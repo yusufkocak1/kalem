@@ -17,6 +17,17 @@ import { fileURLToPath } from "node:url";
 const PORT = Number(process.argv[2] ?? process.env.PORT ?? 5173);
 const KOK = fileURLToPath(new URL("../apps/demo/", import.meta.url));
 
+/**
+ * Paket çıktılarını da servis eder.
+ *
+ * Demo sayfası `@kalem/core`'u **gerçek derlenmiş bundle'dan** yükler —
+ * kaynak kodu tekrar etmek yerine. Böylece sayfada görülen davranış, npm'e
+ * gidecek olanla birebir aynı.
+ */
+const PAKETLER = [
+	{ onEk: "/@kalem/core/", kok: fileURLToPath(new URL("../packages/core/dist/", import.meta.url)) },
+];
+
 const TIPLER = {
 	".html": "text/html; charset=utf-8",
 	".css": "text/css; charset=utf-8",
@@ -32,6 +43,24 @@ const TIPLER = {
 
 createServer((istek, yanit) => {
 	const yol = decodeURIComponent((istek.url ?? "/").split("?")[0]);
+
+	// Paket çıktıları ayrı kökten servis edilir.
+	const paket = PAKETLER.find((p) => yol.startsWith(p.onEk));
+	if (paket !== undefined) {
+		const hedef = normalize(join(paket.kok, yol.slice(paket.onEk.length)));
+		if (hedef.startsWith(paket.kok) && existsSync(hedef)) {
+			yanit.writeHead(200, {
+				"Content-Type": TIPLER[extname(hedef)] ?? "application/octet-stream",
+				"Cache-Control": "no-store",
+			});
+			createReadStream(hedef).pipe(yanit);
+			return;
+		}
+		yanit.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+		yanit.end("Paket dosyası bulunamadı — önce `pnpm build` çalıştır");
+		return;
+	}
+
 	// `..` sızıntısı normalize + KOK önek kontrolü ile kesiliyor (aşağıda).
 	let dosya = normalize(join(KOK, yol));
 	if (existsSync(dosya) && statSync(dosya).isDirectory()) dosya = join(dosya, "index.html");

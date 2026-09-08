@@ -72,8 +72,13 @@ Ayrıntı: [CONTRIBUTING.md](CONTRIBUTING.md)
 ## Prototipi denemek
 
 ```bash
-pnpm demo        # http://localhost:5173
+pnpm build && pnpm demo     # http://localhost:5173
 ```
+
+| Sayfa | Ne gösterir |
+|---|---|
+| `/core.html` | **Kütüphanenin bugünkü hâli** — Markdown → AST → Markdown, canlı gidiş-dönüş ve idempotans ölçümü. Gerçek derlenmiş bundle'ı yükler. |
+| `/` | Mimari doğrulama prototipi (`execCommand` ile; kütüphaneyi kullanmıyor) |
 
 Aynı Wi-Fi'daki telefondan da açılır — mobil davranışı denemek için
 (F1.5-02 matrisi) sunucu `0.0.0.0`'ı dinliyor.
