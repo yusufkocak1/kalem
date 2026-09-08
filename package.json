@@ -16,6 +16,7 @@
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "e2e": "playwright test",
+    "demo": "node scripts/serve-demo.mjs",
     "size": "size-limit",
     "guard:locale": "node scripts/guard-locale.mjs",
     "guard:purity": "node scripts/guard-purity.mjs",

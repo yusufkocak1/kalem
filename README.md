@@ -72,8 +72,11 @@ Ayrıntı: [CONTRIBUTING.md](CONTRIBUTING.md)
 ## Prototipi denemek
 
 ```bash
-node scripts/serve-demo.mjs      # http://localhost:5173
+pnpm demo        # http://localhost:5173
 ```
+
+Aynı Wi-Fi'daki telefondan da açılır — mobil davranışı denemek için
+(F1.5-02 matrisi) sunucu `0.0.0.0`'ı dinliyor.
 
 Deneyin: bir bloğu `⠿` tutamacından sürükleyin · metin seçip balon araç çubuğunu
 görün · boş satırda `/` yazın · `## ` yazıp başlığa dönüşmesini izleyin ·
