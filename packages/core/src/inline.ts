@@ -23,6 +23,23 @@
  */
 import type { Inline, InlineCode, Link, Text } from "./ast.js";
 
+/**
+ * Açık bir `[` ya da `![` — bağlantı/görsel adayı.
+ *
+ * Vurgu sınırlayıcıları gibi bunlar da ileriye bakmadan karara bağlanamaz:
+ * `[a` bir bağlantı başlangıcı da olabilir, düz metin de.
+ */
+interface BracketMark {
+	/** Köşeli ayracın bulunduğu yuva indisi. */
+	readonly index: number;
+	/** Görsel mi (`![`) bağlantı mı (`[`). */
+	readonly image: boolean;
+	/** Ham metindeki konumu — kapanışta metni geri okumak için. */
+	readonly rawStart: number;
+	/** Hâlâ eşleşebilir mi. */
+	active: boolean;
+}
+
 /** Ayrıştırma sırasında kullanılan, henüz karara bağlanmamış sınırlayıcı. */
 interface Delimiter {
 	/** Sınırlayıcı karakteri. */
@@ -66,8 +83,35 @@ const AUTOLINK_EMAIL =
 const INLINE_HTML =
 	/^(?:<[A-Za-z][A-Za-z0-9-]*(?:\s+[a-zA-Z_:][a-zA-Z0-9:._-]*(?:\s*=\s*(?:[^\s"'=<>`]+|'[^']*'|"[^"]*"))?)*\s*\/?>|<\/[A-Za-z][A-Za-z0-9-]*\s*>|<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<![A-Za-z][\s\S]*?>|<!\[CDATA\[[\s\S]*?]]>)/;
 
+/**
+ * `](hedef "başlık")` — bağlantının kapanış kısmı.
+ *
+ * Hedef ya açılı ayraç içindedir ya da boşluk/parantez içermeyen bir dizidir.
+ */
+const LINK_TAIL =
+	/^\]\([ \t]*(?:<([^<>\n]*)>|([^\s()]*))(?:[ \t]+(?:"([^"]*)"|'([^']*)'|\(([^()]*)\)))?[ \t]*\)/;
+
+/** `][etiket]`, `][]` ya da yalnızca `]` — başvurulu bağlantının kapanışı. */
+const REFERENCE_TAIL = /^\](?:\[((?:[^\\[\]]|\\.)*)\])?/;
+
 /** Metin düğümü kısayolu. */
 const text = (value: string): Text => ({ type: "text", value });
+
+/**
+ * Bağlantı etiketini eşleştirme için normalleştirir.
+ *
+ * `blocks.ts`'teki tanım tarafıyla **aynı kuralı** uygulamak zorunda: ikisi
+ * ayrışırsa tanımlar başvurularla eşleşmez. CommonMark bu katlamayı
+ * locale'den bağımsız ister; Türkçe kuralı uygulansaydı aynı belge başka
+ * araçlarda farklı çözülürdü.
+ */
+function normalizeLabel(label: string): string {
+	// kalem-locale-ok: CommonMark etiket eşleştirmesi locale'den bağımsız olmalı
+	return label
+		.trim()
+		.replace(/[ \t\r\n]+/g, " ")
+		.toLowerCase();
+}
 
 /**
  * Ham satır içi metni düğümlere çevirir.
@@ -102,6 +146,8 @@ interface TokenizeResult {
 function tokenize(raw: string): TokenizeResult {
 	const slots: Slots = [];
 	const delimiters: Delimiter[] = [];
+	/** Henüz kapanmamış `[` / `![` yığını. */
+	const brackets: BracketMark[] = [];
 	let buffer = "";
 	let i = 0;
 
@@ -206,6 +252,35 @@ function tokenize(raw: string): TokenizeResult {
 			continue;
 		}
 
+		// --- Bağlantı / görsel açılışı ------------------------------------------
+		if (ch === "[" || (ch === "!" && raw[i + 1] === "[")) {
+			const image = ch === "!";
+			const marker = image ? "![" : "[";
+			flush();
+			brackets.push({ index: slots.length, image, rawStart: i, active: true });
+			nodes.push(text(marker));
+			i += marker.length;
+			continue;
+		}
+
+		// --- Bağlantı / görsel kapanışı -----------------------------------------
+		if (ch === "]") {
+			// Ayraç içindeki metin henüz tamponda; kapanışı denemeden önce
+			// yuvalara geçmeli, yoksa bağlantının çocukları boş kalır.
+			flush();
+			const open = takeActiveBracket(brackets);
+			if (open !== null) {
+				const consumed = closeBracket(raw, i, slots, delimiters, brackets, open);
+				if (consumed !== null) {
+					i = consumed;
+					continue;
+				}
+			}
+			buffer += ch;
+			i++;
+			continue;
+		}
+
 		// --- Vurgu sınırlayıcıları ----------------------------------------------
 		if (ch === "*" || ch === "_" || ch === "~") {
 			const run = readDelimiterRun(raw, i, ch);
@@ -233,6 +308,98 @@ function tokenize(raw: string): TokenizeResult {
 
 	flush();
 	return { slots, delimiters };
+}
+
+/** Yığındaki en yakın açık köşeli ayracı verir. */
+function takeActiveBracket(brackets: BracketMark[]): BracketMark | null {
+	for (let i = brackets.length - 1; i >= 0; i--) {
+		const mark = brackets[i] as BracketMark;
+		if (mark.active) return mark;
+	}
+	return null;
+}
+
+/**
+ * `]` görüldüğünde bağlantıyı/görseli kapatmayı dener.
+ *
+ * Başarılıysa tüketilen konumu, değilse `null` döndürür — o zaman `]` düz
+ * metindir. Üç biçim denenir: satır içi `](url)`, başvurulu `][etiket]`,
+ * ve kısayol `[etiket]`.
+ */
+function closeBracket(
+	raw: string,
+	closeIndex: number,
+	slots: Slots,
+	delimiters: Delimiter[],
+	brackets: BracketMark[],
+	open: BracketMark,
+): number | null {
+	const rest = raw.slice(closeIndex);
+
+	// Ayraçlar arasındaki metin — başvurulu biçimde etiket olarak kullanılır.
+	const innerRaw = raw.slice(open.rawStart + (open.image ? 2 : 1), closeIndex);
+
+	const inlineTail = LINK_TAIL.exec(rest);
+	const refTail = inlineTail === null ? REFERENCE_TAIL.exec(rest) : null;
+	if (inlineTail === null && refTail === null) return null;
+
+	// Ayraç içindeki vurguları çöz, sonra düğümleri topla.
+	resolveEmphasis(
+		slots,
+		delimiters.filter((d) => d.index > open.index),
+	);
+	const children = mergeText(slots.slice(open.index + 1).flat());
+	slots.length = open.index;
+	slots.push([]);
+
+	// Bu ayraçtan sonraki sınırlayıcılar tüketildi.
+	for (const d of delimiters) if (d.index > open.index) d.active = false;
+	// İç içe bağlantı olmaz: dışta kalan açık ayraçlar da kapatılır.
+	for (const b of brackets) if (b.index >= open.index) b.active = false;
+
+	if (inlineTail !== null) {
+		const url = inlineTail[1] ?? inlineTail[2] ?? "";
+		const title = inlineTail[3] ?? inlineTail[4] ?? inlineTail[5] ?? null;
+		const syntax = { style: "inline" } as const;
+		(slots[open.index] as Inline[]).push(
+			open.image
+				? { type: "image", url, alt: plainText(children), title, syntax }
+				: { type: "link", url, title, children, syntax },
+		);
+		return closeIndex + inlineTail[0].length;
+	}
+
+	const tail = refTail as RegExpExecArray;
+	const explicit = tail[1];
+	// `[a][b]` tam · `[a][]` daraltılmış · `[a]` kısayol
+	const referenceType =
+		explicit === undefined ? "shortcut" : explicit === "" ? "collapsed" : "full";
+	const label = explicit === undefined || explicit === "" ? innerRaw : explicit;
+	const identifier = normalizeLabel(label);
+
+	(slots[open.index] as Inline[]).push(
+		open.image
+			? {
+					type: "imageReference",
+					identifier,
+					label,
+					alt: plainText(children),
+					syntax: { referenceType },
+				}
+			: { type: "linkReference", identifier, label, children, syntax: { referenceType } },
+	);
+	return closeIndex + tail[0].length;
+}
+
+/** Görselin `alt` metni: alt ağaçtaki düz metnin birleşimi. */
+function plainText(nodes: readonly Inline[]): string {
+	let out = "";
+	for (const node of nodes) {
+		if (node.type === "text" || node.type === "inlineCode") out += node.value;
+		else if ("children" in node) out += plainText(node.children);
+		else if (node.type === "image") out += node.alt ?? "";
+	}
+	return out;
 }
 
 function makeAutolink(url: string, label: string): Link {

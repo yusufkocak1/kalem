@@ -254,3 +254,135 @@ describe("karışık satır içi", () => {
 		]);
 	});
 });
+
+// ---------------------------------------------------------------------------
+// Bağlantı, görsel ve başvurular
+// ---------------------------------------------------------------------------
+
+describe("satır içi bağlantı", () => {
+	it("basit bağlantı", () => {
+		const l = tek("[metin](https://ornek.com)") as Link;
+		expect(l.type).toBe("link");
+		expect(l.url).toBe("https://ornek.com");
+		expect(l.title).toBeNull();
+		expect(ozet(l)).toBe("link[text(metin)]");
+	});
+
+	it("başlıklı bağlantı", () => {
+		expect((tek('[a](/url "Başlık")') as Link).title).toBe("Başlık");
+		expect((tek("[a](/url 'Başlık')") as Link).title).toBe("Başlık");
+		expect((tek("[a](/url (Başlık))") as Link).title).toBe("Başlık");
+	});
+
+	it("açılı ayraçlı hedef", () => {
+		expect((tek("[a](<boşluklu url>)") as Link).url).toBe("boşluklu url");
+	});
+
+	it("boş hedef", () => {
+		expect((tek("[a]()") as Link).url).toBe("");
+	});
+
+	it("bağlantı metninde vurgu", () => {
+		expect(yapi("[*a* b](/u)")).toEqual(["link[emphasis[text(a)], text( b)]"]);
+	});
+
+	it("yazım tercihini kaydediyor", () => {
+		expect((tek("[a](/u)") as Link).syntax).toEqual({ style: "inline" });
+	});
+
+	it("metin içinde bağlantı", () => {
+		expect(yapi("bir [iki](/u) üç")).toEqual(["text(bir )", "link[text(iki)]", "text( üç)"]);
+	});
+
+	it("kapanmayan ayraç düz metin", () => {
+		expect(yapi("[a")).toEqual(["text([a)"]);
+	});
+
+	it("hedefsiz ayraç kısayol başvurusu oluyor", () => {
+		expect(yapi("[a] metin")).toEqual(["linkReference[text(a)]", "text( metin)"]);
+	});
+
+	it("kaçırılan ayraç bağlantı açmıyor", () => {
+		expect(yapi("\\[a](/u)")).toEqual(["text([a](/u))"]);
+	});
+});
+
+describe("görsel", () => {
+	it("basit görsel", () => {
+		const img = tek("![alt metni](/resim.png)") as { type: string; url: string; alt: string };
+		expect(img.type).toBe("image");
+		expect(img.url).toBe("/resim.png");
+		expect(img.alt).toBe("alt metni");
+	});
+
+	it("başlıklı görsel", () => {
+		expect((tek('![a](/r.png "Başlık")') as { title: string }).title).toBe("Başlık");
+	});
+
+	/** Görselin alt metni düz metne indirgenir — vurgu düğümü taşımaz. */
+	it("alt metni düzleştiriyor", () => {
+		expect((tek("![*a* b](/r.png)") as { alt: string }).alt).toBe("a b");
+	});
+
+	it("metin içinde görsel", () => {
+		expect(yapi("bak ![a](/r.png) buna")).toEqual(["text(bak )", "image()", "text( buna)"]);
+	});
+});
+
+/**
+ * Üç başvuru biçimi de kaynaktaki yazılışını korur — serileştirici (F1-07)
+ * `[a][b]` yazan kullanıcıya `[a]` üretmemeli.
+ */
+describe("başvurulu bağlantı", () => {
+	it("tam başvuru", () => {
+		const r = tek("[metin][etiket]") as { type: string; identifier: string; label: string };
+		expect(r.type).toBe("linkReference");
+		expect(r.identifier).toBe("etiket");
+		expect(r.label).toBe("etiket");
+		expect((r as unknown as { syntax: { referenceType: string } }).syntax.referenceType).toBe(
+			"full",
+		);
+	});
+
+	it("daraltılmış başvuru", () => {
+		const r = tek("[etiket][]") as { identifier: string; syntax: { referenceType: string } };
+		expect(r.identifier).toBe("etiket");
+		expect(r.syntax.referenceType).toBe("collapsed");
+	});
+
+	it("kısayol başvurusu", () => {
+		const r = tek("[etiket]") as { identifier: string; syntax: { referenceType: string } };
+		expect(r.identifier).toBe("etiket");
+		expect(r.syntax.referenceType).toBe("shortcut");
+	});
+
+	it("başvurulu görsel", () => {
+		const r = tek("![alt][etiket]") as { type: string; identifier: string; alt: string };
+		expect(r.type).toBe("imageReference");
+		expect(r.identifier).toBe("etiket");
+		expect(r.alt).toBe("alt");
+	});
+
+	/**
+	 * Etiket eşleştirmesi tanım tarafıyla (`blocks.ts`) aynı kuralı kullanmalı,
+	 * yoksa tanımlar başvurularla eşleşmez. CommonMark bunu locale'den bağımsız
+	 * ister.
+	 */
+	it("etiketi locale'den bağımsız normalleştiriyor", () => {
+		expect((tek("[Etiket]") as { identifier: string }).identifier).toBe("etiket");
+		expect((tek("[IŞIK]") as { identifier: string }).identifier).toBe("işik");
+		expect((tek("[a   b]") as { identifier: string }).identifier).toBe("a b");
+	});
+});
+
+describe("iç içe olmayan bağlantılar", () => {
+	/** CommonMark'ta bağlantı içinde bağlantı olmaz; dıştaki iptal edilir. */
+	it("bağlantı içinde bağlantı olmuyor", () => {
+		const nodes = parseInline("[dış [iç](/i)](/d)");
+		expect(nodes.some((n) => n.type === "link")).toBe(true);
+	});
+
+	it("görsel bağlantı içinde olabiliyor", () => {
+		expect(yapi("[![a](/r.png)](/u)")).toEqual(["link[image()]"]);
+	});
+});
