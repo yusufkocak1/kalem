@@ -151,8 +151,19 @@ describe("yazım tercihi olmayan düğümler — varsayılanlar", () => {
 		);
 	});
 
-	it("sert satır sonu varsayılanı iki boşluk", () => {
-		expect(satirIci({ type: "break" })).toBe("  \n");
+	/**
+	 * Sert satır sonu **iki yanında da içerik** ister. Tek başına duran bir
+	 * `break` yazılırsa satır sonunda görünmez boşluk bırakır ve yeniden
+	 * ayrıştırılınca kaybolur — özellik testi bunu yakaladı.
+	 */
+	it("tek başına duran sert satır sonu yazılmıyor", () => {
+		expect(satirIci({ type: "break" })).toBe("");
+	});
+
+	it("iki metin arasındaki sert satır sonu iki boşlukla yazılıyor", () => {
+		expect(blok({ type: "paragraph", children: [metin("a"), { type: "break" }, metin("b")] })).toBe(
+			"a  \nb",
+		);
 	});
 
 	it("başvuru varsayılanı tam biçim", () => {
@@ -362,7 +373,12 @@ describe("daha az yürünen yollar", () => {
 	});
 
 	it("ters bölülü sert satır sonu", () => {
-		expect(satirIci({ type: "break", syntax: { marker: "backslash" } })).toBe("\\\n");
+		expect(
+			blok({
+				type: "paragraph",
+				children: [metin("a"), { type: "break", syntax: { marker: "backslash" } }, metin("b")],
+			}),
+		).toBe("a\\\nb");
 	});
 
 	/** Autolink metni iç düğümlerden toplanır — kod ve HTML dahil. */
@@ -402,10 +418,19 @@ describe("daha az yürünen yollar", () => {
 		);
 	});
 
-	/** Alt çizgi bir yanı kelime bir yanı boşlukken vurgu açabilir. */
-	it("tek yanı kelime olan alt çizgi kaçırılıyor", () => {
+	/**
+	 * Vurgu bir **eş** gerektirir. Eşi olmayan tek işaret düz metindir ve
+	 * kaçırılmaz — aksi hâlde `_baslangic` gibi sıradan metinler ters bölüyle
+	 * dolardı.
+	 */
+	it("eşi olmayan alt çizgi kaçırılmıyor", () => {
 		const p = (v: string) => blok({ type: "paragraph", children: [metin(v)] });
-		expect(p("_baslangic")).toBe("\\_baslangic");
-		expect(p("bitis_")).toBe("bitis\\_");
+		expect(p("_baslangic")).toBe("_baslangic");
+		expect(p("bitis_")).toBe("bitis_");
+	});
+
+	it("eşi olan alt çizgi kaçırılıyor", () => {
+		const p = (v: string) => blok({ type: "paragraph", children: [metin(v)] });
+		expect(p("_vurgu_")).toBe("\\_vurgu\\_");
 	});
 });

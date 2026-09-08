@@ -117,8 +117,13 @@ describe("satır içi biçimler", () => {
 		);
 	});
 
-	it("iç içe biçimler", () => {
-		expect(md(e("BODY", [e("P", [e("STRONG", [e("EM", [t("a")])])])]))).toBe("***a***");
+	/**
+	 * `***a***` belirsizdir: ayrıştırıcı hangi katmanın kalın hangisinin
+	 * italik olduğunu sözdiziminden çıkaramaz. Serileştirici bu yüzden
+	 * dıştaki işareti değiştiriyor — anlam aynı, okuma tek türlü.
+	 */
+	it("iç içe biçimler belirsizlik olmadan yazılıyor", () => {
+		expect(md(e("BODY", [e("P", [e("STRONG", [e("EM", [t("a")])])])]))).toBe("__*a*__");
 	});
 });
 
@@ -351,9 +356,10 @@ describe("eksik düğümlere dayanıklılık", () => {
 		expect(md(e("BODY", [e("P", [t("a"), bos])]))).toBe("a");
 	});
 
-	it("textContent null olan kod düğümü boş kod veriyor", () => {
+	/** Boş kod span'i Markdown'da temsil edilemez; hiç yazılmaz. */
+	it("textContent null olan kod düğümü hiç yazılmıyor", () => {
 		const kod: HtmlNode = { nodeType: 1, nodeName: "CODE", textContent: null, childNodes: [] };
-		expect(md(e("BODY", [e("P", [kod])]))).toBe("``");
+		expect(md(e("BODY", [e("P", [t("a"), kod])]))).toBe("a");
 	});
 
 	it("start özniteliği olmayan sıralı liste 1'den başlıyor", () => {

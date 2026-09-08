@@ -532,16 +532,12 @@ function readCodeSpan(raw: string, start: number): { node: InlineCode; next: num
 			let value = raw.slice(start + openLength, i);
 			// Satır sonları boşluğa dönüşür; baştaki ve sondaki tek boşluk atılır.
 			value = value.replace(/\n/g, " ");
-			if (
-				value.length >= 2 &&
-				value.startsWith(" ") &&
-				value.endsWith(" ") &&
-				value.trim() !== ""
-			) {
-				value = value.slice(1, -1);
-			}
+			// Dolgu boşluğu atıldıysa kaydedilir; yoksa geri yazarken kaybolur.
+			const padded =
+				value.length >= 2 && value.startsWith(" ") && value.endsWith(" ") && value.trim() !== "";
+			if (padded) value = value.slice(1, -1);
 			return {
-				node: { type: "inlineCode", value, syntax: { fenceLength: openLength } },
+				node: { type: "inlineCode", value, syntax: { fenceLength: openLength, padded } },
 				next: i + closeLength,
 			};
 		}

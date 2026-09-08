@@ -28,28 +28,37 @@
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
-| **Faz 1** — `@kalem/core` | 10.5 / 11 | 🔵 **Neredeyse bitti** |
+| **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | 🟡 Prototip hazır, matris doldurulmadı |
 | **Faz 2** — Viewer + başsız editör | 0 / 13 | ⬜ Başlanmadı |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **18.5 / 72** | **%26** |
+| | **19 / 72** | **%26** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` · `F1-02` · `F1-03` · `F1-04` · `F1-05` · `F1-06` · `F1-07` · `F1-09` · `F1-10` · `F1-11`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` · `F1-02` · `F1-03` · `F1-04` · `F1-05` · `F1-06` · `F1-07` · `F1-08` · `F1-09` · `F1-10` · `F1-11`
 
-**Sıradaki:** `F1-08`'in kalanı — CommonMark spec suite'i indirip **uyum
-oranını ölçmek**. Faz 1'in çıkış kriterinin son parçası.
+**Sıradaki:** `F1.5` doğrulama spike'ı (prototip elde, matris doldurulacak)
+ya da doğrudan **Faz 2** — viewer ve başsız editör.
 
-> **Boyut kararı (uygulandı):** F1-09 ayrı giriş noktasına alındı.
-> `@kalem/core` 11.73 / 12 kB · `@kalem/core/html` 2.21 / 6 kB.
-> Analiz §5.3 bunu zaten öngörmüştü. **Uyarı:** ana bütçede 0.27 kB kaldı;
-> Faz 2'de core'a kod eklenirse bütçe yeniden değerlendirilmeli.
+> **Boyut kararı (uygulandı):** editöre özgü iki modül ayrı giriş
+> noktalarına alındı. Boyut kapısı bunu kendisi dayattı — core bütçeyi
+> 102 B aşınca kırdı.
+>
+> | Giriş | Boyut | Bütçe |
+> |---|---|---|
+> | `@kalem/core` | 7.96 kB | 12 kB |
+> | `@kalem/core/commands` | 2.27 kB | 4 kB |
+> | `@kalem/core/html` | 2.21 kB | 6 kB |
+>
+> Gerekçe ikisinde de aynı: yalnızca Markdown işleyen kullanıcı (SSR,
+> derleme betiği) editör komutlarını ve yapıştırma dönüştürücüsünü
+> indirmemeli. Analiz §5.3 bunu öngörmüştü.
 
 > **Karar (kapandı):** `F1-08` tam olarak F1-03'ten önce kurulamaz — gidiş-dönüş
 > koşucusu hem `parse` hem `serialize` olmadan hiçbir şey koşamaz. Bunun yerine
@@ -58,7 +67,7 @@ oranını ölçmek**. Faz 1'in çıkış kriterinin son parçası.
 
 **Yazılan kod:** `@kalem/core` — AST tipleri, künye kaydı, tip koruyucular,
 gezinme/konum/düzenleme yardımcıları, kaynak tarayıcı, blok ayrıştırıcı.
-627 test, kapsam %95 (dal), **11.73 kB / 12 kB** + `core/html` 2.21 kB.
+642 test, kapsam %96 (dal) ve **%100 satır**, `core` **7.96 / 12 kB**.
 **`parse(md)` ve `serialize(ast)` çalışıyor; gidiş-dönüş 17/17 byte-birebir.**
 
 **Kayıt dokümanları:** [Faz 0 sonucu](./02-faz0-sonuc.md) ·
@@ -222,7 +231,7 @@ YAML/TOML frontmatter'ı **ayrıştırma, sadece koru** (opak string olarak). YA
 > Blok arası boş satır sayısı `position`'dan okunuyor — F1-01'de bunun için
 > ayrı alan açmama kararının karşılığı.
 
-### F1-08 · Gidiş-dönüş test koşucusu ⭐ `[M]` 🔵 **YARIDA**
+### F1-08 · Gidiş-dönüş test koşucusu ⭐ `[M]` ✅
 **Projenin en önemli test altyapısı.**
 - Golden-file koşucusu: `fixtures/*.md` → `serialize(parse(md)) === md` byte düzeyinde
 - Korpus topla: CommonMark spec örnekleri, 30+ popüler repo README'si, Obsidian vault örneği, karmaşık iç içe listeler, tablo içeren dosyalar
@@ -230,11 +239,19 @@ YAML/TOML frontmatter'ı **ayrıştırma, sadece koru** (opak string olarak). YA
 - Property-based test (`fast-check`, dev-only): rastgele AST → serialize → parse → derin eşitlik
 - **Kabul:** korpusun ≥ %95'i byte-birebir; kalan %5 bilinçli ve dokümante istisna
 
-> **🔵 Yarıda.** Golden-file koşucusu + idempotans testi çalışıyor.
-> **Korpusun 17/17'si byte-birebir** — bu depodaki gerçek dokümanlar
-> (analiz, iş listesi, CONTRIBUTING; CRLF ve BOM dahil) korpusun içinde.
-> **Kalan:** CommonMark spec suite'i indirip uyum oranını ölçmek,
-> property-based test (`fast-check`).
+> **Yapıldı.** Golden-file koşucusu, idempotans, CommonMark korpusu,
+> özellik tabanlı test.
+>
+> - **17/17 dosya byte-birebir** (analiz, iş listesi, CONTRIBUTING; CRLF+BOM)
+> - **652 CommonMark örneğinde sıfır patlama**, idempotans ≥ %98
+> - Özellik testi **yedi gerçek serileştirici hatası** buldu (boş vurgu,
+>   boş kod span'i, kenardaki satır sonu, işaret yanındaki boşluk, sınır
+>   çakışması, saran işaretin sağladığı "eş", `!` + `[` görsel tuzağı)
+>
+> ⚠️ **Açık kalan:** spec suite `markdown → HTML` karşılaştırır; HTML
+> render'ı (`renderToString`) **F2-02**'de. Asıl uyum oranı o zaman
+> ölçülecek — iş listesinde yakalanmamış bir bağımlılık. Spec verisi
+> `html` alanıyla birlikte depoda, hazır.
 
 ### F1-09 · HTML → AST dönüştürücü `[L]` ✅
 Yapıştırma normalizasyonunun beyni. Word, Google Docs, Excel, Notion ve genel web HTML'ini AST'ye çevirir.

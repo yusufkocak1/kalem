@@ -36,6 +36,7 @@
     "@playwright/test": "catalog:",
     "@size-limit/preset-small-lib": "catalog:",
     "@vitest/coverage-v8": "catalog:",
+    "fast-check": "^4.9.0",
     "lint-staged": "^17.5.0",
     "publint": "catalog:",
     "simple-git-hooks": "^2.14.0",

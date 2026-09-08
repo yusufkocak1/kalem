@@ -45,7 +45,7 @@ describe("kod span", () => {
 		const c = tek("`kod`") as InlineCode;
 		expect(c.type).toBe("inlineCode");
 		expect(c.value).toBe("kod");
-		expect(c.syntax).toEqual({ fenceLength: 1 });
+		expect(c.syntax).toEqual({ fenceLength: 1, padded: false });
 	});
 
 	it("çok ters tırnaklı kod", () => {

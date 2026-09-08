@@ -610,7 +610,7 @@ function readHtmlBlock(
 		i++;
 
 		// Kapanış deseni AÇILIŞ satırında da bulunabilir: `<!-- yorum -->`.
-		if (rule.close !== null && rule.close.test(line.value)) break;
+		if (rule.close?.test(line.value)) break;
 	}
 
 	blocks.push({

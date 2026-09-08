@@ -17,6 +17,13 @@
  * olarak okunmamalı. Ama her karakteri kaçırmak da gürültü olur: cümle
  * ortasındaki `a * b` zaten vurgu açmaz. Bu yüzden kaçışlama **bağlama
  * duyarlıdır** — satır başındaki `#` kaçırılır, ortadaki kaçırılmaz.
+ *
+ * ## Boş düğümler
+ *
+ * İçeriği olmayan vurgu ve kod düğümleri **yazılmaz**. `**` ya da `` `` ``
+ * geçerli Markdown değildir; yazılırsa yeniden ayrıştırılınca düz metne
+ * döner ve her turda biraz daha kaçırılır — idempotans kaybı. Bu kuralı
+ * özellik tabanlı test (`property.test.ts`) buldu.
  */
 import type {
 	Block,
@@ -320,35 +327,116 @@ function isInlineNode(node: Node): node is Inline {
  * çünkü satır zaten `###` ile başlamıştır. Bu bağlam olmadan kaçışlama
  * gereksiz yere `\1.` üretir ve gidiş-dönüş bozulur.
  */
-function inlines(list: readonly Inline[], o: Resolved, startsLine = false): string {
+function inlines(list: readonly Inline[], o: Resolved, startsLine = false, enclosing = ""): string {
 	let out = "";
 	let atLineStart = startsLine;
-	for (const node of list) {
-		out += inline(node, o, atLineStart);
+	for (const node of trimBreaks(list)) {
+		const parca = inline(node, o, atLineStart, enclosing);
+		// `!` + `[` görsel açar. İki karakter ayrı düğümlerden geliyorsa metin
+		// kaçışlayıcısı bunu göremez — komşuluk ancak burada bilinir.
+		if (parca.startsWith("[") && out.endsWith("!") && !out.endsWith("\\!")) {
+			out = `${out.slice(0, -1)}\\!`;
+		}
+		out += parca;
 		// Sert satır sonundan ve `\n` ile biten metinden sonra yeni satır başlar.
 		atLineStart = node.type === "break" || (node.type === "text" && node.value.endsWith("\n"));
 	}
 	return out;
 }
 
-function inline(node: Inline, o: Resolved, startsLine = false): string {
+/**
+ * İçeriği vurgu işaretiyle sarar — **boşluğu dışarıda bırakarak.**
+ *
+ * CommonMark vurgu işaretinin hemen yanında boşluk kabul etmez: `* a *`
+ * vurgu değil, düz metindir. İçeriği olduğu gibi sarmak geçersiz Markdown
+ * üretir ve her turda biraz daha kaçırılır. Doğrusu boşluğu işaretin dışına
+ * taşımak: `**​ kalın ​**` yerine `​ **kalın** ​`.
+ *
+ * İçerik tamamen boşluksa işaret hiç yazılmaz.
+ */
+function wrapMarked(inner: string, marker: string, escapeBoundary: boolean): string {
+	if (inner.trim() === "") return inner;
+	const lead = inner.slice(0, inner.length - inner.trimStart().length);
+	const tail = inner.slice(inner.trimEnd().length);
+	let core = inner.slice(lead.length, inner.length - tail.length);
+
+	// Sınır çakışması: içerik işaretle aynı karakterle başlıyor/bitiyorsa
+	// `~~` + `~x` birleşip `~~~` olur ve ayrıştırıcı farklı okur.
+	if (escapeBoundary) {
+		const ch = marker[0] as string;
+		if (core.startsWith(ch)) core = `\\${core}`;
+		if (core.endsWith(ch) && !core.endsWith(`\\${ch}`)) core = `${core.slice(0, -1)}\\${ch}`;
+	}
+	return `${lead}${marker}${core}${marker}${tail}`;
+}
+
+/**
+ * Vurguyu sarar; sınır çakışmasında **öteki işarete geçer.**
+ *
+ * `*` ve `_` aynı anlama gelir. İçerik `*` ile başlıyorsa `*` ile sarmak
+ * `**` üretir ve ayrıştırıcı kalın okur; `_` ile sarmak sorunu anlamı
+ * değiştirmeden çözer. Kaçırmak burada yanlış olurdu: içerikteki `*`
+ * çoğu zaman **iç içe bir vurgunun** kendi işaretidir, kaçırılırsa o vurgu
+ * bozulur.
+ */
+function wrapEmphasis(inner: string, preferred: "*" | "_", length: 1 | 2): string {
+	if (inner.trim() === "") return inner;
+	const core = inner.trim();
+	const alternate = preferred === "*" ? "_" : "*";
+
+	const uygun =
+		core.startsWith(preferred) || core.endsWith(preferred)
+			? core.startsWith(alternate) || core.endsWith(alternate)
+				? null
+				: alternate
+			: preferred;
+
+	// İki işaret de çakışıyorsa kaçışa düşülür.
+	if (uygun === null) return wrapMarked(inner, preferred.repeat(length), true);
+	return wrapMarked(inner, uygun.repeat(length), false);
+}
+
+/**
+ * Baştaki ve sondaki sert satır sonlarını atar.
+ *
+ * Sert satır sonu **iki yanında da içerik** ister: paragrafın başındaki bir
+ * `break` kıracak bir şey bulamaz, sonundaki ise CommonMark tarafından zaten
+ * yok sayılır. Yazılırlarsa satır sonunda görünmez boşluk bırakır ve yeniden
+ * ayrıştırılınca kaybolurlar — idempotans kaybı. Özellik testi buldu.
+ */
+function trimBreaks(list: readonly Inline[]): readonly Inline[] {
+	let start = 0;
+	let end = list.length;
+	while (start < end && list[start]?.type === "break") start++;
+	while (end > start && list[end - 1]?.type === "break") end--;
+	return start === 0 && end === list.length ? list : list.slice(start, end);
+}
+
+function inline(node: Inline, o: Resolved, startsLine = false, enclosing = ""): string {
 	switch (node.type) {
 		case "text":
-			return escapeText(node.value, startsLine);
+			return escapeText(node.value, startsLine, enclosing);
 		case "emphasis": {
 			const m = node.syntax?.marker ?? o.emphasisMarker;
-			return `${m}${inlines(node.children, o)}${m}`;
+			// Sarılan metin, kendisini saran işareti artık kaçırmak zorunda.
+			return wrapEmphasis(inlines(node.children, o, false, `${enclosing}*_`), m, 1);
 		}
 		case "strong": {
 			const m = node.syntax?.marker ?? o.emphasisMarker;
-			return `${m}${m}${inlines(node.children, o)}${m}${m}`;
+			return wrapEmphasis(inlines(node.children, o, false, `${enclosing}*_`), m, 2);
 		}
-		case "delete": {
-			const t = "~".repeat(node.syntax?.length ?? 2);
-			return `${t}${inlines(node.children, o)}${t}`;
-		}
+		case "delete":
+			return wrapMarked(
+				inlines(node.children, o, false, `${enclosing}~`),
+				"~".repeat(node.syntax?.length ?? 2),
+				true,
+			);
 		case "inlineCode":
-			return inlineCode(node.value, node.syntax?.fenceLength);
+			// Boş kod span'i Markdown'da temsil edilemez: `` `` `` iki ters
+			// tırnaktır, kod değil. Yazılırsa yeniden ayrıştırılınca düz metne
+			// döner ve her turda farklı kaçırılır — idempotans kaybı.
+			if (node.value === "") return "";
+			return inlineCode(node.value, node.syntax?.fenceLength, node.syntax?.padded);
 		case "link":
 			return link(node, o);
 		case "image":
@@ -373,14 +461,16 @@ function inline(node: Inline, o: Resolved, startsLine = false): string {
  * ``` `fence: '```'` ``` tek ters tırnakla yazılabilir ve öyle yazılmalıdır:
  * kullanıcının yazdığını 4 tırnağa çevirmek gidiş-dönüşü bozar.
  */
-function inlineCode(value: string, preferred?: number): string {
+function inlineCode(value: string, preferred?: number, padded?: boolean): string {
 	const mevcut = fenceRunLengths(value);
 	let length = Math.max(preferred ?? 1, 1);
 	while (mevcut.has(length)) length++;
 
 	const fence = "`".repeat(length);
-	// İçerik ters tırnakla başlıyor ya da bitiyorsa dolgu boşluğu gerekir.
-	const pad = value.startsWith("`") || value.endsWith("`") ? " " : "";
+	// Dolgu ya kaynakta vardı (ayrıştırıcı kaydetti) ya da zorunlu: içerik
+	// ters tırnakla başlıyor/bitiyorsa boşluksuz yazılamaz.
+	const zorunlu = value.startsWith("`") || value.endsWith("`");
+	const pad = padded === true || zorunlu ? " " : "";
 	return `${fence}${pad}${value}${pad}${fence}`;
 }
 
@@ -457,23 +547,32 @@ function plain(nodes: readonly Inline[]): string {
  * karakteri kaçırmak teknik olarak doğru olurdu ama çıktı okunmaz hale
  * gelir — Markdown'ın amacı okunabilirlik.
  */
-function escapeText(value: string, startsLine: boolean): string {
+function escapeText(value: string, startsLine: boolean, enclosing = ""): string {
 	return value
 		.split("\n")
-		.map((line, i) => escapeLine(line, i > 0 || startsLine))
+		.map((line, i) => escapeLine(line, i > 0 || startsLine, enclosing))
 		.join("\n");
 }
 
-function escapeLine(line: string, atLineStart: boolean): string {
+function escapeLine(line: string, atLineStart: boolean, enclosing: string): string {
 	let out = "";
 	for (let i = 0; i < line.length; i++) {
-		out += needsEscape(line, i, atLineStart) ? `\\${line[i]}` : line[i];
+		out += needsEscape(line, i, atLineStart, enclosing) ? `\\${line[i]}` : line[i];
 	}
 	return out;
 }
 
-/** Satır başında blok açabilecek işaretler. */
-const LINE_START_MARKERS = "#>-+*=";
+/** Geçerli bir ATX başlık öneki: 1–6 diyez, ardından boşluk ya da satır sonu. */
+const ATX_PREFIX = /^#{1,6}(?:[ \t]|$)/;
+
+/** Liste maddesi açılışı: işaret + boşluk (ya da yalnız işaret). */
+const LIST_PREFIX = /^[-+*](?:[ \t]|$)/;
+
+/** Yatay çizgi: 3+ aynı işaret. */
+const THEMATIC_LINE = /^([-*_])[ \t]*(?:\1[ \t]*){2,}$/;
+
+/** Setext alt çizgisi: satırın tamamı `=` ya da `-`. */
+const SETEXT_LINE = /^(?:=+|-+)[ \t]*$/;
 
 /** Boşluk ya da satır sınırı — ikisi de vurgu için "boşluk" sayılır. */
 function isSpaceOrEdge(ch: string | undefined): boolean {
@@ -485,6 +584,18 @@ function isWordChar(ch: string | undefined): boolean {
 }
 
 /**
+ * Aynı satırda bu işaretin bir **eşi** var mı.
+ *
+ * Vurgu ve üstü çizili çift gerektirir; eşi olmayan tek bir `*` ya da `~`
+ * düz metindir ve kaçırılmamalıdır. Arama satırla sınırlı: satır dışına
+ * taşan bir eşleşme zaten farklı bir düğüme aittir.
+ */
+function hasPartner(line: string, i: number, ch: string): boolean {
+	if (line.indexOf(ch, i + 1) !== -1) return true;
+	return i > 0 && line.lastIndexOf(ch, i - 1) !== -1;
+}
+
+/**
  * Bu karakter kaçırılmalı mı.
  *
  * Kaçışlama bağlama duyarlı olmak zorunda: `5 * 3 * 2` yazan kullanıcıya
@@ -493,8 +604,11 @@ function isWordChar(ch: string | undefined): boolean {
  * yıldız zaten vurgu açamaz (CommonMark'ın sol/sağ taraflı dizi kuralı),
  * dolayısıyla kaçırmaya gerek yok.
  */
-function needsEscape(line: string, i: number, atLineStart: boolean): boolean {
+function needsEscape(line: string, i: number, atLineStart: boolean, enclosing: string): boolean {
 	const ch = line[i];
+	// Bizi saran işaret, metindeki aynı karaktere bir EŞ sağlar; artık
+	// "eşi yok" gerekçesiyle kaçışsız bırakılamaz.
+	if (ch !== undefined && enclosing.includes(ch)) return true;
 	const prev = i === 0 ? undefined : line[i - 1];
 	const next = line[i + 1];
 
@@ -506,22 +620,29 @@ function needsEscape(line: string, i: number, atLineStart: boolean): boolean {
 		// gibi "yaklaşık" anlamındaki kullanımlar — kaçırılmamalı; kaçırmak
 		// hem gürültü hem gidiş-dönüş kaybı olurdu.
 		if (isSpaceOrEdge(prev) && isSpaceOrEdge(next)) return false;
-		const sonraki = line.indexOf("~", i + 1) !== -1;
-		const onceki = i > 0 && line.lastIndexOf("~", i - 1) !== -1;
-		return sonraki || onceki;
+		return hasPartner(line, i, ch);
 	}
-	if (ch === "*") {
-		return !(isSpaceOrEdge(prev) && isSpaceOrEdge(next));
-	}
-	if (ch === "_") {
+	if (ch === "*" || ch === "_") {
 		if (isSpaceOrEdge(prev) && isSpaceOrEdge(next)) return false;
 		// Kelime içindeki alt çizgi vurgu açmaz: `dosya_adi_uzun` bozulmamalı.
-		if (isWordChar(prev) && isWordChar(next)) return false;
-		return true;
+		if (ch === "_" && isWordChar(prev) && isWordChar(next)) return false;
+		// Satır başında blok açıyorsa (liste ya da yatay çizgi) kaçırılmalı.
+		if (atLineStart && i === 0 && (LIST_PREFIX.test(line) || THEMATIC_LINE.test(line))) return true;
+		// Vurgu bir EŞ gerektirir; eşi olmayan işaret düz metindir.
+		return hasPartner(line, i, ch);
 	}
 
-	// Satır başındakiler yalnızca orada blok açar.
-	if (atLineStart && i === 0 && ch !== undefined && LINE_START_MARKERS.includes(ch)) return true;
+	// Satır başı işaretleri **yalnızca gerçekten blok açıyorsa** kaçırılır.
+	// Aksi hâlde `#5 bolt`, `+++`, `===` gibi sıradan metinler ters bölüyle
+	// dolar — teknik olarak güvenli ama okunmaz, ve gidiş-dönüşü bozar.
+	if (atLineStart && i === 0) {
+		if (ch === ">") return true;
+		if (ch === "#") return ATX_PREFIX.test(line);
+		if (ch === "-" || ch === "+") {
+			return LIST_PREFIX.test(line) || THEMATIC_LINE.test(line) || SETEXT_LINE.test(line);
+		}
+		if (ch === "=") return SETEXT_LINE.test(line);
+	}
 	// `1. ` gibi bir liste açılışı yalnızca satır başında anlamlı.
 	//
 	// Kaçırılan karakter **ayraç** olmalı, rakam değil: CommonMark yalnızca

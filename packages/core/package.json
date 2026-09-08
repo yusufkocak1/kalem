@@ -22,6 +22,16 @@
         "default": "./dist/index.cjs"
       }
     },
+    "./commands": {
+      "import": {
+        "types": "./dist/commands.d.ts",
+        "default": "./dist/commands.js"
+      },
+      "require": {
+        "types": "./dist/commands.d.cts",
+        "default": "./dist/commands.cjs"
+      }
+    },
     "./html": {
       "import": {
         "types": "./dist/html.d.ts",
@@ -46,7 +56,8 @@
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
-    "@types/node": "catalog:"
+    "@types/node": "catalog:",
+    "fast-check": "catalog:"
   },
   "publishConfig": {
     "access": "public"

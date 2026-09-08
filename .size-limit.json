@@ -7,6 +7,13 @@
     "gzip": true
   },
   {
+    "name": "@kalem/core/commands — editör komutları",
+    "path": "packages/core/dist/commands.js",
+    "import": "*",
+    "limit": "4 kB",
+    "gzip": true
+  },
+  {
     "name": "@kalem/core/html — yapıştırma dönüştürücü",
     "path": "packages/core/dist/html.js",
     "import": "*",

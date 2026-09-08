@@ -75,46 +75,6 @@ export type {
 // gerçek kodu ölçmesi.
 export type { InlineParser, ParseBlocksOptions } from "./blocks.js";
 export { parseBlocks } from "./blocks.js";
-// --- Komut çekirdeği (F1-11) ---
-export type { BlockType, MarkType } from "./commands.js";
-export {
-	emptyDocument,
-	emptyList,
-	emptyParagraph,
-	hasMark,
-	insertNode,
-	joinBlocks,
-	lift,
-	setBlockType,
-	splitBlock,
-	toggleMark,
-	wrapIn,
-} from "./commands.js";
-// --- Düzenleme (F1-02) ---
-export type { CloneOptions } from "./edit.js";
-export { clone, insertAt, remove, removeAt, replace, replaceAt } from "./edit.js";
-// --- Tip koruyucular (F1-01) ---
-export {
-	isBlock,
-	isFrontmatter,
-	isInline,
-	isLiteral,
-	isNode,
-	isNodeOf,
-	isParent,
-	isRoot,
-	isStructural,
-} from "./guards.js";
-// --- Satır içi ayrıştırıcı (F1-04, devam ediyor: bağlantı ve görsel eksik) ---
-export { parseInline } from "./inline.js";
-// --- Genel ayrıştırıcı ---
-export { parse } from "./parse.js";
-// --- Konum yolları (F1-02) ---
-export type { Path } from "./path.js";
-export { nodeAtPath, parentAtPath, parentPath, pathEquals, pathToNode } from "./path.js";
-export type { Line, LineEnding, ScanResult } from "./scanner.js";
-export { indentWidth, isBlank, scan } from "./scanner.js";
-
 // --- Güvenlik (F1-10) ---
 export type { HtmlPolicy, SecurityOptions, UrlPolicy } from "./security.js";
 export {

@@ -123,9 +123,17 @@ export interface EmphasisSyntax {
 	marker: "*" | "_";
 }
 
-/** Satır içi kodda kullanılan ters tırnak sayısı. */
+/** Satır içi kodun yazılışı. */
 export interface InlineCodeSyntax {
+	/** Kullanılan ters tırnak sayısı. */
 	fenceLength: number;
+	/**
+	 * İçerik tek boşlukla dolgulanmış mıydı: `` ` a ` ``
+	 *
+	 * CommonMark bu boşlukları içerikten atar (ters tırnakla başlayan kod
+	 * yazılabilsin diye). Atıldığını kaydetmezsek geri yazarken kaybolur.
+	 */
+	padded?: boolean;
 }
 
 /** Sert satır sonunun yazılışı: iki boşluk mu ters bölü mü. */

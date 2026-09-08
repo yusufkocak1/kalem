@@ -7,6 +7,7 @@ packages:
 # Sürüm yükseltmesi tek satırda yapılır, paketler arası kayma olmaz.
 catalog:
   '@types/node': ^22.10.2
+  fast-check: ^4.9.0
   '@arethetypeswrong/cli': ^0.18.5
   '@biomejs/biome': ^2.5.12
   '@playwright/test': ^1.63.0

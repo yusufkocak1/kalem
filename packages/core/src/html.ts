@@ -189,7 +189,7 @@ function marksFromStyle(node: HtmlNode): ("strong" | "emphasis" | "delete")[] {
 	if (fontStyle === "italic" || fontStyle === "oblique") marks.push("emphasis");
 
 	const decoration = style.get("text-decoration") ?? style.get("text-decoration-line");
-	if (decoration !== undefined && decoration.includes("line-through")) marks.push("delete");
+	if (decoration?.includes("line-through")) marks.push("delete");
 
 	return marks;
 }
