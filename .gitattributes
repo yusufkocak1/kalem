@@ -1,0 +1,13 @@
+# Depoda her şey LF. Biome ve .editorconfig LF istiyor; Windows'ta
+# core.autocrlf açıksa bu ayar olmadan her checkout sahte fark üretir.
+* text=auto eol=lf
+
+# Metin muamelesi görmemesi gerekenler
+*.png binary
+*.jpg binary
+*.webp binary
+*.woff2 binary
+*.ico binary
+
+# Diff gürültüsünü azalt
+pnpm-lock.yaml -diff linguist-generated
