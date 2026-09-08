@@ -1,0 +1,55 @@
+{
+  "name": "kalem-monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.18.2",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "pnpm -r --filter=@kalem/* --filter=!@kalem/docs build",
+    "clean": "pnpm -r exec rm -rf dist .tsbuildinfo && rm -rf coverage",
+    "typecheck": "tsc --build --force",
+    "lint": "biome check . && pnpm guard:locale",
+    "format": "biome check --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:cov": "vitest run --coverage",
+    "e2e": "playwright test",
+    "size": "size-limit",
+    "guard:locale": "node scripts/guard-locale.mjs",
+    "guard:purity": "node scripts/guard-purity.mjs",
+    "guard:selftest": "node scripts/guard-selftest.mjs",
+    "publint": "pnpm -r --filter=@kalem/* --filter=!@kalem/docs exec publint",
+    "attw": "pnpm -r --filter=@kalem/* --filter=!@kalem/docs exec attw --pack .",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm guard:purity && pnpm size && pnpm publint",
+    "docs:dev": "pnpm --filter @kalem/docs dev",
+    "docs:build": "pnpm --filter @kalem/docs build",
+    "changeset": "changeset",
+    "prepare": "simple-git-hooks"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "catalog:",
+    "@biomejs/biome": "catalog:",
+    "@changesets/cli": "^3.0.2",
+    "@playwright/test": "catalog:",
+    "@size-limit/preset-small-lib": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "lint-staged": "^17.5.0",
+    "publint": "catalog:",
+    "simple-git-hooks": "^2.14.0",
+    "size-limit": "catalog:",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm exec lint-staged"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,json,jsonc}": [
+      "biome check --write --no-errors-on-unmatched",
+      "node scripts/guard-locale.mjs"
+    ]
+  }
+}

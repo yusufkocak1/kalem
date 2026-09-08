@@ -1,0 +1,26 @@
+packages:
+  - 'packages/*'
+  - 'apps/*'
+  - 'examples/*'
+
+# Tek sürüm kaynağı: tüm paketler devDeps'i buradan çeker (catalog:).
+# Sürüm yükseltmesi tek satırda yapılır, paketler arası kayma olmaz.
+catalog:
+  '@arethetypeswrong/cli': ^0.18.5
+  '@biomejs/biome': ^2.5.12
+  '@playwright/test': ^1.63.0
+  '@size-limit/preset-small-lib': ^13.0.3
+  '@vitest/coverage-v8': ^5.0.0
+  publint: ^0.3.24
+  size-limit: ^13.0.3
+  tsdown: ^0.23.0
+  typescript: ^7.0.2
+  vitest: ^5.0.0
+
+# sharp yalnızca dokümantasyon sitesi (apps/docs) için; yayımlanan
+# paketlerin hiçbirine girmez.
+onlyBuiltDependencies:
+  - '@biomejs/biome'
+  - simple-git-hooks
+  - esbuild
+  - sharp

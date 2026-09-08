@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Güvenlik açığı
+    url: https://github.com/security/advisories
+    about: Güvenlik açıklarını issue olarak açma — özel bildirim kullan (SECURITY.md)
+  - name: Soru / tartışma
+    url: https://github.com/discussions
+    about: Kullanım sorusu ve fikir tartışmaları için

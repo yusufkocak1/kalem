@@ -1,0 +1,30 @@
+[
+  {
+    "name": "@kalem/core",
+    "path": "packages/core/dist/index.js",
+    "import": "*",
+    "limit": "12 kB",
+    "gzip": true
+  },
+  {
+    "name": "@kalem/viewer",
+    "path": "packages/viewer/dist/index.js",
+    "import": "*",
+    "limit": "14 kB",
+    "gzip": true
+  },
+  {
+    "name": "@kalem/editor (core dahil)",
+    "path": "packages/editor/dist/index.js",
+    "import": "*",
+    "limit": "38 kB",
+    "gzip": true
+  },
+  {
+    "name": "@kalem/editor + @kalem/ui — Word deneyimi",
+    "path": ["packages/editor/dist/index.js", "packages/ui/dist/index.js"],
+    "import": "*",
+    "limit": "58 kB",
+    "gzip": true
+  }
+]

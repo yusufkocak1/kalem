@@ -1,0 +1,28 @@
+node_modules/
+dist/
+coverage/
+.turbo/
+*.tsbuildinfo
+
+# test çıktıları
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
+# astro
+apps/docs/.astro/
+apps/docs/dist/
+
+# editör / işletim sistemi
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# ortam
+.env
+.env.*
+!.env.example
+.tsbuild/

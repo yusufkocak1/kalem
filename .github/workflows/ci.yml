@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Locale'e duyarlı hataları ortaya çıkarmak için CI Türkçe locale altında koşar.
+  LANG: tr_TR.UTF-8
+  LC_ALL: tr_TR.UTF-8
+
+jobs:
+  dogrulama:
+    name: lint · tip · test (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Biome (lint + format)
+        run: pnpm exec biome ci .
+
+      - name: Locale kapısı
+        run: pnpm guard:locale
+
+      - name: Koruyucu kapıların öz-testi
+        run: pnpm guard:selftest
+
+      - name: Tip denetimi
+        run: pnpm typecheck
+
+      - name: Birim testleri
+        run: pnpm test:cov
+
+  paket:
+    name: build · boyut · yayın sağlığı
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Saflık kapısı (framework sızıntısı + SSR güvenliği)
+        run: pnpm guard:purity
+
+      - name: Boyut kapısı
+        run: pnpm size
+
+      - name: publint
+        run: pnpm publint
+
+      - name: Tip yayın uyumu (are-the-types-wrong)
+        run: pnpm attw
+
+  tarayici:
+    name: tarayıcı testleri
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium firefox webkit
+      - run: pnpm e2e
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-raporu
+          path: playwright-report/
+          retention-days: 7

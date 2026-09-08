@@ -1,0 +1,69 @@
+---
+title: Kalem
+description: Framework-bağımsız, küçük ve modüler bir WYSIWYG Markdown editör kütüphanesi.
+template: splash
+hero:
+  tagline: Word kadar kolay, Markdown kadar taşınabilir. Herhangi bir framework ile — ya da framework olmadan.
+  actions:
+    - text: Başlangıç
+      link: /baslangic/
+      icon: right-arrow
+      variant: primary
+    - text: Mimari
+      link: /mimari/
+      icon: document
+---
+
+import { Card, CardGrid, Aside } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="Geliştirme aşamasında">
+Bu site **planlanan v1.0 API'sini** dokümante eder. Kalem henüz npm'de yayımlanmadı.
+Yol haritası için [iş listesine](https://github.com/kalem-editor/kalem/blob/main/docs/01-is-listesi.md) bakın.
+</Aside>
+
+<CardGrid stagger>
+  <Card title="Markdown-native" icon="pencil">
+    Doğru kaynak her zaman Markdown metnidir, JSON değil. `serialize(parse(md)) === md`
+    garantisi sayesinde kullanıcının dokunmadığı satır byte düzeyinde değişmez.
+  </Card>
+  <Card title="Framework-bağımsız" icon="puzzle">
+    Çekirdek saf TypeScript. `@kalem/react` ve `@kalem/vue` ayrı paketlerdir ve
+    framework'ü `peerDependency` olarak alır. Vue projesine React sızmaz.
+  </Card>
+  <Card title="Küçük" icon="rocket">
+    Hedef bütçeler CI'da zorlanır: `core` 12 kB, `viewer` 14 kB,
+    `editor + ui` 58 kB (min+gzip). Bütçe aşımı = build kırmızı.
+  </Card>
+  <Card title="Modüler" icon="setting">
+    Sadece görüntülemek için `@kalem/viewer`; düzenlemek için `@kalem/editor`;
+    Word benzeri arayüz için `@kalem/ui`. Ödemediğiniz şeyi indirmezsiniz.
+  </Card>
+</CardGrid>
+
+## Neden Kalem?
+
+Yapay zekâ araçlarının çıktı formatı fiilen Markdown oldu. Ancak yazılım bilmeyen
+kullanıcıların Word rahatlığında kullanabileceği bir Markdown editörü yok.
+Kalem tam olarak bu boşluğu doldurmak için var.
+
+| | Kalem | Tiptap | BlockNote | Editor.js |
+|---|---|---|---|---|
+| Markdown birinci sınıf | ✅ | ❌ HTML odaklı | ❌ JSON | ❌ JSON |
+| Framework bağımsız | ✅ | ✅ | ❌ React zorunlu | ✅ |
+| Runtime bağımlılığı | **0** | ~10 paket | ~15 paket | birkaç |
+| Hedef boyut (editör+ui) | **~58 kB** | ~90–120 kB | ~150 kB+ | ~30 kB + eklentiler |
+| Sürükle-bırak blok | ✅ | Eklenti | ✅ | ✅ |
+| Kayıpsız gidiş-dönüş | ✅ | Kısmi | ❌ | ❌ |
+
+<Aside>
+Rakip boyutları yaklaşık değerlerdir (min+gzip) ve kendi ölçümlerimizle doğrulanacaktır.
+</Aside>
+
+## Üç satırda
+
+```ts
+import { Editor } from '@kalem/editor';
+import { toolbar, slashMenu, dragHandle } from '@kalem/ui';
+
+new Editor(el, { value: '# Merhaba', plugins: [toolbar(), slashMenu(), dragHandle()] });
+```

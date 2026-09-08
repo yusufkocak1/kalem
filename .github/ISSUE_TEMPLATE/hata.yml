@@ -1,0 +1,41 @@
+name: Hata bildirimi
+description: Beklenmeyen bir davranış
+labels: ["hata"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Kalem henüz v1.0 öncesi. Prototip (`apps/demo`) ile ilgili bir sorunsa
+        bunu belirtmen yeterli.
+  - type: textarea
+    id: ne-oldu
+    attributes:
+      label: Ne oldu?
+      description: Beklediğin ve gördüğün davranış.
+    validations: { required: true }
+  - type: textarea
+    id: adimlar
+    attributes:
+      label: Yeniden üretme adımları
+      placeholder: |
+        1. ...
+        2. ...
+    validations: { required: true }
+  - type: textarea
+    id: markdown
+    attributes:
+      label: İlgili Markdown (varsa)
+      description: Sorunu tetikleyen en küçük Markdown parçası.
+      render: markdown
+  - type: input
+    id: ortam
+    attributes:
+      label: Ortam
+      placeholder: "Chrome 140 / Windows 11 / @kalem/editor 0.0.0"
+    validations: { required: true }
+  - type: input
+    id: dil
+    attributes:
+      label: Sayfa dili (lang)
+      description: Locale'e duyarlı hatalar için önemli — arama, sıralama, büyük/küçük harf.
+      placeholder: "tr"
