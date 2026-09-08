@@ -177,12 +177,24 @@ export interface TableSyntax {
 	raw: string;
 }
 
-/** Belge düzeyi yazım bilgisi. */
+/**
+ * Belge düzeyi yazım bilgisi.
+ *
+ * Bunlar tek bir düğüme değil dosyanın tamamına ait olduğu için kökte durur.
+ * Üçü de gidiş-dönüş sadakati (F1-07) için gerekli: biri eksikse serileştirici
+ * kullanıcının dosyasını sessizce değiştirir.
+ */
 export interface RootSyntax {
-	/** Dosyadaki satır sonu. Karışıksa çoğunluk kazanır. */
-	lineEnding: "\n" | "\r\n";
+	/**
+	 * Dosyadaki satır sonu. Karışık kullanımda çoğunluk kazanır — karışık
+	 * satır sonlu dosyalar byte düzeyinde gidiş-dönüşten sağ çıkamaz, bu
+	 * bilinen ve belgelenmiş tek istisnadır.
+	 */
+	lineEnding: "\n" | "\r\n" | "\r";
 	/** Dosya satır sonuyla bitiyor mu. */
 	finalNewline: boolean;
+	/** Dosya bayt sırası işaretiyle (BOM) başlıyor muydu. */
+	bom: boolean;
 }
 
 // ---------------------------------------------------------------------------

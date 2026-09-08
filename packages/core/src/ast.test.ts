@@ -40,7 +40,7 @@ describe("düğüm biçimleri", () => {
 	it("tipik bir belge ağacı kurulabiliyor", () => {
 		const belge: Root = {
 			type: "root",
-			syntax: { lineEnding: "\n", finalNewline: true },
+			syntax: { lineEnding: "\n", finalNewline: true, bom: false },
 			children: [
 				{ type: "yaml", value: "baslik: Deneme" },
 				{
