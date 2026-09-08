@@ -1,8 +1,82 @@
 /**
  * @kalem/core — Markdown AST, ayrıştırıcı ve serileştirici
  *
- * Faz 0 yer tutucusu. Gerçek uygulama Faz 1'de gelir.
- * Bu dosyanın tek görevi build/tip/boyut hattının uçtan uca çalıştığını
- * kanıtlamak; herhangi bir kütüphane davranışı içermez.
+ * DOM'a dokunmaz; sunucuda, worker'da ve tarayıcıda aynı şekilde çalışır.
+ * Üçüncü parti bağımlılığı yoktur ve olmayacaktır (bkz. CONTRIBUTING.md).
+ *
+ * Şu an yalnızca AST katmanı hazır (F1-01). Ayrıştırıcı F1-03/04,
+ * serileştirici F1-07 ile gelir.
  */
-export const PACKAGE = "@kalem/core";
+
+// --- AST tipleri (F1-01) ---
+export type {
+	AlignType,
+	Block,
+	Blockquote,
+	Break,
+	BreakSyntax,
+	Code,
+	CodeSyntax,
+	ContentModel,
+	Data,
+	Definition,
+	Delete,
+	Emphasis,
+	EmphasisSyntax,
+	Frontmatter,
+	Heading,
+	HeadingSyntax,
+	Html,
+	Image,
+	ImageReference,
+	Inline,
+	InlineCode,
+	InlineCodeSyntax,
+	Link,
+	LinkReference,
+	LinkSyntax,
+	List,
+	ListItem,
+	ListSyntax,
+	LiteralNode,
+	Node,
+	NodeBase,
+	NodeGroup,
+	NodeId,
+	NodeOf,
+	NodeSpec,
+	NodeSpecs,
+	NodeType,
+	Paragraph,
+	ParentNode,
+	Point,
+	Position,
+	ReferenceSyntax,
+	Root,
+	RootSyntax,
+	Strong,
+	Structural,
+	Table,
+	TableCell,
+	TableRow,
+	TableSyntax,
+	Text,
+	ThematicBreak,
+	ThematicBreakSyntax,
+	Toml,
+	Yaml,
+} from "./ast.js";
+// --- Tip koruyucular (F1-01) ---
+export {
+	isBlock,
+	isFrontmatter,
+	isInline,
+	isLiteral,
+	isNode,
+	isNodeOf,
+	isParent,
+	isRoot,
+	isStructural,
+} from "./guards.js";
+// --- Künye kaydı (F1-01) ---
+export { isParentContent, NODE_TYPES, SPECS, specOf } from "./spec.js";

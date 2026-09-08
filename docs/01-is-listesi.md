@@ -93,10 +93,15 @@ Bunlar projenin iki temel vaadini **otomatik** koruyan testlerdir. Bunlar olmada
 
 > Bu faz tamamen saf fonksiyonlardan oluşur — hızlı ve keyifli test edilir. Editörün en riskli kısmına girmeden önce sağlam bir zemin kurar.
 
-### F1-01 · AST tip tanımları `[S]`
+### F1-01 · AST tip tanımları `[S]` ✅
 - Analiz §5.2'deki `Block` / `Inline` tipleri, `id` ve `position` alanları
 - Tip koruyucular (`isBlock`, `isInline`), `NodeSpec` kayıt tipi
 - **Kabul:** tipler `core/src/ast.ts`'te, sıfır runtime kodu
+
+> **Yapıldı.** `ast.ts` (tip-saf, 0 runtime) + `spec.ts` (künye kaydı) +
+> `guards.ts` (9 koruyucu). 42 test, core kapsamı %100.
+> Taslaktan üç sapma mdast uyumu lehine yapıldı — ayrıntı:
+> [03-f1-01-ast-kararlari.md](./03-f1-01-ast-kararlari.md)
 
 ### F1-02 · AST yardımcıları `[M]`
 - `walk`, `visit`, `find`, `replace`, `remove`, `insertAt`, `clone`
