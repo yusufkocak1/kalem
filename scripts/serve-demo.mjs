@@ -30,6 +30,11 @@ const PAKETLER = [
 		onEk: "/@kalem/viewer/",
 		kok: fileURLToPath(new URL("../packages/viewer/dist/", import.meta.url)),
 	},
+	// Temalar saf CSS; derleme adımı yok, kaynak doğrudan servis ediliyor.
+	{
+		onEk: "/@kalem/themes/",
+		kok: fileURLToPath(new URL("../packages/themes/css/", import.meta.url)),
+	},
 ];
 
 const TIPLER = {

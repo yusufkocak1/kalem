@@ -1,0 +1,314 @@
+/*
+ * @kalem/themes — Görüntüleyici tipografisi  (İş listesi: F2-03)
+ *
+ * ## Kapsam
+ *
+ * Her şey `.kalem-doc` altına kapatıldı. Sayfanın geri kalanına tek bir
+ * kural sızmıyor: bir Markdown görüntüleyicinin, gömüldüğü uygulamanın
+ * düğmelerinin görünümünü değiştirmesi kabul edilemez. `:root` üzerine
+ * değişken yazılmamasının sebebi de bu.
+ *
+ * ## Değiştirme
+ *
+ * Aşağıdaki `--kalem-*` değişkenleri sözleşmedir. Temayı değiştirmek için
+ * kuralları ezmek gerekmiyor, değişkeni yeniden tanımlamak yeterli:
+ *
+ *     .kalem-doc { --kalem-accent: #7c3aed; --kalem-radius: 2px; }
+ *
+ * ## Koyu tema
+ *
+ * Üç durum var ve üçü de karşılanıyor: kullanıcı seçim yapmadıysa
+ * `prefers-color-scheme`, açıkça seçtiyse `[data-theme]`. Renk yalnızca
+ * media sorgusunun içinde tanımlanmıyor — o klasik "açık temada okunmaz
+ * metin" hatasıdır.
+ *
+ * ## Sınıf öneki
+ *
+ * Plan `mdx-` diyordu; o isim marka kararından önce yazılmıştı. Render
+ * tarafındaki varsayılan `kalem-` ve `classPrefix` ile değiştirilebilir —
+ * değiştirilirse bu dosya da uyarlanmalı.
+ */
+
+.kalem-doc {
+	/* Renk — açık tema. Nötrler hafifçe sıcak: saf gri "seçilmemiş" durur. */
+	--kalem-fg: #22201d;
+	--kalem-fg-muted: #6f6a62;
+	--kalem-bg: transparent;
+	--kalem-bg-subtle: rgb(34 32 29 / 5%);
+	--kalem-border: #e3e0da;
+	--kalem-accent: #0f4e4a;
+
+	/* Tipografi */
+	--kalem-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	--kalem-font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, monospace;
+	--kalem-size: 1rem;
+	--kalem-leading: 1.65;
+
+	/* Ritim: bloklar arası boşluk tek bir değerden türetiliyor. */
+	--kalem-space: 1em;
+	--kalem-radius: 6px;
+
+	color: var(--kalem-fg);
+	background: var(--kalem-bg);
+	font-family: var(--kalem-font);
+	font-size: var(--kalem-size);
+	line-height: var(--kalem-leading);
+	overflow-wrap: break-word;
+}
+
+@media (prefers-color-scheme: dark) {
+	.kalem-doc:not([data-theme="light"]) {
+		--kalem-fg: #e8e6e1;
+		--kalem-fg-muted: #9d978d;
+		--kalem-bg-subtle: rgb(232 230 225 / 8%);
+		--kalem-border: #34323b;
+		--kalem-accent: #6fd3c6;
+	}
+}
+
+.kalem-doc[data-theme="dark"] {
+	--kalem-fg: #e8e6e1;
+	--kalem-fg-muted: #9d978d;
+	--kalem-bg-subtle: rgb(232 230 225 / 8%);
+	--kalem-border: #34323b;
+	--kalem-accent: #6fd3c6;
+}
+
+/* --------------------------------------------------------------------- */
+/* Blok ritmi                                                            */
+/* --------------------------------------------------------------------- */
+
+/*
+ * Alt boşluk tek yönlü veriliyor (üst değil): iç içe bloklarda üst ve alt
+ * marjların çakışması, blockquote ve liste içinde öngörülemez boşluklar
+ * üretir. İlk ve son çocuğun dış boşluğu ayrıca sıfırlanıyor ki kapsayıcı
+ * kendi dolgusunu tam olarak kontrol edebilsin.
+ */
+.kalem-doc > *,
+.kalem-doc blockquote > *,
+.kalem-doc li > * {
+	margin-top: 0;
+	margin-bottom: var(--kalem-space);
+}
+
+.kalem-doc > :last-child,
+.kalem-doc blockquote > :last-child,
+.kalem-doc li > :last-child {
+	margin-bottom: 0;
+}
+
+/* --------------------------------------------------------------------- */
+/* Başlıklar                                                             */
+/* --------------------------------------------------------------------- */
+
+.kalem-doc h1,
+.kalem-doc h2,
+.kalem-doc h3,
+.kalem-doc h4,
+.kalem-doc h5,
+.kalem-doc h6 {
+	margin-top: calc(var(--kalem-space) * 1.8);
+	margin-bottom: calc(var(--kalem-space) * 0.5);
+	font-weight: 650;
+	line-height: 1.25;
+	letter-spacing: -0.011em;
+	text-wrap: balance;
+}
+
+.kalem-doc > :first-child {
+	margin-top: 0;
+}
+
+.kalem-doc h1 {
+	font-size: 1.9em;
+}
+.kalem-doc h2 {
+	font-size: 1.45em;
+}
+.kalem-doc h3 {
+	font-size: 1.2em;
+}
+.kalem-doc h4 {
+	font-size: 1.05em;
+}
+.kalem-doc h5,
+.kalem-doc h6 {
+	font-size: 1em;
+	color: var(--kalem-fg-muted);
+}
+
+/* --------------------------------------------------------------------- */
+/* Satır içi                                                             */
+/* --------------------------------------------------------------------- */
+
+.kalem-doc a {
+	color: var(--kalem-accent);
+	text-decoration-thickness: 1px;
+	text-underline-offset: 0.16em;
+}
+
+.kalem-doc a:focus-visible {
+	outline: 2px solid var(--kalem-accent);
+	outline-offset: 2px;
+	border-radius: 2px;
+}
+
+.kalem-doc del {
+	color: var(--kalem-fg-muted);
+}
+
+.kalem-doc code {
+	font-family: var(--kalem-font-mono);
+	/* 0.88 değil 0.9: tek boşlukluk fark, satır yüksekliğini bozmadan
+	   monospace'in optik olarak daha büyük görünmesini dengeliyor. */
+	font-size: 0.9em;
+	background: var(--kalem-bg-subtle);
+	padding: 0.12em 0.35em;
+	border-radius: 4px;
+}
+
+.kalem-doc img {
+	max-width: 100%;
+	height: auto;
+	border-radius: var(--kalem-radius);
+}
+
+/* --------------------------------------------------------------------- */
+/* Kod bloğu                                                             */
+/* --------------------------------------------------------------------- */
+
+.kalem-doc pre {
+	background: var(--kalem-bg-subtle);
+	padding: 0.85em 1em;
+	border-radius: var(--kalem-radius);
+	/* Uzun satır sayfayı yana kaydırmamalı; kendi kutusunda kaysın. */
+	overflow-x: auto;
+	font-size: 0.9em;
+	line-height: 1.55;
+	tab-size: 2;
+}
+
+.kalem-doc pre code {
+	background: none;
+	padding: 0;
+	font-size: inherit;
+	/* `white-space: pre` `<pre>`den geliyor; kod satırı sarmalanmamalı. */
+	white-space: pre;
+}
+
+/* --------------------------------------------------------------------- */
+/* Alıntı, çizgi                                                          */
+/* --------------------------------------------------------------------- */
+
+.kalem-doc blockquote {
+	margin-left: 0;
+	margin-right: 0;
+	padding-left: 1em;
+	border-left: 3px solid var(--kalem-border);
+	color: var(--kalem-fg-muted);
+}
+
+.kalem-doc hr {
+	border: 0;
+	border-top: 1px solid var(--kalem-border);
+	margin: calc(var(--kalem-space) * 2) 0;
+}
+
+/* --------------------------------------------------------------------- */
+/* Listeler                                                              */
+/* --------------------------------------------------------------------- */
+
+.kalem-doc ul,
+.kalem-doc ol {
+	padding-left: 1.5em;
+}
+
+.kalem-doc li {
+	margin-bottom: 0.25em;
+}
+
+/* İç içe liste, dış maddenin alt boşluğunu iki katına çıkarmamalı. */
+.kalem-doc li > ul,
+.kalem-doc li > ol {
+	margin-top: 0.25em;
+}
+
+/*
+ * Görev maddesi.
+ *
+ * `list-style: none` + negatif marj yerine dolgu sıfırlanıyor: negatif
+ * marj, iç içe görev listelerinde hizayı kaydırır.
+ */
+.kalem-doc .kalem-task {
+	list-style: none;
+	padding-left: 0;
+	text-indent: -1.5em;
+}
+
+.kalem-doc .kalem-task > * {
+	text-indent: 0;
+}
+
+.kalem-doc .kalem-task input[type="checkbox"] {
+	width: 0.95em;
+	height: 0.95em;
+	margin: 0 0.35em 0 0;
+	vertical-align: -0.08em;
+	accent-color: var(--kalem-accent);
+}
+
+/* --------------------------------------------------------------------- */
+/* Tablo                                                                 */
+/* --------------------------------------------------------------------- */
+
+/*
+ * Tablo kendi kutusunda kayıyor. `display: block` bunun için gerekli ama
+ * bedeli var: hücreler artık sütun hizasını tablo genişliğinden almıyor.
+ * Dar ekranda yana kaydırmak, sayfayı yana kaydırmaktan iyi.
+ */
+.kalem-doc table {
+	display: block;
+	overflow-x: auto;
+	max-width: 100%;
+	border-collapse: collapse;
+	font-size: 0.95em;
+}
+
+.kalem-doc th,
+.kalem-doc td {
+	border: 1px solid var(--kalem-border);
+	padding: 0.4em 0.7em;
+	text-align: left;
+}
+
+.kalem-doc th {
+	background: var(--kalem-bg-subtle);
+	font-weight: 620;
+}
+
+/* Sayı sütunları hizalanınca okunur: rakamlar sabit genişlikte. */
+.kalem-doc td {
+	font-variant-numeric: tabular-nums;
+}
+
+.kalem-doc .kalem-align-left {
+	text-align: left;
+}
+.kalem-doc .kalem-align-center {
+	text-align: center;
+}
+.kalem-doc .kalem-align-right {
+	text-align: right;
+}
+
+/* --------------------------------------------------------------------- */
+/* Hareket tercihi                                                       */
+/* --------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+	.kalem-doc * {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+}

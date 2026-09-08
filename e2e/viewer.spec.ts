@@ -134,6 +134,37 @@ test.describe("güvenlik", () => {
 	});
 });
 
+/**
+ * F2-03 — `@kalem/themes/viewer.css`
+ *
+ * Stil dosyası gerçekten yükleniyor mu ve `.kalem-doc` kapsamından dışarı
+ * sızıyor mu. İkincisi asıl iddia: görüntüleyici, gömüldüğü uygulamanın
+ * görünümüne dokunmamalı.
+ */
+test.describe("tema", () => {
+	test("stil dosyası uygulanıyor", async ({ page }) => {
+		const pre = page.locator("#onizleme pre").first();
+		// Tema `<pre>`ye zemin ve köşe yarıçapı veriyor; sayfanın kendi CSS'i vermiyor.
+		await expect(pre).toHaveCSS("border-radius", "6px");
+		await expect(pre).toHaveCSS("overflow-x", "auto");
+	});
+
+	test("başlık ritmi ilk çocukta sıfırlanıyor", async ({ page }) => {
+		await expect(page.locator("#onizleme h1").first()).toHaveCSS("margin-top", "0px");
+	});
+
+	test("stil `.kalem-doc` dışına sızmıyor", async ({ page }) => {
+		// Sayfa kabuğundaki `<h1>` tema kuralından etkilenmemeli.
+		const kabukBaslik = page.locator("header h1");
+		await expect(kabukBaslik).toHaveCSS("font-size", "17px");
+	});
+
+	test("hizalama sınıfları çalışıyor", async ({ page }) => {
+		await page.locator("#girdi").fill("| a |\n| --: |\n| 1 |");
+		await expect(page.locator("#onizleme td").first()).toHaveCSS("text-align", "right");
+	});
+});
+
 test.describe("demo sayfası", () => {
 	test("eşitlik göstergesi yeşil", async ({ page }) => {
 		await expect(page.locator("#esitlik")).toHaveText("byte-birebir ✓");

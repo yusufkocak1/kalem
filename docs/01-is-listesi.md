@@ -23,28 +23,28 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-08 · `master` · `pnpm verify` yeşil · Playwright 78/78
+> Son güncelleme: 2026-09-08 · `master` · `pnpm verify` yeşil · Playwright 90/90
 
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
-| **Faz 2** — Viewer + başsız editör | 2 / 13 | 🔵 2A sürüyor |
+| **Faz 2** — Viewer + başsız editör | 3 / 13 | 🔵 2A sürüyor |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **21 / 72** | **%29** |
+| | **22 / 72** | **%31** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` · `F2-02`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` · `F2-02` · `F2-03`
 
-**Sıradaki:** `F2-03` viewer stilleri (`@kalem/themes`), ardından `F2-04`'ün
-eksik yarısı (axe) ve **2B** — blok motoru (`F2-05`).
+**Sıradaki:** `F2-04`'ün eksik yarısı (axe taraması) ve **2B** —
+blok motoru (`F2-05`).
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -62,6 +62,7 @@ eksik yarısı (axe) ve **2B** — blok motoru (`F2-05`).
 > | `@kalem/core/commands` | 2.28 kB | 4 kB |
 > | `@kalem/core/html` | 2.21 kB | 6 kB |
 > | `@kalem/viewer` | 2.59 kB | 14 kB |
+> | `@kalem/themes/viewer.css` | 1.16 kB | 3 kB |
 >
 > Gerekçe ikisinde de aynı: yalnızca Markdown işleyen kullanıcı (SSR,
 > derleme betiği) editör komutlarını ve yapıştırma dönüştürücüsünü
@@ -80,7 +81,8 @@ eksik yarısı (axe) ve **2B** — blok motoru (`F2-05`).
 gezinme/konum/düzenleme yardımcıları, kaynak tarayıcı, blok ve satır içi
 ayrıştırıcı, serileştirici, güvenlik katmanı, komutlar, HTML dönüştürücü.
 `@kalem/viewer` — render planı, `renderToDOM`, `renderToString`.
-**724 birim testi** + **78 tarayıcı testi** (Chromium · Firefox · WebKit).
+`@kalem/themes` — görüntüleyici tipografisi (saf CSS, 1.16 kB).
+**724 birim testi** + **90 tarayıcı testi** (Chromium · Firefox · WebKit).
 `parse(md)` ↔ `serialize(ast)` gidiş-dönüş 17/17 byte-birebir;
 `renderToDOM` ↔ `renderToString` üç motorda byte-birebir.
 
@@ -402,14 +404,26 @@ Saf, DOM'suz fonksiyon. Doğru HTML kaçışlaması.
 > §13.3) metinde yalnızca `&`, `<`, `>`, U+00A0'yı kaçışlar. Fazladan
 > kaçışlamak çıktıyı bozmaz ama **eşitliği** bozardı.
 
-### F2-03 · Viewer stilleri `[S]` ⬜
+### F2-03 · Viewer stilleri `[S]` ✅
 `@kalem/themes` içindeki temel tipografi; `kalem-` sınıf öneki
-- **Kabul:** salt-okunur bir doküman düzgün görünüyor
+- **Kabul:** salt-okunur bir doküman düzgün görünüyor ✅
 
 > Sınıf öneki plandaki `mdx-` değil `kalem-`: `mdx-` marka kararından önce
 > yazılmıştı. Önek `classPrefix` seçeneğiyle değiştirilebilir.
-> Geçici tipografi `apps/demo/viewer.html` içinde duruyor; asıl tema
-> paketi bu adımda çıkarılacak.
+>
+> **Paket saf CSS** — derleme adımı, JS, bağımlılık yok. Tek dosya:
+> `@kalem/themes/viewer.css` (1.16 kB gzip, bütçe 3 kB).
+>
+> İki tasarım kararı:
+> - **Her kural `.kalem-doc` altında.** `:root` üzerine tek değişken bile
+>   yazılmıyor: bir görüntüleyicinin, gömüldüğü uygulamanın düğmelerinin
+>   görünümünü değiştirmesi kabul edilemez. Sızıntı e2e ile sınanıyor.
+> - **Tema `--kalem-*` değişkenleriyle** değiştiriliyor, kural ezerek
+>   değil. Koyu tema üç durumu da karşılıyor: seçim yoksa
+>   `prefers-color-scheme`, varsa `[data-theme]`.
+>
+> Demo sayfası da bu dosyayı yüklüyor; demoya özel tipografi yok, yani
+> ekranda görünen şey kullanıcının göreceğinin aynısı.
 
 ### F2-04 · Viewer testleri `[S]` 🟡 **KISMEN**
 Render doğruluğu + XSS fixture'ları + a11y (axe)

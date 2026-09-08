@@ -121,48 +121,15 @@
 	.kotu { color: var(--kotu); }
 
 	/*
-	 * Geçici viewer tipografisi.
+	 * Demo kabuğu.
 	 *
-	 * Gerçek tema `@kalem/themes` içinde, F2-03'te gelecek. Buradaki stiller
-	 * yalnızca render'ın doğruluğunu göz kararı denetlenebilir kılmak için.
+	 * Belge tipografisi burada DEĞİL: `@kalem/themes/viewer.css` yükleniyor
+	 * (aşağıdaki <link>). Böylece sayfa, kütüphane kullanıcısının göreceği
+	 * şeyin aynısını gösteriyor — demoya özel güzelleştirme yok.
 	 */
 	.onizleme { flex: 1; overflow: auto; padding: 18px 20px; }
-	.kalem-doc { line-height: 1.65; }
-	.kalem-doc > :first-child { margin-top: 0; }
-	.kalem-doc h1, .kalem-doc h2, .kalem-doc h3 { line-height: 1.25; margin: 1.4em 0 0.5em; }
-	.kalem-doc h1 { font-size: 1.6em; }
-	.kalem-doc h2 { font-size: 1.3em; }
-	.kalem-doc h3 { font-size: 1.1em; }
-	.kalem-doc p, .kalem-doc ul, .kalem-doc ol, .kalem-doc blockquote { margin: 0 0 1em; }
-	.kalem-doc a { color: var(--vurgu); }
-	.kalem-doc code {
-		font-family: var(--kod);
-		font-size: 0.88em;
-		background: color-mix(in srgb, var(--metin) 8%, transparent);
-		padding: 0.12em 0.35em;
-		border-radius: 4px;
-	}
-	.kalem-doc pre {
-		background: color-mix(in srgb, var(--metin) 6%, transparent);
-		padding: 12px 14px;
-		border-radius: 8px;
-		overflow-x: auto;
-	}
-	.kalem-doc pre code { background: none; padding: 0; }
-	.kalem-doc blockquote {
-		border-left: 3px solid var(--kenar);
-		padding-left: 14px;
-		color: var(--soluk);
-	}
-	.kalem-doc hr { border: 0; border-top: 1px solid var(--kenar); margin: 1.6em 0; }
-	.kalem-doc table { border-collapse: collapse; width: 100%; display: block; overflow-x: auto; }
-	.kalem-doc th, .kalem-doc td { border: 1px solid var(--kenar); padding: 6px 10px; }
-	.kalem-doc .kalem-align-left { text-align: left; }
-	.kalem-doc .kalem-align-center { text-align: center; }
-	.kalem-doc .kalem-align-right { text-align: right; }
-	.kalem-doc .kalem-task { list-style: none; margin-left: -1.3em; }
-	.kalem-doc img { max-width: 100%; }
 </style>
+<link rel="stylesheet" href="/@kalem/themes/viewer.css">
 
 <header>
 	<h1>Kalem Viewer <span>— iki render hedefi, tek plan</span></h1>

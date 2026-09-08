@@ -28,6 +28,12 @@
     "gzip": true
   },
   {
+    "name": "@kalem/themes/viewer.css",
+    "path": "packages/themes/css/viewer.css",
+    "limit": "3 kB",
+    "gzip": true
+  },
+  {
     "name": "@kalem/editor (core dahil)",
     "path": "packages/editor/dist/index.js",
     "import": "*",
