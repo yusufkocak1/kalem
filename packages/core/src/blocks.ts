@@ -31,6 +31,7 @@
 import type {
 	Block,
 	Code,
+	Frontmatter,
 	Heading,
 	Inline,
 	ListItem,
@@ -149,6 +150,17 @@ const HTML_BLOCK_RULES: readonly {
 ];
 
 /**
+ * Frontmatter sınırlayıcıları.
+ *
+ * `---` YAML, `+++` TOML. Yalnızca **dosyanın ilk satırında** geçerlidir;
+ * ortadaki `---` yatay çizgidir.
+ */
+const FRONTMATTER_FENCES = [
+	{ fence: "---", type: "yaml" },
+	{ fence: "+++", type: "toml" },
+] as const;
+
+/**
  * Bağlantı tanımı: `[etiket]: hedef "başlık"`
  *
  * **Bilinen kısıt:** yalnızca tek satırlık tanımlar tanınıyor. CommonMark
@@ -171,12 +183,52 @@ export function parseBlocks(source: string, options: ParseBlocksOptions = {}): R
 	const first = must(lines[0], "ilk satır");
 	const last = must(lines[lines.length - 1], "son satır");
 
+	// Frontmatter yalnızca dosyanın en başında olabilir.
+	const front = readFrontmatter(lines);
+	const children: Root["children"] = front === null ? [] : [front.node];
+	children.push(...parseLines(lines.slice(front?.next ?? 0), inline));
+
 	return {
 		type: "root",
-		children: parseLines(lines, inline),
+		children,
 		syntax: { lineEnding, finalNewline, bom },
 		position: { start: point(first, 0), end: point(last, last.value.length) },
 	};
+}
+
+/**
+ * Frontmatter'ı **ayrıştırmaz, olduğu gibi korur** (F1-06).
+ *
+ * YAML ayrıştırıcısı eklemek çekirdeğe 3rd-party bağımlılık sokardı ve
+ * projenin temel vaadini bozardı. Kullanıcının frontmatter'ına ihtiyacı olan
+ * kendi ayrıştırıcısını `yaml.value` üzerinde çalıştırır; biz yalnızca
+ * bozmadan taşırız.
+ */
+function readFrontmatter(lines: readonly Line[]): { node: Frontmatter; next: number } | null {
+	// `scan` boş kaynakta bile bir satır döndürür.
+	const openLine = must(lines[0], "frontmatter açılış satırı");
+	const rule = FRONTMATTER_FENCES.find((f) => openLine.value === f.fence);
+	if (rule === undefined) return null;
+
+	const body: string[] = [];
+	for (let i = 1; i < lines.length; i++) {
+		const line = must(lines[i], "frontmatter satırı");
+		if (line.value === rule.fence) {
+			return {
+				node: {
+					type: rule.type,
+					value: body.join("\n"),
+					position: span(openLine, line),
+				},
+				next: i + 1,
+			};
+		}
+		body.push(line.value);
+	}
+
+	// Kapanmamış sınırlayıcı frontmatter değildir — `---` yatay çizgiye,
+	// `+++` paragrafa düşer.
+	return null;
 }
 
 // ---------------------------------------------------------------------------

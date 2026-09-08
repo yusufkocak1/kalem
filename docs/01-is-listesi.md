@@ -28,23 +28,23 @@
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
-| **Faz 1** — `@kalem/core` | 3 / 11 | 🔵 **Devam ediyor** |
+| **Faz 1** — `@kalem/core` | 4 / 11 | 🔵 **Devam ediyor** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | 🟡 Prototip hazır, matris doldurulmadı |
 | **Faz 2** — Viewer + başsız editör | 0 / 13 | ⬜ Başlanmadı |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **11 / 72** | **%15** |
+| | **12 / 72** | **%17** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` · `F1-02` · `F1-03`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` · `F1-02` · `F1-03` · `F1-06`
 
-**Sıradaki:** `F1-06` frontmatter (blok katmanına ait, sırası öne alındı),
-ardından `F1-04` satır içi ayrıştırıcı
+**Sıradaki:** `F1-04` · Satır içi ayrıştırıcı `[L]` — vurgu algoritması
+CommonMark'ın en zor kısmı, projenin en riskli iki görevinden biri
 
 > **Karar (kapandı):** `F1-08` tam olarak F1-03'ten önce kurulamaz — gidiş-dönüş
 > koşucusu hem `parse` hem `serialize` olmadan hiçbir şey koşamaz. Bunun yerine
@@ -53,7 +53,7 @@ ardından `F1-04` satır içi ayrıştırıcı
 
 **Yazılan kod:** `@kalem/core` — AST tipleri, künye kaydı, tip koruyucular,
 gezinme/konum/düzenleme yardımcıları, kaynak tarayıcı, blok ayrıştırıcı.
-299 test, kapsam %99.7 (dal), 5.6 kB / 12 kB.
+313 test, kapsam **%100 (dal)**, 5.76 kB / 12 kB.
 
 **Kayıt dokümanları:** [Faz 0 sonucu](./02-faz0-sonuc.md) ·
 [F1-01 AST kararları](./03-f1-01-ast-kararlari.md)
@@ -180,9 +180,15 @@ Vurgu (`*`/`_`, CommonMark'ın delimiter-run algoritması), kod span, link, refe
 Üstü çizili (`~~`), görev listesi (`- [ ]`), otomatik link literal, **tablo ayrıştırma** (motor v1'de UI vermeyecek ama parser/serializer tabloyu **kayıpsız korumalı** — kullanıcının dosyasını bozmamak için zorunlu)
 - **Kabul:** GFM spec testleri geçiyor; tablo içeren dosya parse→serialize'da bozulmuyor
 
-### F1-06 · Frontmatter `[S]` ⬜
+### F1-06 · Frontmatter `[S]` ✅
 YAML/TOML frontmatter'ı **ayrıştırma, sadece koru** (opak string olarak). YAML parser bağımlılığı **eklenmez**.
 - **Kabul:** frontmatter'lı dosya gidiş-dönüşte birebir korunuyor
+
+> **Yapıldı.** YAML (`---`) ve TOML (`+++`) sınırlayıcıları, yalnızca dosyanın
+> ilk satırında. İçerik opak string olarak korunuyor — YAML ayrıştırıcısı
+> bağımlılığı eklenmedi. Kapanmamış sınırlayıcı yatay çizgiye/paragrafa
+> düşüyor. Sırası F1-04'ün önüne alındı: blok katmanına ait ve `blocks.ts`
+> zaten açıktı.
 
 ### F1-07 · Serileştirici (AST → Markdown) `[L]` ⬜
 - F1-03'te saklanan sözdizimi tercihlerini **kullan** — kullanıcının `*` kullandığı yerde `*` üret

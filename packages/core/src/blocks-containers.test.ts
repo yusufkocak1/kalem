@@ -221,6 +221,15 @@ describe("liste ile diğer bloklar", () => {
 		expect(tipler("paragraf\n- madde")).toEqual(["paragraph", "list"]);
 	});
 
+	/**
+	 * Listenin ortasındaki `- - -` yeni bir madde değil, yatay çizgidir —
+	 * ve listeyi bitirir. Aynı işareti taşıdığı için gözden kaçması kolay.
+	 */
+	it("liste içinde yatay çizgi listeyi bitiriyor", () => {
+		expect(tipler("- madde\n- - -")).toEqual(["list", "thematicBreak"]);
+		expect((tek("- madde\n- - -") as List).children).toHaveLength(1);
+	});
+
 	/** Sıralı liste paragrafı ancak 1'den başlıyorsa kesebilir. */
 	it("1 ile başlayan sıralı liste paragrafı kesiyor", () => {
 		expect(tipler("paragraf\n1. madde")).toEqual(["paragraph", "list"]);
