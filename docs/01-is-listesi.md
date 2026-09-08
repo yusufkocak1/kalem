@@ -28,30 +28,28 @@
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
-| **Faz 1** — `@kalem/core` | 9.5 / 11 | 🔵 **Devam ediyor** |
+| **Faz 1** — `@kalem/core` | 10.5 / 11 | 🔵 **Neredeyse bitti** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | 🟡 Prototip hazır, matris doldurulmadı |
 | **Faz 2** — Viewer + başsız editör | 0 / 13 | ⬜ Başlanmadı |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **17.5 / 72** | **%24** |
+| | **18.5 / 72** | **%26** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` · `F1-02` · `F1-03` · `F1-04` · `F1-05` · `F1-06` · `F1-07` · `F1-10` · `F1-11`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` · `F1-02` · `F1-03` · `F1-04` · `F1-05` · `F1-06` · `F1-07` · `F1-09` · `F1-10` · `F1-11`
 
-**Sıradaki:** `F1-09` HTML → AST (Word yapıştırma), ardından `F1-08`'in
-kalanı (CommonMark spec suite)
+**Sıradaki:** `F1-08`'in kalanı — CommonMark spec suite'i indirip **uyum
+oranını ölçmek**. Faz 1'in çıkış kriterinin son parçası.
 
-> ⚠️ **Boyut kararı gerekiyor:** `@kalem/core` 11.72 kB / 12 kB — 0.28 kB
-> kaldı. F1-09 (HTML → AST) bütçeyi kesin aşar. Plan: F1-09'u **ayrı bir
-> giriş noktası** (`@kalem/core/html`) yapmak. Analiz §5.3 zaten bunu
-> öngörmüştü ("parser ayrı modül olarak tembel yüklenebilir") ve yapıştırma
-> zaten bir editör ihtiyacı — F3-07 boru hattı bunu kullanacak. Böylece
-> yalnızca Markdown işleyen kullanıcı o kodu indirmez.
+> **Boyut kararı (uygulandı):** F1-09 ayrı giriş noktasına alındı.
+> `@kalem/core` 11.73 / 12 kB · `@kalem/core/html` 2.21 / 6 kB.
+> Analiz §5.3 bunu zaten öngörmüştü. **Uyarı:** ana bütçede 0.27 kB kaldı;
+> Faz 2'de core'a kod eklenirse bütçe yeniden değerlendirilmeli.
 
 > **Karar (kapandı):** `F1-08` tam olarak F1-03'ten önce kurulamaz — gidiş-dönüş
 > koşucusu hem `parse` hem `serialize` olmadan hiçbir şey koşamaz. Bunun yerine
@@ -60,7 +58,7 @@ kalanı (CommonMark spec suite)
 
 **Yazılan kod:** `@kalem/core` — AST tipleri, künye kaydı, tip koruyucular,
 gezinme/konum/düzenleme yardımcıları, kaynak tarayıcı, blok ayrıştırıcı.
-567 test, kapsam %96 (dal), **11.72 kB / 12 kB**.
+627 test, kapsam %95 (dal), **11.73 kB / 12 kB** + `core/html` 2.21 kB.
 **`parse(md)` ve `serialize(ast)` çalışıyor; gidiş-dönüş 17/17 byte-birebir.**
 
 **Kayıt dokümanları:** [Faz 0 sonucu](./02-faz0-sonuc.md) ·
@@ -238,7 +236,7 @@ YAML/TOML frontmatter'ı **ayrıştırma, sadece koru** (opak string olarak). YA
 > **Kalan:** CommonMark spec suite'i indirip uyum oranını ölçmek,
 > property-based test (`fast-check`).
 
-### F1-09 · HTML → AST dönüştürücü `[L]` ⬜
+### F1-09 · HTML → AST dönüştürücü `[L]` ✅
 Yapıştırma normalizasyonunun beyni. Word, Google Docs, Excel, Notion ve genel web HTML'ini AST'ye çevirir.
 - Beyaz liste yaklaşımı; bilinmeyen etiket = içeriği düz metne düşür
 - Word'e özgü temizlik: `mso-*` stilleri, `<o:p>`, boş `<span>` yığınları, listeyi taklit eden `<p class="MsoListParagraph">`
@@ -246,6 +244,19 @@ Yapıştırma normalizasyonunun beyni. Word, Google Docs, Excel, Notion ve genel
 - Stil çıkarımı: `font-weight:bold` → `strong`, `font-style:italic` → `emphasis`
 - **Kabul:** gerçek Word ve GDocs kopya çıktılarından oluşan fixture seti doğru AST üretiyor
 - **Not:** Bu görev sürekli iyileştirilir; v1 için "makul" hedeflenir, "mükemmel" değil
+
+> **Yapıldı.** `@kalem/core/html` — **ayrı giriş noktası**. Yalnızca Markdown
+> işleyen kullanıcı bu kodu indirmez (2.21 kB, core bütçesinin dışında).
+>
+> DOM tipleri kullanılmıyor: dönüştürücü, gerçek bir `Element`'in yapısal
+> olarak uyduğu küçük bir arayüzle çalışıyor. HTML metnini DOM'a çevirmek
+> çağıranın işi; testler jsdom olmadan düz nesnelerle yazılıyor.
+>
+> Beyaz liste, stil çıkarımı (`font-weight` → `strong`), Word `<o:p>` ve boş
+> `<span>` yığını temizliği, **Google Docs sahte kalını** (`<b
+> style="font-weight:normal">`), görev listesi onay kutusu, tablo.
+> Yapıştırma en olası XSS yüzeyi olduğu için F1-10 kuralları burada da
+> uygulanıyor.
 
 ### F1-10 · Güvenlik katmanı `[M]` ✅
 - URL protokol beyaz listesi (`http`, `https`, `mailto`, `tel`, göreli); `javascript:`, `vbscript:`, `data:` (görsel istisnası hariç) reddedilir

@@ -201,6 +201,26 @@ const yaz = (ad, icerik) => {
 	const r = calistir(LOCALE, [y]);
 	bekle("template literal düz kısmı sayılmıyor", r.kod === 0, r.cikti);
 }
+{
+	// GERÇEK BİR SORUNDU: Biome uzun zincirleri satırlara bölünce
+	// `kalem-locale-ok` yorumu çağrıdan uzaklaşıyor ve kaçış sessizce
+	// etkisizleşiyordu. Kaçış artık ifadenin tamamını kapsıyor.
+	const y = yaz(
+		"cok-satirli-kacis.ts",
+		"// kalem-locale-ok: gerekçe\nconst a = deger\n\t.trim()\n\t.replace(/x/g, '')\n\t.toLowerCase();\n",
+	);
+	const r = calistir(LOCALE, [y]);
+	bekle("çok satırlı zincirde kaçış geçerli", r.kod === 0, r.cikti);
+}
+{
+	// Kaçış bir ÖNCEKİ ifadeye aitse bu ifadeyi kapsamamalı.
+	const y = yaz(
+		"kacis-sizmasi.ts",
+		"// kalem-locale-ok: baska bir sebep\nconst a = 1;\nconst b = x.toLowerCase();\n",
+	);
+	const r = calistir(LOCALE, [y]);
+	bekle("kaçış bir sonraki ifadeye sızmıyor", r.kod === 1, r.cikti);
+}
 
 for (const d of temizlenecek) rmSync(d, { recursive: true, force: true });
 

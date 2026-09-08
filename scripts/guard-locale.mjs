@@ -197,6 +197,31 @@ function argSay(s, acilisIdx) {
 	return -1;
 }
 
+/**
+ * Kaçış yorumu bu çağrıyı kapsıyor mu.
+ *
+ * Yalnızca "aynı satır ya da bir üst satır" bakmak **kırılgan**: Biome uzun
+ * zincirleri satırlara böldüğünde `// kalem-locale-ok` yorumu çağrıdan
+ * uzaklaşıyor ve kaçış sessizce etkisizleşiyor. Bu tam olarak iki kez
+ * yaşandı.
+ *
+ * Bunun yerine **ifadenin başına kadar** yukarı yürünüyor: bir önceki
+ * satırın sonu ifadeyi bitirmişse (`;`, `{`, `}` ya da boş satır) durulur.
+ */
+function izinliMi(satirlar, satirNo) {
+	for (let i = satirNo - 1; i >= 0 && satirNo - i <= IZIN_ARAMA_DERINLIGI; i--) {
+		const satir = satirlar[i] ?? "";
+		if (IZIN.test(satir)) return true;
+		const kirpik = satir.trim();
+		// İfade sınırı: buradan yukarısı başka bir ifadeye ait.
+		if (i < satirNo - 1 && (kirpik === "" || /[;{}]$/.test(kirpik))) return false;
+	}
+	return false;
+}
+
+/** Kaçış yorumu bu kadar satır yukarıya kadar aranır. */
+const IZIN_ARAMA_DERINLIGI = 8;
+
 function* dosyalar(yol) {
 	let st;
 	try {
@@ -236,12 +261,11 @@ for (const hedef of hedefler) {
 					}
 				}
 				const satirNo = kod.slice(0, idx).split("\n").length;
-				const buSatir = satirlar[satirNo - 1] ?? "";
-				const oncekiSatir = satirlar[satirNo - 2] ?? "";
-				if (IZIN.test(buSatir) || IZIN.test(oncekiSatir)) {
+				if (izinliMi(satirlar, satirNo)) {
 					m = kural.re.exec(kod);
 					continue;
 				}
+				const buSatir = satirlar[satirNo - 1] ?? "";
 				const sutun = idx - kod.lastIndexOf("\n", idx - 1);
 				bulgular.push({
 					dosya: relative(process.cwd(), dosya).split(sep).join("/"),

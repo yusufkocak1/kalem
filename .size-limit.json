@@ -7,6 +7,13 @@
     "gzip": true
   },
   {
+    "name": "@kalem/core/html — yapıştırma dönüştürücü",
+    "path": "packages/core/dist/html.js",
+    "import": "*",
+    "limit": "6 kB",
+    "gzip": true
+  },
+  {
     "name": "@kalem/viewer",
     "path": "packages/viewer/dist/index.js",
     "import": "*",
