@@ -103,10 +103,19 @@ Bunlar projenin iki temel vaadini **otomatik** koruyan testlerdir. Bunlar olmada
 > Taslaktan üç sapma mdast uyumu lehine yapıldı — ayrıntı:
 > [03-f1-01-ast-kararlari.md](./03-f1-01-ast-kararlari.md)
 
-### F1-02 · AST yardımcıları `[M]`
+### F1-02 · AST yardımcıları `[M]` ✅
 - `walk`, `visit`, `find`, `replace`, `remove`, `insertAt`, `clone`
 - Konum yardımcıları: `pathToNode`, `nodeAtPath`
 - **Kabul:** her fonksiyon için birim testi, %95 kapsam
+
+> **Yapıldı.** `path.ts` (yol çözme) + `traverse.ts` (gezinme) + `edit.ts`
+> (düzenleme). 109 test, core kapsamı **%100** (dallar ve fonksiyonlar dahil);
+> kapsam eşiği %90'dan %95'e çekildi.
+>
+> **Karar: düzenleme işlemleri değişmez (immutable).** `insertAt` / `replaceAt`
+> / `removeAt` girdiyi değiştirmez, yapısal paylaşımla yeni ağaç döndürür —
+> yalnızca yol üzerindeki atalar kopyalanır. F2-09'un geri al/ileri al yığını
+> ve F2'nin render karşılaştırması bunun üzerine kurulacak.
 
 ### F1-03 · Blok ayrıştırıcı `[L]`
 CommonMark blok yapısı: paragraf, ATX + setext başlık, fenced + indented kod, blockquote, liste (sırasız/sıralı, tight/loose, iç içe), thematic break, HTML blokları, boş satır işleme

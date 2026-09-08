@@ -66,6 +66,9 @@ export type {
 	Toml,
 	Yaml,
 } from "./ast.js";
+// --- Düzenleme (F1-02) ---
+export type { CloneOptions } from "./edit.js";
+export { clone, insertAt, remove, removeAt, replace, replaceAt } from "./edit.js";
 // --- Tip koruyucular (F1-01) ---
 export {
 	isBlock,
@@ -78,5 +81,11 @@ export {
 	isRoot,
 	isStructural,
 } from "./guards.js";
+// --- Konum yolları (F1-02) ---
+export type { Path } from "./path.js";
+export { nodeAtPath, parentAtPath, parentPath, pathEquals, pathToNode } from "./path.js";
 // --- Künye kaydı (F1-01) ---
 export { isParentContent, NODE_TYPES, SPECS, specOf } from "./spec.js";
+// --- Gezinme (F1-02) ---
+export type { VisitContext, Visitor, VisitorResult } from "./traverse.js";
+export { CONTINUE, EXIT, find, SKIP, visit, walk } from "./traverse.js";
