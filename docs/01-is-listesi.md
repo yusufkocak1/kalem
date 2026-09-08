@@ -21,6 +21,40 @@
 
 ---
 
+## İlerleme Durumu
+
+> Son güncelleme: 2026-09-08 · `master` · `pnpm verify` yeşil
+
+| Faz | Görev | Durum |
+|---|---|---|
+| **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
+| **Faz 1** — `@kalem/core` | 2 / 11 | 🔵 **Devam ediyor** |
+| **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | 🟡 Prototip hazır, matris doldurulmadı |
+| **Faz 2** — Viewer + başsız editör | 0 / 13 | ⬜ Başlanmadı |
+| **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
+| **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
+| **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
+| **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
+| | **10 / 72** | **%14** |
+
+### 👉 Şu an buradayız
+
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` · `F1-02`
+
+**Sıradaki:** `F1-03` · Blok ayrıştırıcı `[L]` — CommonMark blok yapısı
+
+> **Açık soru:** `F1-08` (gidiş-dönüş test koşucusu) planda F1-03'ten *sonra*
+> geliyor. Ayrıştırıcıyı ona **karşı** yazmak, sonradan doğrulamaktan güvenli
+> olabilir — sıra değiştirilsin mi, karar verilmedi.
+
+**Yazılan kod:** `@kalem/core` — AST tipleri, künye kaydı, tip koruyucular,
+gezinme/konum/düzenleme yardımcıları. 109 test, kapsam %100, 2.02 kB / 12 kB.
+
+**Kayıt dokümanları:** [Faz 0 sonucu](./02-faz0-sonuc.md) ·
+[F1-01 AST kararları](./03-f1-01-ast-kararlari.md)
+
+---
+
 ## Efor Notasyonu
 
 `[S]` ≈ 1 gün · `[M]` ≈ 2–4 gün · `[L]` ≈ 1–2 hafta · `[XL]` ≈ 2–4 hafta
@@ -88,7 +122,7 @@ Bunlar projenin iki temel vaadini **otomatik** koruyan testlerdir. Bunlar olmada
 
 ---
 
-# FAZ 1 — `@kalem/core`
+# FAZ 1 — `@kalem/core` 🔵 DEVAM EDİYOR (2 / 11)
 **Amaç:** DOM'suz, saf, test edilebilir Markdown çekirdeği. **Süre: ~5–7 hafta**
 
 > Bu faz tamamen saf fonksiyonlardan oluşur — hızlı ve keyifli test edilir. Editörün en riskli kısmına girmeden önce sağlam bir zemin kurar.
@@ -117,7 +151,7 @@ Bunlar projenin iki temel vaadini **otomatik** koruyan testlerdir. Bunlar olmada
 > yalnızca yol üzerindeki atalar kopyalanır. F2-09'un geri al/ileri al yığını
 > ve F2'nin render karşılaştırması bunun üzerine kurulacak.
 
-### F1-03 · Blok ayrıştırıcı `[L]`
+### F1-03 · Blok ayrıştırıcı `[L]` 👈 **SIRADAKİ**
 CommonMark blok yapısı: paragraf, ATX + setext başlık, fenced + indented kod, blockquote, liste (sırasız/sıralı, tight/loose, iç içe), thematic break, HTML blokları, boş satır işleme
 - **Kritik:** her düğüme `position` (satır/sütun ofset) ve **sözdizimi tercihi** meta verisi yaz (`marker: '-' | '*' | '+'`, `fence: '```' | '~~~'`, `headingStyle: 'atx' | 'setext'`)
 - **Kabul:** CommonMark spec suite'in blok bölümünde ≥ %90 geçiş
@@ -172,7 +206,7 @@ DOM'suz, AST üzerinde çalışan işlemler: `toggleMark`, `setBlockType`, `wrap
 
 ---
 
-# FAZ 1.5 — DOĞRULAMA SPIKE'I ⚠️
+# FAZ 1.5 — DOĞRULAMA SPIKE'I ⚠️ 🟡 (prototip hazır)
 **Amaç:** Blok-tabanlı contenteditable mimarisinin gerçekten çalıştığını, aylar harcamadan kanıtlamak. **Süre: ~1 hafta**
 
 > **Bu fazı atlama.** Sessiz geliştirme stratejisi seçildiği için dış geri bildirim yok; bu spike, mimari riski erken yakalayan tek mekanizma.
@@ -183,6 +217,13 @@ Tek dosyalık, test edilmemiş, çirkin bir prototip. Sadece şunu cevaplar: *bu
 - Blok başında Backspace → önceki bloğa birleş; blok ortasında Enter → böl
 - Bloklar arası sürükleyerek metin seçimi
 - **Zaten var:** bu prototipin ilk sürümü Artifact olarak üretildi — başlangıç noktası olarak kullan
+
+> **🟡 Kısmen yapıldı.** Prototip [`apps/demo/index.html`](../apps/demo/index.html)
+> içinde duruyor ve `pnpm demo` ile açılıyor. Ok tuşuyla blok geçişi, Backspace
+> birleştirme, Enter bölme, sürükle-bırak, balon araç çubuğu, slash menü ve
+> Word yapıştırma normalleştirmesi çalışıyor.
+> **Eksik:** bloklar arası sürükleyerek metin seçimi — listedeki üç maddeden
+> en riskli olanı ve F1.5-02'nin asıl sınayacağı şey.
 
 ### F1.5-02 · Riskli senaryo matrisi `[M]`
 Prototipi şu senaryolarda **elle** sına ve sonucu tabloya yaz:
