@@ -133,6 +133,19 @@ for (const ad of CEKIRDEK) {
 		}
 
 		if (ad === "core") {
+			// Node yerleşikleri: core hem tarayıcıda hem sunucuda çalışmalı.
+			// Test dosyaları `node:fs` kullanabilir (tipler açık) ama bunlar
+			// dist'e girmez; kapı tam olarak bu ayrımı zorluyor.
+			for (const hedef of importHedefleri(kod)) {
+				if (hedef.startsWith("node:")) {
+					hata(
+						ad,
+						`${kisa} → Node yerleşiği "${hedef}" import ediyor`,
+						"@kalem/core tarayıcıda da çalışmalı. Node'a özgü kod viewer/editor tarafına ya da ayrı bir pakete ait.",
+					);
+				}
+			}
+
 			for (const g of DOM_GLOBALLERI) {
 				const re = new RegExp(String.raw`(^|[^\w$.])` + g + String.raw`\b`);
 				if (re.test(kod)) {

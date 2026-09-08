@@ -35,7 +35,8 @@
   "devDependencies": {
     "tsdown": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "@types/node": "catalog:"
   },
   "publishConfig": {
     "access": "public"

@@ -21,6 +21,7 @@ export type {
 	Data,
 	Definition,
 	Delete,
+	DeleteSyntax,
 	Emphasis,
 	EmphasisSyntax,
 	Frontmatter,
@@ -98,6 +99,9 @@ export type { Path } from "./path.js";
 export { nodeAtPath, parentAtPath, parentPath, pathEquals, pathToNode } from "./path.js";
 export type { Line, LineEnding, ScanResult } from "./scanner.js";
 export { indentWidth, isBlank, scan } from "./scanner.js";
+// --- Serileştirici (F1-07) ---
+export type { SerializeOptions } from "./serialize.js";
+export { serialize } from "./serialize.js";
 // --- Künye kaydı (F1-01) ---
 export { isParentContent, NODE_TYPES, SPECS, specOf } from "./spec.js";
 // --- Gezinme (F1-02) ---

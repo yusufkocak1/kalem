@@ -41,7 +41,7 @@ export const SPECS: NodeSpecs = {
 	text: { type: "text", groups: ["inline"], content: "value", hasSyntax: false },
 	emphasis: { type: "emphasis", groups: ["inline"], content: "inlines", hasSyntax: true },
 	strong: { type: "strong", groups: ["inline"], content: "inlines", hasSyntax: true },
-	delete: { type: "delete", groups: ["inline"], content: "inlines", hasSyntax: false },
+	delete: { type: "delete", groups: ["inline"], content: "inlines", hasSyntax: true },
 	inlineCode: { type: "inlineCode", groups: ["inline"], content: "value", hasSyntax: true },
 	link: { type: "link", groups: ["inline"], content: "inlines", hasSyntax: true },
 	image: { type: "image", groups: ["inline"], content: "void", hasSyntax: true },

@@ -525,13 +525,28 @@ function startsNewBlock(line: Line): boolean {
 	return item.content !== "" && (item.number === null || item.number === 1);
 }
 
+/**
+ * Paragraf satırlarını ham içeriğe çevirir.
+ *
+ * CommonMark her satırın **baştaki** boşluğunu atar ama sondakini atmaz:
+ * satır sonundaki iki boşluk sert satır sonu demektir ve satır içi
+ * ayrıştırıcıya ulaşması gerekir. Yalnızca paragrafın tamamının sonundaki
+ * boşluk atılır.
+ */
+function paragraphContent(collected: readonly Line[]): string {
+	return collected
+		.map((l) => l.value.replace(/^[ \t]+/, ""))
+		.join("\n")
+		.replace(/[ \t]+$/, "");
+}
+
 function makeParagraph(collected: readonly Line[], inline: InlineParser): Paragraph {
 	const first = must(collected[0], "paragraf ilk satırı");
 	const last = must(collected[collected.length - 1], "paragraf son satırı");
 
 	return {
 		type: "paragraph",
-		children: inline(collected.map((l) => l.value.trim()).join("\n")),
+		children: inline(paragraphContent(collected)),
 		position: span(first, last),
 	};
 }
@@ -547,7 +562,7 @@ function makeSetextHeading(
 	return {
 		type: "heading",
 		depth: marker === "=" ? 1 : 2,
-		children: inline(collected.map((l) => l.value.trim()).join("\n")),
+		children: inline(paragraphContent(collected)),
 		syntax: { style: "setext", underline: marker },
 		position: span(first, underline),
 	};

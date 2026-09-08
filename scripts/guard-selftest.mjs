@@ -60,6 +60,8 @@ function sahteWorkspace(secenekler = {}) {
 		if (ad === "core" && secenekler.reactImport) kod = `import { useState } from "react";\n${kod}`;
 		if (ad === "core" && secenekler.domErisimi)
 			kod += `export const el = document.createElement("div");\n`;
+		if (ad === "core" && secenekler.nodeImport)
+			kod = `import { readFileSync } from "node:fs";\n${kod}`;
 		writeFileSync(join(dir, "dist", "index.js"), kod);
 	}
 	return kok;
@@ -107,6 +109,16 @@ console.log("\nSAFLIK KAPISI ÖZ-TESTİ");
 	bekle(
 		"core'a peerDependency ekleyen dal KIRILIYOR",
 		r.kod === 1 && /peerDependency/.test(r.cikti),
+		r.cikti,
+	);
+}
+{
+	// Testler `node:fs` kullanabilir (tipler açık) ama dist'e girmemeli:
+	// core tarayıcıda da çalışmak zorunda.
+	const r = calistir(PURITY, ["--root", kur({ nodeImport: true })]);
+	bekle(
+		"core'da node: yerleşiği import eden dal KIRILIYOR",
+		r.kod === 1 && /Node yerleşiği/.test(r.cikti),
 		r.cikti,
 	);
 }

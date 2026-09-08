@@ -680,7 +680,7 @@ function wrap(slots: Slots, opener: Delimiter, closer: Delimiter, used: number):
 	const children = mergeText(inner);
 	const wrapped: Inline =
 		marker === "~"
-			? { type: "delete", children }
+			? { type: "delete", children, syntax: { length: used === 2 ? 2 : 1 } }
 			: used === 2
 				? { type: "strong", children, syntax: { marker } }
 				: { type: "emphasis", children, syntax: { marker } };

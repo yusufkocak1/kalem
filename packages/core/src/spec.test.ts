@@ -69,14 +69,15 @@ describe("künye kaydı", () => {
 	it("`hasSyntax` yalnızca yazım tercihi olan tiplerde açık", () => {
 		// Yazılışı tek biçimli olan düğümlerin yazım tercihi olamaz.
 		expect(SPECS.paragraph.hasSyntax).toBe(false);
-		expect(SPECS.delete.hasSyntax).toBe(false); // GFM'de yalnızca ~~
 		expect(SPECS.text.hasSyntax).toBe(false);
+		expect(SPECS.blockquote.hasSyntax).toBe(false);
 
 		// Birden fazla geçerli yazılışı olanlarda açık.
 		expect(SPECS.heading.hasSyntax).toBe(true); // atx / setext
 		expect(SPECS.list.hasSyntax).toBe(true); // - / * / +
 		expect(SPECS.code.hasSyntax).toBe(true); // ``` / ~~~ / girintili
 		expect(SPECS.emphasis.hasSyntax).toBe(true); // * / _
+		expect(SPECS.delete.hasSyntax).toBe(true); // ~ / ~~ (GFM ikisini de kabul eder)
 	});
 });
 

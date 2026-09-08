@@ -367,10 +367,21 @@ export interface Strong extends NodeBase {
 	syntax?: EmphasisSyntax;
 }
 
+/**
+ * Üstü çizili işaretinin uzunluğu.
+ *
+ * GFM hem `~metin~` hem `~~metin~~` kabul eder; ikisi aynı anlama gelir,
+ * farklı yazılır.
+ */
+export interface DeleteSyntax {
+	length: 1 | 2;
+}
+
 /** GFM üstü çizili (`~~metin~~`). */
 export interface Delete extends NodeBase {
 	type: "delete";
 	children: Inline[];
+	syntax?: DeleteSyntax;
 }
 
 export interface InlineCode extends NodeBase {

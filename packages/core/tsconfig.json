@@ -4,7 +4,8 @@
     "lib": ["ES2022"],
     "rootDir": "src",
     "outDir": ".tsbuild",
-    "tsBuildInfoFile": ".tsbuild/.tsbuildinfo"
+    "tsBuildInfoFile": ".tsbuild/.tsbuildinfo",
+    "types": ["node"]
   },
   "include": ["src"],
   "references": []

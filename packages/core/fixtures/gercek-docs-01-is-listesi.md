@@ -28,27 +28,23 @@
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
-| **Faz 1** — `@kalem/core` | 7.5 / 11 | 🔵 **Devam ediyor** |
+| **Faz 1** — `@kalem/core` | 6 / 11 | 🔵 **Devam ediyor** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | 🟡 Prototip hazır, matris doldurulmadı |
 | **Faz 2** — Viewer + başsız editör | 0 / 13 | ⬜ Başlanmadı |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **15.5 / 72** | **%22** |
+| | **14 / 72** | **%19** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` · `F1-02` · `F1-03` · `F1-04` · `F1-05` · `F1-06` · `F1-07`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` · `F1-02` · `F1-03` · `F1-04` · `F1-05` · `F1-06`
 
-**Sıradaki:** `F1-10` güvenlik katmanı, `F1-11` komut çekirdeği,
-`F1-09` HTML → AST
-
-> ⚠️ **Boyut uyarısı:** `@kalem/core` 10.39 kB / 12 kB. Kalan üç görev
-> bütçeyi aşabilir; F1-09'un core'da mı yoksa ayrı pakette mi olacağı
-> yeniden değerlendirilmeli.
+**Sıradaki:** `F1-07` serileştirici (AST → Markdown), ardından `F1-08`
+gidiş-dönüş koşucusu — ayrıştırıcının gerçek uyum oranı orada ölçülecek
 
 > **Karar (kapandı):** `F1-08` tam olarak F1-03'ten önce kurulamaz — gidiş-dönüş
 > koşucusu hem `parse` hem `serialize` olmadan hiçbir şey koşamaz. Bunun yerine
@@ -57,8 +53,7 @@
 
 **Yazılan kod:** `@kalem/core` — AST tipleri, künye kaydı, tip koruyucular,
 gezinme/konum/düzenleme yardımcıları, kaynak tarayıcı, blok ayrıştırıcı.
-504 test, kapsam %96 (dal), **10.39 kB / 12 kB**.
-**`parse(md)` ve `serialize(ast)` çalışıyor; gidiş-dönüş 17/17 byte-birebir.**
+415 test, kapsam %97 (dal), 8.44 kB / 12 kB. **`parse(md)` çalışıyor.**
 
 **Kayıt dokümanları:** [Faz 0 sonucu](./02-faz0-sonuc.md) ·
 [F1-01 AST kararları](./03-f1-01-ast-kararlari.md)
@@ -209,31 +204,19 @@ YAML/TOML frontmatter'ı **ayrıştırma, sadece koru** (opak string olarak). YA
 > düşüyor. Sırası F1-04'ün önüne alındı: blok katmanına ait ve `blocks.ts`
 > zaten açıktı.
 
-### F1-07 · Serileştirici (AST → Markdown) `[L]` ✅
+### F1-07 · Serileştirici (AST → Markdown) `[L]` ⬜
 - F1-03'te saklanan sözdizimi tercihlerini **kullan** — kullanıcının `*` kullandığı yerde `*` üret
 - Yeni düğümler için yapılandırılabilir varsayılanlar (`bulletMarker`, `emphasisMarker`, `codeFence`)
 - Doğru kaçışlama (metin içindeki `*`, `_`, `#`, `[` vb.)
 - **Kabul:** F1-08'deki gidiş-dönüş testleri geçiyor
 
-> **Yapıldı.** Yazım tercihleri kullanılıyor, yeni düğümler için
-> `SerializeOptions` varsayılanları var. Kaçışlama **bağlama duyarlı**:
-> `5 * 3` kaçırılmıyor, `### 1. Başlık` içindeki `1.` kaçırılmıyor.
-> Blok arası boş satır sayısı `position`'dan okunuyor — F1-01'de bunun için
-> ayrı alan açmama kararının karşılığı.
-
-### F1-08 · Gidiş-dönüş test koşucusu ⭐ `[M]` 🔵 **YARIDA**
+### F1-08 · Gidiş-dönüş test koşucusu ⭐ `[M]` ⬜
 **Projenin en önemli test altyapısı.**
 - Golden-file koşucusu: `fixtures/*.md` → `serialize(parse(md)) === md` byte düzeyinde
 - Korpus topla: CommonMark spec örnekleri, 30+ popüler repo README'si, Obsidian vault örneği, karmaşık iç içe listeler, tablo içeren dosyalar
 - İdempotans testi: `serialize(parse(x)) === serialize(parse(serialize(parse(x))))`
 - Property-based test (`fast-check`, dev-only): rastgele AST → serialize → parse → derin eşitlik
 - **Kabul:** korpusun ≥ %95'i byte-birebir; kalan %5 bilinçli ve dokümante istisna
-
-> **🔵 Yarıda.** Golden-file koşucusu + idempotans testi çalışıyor.
-> **Korpusun 17/17'si byte-birebir** — bu depodaki gerçek dokümanlar
-> (analiz, iş listesi, CONTRIBUTING; CRLF ve BOM dahil) korpusun içinde.
-> **Kalan:** CommonMark spec suite'i indirip uyum oranını ölçmek,
-> property-based test (`fast-check`).
 
 ### F1-09 · HTML → AST dönüştürücü `[L]` ⬜
 Yapıştırma normalizasyonunun beyni. Word, Google Docs, Excel, Notion ve genel web HTML'ini AST'ye çevirir.
