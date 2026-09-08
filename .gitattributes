@@ -2,6 +2,12 @@
 # core.autocrlf açıksa bu ayar olmadan her checkout sahte fark üretir.
 * text=auto eol=lf
 
+# Gidiş-dönüş korpusu BYTE DÜZEYİNDE korunmalı.
+# `* text=auto eol=lf` bu dosyaların CRLF'ini LF'e çevirirdi ve taze bir
+# klonda CRLF testi sessizce anlamsızlaşırdı — tam olarak testin ölçmek
+# istediği şeyi ortadan kaldırarak.
+packages/core/fixtures/** -text
+
 # Metin muamelesi görmemesi gerekenler
 *.png binary
 *.jpg binary
