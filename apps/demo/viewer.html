@@ -1,0 +1,343 @@
+<meta charset="utf-8">
+<title>Kalem Viewer — Render Karşılaştırması</title>
+<style>
+	:root {
+		color-scheme: light;
+		--zemin: #fbfaf8;
+		--kart: #ffffff;
+		--kenar: #e3e0da;
+		--metin: #22201d;
+		--soluk: #6f6a62;
+		--vurgu: #0f4e4a;
+		--iyi: #1a7f5a;
+		--kotu: #b3402a;
+		--kod: "SFMono-Regular", ui-monospace, "Cascadia Mono", Consolas, monospace;
+	}
+	@media (prefers-color-scheme: dark) {
+		:root:not([data-theme="light"]) {
+			--zemin: #16151a;
+			--kart: #1e1d23;
+			--kenar: #34323b;
+			--metin: #e8e6e1;
+			--soluk: #9d978d;
+			--vurgu: #6fd3c6;
+			--iyi: #58d0a0;
+			--kotu: #ff9b82;
+		}
+	}
+	* { box-sizing: border-box; }
+	body {
+		margin: 0;
+		background: var(--zemin);
+		color: var(--metin);
+		font: 14px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+	}
+	header {
+		padding: 18px 22px 14px;
+		border-bottom: 1px solid var(--kenar);
+		display: flex;
+		flex-wrap: wrap;
+		gap: 14px;
+		align-items: baseline;
+	}
+	h1 { margin: 0; font-size: 17px; letter-spacing: -0.01em; }
+	h1 span { color: var(--soluk); font-weight: 400; }
+	.uyari {
+		margin: 0;
+		padding: 10px 22px;
+		background: color-mix(in srgb, var(--vurgu) 7%, var(--zemin));
+		border-bottom: 1px solid var(--kenar);
+		color: var(--soluk);
+		font-size: 13px;
+	}
+	.uyari b { color: var(--metin); }
+	nav { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+	button, select {
+		font: inherit;
+		font-size: 12.5px;
+		padding: 5px 11px;
+		border: 1px solid var(--kenar);
+		border-radius: 7px;
+		background: var(--kart);
+		color: var(--metin);
+		cursor: pointer;
+	}
+	button:hover { border-color: var(--vurgu); color: var(--vurgu); }
+	button:focus-visible, select:focus-visible { outline: 2px solid var(--vurgu); outline-offset: 2px; }
+
+	main {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+		gap: 1px;
+		background: var(--kenar);
+		border-bottom: 1px solid var(--kenar);
+	}
+	section { background: var(--kart); display: flex; flex-direction: column; min-height: 62vh; }
+	.baslik {
+		padding: 9px 14px;
+		border-bottom: 1px solid var(--kenar);
+		font-size: 11.5px;
+		text-transform: uppercase;
+		letter-spacing: 0.07em;
+		color: var(--soluk);
+		display: flex;
+		justify-content: space-between;
+		gap: 10px;
+	}
+	.baslik .ek { text-transform: none; letter-spacing: 0; }
+	textarea, pre.kaynak {
+		flex: 1;
+		margin: 0;
+		padding: 14px;
+		border: 0;
+		background: transparent;
+		color: inherit;
+		font-family: var(--kod);
+		font-size: 12.5px;
+		line-height: 1.6;
+		tab-size: 2;
+		overflow: auto;
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
+	textarea { resize: none; white-space: pre; }
+	textarea:focus { outline: 2px solid var(--vurgu); outline-offset: -2px; }
+
+	.rapor {
+		padding: 12px 22px 22px;
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+		gap: 12px;
+	}
+	.olcum {
+		border: 1px solid var(--kenar);
+		border-radius: 9px;
+		padding: 11px 13px;
+		background: var(--kart);
+	}
+	.olcum dt { font-size: 11.5px; color: var(--soluk); margin: 0 0 3px; }
+	.olcum dd { margin: 0; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+	.iyi { color: var(--iyi); }
+	.kotu { color: var(--kotu); }
+
+	/*
+	 * Geçici viewer tipografisi.
+	 *
+	 * Gerçek tema `@kalem/themes` içinde, F2-03'te gelecek. Buradaki stiller
+	 * yalnızca render'ın doğruluğunu göz kararı denetlenebilir kılmak için.
+	 */
+	.onizleme { flex: 1; overflow: auto; padding: 18px 20px; }
+	.kalem-doc { line-height: 1.65; }
+	.kalem-doc > :first-child { margin-top: 0; }
+	.kalem-doc h1, .kalem-doc h2, .kalem-doc h3 { line-height: 1.25; margin: 1.4em 0 0.5em; }
+	.kalem-doc h1 { font-size: 1.6em; }
+	.kalem-doc h2 { font-size: 1.3em; }
+	.kalem-doc h3 { font-size: 1.1em; }
+	.kalem-doc p, .kalem-doc ul, .kalem-doc ol, .kalem-doc blockquote { margin: 0 0 1em; }
+	.kalem-doc a { color: var(--vurgu); }
+	.kalem-doc code {
+		font-family: var(--kod);
+		font-size: 0.88em;
+		background: color-mix(in srgb, var(--metin) 8%, transparent);
+		padding: 0.12em 0.35em;
+		border-radius: 4px;
+	}
+	.kalem-doc pre {
+		background: color-mix(in srgb, var(--metin) 6%, transparent);
+		padding: 12px 14px;
+		border-radius: 8px;
+		overflow-x: auto;
+	}
+	.kalem-doc pre code { background: none; padding: 0; }
+	.kalem-doc blockquote {
+		border-left: 3px solid var(--kenar);
+		padding-left: 14px;
+		color: var(--soluk);
+	}
+	.kalem-doc hr { border: 0; border-top: 1px solid var(--kenar); margin: 1.6em 0; }
+	.kalem-doc table { border-collapse: collapse; width: 100%; display: block; overflow-x: auto; }
+	.kalem-doc th, .kalem-doc td { border: 1px solid var(--kenar); padding: 6px 10px; }
+	.kalem-doc .kalem-align-left { text-align: left; }
+	.kalem-doc .kalem-align-center { text-align: center; }
+	.kalem-doc .kalem-align-right { text-align: right; }
+	.kalem-doc .kalem-task { list-style: none; margin-left: -1.3em; }
+	.kalem-doc img { max-width: 100%; }
+</style>
+
+<header>
+	<h1>Kalem Viewer <span>— iki render hedefi, tek plan</span></h1>
+	<nav>
+		<button type="button" data-ornek="temel">Temel</button>
+		<button type="button" data-ornek="gfm">GFM</button>
+		<button type="button" data-ornek="guvenlik">Güvenlik</button>
+		<label class="baslik" style="border:0;padding:0;text-transform:none;letter-spacing:0">
+			ham HTML
+			<select id="politika">
+				<option value="escape">escape</option>
+				<option value="strip">strip</option>
+				<option value="allow">allow</option>
+			</select>
+		</label>
+		<button type="button" id="ayristirici">Ayrıştırıcı →</button>
+	</nav>
+</header>
+
+<p class="uyari">
+	<b>Salt okunur görüntüleyici.</b> Ortadaki panel <code>renderToDOM</code> ile
+	kuruldu — hiçbir aşamada <code>innerHTML</code> kullanılmadı. Sağdaki panel
+	aynı AST'den <code>renderToString</code> ile üretildi (DOM'suz, SSR yolu).
+	Aşağıdaki ölçüm ikisinin <b>byte-birebir</b> aynı olduğunu her tuşta yeniden
+	sınıyor. Düzenleme yok — editör Faz 2B'de.
+</p>
+
+<main>
+	<section>
+		<div class="baslik"><span>Markdown</span><span class="ek" id="girdiBilgi"></span></div>
+		<textarea id="girdi" spellcheck="false" aria-label="Markdown girdi"></textarea>
+	</section>
+	<section>
+		<div class="baslik"><span>renderToDOM</span><span class="ek">createElement + textContent</span></div>
+		<div class="onizleme"><div id="onizleme"></div></div>
+	</section>
+	<section>
+		<div class="baslik"><span>renderToString</span><span class="ek" id="ciktiBilgi"></span></div>
+		<pre class="kaynak" id="cikti"></pre>
+	</section>
+</main>
+
+<dl class="rapor">
+	<div class="olcum"><dt>DOM ↔ string</dt><dd id="esitlik">—</dd></div>
+	<div class="olcum"><dt>Plan düğümü</dt><dd id="dugum">—</dd></div>
+	<div class="olcum"><dt>renderToString</dt><dd id="sureString">—</dd></div>
+	<div class="olcum"><dt>renderToDOM</dt><dd id="sureDom">—</dd></div>
+</dl>
+
+<script type="importmap">
+	{
+		"imports": {
+			"@kalem/core": "/@kalem/core/index.js",
+			"@kalem/viewer": "/@kalem/viewer/index.js"
+		}
+	}
+</script>
+<script type="module">
+	import { parse } from "@kalem/core";
+	import { buildPlan, renderToDOM, renderToString } from "@kalem/viewer";
+
+	const ORNEKLER = {
+		temel: `# Kalem
+
+Word kadar kolay, **Markdown** kadar taşınabilir.
+
+- ayrıştırıcı
+- serileştirici
+  - iç içe madde
+
+> Alıntı, \`kod\` ve [bağlantı](https://ornek.com).
+
+\`\`\`ts
+const kok = parse(md);
+\`\`\`
+`,
+		gfm: `## Görev listesi
+
+- [x] AST tipleri
+- [x] Ayrıştırıcı
+- [ ] Editör motoru
+
+| Paket | Boyut | Bütçe |
+| :-- | --: | --: |
+| core | 11.51 kB | 12 kB |
+| viewer | 2.59 kB | 14 kB |
+
+~~Eski plan~~ ve çıplak https://commonmark.org adresi.
+
+Parantezli bağlantı: [Kalem](https://tr.wikipedia.org/wiki/Kalem_(araç))
+`,
+		guvenlik: `## Güvenlik katmanı
+
+Bunlar ayrıştırılır ama **etkisizleştirilir**:
+
+[tıkla](javascript:alert(1))
+
+[sekmeli](java\tscript:alert(1))
+
+![svg](data:image/svg+xml,%3Csvg%20onload=alert(1)%3E)
+
+Ham HTML politikası yukarıdaki açılır listeden değiştirilebilir:
+
+<img src=x onerror="alert(1)">
+
+Bunlar güvenli, olduğu gibi kalır:
+
+[normal](https://ornek.com) · [posta](mailto:a@b.c) · [göreli](/yol/dosya.md)
+`,
+	};
+
+	const girdi = document.getElementById("girdi");
+	const onizleme = document.getElementById("onizleme");
+	const ciktiEl = document.getElementById("cikti");
+	const politika = document.getElementById("politika");
+
+	function secenekler() {
+		return { html: politika.value };
+	}
+
+	function planDugumSay(plan) {
+		let n = 0;
+		const yigin = [...plan];
+		while (yigin.length > 0) {
+			const dugum = yigin.pop();
+			n++;
+			if (dugum.kind === "element") yigin.push(...dugum.children);
+		}
+		return n;
+	}
+
+	function guncelle() {
+		const md = girdi.value;
+		const options = secenekler();
+		const kok = parse(md);
+
+		const t0 = performance.now();
+		const metin = renderToString(kok, options);
+		const t1 = performance.now();
+		renderToDOM(kok, onizleme, options);
+		const t2 = performance.now();
+
+		ciktiEl.textContent = metin;
+
+		// Asıl iddia: iki hedef aynı çıktıyı veriyor. `innerHTML` burada
+		// yalnızca **okunuyor** — render tarafında hiç kullanılmıyor.
+		const esit = onizleme.innerHTML === metin;
+		const esitlik = document.getElementById("esitlik");
+		esitlik.textContent = esit ? "byte-birebir ✓" : "AYRIŞIYOR ✗";
+		esitlik.className = esit ? "iyi" : "kotu";
+
+		document.getElementById("dugum").textContent = String(planDugumSay(buildPlan(kok, options)));
+		document.getElementById("sureString").textContent = `${(t1 - t0).toFixed(2)} ms`;
+		document.getElementById("sureDom").textContent = `${(t2 - t1).toFixed(2)} ms`;
+		document.getElementById("girdiBilgi").textContent = `${md.length} karakter`;
+		document.getElementById("ciktiBilgi").textContent = `${metin.length} karakter`;
+	}
+
+	for (const dugme of document.querySelectorAll("[data-ornek]")) {
+		dugme.addEventListener("click", () => {
+			girdi.value = ORNEKLER[dugme.dataset.ornek];
+			guncelle();
+		});
+	}
+	document.getElementById("ayristirici").addEventListener("click", () => {
+		window.location.href = "/core.html";
+	});
+
+	girdi.addEventListener("input", guncelle);
+	politika.addEventListener("change", guncelle);
+	girdi.value = ORNEKLER.temel;
+	document.documentElement.lang = "tr";
+	guncelle();
+
+	// Konsoldan ve Playwright'tan erişim için. Demo sayfasının parçası;
+	// kütüphane hiçbir yerde global'e yazmaz.
+	window.kalem = { parse, buildPlan, renderToDOM, renderToString };
+</script>

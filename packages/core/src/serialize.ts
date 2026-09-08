@@ -276,9 +276,7 @@ function listItem(node: ListItem, marker: string, o: Resolved): string {
 }
 
 function definition(node: Definition): string {
-	const url = /[ \t]/.test(node.url) ? `<${node.url}>` : node.url;
-	const title = node.title === null ? "" : ` "${node.title}"`;
-	return `[${node.label}]: ${url}${title}`;
+	return `[${node.label}]: ${destination(node.url)}${titlePart(node.title, undefined)}`;
 }
 
 /**
@@ -497,11 +495,11 @@ function link(node: Extract<Inline, { type: "link" }>, o: Resolved): string {
 	if (style === "autolink") return `<${plain(node.children)}>`;
 	if (style === "literal") return plain(node.children);
 
-	return `[${label}](${destination(node.url)}${titlePart(node.title)})`;
+	return `[${label}](${destination(node.url)}${titlePart(node.title, node.syntax?.titleDelimiter)})`;
 }
 
 function image(node: Extract<Inline, { type: "image" }>): string {
-	return `![${node.alt ?? ""}](${destination(node.url)}${titlePart(node.title)})`;
+	return `![${node.alt ?? ""}](${destination(node.url)}${titlePart(node.title, node.syntax?.titleDelimiter)})`;
 }
 
 function reference(
@@ -516,13 +514,49 @@ function reference(
 	return `${prefix}[${inner}][${label}]`;
 }
 
-/** Boşluk içeren hedef açılı ayraca alınır. */
+/**
+ * Hedefi yazar.
+ *
+ * AST çözülmüş değeri taşıdığı için (`\(` orada zaten `(`), kaçışı burada
+ * geri koymak gerekiyor. İki biçim var ve seçim içeriğe bakıyor:
+ *
+ * - Boşluk ya da açılı ayraç varsa `<…>` — okunur ve tek kuralla doğru.
+ * - Değilse çıplak. Parantezler **dengeliyse dokunulmuyor**: `foo(bar)`
+ *   böyle yazılabilir ve gidiş-dönüş byte-birebir kalır. Dengesizse
+ *   hepsi kaçışlanır, yoksa bağlantı erken kapanır.
+ */
 function destination(url: string): string {
-	return url === "" || /[ \t<>]/.test(url) ? `<${url}>` : url;
+	if (url === "" || /[\s<>]/.test(url)) return `<${url.replace(/[\\<>]/g, "\\$&")}>`;
+	const escaped = url.replace(/\\/g, "\\\\");
+	return balancedParens(escaped) ? escaped : escaped.replace(/[()]/g, "\\$&");
 }
 
-function titlePart(title: string | null): string {
-	return title === null ? "" : ` "${title}"`;
+/** Parantezler dengeli mi — hiçbir ön ek eksiye düşmüyor ve sonuç sıfır. */
+function balancedParens(value: string): boolean {
+	let depth = 0;
+	for (const ch of value) {
+		if (ch === "(") depth++;
+		else if (ch === ")" && --depth < 0) return false;
+	}
+	return depth === 0;
+}
+
+/**
+ * Başlığı yazar.
+ *
+ * Ayraç kaynaktaki tercihtir (`'x'` yazan `"x"` görmemeli). Kapanış
+ * karakteri ve ters bölü kaçışlanıyor; başka hiçbir şeye dokunulmuyor.
+ */
+function titlePart(title: string | null, delimiter: '"' | "'" | "(" | undefined): string {
+	if (title === null) return "";
+	const open = delimiter ?? '"';
+	const close = open === "(" ? ")" : open;
+	let escaped = title.split("\\").join("\\\\");
+	escaped =
+		open === "("
+			? escaped.split("(").join("\\(").split(")").join("\\)")
+			: escaped.split(close).join(`\\${close}`);
+	return ` ${open}${escaped}${close}`;
 }
 
 /** Alt ağaçtaki düz metin — autolink ve literal için. */

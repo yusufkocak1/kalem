@@ -23,28 +23,34 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-08 · `master` · `pnpm verify` yeşil
+> Son güncelleme: 2026-09-08 · `master` · `pnpm verify` yeşil · Playwright 78/78
 
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
-| **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | 🟡 Prototip hazır, matris doldurulmadı |
-| **Faz 2** — Viewer + başsız editör | 0 / 13 | ⬜ Başlanmadı |
+| **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
+| **Faz 2** — Viewer + başsız editör | 2 / 13 | 🔵 2A sürüyor |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **19 / 72** | **%26** |
+| | **21 / 72** | **%29** |
 
-**İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı
+**İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` · `F1-02` · `F1-03` · `F1-04` · `F1-05` · `F1-06` · `F1-07` · `F1-08` · `F1-09` · `F1-10` · `F1-11`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` · `F2-02`
 
-**Sıradaki:** `F1.5` doğrulama spike'ı (prototip elde, matris doldurulacak)
-ya da doğrudan **Faz 2** — viewer ve başsız editör.
+**Sıradaki:** `F2-03` viewer stilleri (`@kalem/themes`), ardından `F2-04`'ün
+eksik yarısı (axe) ve **2B** — blok motoru (`F2-05`).
+
+> **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
+> Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
+> Bunun bedeli, matrisin sınayacağı şeylerin — IME, bloklar arası
+> sürükleyerek seçim, mobil klavye — **2B'de gerçek kodda** karşımıza
+> çıkması. `F2-06` ve `F2-13` bunu üstlenmek zorunda.
 
 > **Boyut kararı (uygulandı):** editöre özgü iki modül ayrı giriş
 > noktalarına alındı. Boyut kapısı bunu kendisi dayattı — core bütçeyi
@@ -52,13 +58,18 @@ ya da doğrudan **Faz 2** — viewer ve başsız editör.
 >
 > | Giriş | Boyut | Bütçe |
 > |---|---|---|
-> | `@kalem/core` | 11.11 kB | 12 kB |
-> | `@kalem/core/commands` | 2.27 kB | 4 kB |
+> | `@kalem/core` | 11.51 kB | 12 kB |
+> | `@kalem/core/commands` | 2.28 kB | 4 kB |
 > | `@kalem/core/html` | 2.21 kB | 6 kB |
+> | `@kalem/viewer` | 2.59 kB | 14 kB |
 >
 > Gerekçe ikisinde de aynı: yalnızca Markdown işleyen kullanıcı (SSR,
 > derleme betiği) editör komutlarını ve yapıştırma dönüştürücüsünü
 > indirmemeli. Analiz §5.3 bunu öngörmüştü.
+>
+> ⚠️ **Core'da 0.49 kB kaldı.** Core özellik olarak tamam; buraya yeni
+> bir şey eklenecekse ya bütçe gerekçelendirilerek yükseltilmeli ya da
+> modül ayrı giriş noktasına alınmalı.
 
 > **Karar (kapandı):** `F1-08` tam olarak F1-03'ten önce kurulamaz — gidiş-dönüş
 > koşucusu hem `parse` hem `serialize` olmadan hiçbir şey koşamaz. Bunun yerine
@@ -66,9 +77,25 @@ ya da doğrudan **Faz 2** — viewer ve başsız editör.
 > koşucu ikisi de var olur olmaz devreye girecek.
 
 **Yazılan kod:** `@kalem/core` — AST tipleri, künye kaydı, tip koruyucular,
-gezinme/konum/düzenleme yardımcıları, kaynak tarayıcı, blok ayrıştırıcı.
-642 test, kapsam %96 (dal) ve **%100 satır**, `core` **11.11 / 12 kB**.
-**`parse(md)` ve `serialize(ast)` çalışıyor; gidiş-dönüş 17/17 byte-birebir.**
+gezinme/konum/düzenleme yardımcıları, kaynak tarayıcı, blok ve satır içi
+ayrıştırıcı, serileştirici, güvenlik katmanı, komutlar, HTML dönüştürücü.
+`@kalem/viewer` — render planı, `renderToDOM`, `renderToString`.
+**724 birim testi** + **78 tarayıcı testi** (Chromium · Firefox · WebKit).
+`parse(md)` ↔ `serialize(ast)` gidiş-dönüş 17/17 byte-birebir;
+`renderToDOM` ↔ `renderToString` üç motorda byte-birebir.
+
+> **Faz 2'nin ilk bulduğu şey Faz 1 hatası oldu.** Viewer testleri yazılırken
+> üç gerçek kusur çıktı ve düzeltildi:
+> 1. `core`'un giriş noktası `parse`'ı hiç dışa aktarmıyordu — paket
+>    dışarıdan kullanılamaz hâldeydi ve tüm testler modülleri doğrudan
+>    import ettiği için hiçbiri bunu görmüyordu.
+> 2. Bağlantı hedefinde **dengeli parantez** desteklenmiyordu:
+>    `[a](https://.../Kalem_(araç))` bağlantı bile sayılmıyordu.
+> 3. Bağlantı başlığında ters bölü kaçışı (`"tır\"nak"`) çalışmıyordu.
+>
+> (2) ve (3) tek bir regex'ten kaynaklanıyordu; hedef/başlık okuması elle
+> yazılmış bir tarayıcıya taşındı. Ders: paketler arası testler `dist`'e
+> değil kaynağa bakmalı — `vitest.config.ts`'e takma ad eklendi.
 
 **Kayıt dokümanları:** [Faz 0 sonucu](./02-faz0-sonuc.md) ·
 [F1-01 AST kararları](./03-f1-01-ast-kararlari.md)
@@ -350,21 +377,49 @@ Sonuçları değerlendir ve **açıkça karar ver**:
 
 ## 2A · `@kalem/viewer` (~1 hafta)
 
-### F2-01 · `renderToDOM(ast, el)` `[M]` ⬜
-AST → DOM, `createElement` + `textContent` ile. `innerHTML` **hiçbir yerde kullanılmaz**.
-- **Kabul:** tüm blok/satır içi tipleri doğru render ediliyor
+> **Mimari karar (uygulandı):** iki render hedefi ayrı ayrı yazılmadı.
+> Aralarına saf bir **render planı** kondu (`plan.ts`): AST → element
+> tarifi. `renderToDOM` ve `renderToString` yalnızca o planı çeviriyor.
+> Böylece F2-02'nin "aynı çıktıyı üretiyor" kriteri umut değil, yapısal
+> sonuç — ve ölçülebilir: `renderToString(ast) === kapsayıcı.innerHTML`,
+> byte-birebir. Bu eşitlik SSR hidrasyonunun da tam ihtiyacı.
 
-### F2-02 · `renderToString(ast)` `[M]` ⬜
+### F2-01 · `renderToDOM(ast, el)` `[M]` ✅
+AST → DOM, `createElement` + `textContent` ile. `innerHTML` **hiçbir yerde kullanılmaz**.
+- **Kabul:** tüm blok/satır içi tipleri doğru render ediliyor ✅
+
+> Tek istisna `html: "allow"` politikası — orada da kütüphane HTML
+> ayrıştırmıyor, `renderRawHtml` kancasıyla işi çağırana devrediyor.
+> Kanca yoksa ham HTML metin olarak basılıyor (görünür ve zararsız).
+> `document` kapsayıcının kendi belgesinden okunuyor: iframe ve
+> `<template>` içeriği global `document`'a bağlanınca sessizce bozulur.
+
+### F2-02 · `renderToString(ast)` `[M]` ✅
 Saf, DOM'suz fonksiyon. Doğru HTML kaçışlaması.
-- **Kabul:** Node'da (DOM shim olmadan) çalışıyor; F2-01 ile aynı çıktıyı üretiyor
+- **Kabul:** Node'da (DOM shim olmadan) çalışıyor ✅; F2-01 ile aynı çıktıyı üretiyor ✅
+
+> Kaçışlama `escapeHtml`'den ayrı: HTML serileştirme algoritması (Standard
+> §13.3) metinde yalnızca `&`, `<`, `>`, U+00A0'yı kaçışlar. Fazladan
+> kaçışlamak çıktıyı bozmaz ama **eşitliği** bozardı.
 
 ### F2-03 · Viewer stilleri `[S]` ⬜
-`@kalem/themes` içindeki temel tipografi; `mdx-` sınıf öneki
+`@kalem/themes` içindeki temel tipografi; `kalem-` sınıf öneki
 - **Kabul:** salt-okunur bir doküman düzgün görünüyor
 
-### F2-04 · Viewer testleri `[S]` ⬜
+> Sınıf öneki plandaki `mdx-` değil `kalem-`: `mdx-` marka kararından önce
+> yazılmıştı. Önek `classPrefix` seçeneğiyle değiştirilebilir.
+> Geçici tipografi `apps/demo/viewer.html` içinde duruyor; asıl tema
+> paketi bu adımda çıkarılacak.
+
+### F2-04 · Viewer testleri `[S]` 🟡 **KISMEN**
 Render doğruluğu + XSS fixture'ları + a11y (axe)
-- **Kabul:** CI'da yeşil, ≤ 14 kB
+- **Kabul:** CI'da yeşil ✅, ≤ 14 kB ✅ (2.59 kB)
+
+> **Var:** 51 birim testi (`renderToString`, saf, Node'da) + 26 tarayıcı
+> testi × 3 motor = 78 Playwright testi. Chromium, Firefox ve WebKit'te
+> DOM ↔ string eşitliği byte-birebir doğrulandı.
+> **Eksik:** a11y (axe) taraması. Erişilebilirlik geçişi F3-10'da bir
+> bütün olarak ele alınacak; viewer için ayrı bir axe koşusu oraya bağlı.
 
 ## 2B · `@kalem/editor` — blok motoru (~6–8 hafta)
 

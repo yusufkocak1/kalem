@@ -84,6 +84,16 @@
       }
     },
     {
+      "includes": ["apps/demo/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUndeclaredDependencies": "off"
+          }
+        }
+      }
+    },
+    {
       "includes": ["**/*.test.ts", "e2e/**"],
       "linter": {
         "rules": {

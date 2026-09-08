@@ -21,7 +21,7 @@
  * yıldızlar vurgu değildir. Bu yüzden bunlar birinci geçişte kesinleşir ve
  * ikinci geçiş onların içine bakmaz.
  */
-import type { Inline, InlineCode, Link, Text } from "./ast.js";
+import type { Inline, InlineCode, Link, LinkSyntax, Text } from "./ast.js";
 
 /**
  * Açık bir `[` ya da `![` — bağlantı/görsel adayı.
@@ -86,10 +86,142 @@ const INLINE_HTML =
 /**
  * `](hedef "başlık")` — bağlantının kapanış kısmı.
  *
- * Hedef ya açılı ayraç içindedir ya da boşluk/parantez içermeyen bir dizidir.
+ * ## Neden düzenli ifade değil
+ *
+ * Burası önce tek bir regex'ti ve iki gerçek durumu sessizce kaçırıyordu:
+ *
+ * 1. **Dengeli parantez.** CommonMark hedefte parantez kabul eder —
+ *    `[a](foo(bar))` geçerli bir bağlantıdır. Wikipedia bağlantılarının
+ *    büyük kısmı tam olarak böyle. Dengeli parantez düzenli bir dil
+ *    değildir; regex yalnızca sabit derinliğe kadar sayabilir.
+ * 2. **Başlıkta ters bölü kaçışı.** `"tır\"nak"` geçerli bir başlıktır.
+ *
+ * İkisi de elle yazılmış bir tarayıcıda birkaç düzine satır tutuyor ve
+ * bu sefer eksiksiz. Bu hatayı Faz 2'de viewer testleri ortaya çıkardı:
+ * `[tıkla](javascript:alert(1))` bağlantı olarak bile ayrıştırılmıyordu.
  */
-const LINK_TAIL =
-	/^\]\([ \t]*(?:<([^<>\n]*)>|([^\s()]*))(?:[ \t]+(?:"([^"]*)"|'([^']*)'|\(([^()]*)\)))?[ \t]*\)/;
+interface InlineTail {
+	url: string;
+	title: string | null;
+	delimiter: '"' | "'" | "(" | undefined;
+	length: number;
+}
+
+function skipTailSpace(source: string, from: number): number {
+	let i = from;
+	while (i < source.length) {
+		const ch = source[i];
+		if (ch !== " " && ch !== "\t" && ch !== "\n") break;
+		i++;
+	}
+	return i;
+}
+
+/**
+ * Hedefi okur.
+ *
+ * Kaçışlar **çözülerek** saklanır (`\(` → `(`), metin düğümlerindeki
+ * kuralın aynısı: AST kaynak metni değil, çözülmüş değeri taşır.
+ * Serileştirici yazarken gereken kaçışı kendisi koyar.
+ */
+function readDestination(source: string, start: number): { value: string; end: number } | null {
+	let out = "";
+	let i = start;
+
+	if (source[start] === "<") {
+		i = start + 1;
+		while (i < source.length) {
+			const ch = source[i] as string;
+			const next = source[i + 1];
+			if (ch === "\\" && next !== undefined && ESCAPABLE.includes(next)) {
+				out += next;
+				i += 2;
+				continue;
+			}
+			if (ch === ">") return { value: out, end: i + 1 };
+			if (ch === "<" || ch === "\n") return null;
+			out += ch;
+			i++;
+		}
+		return null;
+	}
+
+	let depth = 0;
+	while (i < source.length) {
+		const ch = source[i] as string;
+		const next = source[i + 1];
+		if (ch === "\\" && next !== undefined && ESCAPABLE.includes(next)) {
+			out += next;
+			i += 2;
+			continue;
+		}
+		if (UNICODE_WHITESPACE.test(ch)) break;
+		if (ch === "(") depth++;
+		else if (ch === ")") {
+			if (depth === 0) break;
+			depth--;
+		}
+		out += ch;
+		i++;
+	}
+	// Kapanmamış parantez hedefi geçersiz kılar; `[a](foo(bar)` bağlantı değil.
+	return depth === 0 ? { value: out, end: i } : null;
+}
+
+/** Başlığı okur; hangi ayracın kullanıldığını da bildirir. */
+function readTitle(
+	source: string,
+	start: number,
+): { value: string; delimiter: '"' | "'" | "("; end: number } | null {
+	const open = source[start];
+	if (open !== '"' && open !== "'" && open !== "(") return null;
+	const close = open === "(" ? ")" : open;
+
+	let out = "";
+	let i = start + 1;
+	while (i < source.length) {
+		const ch = source[i] as string;
+		const next = source[i + 1];
+		if (ch === "\\" && next !== undefined && ESCAPABLE.includes(next)) {
+			out += next;
+			i += 2;
+			continue;
+		}
+		if (ch === close) return { value: out, delimiter: open, end: i + 1 };
+		// Parantezli başlıkta iç içe parantez yasak (CommonMark §6.3).
+		if (open === "(" && ch === "(") return null;
+		out += ch;
+		i++;
+	}
+	return null;
+}
+
+function parseInlineTail(rest: string): InlineTail | null {
+	if (!rest.startsWith("](")) return null;
+
+	const destination = readDestination(rest, skipTailSpace(rest, 2));
+	if (destination === null) return null;
+
+	let i = destination.end;
+	let title: string | null = null;
+	let delimiter: '"' | "'" | "(" | undefined;
+
+	// Başlık ancak hedeften sonra boşluk varsa gelebilir: `[a](/u"t")`
+	// CommonMark'a göre bağlantı değildir.
+	const afterDestination = i;
+	i = skipTailSpace(rest, i);
+	if (i > afterDestination) {
+		const parsed = readTitle(rest, i);
+		if (parsed !== null) {
+			title = parsed.value;
+			delimiter = parsed.delimiter;
+			i = skipTailSpace(rest, parsed.end);
+		}
+	}
+
+	if (rest[i] !== ")") return null;
+	return { url: destination.value, title, delimiter, length: i + 1 };
+}
 
 /** `][etiket]`, `][]` ya da yalnızca `]` — başvurulu bağlantının kapanışı. */
 const REFERENCE_TAIL = /^\](?:\[((?:[^\\[\]]|\\.)*)\])?/;
@@ -436,7 +568,7 @@ function closeBracket(
 	// Ayraçlar arasındaki metin — başvurulu biçimde etiket olarak kullanılır.
 	const innerRaw = raw.slice(open.rawStart + (open.image ? 2 : 1), closeIndex);
 
-	const inlineTail = LINK_TAIL.exec(rest);
+	const inlineTail = parseInlineTail(rest);
 	const refTail = inlineTail === null ? REFERENCE_TAIL.exec(rest) : null;
 	if (inlineTail === null && refTail === null) return null;
 
@@ -455,15 +587,19 @@ function closeBracket(
 	for (const b of brackets) if (b.index >= open.index) b.active = false;
 
 	if (inlineTail !== null) {
-		const url = inlineTail[1] ?? inlineTail[2] ?? "";
-		const title = inlineTail[3] ?? inlineTail[4] ?? inlineTail[5] ?? null;
-		const syntax = { style: "inline" } as const;
+		const { url, title, delimiter } = inlineTail;
+		// Başlık ayracı kaynak yazım tercihidir: `'x'` yazan kullanıcı geri
+		// yazıldığında `"x"` görmemeli (F1-01 kararı).
+		const syntax: LinkSyntax =
+			delimiter === undefined
+				? { style: "inline" }
+				: { style: "inline", titleDelimiter: delimiter };
 		(slots[open.index] as Inline[]).push(
 			open.image
 				? { type: "image", url, alt: plainText(children), title, syntax }
 				: { type: "link", url, title, children, syntax },
 		);
-		return closeIndex + inlineTail[0].length;
+		return closeIndex + inlineTail.length;
 	}
 
 	const tail = refTail as RegExpExecArray;

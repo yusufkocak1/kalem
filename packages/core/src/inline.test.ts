@@ -386,3 +386,97 @@ describe("iç içe olmayan bağlantılar", () => {
 		expect(yapi("[![a](/r.png)](/u)")).toEqual(["link[image()]"]);
 	});
 });
+
+/**
+ * Bağlantı hedefi ve başlığı — elle yazılmış tarayıcı.
+ *
+ * Bu bölüm, hedef/başlık okuması regex'ten tarayıcıya geçirilirken yazıldı.
+ * Eski regex iki gerçek durumu sessizce kaçırıyordu ve hatayı Faz 2'de
+ * viewer testleri buldu, ayrıştırıcı testleri değil.
+ */
+describe("bağlantı hedefi", () => {
+	const url = (raw: string) => (tek(raw) as { url?: string }).url;
+
+	it("dengeli parantez hedefte kabul ediliyor", () => {
+		expect(url("[a](foo(bar))")).toBe("foo(bar)");
+	});
+
+	it("iç içe dengeli parantez", () => {
+		expect(url("[a](foo(and(bar)))")).toBe("foo(and(bar))");
+	});
+
+	/** Wikipedia bağlantılarının klasik biçimi — en sık gerçek durum. */
+	it("gerçek dünya: parantezli Wikipedia bağlantısı", () => {
+		expect(url("[a](https://tr.wikipedia.org/wiki/Kalem_(araç))")).toBe(
+			"https://tr.wikipedia.org/wiki/Kalem_(araç)",
+		);
+	});
+
+	it("javascript: şeması ayrıştırılıyor — etkisizleştirme render'ın işi", () => {
+		expect(url("[a](javascript:alert(1))")).toBe("javascript:alert(1)");
+	});
+
+	it("kapanmamış parantez bağlantıyı iptal ediyor", () => {
+		expect((tek("[a](foo(bar)") as Inline).type).not.toBe("link");
+	});
+
+	/** Kaçırılmış parantez dengeye sayılmaz: sondaki `)` bağlantıyı kapatır. */
+	it("kaçırılmış parantez hedefte çözülüyor", () => {
+		expect(url("[a](foo\\(bar)")).toBe("foo(bar");
+	});
+
+	it("kaçışlar hedefte çözülüyor", () => {
+		expect(url("[a](/b\\_c)")).toBe("/b_c");
+	});
+
+	it("açılı ayraçlı hedefte boşluk serbest", () => {
+		expect(url("[a](<b c>)")).toBe("b c");
+	});
+
+	it("boş hedef", () => {
+		expect(url("[a]()")).toBe("");
+	});
+});
+
+describe("bağlantı başlığı", () => {
+	const baslik = (raw: string) => (tek(raw) as { title?: string | null }).title;
+	const ayrac = (raw: string) => (tek(raw) as { syntax?: { titleDelimiter?: string } }).syntax;
+
+	it("ters bölü ile kaçırılmış tırnak başlıkta çözülüyor", () => {
+		expect(baslik('[a](/y "tır\\"nak")')).toBe('tır"nak');
+	});
+
+	it("tek tırnaklı başlık", () => {
+		expect(baslik("[a](/y 'b')")).toBe("b");
+	});
+
+	it("parantezli başlık", () => {
+		expect(baslik("[a](/y (b))")).toBe("b");
+	});
+
+	it("kullanılan ayraç saklanıyor", () => {
+		expect(ayrac("[a](/y 'b')")?.titleDelimiter).toBe("'");
+		expect(ayrac('[a](/y "b")')?.titleDelimiter).toBe('"');
+		expect(ayrac("[a](/y (b))")?.titleDelimiter).toBe("(");
+	});
+
+	it("başlıksız bağlantıda ayraç yazılmıyor", () => {
+		expect(ayrac("[a](/y)")?.titleDelimiter).toBeUndefined();
+	});
+
+	/**
+	 * CommonMark: başlık ancak hedeften **sonra boşluk varsa** başlıktır.
+	 * Boşluk yoksa tırnaklar hedefin parçasıdır — bağlantı iptal olmaz,
+	 * URL'ye girer. Bu testi yazarken tersini varsaymıştım; şartname haklı.
+	 */
+	it("boşluksuz tırnak başlık değil, hedefin parçası", () => {
+		const node = tek('[a](/y"b")') as { type: string; url?: string; title?: string | null };
+		expect(node.type).toBe("link");
+		expect(node.url).toBe('/y"b"');
+		expect(node.title).toBeNull();
+	});
+
+	it("kapanmamış başlık bağlantıyı iptal ediyor", () => {
+		expect((tek('[a](/y "b)') as Inline).type).not.toBe("link");
+	});
+});

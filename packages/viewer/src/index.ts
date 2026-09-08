@@ -1,8 +1,23 @@
 /**
- * @kalem/viewer — AST → DOM / SSR string render
+ * @kalem/viewer — AST → DOM / HTML metni
  *
- * Faz 0 yer tutucusu. Gerçek uygulama Faz 2'de gelir.
- * Bu dosyanın tek görevi build/tip/boyut hattının uçtan uca çalıştığını
- * kanıtlamak; herhangi bir kütüphane davranışı içermez.
+ * Salt okunur görüntüleyici. İki hedefi var ve ikisi de **aynı** render
+ * planından beslenir (bkz. `plan.ts`), dolayısıyla aynı çıktıyı verir:
+ *
+ * - `renderToDOM(ast, el)` — tarayıcı. `innerHTML` kullanılmaz.
+ * - `renderToString(ast)`  — SSR. Saf fonksiyon, DOM gerektirmez.
+ *
+ * Editör (`@kalem/editor`) bu paketi kullanmaz; kendi artımlı DOM yamasını
+ * uygular. Viewer'ın işi, düzenlenmeyen içeriği ucuza göstermek.
  */
-export const PACKAGE = "@kalem/viewer";
+export type { RenderToDomOptions } from "./dom.js";
+export { renderToDOM } from "./dom.js";
+export type {
+	RenderElement,
+	RenderNode,
+	RenderRaw,
+	RenderText,
+	ViewerOptions,
+} from "./plan.js";
+export { buildPlan, VOID_TAGS } from "./plan.js";
+export { escapeAttribute, escapeText, renderToString, stringifyPlan } from "./string.js";

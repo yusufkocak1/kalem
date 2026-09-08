@@ -77,8 +77,11 @@ pnpm build && pnpm demo     # http://localhost:5173
 
 | Sayfa | Ne gösterir |
 |---|---|
-| `/core.html` | **Kütüphanenin bugünkü hâli** — Markdown → AST → Markdown, canlı gidiş-dönüş ve idempotans ölçümü. Gerçek derlenmiş bundle'ı yükler. |
+| `/viewer.html` | **`@kalem/viewer`** — aynı AST'nin `renderToDOM` ve `renderToString` çıktıları yan yana, byte-birebir eşitlik ölçümüyle. Ham HTML politikası canlı değiştirilebilir. |
+| `/core.html` | **`@kalem/core`** — Markdown → AST → Markdown, canlı gidiş-dönüş ve idempotans ölçümü. |
 | `/` | Mimari doğrulama prototipi (`execCommand` ile; kütüphaneyi kullanmıyor) |
+
+İlk ikisi gerçek derlenmiş bundle'ı yükler — npm'e gidecek kodun aynısı.
 
 Aynı Wi-Fi'daki telefondan da açılır — mobil davranışı denemek için
 (F1.5-02 matrisi) sunucu `0.0.0.0`'ı dinliyor.

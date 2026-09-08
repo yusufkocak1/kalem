@@ -26,6 +26,10 @@ const KOK = fileURLToPath(new URL("../apps/demo/", import.meta.url));
  */
 const PAKETLER = [
 	{ onEk: "/@kalem/core/", kok: fileURLToPath(new URL("../packages/core/dist/", import.meta.url)) },
+	{
+		onEk: "/@kalem/viewer/",
+		kok: fileURLToPath(new URL("../packages/viewer/dist/", import.meta.url)),
+	},
 ];
 
 const TIPLER = {
