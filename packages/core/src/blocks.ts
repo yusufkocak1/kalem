@@ -23,10 +23,10 @@
  *
  * ## Şu an kapsam dışı
  *
- * HTML blokları, bağlantı tanımları (`[etiket]: url`) ve GFM tabloları sonraki
- * adımlarda. GFM görev listesi (`- [ ]`) F1-05'te; `listItem.checked` şimdilik
- * hep `null`. Satır içi ayrıştırma F1-04 — metin tek bir `text` düğümü olarak
- * bırakılıyor, `parseInline` seçeneğiyle takılacak.
+ * GFM tabloları ve görev listesi (`- [ ]`) F1-05'te; `listItem.checked`
+ * şimdilik hep `null`. Frontmatter F1-06. Satır içi ayrıştırma F1-04 —
+ * metin tek bir `text` düğümü olarak bırakılıyor, `parseInline` seçeneğiyle
+ * takılacak.
  */
 import type {
 	Block,
@@ -111,6 +111,53 @@ const ORDERED_ITEM = /^( {0,3})(\d{1,9})([.)])([ \t]*)(.*)$/;
  */
 const MAX_MARKER_SPACES = 4;
 
+/** CommonMark'ın blok düzeyi kabul ettiği HTML etiketleri (tip 6). */
+const HTML_BLOCK_TAGS =
+	"address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h1|h2|h3|h4|h5|h6|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul";
+
+/**
+ * CommonMark'ın yedi HTML blok türü.
+ *
+ * `close` doluysa blok o desen görülene kadar sürer; `null` ise ilk boş satır
+ * bitirir. `canInterrupt` yalnızca 7. tür için kapalıdır: tek başına duran
+ * herhangi bir etiket, süregelen bir paragrafı bölmemelidir.
+ */
+const HTML_BLOCK_RULES: readonly {
+	readonly open: RegExp;
+	readonly close: RegExp | null;
+	readonly canInterrupt: boolean;
+}[] = [
+	{
+		open: /^ {0,3}<(script|pre|style|textarea)(?:[ \t]|>|$)/i,
+		close: /<\/(script|pre|style|textarea)>/i,
+		canInterrupt: true,
+	},
+	{ open: /^ {0,3}<!--/, close: /-->/, canInterrupt: true },
+	{ open: /^ {0,3}<\?/, close: /\?>/, canInterrupt: true },
+	{ open: /^ {0,3}<![A-Za-z]/, close: />/, canInterrupt: true },
+	{ open: /^ {0,3}<!\[CDATA\[/, close: /]]>/, canInterrupt: true },
+	{
+		open: new RegExp(`^ {0,3}</?(?:${HTML_BLOCK_TAGS})(?:[ \\t]|/?>|$)`, "i"),
+		close: null,
+		canInterrupt: true,
+	},
+	{
+		open: /^ {0,3}(?:<[A-Za-z][A-Za-z0-9-]*(?:[ \t]+[^<>]*)?\/?>|<\/[A-Za-z][A-Za-z0-9-]*[ \t]*>)[ \t]*$/,
+		close: null,
+		canInterrupt: false,
+	},
+];
+
+/**
+ * Bağlantı tanımı: `[etiket]: hedef "başlık"`
+ *
+ * **Bilinen kısıt:** yalnızca tek satırlık tanımlar tanınıyor. CommonMark
+ * hedefin ve başlığın sonraki satırlara taşmasına izin verir; gerçek
+ * belgelerde çok nadir olduğu için v1'de kapsam dışı bırakıldı.
+ */
+const DEFINITION =
+	/^ {0,3}\[((?:[^\\[\]]|\\.)+)\]:[ \t]*(<[^<>\n]*>|[^\s<][^\s]*)(?:[ \t]+(?:"([^"]*)"|'([^']*)'|\(([^()]*)\)))?[ \t]*$/;
+
 // ---------------------------------------------------------------------------
 // Giriş noktası
 // ---------------------------------------------------------------------------
@@ -172,6 +219,19 @@ function parseLines(lines: readonly Line[], inline: InlineParser): Block[] {
 		const atx = ATX.exec(line.value);
 		if (atx !== null) {
 			blocks.push(makeAtxHeading(line, atx, inline));
+			i++;
+			continue;
+		}
+
+		const html = htmlBlockRule(line, true);
+		if (html !== null) {
+			i = readHtmlBlock(lines, i, html, blocks);
+			continue;
+		}
+
+		const definition = DEFINITION.exec(line.value);
+		if (definition !== null) {
+			blocks.push(makeDefinition(line, definition));
 			i++;
 			continue;
 		}
@@ -379,6 +439,10 @@ function startsNewBlock(line: Line): boolean {
 	if (THEMATIC_BREAK.test(line.value)) return true;
 	if (ATX.test(line.value)) return true;
 	if (BLOCKQUOTE.test(line.value)) return true;
+	// HTML bloklarının 7. türü (tek başına duran herhangi bir etiket) paragrafı
+	// kesemez; diğer altı tür keser. Bağlantı tanımı da paragrafı kesemez —
+	// bu yüzden burada aranmıyor.
+	if (htmlBlockRule(line, false) !== null) return true;
 	const fence = FENCE_OPEN.exec(line.value);
 	if (fence !== null && isValidFence(fence)) return true;
 	// Liste paragrafı yalnızca boş olmayan bir maddeyle kesebilir; ayrıca
@@ -414,6 +478,96 @@ function makeSetextHeading(
 		children: inline(collected.map((l) => l.value.trim()).join("\n")),
 		syntax: { style: "setext", underline: marker },
 		position: span(first, underline),
+	};
+}
+
+// ---------------------------------------------------------------------------
+// HTML blokları
+//
+// Ham HTML **korunur, çalıştırılmaz**. Viewer varsayılan olarak kaçırarak
+// metin gibi gösterir (bkz. SECURITY.md); ayrıştırıcının görevi yalnızca
+// nerede başlayıp bittiğini doğru bulmak.
+// ---------------------------------------------------------------------------
+
+type HtmlRule = (typeof HTML_BLOCK_RULES)[number];
+
+/** Satır bir HTML bloğu açıyorsa kuralını verir. */
+function htmlBlockRule(line: Line, allowNonInterrupting: boolean): HtmlRule | null {
+	for (const rule of HTML_BLOCK_RULES) {
+		if (!rule.canInterrupt && !allowNonInterrupting) continue;
+		if (rule.open.test(line.value)) return rule;
+	}
+	return null;
+}
+
+function readHtmlBlock(
+	lines: readonly Line[],
+	start: number,
+	rule: HtmlRule,
+	blocks: Block[],
+): number {
+	const openLine = must(lines[start], "HTML açılış satırı");
+	const body: string[] = [];
+	let i = start;
+	let endLine = openLine;
+
+	while (i < lines.length) {
+		const line = must(lines[i], "HTML satırı");
+
+		// Kapanış deseni olmayan türlerde bloğu ilk boş satır bitirir; boş satır
+		// bloğa dahil edilmez.
+		if (rule.close === null && isBlank(line.value)) break;
+
+		body.push(line.value);
+		endLine = line;
+		i++;
+
+		// Kapanış deseni AÇILIŞ satırında da bulunabilir: `<!-- yorum -->`.
+		if (rule.close !== null && rule.close.test(line.value)) break;
+	}
+
+	blocks.push({
+		type: "html",
+		value: body.join("\n"),
+		position: span(openLine, endLine),
+	});
+	return i;
+}
+
+// ---------------------------------------------------------------------------
+// Bağlantı tanımları
+// ---------------------------------------------------------------------------
+
+/**
+ * Bağlantı etiketini eşleştirme için normalleştirir.
+ *
+ * CommonMark etiketleri **locale'den bağımsız** Unicode büyük/küçük harf
+ * katlamasıyla eşleştirir. Türkçe kurallarını uygulamak (`İ` → `i̇` yerine
+ * `i`) aynı belgeyi başka bir Markdown aracıyla farklı çözerdi — yani burada
+ * locale duyarlılığı **istenmeyen** şeydir.
+ */
+function normalizeLabel(label: string): string {
+	// kalem-locale-ok: CommonMark etiket eşleştirmesi locale'den bağımsız olmalı
+	return label
+		.trim()
+		.replace(/[ \t\r\n]+/g, " ")
+		.toLowerCase();
+}
+
+function makeDefinition(line: Line, match: RegExpExecArray): Block {
+	const label = must(match[1], "tanım etiketi");
+	const rawUrl = must(match[2], "tanım hedefi");
+	// `<...>` sarmalı hedefin parçası değil.
+	const url = rawUrl.startsWith("<") && rawUrl.endsWith(">") ? rawUrl.slice(1, -1) : rawUrl;
+	const title = match[3] ?? match[4] ?? match[5] ?? null;
+
+	return {
+		type: "definition",
+		identifier: normalizeLabel(label),
+		label,
+		url,
+		title,
+		position: span(line, line),
 	};
 }
 
