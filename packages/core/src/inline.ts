@@ -94,6 +94,15 @@ const LINK_TAIL =
 /** `][etiket]`, `][]` ya da yalnızca `]` — başvurulu bağlantının kapanışı. */
 const REFERENCE_TAIL = /^\](?:\[((?:[^\\[\]]|\\.)*)\])?/;
 
+/**
+ * GFM otomatik bağlantı literali: çıplak `https://…`, `www.…` ve e-posta.
+ *
+ * Açılı ayraç gerektirmez — kullanıcı URL'yi düz yazar, bağlantıya dönüşür.
+ * Kelime sınırı kontrolü çağıranın işi (`isLiteralBoundary`).
+ */
+const LITERAL_URL = /^(?:https?:\/\/|www\.)[^\s<]+/;
+const LITERAL_EMAIL = /^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/;
+
 /** Metin düğümü kısayolu. */
 const text = (value: string): Text => ({ type: "text", value });
 
@@ -106,11 +115,9 @@ const text = (value: string): Text => ({ type: "text", value });
  * araçlarda farklı çözülürdü.
  */
 function normalizeLabel(label: string): string {
+	const sadelestirilmis = label.trim().replace(/[ \t\r\n]+/g, " ");
 	// kalem-locale-ok: CommonMark etiket eşleştirmesi locale'den bağımsız olmalı
-	return label
-		.trim()
-		.replace(/[ \t\r\n]+/g, " ")
-		.toLowerCase();
+	return sadelestirilmis.toLowerCase();
 }
 
 /**
@@ -252,6 +259,17 @@ function tokenize(raw: string): TokenizeResult {
 			continue;
 		}
 
+		// --- GFM otomatik bağlantı literali -------------------------------------
+		if ((ch === "h" || ch === "w" || isEmailChar(ch)) && isLiteralBoundary(raw, i, buffer)) {
+			const literal = readLiteralAutolink(raw, i);
+			if (literal !== null) {
+				flush();
+				nodes.push(literal.node);
+				i = literal.next;
+				continue;
+			}
+		}
+
 		// --- Bağlantı / görsel açılışı ------------------------------------------
 		if (ch === "[" || (ch === "!" && raw[i + 1] === "[")) {
 			const image = ch === "!";
@@ -308,6 +326,85 @@ function tokenize(raw: string): TokenizeResult {
 
 	flush();
 	return { slots, delimiters };
+}
+
+/** E-posta yerel kısmında geçebilecek karakter mi. */
+function isEmailChar(ch: string): boolean {
+	return /[A-Za-z0-9._+-]/.test(ch);
+}
+
+/**
+ * Literal bağlantı ancak **kelime sınırında** başlayabilir.
+ *
+ * Aksi hâlde `bahttps://x` gibi metinlerin ortasından bağlantı çıkardı.
+ * Önceki karakter tampondan okunur; tampon boşsa metnin başındayız.
+ */
+function isLiteralBoundary(raw: string, index: number, buffer: string): boolean {
+	if (index === 0) return true;
+	const previous =
+		buffer === "" ? (raw[index - 1] as string) : (buffer[buffer.length - 1] as string);
+	return UNICODE_WHITESPACE.test(previous) || "*_~([".includes(previous);
+}
+
+/**
+ * Literal bağlantıyı okur ve sondaki noktalamayı kırpar.
+ *
+ * `Şuraya bak: https://ornek.com.` cümlesindeki nokta URL'ye ait değildir.
+ * GFM ayrıca dengesiz kapanış parantezini de kırpar: `(https://a.com/b)`
+ * içindeki `)` bağlantının parçası olmamalı.
+ */
+function readLiteralAutolink(raw: string, start: number): { node: Link; next: number } | null {
+	const rest = raw.slice(start);
+
+	const url = LITERAL_URL.exec(rest);
+	if (url !== null) {
+		const trimmed = trimTrailingPunctuation(url[0]);
+		if (trimmed === "") return null;
+		const href = trimmed.startsWith("www.") ? `http://${trimmed}` : trimmed;
+		return {
+			node: {
+				type: "link",
+				url: href,
+				title: null,
+				children: [text(trimmed)],
+				syntax: { style: "literal" },
+			},
+			next: start + trimmed.length,
+		};
+	}
+
+	const mail = LITERAL_EMAIL.exec(rest);
+	if (mail !== null) {
+		// E-postanın sonundaki nokta ve tire alan adına ait değildir.
+		const trimmed = mail[0].replace(/[.\-_]+$/, "");
+		return {
+			node: {
+				type: "link",
+				url: `mailto:${trimmed}`,
+				title: null,
+				children: [text(trimmed)],
+				syntax: { style: "literal" },
+			},
+			next: start + trimmed.length,
+		};
+	}
+
+	return null;
+}
+
+/** URL sonundaki cümle noktalamasını ve dengesiz parantezi kırpar. */
+function trimTrailingPunctuation(url: string): string {
+	let out = url;
+	for (;;) {
+		const before = out;
+		out = out.replace(/[?!.,:*_~'"]+$/, "");
+		if (out.endsWith(")")) {
+			const opens = (out.match(/\(/g) ?? []).length;
+			const closes = (out.match(/\)/g) ?? []).length;
+			if (closes > opens) out = out.slice(0, -1);
+		}
+		if (out === before) return out;
+	}
 }
 
 /** Yığındaki en yakın açık köşeli ayracı verir. */

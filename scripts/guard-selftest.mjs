@@ -156,6 +156,26 @@ const yaz = (ad, icerik) => {
 	const r = calistir(LOCALE, [y]);
 	bekle("yorum ve string içi eşleşme sayılmıyor", r.kod === 0, r.cikti);
 }
+{
+	// GERÇEK BİR HATAYDI: içinde tırnak geçen bir regex maskeleyiciyi
+	// kaydırıyor ve dosyanın geri kalanını görünmez yapıyordu. Kapı
+	// "temiz" diyordu, oysa altında ihlal vardı.
+	const y = yaz("regex-tuzagi.ts", 'const RE = /"([^"]*)"/;\nconst a = "Işık".toLowerCase();\n');
+	const r = calistir(LOCALE, [y]);
+	bekle("tırnaklı regex sonrasındaki ihlal yakalanıyor", r.kod === 1, r.cikti);
+}
+{
+	// Regex İÇİNDEKİ `.toLowerCase(` metni kod değildir, sayılmamalı.
+	const y = yaz("regex-icinde.ts", "const RE = /\\.toLowerCase\\(/;\n");
+	const r = calistir(LOCALE, [y]);
+	bekle("regex içindeki eşleşme sayılmıyor", r.kod === 0, r.cikti);
+}
+{
+	// Bölme işlemi regex sanılıp sonrası maskelenmemeli.
+	const y = yaz("bolme.ts", "const oran = toplam / adet;\nconst b = x.toUpperCase();\n");
+	const r = calistir(LOCALE, [y]);
+	bekle("bölme regex sanılmıyor", r.kod === 1 && /toUpperCase/.test(r.cikti), r.cikti);
+}
 
 for (const d of temizlenecek) rmSync(d, { recursive: true, force: true });
 

@@ -21,14 +21,15 @@
  * 2. **Yazım tercihi (`syntax`)** — `-` mi `*` mi, ATX mi setext mi, ``` mi
  *    ~~~ mi. Kendi ayrıştırıcımızı yazma gerekçemiz bu (analiz §5.3).
  *
- * ## Şu an kapsam dışı
+ * ## Satır içi katman
  *
- * GFM tabloları ve görev listesi (`- [ ]`) F1-05'te; `listItem.checked`
- * şimdilik hep `null`. Frontmatter F1-06. Satır içi ayrıştırma F1-04 —
- * metin tek bir `text` düğümü olarak bırakılıyor, `parseInline` seçeneğiyle
- * takılacak.
+ * Metin varsayılan olarak tek bir `text` düğümü olarak bırakılır; gerçek
+ * satır içi ayrıştırma `parseInline` seçeneğiyle takılır (`parse.ts` bunu
+ * yapar). Ayrım bilinçli: blok yapısı satır içi ayrıştırıcıdan bağımsız
+ * test edilebiliyor.
  */
 import type {
+	AlignType,
 	Block,
 	Code,
 	Frontmatter,
@@ -38,6 +39,8 @@ import type {
 	Paragraph,
 	Point,
 	Root,
+	TableCell,
+	TableRow,
 	ThematicBreak,
 } from "./ast.js";
 import { consumeIndent, indentWidth, isBlank, type Line, scan } from "./scanner.js";
@@ -148,6 +151,16 @@ const HTML_BLOCK_RULES: readonly {
 		canInterrupt: false,
 	},
 ];
+
+/** GFM görev listesi işareti: `- [ ]` ya da `- [x]`. */
+const TASK_MARKER = /^\[([ xX])\][ \t]+/;
+
+/**
+ * GFM tablo ayraç satırı: `| --- | :--: |`
+ *
+ * Tabloyu tablo yapan budur — üstündeki satır tek başına başlık değildir.
+ */
+const TABLE_DELIMITER = /^ {0,3}\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
 
 /**
  * Frontmatter sınırlayıcıları.
@@ -290,6 +303,13 @@ function parseLines(lines: readonly Line[], inline: InlineParser): Block[] {
 
 		if (BLOCKQUOTE.test(line.value)) {
 			i = readBlockquote(lines, i, blocks, inline);
+			continue;
+		}
+
+		// Tablo, ikinci satırındaki ayraçtan tanınır — tek satıra bakarak
+		// anlaşılamaz, bu yüzden liste ve paragraftan önce denenir.
+		if (isTableStart(lines, i)) {
+			i = readTable(lines, i, blocks, inline);
 			continue;
 		}
 
@@ -587,6 +607,115 @@ function readHtmlBlock(
 }
 
 // ---------------------------------------------------------------------------
+// GFM tabloları
+//
+// v1'de tablo **düzenleme arayüzü yok** (Karar #5) ama ayrıştırıcı tabloyu
+// kayıpsız korumak zorunda — kullanıcının dosyasını bozmamak için. Bu yüzden
+// tablo hem gerçek bir ağaç olarak (viewer render edebilsin) hem ham metin
+// olarak (`syntax.raw`, byte düzeyinde geri yazılabilsin) tutuluyor.
+// ---------------------------------------------------------------------------
+
+/** Satır bir tablo başlatıyor mu — ikinci satırdaki ayraç belirler. */
+function isTableStart(lines: readonly Line[], index: number): boolean {
+	const header = lines[index];
+	const delimiter = lines[index + 1];
+	if (header === undefined || delimiter === undefined) return false;
+	if (!header.value.includes("|")) return false;
+	if (!TABLE_DELIMITER.test(delimiter.value)) return false;
+	// Başlık ve ayraç satırındaki hücre sayıları uyuşmalı.
+	return splitRow(header.value).length === splitRow(delimiter.value).length;
+}
+
+/**
+ * Tablo satırını hücrelere böler.
+ *
+ * Kenardaki borular isteğe bağlıdır; `\|` kaçırılmış boru hücre ayracı
+ * değildir, hücre içeriğidir.
+ */
+function splitRow(value: string): string[] {
+	const trimmed = value
+		.trim()
+		.replace(/^\|/, "")
+		.replace(/(?<!\\)\|[ \t]*$/, "");
+	const cells: string[] = [];
+	let current = "";
+	for (let i = 0; i < trimmed.length; i++) {
+		const ch = trimmed[i];
+		if (ch === "\\" && trimmed[i + 1] === "|") {
+			current += "|";
+			i++;
+			continue;
+		}
+		if (ch === "|") {
+			cells.push(current.trim());
+			current = "";
+			continue;
+		}
+		current += ch;
+	}
+	cells.push(current.trim());
+	return cells;
+}
+
+/** Ayraç satırından sütun hizalamalarını çıkarır. */
+function readAlignments(value: string): (AlignType | null)[] {
+	return splitRow(value).map((cell) => {
+		const left = cell.startsWith(":");
+		const right = cell.endsWith(":");
+		if (left && right) return "center";
+		if (left) return "left";
+		if (right) return "right";
+		return null;
+	});
+}
+
+function readTable(
+	lines: readonly Line[],
+	start: number,
+	blocks: Block[],
+	inline: InlineParser,
+): number {
+	const headerLine = must(lines[start], "tablo başlık satırı");
+	const delimiterLine = must(lines[start + 1], "tablo ayraç satırı");
+	const align = readAlignments(delimiterLine.value);
+	const columns = align.length;
+
+	const rows: TableRow[] = [makeRow(headerLine, columns, inline)];
+	const raw: string[] = [headerLine.value, delimiterLine.value];
+	let endLine = delimiterLine;
+	let i = start + 2;
+
+	while (i < lines.length) {
+		const line = must(lines[i], "tablo gövde satırı");
+		// Tablo, boş satırda ya da boru içermeyen satırda biter.
+		if (isBlank(line.value) || !line.value.includes("|")) break;
+		rows.push(makeRow(line, columns, inline));
+		raw.push(line.value);
+		endLine = line;
+		i++;
+	}
+
+	blocks.push({
+		type: "table",
+		align,
+		children: rows,
+		syntax: { raw: raw.join("\n") },
+		position: span(headerLine, endLine),
+	});
+	return i;
+}
+
+/** Satırı hücrelere böler; eksik hücreleri boşla tamamlar, fazlasını atar. */
+function makeRow(line: Line, columns: number, inline: InlineParser): TableRow {
+	const cells = splitRow(line.value);
+	const children: TableCell[] = [];
+	for (let c = 0; c < columns; c++) {
+		children.push({ type: "tableCell", children: inline(cells[c] ?? "") });
+	}
+	return { type: "tableRow", children, position: span(line, line) };
+}
+
+// ---------------------------------------------------------------------------
 // Bağlantı tanımları
 // ---------------------------------------------------------------------------
 
@@ -599,11 +728,9 @@ function readHtmlBlock(
  * locale duyarlılığı **istenmeyen** şeydir.
  */
 function normalizeLabel(label: string): string {
+	const sadelestirilmis = label.trim().replace(/[ \t\r\n]+/g, " ");
 	// kalem-locale-ok: CommonMark etiket eşleştirmesi locale'den bağımsız olmalı
-	return label
-		.trim()
-		.replace(/[ \t\r\n]+/g, " ")
-		.toLowerCase();
+	return sadelestirilmis.toLowerCase();
 }
 
 function makeDefinition(line: Line, match: RegExpExecArray): Block {
@@ -876,7 +1003,16 @@ function readListItem(
 	inline: InlineParser,
 ): ReadItem {
 	const openLine = must(lines[start], "madde açılış satırı");
-	const inner: Line[] = [sliceLine(openLine, info.markerChars)];
+	const firstInner = sliceLine(openLine, info.markerChars);
+
+	// GFM görev listesi: içerik `[ ]` ya da `[x]` ile başlıyorsa madde bir
+	// göreve dönüşür ve işaret içerikten çıkarılır.
+	const task = TASK_MARKER.exec(firstInner.value);
+	// Desen zaten yalnızca " ", "x" ya da "X" yakalıyor; boşluk olmayan her
+	// şey işaretli demek. Büyük/küçük harf katlaması gerekmiyor — gereksiz
+	// bir locale bağımlılığı yaratmamak için de tercih edilmedi.
+	const checked = task === null ? null : must(task[1], "görev işareti") !== " ";
+	const inner: Line[] = [task === null ? firstInner : sliceLine(firstInner, task[0].length)];
 
 	let i = start + 1;
 	let lastContent = start;
@@ -920,8 +1056,7 @@ function readListItem(
 	return {
 		item: {
 			type: "listItem",
-			// GFM görev listesi (`- [ ]`) F1-05'te; şimdilik görev değil.
-			checked: null,
+			checked,
 			spread,
 			children: parseLines(kept, inline),
 			position: span(openLine, must(lines[lastContent], "madde bitiş satırı")),

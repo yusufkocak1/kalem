@@ -16,7 +16,18 @@ import { join, relative, sep } from "node:path";
 
 const VARSAYILAN = ["packages", "scripts", "apps/docs/src"];
 const UZANTI = /\.(ts|tsx|mts|cts|js|mjs|cjs)$/;
-const ATLA = new Set(["node_modules", "dist", "coverage", ".astro", ".git"]);
+// Üretilmiş çıktılar taranmaz: kaynak zaten denetleniyor, üretilmiş kopya
+// yalnızca gürültü ve bayat sonuç üretir (`.tsbuild` tsc'nin ara çıktısı).
+const ATLA = new Set([
+	"node_modules",
+	"dist",
+	".tsbuild",
+	"coverage",
+	".astro",
+	".git",
+	"test-results",
+	"playwright-report",
+]);
 const IZIN = /kalem-locale-ok:/;
 
 const KURALLAR = [
@@ -58,7 +69,34 @@ const KURALLAR = [
 	},
 ];
 
-/** Yorum ve string içeriğini boşlukla maskeler; ofsetler korunur. */
+/**
+ * Bir `/` bu konumda regex literal mi başlatıyor, yoksa bölme mi.
+ *
+ * Sözcüksel çözümleyici olmadan kesin ayrım yapılamaz; standart sezgisel
+ * kural şudur: regex ancak bir **değer beklenen** yerde başlayabilir, yani
+ * kendinden önceki anlamlı karakter bir operatör, ayraç açılışı ya da
+ * anahtar sözcük ise.
+ */
+function regexBaslangiciMi(s, i) {
+	let k = i - 1;
+	while (k >= 0 && /\s/.test(s[k])) k--;
+	if (k < 0) return true;
+	const onceki = s[k];
+	if ("(,=:[!&|?{};+-*%^~<>".includes(onceki)) return true;
+	// `return /.../`, `typeof /.../` gibi anahtar sözcüklerden sonra.
+	const kelime = /[A-Za-z_$][\w$]*$/.exec(s.slice(0, k + 1));
+	return (
+		kelime !== null && ["return", "typeof", "case", "in", "of", "new", "delete"].includes(kelime[0])
+	);
+}
+
+/**
+ * Yorum, string ve **regex literal** içeriğini boşlukla maskeler; ofsetler korunur.
+ *
+ * Regex'leri atlamak şart: içinde tırnak geçen bir desen (`/"([^"]*)"/` gibi)
+ * maskeleyiciyi kaydırır ve dosyanın geri kalanını görünmez yapar — kapı
+ * sessizce hiçbir şey bulamaz hale gelir. Bu tam olarak bir kez yaşandı.
+ */
 function maskele(s) {
 	const c = [...s];
 	let i = 0;
@@ -79,6 +117,26 @@ function maskele(s) {
 			const tirnak = c[i];
 			let k = i + 1;
 			while (k < c.length && c[k] !== tirnak) k += c[k] === "\\" ? 2 : 1;
+			bosalt(i + 1, k);
+			i = k + 1;
+		} else if (c[i] === "/" && regexBaslangiciMi(s, i)) {
+			let k = i + 1;
+			let sinifIcinde = false;
+			while (k < c.length && c[k] !== "\n") {
+				if (c[k] === "\\") {
+					k += 2;
+					continue;
+				}
+				if (c[k] === "[") sinifIcinde = true;
+				else if (c[k] === "]") sinifIcinde = false;
+				else if (c[k] === "/" && !sinifIcinde) break;
+				k++;
+			}
+			// Satır sonuna kadar kapanmadıysa regex değildi; bölme say.
+			if (k >= c.length || c[k] === "\n") {
+				i++;
+				continue;
+			}
 			bosalt(i + 1, k);
 			i = k + 1;
 		} else {

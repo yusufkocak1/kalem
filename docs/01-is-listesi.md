@@ -28,23 +28,23 @@
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
-| **Faz 1** — `@kalem/core` | 5 / 11 | 🔵 **Devam ediyor** |
+| **Faz 1** — `@kalem/core` | 6 / 11 | 🔵 **Devam ediyor** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | 🟡 Prototip hazır, matris doldurulmadı |
 | **Faz 2** — Viewer + başsız editör | 0 / 13 | ⬜ Başlanmadı |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **13 / 72** | **%18** |
+| | **14 / 72** | **%19** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` · `F1-02` · `F1-03` · `F1-04` · `F1-06`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` · `F1-02` · `F1-03` · `F1-04` · `F1-05` · `F1-06`
 
-**Sıradaki:** `F1-05` GFM uzantıları (görev listesi, tablo, otomatik
-bağlantı literali), ardından `F1-07` serileştirici ve `F1-08` gidiş-dönüş
+**Sıradaki:** `F1-07` serileştirici (AST → Markdown), ardından `F1-08`
+gidiş-dönüş koşucusu — ayrıştırıcının gerçek uyum oranı orada ölçülecek
 
 > **Karar (kapandı):** `F1-08` tam olarak F1-03'ten önce kurulamaz — gidiş-dönüş
 > koşucusu hem `parse` hem `serialize` olmadan hiçbir şey koşamaz. Bunun yerine
@@ -53,7 +53,7 @@ bağlantı literali), ardından `F1-07` serileştirici ve `F1-08` gidiş-dönü�
 
 **Yazılan kod:** `@kalem/core` — AST tipleri, künye kaydı, tip koruyucular,
 gezinme/konum/düzenleme yardımcıları, kaynak tarayıcı, blok ayrıştırıcı.
-386 test, kapsam %97 (dal), 7.68 kB / 12 kB. **`parse(md)` çalışıyor.**
+415 test, kapsam %97 (dal), 8.44 kB / 12 kB. **`parse(md)` çalışıyor.**
 
 **Kayıt dokümanları:** [Faz 0 sonucu](./02-faz0-sonuc.md) ·
 [F1-01 AST kararları](./03-f1-01-ast-kararlari.md)
@@ -185,9 +185,14 @@ Vurgu (`*`/`_`, CommonMark'ın delimiter-run algoritması), kod span, link, refe
 > `parse.ts` iki katmanı birleştiriyor: **`parse(md)` artık çalışıyor.**
 > Spec suite F1-08'le koşulacak.
 
-### F1-05 · GFM uzantıları `[M]` ⬜
+### F1-05 · GFM uzantıları `[M]` ✅
 Üstü çizili (`~~`), görev listesi (`- [ ]`), otomatik link literal, **tablo ayrıştırma** (motor v1'de UI vermeyecek ama parser/serializer tabloyu **kayıpsız korumalı** — kullanıcının dosyasını bozmamak için zorunlu)
 - **Kabul:** GFM spec testleri geçiyor; tablo içeren dosya parse→serialize'da bozulmuyor
+
+> **Yapıldı.** Görev listesi (`- [ ]` / `- [x]`), tablo (hizalama, kaçırılmış
+> boru, eksik/fazla hücre), otomatik bağlantı literali (`https://`, `www.`,
+> e-posta; sondaki noktalama ve dengesiz parantez kırpılıyor). Üstü çizili
+> F1-04'te gelmişti. Tablo `syntax.raw` ile kayıpsız korunuyor.
 
 ### F1-06 · Frontmatter `[S]` ✅
 YAML/TOML frontmatter'ı **ayrıştırma, sadece koru** (opak string olarak). YAML parser bağımlılığı **eklenmez**.
