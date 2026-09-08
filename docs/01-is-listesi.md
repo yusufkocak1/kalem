@@ -28,26 +28,30 @@
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
-| **Faz 1** — `@kalem/core` | 8.5 / 11 | 🔵 **Devam ediyor** |
+| **Faz 1** — `@kalem/core` | 9.5 / 11 | 🔵 **Devam ediyor** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | 🟡 Prototip hazır, matris doldurulmadı |
 | **Faz 2** — Viewer + başsız editör | 0 / 13 | ⬜ Başlanmadı |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **16.5 / 72** | **%23** |
+| | **17.5 / 72** | **%24** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` · `F1-02` · `F1-03` · `F1-04` · `F1-05` · `F1-06` · `F1-07` · `F1-10`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` · `F1-02` · `F1-03` · `F1-04` · `F1-05` · `F1-06` · `F1-07` · `F1-10` · `F1-11`
 
-**Sıradaki:** `F1-11` komut çekirdeği, `F1-09` HTML → AST
+**Sıradaki:** `F1-09` HTML → AST (Word yapıştırma), ardından `F1-08`'in
+kalanı (CommonMark spec suite)
 
-> ⚠️ **Boyut uyarısı:** `@kalem/core` 10.39 kB / 12 kB. Kalan üç görev
-> bütçeyi aşabilir; F1-09'un core'da mı yoksa ayrı pakette mi olacağı
-> yeniden değerlendirilmeli.
+> ⚠️ **Boyut kararı gerekiyor:** `@kalem/core` 11.72 kB / 12 kB — 0.28 kB
+> kaldı. F1-09 (HTML → AST) bütçeyi kesin aşar. Plan: F1-09'u **ayrı bir
+> giriş noktası** (`@kalem/core/html`) yapmak. Analiz §5.3 zaten bunu
+> öngörmüştü ("parser ayrı modül olarak tembel yüklenebilir") ve yapıştırma
+> zaten bir editör ihtiyacı — F3-07 boru hattı bunu kullanacak. Böylece
+> yalnızca Markdown işleyen kullanıcı o kodu indirmez.
 
 > **Karar (kapandı):** `F1-08` tam olarak F1-03'ten önce kurulamaz — gidiş-dönüş
 > koşucusu hem `parse` hem `serialize` olmadan hiçbir şey koşamaz. Bunun yerine
@@ -56,7 +60,7 @@
 
 **Yazılan kod:** `@kalem/core` — AST tipleri, künye kaydı, tip koruyucular,
 gezinme/konum/düzenleme yardımcıları, kaynak tarayıcı, blok ayrıştırıcı.
-522 test, kapsam %96 (dal), **10.8 kB / 12 kB**.
+567 test, kapsam %96 (dal), **11.72 kB / 12 kB**.
 **`parse(md)` ve `serialize(ast)` çalışıyor; gidiş-dönüş 17/17 byte-birebir.**
 
 **Kayıt dokümanları:** [Faz 0 sonucu](./02-faz0-sonuc.md) ·
@@ -255,10 +259,17 @@ Yapıştırma normalizasyonunun beyni. Word, Google Docs, Excel, Notion ve genel
 > `data:image/svg+xml` görsel bağlamında bile **reddediliyor**: SVG içinde
 > script çalışır.
 
-### F1-11 · Komut çekirdeği (saf) `[M]` ⬜
+### F1-11 · Komut çekirdeği (saf) `[M]` ✅
 DOM'suz, AST üzerinde çalışan işlemler: `toggleMark`, `setBlockType`, `wrapIn`, `lift`, `splitBlock`, `joinBlocks`, `insertNode`
 - Editör bunları çağıracak; saf oldukları için Faz 2'den bağımsız test edilirler
 - **Kabul:** her komut için birim testi
+
+> **Yapıldı.** `toggleMark`, `hasMark`, `setBlockType`, `wrapIn`, `lift`,
+> `splitBlock`, `joinBlocks`, `insertNode` + boş düğüm kurucuları. Hepsi
+> `edit.ts` gibi değişmez.
+> **Bilinçli sınır:** `lift` şimdilik yalnızca kapsayıcının ilk ya da son
+> çocuğunu çıkarabiliyor; ortadaki, kapsayıcıyı ikiye bölmeyi gerektiriyor
+> ve editör ihtiyacı netleşmeden tasarlanmamalı (F2).
 
 > **FAZ 1 ÇIKIŞ KRİTERİ:** `@kalem/core` tek başına kullanılabilir, %90+ test kapsamlı, 0 bağımlılık, ≤ 12 kB. `pnpm size` yeşil.
 

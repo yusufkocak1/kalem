@@ -259,7 +259,12 @@ function listItem(node: ListItem, marker: string, o: Resolved): string {
 
 	const lines = inner.split("\n");
 	return lines
-		.map((line, i) => (i === 0 ? marker + line : line === "" ? "" : indent + line))
+		.map((line, i) => {
+			// Boş maddede işaretin ardındaki boşluk yazılmaz: `- ` yerine `-`.
+			// Sondaki görünmez boşluk hem gürültü hem birçok linter için hata.
+			if (i === 0) return line === "" ? marker.trimEnd() : marker + line;
+			return line === "" ? "" : indent + line;
+		})
 		.join("\n");
 }
 
