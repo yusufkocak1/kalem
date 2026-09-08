@@ -23,11 +23,22 @@
  *
  * ## Şu an kapsam dışı
  *
- * Kapsayıcı bloklar (blockquote, liste), HTML blokları ve bağlantı tanımları
- * sonraki adımlarda. Satır içi ayrıştırma F1-04 — şimdilik metin tek bir
- * `text` düğümü olarak bırakılıyor, `parseInline` seçeneğiyle takılacak.
+ * HTML blokları, bağlantı tanımları (`[etiket]: url`) ve GFM tabloları sonraki
+ * adımlarda. GFM görev listesi (`- [ ]`) F1-05'te; `listItem.checked` şimdilik
+ * hep `null`. Satır içi ayrıştırma F1-04 — metin tek bir `text` düğümü olarak
+ * bırakılıyor, `parseInline` seçeneğiyle takılacak.
  */
-import type { Block, Code, Heading, Inline, Paragraph, Point, Root, ThematicBreak } from "./ast.js";
+import type {
+	Block,
+	Code,
+	Heading,
+	Inline,
+	ListItem,
+	Paragraph,
+	Point,
+	Root,
+	ThematicBreak,
+} from "./ast.js";
 import { consumeIndent, indentWidth, isBlank, type Line, scan } from "./scanner.js";
 
 /** Satır içi ayrıştırıcıyı takmak için — F1-04 buraya bağlanacak. */
@@ -85,6 +96,21 @@ const ATX_CLOSING = /(^|[ \t])#+[ \t]*$/;
 /** Girintili kod bloğunun eşiği. */
 const INDENTED_CODE_COLUMNS = 4;
 
+/** `> ` alıntı öneki. `>` sonrası tek boşluk isteğe bağlı ve içeriğe dahil değil. */
+const BLOCKQUOTE = /^ {0,3}> ?/;
+
+/** Sırasız liste maddesi: `- `, `* `, `+ ` (ya da yalnız işaret). */
+const BULLET_ITEM = /^( {0,3})([-+*])([ \t]*)(.*)$/;
+
+/** Sıralı liste maddesi: `1. `, `12) ` — en çok 9 basamak. */
+const ORDERED_ITEM = /^( {0,3})(\d{1,9})([.)])([ \t]*)(.*)$/;
+
+/**
+ * İşaretten sonra bu kadar boşluk varsa fazlası içeriğe (girintili kod)
+ * sayılır; içerik sütunu işaret + 1 kabul edilir. CommonMark kuralı.
+ */
+const MAX_MARKER_SPACES = 4;
+
 // ---------------------------------------------------------------------------
 // Giriş noktası
 // ---------------------------------------------------------------------------
@@ -135,6 +161,8 @@ function parseLines(lines: readonly Line[], inline: InlineParser): Block[] {
 			continue;
 		}
 
+		// Yatay çizgi liste maddesinden ÖNCE denenmeli: `- - -` her ikisine de
+		// uyar ve CommonMark yatay çizgiyi seçer.
 		if (THEMATIC_BREAK.test(line.value)) {
 			blocks.push(makeThematicBreak(line));
 			i++;
@@ -145,6 +173,17 @@ function parseLines(lines: readonly Line[], inline: InlineParser): Block[] {
 		if (atx !== null) {
 			blocks.push(makeAtxHeading(line, atx, inline));
 			i++;
+			continue;
+		}
+
+		if (BLOCKQUOTE.test(line.value)) {
+			i = readBlockquote(lines, i, blocks, inline);
+			continue;
+		}
+
+		const item = listItemStart(line);
+		if (item !== null) {
+			i = readList(lines, i, item, blocks, inline);
 			continue;
 		}
 
@@ -339,8 +378,15 @@ function startsNewBlock(line: Line): boolean {
 	if (indentWidth(line.value) >= INDENTED_CODE_COLUMNS) return false; // paragraf devamı
 	if (THEMATIC_BREAK.test(line.value)) return true;
 	if (ATX.test(line.value)) return true;
+	if (BLOCKQUOTE.test(line.value)) return true;
 	const fence = FENCE_OPEN.exec(line.value);
-	return fence !== null && isValidFence(fence);
+	if (fence !== null && isValidFence(fence)) return true;
+	// Liste paragrafı yalnızca boş olmayan bir maddeyle kesebilir; ayrıca
+	// sıralı listede numara 1 olmalıdır. `2020. yılında` diye başlayan bir
+	// satır liste başlatmamalı.
+	const item = listItemStart(line);
+	if (item === null) return false;
+	return item.content !== "" && (item.number === null || item.number === 1);
 }
 
 function makeParagraph(collected: readonly Line[], inline: InlineParser): Paragraph {
@@ -368,6 +414,315 @@ function makeSetextHeading(
 		children: inline(collected.map((l) => l.value.trim()).join("\n")),
 		syntax: { style: "setext", underline: marker },
 		position: span(first, underline),
+	};
+}
+
+// ---------------------------------------------------------------------------
+// Kapsayıcı bloklar
+//
+// Kapsayıcılar kendi öneklerini soyup `parseLines`'ı yeniden çağırır. Soyulan
+// satırlar **türetilmiş** satırlardır: ofsetleri kaydırılmış olsa da hâlâ
+// özgün kaynağı gösterirler, böylece iç bloklar da doğru `position` alır.
+// ---------------------------------------------------------------------------
+
+/** Satırın baştan `chars` karakterini atarak türetilmiş satır üretir. */
+function sliceLine(line: Line, chars: number): Line {
+	return {
+		value: line.value.slice(chars),
+		line: line.line,
+		start: line.start + chars,
+		end: line.end,
+		ending: line.ending,
+	};
+}
+
+/**
+ * Satırdan `columns` sütunluk girinti soyar.
+ *
+ * **Bilinen kısıt:** kısmen tüketilen bir sekme boşluğa çevrildiğinden
+ * (CommonMark kuralı) o satırın karakter uzunluğu değişir ve türetilmiş
+ * ofset bir miktar kayar. Yalnızca sekmeyle girintilenmiş iç içe listelerde
+ * görülür; içerik doğru, `position` yaklaşıktır.
+ */
+function sliceColumns(line: Line, columns: number): Line {
+	const { rest } = consumeIndent(line.value, columns);
+	const chars = Math.max(0, line.value.length - rest.length);
+	return {
+		value: rest,
+		line: line.line,
+		start: line.start + chars,
+		end: line.end,
+		ending: line.ending,
+	};
+}
+
+function readBlockquote(
+	lines: readonly Line[],
+	start: number,
+	blocks: Block[],
+	inline: InlineParser,
+): number {
+	const openLine = must(lines[start], "alıntı açılış satırı");
+	const inner: Line[] = [];
+	let i = start;
+	let lastWasContent = false;
+
+	while (i < lines.length) {
+		const line = must(lines[i], "alıntı satırı");
+		const marker = BLOCKQUOTE.exec(line.value);
+
+		if (marker !== null) {
+			inner.push(sliceLine(line, marker[0].length));
+			lastWasContent = !isBlank(line.value.slice(marker[0].length));
+			i++;
+			continue;
+		}
+
+		// Tembel devam: alıntı içindeki bir paragraf, `>` olmadan da sürebilir.
+		// Ama yeni bir blok başlatan satır alıntıyı bitirir.
+		if (lastWasContent && !isBlank(line.value) && !startsNewBlock(line)) {
+			inner.push(line);
+			i++;
+			continue;
+		}
+		break;
+	}
+
+	const endLine = must(lines[i - 1], "alıntı bitiş satırı");
+	blocks.push({
+		type: "blockquote",
+		children: parseLines(inner, inline),
+		position: span(openLine, endLine),
+	});
+	return i;
+}
+
+// ---------------------------------------------------------------------------
+// Listeler
+// ---------------------------------------------------------------------------
+
+/** İşaretin satırdaki ölçüleri — sırasız ve sıralı maddede ortak. */
+interface MarkerGeometry {
+	/** İçeriğin başladığı sütun — devam satırlarının uyması gereken girinti. */
+	readonly contentColumn: number;
+	/** İşaret ve ardındaki boşluğun karakter uzunluğu. */
+	readonly markerChars: number;
+	/** İşaretten sonra bu satırda kalan içerik. */
+	readonly content: string;
+}
+
+/**
+ * Bir liste maddesi başlangıcı.
+ *
+ * Ayrık birlik olmasının sebebi: `bullet` doluysa `delimiter` ve `number`
+ * kesinlikle boştur, tersi de doğrudur. Üçünü de "olabilir null" yapmak,
+ * derleyicinin bildiği bu ilişkiyi saklar ve her kullanım yerinde asla
+ * çalışmayacak null kontrolleri gerektirirdi.
+ */
+type ListItemStart =
+	| (MarkerGeometry & {
+			readonly bullet: "-" | "*" | "+";
+			readonly delimiter: null;
+			readonly number: null;
+	  })
+	| (MarkerGeometry & {
+			readonly bullet: null;
+			readonly delimiter: "." | ")";
+			readonly number: number;
+	  });
+
+/** Satır bir liste maddesi başlatıyorsa çözümler, başlatmıyorsa `null`. */
+function listItemStart(line: Line): ListItemStart | null {
+	// Yatay çizgi liste maddesi değildir; `- - -` çizgidir.
+	if (THEMATIC_BREAK.test(line.value)) return null;
+
+	const bullet = BULLET_ITEM.exec(line.value);
+	if (bullet !== null) {
+		const geo = geometry({
+			indent: must(bullet[1], "madde girintisi").length,
+			markerWidth: 1,
+			spaces: must(bullet[3], "işaret sonrası boşluk"),
+			content: must(bullet[4], "madde içeriği"),
+		});
+		if (geo === null) return null;
+		return {
+			...geo,
+			bullet: must(bullet[2], "madde işareti") as "-" | "*" | "+",
+			delimiter: null,
+			number: null,
+		};
+	}
+
+	const ordered = ORDERED_ITEM.exec(line.value);
+	if (ordered !== null) {
+		const digits = must(ordered[2], "madde numarası");
+		const geo = geometry({
+			indent: must(ordered[1], "madde girintisi").length,
+			markerWidth: digits.length + 1,
+			spaces: must(ordered[4], "işaret sonrası boşluk"),
+			content: must(ordered[5], "madde içeriği"),
+		});
+		if (geo === null) return null;
+		return {
+			...geo,
+			bullet: null,
+			delimiter: must(ordered[3], "madde ayracı") as "." | ")",
+			number: Number(digits),
+		};
+	}
+
+	return null;
+}
+
+/** İşaret ölçülerini hesaplar; satır liste maddesi değilse `null`. */
+function geometry(p: {
+	indent: number;
+	markerWidth: number;
+	spaces: string;
+	content: string;
+}): MarkerGeometry | null {
+	// İşaretten sonra boşluk yoksa ve içerik varsa bu bir liste değildir:
+	// `-metin` paragraftır. `-` tek başına ise boş maddedir.
+	if (p.spaces === "" && p.content !== "") return null;
+
+	const spaceWidth = indentWidth(p.spaces);
+	// Boş madde ya da 5+ boşluk: içerik sütunu işaret + 1. Fazla boşluk
+	// maddenin İÇİNDE girintili kod olur.
+	const effective = p.content === "" || spaceWidth > MAX_MARKER_SPACES ? 1 : spaceWidth;
+
+	return {
+		contentColumn: p.indent + p.markerWidth + effective,
+		markerChars: p.indent + p.markerWidth + (p.content === "" ? p.spaces.length : effective),
+		content: p.content,
+	};
+}
+
+/** İki madde aynı listeye mi ait — işaret türü değişirse yeni liste başlar. */
+function sameList(a: ListItemStart, b: ListItemStart): boolean {
+	return a.bullet === b.bullet && a.delimiter === b.delimiter;
+}
+
+function readList(
+	lines: readonly Line[],
+	start: number,
+	first: ListItemStart,
+	blocks: Block[],
+	inline: InlineParser,
+): number {
+	const openLine = must(lines[start], "liste açılış satırı");
+	const items: ListItem[] = [];
+	let i = start;
+	let current: ListItemStart | null = first;
+	/** Maddeler arasında boş satır görüldü mü — gevşek listenin ölçütü. */
+	let looseBetween = false;
+	let looseInside = false;
+	let lastConsumed = start;
+
+	while (current !== null && i < lines.length) {
+		const read = readListItem(lines, i, current, inline);
+		items.push(read.item);
+		looseInside ||= read.spread;
+		lastConsumed = read.lastContent;
+		i = read.next;
+
+		// Sonraki maddeye kadar boş satırları atla.
+		let blanks = 0;
+		while (i < lines.length && isBlank(must(lines[i], "liste boş satırı").value)) {
+			blanks++;
+			i++;
+		}
+		if (i >= lines.length) break;
+
+		const next = listItemStart(must(lines[i], "sonraki madde satırı"));
+		if (next === null || !sameList(current, next)) break;
+
+		if (blanks > 0) looseBetween = true;
+		current = next;
+	}
+
+	const endLine = must(lines[lastConsumed], "liste bitiş satırı");
+	blocks.push({
+		type: "list",
+		ordered: first.bullet === null,
+		start: first.number,
+		spread: looseBetween || looseInside,
+		children: items,
+		syntax:
+			first.bullet !== null
+				? { marker: first.bullet }
+				: { delimiter: first.delimiter, numbering: "incrementing" },
+		position: span(openLine, endLine),
+	});
+	return i;
+}
+
+interface ReadItem {
+	readonly item: ListItem;
+	readonly next: number;
+	readonly lastContent: number;
+	readonly spread: boolean;
+}
+
+function readListItem(
+	lines: readonly Line[],
+	start: number,
+	info: ListItemStart,
+	inline: InlineParser,
+): ReadItem {
+	const openLine = must(lines[start], "madde açılış satırı");
+	const inner: Line[] = [sliceLine(openLine, info.markerChars)];
+
+	let i = start + 1;
+	let lastContent = start;
+	let sawBlank = false;
+	/** Madde içinde boş satırdan SONRA içerik geldi mi — gevşek maddenin ölçütü. */
+	let spread = false;
+
+	while (i < lines.length) {
+		const line = must(lines[i], "madde devam satırı");
+
+		if (isBlank(line.value)) {
+			inner.push(sliceLine(line, 0));
+			sawBlank = true;
+			i++;
+			continue;
+		}
+
+		if (indentWidth(line.value) >= info.contentColumn) {
+			inner.push(sliceColumns(line, info.contentColumn));
+			if (sawBlank) spread = true;
+			lastContent = i;
+			sawBlank = false;
+			i++;
+			continue;
+		}
+
+		// Tembel devam: maddedeki paragraf, girintisiz de sürebilir — ama
+		// boş satırdan sonra ya da yeni bir blok başlangıcıysa sürmez.
+		if (!sawBlank && !startsNewBlock(line) && listItemStart(line) === null) {
+			inner.push(line);
+			lastContent = i;
+			i++;
+			continue;
+		}
+		break;
+	}
+
+	// Maddenin sonundaki boş satırlar maddeye ait değil.
+	const kept = inner.slice(0, lastContent - start + 1);
+
+	return {
+		item: {
+			type: "listItem",
+			// GFM görev listesi (`- [ ]`) F1-05'te; şimdilik görev değil.
+			checked: null,
+			spread,
+			children: parseLines(kept, inline),
+			position: span(openLine, must(lines[lastContent], "madde bitiş satırı")),
+		},
+		next: lastContent + 1,
+		lastContent,
+		spread,
 	};
 }
 

@@ -28,14 +28,14 @@
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
-| **Faz 1** — `@kalem/core` | 2.5 / 11 | 🔵 **Devam ediyor** (F1-03 yarıda) |
+| **Faz 1** — `@kalem/core` | 2.8 / 11 | 🔵 **Devam ediyor** (F1-03 yarıda) |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | 🟡 Prototip hazır, matris doldurulmadı |
 | **Faz 2** — Viewer + başsız editör | 0 / 13 | ⬜ Başlanmadı |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **10.5 / 72** | **%15** |
+| | **10.8 / 72** | **%15** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı
 
@@ -43,11 +43,11 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` · `F1-02`
 
-**Yarıda:** `F1-03` — yaprak bloklar bitti (paragraf, ATX/setext başlık,
-yatay çizgi, çitli/girintili kod). Kalan: kapsayıcılar (blockquote, liste),
-HTML blokları, bağlantı tanımları.
+**Yarıda:** `F1-03` — yaprak **ve kapsayıcı** bloklar bitti (paragraf,
+ATX/setext başlık, yatay çizgi, çitli/girintili kod, blockquote, liste).
+Kalan: HTML blokları, bağlantı tanımları.
 
-**Sıradaki:** `F1-03`'ün devamı — kapsayıcı bloklar
+**Sıradaki:** `F1-03`'ün kalanı — HTML blokları ve bağlantı tanımları
 
 > **Karar (kapandı):** `F1-08` tam olarak F1-03'ten önce kurulamaz — gidiş-dönüş
 > koşucusu hem `parse` hem `serialize` olmadan hiçbir şey koşamaz. Bunun yerine
@@ -56,7 +56,7 @@ HTML blokları, bağlantı tanımları.
 
 **Yazılan kod:** `@kalem/core` — AST tipleri, künye kaydı, tip koruyucular,
 gezinme/konum/düzenleme yardımcıları, kaynak tarayıcı, blok ayrıştırıcı.
-213 test, kapsam %100 (dal ve fonksiyon dahil), 3.85 kB / 12 kB.
+265 test, kapsam %99.6 (dal), 4.83 kB / 12 kB.
 
 **Kayıt dokümanları:** [Faz 0 sonucu](./02-faz0-sonuc.md) ·
 [F1-01 AST kararları](./03-f1-01-ast-kararlari.md)
@@ -165,11 +165,12 @@ CommonMark blok yapısı: paragraf, ATX + setext başlık, fenced + indented kod
 - **Kabul:** CommonMark spec suite'in blok bölümünde ≥ %90 geçiş
 
 > **🔵 Yarıda.** `scanner.ts` (satır bölme, sekme genişletme) + `blocks.ts`
-> (yaprak bloklar). Biten: paragraf, ATX + setext başlık, yatay çizgi,
-> çitli + girintili kod, boş satır işleme, paragrafı kesen bloklar. Her
-> düğümde `position` ve yazım tercihi var.
-> **Kalan:** blockquote, liste (iç içe, sıkı/gevşek), HTML blokları,
-> bağlantı tanımları. Spec suite henüz koşulmadı (F1-08'le gelecek).
+> (yaprak + kapsayıcı bloklar). Biten: paragraf, ATX + setext başlık, yatay
+> çizgi, çitli + girintili kod, **blockquote** (iç içe, tembel devam),
+> **liste** (sırasız/sıralı, iç içe, sıkı/gevşek), boş satır işleme,
+> paragrafı kesen bloklar. Her düğümde `position` ve yazım tercihi var.
+> **Kalan:** HTML blokları, bağlantı tanımları. Spec suite henüz koşulmadı
+> (F1-08'le gelecek).
 
 ### F1-04 · Satır içi ayrıştırıcı `[L]` ⬜
 Vurgu (`*`/`_`, CommonMark'ın delimiter-run algoritması), kod span, link, referanslı link, görsel, autolink, ham HTML, kaçış karakterleri, hard/soft break
