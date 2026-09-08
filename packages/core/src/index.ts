@@ -89,6 +89,8 @@ export {
 	isRoot,
 	isStructural,
 } from "./guards.js";
+// --- Satır içi ayrıştırıcı (F1-04, devam ediyor: bağlantı ve görsel eksik) ---
+export { parseInline } from "./inline.js";
 // --- Konum yolları (F1-02) ---
 export type { Path } from "./path.js";
 export { nodeAtPath, parentAtPath, parentPath, pathEquals, pathToNode } from "./path.js";

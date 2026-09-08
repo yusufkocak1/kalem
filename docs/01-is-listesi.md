@@ -43,8 +43,7 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` · `F1-02` · `F1-03` · `F1-06`
 
-**Sıradaki:** `F1-04` · Satır içi ayrıştırıcı `[L]` — vurgu algoritması
-CommonMark'ın en zor kısmı, projenin en riskli iki görevinden biri
+**Sıradaki:** `F1-04`'ün kalanı — bağlantı, görsel, başvurulu bağlantı
 
 > **Karar (kapandı):** `F1-08` tam olarak F1-03'ten önce kurulamaz — gidiş-dönüş
 > koşucusu hem `parse` hem `serialize` olmadan hiçbir şey koşamaz. Bunun yerine
@@ -53,7 +52,7 @@ CommonMark'ın en zor kısmı, projenin en riskli iki görevinden biri
 
 **Yazılan kod:** `@kalem/core` — AST tipleri, künye kaydı, tip koruyucular,
 gezinme/konum/düzenleme yardımcıları, kaynak tarayıcı, blok ayrıştırıcı.
-313 test, kapsam **%100 (dal)**, 5.76 kB / 12 kB.
+357 test, kapsam %98 (dal), 7.7 kB / 12 kB.
 
 **Kayıt dokümanları:** [Faz 0 sonucu](./02-faz0-sonuc.md) ·
 [F1-01 AST kararları](./03-f1-01-ast-kararlari.md)
@@ -171,10 +170,16 @@ CommonMark blok yapısı: paragraf, ATX + setext başlık, fenced + indented kod
 > paragrafın girintili devam satırlarında baştaki boşluk atılıyor
 > (CommonMark gereği ama gidiş-dönüşü etkiler). Spec suite F1-08'le koşulacak.
 
-### F1-04 · Satır içi ayrıştırıcı `[L]` ⬜
+### F1-04 · Satır içi ayrıştırıcı `[L]` 🔵 **YARIDA**
 Vurgu (`*`/`_`, CommonMark'ın delimiter-run algoritması), kod span, link, referanslı link, görsel, autolink, ham HTML, kaçış karakterleri, hard/soft break
 - **Uyarı:** Vurgu algoritması CommonMark'ın en zor kısmı. Referans implementasyonu birebir takip et, kestirme yapma.
 - **Kabul:** spec suite'in satır içi bölümünde ≥ %90 geçiş
+
+> **🔵 Yarıda.** `inline.ts` — iki geçişli: önce belirteçleme, sonra
+> CommonMark'ın sınırlayıcı eşleştirme algoritması. Biten: vurgu (`*`/`_`,
+> üçün kuralı dahil), üstü çizili, kod span, autolink, ham satır içi HTML,
+> ters bölü kaçışı, sert/yumuşak satır sonu.
+> **Kalan:** bağlantı `[a](b)`, görsel, başvurulu bağlantı.
 
 ### F1-05 · GFM uzantıları `[M]` ⬜
 Üstü çizili (`~~`), görev listesi (`- [ ]`), otomatik link literal, **tablo ayrıştırma** (motor v1'de UI vermeyecek ama parser/serializer tabloyu **kayıpsız korumalı** — kullanıcının dosyasını bozmamak için zorunlu)
