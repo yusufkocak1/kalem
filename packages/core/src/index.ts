@@ -66,6 +66,14 @@ export type {
 	Toml,
 	Yaml,
 } from "./ast.js";
+// --- Blok ayrıştırıcı (F1-03, devam ediyor) ---
+//
+// API henüz kararlı DEĞİL: kapsayıcı bloklar (blockquote, liste), HTML
+// blokları ve satır içi ayrıştırma eksik. Yayımlanan `parse()` bunların
+// üstüne kurulacak. Şimdiden dışa aktarılmasının sebebi boyut kapısının
+// gerçek kodu ölçmesi.
+export type { InlineParser, ParseBlocksOptions } from "./blocks.js";
+export { parseBlocks } from "./blocks.js";
 // --- Düzenleme (F1-02) ---
 export type { CloneOptions } from "./edit.js";
 export { clone, insertAt, remove, removeAt, replace, replaceAt } from "./edit.js";
@@ -84,6 +92,8 @@ export {
 // --- Konum yolları (F1-02) ---
 export type { Path } from "./path.js";
 export { nodeAtPath, parentAtPath, parentPath, pathEquals, pathToNode } from "./path.js";
+export type { Line, LineEnding, ScanResult } from "./scanner.js";
+export { indentWidth, isBlank, scan } from "./scanner.js";
 // --- Künye kaydı (F1-01) ---
 export { isParentContent, NODE_TYPES, SPECS, specOf } from "./spec.js";
 // --- Gezinme (F1-02) ---

@@ -28,27 +28,33 @@
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
-| **Faz 1** — `@kalem/core` | 2 / 11 | 🔵 **Devam ediyor** |
+| **Faz 1** — `@kalem/core` | 2.5 / 11 | 🔵 **Devam ediyor** (F1-03 yarıda) |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | 🟡 Prototip hazır, matris doldurulmadı |
 | **Faz 2** — Viewer + başsız editör | 0 / 13 | ⬜ Başlanmadı |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **10 / 72** | **%14** |
+| | **10.5 / 72** | **%15** |
 
 ### 👉 Şu an buradayız
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` · `F1-02`
 
-**Sıradaki:** `F1-03` · Blok ayrıştırıcı `[L]` — CommonMark blok yapısı
+**Yarıda:** `F1-03` — yaprak bloklar bitti (paragraf, ATX/setext başlık,
+yatay çizgi, çitli/girintili kod). Kalan: kapsayıcılar (blockquote, liste),
+HTML blokları, bağlantı tanımları.
 
-> **Açık soru:** `F1-08` (gidiş-dönüş test koşucusu) planda F1-03'ten *sonra*
-> geliyor. Ayrıştırıcıyı ona **karşı** yazmak, sonradan doğrulamaktan güvenli
-> olabilir — sıra değiştirilsin mi, karar verilmedi.
+**Sıradaki:** `F1-03`'ün devamı — kapsayıcı bloklar
+
+> **Karar (kapandı):** `F1-08` tam olarak F1-03'ten önce kurulamaz — gidiş-dönüş
+> koşucusu hem `parse` hem `serialize` olmadan hiçbir şey koşamaz. Bunun yerine
+> ayrıştırıcı ve serileştirici **blok tipi başına birlikte** ilerletiliyor;
+> koşucu ikisi de var olur olmaz devreye girecek.
 
 **Yazılan kod:** `@kalem/core` — AST tipleri, künye kaydı, tip koruyucular,
-gezinme/konum/düzenleme yardımcıları. 109 test, kapsam %100, 2.02 kB / 12 kB.
+gezinme/konum/düzenleme yardımcıları, kaynak tarayıcı, blok ayrıştırıcı.
+213 test, kapsam %100 (dal ve fonksiyon dahil), 3.85 kB / 12 kB.
 
 **Kayıt dokümanları:** [Faz 0 sonucu](./02-faz0-sonuc.md) ·
 [F1-01 AST kararları](./03-f1-01-ast-kararlari.md)
@@ -151,10 +157,17 @@ Bunlar projenin iki temel vaadini **otomatik** koruyan testlerdir. Bunlar olmada
 > yalnızca yol üzerindeki atalar kopyalanır. F2-09'un geri al/ileri al yığını
 > ve F2'nin render karşılaştırması bunun üzerine kurulacak.
 
-### F1-03 · Blok ayrıştırıcı `[L]` 👈 **SIRADAKİ**
+### F1-03 · Blok ayrıştırıcı `[L]` 🔵 **YARIDA**
 CommonMark blok yapısı: paragraf, ATX + setext başlık, fenced + indented kod, blockquote, liste (sırasız/sıralı, tight/loose, iç içe), thematic break, HTML blokları, boş satır işleme
 - **Kritik:** her düğüme `position` (satır/sütun ofset) ve **sözdizimi tercihi** meta verisi yaz (`marker: '-' | '*' | '+'`, `fence: '```' | '~~~'`, `headingStyle: 'atx' | 'setext'`)
 - **Kabul:** CommonMark spec suite'in blok bölümünde ≥ %90 geçiş
+
+> **🔵 Yarıda.** `scanner.ts` (satır bölme, sekme genişletme) + `blocks.ts`
+> (yaprak bloklar). Biten: paragraf, ATX + setext başlık, yatay çizgi,
+> çitli + girintili kod, boş satır işleme, paragrafı kesen bloklar. Her
+> düğümde `position` ve yazım tercihi var.
+> **Kalan:** blockquote, liste (iç içe, sıkı/gevşek), HTML blokları,
+> bağlantı tanımları. Spec suite henüz koşulmadı (F1-08'le gelecek).
 
 ### F1-04 · Satır içi ayrıştırıcı `[L]`
 Vurgu (`*`/`_`, CommonMark'ın delimiter-run algoritması), kod span, link, referanslı link, görsel, autolink, ham HTML, kaçış karakterleri, hard/soft break
