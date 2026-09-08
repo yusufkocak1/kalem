@@ -99,6 +99,18 @@ export type { Path } from "./path.js";
 export { nodeAtPath, parentAtPath, parentPath, pathEquals, pathToNode } from "./path.js";
 export type { Line, LineEnding, ScanResult } from "./scanner.js";
 export { indentWidth, isBlank, scan } from "./scanner.js";
+// --- Güvenlik (F1-10) ---
+export type { HtmlPolicy, SecurityOptions, UrlPolicy } from "./security.js";
+export {
+	ALLOWED_IMAGE_DATA_TYPES,
+	ALLOWED_PROTOCOLS,
+	applyHtmlPolicy,
+	escapeHtml,
+	isSafeUrl,
+	NEUTRALIZED_URL,
+	sanitizeUrl,
+} from "./security.js";
+
 // --- Serileştirici (F1-07) ---
 export type { SerializeOptions } from "./serialize.js";
 export { serialize } from "./serialize.js";

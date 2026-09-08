@@ -188,6 +188,19 @@ const yaz = (ad, icerik) => {
 	const r = calistir(LOCALE, [y]);
 	bekle("bölme regex sanılmıyor", r.kod === 1 && /toUpperCase/.test(r.cikti), r.cikti);
 }
+{
+	// GERÇEK BİR HATAYDI: template literal tamamen maskeleniyordu, oysa
+	// `${...}` içindeki gerçek koddur ve taranmalıdır.
+	const y = yaz("sablon.ts", "const a = `deger: ${x.toLowerCase()}`;\n");
+	const r = calistir(LOCALE, [y]);
+	bekle("template literal içindeki ${} taranıyor", r.kod === 1, r.cikti);
+}
+{
+	// Template literal'in DÜZ kısmı kod değildir, sayılmamalı.
+	const y = yaz("sablon-duz.ts", "const a = `burada .toLowerCase() yazıyor ama metin`;\n");
+	const r = calistir(LOCALE, [y]);
+	bekle("template literal düz kısmı sayılmıyor", r.kod === 0, r.cikti);
+}
 
 for (const d of temizlenecek) rmSync(d, { recursive: true, force: true });
 

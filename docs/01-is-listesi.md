@@ -28,23 +28,22 @@
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
-| **Faz 1** — `@kalem/core` | 7.5 / 11 | 🔵 **Devam ediyor** |
+| **Faz 1** — `@kalem/core` | 8.5 / 11 | 🔵 **Devam ediyor** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | 🟡 Prototip hazır, matris doldurulmadı |
 | **Faz 2** — Viewer + başsız editör | 0 / 13 | ⬜ Başlanmadı |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **15.5 / 72** | **%22** |
+| | **16.5 / 72** | **%23** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` · `F1-02` · `F1-03` · `F1-04` · `F1-05` · `F1-06` · `F1-07`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` · `F1-02` · `F1-03` · `F1-04` · `F1-05` · `F1-06` · `F1-07` · `F1-10`
 
-**Sıradaki:** `F1-10` güvenlik katmanı, `F1-11` komut çekirdeği,
-`F1-09` HTML → AST
+**Sıradaki:** `F1-11` komut çekirdeği, `F1-09` HTML → AST
 
 > ⚠️ **Boyut uyarısı:** `@kalem/core` 10.39 kB / 12 kB. Kalan üç görev
 > bütçeyi aşabilir; F1-09'un core'da mı yoksa ayrı pakette mi olacağı
@@ -57,7 +56,7 @@
 
 **Yazılan kod:** `@kalem/core` — AST tipleri, künye kaydı, tip koruyucular,
 gezinme/konum/düzenleme yardımcıları, kaynak tarayıcı, blok ayrıştırıcı.
-504 test, kapsam %96 (dal), **10.39 kB / 12 kB**.
+522 test, kapsam %96 (dal), **10.8 kB / 12 kB**.
 **`parse(md)` ve `serialize(ast)` çalışıyor; gidiş-dönüş 17/17 byte-birebir.**
 
 **Kayıt dokümanları:** [Faz 0 sonucu](./02-faz0-sonuc.md) ·
@@ -244,10 +243,17 @@ Yapıştırma normalizasyonunun beyni. Word, Google Docs, Excel, Notion ve genel
 - **Kabul:** gerçek Word ve GDocs kopya çıktılarından oluşan fixture seti doğru AST üretiyor
 - **Not:** Bu görev sürekli iyileştirilir; v1 için "makul" hedeflenir, "mükemmel" değil
 
-### F1-10 · Güvenlik katmanı `[M]` ⬜
+### F1-10 · Güvenlik katmanı `[M]` ✅
 - URL protokol beyaz listesi (`http`, `https`, `mailto`, `tel`, göreli); `javascript:`, `vbscript:`, `data:` (görsel istisnası hariç) reddedilir
 - HTML düğümü politikası: varsayılan escape; `allowHtml` + `sanitizeHtml` kancası
 - **Kabul:** XSS payload fixture seti (50+ vektör) hiçbirini geçirmiyor
+
+> **Yapıldı.** 55 vektör, hepsi engelleniyor. Şema kontrolü `URL` sınıfına
+> değil RFC 3986 dil bilgisine dayanıyor (core tarayıcı API'sine bağlanamaz)
+> ve **önce kontrol karakterlerini temizliyor** — `java	script:` gibi
+> vektörler tam olarak bu adım atlandığı için çalışır.
+> `data:image/svg+xml` görsel bağlamında bile **reddediliyor**: SVG içinde
+> script çalışır.
 
 ### F1-11 · Komut çekirdeği (saf) `[M]` ⬜
 DOM'suz, AST üzerinde çalışan işlemler: `toggleMark`, `setBlockType`, `wrapIn`, `lift`, `splitBlock`, `joinBlocks`, `insertNode`

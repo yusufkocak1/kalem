@@ -113,11 +113,45 @@ function maskele(s) {
 			const son = s.indexOf("*/", i + 2);
 			bosalt(i, son === -1 ? c.length : son + 2);
 			i = son === -1 ? c.length : son + 2;
-		} else if (c[i] === '"' || c[i] === "'" || c[i] === "`") {
+		} else if (c[i] === '"' || c[i] === "'") {
 			const tirnak = c[i];
 			let k = i + 1;
 			while (k < c.length && c[k] !== tirnak) k += c[k] === "\\" ? 2 : 1;
 			bosalt(i + 1, k);
+			i = k + 1;
+		} else if (c[i] === "`") {
+			// Template literal: yalnızca DÜZ kısımlar maskelenir. `${...}`
+			// içindeki gerçek koddur ve taranmalıdır — burayı maskelemek
+			// `${x.toLowerCase()}` gibi ihlalleri görünmez yapardı.
+			let k = i + 1;
+			let duzBaslangic = k;
+			while (k < c.length) {
+				if (c[k] === "\\") {
+					k += 2;
+					continue;
+				}
+				if (c[k] === "`") break;
+				if (c[k] === "$" && c[k + 1] === "{") {
+					bosalt(duzBaslangic, k);
+					let derinlik = 0;
+					k++; // '$'
+					while (k < c.length) {
+						if (c[k] === "{") derinlik++;
+						else if (c[k] === "}") {
+							derinlik--;
+							if (derinlik === 0) {
+								k++;
+								break;
+							}
+						}
+						k++;
+					}
+					duzBaslangic = k;
+					continue;
+				}
+				k++;
+			}
+			bosalt(duzBaslangic, k);
 			i = k + 1;
 		} else if (c[i] === "/" && regexBaslangiciMi(s, i)) {
 			let k = i + 1;
