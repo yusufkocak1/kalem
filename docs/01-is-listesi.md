@@ -23,28 +23,28 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-08 · `master` · `pnpm verify` yeşil · Playwright 96/96
+> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 147/147
 
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
-| **Faz 2** — Viewer + başsız editör | 4 / 13 | 🔵 2A bitti, 2B sırada |
+| **Faz 2** — Viewer + başsız editör | 5 / 13 | 🔵 2B sürüyor |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **23 / 72** | **%32** |
+| | **24 / 72** | **%33** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-04` (2A tamam)**
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-04` (2A tamam)** · `F2-05`
 
-**Sıradaki:** **2B — blok motoru.** `F2-05` blok kapsayıcı ve yaşam
-döngüsü; fazın en büyük parçası (~6–8 hafta).
+**Sıradaki:** `F2-06` seçim modeli — blok içi seçim tarayıcıdan, bloklar
+arası seçim kendi modelimizden.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -63,6 +63,8 @@ döngüsü; fazın en büyük parçası (~6–8 hafta).
 > | `@kalem/core/html` | 2.21 kB | 6 kB |
 > | `@kalem/viewer` | 2.68 kB | 14 kB |
 > | `@kalem/themes/viewer.css` | 1.16 kB | 3 kB |
+> | `@kalem/themes/editor.css` | 252 B | 2 kB |
+> | `@kalem/editor` (core dâhil) | 13.37 kB | 38 kB |
 >
 > Gerekçe ikisinde de aynı: yalnızca Markdown işleyen kullanıcı (SSR,
 > derleme betiği) editör komutlarını ve yapıştırma dönüştürücüsünü
@@ -81,8 +83,9 @@ döngüsü; fazın en büyük parçası (~6–8 hafta).
 gezinme/konum/düzenleme yardımcıları, kaynak tarayıcı, blok ve satır içi
 ayrıştırıcı, serileştirici, güvenlik katmanı, komutlar, HTML dönüştürücü.
 `@kalem/viewer` — render planı, `renderToDOM`, `renderToString`.
-`@kalem/themes` — görüntüleyici tipografisi (saf CSS, 1.16 kB).
-**729 birim testi** + **96 tarayıcı testi** (Chromium · Firefox · WebKit),
+`@kalem/themes` — görüntüleyici ve editör stilleri (saf CSS).
+`@kalem/editor` — blok kapsayıcı, model↔DOM eşlemesi, satır içi geri okuma.
+**758 birim testi** + **147 tarayıcı testi** (Chromium · Firefox · WebKit),
 axe ile WCAG 2.1 A/AA taraması dâhil.
 `parse(md)` ↔ `serialize(ast)` gidiş-dönüş 17/17 byte-birebir;
 `renderToDOM` ↔ `renderToString` üç motorda byte-birebir.
@@ -446,15 +449,46 @@ Render doğruluğu + XSS fixture'ları + a11y (axe)
 > Tek dev bağımlılık eklendi: `@axe-core/playwright`. Yayımlanan hiçbir
 > pakete girmiyor.
 
-## 2B · `@kalem/editor` — blok motoru (~6–8 hafta)
+## 2B · `@kalem/editor` — blok motoru (~6–8 hafta) 🔵 SÜRÜYOR
 
-### F2-05 · Blok kapsayıcı ve yaşam döngüsü `[L]` ⬜
-- `Editor` sınıfı: `new Editor(el, { value, onChange, readOnly, plugins })`
-- Her AST bloğu için bir DOM elemanı; her biri kendi `contenteditable="true"`
-- Model↔DOM eşlemesi (`blockId` ↔ element), sıralı bloklar
-- Sanal DOM yok: hedefli, minimal DOM yamaları
-- **Dil bağlamı:** kök elemanın `lang` özniteliği okunur ve bloklara miras verilir; `new Editor(el, { lang: 'tr' })` ile ezilebilir. Bu, tarayıcının `spellcheck` sözlüğünü ve satır sonu/hecelemeyi doğru dile bağlar.
-- **Kabul:** doküman render ediliyor, her blokta yazı yazılabiliyor; `lang="tr"` verilen editörde yazım denetimi Türkçe sözlük kullanıyor
+### F2-05 · Blok kapsayıcı ve yaşam döngüsü `[L]` ✅
+- `Editor` sınıfı: `new Editor(el, { value, onChange, readOnly, plugins })` ✅ *(`plugins` F2-12'de)*
+- Her AST bloğu için bir DOM elemanı; her biri kendi `contenteditable="true"` ✅
+- Model↔DOM eşlemesi (`blockId` ↔ element), sıralı bloklar ✅
+- Sanal DOM yok: hedefli, minimal DOM yamaları ✅
+- **Dil bağlamı:** kök elemanın `lang` özniteliği okunur ve bloklara miras verilir; `new Editor(el, { lang: 'tr' })` ile ezilebilir. Bu, tarayıcının `spellcheck` sözlüğünü ve satır sonu/hecelemeyi doğru dile bağlar. ✅
+- **Kabul:** doküman render ediliyor ✅, her blokta yazı yazılabiliyor ✅; `lang="tr"` verilen editörde yazım denetimi Türkçe sözlük kullanıyor ✅
+
+> **Veri akışının yönü ikiye bölündü — fazın en önemli kararı.**
+>
+> ```
+> blok yapısı :  model ──► DOM      (komutlar, hedefli yamalar)
+> satır içi   :  DOM   ──► model    (`input` olayında geri okunur)
+> ```
+>
+> Sebep IME: bileşim (composition) sırasında DOM'a karışmak Japonca/Çince
+> yazımı bozar, o yüzden satır içinde tarayıcı serbest bırakıldı. Blok
+> yapısında ise tarayıcıya güvenilemez — Enter'a basınca ürettiği `<div>`
+> çorbası Markdown'a çevrilemez.
+>
+> **İkinci kazanç:** blok düzeyi modelde kaldığı için `syntax` alanları
+> düzenlemeden etkilenmiyor. Kullanıcı bir paragrafa harf eklediğinde
+> listenin `*` işareti `-`ye dönmüyor; e2e testi tam olarak bunu ölçüyor.
+> Satır içinde de içerik değişmemişse modeldeki düğüm korunuyor, yani
+> `_italik_` yazan `*italik*` görmüyor.
+>
+> **Hedefli yama:** blok yalnızca **referansı** değiştiyse yeniden
+> kuruluyor. Bu, `@kalem/core`'un değişmez düzenleme kararının (F1-02)
+> karşılığını aldığı yer: `replaceAt` yalnızca yoldaki ataları kopyaladığı
+> için dokunulmayan blokların referansı aynı kalıyor ve karşılaştırma tek
+> bir `!==`. Sanal DOM'a gerek kalmamasının sebebi bu.
+>
+> **F2-07'nin ilk maddesi burada indi:** blok içi DOM'dan `Inline[]`
+> dönüşümü, "yazı yazılabiliyor" kriterinin ön koşuluydu. F2-07'ye
+> biçimlendirme komutları kaldı.
+>
+> Testler: 29 birim (sahte DOM'la normalleştirme mantığı) + 17 tarayıcı
+> testi × 3 motor. `@kalem/editor` 13.37 / 38 kB.
 
 ### F2-06 · Seçim modeli `[L]` ⬜
 İki seviyeli seçim:

@@ -1,0 +1,237 @@
+<meta charset="utf-8">
+<title>Kalem Editör — Blok Motoru</title>
+<style>
+	:root {
+		color-scheme: light;
+		--zemin: #fbfaf8;
+		--kart: #ffffff;
+		--kenar: #e3e0da;
+		--metin: #22201d;
+		--soluk: #6f6a62;
+		--vurgu: #0f4e4a;
+		--iyi: #1a7f5a;
+		--kotu: #b3402a;
+		--kod: "SFMono-Regular", ui-monospace, "Cascadia Mono", Consolas, monospace;
+	}
+	@media (prefers-color-scheme: dark) {
+		:root:not([data-theme="light"]) {
+			--zemin: #16151a;
+			--kart: #1e1d23;
+			--kenar: #34323b;
+			--metin: #e8e6e1;
+			--soluk: #9d978d;
+			--vurgu: #6fd3c6;
+			--iyi: #58d0a0;
+			--kotu: #ff9b82;
+		}
+	}
+	* { box-sizing: border-box; }
+	body {
+		margin: 0;
+		background: var(--zemin);
+		color: var(--metin);
+		font: 14px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+	}
+	header {
+		padding: 18px 22px 14px;
+		border-bottom: 1px solid var(--kenar);
+		display: flex;
+		flex-wrap: wrap;
+		gap: 14px;
+		align-items: baseline;
+	}
+	h1 { margin: 0; font-size: 17px; letter-spacing: -0.01em; }
+	h1 span { color: var(--soluk); font-weight: 400; }
+	.uyari {
+		margin: 0;
+		padding: 10px 22px;
+		background: color-mix(in srgb, var(--vurgu) 7%, var(--zemin));
+		border-bottom: 1px solid var(--kenar);
+		color: var(--soluk);
+		font-size: 13px;
+	}
+	.uyari b { color: var(--metin); }
+	nav { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+	button {
+		font: inherit;
+		font-size: 12.5px;
+		padding: 5px 11px;
+		border: 1px solid var(--kenar);
+		border-radius: 7px;
+		background: var(--kart);
+		color: var(--metin);
+		cursor: pointer;
+	}
+	button:hover { border-color: var(--vurgu); color: var(--vurgu); }
+	button:focus-visible { outline: 2px solid var(--vurgu); outline-offset: 2px; }
+	label.secim { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--soluk); }
+
+	main {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+		gap: 1px;
+		background: var(--kenar);
+		border-bottom: 1px solid var(--kenar);
+	}
+	section { background: var(--kart); display: flex; flex-direction: column; min-height: 66vh; }
+	.baslik {
+		padding: 9px 14px;
+		border-bottom: 1px solid var(--kenar);
+		font-size: 11.5px;
+		text-transform: uppercase;
+		letter-spacing: 0.07em;
+		color: var(--soluk);
+		display: flex;
+		justify-content: space-between;
+		gap: 10px;
+	}
+	.baslik .ek { text-transform: none; letter-spacing: 0; }
+	pre.kaynak {
+		flex: 1;
+		margin: 0;
+		padding: 14px;
+		font-family: var(--kod);
+		font-size: 12.5px;
+		line-height: 1.6;
+		overflow: auto;
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
+	.tuval { flex: 1; overflow: auto; padding: 20px 22px; }
+
+	.rapor {
+		padding: 12px 22px 22px;
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+		gap: 12px;
+	}
+	.olcum {
+		border: 1px solid var(--kenar);
+		border-radius: 9px;
+		padding: 11px 13px;
+		background: var(--kart);
+	}
+	.olcum dt { font-size: 11.5px; color: var(--soluk); margin: 0 0 3px; }
+	.olcum dd { margin: 0; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+	.iyi { color: var(--iyi); }
+	.kotu { color: var(--kotu); }
+</style>
+<link rel="stylesheet" href="/@kalem/themes/viewer.css">
+<link rel="stylesheet" href="/@kalem/themes/editor.css">
+
+<header>
+	<h1>Kalem Editör <span>— blok motoru (F2-05)</span></h1>
+	<nav>
+		<button type="button" id="ornek">Örneği yükle</button>
+		<label class="secim"><input type="checkbox" id="saltOkunur"> salt okunur</label>
+		<button type="button" id="viewer">Viewer →</button>
+	</nav>
+</header>
+
+<p class="uyari">
+	<b>Blok motorunun ilk hâli.</b> Her blok kendi <code>contenteditable</code>
+	elemanı; yazdıkça model DOM'dan geri okunuyor ve sağda gerçek Markdown
+	çıktısı beliriyor. <b>Henüz yok:</b> Enter ile blok bölme, Backspace ile
+	birleştirme, Ctrl+B, geri alma — bunlar F2-07…F2-09.
+</p>
+
+<main>
+	<section>
+		<div class="baslik"><span>Editör</span><span class="ek" id="blokBilgi"></span></div>
+		<div class="tuval"><div id="editor" lang="tr"></div></div>
+	</section>
+	<section>
+		<div class="baslik"><span>Markdown çıktısı</span><span class="ek" id="ciktiBilgi"></span></div>
+		<pre class="kaynak" id="cikti"></pre>
+	</section>
+</main>
+
+<dl class="rapor">
+	<div class="olcum"><dt>Belge dili</dt><dd id="dil">—</dd></div>
+	<div class="olcum"><dt>Blok sayısı</dt><dd id="blok">—</dd></div>
+	<div class="olcum"><dt>Değişiklik</dt><dd id="sayac">0</dd></div>
+	<div class="olcum"><dt>Yazım tercihleri</dt><dd id="tercih">—</dd></div>
+</dl>
+
+<script type="importmap">
+	{
+		"imports": {
+			"@kalem/core": "/@kalem/core/index.js",
+			"@kalem/editor": "/@kalem/editor/index.js"
+		}
+	}
+</script>
+<script type="module">
+	import { Editor } from "@kalem/editor";
+
+	const ORNEK = `# Işık ve Gölge
+
+Word kadar kolay, **Markdown** kadar taşınabilir. Yazmayı deneyin —
+sağdaki Markdown her tuşta güncelleniyor.
+
+* yıldız işareti korunuyor
+* çünkü yazım tercihi modelde duruyor
+
+1) parantez ayracı da öyle
+
+> Alıntı, \`kod\` ve [bağlantı](https://ornek.com).
+
+- [x] AST tipleri
+- [ ] Enter ile blok bölme
+
+\`\`\`ts
+const editor = new Editor(el, { value: md });
+\`\`\`
+
+---
+
+Son paragraf.
+`;
+
+	const tuval = document.getElementById("editor");
+	const ciktiEl = document.getElementById("cikti");
+	let sayac = 0;
+
+	function rapor(value, doc) {
+		ciktiEl.textContent = value;
+		document.getElementById("blok").textContent = String(doc.children.length);
+		document.getElementById("ciktiBilgi").textContent = `${value.length} karakter`;
+		document.getElementById("blokBilgi").textContent =
+			`${tuval.querySelectorAll("[data-kalem-id]").length} blok elemanı`;
+		document.getElementById("sayac").textContent = String(sayac);
+
+		// Yazım tercihleri korunuyor mu — kullanıcı yazarken kaybolmamalı.
+		const liste = doc.children.find((c) => c.type === "list" && !c.ordered);
+		const tercih = document.getElementById("tercih");
+		const isaret = liste?.syntax?.marker;
+		tercih.textContent = isaret === undefined ? "—" : `liste işareti: ${isaret}`;
+		tercih.className = isaret === "*" ? "iyi" : "";
+	}
+
+	const editor = new Editor(tuval, {
+		value: ORNEK,
+		lang: "tr",
+		onChange: (value, doc) => {
+			sayac += 1;
+			rapor(value, doc);
+		},
+	});
+
+	document.getElementById("dil").textContent = tuval.getAttribute("lang") ?? "—";
+	rapor(editor.getValue(), editor.getDocument());
+
+	document.getElementById("ornek").addEventListener("click", () => {
+		sayac = 0;
+		editor.setValue(ORNEK);
+	});
+	document.getElementById("saltOkunur").addEventListener("change", (e) => {
+		editor.setReadOnly(e.target.checked);
+	});
+	document.getElementById("viewer").addEventListener("click", () => {
+		window.location.href = "/viewer.html";
+	});
+
+	document.documentElement.lang = "tr";
+	// Konsol ve Playwright için; kütüphane global'e yazmaz.
+	window.kalem = { editor };
+</script>

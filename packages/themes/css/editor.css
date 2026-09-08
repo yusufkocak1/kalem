@@ -1,0 +1,76 @@
+/*
+ * @kalem/themes — Editör katmanı  (İş listesi: F2-05)
+ *
+ * `viewer.css`'in **üstüne** yükleniyor: belge tipografisi oradan gelir,
+ * burada yalnızca düzenlemeye ait olan şeyler var. Ayrı dosya olmasının
+ * sebebi salt okunur kullanıcıya düzenleme stillerini indirtmemek.
+ *
+ * Her şey yine `.kalem-editor` altına kapatılı — sayfanın geri kalanına
+ * tek kural sızmıyor.
+ */
+
+.kalem-editor {
+	/* Boş belgede tıklanacak bir alan kalsın. */
+	min-height: 3em;
+}
+
+/*
+ * Odak halkası bloğun kendisinde.
+ *
+ * Kapsayıcıya konsaydı, hangi blokta olduğunuz görünmezdi; `contenteditable`
+ * blok başına verildiği için (F2-05) odak da blok başına.
+ *
+ * `outline-offset` negatif: halka bloğun içinde kalıyor, aksi hâlde
+ * komşu bloğun üstüne biner.
+ */
+.kalem-editor > [contenteditable="true"]:focus,
+.kalem-editor > [contenteditable="true"]:focus-visible {
+	outline: 2px solid var(--kalem-accent);
+	outline-offset: 2px;
+	border-radius: 3px;
+}
+
+/*
+ * Yatay çizgi düzenlenemez, ama seçilebilir olmalı.
+ *
+ * `contenteditable="false"` bir bloğu fare için görünmez kılmaz; tıklama
+ * hedefi kalsın diye dikey dolgu veriliyor — 1 piksellik çizgiye nişan
+ * almak imkânsıza yakın.
+ */
+.kalem-editor > hr {
+	padding: 0.6em 0;
+	margin: 0.6em 0;
+	background-clip: content-box;
+	cursor: pointer;
+}
+
+/*
+ * Kaynak olarak düzenlenen bloklar (kod, ham HTML, tanım, frontmatter).
+ *
+ * Bunlarda `white-space: pre-wrap`: `pre` olsaydı uzun satır kutudan
+ * taşar, imleç görünmeyen bir yere giderdi. Düzenlerken sarmalamak,
+ * okurken kaydırmaktan iyi.
+ */
+.kalem-editor > pre {
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.kalem-editor > pre code {
+	white-space: inherit;
+}
+
+/*
+ * Görev kutusu editörde tıklanabilir.
+ *
+ * Görüntüleyicideki kutu `disabled`; buradaki değil — durum değiştirmek
+ * düzenlemenin bir parçası.
+ */
+.kalem-editor .kalem-task input[type="checkbox"] {
+	cursor: pointer;
+}
+
+/* Salt okunur modda odak halkası anlamsız. */
+.kalem-editor[aria-readonly="true"] > [contenteditable="false"]:focus {
+	outline: none;
+}

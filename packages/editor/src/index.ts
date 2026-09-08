@@ -1,8 +1,18 @@
 /**
- * @kalem/editor — başsız blok editör motoru
+ * @kalem/editor — Başsız blok editör motoru
  *
- * Faz 0 yer tutucusu. Gerçek uygulama Faz 2'de gelir.
- * Bu dosyanın tek görevi build/tip/boyut hattının uçtan uca çalıştığını
- * kanıtlamak; herhangi bir kütüphane davranışı içermez.
+ * "Başsız" (headless) burada gerçek anlamıyla: bu paket **hiçbir arayüz
+ * çizmez**. Araç çubuğu, balon menü, slash menüsü — hepsi `@kalem/ui`
+ * (Faz 3). Buradaki iş, düzenlemenin kendisi: model, DOM eşlemesi, seçim,
+ * klavye, geçmiş.
+ *
+ * Ayrımın sebebi analiz §5.3: arayüzü olmayan bir editör, kendi tasarım
+ * sistemi olan bir uygulamaya gömülebilir. Arayüz gömülü olsaydı ya
+ * uygulamanın tasarımına yabancı kalırdı ya da ezilmek zorunda kalırdı.
  */
-export const PACKAGE = "@kalem/editor";
+export type { EditorOptions } from "./editor.js";
+export { Editor } from "./editor.js";
+export { assignIds, newId } from "./ids.js";
+export { readCode, readInline } from "./read.js";
+export type { TopNode } from "./render.js";
+export { CODE_ATTR, ID_ATTR, PATH_ATTR } from "./render.js";

@@ -1,7 +1,7 @@
 {
   "name": "@kalem/themes",
   "version": "0.0.0",
-  "description": "Kalem için temel tipografi ve tema değişkenleri — saf CSS, derleme adımı yok",
+  "description": "Kalem için tipografi ve tema değişkenleri — saf CSS, derleme adımı yok",
   "license": "MIT",
   "type": "module",
   "sideEffects": [
@@ -12,6 +12,7 @@
   ],
   "exports": {
     "./viewer.css": "./css/viewer.css",
+    "./editor.css": "./css/editor.css",
     "./package.json": "./package.json"
   },
   "publishConfig": {

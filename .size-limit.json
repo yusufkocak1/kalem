@@ -34,6 +34,12 @@
     "gzip": true
   },
   {
+    "name": "@kalem/themes/editor.css",
+    "path": "packages/themes/css/editor.css",
+    "limit": "2 kB",
+    "gzip": true
+  },
+  {
     "name": "@kalem/editor (core dahil)",
     "path": "packages/editor/dist/index.js",
     "import": "*",

@@ -77,6 +77,7 @@ pnpm build && pnpm demo     # http://localhost:5173
 
 | Sayfa | Ne gösterir |
 |---|---|
+| `/editor.html` | **`@kalem/editor`** — blok motoru: her blok kendi `contenteditable` elemanı, yazdıkça sağda gerçek Markdown çıktısı. |
 | `/viewer.html` | **`@kalem/viewer`** — aynı AST'nin `renderToDOM` ve `renderToString` çıktıları yan yana, byte-birebir eşitlik ölçümüyle. Ham HTML politikası canlı değiştirilebilir. |
 | `/core.html` | **`@kalem/core`** — Markdown → AST → Markdown, canlı gidiş-dönüş ve idempotans ölçümü. |
 | `/` | Mimari doğrulama prototipi (`execCommand` ile; kütüphaneyi kullanmıyor) |
