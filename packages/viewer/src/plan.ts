@@ -240,30 +240,59 @@ function listItem(
 	// CommonMark: sıkı (tight) listede madde paragrafları `<p>` almaz.
 	// Gevşeklik ya listenin ya da maddenin kendisinden gelir.
 	const loose = listSpread || item.spread;
-	const children: RenderNode[] = [];
-
-	if (item.checked !== null) {
-		const attrs: (readonly [string, string])[] = [["type", "checkbox"]];
-		// Boole öznitelikleri `checked=""` olarak yazılıyor: tarayıcının
-		// `innerHTML` çıktısı da böyle, string hedefiyle eşitlik korunuyor.
-		if (item.checked) attrs.push(["checked", ""]);
-		attrs.push(["disabled", ""]);
-		children.push(el("input", attrs, []));
-		children.push(txt(" "));
-	}
+	const content: RenderNode[] = [];
 
 	for (const child of item.children) {
 		if (!loose && child.type === "paragraph") {
-			children.push(...inlines(child.children, ctx));
+			content.push(...inlines(child.children, ctx));
 			continue;
 		}
 		const rendered = block(child, ctx);
-		if (rendered !== null) children.push(rendered);
+		if (rendered !== null) content.push(rendered);
 	}
 
-	const attrs: (readonly [string, string])[] =
-		item.checked === null ? [] : [["class", `${ctx.o.prefix}task`]];
-	return el("li", attrs, children);
+	if (item.checked === null) return el("li", [], content);
+
+	const attrs: (readonly [string, string])[] = [["type", "checkbox"]];
+	// Boole öznitelikleri `checked=""` olarak yazılıyor: tarayıcının
+	// `innerHTML` çıktısı da böyle, string hedefiyle eşitlik korunuyor.
+	if (item.checked) attrs.push(["checked", ""]);
+	attrs.push(["disabled", ""]);
+
+	/*
+	 * Kutunun erişilebilir adı maddenin **kendi metni**.
+	 *
+	 * Adsız onay kutusu ekran okuyucuda "onay kutusu, işaretli" diye
+	 * geçer — neyin işaretli olduğu söylenmez; axe bunu WCAG `label`
+	 * ihlali olarak yakalıyor (F2-04 taraması bulduğu ilk gerçek kusur).
+	 *
+	 * Çözüm olarak sabit bir metin ("yapıldı"/"yapılmadı") konmadı:
+	 * kütüphaneye dil eklerdi ve her belge kendi dilinde yazılıyor.
+	 * Maddenin metni her dilde doğru ve zaten oradaki bilgi. Bedeli,
+	 * metnin ekran okuyucuda iki kez duyulması; adsız bırakmaktan iyi.
+	 *
+	 * Metinsiz madde (`- [ ]`) için ad üretilemez; orada kutu erişilebilirlik
+	 * ağacından çıkarılıyor — duyurulacak bir görev zaten yok.
+	 */
+	const label = planText(content).trim().replace(/\s+/g, " ");
+	if (label === "") attrs.push(["aria-hidden", "true"]);
+	else attrs.push(["aria-label", label]);
+
+	return el(
+		"li",
+		[["class", `${ctx.o.prefix}task`]],
+		[el("input", attrs, []), txt(" "), ...content],
+	);
+}
+
+/** Plan ağacındaki düz metnin birleşimi — erişilebilir ad üretmek için. */
+function planText(nodes: readonly RenderNode[]): string {
+	let out = "";
+	for (const node of nodes) {
+		if (node.kind === "text") out += node.value;
+		else if (node.kind === "element") out += planText(node.children);
+	}
+	return out;
 }
 
 function tableBlock(node: Extract<Block, { type: "table" }>, ctx: Ctx): RenderElement {

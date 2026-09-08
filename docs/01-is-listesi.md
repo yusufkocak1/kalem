@@ -23,28 +23,28 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-08 · `master` · `pnpm verify` yeşil · Playwright 90/90
+> Son güncelleme: 2026-09-08 · `master` · `pnpm verify` yeşil · Playwright 96/96
 
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
-| **Faz 2** — Viewer + başsız editör | 3 / 13 | 🔵 2A sürüyor |
+| **Faz 2** — Viewer + başsız editör | 4 / 13 | 🔵 2A bitti, 2B sırada |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **22 / 72** | **%31** |
+| | **23 / 72** | **%32** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` · `F2-02` · `F2-03`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-04` (2A tamam)**
 
-**Sıradaki:** `F2-04`'ün eksik yarısı (axe taraması) ve **2B** —
-blok motoru (`F2-05`).
+**Sıradaki:** **2B — blok motoru.** `F2-05` blok kapsayıcı ve yaşam
+döngüsü; fazın en büyük parçası (~6–8 hafta).
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -61,7 +61,7 @@ blok motoru (`F2-05`).
 > | `@kalem/core` | 11.51 kB | 12 kB |
 > | `@kalem/core/commands` | 2.28 kB | 4 kB |
 > | `@kalem/core/html` | 2.21 kB | 6 kB |
-> | `@kalem/viewer` | 2.59 kB | 14 kB |
+> | `@kalem/viewer` | 2.68 kB | 14 kB |
 > | `@kalem/themes/viewer.css` | 1.16 kB | 3 kB |
 >
 > Gerekçe ikisinde de aynı: yalnızca Markdown işleyen kullanıcı (SSR,
@@ -82,7 +82,8 @@ gezinme/konum/düzenleme yardımcıları, kaynak tarayıcı, blok ve satır içi
 ayrıştırıcı, serileştirici, güvenlik katmanı, komutlar, HTML dönüştürücü.
 `@kalem/viewer` — render planı, `renderToDOM`, `renderToString`.
 `@kalem/themes` — görüntüleyici tipografisi (saf CSS, 1.16 kB).
-**724 birim testi** + **90 tarayıcı testi** (Chromium · Firefox · WebKit).
+**729 birim testi** + **96 tarayıcı testi** (Chromium · Firefox · WebKit),
+axe ile WCAG 2.1 A/AA taraması dâhil.
 `parse(md)` ↔ `serialize(ast)` gidiş-dönüş 17/17 byte-birebir;
 `renderToDOM` ↔ `renderToString` üç motorda byte-birebir.
 
@@ -377,7 +378,7 @@ Sonuçları değerlendir ve **açıkça karar ver**:
 # FAZ 2 — Viewer + Başsız Editör
 **Amaç:** Görsel olmadan çalışan bir editör motoru. **Süre: ~7–9 hafta**
 
-## 2A · `@kalem/viewer` (~1 hafta)
+## 2A · `@kalem/viewer` (~1 hafta) ✅ TAMAMLANDI
 
 > **Mimari karar (uygulandı):** iki render hedefi ayrı ayrı yazılmadı.
 > Aralarına saf bir **render planı** kondu (`plan.ts`): AST → element
@@ -425,15 +426,25 @@ Saf, DOM'suz fonksiyon. Doğru HTML kaçışlaması.
 > Demo sayfası da bu dosyayı yüklüyor; demoya özel tipografi yok, yani
 > ekranda görünen şey kullanıcının göreceğinin aynısı.
 
-### F2-04 · Viewer testleri `[S]` 🟡 **KISMEN**
+### F2-04 · Viewer testleri `[S]` ✅
 Render doğruluğu + XSS fixture'ları + a11y (axe)
-- **Kabul:** CI'da yeşil ✅, ≤ 14 kB ✅ (2.59 kB)
+- **Kabul:** CI'da yeşil ✅, ≤ 14 kB ✅ (2.68 kB)
 
-> **Var:** 51 birim testi (`renderToString`, saf, Node'da) + 26 tarayıcı
-> testi × 3 motor = 78 Playwright testi. Chromium, Firefox ve WebKit'te
-> DOM ↔ string eşitliği byte-birebir doğrulandı.
-> **Eksik:** a11y (axe) taraması. Erişilebilirlik geçişi F3-10'da bir
-> bütün olarak ele alınacak; viewer için ayrı bir axe koşusu oraya bağlı.
+> **56 birim testi** (`renderToString`, saf, Node'da) + **32 tarayıcı testi
+> × 3 motor = 96 Playwright testi** (Chromium · Firefox · WebKit).
+> Kapsanan: iki hedefin byte-birebir eşitliği, XSS vektörleri, tema
+> kapsamı, axe ile WCAG 2.1 A/AA taraması (açık ve koyu temada).
+>
+> **axe ilk koşusunda gerçek bir kusur buldu:** görev listesi onay
+> kutularının erişilebilir adı yoktu — ekran okuyucu "onay kutusu,
+> işaretli" diyor, neyin işaretli olduğunu söylemiyordu. Ad artık
+> maddenin **kendi metninden** üretiliyor: sabit bir dize koymak
+> kütüphaneye dil eklerdi, oysa her belge kendi dilinde yazılıyor.
+> Metinsiz maddede (editörde Enter'a basınca oluşan ilk hâl) kutu
+> erişilebilirlik ağacından çıkarılıyor.
+>
+> Tek dev bağımlılık eklendi: `@axe-core/playwright`. Yayımlanan hiçbir
+> pakete girmiyor.
 
 ## 2B · `@kalem/editor` — blok motoru (~6–8 hafta)
 

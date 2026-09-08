@@ -5,6 +5,7 @@
  * Node'da, shim olmadan çalışır. DOM tarafıyla eşitlik ayrı bir testte,
  * gerçek tarayıcıda ölçülüyor (`e2e/viewer.spec.ts`).
  */
+import type { Root } from "@kalem/core";
 import { parse } from "@kalem/core";
 import { describe, expect, it } from "vitest";
 import type { ViewerOptions } from "./plan.js";
@@ -90,8 +91,8 @@ describe("listeler", () => {
 	it("görev listesi devre dışı kutu üretir", () => {
 		expect(html("- [ ] yapılacak\n- [x] bitti")).toBe(
 			"<ul>" +
-				'<li class="kalem-task"><input type="checkbox" disabled=""> yapılacak</li>' +
-				'<li class="kalem-task"><input type="checkbox" checked="" disabled=""> bitti</li>' +
+				'<li class="kalem-task"><input type="checkbox" disabled="" aria-label="yapılacak"> yapılacak</li>' +
+				'<li class="kalem-task"><input type="checkbox" checked="" disabled="" aria-label="bitti"> bitti</li>' +
 				"</ul>",
 		);
 	});
@@ -268,7 +269,7 @@ describe("frontmatter", () => {
 describe("seçenekler", () => {
 	it("sınıf öneki değiştirilebilir", () => {
 		expect(html("- [x] a", { classPrefix: "md-" })).toBe(
-			'<ul><li class="md-task"><input type="checkbox" checked="" disabled=""> a</li></ul>',
+			'<ul><li class="md-task"><input type="checkbox" checked="" disabled="" aria-label="a"> a</li></ul>',
 		);
 	});
 });
@@ -276,5 +277,54 @@ describe("seçenekler", () => {
 describe("boş girdi", () => {
 	it("boş belge boş çıktı verir", () => {
 		expect(html("")).toBe("");
+	});
+});
+
+/**
+ * Erişilebilirlik ayrıntıları  (İş listesi: F2-04)
+ *
+ * Buradaki iddiaların çoğu axe taramasının (`e2e/viewer-a11y.spec.ts`)
+ * bulduğu gerçek kusurlardan doğdu; birim testi olarak burada duruyorlar
+ * ki hangi işaretlemenin neden üretildiği tek bakışta görünsün.
+ */
+describe("erişilebilirlik", () => {
+	it("görev kutusunun erişilebilir adı maddenin metni", () => {
+		expect(html("- [x] Faturayı öde")).toContain('aria-label="Faturayı öde"');
+	});
+
+	it("ad üretilirken satır içi biçimlendirme düzleştiriliyor", () => {
+		expect(html("- [ ] **kalın** ve `kod`")).toContain('aria-label="kalın ve kod"');
+	});
+
+	it("çok satırlı maddede boşluklar tek boşluğa iniyor", () => {
+		expect(html("- [ ] bir\n  iki")).toContain('aria-label="bir iki"');
+	});
+
+	/**
+	 * Boş görev maddesi ayrıştırıcıdan gelmez (`- [ ]` GFM'de görev sayılmaz)
+	 * ama **editörden gelir**: kullanıcı Enter'a basınca oluşan ilk şey boş
+	 * bir maddedir. Ağaç bu yüzden elle kuruluyor.
+	 */
+	it("metinsiz görev kutusu erişilebilirlik ağacından çıkarılıyor", () => {
+		const kok: Root = {
+			type: "root",
+			children: [
+				{
+					type: "list",
+					ordered: false,
+					start: null,
+					spread: false,
+					children: [{ type: "listItem", checked: false, spread: false, children: [] }],
+				},
+			],
+		};
+		const cikti = renderToString(kok);
+		expect(cikti).toContain('aria-hidden="true"');
+		expect(cikti).not.toContain("aria-label");
+	});
+
+	it("görsel `alt` boş bile olsa yazılıyor", () => {
+		// `alt`'sız görseli ekran okuyucu dosya adıyla okur.
+		expect(html("![](/uzun-dosya-adi.png)")).toContain('alt=""');
 	});
 });
