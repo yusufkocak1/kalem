@@ -4,8 +4,12 @@
  * DOM'a dokunmaz; sunucuda, worker'da ve tarayıcıda aynı şekilde çalışır.
  * Üçüncü parti bağımlılığı yoktur ve olmayacaktır (bkz. CONTRIBUTING.md).
  *
- * Şu an yalnızca AST katmanı hazır (F1-01). Ayrıştırıcı F1-03/04,
- * serileştirici F1-07 ile gelir.
+ * İki modül **kasten** burada değil, kendi giriş noktalarında:
+ * `@kalem/core/commands` (editör komutları) ve `@kalem/core/html`
+ * (yapıştırma dönüştürücüsü). Yalnızca Markdown işleyen kullanıcı —
+ * SSR, derleme betiği — onların boyutunu ödemez.
+ *
+ * `scanner` de dışarıda: ayrıştırıcının iç tesisatı, kararlı API değil.
  */
 
 // --- AST tipleri (F1-01) ---
@@ -67,14 +71,32 @@ export type {
 	Toml,
 	Yaml,
 } from "./ast.js";
-// --- Blok ayrıştırıcı (F1-03, devam ediyor) ---
+// --- Blok ayrıştırıcı (F1-03) ---
 //
-// API henüz kararlı DEĞİL: kapsayıcı bloklar (blockquote, liste), HTML
-// blokları ve satır içi ayrıştırma eksik. Yayımlanan `parse()` bunların
-// üstüne kurulacak. Şimdiden dışa aktarılmasının sebebi boyut kapısının
-// gerçek kodu ölçmesi.
+// `parseBlocks` düşük seviyeli giriş: satır içi ayrıştırıcıyı dışarıdan
+// almak isteyen (editör, özel eklenti) için. Sıradan kullanım `parse`.
 export type { InlineParser, ParseBlocksOptions } from "./blocks.js";
 export { parseBlocks } from "./blocks.js";
+// --- Ağaç düzenleme (F1-02) ---
+export type { CloneOptions } from "./edit.js";
+export { clone, insertAt, remove, removeAt, replace, replaceAt } from "./edit.js";
+// --- Tip koruyucuları (F1-02) ---
+export {
+	isBlock,
+	isFrontmatter,
+	isInline,
+	isLiteral,
+	isNode,
+	isNodeOf,
+	isParent,
+	isRoot,
+	isStructural,
+} from "./guards.js";
+// --- Ayrıştırıcı (F1-03 + F1-04) ---
+export { parse } from "./parse.js";
+// --- Yol (path) yardımcıları (F1-02) ---
+export type { Path } from "./path.js";
+export { nodeAtPath, parentAtPath, parentPath, pathEquals, pathToNode } from "./path.js";
 // --- Güvenlik (F1-10) ---
 export type { HtmlPolicy, SecurityOptions, UrlPolicy } from "./security.js";
 export {

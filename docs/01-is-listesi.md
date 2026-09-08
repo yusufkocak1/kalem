@@ -52,7 +52,7 @@ ya da doğrudan **Faz 2** — viewer ve başsız editör.
 >
 > | Giriş | Boyut | Bütçe |
 > |---|---|---|
-> | `@kalem/core` | 7.96 kB | 12 kB |
+> | `@kalem/core` | 11.11 kB | 12 kB |
 > | `@kalem/core/commands` | 2.27 kB | 4 kB |
 > | `@kalem/core/html` | 2.21 kB | 6 kB |
 >
@@ -67,7 +67,7 @@ ya da doğrudan **Faz 2** — viewer ve başsız editör.
 
 **Yazılan kod:** `@kalem/core` — AST tipleri, künye kaydı, tip koruyucular,
 gezinme/konum/düzenleme yardımcıları, kaynak tarayıcı, blok ayrıştırıcı.
-642 test, kapsam %96 (dal) ve **%100 satır**, `core` **7.96 / 12 kB**.
+642 test, kapsam %96 (dal) ve **%100 satır**, `core` **11.11 / 12 kB**.
 **`parse(md)` ve `serialize(ast)` çalışıyor; gidiş-dönüş 17/17 byte-birebir.**
 
 **Kayıt dokümanları:** [Faz 0 sonucu](./02-faz0-sonuc.md) ·
