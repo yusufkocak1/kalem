@@ -132,6 +132,17 @@ export function mountUi(editor: Editor, options: UiOptions = {}): Ui {
 	// kendisi ekliyor.
 	element.classList.add(`${prefix}ui`, `${prefix}theme`);
 
+	// Erişilebilir ad (F3-10). Editör başsız olduğu için kendi metin
+	// sözlüğü yok ve adsız bir `role="textbox"` ekran okuyucuda **neyi**
+	// düzenlediğini söylemiyor. Zaten adı olan elemana dokunulmuyor:
+	// gömen sayfa `aria-labelledby` ile görünür bir başlığa bağlamış
+	// olabilir ve o daha iyisi.
+	const adiVar = element.hasAttribute("aria-label") || element.hasAttribute("aria-labelledby");
+	if (!adiVar) {
+		element.setAttribute("aria-label", labels.editor);
+		sokucular.push(() => element.removeAttribute("aria-label"));
+	}
+
 	const liveRegion = createLiveRegion(element.ownerDocument, prefix);
 	sokucular.push(() => liveRegion.destroy());
 

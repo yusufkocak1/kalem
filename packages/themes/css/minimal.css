@@ -31,7 +31,12 @@
 	--kalem-font: inherit;
 	/* Panel zemini yine de opak olmak zorunda — menü metnin üstünde durur. */
 	--kalem-surface: Canvas;
-	--kalem-fg-muted: color-mix(in srgb, currentcolor 55%, transparent);
+	/*
+	 * %55 saydamlık beyaz üstünde 3.73 kontrast veriyordu — WCAG AA metin
+	 * eşiği 4.5. Alıntı, bağlantı ve satır içi kod bu tokenı kullandığı
+	 * için üçü birden okunmaz sınırındaydı; axe yakaladı.
+	 */
+	--kalem-fg-muted: color-mix(in srgb, currentcolor 72%, transparent);
 	--kalem-bg-subtle: color-mix(in srgb, currentcolor 6%, transparent);
 	--kalem-border: color-mix(in srgb, currentcolor 20%, transparent);
 

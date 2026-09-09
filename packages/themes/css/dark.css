@@ -10,7 +10,16 @@
  * bir CMS bloğuna kütüphaneyi koyan kişi kök elemana öznitelik ekleyemiyor
  * olabilir ama hangi CSS'in yükleneceğine karar verebiliyor.
  *
- * Renkler `tokens.css`teki koyu değerlerin aynısı; tek bir palet var.
+ * Renkler `tokens.css`teki koyu değerlerin aynısı; tek bir palet var. Tek
+ * fark `--kalem-bg`: burada **opak**.
+ *
+ * ## Neden zemini kendisi boyuyor
+ *
+ * `--kalem-bg` normalde saydam, çünkü gömen sayfanın kendi zemini
+ * görünmeli. Ama bu dosya tam olarak *sayfasını temalandıramayan* gömme
+ * senaryosu için var; saydam bırakılsaydı açık renkli bir sayfada açık
+ * renkli metin kalırdı. axe bunu 1.24 kontrastla yakaladı — kütüphanenin
+ * kendi tema dosyası okunamaz çıktı üretiyordu.
  */
 
 :where(
@@ -26,6 +35,8 @@
 ) {
 	--kalem-fg: #e8e6e1;
 	--kalem-fg-muted: #9d978d;
+	/* Opak: bu dosya sayfasını temalandıramayan gömme için (yukarıya bakın). */
+	--kalem-bg: #1a191f;
 	--kalem-surface: #24232a;
 	--kalem-bg-subtle: rgb(232 230 225 / 8%);
 	--kalem-border: #34323b;

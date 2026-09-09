@@ -31,11 +31,11 @@
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
-| **Faz 3** — Word deneyimi | 9 / 11 | 🔵 Sürüyor |
+| **Faz 3** — Word deneyimi | 10 / 11 | 🔵 Sürüyor |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **41 / 72** | **%57** |
+| | **42 / 72** | **%58** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,7 +43,7 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-13` (Faz 2 tamam)** · `F3-01` · `F3-02` · `F3-03` · `F3-08`
 
-**Sıradaki:** `F3-10` erişilebilirlik geçişi.
+**Sıradaki:** `F3-11` UI E2E + görsel regresyon.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -1096,12 +1096,57 @@ CSS'in yükleneceğine karar verebiliyorlar.
 Boyut: `tokens.css` 467 B, `dark.css` 191 B, `minimal.css` 221 B;
 `viewer.css` 1.16 kB → 869 B. Üç yeni dosyaya rağmen toplam CSS düştü.
 
-### F3-10 · Erişilebilirlik geçişi `[L]` ⬜
-- ARIA rolleri (`role="textbox"`, `aria-multiline`), menüler için `role="menu"` + `aria-activedescendant`
-- Odak tuzağı yönetimi, odak halkaları, canlı bölge duyuruları ("Blok yukarı taşındı")
-- Sürükle-bırak için klavye alternatifi (Ctrl+Shift+↑/↓) — **sürükle-bırak tek yol olamaz**
-- NVDA ve VoiceOver ile elle test
-- **Kabul:** axe sıfır ihlal; ekran okuyucuyla doküman yazılıp düzenlenebiliyor
+### F3-10 · Erişilebilirlik geçişi `[L]` 🟡
+- [x] ARIA rolleri (`role="textbox"`, `aria-multiline`), menüler için `role="menu"` +
+      `aria-activedescendant`
+- [x] Odak yönetimi, odak halkaları, canlı bölge duyuruları ("Blok yukarı taşındı")
+- [x] Sürükle-bırak için klavye alternatifi (Ctrl+Shift+↑/↓) — **sürükle-bırak tek yol olamaz**
+- ⬜ **NVDA ve VoiceOver ile elle test — YAPILMADI**
+- [x] **Kabul (otomatik kısım):** axe sıfır ihlal, sekiz farklı durumda
+
+> **Elle ekran okuyucu testi yapılmadı ve yapılamaz.** NVDA ve VoiceOver
+> gerçek bir masaüstünde, gerçek bir kişiyle çalıştırılmayı gerektiriyor.
+> Otomatikleştirilebilir her şey yapıldı; bu madde bilerek açık bırakıldı
+> ve Faz 3'ün çıkış kriteri ("gerçek bir kişiyle test et") ile birlikte
+> yapılmalı.
+
+**axe sekiz durumda taranıyor,** yalnızca açılış ekranında değil: balon,
+slash menü, blok menüsü, bağlantı popover'ı, salt okunur, koyu ve yalın
+tema. Arayüzün çoğu ancak bir etkileşimden sonra var oluyor; tek bir
+tarama onu hiç görmüyor.
+
+**Bulunan ve düzeltilen gerçek kusurlar:**
+- `role="textbox"` **adsızdı** — ekran okuyucu "düzenle, çok satırlı"
+  diyor, neyi düzenlediğini söylemiyordu. `EditorOptions.label` eklendi;
+  `mountUi` sözlüğünden bir ad koyuyor (var olan `aria-label` /
+  `aria-labelledby` ezilmiyor). Başsız paket kendi metnini uydurmuyor.
+- **Görev kutularının etiketi yoktu.** Görüntüleyicide F2-04'te
+  düzeltilmişti, editörde değil. Ad maddenin kendi metninden üretiliyor —
+  sabit bir dize her dilde yanlış olurdu.
+- **`dark.css` okunmaz çıktı üretiyordu:** `--kalem-bg` saydam kaldığı
+  için açık renkli bir sayfada açık renkli metin; kontrast 1.24. Bu dosya
+  tam olarak *sayfasını temalandıramayan* gömme için var, artık kendi
+  zeminini boyuyor.
+- **`minimal.css` soluk metni 3.73 kontrast veriyordu** (AA eşiği 4.5);
+  alıntı, bağlantı ve satır içi kod aynı tokenı kullandığı için üçü
+  birden sınırdaydı.
+- **Demo sayfalarında doctype yoktu** — sayfa quirks modundaydı ve orada
+  tablolar `color` miras almıyor. Koyu temada tablo başlığı okunmaz
+  çıkıyordu. Gerçek bir gömme sayfasında da aynı tuzak var.
+
+**Bilerek kabul edilen tek axe bulgusu:** slash menüsünün kaydırmalı
+listesi `scrollable-region-focusable` kuralını karşılamıyor. Menü açıkken
+kullanıcı **yazmaya devam ediyor**, yani odak editörde kalmak zorunda ve
+seçili öğe `aria-activedescendant` ile bildiriliyor — ARIA APG'nin açılır
+liste için önerdiği desen. Kuralın koruduğu asıl şey (*klavye kullanıcısı
+listenin tamamına erişebiliyor mu*) ayrı bir testle ölçülüyor. İstisna
+dar: yalnızca o kural, yalnızca o eleman.
+
+**axe'ın göremediği 10 test** ayrıca yazıldı: adlandırma, salt okunur
+duyurusu, görev kutusu adı, klavyeyle blok taşıma + duyuru, menü
+işlemlerinin duyurulması, menü kapanınca odağın geri verilmesi, slash
+listesinin son öğesine klavyeyle inilebilmesi, tek sekme durağı, simge
+`aria-hidden`ları, canlı bölgenin kurulumu.
 
 ### F3-11 · UI E2E + görsel regresyon `[M]` ⬜
 Playwright: balon araç çubuğu, slash menü, sürükle-bırak, yapıştırma; her tema için ekran görüntüsü karşılaştırması

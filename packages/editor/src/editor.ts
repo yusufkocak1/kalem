@@ -102,6 +102,24 @@ export interface EditorOptions {
 	lang?: string;
 	/** CSS sınıf öneki (varsayılan `"kalem-"`). */
 	classPrefix?: string;
+	/**
+	 * Editörün erişilebilir adı (`aria-label`).
+	 *
+	 * `role="textbox"` bir ad taşımak zorunda; adsız bir metin kutusu ekran
+	 * okuyucuda "düzenle, çok satırlı" diye duyuruluyor ve **neyi**
+	 * düzenlediği hiç söylenmiyor (F3-10).
+	 *
+	 * Bu paket başsız: hiçbir kullanıcı metni taşımıyor ve buraya varsayılan
+	 * bir dize **yazılmıyor** — yazılsaydı Türkçe bir belgede İngilizce
+	 * duyurulurdu. Üç seçenek var ve biri seçilmek zorunda:
+	 *
+	 * - bu seçeneği vermek,
+	 * - kök elemana kendiniz `aria-label` / `aria-labelledby` yazmak,
+	 * - `@kalem/ui` kullanmak — `mountUi` sözlüğünden bir ad koyuyor.
+	 *
+	 * Zaten bir adı olan elemana dokunulmuyor.
+	 */
+	label?: string;
 	/** Seçim her değiştiğinde çağrılır (bloklar arası seçim dâhil). */
 	onSelectionChange?: (selection: EditorSelection) => void;
 	/**
@@ -191,6 +209,9 @@ export class Editor {
 		element.classList.add(`${this.#prefix}editor`, `${this.#prefix}doc`);
 		element.setAttribute("role", "textbox");
 		element.setAttribute("aria-multiline", "true");
+		// Var olan adın üstüne yazılmıyor: gömen sayfa `aria-labelledby` ile
+		// görünür bir başlığa bağlamış olabilir ve o daha iyisi.
+		if (options.label !== undefined) element.setAttribute("aria-label", options.label);
 		if (options.lang !== undefined) element.lang = options.lang;
 
 		element.addEventListener("input", this.#onInput);

@@ -230,6 +230,22 @@ function renderListItems(
 			// Kutu düzenlenebilir alanın dışında: tıklanabilir olmalı ama
 			// imleç içine girmemeli.
 			box.contentEditable = "false";
+			/*
+			 * Erişilebilir ad maddenin **kendi metninden** üretiliyor
+			 * (F3-10; görüntüleyicide F2-04'te aynısı yapılmıştı).
+			 *
+			 * Sabit bir dize yazılamaz: bu paket başsız ve hiçbir kullanıcı
+			 * metni taşımıyor — yazılsaydı Türkçe bir belgede İngilizce
+			 * duyurulurdu. Maddenin metni her dilde doğru.
+			 *
+			 * Bedeli metnin ekran okuyucuda iki kez duyulması; adsız
+			 * bırakmaktan iyi. Metinsiz madde için ad üretilemiyor, orada
+			 * kutu erişilebilirlik ağacından çıkarılıyor — duyurulacak bir
+			 * görev zaten yok.
+			 */
+			const ad = itemText(item).trim().replace(/\s+/g, " ");
+			if (ad === "") box.setAttribute("aria-hidden", "true");
+			else box.setAttribute("aria-label", ad);
 			li.append(box, ctx.document.createTextNode(" "));
 		}
 
@@ -395,4 +411,20 @@ function referenceText(
 	if (type === "collapsed") return `${head}[]`;
 	if (type === "full") return `${head}[${node.label}]`;
 	return head;
+}
+
+/**
+ * Bir liste maddesinin düz metni.
+ *
+ * Görev kutusunun erişilebilir adı buradan geliyor. Yalnızca metin
+ * taşıyan düğümler okunuyor; görsel `alt` metni bilerek dışarıda, çünkü
+ * "kutuyu işaretle" komutunun adı bir görselin tarifi olmamalı.
+ */
+function itemText(node: unknown): string {
+	const kendi = node as { value?: unknown; children?: readonly unknown[] };
+	if (typeof kendi.value === "string") return kendi.value;
+	if (!Array.isArray(kendi.children)) return "";
+	let out = "";
+	for (const child of kendi.children) out += itemText(child);
+	return out;
 }

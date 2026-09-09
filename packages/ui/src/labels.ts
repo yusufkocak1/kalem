@@ -20,6 +20,9 @@
  */
 
 export interface UiLabels {
+	/** Editörün erişilebilir adı (`role="textbox"` bir ad taşımak zorunda). */
+	readonly editor: string;
+
 	// Araç çubukları
 	readonly formatting: string;
 	readonly toolbar: string;
@@ -77,6 +80,8 @@ export interface UiLabels {
 }
 
 export const enLabels: UiLabels = {
+	editor: "Document",
+
 	formatting: "Formatting",
 	toolbar: "Toolbar",
 	undo: "Undo",
@@ -128,6 +133,8 @@ export const enLabels: UiLabels = {
 };
 
 export const trLabels: UiLabels = {
+	editor: "Belge",
+
 	formatting: "Biçimlendirme",
 	toolbar: "Araç çubuğu",
 	undo: "Geri al",
