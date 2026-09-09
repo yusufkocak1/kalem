@@ -64,6 +64,9 @@
 	}
 	button:hover { border-color: var(--vurgu); color: var(--vurgu); }
 	button:focus-visible { outline: 2px solid var(--vurgu); outline-offset: 2px; }
+	.araclar { display: inline-flex; gap: 4px; padding-right: 6px; border-right: 1px solid var(--kenar); margin-right: 2px; }
+	.araclar button { min-width: 30px; }
+	.araclar button[aria-pressed="true"] { background: var(--vurgu); color: #fff; border-color: var(--vurgu); }
 	label.secim { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--soluk); }
 
 	main {
@@ -122,6 +125,13 @@
 <header>
 	<h1>Kalem Editör <span>— blok motoru</span></h1>
 	<nav>
+		<span class="araclar">
+			<button type="button" data-bicim="strong" title="Ctrl+B"><b>B</b></button>
+			<button type="button" data-bicim="emphasis" title="Ctrl+I"><i>I</i></button>
+			<button type="button" data-bicim="delete" title="Ctrl+Shift+X"><s>S</s></button>
+			<button type="button" data-bicim="inlineCode" title="Ctrl+E"><code>&lt;&gt;</code></button>
+			<button type="button" id="bag" title="Seçime bağlantı ver">Bağlantı</button>
+		</span>
 		<button type="button" id="ornek">Örneği yükle</button>
 		<label class="secim"><input type="checkbox" id="saltOkunur"> salt okunur</label>
 		<button type="button" id="viewer">Viewer →</button>
@@ -133,8 +143,10 @@
 	elemanı; yazdıkça model DOM'dan geri okunuyor ve sağda gerçek Markdown
 	çıktısı beliriyor. <b>Birden çok bloğu sürükleyerek seçip Delete'e basın</b> —
 	tarayıcının yapamadığı şey burada bizim modelimize düşüyor.
-	<b>Henüz yok:</b> Enter ile blok bölme, Backspace ile birleştirme, Ctrl+B,
-	geri alma — bunlar F2-07…F2-09.
+	Metin seçip <b>Ctrl+B</b>'ye ya da yukarıdaki düğmelere basın; biçim
+	modelde uygulanıyor, çıktı gerçek Markdown.
+	<b>Henüz yok:</b> Enter ile blok bölme, Backspace ile birleştirme,
+	geri alma — bunlar F2-08 ve F2-09.
 </p>
 
 <main>
@@ -154,6 +166,7 @@
 	<div class="olcum"><dt>Değişiklik</dt><dd id="sayac">0</dd></div>
 	<div class="olcum"><dt>Yazım tercihleri</dt><dd id="tercih">—</dd></div>
 	<div class="olcum"><dt>Seçim</dt><dd id="secim">—</dd></div>
+	<div class="olcum"><dt>Etkin biçimler</dt><dd id="bicimler">—</dd></div>
 </dl>
 
 <script type="importmap">
@@ -211,6 +224,10 @@ Son paragraf.
 		const isaret = liste?.syntax?.marker;
 		tercih.textContent = isaret === undefined ? "—" : `liste işareti: ${isaret}`;
 		tercih.className = isaret === "*" ? "iyi" : "";
+
+		// Biçim uygulandığında seçim aynı kalır, yani `onSelectionChange`
+		// tetiklenmez; düğmelerin basılı durumu buradan tazeleniyor.
+		bicimleriTazele();
 	}
 
 	const editor = new Editor(tuval, {
@@ -230,12 +247,38 @@ Son paragraf.
 			if (selection.kind === "text") {
 				kutu.textContent = selection.collapsed ? "imleç (blok içi)" : "metin (blok içi)";
 				kutu.className = "";
+				bicimleriTazele();
 				return;
 			}
 			const sayi = tuval.querySelectorAll(".kalem-selected").length;
 			kutu.textContent = `${sayi} blok seçili`;
 			kutu.className = "iyi";
 		},
+	});
+
+	const BICIMLER = ["strong", "emphasis", "delete", "inlineCode"];
+
+	/** Düğmelerin basılı durumunu seçime göre günceller. */
+	function bicimleriTazele() {
+		const etkin = BICIMLER.filter((b) => editor.isMarkActive(b));
+		for (const dugme of document.querySelectorAll("[data-bicim]")) {
+			dugme.setAttribute("aria-pressed", String(etkin.includes(dugme.dataset.bicim)));
+		}
+		document.getElementById("bicimler").textContent = etkin.length === 0 ? "—" : etkin.join(", ");
+	}
+
+	for (const dugme of document.querySelectorAll("[data-bicim]")) {
+		// `mousedown` değil `click`: `mousedown` seçimi düşürürdü.
+		dugme.addEventListener("mousedown", (e) => e.preventDefault());
+		dugme.addEventListener("click", () => {
+			editor.toggleMark(dugme.dataset.bicim);
+			bicimleriTazele();
+		});
+	}
+	document.getElementById("bag").addEventListener("mousedown", (e) => e.preventDefault());
+	document.getElementById("bag").addEventListener("click", () => {
+		editor.setLink("https://ornek.com");
+		bicimleriTazele();
 	});
 
 	document.getElementById("dil").textContent = tuval.getAttribute("lang") ?? "—";

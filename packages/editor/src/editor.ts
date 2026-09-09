@@ -23,8 +23,11 @@
  */
 import type { Definition, Inline, NodeId, Root } from "@kalem/core";
 import { parse, removeAt, replaceAt, serialize } from "@kalem/core";
+import type { MarkType } from "@kalem/core/commands";
 import { emptyParagraph } from "@kalem/core/commands";
 import { assignIds, newId } from "./ids.js";
+import { applyLink, applyMark, markActive } from "./inline-edit.js";
+import { offsetOf, selectRange } from "./offsets.js";
 import { readCode, readInline } from "./read.js";
 import {
 	CODE_ATTR,
@@ -179,6 +182,34 @@ export class Editor {
 		selection.removeAllRanges();
 		selection.addRange(range);
 		this.#refreshSelection();
+	}
+
+	// -----------------------------------------------------------------------
+	// Satır içi biçimlendirme  (F2-07)
+	// -----------------------------------------------------------------------
+
+	/**
+	 * Seçili aralığa bir biçim uygular ya da kaldırır.
+	 *
+	 * Seçim boşsa (yalnızca imleç) hiçbir şey yapmıyor ve `false` dönüyor.
+	 * Word'de imleçle Ctrl+B'ye basmak "bundan sonra yazacaklarım kalın
+	 * olsun" demek; o **saklı işaret** (stored mark) makinesi ayrı bir iş ve
+	 * balon araç çubuğuyla birlikte anlam kazanıyor (F3-01).
+	 */
+	toggleMark(mark: MarkType): boolean {
+		return this.#editRange((children, from, to) => applyMark(children, from, to, mark));
+	}
+
+	/** Seçili aralık tamamen bu biçimde mi — araç çubuğunun basılı durumu. */
+	isMarkActive(mark: MarkType): boolean {
+		const hedef = this.#rangeTarget();
+		if (hedef === null) return false;
+		return markActive(hedef.children, hedef.from, hedef.to, mark);
+	}
+
+	/** Seçili aralığı bağlantıya çevirir; `url` boşsa bağlantıyı kaldırır. */
+	setLink(url: string): boolean {
+		return this.#editRange((children, from, to) => applyLink(children, from, to, url));
 	}
 
 	/** İlk bloğa odaklanır. */
@@ -457,11 +488,44 @@ export class Editor {
 	 */
 	#onKeyDown = (event: KeyboardEvent): void => {
 		if (this.#readOnly) return;
-		if (this.#selection?.kind !== "block") return;
-		if (event.key !== "Backspace" && event.key !== "Delete") return;
-		event.preventDefault();
-		this.#deleteSelectedBlocks();
+
+		if (this.#selection?.kind === "block") {
+			if (event.key !== "Backspace" && event.key !== "Delete") return;
+			event.preventDefault();
+			this.#deleteSelectedBlocks();
+			return;
+		}
+
+		if (event.ctrlKey || event.metaKey) this.#formatShortcut(event);
 	};
+
+	/**
+	 * Biçim kısayolları.
+	 *
+	 * Ctrl+U burada **hiçbir şey yapmadan** engelleniyor: Markdown'da altı
+	 * çizili yok ve engellenmezse tarayıcı `<u>` üretir, o da bir sonraki
+	 * okumada sessizce kaybolur. Kullanıcının bastığı tuşun izsiz kaybolması,
+	 * hiç tepki vermemesinden kötü.
+	 *
+	 * Kalan kısayollar (geri alma, liste, başlık) F2-08 ve F2-09'da.
+	 */
+	#formatShortcut(event: KeyboardEvent): void {
+		// kalem-locale-ok: tuş adları ASCII; Türkçe kuralı burada zarar verir
+		const tus = event.key.toLowerCase();
+
+		if (tus === "u") {
+			event.preventDefault();
+			return;
+		}
+		const mark = KISAYOLLAR[tus];
+		if (mark === undefined) return;
+		// Ctrl+Shift+X üstü çizili; Ctrl+X kesme olarak kalmalı.
+		if (mark === "delete" && !event.shiftKey) return;
+		if (mark !== "delete" && event.shiftKey) return;
+
+		event.preventDefault();
+		this.toggleMark(mark);
+	}
 
 	/**
 	 * Seçili blokları siler.
@@ -495,6 +559,89 @@ export class Editor {
 		const hedefIndex = Math.max(0, ilk - 1);
 		const hedef = this.#elements.get(doc.children[hedefIndex]?.id as NodeId);
 		if (hedef !== undefined) placeCaret(hedef, ilk === 0 ? "start" : "end");
+	}
+
+	// -----------------------------------------------------------------------
+	// Biçimlendirmenin iç işleyişi  (F2-07)
+	// -----------------------------------------------------------------------
+
+	/**
+	 * Seçimin düştüğü içerik taşıyıcısını ve karakter aralığını bulur.
+	 *
+	 * Taşıyıcı = `data-kalem-path` taşıyan eleman, yani modelde `children`'ı
+	 * satır içi olan düğüm (paragraf, başlık, tablo hücresi, madde
+	 * paragrafı). Seçim iki taşıyıcıya yayılıyorsa `null`: bir paragrafın
+	 * yarısı ile diğerinin yarısını birlikte kalınlaştırmak, iki ayrı
+	 * düzenleme demek ve F2-07'nin kapsamında değil.
+	 */
+	#rangeTarget(): {
+		holder: HTMLElement;
+		blockIndex: number;
+		path: number[];
+		children: readonly Inline[];
+		from: number;
+		to: number;
+	} | null {
+		const selection = this.#element.ownerDocument.getSelection();
+		if (selection === null || selection.rangeCount === 0) return null;
+
+		const range = selection.getRangeAt(0);
+		const holder = holderOf(range.startContainer, this.#element);
+		if (holder === null || holder !== holderOf(range.endContainer, this.#element)) return null;
+
+		const blockElement = holder.closest(`[${ID_ATTR}]`);
+		if (!(blockElement instanceof HTMLElement)) return null;
+		const blockIndex = this.#indexOf(blockElement);
+		if (blockIndex < 0) return null;
+
+		const path = parsePath(holder.getAttribute(PATH_ATTR));
+		const hedef = nodeAt(this.#doc.children[blockIndex], path) as
+			| { children?: readonly Inline[] }
+			| undefined;
+		if (hedef?.children === undefined) return null;
+
+		const from = offsetOf(holder, range.startContainer, range.startOffset);
+		const to = offsetOf(holder, range.endContainer, range.endOffset);
+		return { holder, blockIndex, path, children: hedef.children, from, to };
+	}
+
+	/**
+	 * Seçili aralığı dönüştürür ve seçimi geri koyar.
+	 *
+	 * Blok yeniden basıldığı için DOM düğümleri değişiyor; seçim karakter
+	 * ofsetiyle yeniden kuruluyor. Aralığın **uzunluğu değişmediği** için
+	 * (biçim ekleniyor, metin değil) eski ofsetler geçerli kalıyor.
+	 */
+	#editRange(
+		donustur: (children: readonly Inline[], from: number, to: number) => Inline[],
+	): boolean {
+		if (this.#readOnly) return false;
+		const hedef = this.#rangeTarget();
+		if (hedef === null || hedef.from >= hedef.to) return false;
+
+		const donusen = donustur(hedef.children, hedef.from, hedef.to);
+		const dugum = nodeAt(this.#doc.children[hedef.blockIndex], hedef.path) as object;
+		const doc = replaceAt(this.#doc, [hedef.blockIndex, ...hedef.path], {
+			...dugum,
+			children: donusen,
+		} as never);
+
+		// Seçim `onChange`'den **önce** geri konuyor.
+		//
+		// `#replaceDocument` kullanılsaydı kanca, blok yeniden basılmış ama
+		// seçim henüz kurulmamışken çağrılırdı; o anda `isMarkActive`
+		// sorulunca cevap yanlış çıkıyordu (demo düğmeleri bunu yakaladı).
+		// Dinleyici her zaman tutarlı bir durum görmeli.
+		this.#doc = doc;
+		this.#defs = collectDefinitions(doc);
+		this.#sync();
+
+		const blockElement = this.#elements.get(doc.children[hedef.blockIndex]?.id as string);
+		const holder = blockElement === undefined ? null : holderAt(blockElement, hedef.path);
+		if (holder !== null) selectRange(holder, hedef.from, hedef.to);
+
+		this.#emit();
+		return true;
 	}
 
 	#indexOf(blockElement: HTMLElement): number {
@@ -548,6 +695,29 @@ export class Editor {
 // ---------------------------------------------------------------------------
 // Yardımcılar
 // ---------------------------------------------------------------------------
+
+/** Klavye kısayolu → biçim. */
+const KISAYOLLAR: Record<string, MarkType | undefined> = {
+	b: "strong",
+	i: "emphasis",
+	e: "inlineCode",
+	x: "delete",
+};
+
+/** Bir düğümün içinde bulunduğu satır içi içerik taşıyıcısı. */
+function holderOf(node: Node, root: HTMLElement): HTMLElement | null {
+	const element = node instanceof Element ? node : node.parentElement;
+	const holder = element?.closest(`[${PATH_ATTR}]`);
+	return holder instanceof HTMLElement && root.contains(holder) ? holder : null;
+}
+
+/** Blok elemanı içinde verilen yola karşılık gelen taşıyıcı. */
+function holderAt(blockElement: HTMLElement, path: readonly number[]): HTMLElement | null {
+	const aranan = path.join(".");
+	if (blockElement.getAttribute(PATH_ATTR) === aranan) return blockElement;
+	const bulunan = blockElement.querySelector(`[${PATH_ATTR}="${aranan}"]`);
+	return bulunan instanceof HTMLElement ? bulunan : null;
+}
 
 /** Blok içindeki içerik taşıyıcıları — bloğun kendisi de olabilir. */
 function holders(blockElement: HTMLElement, attr: string): HTMLElement[] {

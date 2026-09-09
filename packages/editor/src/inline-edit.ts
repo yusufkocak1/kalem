@@ -1,0 +1,167 @@
+/**
+ * @kalem/editor — Satır içi aralık düzenleme  (İş listesi: F2-07)
+ *
+ * ## Ne yapıyor
+ *
+ * `Inline[]` listesini karakter ofsetlerine göre kesiyor. Biçimlendirmenin
+ * tamamı buna dayanıyor: seçili aralığı kes, `toggleMark`'tan geçir, geri
+ * yapıştır.
+ *
+ * Kesme **sarmalayıcıları koruyor**: `strong[text("abc")]` listesinin
+ * `[1,2)` dilimi `strong[text("b")]` veriyor, çıplak `text("b")` değil.
+ * Bu şart, çünkü `hasMark` "seçimin tamamı bu biçimde mi" diye soruyor —
+ * sarmalayıcı düşerse kalın bir metnin ortasını seçip Ctrl+B'ye basmak
+ * kalınlığı kaldırmak yerine bir kat daha kalın yapardı.
+ *
+ * ## Uzunluk kuralı
+ *
+ * `offsets.ts` ile **birebir aynı** olmak zorunda: metin karakteri 1,
+ * `break` 1, görsel 0. Ayrışırlarsa seçim kayar ve hata, yanlış yeri
+ * kalınlaştırmak olarak görünür — bulması zor bir hata.
+ */
+import type { Inline } from "@kalem/core";
+import type { MarkType } from "@kalem/core/commands";
+import { toggleMark } from "@kalem/core/commands";
+import { normalizeInline } from "./read.js";
+
+/** Bir düğümün ofset uzunluğu. */
+export function inlineLength(node: Inline): number {
+	switch (node.type) {
+		case "text":
+		case "inlineCode":
+		case "html":
+			return node.value.length;
+		case "break":
+			return 1;
+		case "image":
+		case "imageReference":
+			return 0;
+		default:
+			return listLength(node.children);
+	}
+}
+
+export function listLength(nodes: readonly Inline[]): number {
+	let out = 0;
+	for (const node of nodes) out += inlineLength(node);
+	return out;
+}
+
+/**
+ * Listenin `[from, to)` aralığını verir.
+ *
+ * Kısmen kapsanan **atomik** düğümler (görsel, referans) atlanıyor: bir
+ * görselin yarısı diye bir şey yok. Tamamı kapsanıyorsa aynen geçiyor.
+ */
+export function sliceInline(nodes: readonly Inline[], from: number, to: number): Inline[] {
+	const out: Inline[] = [];
+	let pos = 0;
+	for (const node of nodes) {
+		const len = inlineLength(node);
+		const bas = pos;
+		const bit = pos + len;
+		pos = bit;
+		if (bit <= from || bas >= to) continue;
+		out.push(...sliceNode(node, Math.max(from, bas) - bas, Math.min(to, bit) - bas));
+	}
+	return out;
+}
+
+function sliceNode(node: Inline, from: number, to: number): Inline[] {
+	const len = inlineLength(node);
+	if (from <= 0 && to >= len) return [node];
+
+	if (node.type === "text" || node.type === "html") {
+		const value = node.value.slice(from, to);
+		return value === "" ? [] : [{ ...node, value }];
+	}
+	if (node.type === "inlineCode") {
+		const value = node.value.slice(from, to);
+		// Kesilen kod parçası kaynaktaki çit uzunluğunu taşımamalı; içerik
+		// değişti, çit yeniden hesaplanmalı.
+		return value === "" ? [] : [{ type: "inlineCode", value }];
+	}
+	if ("children" in node) {
+		const kids = sliceInline(node.children, from, to);
+		return kids.length === 0 ? [] : [{ ...node, children: kids } as Inline];
+	}
+	// Atomik düğümün parçası alınamaz.
+	return [];
+}
+
+/**
+ * Aralığı verilen düğümlerle değiştirir.
+ *
+ * Sonuç normalleştiriliyor: kesme, komşu hâle gelmiş aynı biçimleri ve
+ * bölünmüş metinleri üretir; birleştirilmezse model her işlemde biraz
+ * daha parçalanır.
+ */
+export function spliceInline(
+	nodes: readonly Inline[],
+	from: number,
+	to: number,
+	replacement: readonly Inline[],
+): Inline[] {
+	const uzunluk = listLength(nodes);
+	return normalizeInline([
+		...sliceInline(nodes, 0, from),
+		...replacement,
+		...sliceInline(nodes, to, uzunluk),
+	]);
+}
+
+/**
+ * Aralığa bir biçim uygular ya da kaldırır.
+ *
+ * Karar `@kalem/core/commands`'ın `toggleMark`'ına ait: aralığın tamamı o
+ * biçimdeyse kaldırıyor, değilse uyguluyor — Word'ün kalın düğmesiyle aynı
+ * davranış. Kararın çekirdekte olması, aynı mantığın başsız kullanımda
+ * (SSR, betik) da geçerli olmasını sağlıyor.
+ */
+export function applyMark(
+	nodes: readonly Inline[],
+	from: number,
+	to: number,
+	mark: MarkType,
+): Inline[] {
+	if (from >= to) return [...nodes];
+	const secili = sliceInline(nodes, from, to);
+	return spliceInline(nodes, from, to, toggleMark(secili, mark));
+}
+
+/** Aralığın tamamı bu biçimde mi — araç çubuğunun basılı durumu için. */
+export function markActive(
+	nodes: readonly Inline[],
+	from: number,
+	to: number,
+	mark: MarkType,
+): boolean {
+	if (from >= to) return false;
+	const secili = sliceInline(nodes, from, to);
+	return secili.length > 0 && secili.every((node) => node.type === mark);
+}
+
+/**
+ * Aralığı bağlantıya çevirir; `url` boşsa bağlantıyı kaldırır.
+ *
+ * Bağlantı `toggleMark`'a girmiyor çünkü işaret değil: bir URL taşıyor ve
+ * "aç/kapa" yerine "kur/kaldır" davranıyor. Çekirdekteki `MarkType` de bu
+ * yüzden bağlantıyı içermiyor.
+ */
+export function applyLink(
+	nodes: readonly Inline[],
+	from: number,
+	to: number,
+	url: string,
+): Inline[] {
+	if (from >= to) return [...nodes];
+	const secili = sliceInline(nodes, from, to);
+
+	// Var olan bağlantıları önce aç: iç içe bağlantı Markdown'da yok.
+	const duz = secili.flatMap((node) => (node.type === "link" ? [...node.children] : [node]));
+	if (url === "") return spliceInline(nodes, from, to, duz);
+
+	return spliceInline(nodes, from, to, [
+		{ type: "link", url, title: null, children: normalizeInline(duz) },
+	]);
+}

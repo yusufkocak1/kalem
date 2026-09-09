@@ -18,6 +18,9 @@ declare global {
 				getDocument(): { children: { type: string; id?: string }[] };
 				setValue(markdown: string): void;
 				selectBlocks(anchor: string, focus?: string): void;
+				toggleMark(mark: string): boolean;
+				isMarkActive(mark: string): boolean;
+				setLink(url: string): boolean;
 				setReadOnly(readOnly: boolean): void;
 				destroy(): void;
 			};
@@ -319,5 +322,130 @@ test.describe("seçim", () => {
 		await surukle(page, 0, 2);
 		await page.keyboard.press("Delete");
 		await expect(page.locator(BLOK)).toHaveCount(once);
+	});
+});
+
+/**
+ * Satır içi biçimlendirme  (İş listesi: F2-07)
+ *
+ * Biçim **modelde** uygulanıyor: seçim karakter ofsetine çevriliyor,
+ * `Inline[]` kesiliyor, `toggleMark`'tan geçiyor, blok yeniden basılıyor,
+ * seçim geri konuyor. Buradaki testlerin ölçtüğü şey bu zincirin uçtan uca
+ * çalıştığı — özellikle imlecin kaybolmadığı.
+ */
+test.describe("biçimlendirme", () => {
+	/** İlk paragrafı sadeleştirip ilk `n` karakterini seçer. */
+	async function secim(page: import("@playwright/test").Page, metin: string, n: number) {
+		const paragraf = page.locator("#editor > p").first();
+		await paragraf.click();
+		await page.keyboard.press("ControlOrMeta+a");
+		await page.keyboard.type(metin);
+		await page.keyboard.press("ControlOrMeta+a");
+		if (n < metin.length) {
+			await page.keyboard.press("ArrowLeft");
+			for (let i = 0; i < n; i++) await page.keyboard.press("Shift+ArrowRight");
+		}
+	}
+
+	test("Ctrl+B seçili metni kalın yapıyor", async ({ page }) => {
+		await secim(page, "kalın olacak", 5);
+		await page.keyboard.press("ControlOrMeta+b");
+		await expect(page.locator("#cikti")).toContainText("**kalın** olacak");
+		await expect(page.locator("#editor > p strong").first()).toHaveText("kalın");
+	});
+
+	/** F2-07'nin kabul kriteri: tekrar basınca kalkıyor. */
+	test("tekrar Ctrl+B kalınlığı kaldırıyor", async ({ page }) => {
+		await secim(page, "kalın olacak", 5);
+		await page.keyboard.press("ControlOrMeta+b");
+		await expect(page.locator("#cikti")).toContainText("**kalın**");
+		await page.keyboard.press("ControlOrMeta+b");
+		await expect(page.locator("#cikti")).toContainText("kalın olacak");
+		await expect(page.locator("#cikti")).not.toContainText("**kalın**");
+	});
+
+	/**
+	 * Blok yeniden basıldığı için DOM düğümleri değişiyor; seçim karakter
+	 * ofsetiyle geri kuruluyor. Kurulmazsa kullanıcı ikinci kez Ctrl+B'ye
+	 * basamaz — kabul kriterinin görünmeyen yarısı bu.
+	 */
+	test("biçimden sonra seçim korunuyor", async ({ page }) => {
+		await secim(page, "kalın olacak", 5);
+		await page.keyboard.press("ControlOrMeta+b");
+		const secili = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+		expect(secili).toBe("kalın");
+	});
+
+	test("Ctrl+I italik yapıyor", async ({ page }) => {
+		await secim(page, "italik olacak", 6);
+		await page.keyboard.press("ControlOrMeta+i");
+		await expect(page.locator("#cikti")).toContainText("*italik* olacak");
+	});
+
+	test("Ctrl+E satır içi kod yapıyor", async ({ page }) => {
+		await secim(page, "kod olacak", 3);
+		await page.keyboard.press("ControlOrMeta+e");
+		await expect(page.locator("#cikti")).toContainText("`kod` olacak");
+	});
+
+	test("Ctrl+Shift+X üstü çizili yapıyor", async ({ page }) => {
+		await secim(page, "cizik olacak", 5);
+		await page.keyboard.press("ControlOrMeta+Shift+x");
+		await expect(page.locator("#cikti")).toContainText("~~cizik~~ olacak");
+	});
+
+	/** Markdown'da altı çizili yok; tarayıcı `<u>` üretmemeli. */
+	test("Ctrl+U hiçbir şey yapmıyor", async ({ page }) => {
+		await secim(page, "altcizgi olacak", 8);
+		await page.keyboard.press("ControlOrMeta+u");
+		await expect(page.locator("#editor u")).toHaveCount(0);
+		await expect(page.locator("#cikti")).toContainText("altcizgi olacak");
+	});
+
+	test("araç çubuğu düğmesi de aynı işi yapıyor", async ({ page }) => {
+		await secim(page, "dugme olacak", 5);
+		await page.locator("[data-bicim=strong]").click();
+		await expect(page.locator("#cikti")).toContainText("**dugme** olacak");
+		await expect(page.locator("[data-bicim=strong]")).toHaveAttribute("aria-pressed", "true");
+	});
+
+	test("etkin biçimler seçime göre raporlanıyor", async ({ page }) => {
+		await secim(page, "abc def", 3);
+		await page.keyboard.press("ControlOrMeta+b");
+		await expect(page.locator("#bicimler")).toHaveText("strong");
+	});
+
+	test("bağlantı kuruluyor", async ({ page }) => {
+		await secim(page, "baglanti olacak", 8);
+		await page.locator("#bag").click();
+		await expect(page.locator("#cikti")).toContainText("[baglanti](https://ornek.com)");
+		await expect(page.locator("#editor > p a").first()).toHaveAttribute(
+			"href",
+			"https://ornek.com",
+		);
+	});
+
+	test("imleç varken biçim uygulanmıyor", async ({ page }) => {
+		const paragraf = page.locator("#editor > p").first();
+		await paragraf.click();
+		await page.keyboard.press("ControlOrMeta+a");
+		await page.keyboard.type("imlec");
+		await page.keyboard.press("ArrowRight");
+		await page.keyboard.press("ControlOrMeta+b");
+		await expect(page.locator("#cikti")).toContainText("imlec");
+		await expect(page.locator("#cikti")).not.toContainText("****");
+	});
+
+	test("salt okunur modda biçim uygulanmıyor", async ({ page }) => {
+		await secim(page, "salt okunur", 4);
+		await page.locator("#saltOkunur").check();
+		await page.keyboard.press("ControlOrMeta+b");
+		await expect(page.locator("#cikti")).not.toContainText("**salt**");
+	});
+
+	test("Türkçe karakterlerde ofset kaymıyor", async ({ page }) => {
+		await secim(page, "ışık ve gölge", 4);
+		await page.keyboard.press("ControlOrMeta+b");
+		await expect(page.locator("#cikti")).toContainText("**ışık** ve gölge");
 	});
 });

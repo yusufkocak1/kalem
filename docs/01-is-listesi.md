@@ -23,28 +23,28 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 171/171
+> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 210/210
 
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
-| **Faz 2** — Viewer + başsız editör | 6 / 13 | 🔵 2B sürüyor |
+| **Faz 2** — Viewer + başsız editör | 7 / 13 | 🔵 2B sürüyor |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **25 / 72** | **%35** |
+| | **26 / 72** | **%36** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-04` (2A tamam)** · `F2-05` · `F2-06`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-04` (2A tamam)** · `F2-05` · `F2-06` · `F2-07`
 
-**Sıradaki:** `F2-07` satır içi format motoru — Ctrl+B ile kalın, iç içe
-biçim normalleştirmesi.
+**Sıradaki:** `F2-08` klavye ve gezinme — Enter ile blok bölme, Backspace
+ile birleştirme, bloklar arası ok tuşları.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -67,7 +67,7 @@ biçim normalleştirmesi.
 > | `@kalem/viewer` | 2.68 kB | 14 kB |
 > | `@kalem/themes/viewer.css` | 1.16 kB | 3 kB |
 > | `@kalem/themes/editor.css` | 340 B | 2 kB |
-> | `@kalem/editor` (core dâhil) | 14.53 kB | 38 kB |
+> | `@kalem/editor` (core dâhil) | 15.91 kB | 38 kB |
 >
 > Gerekçe ikisinde de aynı: yalnızca Markdown işleyen kullanıcı (SSR,
 > derleme betiği) editör komutlarını ve yapıştırma dönüştürücüsünü
@@ -88,8 +88,8 @@ ayrıştırıcı, serileştirici, güvenlik katmanı, komutlar, HTML dönüştü
 `@kalem/viewer` — render planı, `renderToDOM`, `renderToString`.
 `@kalem/themes` — görüntüleyici ve editör stilleri (saf CSS).
 `@kalem/editor` — blok kapsayıcı, model↔DOM eşlemesi, satır içi geri okuma,
-iki seviyeli seçim.
-**771 birim testi** + **171 tarayıcı testi** (Chromium · Firefox · WebKit),
+iki seviyeli seçim, satır içi biçimlendirme.
+**798 birim testi** + **210 tarayıcı testi** (Chromium · Firefox · WebKit),
 axe ile WCAG 2.1 A/AA taraması dâhil.
 `parse(md)` ↔ `serialize(ast)` gidiş-dönüş 17/17 byte-birebir;
 `renderToDOM` ↔ `renderToString` üç motorda byte-birebir.
@@ -536,11 +536,51 @@ Render doğruluğu + XSS fixture'ları + a11y (axe)
 > Testler: 13 birim (yön normalleştirmesi, karşılaştırma) + 8 tarayıcı
 > testi × 3 motor. Gerçek fare sürüklemesiyle ölçülüyor.
 
-### F2-07 · Satır içi format motoru `[L]` ⬜
-Blok içi `strong`/`emphasis`/`delete`/`inlineCode`/`link` uygulama ve kaldırma
-- Blok içi DOM'dan `Inline[]` AST'sine dönüştürme (her `input` olayında)
-- İç içe format normalizasyonu (`<b><b>x</b></b>` → tek `strong`)
-- **Kabul:** Ctrl+B ile seçili metin kalın oluyor; tekrar basınca kalkıyor; AST doğru
+### F2-07 · Satır içi format motoru `[L]` ✅
+Blok içi `strong`/`emphasis`/`delete`/`inlineCode`/`link` uygulama ve kaldırma ✅
+- Blok içi DOM'dan `Inline[]` AST'sine dönüştürme (her `input` olayında) ✅ *(F2-05'te indi)*
+- İç içe format normalizasyonu (`<b><b>x</b></b>` → tek `strong`) ✅
+- **Kabul:** Ctrl+B ile seçili metin kalın oluyor ✅; tekrar basınca kalkıyor ✅; AST doğru ✅
+
+> **Biçim DOM'da değil modelde uygulanıyor.** Seçim karakter ofsetine
+> çevriliyor, `Inline[]` o ofsetlerden kesiliyor, çekirdeğin `toggleMark`'ı
+> uygulanıyor, blok yeniden basılıyor, seçim geri konuyor.
+>
+> Alternatif `document.execCommand("bold")` idi ve reddedildi: kullanımdan
+> kaldırılmış, üç tarayıcıda üç farklı HTML üretiyor, `inlineCode` gibi
+> kendi biçimlerimizi bilmiyor — ve sonucu yine modele geri okumak
+> gerekiyordu. Karar çekirdekte kalınca aynı mantık başsız kullanımda
+> (SSR, betik) da geçerli.
+>
+> **Kesmenin kritik kuralı:** sarmalayıcılar korunuyor.
+> `strong[text("abc")]` listesinin `[1,2)` dilimi `strong[text("b")]`
+> veriyor, çıplak `text("b")` değil. Düşseydi, kalın bir metnin ortasını
+> seçip Ctrl+B'ye basmak kalınlığı kaldırmak yerine bir kat daha kalın
+> yapardı.
+>
+> **İki uzunluk hesabı birebir aynı olmak zorunda:** DOM tarafı
+> (`offsets.ts`) ve model tarafı (`inline-edit.ts`) — metin karakteri 1,
+> `<br>`/`break` 1, görsel 0. Ayrışırlarsa hata "yanlış yeri
+> kalınlaştırmak" olarak görünür ve bulunması zordur.
+>
+> **Bir sıralama hatası demo düğmeleri sayesinde yakalandı:** `onChange`,
+> seçim geri konmadan önce tetikleniyordu; o anda `isMarkActive` sorulunca
+> yanlış cevap veriyordu. Artık seçim kancadan önce kuruluyor — dinleyici
+> her zaman tutarlı durum görüyor.
+>
+> **Kapsam dışı bırakılanlar (gerekçeli):**
+> - **İmleçle Ctrl+B** (saklı işaret / stored mark) hiçbir şey yapmıyor.
+>   "Bundan sonra yazacaklarım kalın olsun" ayrı bir makine ve balon araç
+>   çubuğuyla birlikte anlam kazanıyor → F3-01.
+> - **Ctrl+U** bilerek engelleniyor ama bir şey yapmıyor: Markdown'da altı
+>   çizili yok. Engellenmezse tarayıcı `<u>` üretir, o da bir sonraki
+>   okumada sessizce kaybolur — kullanıcının bastığı tuşun izsiz
+>   kaybolması, hiç tepki vermemesinden kötü.
+> - **Bağlantı URL'si** demo sabitinden geliyor; gerçek düzenleme akışı
+>   F3-02.
+>
+> Testler: 27 birim (kesme, birleştirme, işaret durumu — hepsi saf) +
+> 13 tarayıcı testi × 3 motor.
 
 ### F2-08 · Klavye ve gezinme `[L]` ⬜
 - Enter (blok böl), Shift+Enter (satır sonu), Backspace/Delete (birleş, sınır durumları), Tab/Shift+Tab (liste girinti)

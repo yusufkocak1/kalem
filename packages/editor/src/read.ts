@@ -143,11 +143,54 @@ function collect(element: Element): Inline[] {
  *    tarayıcının koyduğu doldurucu; Markdown'da karşılığı yok.
  */
 function normalize(nodes: readonly Inline[]): Inline[] {
-	const flat: Inline[] = [];
-	for (const node of nodes) flattenInto(flat, node, null);
-	const merged = mergeTexts(flat);
+	const merged = normalizeInline(nodes);
 	while (merged.length > 0 && merged[merged.length - 1]?.type === "break") merged.pop();
 	return merged;
+}
+
+/**
+ * Satır içi listeyi sadeleştirir.
+ *
+ * DOM'dan okurken de (F2-05) biçim uygularken de (F2-07) aynı düzeltmeler
+ * gerekiyor, o yüzden dışa açık. Sondaki doldurucu `<br>` **burada
+ * atılmıyor**: o yalnızca DOM'dan okumaya özgü bir tarayıcı artığı, model
+ * üzerinde çalışan biçimlendirmenin ona dokunma hakkı yok.
+ */
+export function normalizeInline(nodes: readonly Inline[]): Inline[] {
+	const flat: Inline[] = [];
+	for (const node of nodes) flattenInto(flat, node, null);
+	return mergeAdjacent(flat);
+}
+
+/** Bitişik metinleri ve bitişik aynı biçimleri tek düğüme indirir. */
+function mergeAdjacent(nodes: readonly Inline[]): Inline[] {
+	const out: Inline[] = [];
+	for (const node of nodes) {
+		const last = out[out.length - 1];
+
+		if (node.type === "text" && last?.type === "text") {
+			out[out.length - 1] = { ...last, value: last.value + node.value };
+			continue;
+		}
+		// `**a****b**` değil `**ab**`. Bölünmüş kalınlık, biçim uygulandıktan
+		// sonra doğal olarak oluşuyor ve serileştirilince gerçekten bozuk
+		// Markdown üretiyor.
+		if (isMark(node) && isMark(last) && node.type === last.type) {
+			out[out.length - 1] = {
+				...last,
+				children: mergeAdjacent([...last.children, ...node.children]),
+			} as Inline;
+			continue;
+		}
+		out.push(node);
+	}
+	return out;
+}
+
+type MarkNode = Extract<Inline, { type: "strong" | "emphasis" | "delete" }>;
+
+function isMark(node: Inline | undefined): node is MarkNode {
+	return node?.type === "strong" || node?.type === "emphasis" || node?.type === "delete";
 }
 
 /** Bitişik metin düğümlerini tek düğüme indirir. */

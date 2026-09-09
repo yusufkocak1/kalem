@@ -13,7 +13,18 @@
 export type { EditorOptions } from "./editor.js";
 export { Editor } from "./editor.js";
 export { assignIds, newId } from "./ids.js";
-export { readCode, readInline } from "./read.js";
+export {
+	applyLink,
+	applyMark,
+	inlineLength,
+	listLength,
+	markActive,
+	sliceInline,
+	spliceInline,
+} from "./inline-edit.js";
+export type { DomPoint } from "./offsets.js";
+export { contentLength, offsetOf, pointAt, selectRange } from "./offsets.js";
+export { normalizeInline, readCode, readInline } from "./read.js";
 export type { TopNode } from "./render.js";
 export { CODE_ATTR, ID_ATTR, PATH_ATTR } from "./render.js";
 export type { BlockSelection, EditorSelection, TextSelection } from "./selection.js";
