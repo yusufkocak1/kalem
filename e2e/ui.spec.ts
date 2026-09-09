@@ -707,3 +707,164 @@ test.describe("klavyeyle blok taşıma", () => {
 		await expect(page.locator(".kalem-live")).toHaveText("Blok yukarı taşındı");
 	});
 });
+
+/**
+ * Blok bağlam menüsü  (İş listesi: F3-05)
+ *
+ * Kabul kriteri tek cümle: *menü klavyeyle de kullanılabiliyor.* Bu yüzden
+ * testlerin yarısı fareyle değil klavyeyle sürüyor — odağın nereye gittiği
+ * burada davranışın kendisi.
+ */
+
+const MENU = ".kalem-block-menu";
+
+/** Tutamacı açıp menüyü getirir. */
+async function menuAc(page: import("@playwright/test").Page, index: number) {
+	const bloklar = page.locator("#editor > [data-kalem-id]");
+	const kutu = await bloklar.nth(index).boundingBox();
+	if (kutu === null) throw new Error("blok kutusu ölçülemedi");
+	await page.mouse.move(kutu.x + 10, kutu.y + kutu.height / 2);
+	await expect(page.locator(TUTAMAC)).toBeVisible();
+	await page.locator(".kalem-handle-grip").click();
+	await expect(page.locator(MENU)).toBeVisible();
+}
+
+test.describe("blok menüsü", () => {
+	test.beforeEach(async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("bir\n\niki\n\nüç\n"));
+	});
+
+	test("tutamaca tıklayınca açılıyor", async ({ page }) => {
+		await menuAc(page, 1);
+		await expect(page.locator(MENU)).toHaveAttribute("role", "menu");
+	});
+
+	test("çoğalt bloğun kopyasını ekliyor", async ({ page }) => {
+		await menuAc(page, 1);
+		await page.locator(`${MENU} .kalem-menu-item`, { hasText: "Çoğalt" }).click();
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe(
+			"bir\n\niki\n\niki\n\nüç\n",
+		);
+	});
+
+	test("sil bloğu kaldırıyor", async ({ page }) => {
+		await menuAc(page, 1);
+		await page.locator(`${MENU} .kalem-menu-item`, { hasText: "Sil" }).click();
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("bir\n\nüç\n");
+	});
+
+	test("yukarı taşı bloğu bir sıra çıkarıyor", async ({ page }) => {
+		await menuAc(page, 2);
+		await page.locator(`${MENU} .kalem-menu-item`, { hasText: "Yukarı taşı" }).click();
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("bir\n\nüç\n\niki\n");
+	});
+
+	test("blok türü başlığa çeviriyor", async ({ page }) => {
+		await menuAc(page, 1);
+		await page.locator(`${MENU} .kalem-menu-item`, { hasText: "Başlık 2" }).click();
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("bir\n\n## iki\n\nüç\n");
+	});
+
+	/** Menüden yapılan her işlem tek bir geçmiş adımı olmalı. */
+	test("menü işlemi tek Ctrl+Z ile geri alınıyor", async ({ page }) => {
+		await menuAc(page, 1);
+		await page.locator(`${MENU} .kalem-menu-item`, { hasText: "Çoğalt" }).click();
+		await page.locator("#editor > [data-kalem-id]").first().click();
+		await page.keyboard.press("ControlOrMeta+z");
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("bir\n\niki\n\nüç\n");
+	});
+
+	test("dışarı tıklamak kapatıyor", async ({ page }) => {
+		await menuAc(page, 1);
+		await page.locator("#cikti").click();
+		await expect(page.locator(MENU)).toBeHidden();
+	});
+
+	test("salt okunur modda açılmıyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setReadOnly(true));
+		const kutu = await page.locator("#editor > [data-kalem-id]").nth(1).boundingBox();
+		await page.mouse.move(kutu!.x + 10, kutu!.y + kutu!.height / 2);
+		await expect(page.locator(TUTAMAC)).toBeHidden();
+		await expect(page.locator(MENU)).toBeHidden();
+	});
+
+	/** Sürükleme de bir tıklamayla bitiyor; menü o tıklamada açılmamalı. */
+	test("sürükledikten sonra menü açılmıyor", async ({ page }) => {
+		const bloklar = page.locator("#editor > [data-kalem-id]");
+		const ilk = await bloklar.nth(0).boundingBox();
+		await surukle(page, bloklar.nth(2), ilk!.y + 2);
+		await expect(page.locator(MENU)).toBeHidden();
+	});
+});
+
+test.describe("blok menüsü — klavye", () => {
+	test.beforeEach(async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("bir\n\niki\n\nüç\n"));
+	});
+
+	/** F3-05'in kabul kriteri: menü klavyeyle de kullanılabiliyor. */
+	test("açılınca odak ilk öğede", async ({ page }) => {
+		await menuAc(page, 1);
+		await expect(page.locator(`${MENU} .kalem-menu-item`).first()).toBeFocused();
+	});
+
+	test("ok tuşlarıyla geziliyor", async ({ page }) => {
+		await menuAc(page, 1);
+		await page.keyboard.press("ArrowDown");
+		await expect(page.locator(`${MENU} .kalem-menu-item`).nth(1)).toBeFocused();
+		await page.keyboard.press("ArrowUp");
+		await expect(page.locator(`${MENU} .kalem-menu-item`).first()).toBeFocused();
+	});
+
+	/** Liste sarmalı: son öğeden aşağı ilk öğeye dönüyor. */
+	test("gezinme başa sarıyor", async ({ page }) => {
+		await menuAc(page, 1);
+		await page.keyboard.press("ArrowUp");
+		await expect(page.locator(`${MENU} .kalem-menu-item`).last()).toBeFocused();
+	});
+
+	test("End son öğeye, Home ilk öğeye gidiyor", async ({ page }) => {
+		await menuAc(page, 1);
+		await page.keyboard.press("End");
+		await expect(page.locator(`${MENU} .kalem-menu-item`).last()).toBeFocused();
+		await page.keyboard.press("Home");
+		await expect(page.locator(`${MENU} .kalem-menu-item`).first()).toBeFocused();
+	});
+
+	test("Enter odaklı öğeyi çalıştırıyor", async ({ page }) => {
+		await menuAc(page, 1);
+		await page.keyboard.press("ArrowDown");
+		await page.keyboard.press("ArrowDown");
+		await page.keyboard.press("ArrowDown");
+		// Sırayla: Çoğalt, Kopyala, Yukarı taşı, Aşağı taşı.
+		await page.keyboard.press("Enter");
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("bir\n\nüç\n\niki\n");
+	});
+
+	/** Escape odağı geldiği düğmeye geri vermeli; odak boşlukta kalamaz. */
+	test("Escape kapatıyor ve odağı tutamaca döndürüyor", async ({ page }) => {
+		await menuAc(page, 1);
+		await page.keyboard.press("Escape");
+		await expect(page.locator(MENU)).toBeHidden();
+		await expect(page.locator(".kalem-handle-grip")).toBeFocused();
+	});
+
+	/** Roving tabindex: menüde tek odaklanabilir öğe var, Tab dışarı çıkıyor. */
+	test("menüde tek odaklanabilir öğe var", async ({ page }) => {
+		await menuAc(page, 1);
+		const sayi = await page.evaluate(
+			() => document.querySelectorAll('.kalem-block-menu [tabindex="0"]').length,
+		);
+		expect(sayi).toBe(1);
+	});
+
+	test("her öğe menuitem olarak duyuruluyor", async ({ page }) => {
+		await menuAc(page, 1);
+		const roller = await page.evaluate(() =>
+			Array.from(document.querySelectorAll(".kalem-block-menu .kalem-menu-item")).map((n) =>
+				n.getAttribute("role"),
+			),
+		);
+		expect(new Set(roller)).toEqual(new Set(["menuitem"]));
+	});
+});

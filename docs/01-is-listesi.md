@@ -31,11 +31,11 @@
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
-| **Faz 3** — Word deneyimi | 5 / 11 | 🔵 Sürüyor |
+| **Faz 3** — Word deneyimi | 6 / 11 | 🔵 Sürüyor |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **37 / 72** | **%51** |
+| | **38 / 72** | **%53** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,7 +43,7 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-13` (Faz 2 tamam)** · `F3-01` · `F3-02` · `F3-03` · `F3-08`
 
-**Sıradaki:** `F3-05` blok bağlam menüsü — tutamaca tıklayınca açılan işlemler.
+**Sıradaki:** `F3-06` sabit üst araç çubuğu — Word'e alışkın kullanıcı için.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -934,9 +934,30 @@ görünmüyordu. `serve-demo.mjs` artık açılışta derliyor ve
 `reuseExistingServer: false` — açık duran sunucu kendinden sonra yazılan
 kodu bilmiyor.
 
-### F3-05 · Blok bağlam menüsü `[M]` ⬜
-Tutamaca tıklayınca: sil, çoğalt, blok tipini değiştir, yukarı/aşağı taşı, kopyala
-- **Kabul:** menü klavyeyle de kullanılabiliyor
+### F3-05 · Blok bağlam menüsü `[M]` ✅
+Tutamaca tıklayınca: sil ✅, çoğalt ✅, blok tipini değiştir ✅, yukarı/aşağı taşı ✅, kopyala ✅
+- [x] **Kabul:** menü klavyeyle de kullanılabiliyor
+
+**Odak menüye taşınıyor — slash menünün tersine.** Slash menü odağı
+editörde bırakıyor çünkü kullanıcı menü açıkken *yazmaya devam ediyor*
+(`/bas` ile filtreliyor). Blok menüsünde yazılacak bir şey yok, o yüzden
+standart `role="menu"` deseni: gerçek odak menüye giriyor, oklarla
+geziliyor, Escape odağı geldiği düğmeye geri veriyor. Kabul kriteri
+tam olarak bu.
+
+**Blok türü alt menü değil**, aynı menüde başlıklı bir grup. Alt menü bir
+gezinme seviyesi daha ekliyor ve altı öğe o karmaşıklığı hak etmiyor.
+
+**Ön madde çoğaltılamıyor:** belgede en fazla bir ön madde olabiliyor ve
+o da ilk çocuk olmak zorunda; kopyası geçersiz belge üretirdi. Tip
+denetimi bunu kendiliğinden yakaladı.
+
+**İki odak/görünürlük tuzağı çıktı:**
+- Sürükleme de bir `click` ile bitiyor; menü yerinde tıklamada açılıyor
+  (3 px eşik).
+- Menü kapanırken tutamaca odaklanıp ardından tutamacı gizlemek odağı
+  gövdeye düşürüyordu. Kural genelleştirildi: *odağı barındıran tutamaç
+  gizlenmiyor.*
 
 ### F3-06 · Üst araç çubuğu (opsiyonel ribbon) `[M]` ⬜
 Word'e alışkın kullanıcı için sabit araç çubuğu; yapılandırılabilir buton grupları

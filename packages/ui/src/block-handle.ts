@@ -24,6 +24,7 @@
  * ekranın yarısını kaplıyor. Çizgi "nereye düşecek" sorusunu daha net
  * cevaplıyor.
  */
+import type { NodeId } from "@kalem/core";
 import type { Editor } from "@kalem/editor";
 import { moveBlocks, newParagraph, nudgeBlock } from "@kalem/editor";
 import { button, el } from "./dom.js";
@@ -33,13 +34,22 @@ export interface BlockHandleOptions {
 	readonly prefix: string;
 	readonly labels: UiLabels;
 	/** Tutamaca tıklanınca çağrılıyor (F3-05 blok menüsü). */
-	readonly onMenu?: (blockId: string, anchor: HTMLElement) => void;
+	readonly onMenu?: (blockId: NodeId, anchor: HTMLElement) => void;
 	/** Ekran okuyucuya duyuru yapan kanca. */
 	readonly announce?: (message: string) => void;
 }
 
 export interface BlockHandle {
 	readonly element: HTMLElement;
+	/**
+	 * Tutamacı yerinde tutar.
+	 *
+	 * Menü açılınca işaretçi editörden çıkıyor ve tutamaç normalde
+	 * gizlenirdi — ama menüyü kapatan Escape odağı **tutamaca** geri
+	 * veriyor. Gizli bir düğme odak alamıyor, odak da hiçbir yere gitmiş
+	 * olurdu.
+	 */
+	setPinned(pinned: boolean): void;
 	destroy(): void;
 }
 
@@ -49,6 +59,8 @@ const KAYDIRMA_ESIGI = 60;
 const KAYDIRMA_HIZI = 12;
 /** Tutamaç ile bloğun arasındaki boşluk (px). */
 const ARALIK = 6;
+/** Bu kadar pikselden azı sürükleme değil, tıklama sayılıyor. */
+const ESIK = 3;
 
 export function createBlockHandle(editor: Editor, options: BlockHandleOptions): BlockHandle {
 	const element = editor.getElement();
@@ -61,7 +73,10 @@ export function createBlockHandle(editor: Editor, options: BlockHandleOptions): 
 		label: labels.blockHandle,
 		glyph: "⠿",
 		onClick: () => {
-			if (hoverId !== null) options.onMenu?.(hoverId, kok);
+			// Sürükleme de bir `click` ile bitiyor; menü yalnızca yerinde
+			// bir tıklamada açılıyor.
+			if (hareketVar || hoverId === null) return;
+			options.onMenu?.(hoverId as NodeId, tutamac);
 		},
 	});
 	const ekle = button(doc, {
@@ -89,6 +104,11 @@ export function createBlockHandle(editor: Editor, options: BlockHandleOptions): 
 	let surukleme: { from: number; count: number } | null = null;
 	let birakmaHedefi: number | null = null;
 	let kaydirmaKaresi = 0;
+	/** Bu jestte işaretçi anlamlı biçimde hareket etti mi. */
+	let hareketVar = false;
+	let baslangicY = 0;
+	/** Menü açıkken tutamaç gizlenmiyor. */
+	let sabit = false;
 
 	// -----------------------------------------------------------------------
 	// Tutamacın konumu
@@ -125,10 +145,21 @@ export function createBlockHandle(editor: Editor, options: BlockHandleOptions): 
 	}
 
 	function tutamaciGizle(): void {
-		if (surukleme !== null) return;
+		if (surukleme !== null || sabit) return;
+		// Odağı barındırırken gizlenemez: `display: none` olan bir düğme
+		// odağı tutamıyor ve odak gövdeye düşüyor. Menü Escape ile
+		// kapanınca odağı tutamaca geri veriyor — o odak burada korunuyor.
+		if (kok.contains(doc.activeElement)) return;
 		kok.hidden = true;
 		hoverId = null;
 	}
+
+	// Odak tutamaçtan ayrılınca gizlenme yeniden mümkün.
+	const odakCikti = (event: FocusEvent): void => {
+		const gidilen = event.relatedTarget;
+		if (gidilen instanceof Node && kok.contains(gidilen)) return;
+		tutamaciGizle();
+	};
 
 	const uzerinde = (event: PointerEvent): void => {
 		if (editor.isReadOnly() || surukleme !== null) return;
@@ -229,6 +260,8 @@ export function createBlockHandle(editor: Editor, options: BlockHandleOptions): 
 	const basildi = (event: PointerEvent): void => {
 		if (editor.isReadOnly() || hoverId === null || !event.isPrimary) return;
 		event.preventDefault();
+		hareketVar = false;
+		baslangicY = event.clientY;
 		surukleme = suruklenecek(hoverId);
 		if (surukleme === null) return;
 		tutamac.setPointerCapture(event.pointerId);
@@ -238,6 +271,9 @@ export function createBlockHandle(editor: Editor, options: BlockHandleOptions): 
 	const suruklendi = (event: PointerEvent): void => {
 		if (surukleme === null) return;
 		event.preventDefault();
+		// Küçük titremeler sürükleme sayılmıyor; parmakla dokunmak da bir
+		// iki piksel oynatıyor ve her dokunuş sürüklemeye dönerdi.
+		if (Math.abs(event.clientY - baslangicY) > ESIK) hareketVar = true;
 		birakmaHedefi = hedefBul(event.clientY);
 		gostergeyiCiz(birakmaHedefi);
 		otomatikKaydir(event.clientY);
@@ -254,7 +290,7 @@ export function createBlockHandle(editor: Editor, options: BlockHandleOptions): 
 		doc.defaultView?.cancelAnimationFrame(kaydirmaKaresi);
 		kaydirmaKaresi = 0;
 
-		if (hedef === null) return;
+		if (hedef === null || !hareketVar) return;
 		editor.applyEdit(moveBlocks(editor.getDocument(), from, count, hedef));
 	};
 
@@ -304,13 +340,19 @@ export function createBlockHandle(editor: Editor, options: BlockHandleOptions): 
 
 	element.addEventListener("pointerover", uzerinde);
 	element.addEventListener("pointerout", ayrildi);
+	kok.addEventListener("focusout", odakCikti);
 
 	return {
 		element: kok,
+		setPinned(pinned) {
+			sabit = pinned;
+			if (!pinned) tutamaciGizle();
+		},
 		destroy() {
 			editor.removePlugin(klavyeEklentisi.name);
 			element.removeEventListener("pointerover", uzerinde);
 			element.removeEventListener("pointerout", ayrildi);
+			kok.removeEventListener("focusout", odakCikti);
 			doc.defaultView?.cancelAnimationFrame(kaydirmaKaresi);
 			kok.remove();
 			gosterge.remove();

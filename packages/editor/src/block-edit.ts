@@ -17,7 +17,7 @@
  * bağlandığını doğruluyor.
  */
 import type { Block, Inline, ListItem, NodeId, Paragraph, Root } from "@kalem/core";
-import { nodeAtPath, replaceAt } from "@kalem/core";
+import { isFrontmatter, nodeAtPath, replaceAt } from "@kalem/core";
 import { emptyParagraph } from "@kalem/core/commands";
 import { newId } from "./ids.js";
 import { listLength, sliceInline } from "./inline-edit.js";
@@ -612,4 +612,65 @@ export function nudgeBlock(doc: Root, blockIndex: number, direction: -1 | 1): Ed
 	if (hedef < 0 || hedef >= doc.children.length) return null;
 	// Aşağı taşırken hedef, çıkarma öncesi listeye göre bir fazla.
 	return moveBlocks(doc, blockIndex, 1, direction === 1 ? hedef + 1 : hedef);
+}
+
+// ---------------------------------------------------------------------------
+// Blok çoğaltma ve silme
+// ---------------------------------------------------------------------------
+
+/**
+ * `count` bloğun kopyasını hemen altına ekler.
+ *
+ * Kopyaların **kimliği yeni**: kimlik DOM eşlemesinin anahtarı (F2-05) ve
+ * iki blok aynı kimliği taşırsa `#sync` hangisinin hangisi olduğunu
+ * bilemiyor. Yalnızca üst düzey bloklar kimlik taşıdığı için derin bir
+ * kimlik gezintisi gerekmiyor.
+ *
+ * Kopyaların konumu da düşürülüyor: özgün bloğun satır numarası kopyası
+ * için yalan.
+ *
+ * **Ön madde çoğaltılamıyor.** Belgede en fazla bir ön madde olabiliyor ve
+ * o da ilk çocuk olmak zorunda (`ast.ts`); kopyası geçersiz bir belge
+ * üretirdi.
+ */
+export function duplicateBlocks(doc: Root, from: number, count = 1): EditResult | null {
+	if (from < 0 || count < 1 || from + count > doc.children.length) return null;
+
+	const kopya: Block[] = [];
+	for (const node of doc.children.slice(from, from + count)) {
+		if (isFrontmatter(node)) return null;
+		kopya.push(yeniBlok(konumsuz(node)));
+	}
+	const children = komsulukTazele(doc.children, [
+		...doc.children.slice(0, from + count),
+		...kopya,
+		...doc.children.slice(from + count),
+	]);
+	return {
+		doc: withBlocks(doc, children as Root["children"]),
+		// İmleç kopyaya gidiyor: çoğaltan kullanıcı kopyayı düzenlemek istiyor.
+		caret: { blockIndex: from + count, path: [], offset: 0 },
+	};
+}
+
+/**
+ * `count` bloğu siler.
+ *
+ * Belge tamamen boşalırsa yerine boş bir paragraf konuyor: sıfır bloklu
+ * belgede imleç konulacak yer yok ve editör kullanılamaz hâle geliyor
+ * (F2-08'de bir kez yaşandı).
+ */
+export function deleteBlocks(doc: Root, from: number, count = 1): EditResult | null {
+	if (from < 0 || count < 1 || from + count > doc.children.length) return null;
+
+	const kalan = komsulukTazele(doc.children, [
+		...doc.children.slice(0, from),
+		...doc.children.slice(from + count),
+	]);
+	const children = kalan.length > 0 ? kalan : [newParagraph()];
+	return {
+		doc: withBlocks(doc, children as Root["children"]),
+		// Silinenin yerine geçen blok; sonuncu silindiyse bir öncekine.
+		caret: { blockIndex: Math.min(from, children.length - 1), path: [], offset: 0 },
+	};
 }

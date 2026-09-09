@@ -14,6 +14,8 @@
 import type { Editor } from "@kalem/editor";
 import type { BlockHandle } from "./block-handle.js";
 import { createBlockHandle } from "./block-handle.js";
+import type { BlockMenu } from "./block-menu.js";
+import { createBlockMenu } from "./block-menu.js";
 import type { BubbleToolbar } from "./bubble-toolbar.js";
 import { createBubbleToolbar } from "./bubble-toolbar.js";
 import type { UiLabels } from "./labels.js";
@@ -93,6 +95,8 @@ export interface Ui {
 	readonly slashMenu: SlashMenu | null;
 	/** Blok tutamacı — kapalıysa `null`. */
 	readonly blockHandle: BlockHandle | null;
+	/** Blok bağlam menüsü — tutamaç kapalıysa `null`. */
+	readonly blockMenu: BlockMenu | null;
 	/** Ekran okuyucu duyuru kanalı. */
 	readonly liveRegion: LiveRegion;
 	readonly labels: UiLabels;
@@ -180,11 +184,27 @@ export function mountUi(editor: Editor, options: UiOptions = {}): Ui {
 	}
 
 	let blockHandle: BlockHandle | null = null;
+	let blockMenu: BlockMenu | null = null;
 	if (options.blockHandle !== false) {
+		blockMenu = createBlockMenu(editor, {
+			prefix,
+			labels,
+			announce: (mesaj) => liveRegion.announce(mesaj),
+			// Menü kapanınca tutamaç yeniden işaretçiyi izliyor.
+			onClose: () => blockHandle?.setPinned(false),
+		});
+		sokucular.push(() => blockMenu?.destroy());
+
 		blockHandle = createBlockHandle(editor, {
 			prefix,
 			labels,
 			announce: (mesaj) => liveRegion.announce(mesaj),
+			onMenu: (blockId, anchor) => {
+				// Menü açıkken tutamaç yerinde kalıyor: Escape odağı ona
+				// geri veriyor ve gizli bir düğme odak alamıyor.
+				blockHandle?.setPinned(true);
+				blockMenu?.open(blockId, anchor);
+			},
 		});
 		sokucular.push(() => blockHandle?.destroy());
 	}
@@ -209,6 +229,7 @@ export function mountUi(editor: Editor, options: UiOptions = {}): Ui {
 		linkPopover,
 		slashMenu,
 		blockHandle,
+		blockMenu,
 		liveRegion,
 		labels,
 		destroy() {

@@ -10,6 +10,8 @@ import { parse, serialize } from "@kalem/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Caret, EditResult } from "./block-edit.js";
 import {
+	deleteBlocks,
+	duplicateBlocks,
 	indentItem,
 	insertBreak,
 	mergeWithNext,
@@ -247,5 +249,71 @@ describe("klavyeyle blok taşıma", () => {
 
 	it("son blok aşağı gitmiyor", () => {
 		expect(nudgeBlock(uc(), 2, 1)).toBeNull();
+	});
+});
+
+describe("blok çoğaltma", () => {
+	const uc = () => belge("bir\n\niki\n\nüç\n");
+
+	it("bloğun kopyasını altına ekliyor", () => {
+		expect(md(duplicateBlocks(uc(), 1))).toBe("bir\n\niki\n\niki\n\nüç\n");
+	});
+
+	it("imleç kopyaya gidiyor", () => {
+		expect(duplicateBlocks(uc(), 1)?.caret).toEqual(imlec(2, [], 0));
+	});
+
+	/** Kimlik DOM eşlemesinin anahtarı; iki blok aynı kimliği taşıyamaz. */
+	it("kopyanın kimliği yeni", () => {
+		const sonuc = duplicateBlocks(uc(), 1);
+		const kimlikler = sonuc?.doc.children.map((c) => c.id) ?? [];
+		expect(new Set(kimlikler).size).toBe(kimlikler.length);
+	});
+
+	it("birden çok bloğu birlikte çoğaltıyor", () => {
+		expect(md(duplicateBlocks(uc(), 0, 2))).toBe("bir\n\niki\n\nbir\n\niki\n\nüç\n");
+	});
+
+	it("aralık dışı reddediliyor", () => {
+		expect(duplicateBlocks(uc(), 3)).toBeNull();
+		expect(duplicateBlocks(uc(), 2, 2)).toBeNull();
+	});
+
+	/** Belgede en fazla bir ön madde olabiliyor ve o da ilk çocuk olmak zorunda. */
+	it("ön madde çoğaltılamıyor", () => {
+		const doc = belge("---\nbaslik: bir\n---\n\nmetin\n");
+		expect(doc.children[0]?.type).toBe("yaml");
+		expect(duplicateBlocks(doc, 0)).toBeNull();
+	});
+});
+
+describe("blok silme", () => {
+	const uc = () => belge("bir\n\niki\n\nüç\n");
+
+	it("bloğu siliyor", () => {
+		expect(md(deleteBlocks(uc(), 1))).toBe("bir\n\nüç\n");
+	});
+
+	it("imleç silinenin yerine geçen bloğa gidiyor", () => {
+		expect(deleteBlocks(uc(), 1)?.caret).toEqual(imlec(1, [], 0));
+	});
+
+	it("son blok silinince imleç bir öncekine düşüyor", () => {
+		expect(deleteBlocks(uc(), 2)?.caret).toEqual(imlec(1, [], 0));
+	});
+
+	it("birden çok bloğu birlikte siliyor", () => {
+		expect(md(deleteBlocks(uc(), 0, 2))).toBe("üç\n");
+	});
+
+	/** Sıfır bloklu belgede imleç konulacak yer yok; editör kullanılamaz olurdu. */
+	it("son blok silinince boş paragraf bırakıyor", () => {
+		const sonuc = deleteBlocks(belge("tek\n"), 0);
+		expect(sonuc?.doc.children).toHaveLength(1);
+		expect(sonuc?.doc.children[0]?.type).toBe("paragraph");
+	});
+
+	it("aralık dışı reddediliyor", () => {
+		expect(deleteBlocks(uc(), 3)).toBeNull();
 	});
 });

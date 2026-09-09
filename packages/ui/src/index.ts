@@ -8,6 +8,8 @@
  */
 export type { BlockHandle, BlockHandleOptions } from "./block-handle.js";
 export { createBlockHandle } from "./block-handle.js";
+export type { BlockMenu, BlockMenuOptions } from "./block-menu.js";
+export { createBlockMenu } from "./block-menu.js";
 export type { BubbleToolbar, BubbleToolbarOptions } from "./bubble-toolbar.js";
 export { createBubbleToolbar } from "./bubble-toolbar.js";
 export type { ButtonOptions, ElementOptions } from "./dom.js";

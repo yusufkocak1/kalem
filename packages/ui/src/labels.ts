@@ -59,6 +59,8 @@ export interface UiLabels {
 	readonly delete: string;
 	readonly moveUp: string;
 	readonly moveDown: string;
+	readonly copy: string;
+	readonly blockActions: string;
 
 	// Yer tutucu
 	readonly placeholder: string;
@@ -67,6 +69,8 @@ export interface UiLabels {
 	readonly movedUp: string;
 	readonly movedDown: string;
 	readonly blockDeleted: string;
+	readonly blockDuplicated: string;
+	readonly blockCopied: string;
 }
 
 export const enLabels: UiLabels = {
@@ -105,12 +109,16 @@ export const enLabels: UiLabels = {
 	delete: "Delete",
 	moveUp: "Move up",
 	moveDown: "Move down",
+	copy: "Copy",
+	blockActions: "Actions",
 
 	placeholder: "Start writing, or press / for commands",
 
 	movedUp: "Block moved up",
 	movedDown: "Block moved down",
 	blockDeleted: "Block deleted",
+	blockDuplicated: "Block duplicated",
+	blockCopied: "Block copied",
 };
 
 export const trLabels: UiLabels = {
@@ -149,12 +157,16 @@ export const trLabels: UiLabels = {
 	delete: "Sil",
 	moveUp: "Yukarı taşı",
 	moveDown: "Aşağı taşı",
+	copy: "Kopyala",
+	blockActions: "İşlemler",
 
 	placeholder: "Yazmaya başlayın veya / ile komut çalıştırın",
 
 	movedUp: "Blok yukarı taşındı",
 	movedDown: "Blok aşağı taşındı",
 	blockDeleted: "Blok silindi",
+	blockDuplicated: "Blok çoğaltıldı",
+	blockCopied: "Blok kopyalandı",
 };
 
 /**

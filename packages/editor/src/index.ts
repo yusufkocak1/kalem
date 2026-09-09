@@ -13,6 +13,8 @@
 
 export type { Caret, EditResult } from "./block-edit.js";
 export {
+	deleteBlocks,
+	duplicateBlocks,
 	indentItem,
 	insertBreak,
 	mergeWithNext,
