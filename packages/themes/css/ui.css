@@ -355,3 +355,130 @@
 .kalem-slash-empty[hidden] {
 	display: none;
 }
+
+/* ---------------------------------------------------------------------------
+ * Blok tutamacı ve sürükle-bırak  (F3-04)
+ * ------------------------------------------------------------------------- */
+
+/*
+ * Sol boşluk.
+ *
+ * Tutamaç metnin **yanında** durmak zorunda; üstüne binerse tıklamaları
+ * yutuyor — bağlantıya tıklamak ve bloklar arası sürükleyerek seçim
+ * yapmak ikisi de tutamaca çarpıyor. Boşluğu arayüz katmanı ayırıyor,
+ * çünkü ihtiyacı doğuran o: `@kalem/ui` yüklenmemişse editör boşluk
+ * ödemiyor.
+ */
+.kalem-ui {
+	padding-left: 2.75rem;
+}
+
+/*
+ * Tutamaç `position: fixed` ve `<body>` altında duruyor, editörün içinde
+ * değil: `contenteditable` içine yerleştirilen her eleman kullanıcının
+ * silebileceği içerik hâline geliyor ve seçim onun üstünden geçiyor.
+ */
+.kalem-handle {
+	/*
+	 * `fixed` burada, JS'te değil: ölçülmeden önce akışta duran bir
+	 * `display: flex` kutusu gövde genişliğini kaplıyor ve tutamacı
+	 * göstermek sayfayı yeniden düzenliyor — sürüklenerek yapılan seçim
+	 * o anda bozuluyor.
+	 */
+	position: fixed;
+	top: 0;
+	left: 0;
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	z-index: 40;
+	/* Blokla aynı yükseklikte, ilk satırın hizasında. */
+	height: 1.6em;
+	font-size: 14px;
+}
+
+.kalem-handle[hidden] {
+	display: none !important;
+}
+
+.kalem-handle-grip,
+.kalem-handle-add {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.4em;
+	height: 1.4em;
+	padding: 0;
+	border: 0;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--kalem-ui-muted);
+	font: inherit;
+	line-height: 1;
+	cursor: grab;
+}
+
+.kalem-handle-add {
+	cursor: pointer;
+}
+
+.kalem-handle-grip:hover,
+.kalem-handle-add:hover {
+	background: color-mix(in srgb, var(--kalem-ui-fg) 8%, transparent);
+	color: var(--kalem-ui-fg);
+}
+
+.kalem-handle-grip:focus-visible,
+.kalem-handle-add:focus-visible {
+	outline: 2px solid var(--kalem-ui-accent);
+	outline-offset: 1px;
+}
+
+.kalem-handle-grip:active {
+	cursor: grabbing;
+}
+
+/*
+ * Bırakma göstergesi.
+ *
+ * Hayalet önizleme yerine ince bir çizgi: sürüklenen blok uzunsa hayalet
+ * ekranın yarısını kaplıyor ve "nereye düşecek" sorusunu gizliyor.
+ */
+.kalem-drop-line {
+	position: fixed;
+	top: 0;
+	left: 0;
+	z-index: 41;
+	height: 2px;
+	border-radius: 1px;
+	background: var(--kalem-ui-accent);
+	pointer-events: none;
+}
+
+.kalem-drop-line[hidden] {
+	display: none !important;
+}
+
+/* Sürükleme sırasında metin seçimi devreye girmemeli. */
+.kalem-dragging {
+	user-select: none;
+	cursor: grabbing;
+}
+
+/*
+ * Canlı bölge görsel olarak gizli ama ekran okuyucuya açık.
+ *
+ * `display: none` ya da `visibility: hidden` bölgeyi erişilebilirlik
+ * ağacından da düşürür ve duyuru hiç okunmaz.
+ */
+.kalem-live {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	border: 0;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}

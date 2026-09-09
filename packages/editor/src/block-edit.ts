@@ -63,6 +63,32 @@ function yeniBlok<T extends Block>(node: T): T {
 	return { ...node, id: newId() };
 }
 
+/**
+ * Komşuluğu değişen blokların konum bilgisini düşürür.
+ *
+ * Serileştirici iki blok arasındaki boş satır sayısını `position`'dan
+ * okuyor (F1-07). Bir blok taşındığında yalnızca taşınanın değil,
+ * **açılan boşluğun ve eklenen yerin komşularının** da eski konumu yalan
+ * söylüyor; dokunulmadan bırakılırsa çıktıda olmayan boş satırlar
+ * beliriyor.
+ *
+ * Kural tek cümle: *önceki komşusu değişen blok konumunu kaybeder.*
+ * Dokunulmayan blokların özgün boş satır sayısı böylece korunuyor.
+ */
+function komsulukTazele<T extends { position?: unknown }>(
+	onceki: readonly T[],
+	yeni: readonly T[],
+): T[] {
+	const indeks = new Map<T, number>();
+	for (const [i, node] of onceki.entries()) indeks.set(node, i);
+
+	return yeni.map((node, i) => {
+		const eski = indeks.get(node);
+		const eskiOnce = eski === undefined ? undefined : onceki[eski - 1];
+		return eskiOnce === yeni[i - 1] ? node : konumsuz(node);
+	});
+}
+
 function nodeAt(doc: Root, blockIndex: number, path: readonly number[]): unknown {
 	return nodeAtPath(doc, [blockIndex, ...path]);
 }
@@ -537,4 +563,53 @@ export function normalizeDocument(doc: Root): Root {
 /** Kimlik atanmış boş paragraf — dışarıdan da gerekiyor. */
 export function newParagraph(): Block & { id: NodeId } {
 	return yeniBlok(emptyParagraph()) as Block & { id: NodeId };
+}
+
+// ---------------------------------------------------------------------------
+// Blok taşıma
+// ---------------------------------------------------------------------------
+
+/**
+ * `count` bloğu `from` konumundan `to` konumuna taşır.
+ *
+ * `to`, taşınacak bloklar **çıkarılmadan önceki** listeye göre veriliyor:
+ * "3. bloğu 1. sıraya al" demek, kullanıcının ekranda gördüğü sırayla
+ * konuşmak demek. Çıkarma sonrası indeks kaymasını bu fonksiyon
+ * hesaplıyor; çağıranın hesaplaması gereken tek şey nereye bıraktığı.
+ *
+ * Taşınan blokların **konum bilgisi düşürülüyor**: serileştirici bloklar
+ * arası boş satır sayısını `position`'dan okuyor (F1-07) ve taşınmış bir
+ * bloğun eski satır numarası yalan söylüyor.
+ */
+export function moveBlocks(doc: Root, from: number, count: number, to: number): EditResult | null {
+	const toplam = doc.children.length;
+	if (from < 0 || count < 1 || from + count > toplam) return null;
+	// Kendi içine taşımak ve yerinde bırakmak işlemsiz.
+	if (to >= from && to <= from + count) return null;
+
+	const tasinan = doc.children.slice(from, from + count);
+	const kalan = [...doc.children.slice(0, from), ...doc.children.slice(from + count)];
+	const hedef = to > from ? to - count : to;
+
+	const children = komsulukTazele(doc.children, [
+		...kalan.slice(0, hedef),
+		...tasinan,
+		...kalan.slice(hedef),
+	]);
+	return {
+		doc: withBlocks(doc, children as Root["children"]),
+		caret: { blockIndex: hedef, path: [], offset: 0 },
+	};
+}
+
+/**
+ * Bloğu bir sıra yukarı ya da aşağı taşır.
+ *
+ * Sürükle-bırakın klavye karşılığı (F3-10): sürükleme tek yol olamaz.
+ */
+export function nudgeBlock(doc: Root, blockIndex: number, direction: -1 | 1): EditResult | null {
+	const hedef = blockIndex + direction;
+	if (hedef < 0 || hedef >= doc.children.length) return null;
+	// Aşağı taşırken hedef, çıkarma öncesi listeye göre bir fazla.
+	return moveBlocks(doc, blockIndex, 1, direction === 1 ? hedef + 1 : hedef);
 }

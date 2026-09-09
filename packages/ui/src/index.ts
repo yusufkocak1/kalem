@@ -6,6 +6,8 @@
  *
  * Stiller ayrı: `@kalem/themes/ui.css`.
  */
+export type { BlockHandle, BlockHandleOptions } from "./block-handle.js";
+export { createBlockHandle } from "./block-handle.js";
 export type { BubbleToolbar, BubbleToolbarOptions } from "./bubble-toolbar.js";
 export { createBubbleToolbar } from "./bubble-toolbar.js";
 export type { ButtonOptions, ElementOptions } from "./dom.js";
@@ -16,6 +18,8 @@ export type { UiLabels } from "./labels.js";
 export { enLabels, labelsFor, trLabels } from "./labels.js";
 export type { LinkPopover, LinkPopoverOptions } from "./link-popover.js";
 export { createLinkPopover, normalizeUrl } from "./link-popover.js";
+export type { LiveRegion } from "./live-region.js";
+export { createLiveRegion } from "./live-region.js";
 export type { Placeholder, PlaceholderOptions } from "./placeholder.js";
 export { createPlaceholder } from "./placeholder.js";
 export { foldForSearch, matches, score } from "./search.js";

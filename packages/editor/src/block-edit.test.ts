@@ -14,7 +14,9 @@ import {
 	insertBreak,
 	mergeWithNext,
 	mergeWithPrevious,
+	moveBlocks,
 	normalizeDocument,
+	nudgeBlock,
 	outdentItem,
 	splitAtCaret,
 	toggleList,
@@ -183,5 +185,67 @@ describe("liste dönüşümleri", () => {
 
 	it("başlığı da listeye çevirebiliyor", () => {
 		expect(md(toggleList(belge("# abc\n"), imlec(0, [], 0), false))).toBe("- abc\n");
+	});
+});
+
+describe("blok taşıma", () => {
+	const bes = () => belge("bir\n\niki\n\nüç\n\ndört\n\nbeş\n");
+
+	/** F3-04'ün kabul kriteri: 3. paragraf 1. sıraya. */
+	it("bloğu başa taşıyor", () => {
+		expect(md(moveBlocks(bes(), 2, 1, 0))).toBe("üç\n\nbir\n\niki\n\ndört\n\nbeş\n");
+	});
+
+	it("bloğu sona taşıyor", () => {
+		expect(md(moveBlocks(bes(), 0, 1, 5))).toBe("iki\n\nüç\n\ndört\n\nbeş\n\nbir\n");
+	});
+
+	/**
+	 * Hedef, taşınacaklar **çıkarılmadan önceki** listeye göre veriliyor:
+	 * kullanıcı ekranda gördüğü sırayla konuşuyor.
+	 */
+	it("aşağı taşımada indeks kayması hesaplanıyor", () => {
+		expect(md(moveBlocks(bes(), 0, 1, 3))).toBe("iki\n\nüç\n\nbir\n\ndört\n\nbeş\n");
+	});
+
+	it("birden çok bloğu birlikte taşıyor", () => {
+		expect(md(moveBlocks(bes(), 3, 2, 0))).toBe("dört\n\nbeş\n\nbir\n\niki\n\nüç\n");
+	});
+
+	it("yerinde bırakmak işlemsiz", () => {
+		expect(moveBlocks(bes(), 2, 1, 2)).toBeNull();
+		expect(moveBlocks(bes(), 2, 1, 3)).toBeNull();
+	});
+
+	it("aralık dışına taşımak reddediliyor", () => {
+		expect(moveBlocks(bes(), 4, 3, 0)).toBeNull();
+		expect(moveBlocks(bes(), -1, 1, 0)).toBeNull();
+	});
+
+	/** Taşınan bloğun eski satır numarası yalan söyler; konum düşürülüyor. */
+	it("taşınan bloğun konum bilgisi düşüyor", () => {
+		const sonuc = moveBlocks(bes(), 2, 1, 0);
+		const ilk = sonuc?.doc.children[0] as { position?: unknown };
+		expect(ilk.position).toBeUndefined();
+	});
+});
+
+describe("klavyeyle blok taşıma", () => {
+	const uc = () => belge("bir\n\niki\n\nüç\n");
+
+	it("bir sıra yukarı", () => {
+		expect(md(nudgeBlock(uc(), 1, -1))).toBe("iki\n\nbir\n\nüç\n");
+	});
+
+	it("bir sıra aşağı", () => {
+		expect(md(nudgeBlock(uc(), 1, 1))).toBe("bir\n\nüç\n\niki\n");
+	});
+
+	it("ilk blok yukarı gitmiyor", () => {
+		expect(nudgeBlock(uc(), 0, -1)).toBeNull();
+	});
+
+	it("son blok aşağı gitmiyor", () => {
+		expect(nudgeBlock(uc(), 2, 1)).toBeNull();
 	});
 });

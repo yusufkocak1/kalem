@@ -521,3 +521,189 @@ test.describe("slash menü", () => {
 		await expect(page.locator(".kalem-slash-item").first()).toContainText("İstatistik");
 	});
 });
+
+/**
+ * Blok tutamacı ve sürükle-bırak  (İş listesi: F3-04)
+ *
+ * Sürüklemenin tamamı geometri: hangi bloğun ortasını geçtiğimiz, çizginin
+ * nereye düştüğü, bırakınca ne olduğu. Hiçbiri birim testinde ölçülemiyor —
+ * model katmanı (`block-edit.test.ts`) neyin taşındığını sabitliyor, burası
+ * kullanıcının o taşımayı gerçekten tetikleyebildiğini.
+ */
+
+const TUTAMAC = ".kalem-handle";
+const CIZGI = ".kalem-drop-line";
+
+/** Beş paragraflık belge — F3-04'ün kabul senaryosunun sahnesi. */
+async function besParagraf(page: import("@playwright/test").Page) {
+	await page.evaluate(() => window.kalem.editor.setValue("bir\n\niki\n\nüç\n\ndört\n\nbeş\n"));
+	return page.locator("#editor > [data-kalem-id]");
+}
+
+/**
+ * Tutamacı `from` bloğundan tutup `to` bloğunun üst yarısına bırakır.
+ *
+ * `steps` şart: tek sıçrayışlı `mouse.move` bazı tarayıcılarda tek bir
+ * `pointermove` üretiyor ve otomatik kaydırma yolu hiç çalışmıyor.
+ */
+async function surukle(
+	page: import("@playwright/test").Page,
+	kaynak: import("@playwright/test").Locator,
+	hedefY: number,
+) {
+	const kutu = await kaynak.boundingBox();
+	if (kutu === null) throw new Error("Kaynak bloğun kutusu yok");
+	await page.mouse.move(kutu.x + 10, kutu.y + kutu.height / 2);
+	await expect(page.locator(TUTAMAC)).toBeVisible();
+
+	const tutamac = await page.locator(".kalem-handle-grip").boundingBox();
+	if (tutamac === null) throw new Error("Tutamacın kutusu yok");
+	await page.mouse.move(tutamac.x + tutamac.width / 2, tutamac.y + tutamac.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(tutamac.x + tutamac.width / 2, hedefY, { steps: 8 });
+	await page.mouse.up();
+}
+
+test.describe("blok tutamacı", () => {
+	test("başlangıçta gizli", async ({ page }) => {
+		await expect(page.locator(TUTAMAC)).toBeHidden();
+	});
+
+	test("blok üzerine gelince beliriyor", async ({ page }) => {
+		const bloklar = await besParagraf(page);
+		const kutu = await bloklar.nth(1).boundingBox();
+		await page.mouse.move(kutu!.x + 10, kutu!.y + kutu!.height / 2);
+		await expect(page.locator(TUTAMAC)).toBeVisible();
+	});
+
+	/** Tutamaç bloğun **solunda** durmalı; metnin üstünü kapatamaz. */
+	test("bloğun soluna hizalanıyor", async ({ page }) => {
+		const bloklar = await besParagraf(page);
+		const blok = await bloklar.nth(1).boundingBox();
+		await page.mouse.move(blok!.x + 10, blok!.y + blok!.height / 2);
+		await expect(page.locator(TUTAMAC)).toBeVisible();
+		const tutamac = await page.locator(TUTAMAC).boundingBox();
+		expect(tutamac!.x + tutamac!.width).toBeLessThanOrEqual(blok!.x + 1);
+	});
+
+	test("salt okunur modda çıkmıyor", async ({ page }) => {
+		const bloklar = await besParagraf(page);
+		await page.evaluate(() => window.kalem.editor.setReadOnly(true));
+		const kutu = await bloklar.nth(1).boundingBox();
+		await page.mouse.move(kutu!.x + 10, kutu!.y + kutu!.height / 2);
+		await expect(page.locator(TUTAMAC)).toBeHidden();
+	});
+
+	test("artı düğmesi altına paragraf ekliyor", async ({ page }) => {
+		const bloklar = await besParagraf(page);
+		const kutu = await bloklar.nth(0).boundingBox();
+		await page.mouse.move(kutu!.x + 10, kutu!.y + kutu!.height / 2);
+		await page.locator(".kalem-handle-add").click();
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe(
+			"bir\n\n\n\niki\n\nüç\n\ndört\n\nbeş\n",
+		);
+	});
+});
+
+test.describe("sürükle-bırak", () => {
+	/**
+	 * F3-04'ün kabul kriteri.
+	 *
+	 * "5 paragraflık dokümanda 3. paragraf 1. sıraya sürüklenebiliyor,
+	 * undo ile geri alınıyor."
+	 */
+	test("3. paragraf 1. sıraya sürükleniyor", async ({ page }) => {
+		const bloklar = await besParagraf(page);
+		const ilk = await bloklar.nth(0).boundingBox();
+		await surukle(page, bloklar.nth(2), ilk!.y + 2);
+
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe(
+			"üç\n\nbir\n\niki\n\ndört\n\nbeş\n",
+		);
+	});
+
+	test("sürükleme tek Ctrl+Z ile geri alınıyor", async ({ page }) => {
+		const bloklar = await besParagraf(page);
+		const ilk = await bloklar.nth(0).boundingBox();
+		await surukle(page, bloklar.nth(2), ilk!.y + 2);
+
+		await page.locator("#editor > [data-kalem-id]").first().click();
+		await page.keyboard.press("ControlOrMeta+z");
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe(
+			"bir\n\niki\n\nüç\n\ndört\n\nbeş\n",
+		);
+	});
+
+	test("sürükleme sırasında bırakma çizgisi görünüyor", async ({ page }) => {
+		const bloklar = await besParagraf(page);
+		const kutu = await bloklar.nth(2).boundingBox();
+		await page.mouse.move(kutu!.x + 10, kutu!.y + kutu!.height / 2);
+		await expect(page.locator(TUTAMAC)).toBeVisible();
+
+		const tutamac = await page.locator(".kalem-handle-grip").boundingBox();
+		await page.mouse.move(tutamac!.x + tutamac!.width / 2, tutamac!.y + tutamac!.height / 2);
+		await page.mouse.down();
+		const ilk = await bloklar.nth(0).boundingBox();
+		await page.mouse.move(tutamac!.x + tutamac!.width / 2, ilk!.y + 2, { steps: 6 });
+
+		await expect(page.locator(CIZGI)).toBeVisible();
+		// Çizgi ilk bloğun üstünde: "buraya düşecek" demek.
+		const cizgi = await page.locator(CIZGI).boundingBox();
+		expect(Math.abs(cizgi!.y - ilk!.y)).toBeLessThan(4);
+
+		await page.mouse.up();
+		await expect(page.locator(CIZGI)).toBeHidden();
+	});
+
+	/** Bloğu bulunduğu yere bırakmak belgeyi değiştirmemeli. */
+	test("yerinde bırakmak işlemsiz", async ({ page }) => {
+		const bloklar = await besParagraf(page);
+		const kendi = await bloklar.nth(2).boundingBox();
+		await surukle(page, bloklar.nth(2), kendi!.y + 2);
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe(
+			"bir\n\niki\n\nüç\n\ndört\n\nbeş\n",
+		);
+	});
+});
+
+test.describe("klavyeyle blok taşıma", () => {
+	/**
+	 * F3-10'un gereği: sürükle-bırak tek yol olamaz.
+	 *
+	 * Fare kullanamayan kullanıcı da aynı işi yapabilmeli.
+	 */
+	test("Ctrl+Shift+Yukarı bloğu yukarı taşıyor", async ({ page }) => {
+		const bloklar = await besParagraf(page);
+		await bloklar.nth(2).click();
+		await page.keyboard.press("ControlOrMeta+Shift+ArrowUp");
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe(
+			"bir\n\nüç\n\niki\n\ndört\n\nbeş\n",
+		);
+	});
+
+	test("Ctrl+Shift+Aşağı bloğu aşağı taşıyor", async ({ page }) => {
+		const bloklar = await besParagraf(page);
+		await bloklar.nth(0).click();
+		await page.keyboard.press("ControlOrMeta+Shift+ArrowDown");
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe(
+			"iki\n\nbir\n\nüç\n\ndört\n\nbeş\n",
+		);
+	});
+
+	test("ilk blok yukarı gitmiyor", async ({ page }) => {
+		const bloklar = await besParagraf(page);
+		await bloklar.nth(0).click();
+		await page.keyboard.press("ControlOrMeta+Shift+ArrowUp");
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe(
+			"bir\n\niki\n\nüç\n\ndört\n\nbeş\n",
+		);
+	});
+
+	/** Taşıma ekran okuyucuya duyuruluyor; ekranda görülen tek geri bildirim değil. */
+	test("taşıma canlı bölgeye duyuruluyor", async ({ page }) => {
+		const bloklar = await besParagraf(page);
+		await bloklar.nth(2).click();
+		await page.keyboard.press("ControlOrMeta+Shift+ArrowUp");
+		await expect(page.locator(".kalem-live")).toHaveText("Blok yukarı taşındı");
+	});
+});

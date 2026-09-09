@@ -12,12 +12,16 @@
  * Ters bağımlılık, başsız kullanımı imkânsız kılardı.
  */
 import type { Editor } from "@kalem/editor";
+import type { BlockHandle } from "./block-handle.js";
+import { createBlockHandle } from "./block-handle.js";
 import type { BubbleToolbar } from "./bubble-toolbar.js";
 import { createBubbleToolbar } from "./bubble-toolbar.js";
 import type { UiLabels } from "./labels.js";
 import { labelsFor } from "./labels.js";
 import type { LinkPopover } from "./link-popover.js";
 import { createLinkPopover, normalizeUrl } from "./link-popover.js";
+import type { LiveRegion } from "./live-region.js";
+import { createLiveRegion } from "./live-region.js";
 import { createPlaceholder } from "./placeholder.js";
 import type { SlashItem, SlashMenu } from "./slash-menu.js";
 import { createSlashMenu } from "./slash-menu.js";
@@ -63,6 +67,14 @@ export interface UiOptions {
 	/** Slash menüye eklenen öğeler (eklentiler için). */
 	readonly slashItems?: readonly SlashItem[];
 	/**
+	 * Blok tutamacı ve sürükle-bırak (varsayılan açık).
+	 *
+	 * Kapatmak bloğu taşımayı tümden kapatmıyor: Ctrl+Shift+↑/↓ tutamaçla
+	 * birlikte kurulduğu için o da gider. Sıralamayı tümden yasaklamak
+	 * isteyen `setReadOnly` kullanmalı.
+	 */
+	readonly blockHandle?: boolean;
+	/**
 	 * Arama karşılaştırmasının dili.
 	 *
 	 * Verilmezse belgenin `lang`i kullanılıyor. Türkçe'de büyük/küçük
@@ -79,6 +91,10 @@ export interface Ui {
 	readonly linkPopover: LinkPopover | null;
 	/** Slash menü — kapalıysa `null`. */
 	readonly slashMenu: SlashMenu | null;
+	/** Blok tutamacı — kapalıysa `null`. */
+	readonly blockHandle: BlockHandle | null;
+	/** Ekran okuyucu duyuru kanalı. */
+	readonly liveRegion: LiveRegion;
 	readonly labels: UiLabels;
 	destroy(): void;
 }
@@ -92,6 +108,9 @@ export function mountUi(editor: Editor, options: UiOptions = {}): Ui {
 	const sokucular: (() => void)[] = [];
 
 	element.classList.add(`${prefix}ui`);
+
+	const liveRegion = createLiveRegion(element.ownerDocument, prefix);
+	sokucular.push(() => liveRegion.destroy());
 
 	if (options.placeholder !== false) {
 		const yerTutucu = createPlaceholder(editor, { prefix, text: labels.placeholder });
@@ -160,6 +179,16 @@ export function mountUi(editor: Editor, options: UiOptions = {}): Ui {
 		sokucular.push(() => slashMenu?.destroy());
 	}
 
+	let blockHandle: BlockHandle | null = null;
+	if (options.blockHandle !== false) {
+		blockHandle = createBlockHandle(editor, {
+			prefix,
+			labels,
+			announce: (mesaj) => liveRegion.announce(mesaj),
+		});
+		sokucular.push(() => blockHandle?.destroy());
+	}
+
 	let bubbleToolbar: BubbleToolbar | null = null;
 	if (options.bubbleToolbar !== false) {
 		bubbleToolbar = createBubbleToolbar(editor, {
@@ -179,6 +208,8 @@ export function mountUi(editor: Editor, options: UiOptions = {}): Ui {
 		bubbleToolbar,
 		linkPopover,
 		slashMenu,
+		blockHandle,
+		liveRegion,
 		labels,
 		destroy() {
 			for (const sok of sokucular.reverse()) sok();

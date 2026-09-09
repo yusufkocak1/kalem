@@ -21,9 +21,19 @@ export default defineConfig({
 		{ name: "webkit", use: { ...devices["Desktop Safari"] } },
 	],
 	webServer: {
+		// Sunucu açılışta paketleri derliyor; demo sayfası `dist/`ten
+		// yüklüyor ve derlemeden servis etmek eski JS'i test etmek demek.
 		command: "node scripts/serve-demo.mjs 5173",
 		url: "http://localhost:5173",
-		reuseExistingServer: !process.env.CI,
+		/*
+		 * Var olan sunucu **kullanılmıyor**.
+		 *
+		 * Açık duran bir sunucu, kendinden sonra yazılan kodu bilmiyor:
+		 * testler geçiyor ama ölçtükleri şey çalışan kod değil. Bu bir kez
+		 * 18 testi yanlış yere baktırdı. Port doluysa Playwright yüksek
+		 * sesle hata veriyor — sessizce yanlış cevap vermesinden iyi.
+		 */
+		reuseExistingServer: false,
 		stdout: "ignore",
 	},
 });

@@ -7,8 +7,9 @@
  * bozuluyor ("Editör" → "EditÃ¶r"). Aynı tuzağa iki kez düşmemek için
  * charset burada açıkça yazılıyor.
  *
- * Kullanım: node scripts/serve-demo.mjs [port]
+ * Kullanım: node scripts/serve-demo.mjs [port] [--derleme-yok]
  */
+import { spawnSync } from "node:child_process";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";
@@ -16,6 +17,34 @@ import { fileURLToPath } from "node:url";
 
 const PORT = Number(process.argv[2] ?? process.env.PORT ?? 5173);
 const KOK = fileURLToPath(new URL("../apps/demo/", import.meta.url));
+const KOK_DIZIN = fileURLToPath(new URL("../", import.meta.url));
+
+/**
+ * Açılışta paketleri derler.
+ *
+ * Paketler `dist/`ten, temalar kaynaktan servis ediliyor (aşağıya bakın).
+ * Bu asimetri bir kez pahalıya patladı: CSS değişikliği anında görünüyor,
+ * TypeScript değişikliği görünmüyor ve Playwright sessizce **eski** JS'i
+ * test ediyor — testler geçiyor ama ölçtükleri şey yazılan kod değil.
+ *
+ * Derlemeyi buraya koymanın sebebi kapsam: hem `pnpm demo` hem de
+ * Playwright'ın `webServer` komutu buradan geçiyor, yani tek yerde
+ * durdurulamaz hâle geliyor.
+ */
+function derle() {
+	if (process.argv.includes("--derleme-yok")) return;
+	const sonuc = spawnSync("pnpm", ["build"], {
+		cwd: KOK_DIZIN,
+		stdio: "inherit",
+		shell: process.platform === "win32",
+	});
+	if (sonuc.status !== 0) {
+		console.error("Derleme başarısız; sunucu başlatılmadı.");
+		process.exit(sonuc.status ?? 1);
+	}
+}
+
+derle();
 
 /**
  * Paket çıktılarını da servis eder.

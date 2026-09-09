@@ -31,11 +31,11 @@
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
-| **Faz 3** — Word deneyimi | 4 / 11 | 🔵 Sürüyor |
+| **Faz 3** — Word deneyimi | 5 / 11 | 🔵 Sürüyor |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **36 / 72** | **%50** |
+| | **37 / 72** | **%51** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,7 +43,7 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-13` (Faz 2 tamam)** · `F3-01` · `F3-02` · `F3-03` · `F3-08`
 
-**Sıradaki:** `F3-04` blok sürükle-bırak — kullanıcının açıkça istediği özellik.
+**Sıradaki:** `F3-05` blok bağlam menüsü — tutamaca tıklayınca açılan işlemler.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -908,12 +908,31 @@ Link ekleme popover'ı ✅, URL doğrulama ✅, mevcut linki düzenle/kaldır �
 >
 > Testler: 15 birim (arama katlaması) + 13 tarayıcı testi × 3 motor.
 
-### F3-04 · Blok drag handle + sürükle-bırak ⭐ `[L]` ⬜
+### F3-04 · Blok drag handle + sürükle-bırak ⭐ `[L]` ✅
 Kullanıcının açıkça istediği özellik.
-- Blok hover'ında sol kenarda tutamaç (⠿) + artı butonu
-- Sürükleme sırasında: bırakma göstergesi çizgisi, hayalet önizleme, otomatik kaydırma
-- Çoklu blok seçimini birlikte sürükleme
-- **Kabul:** 5 paragraflık dokümanda 3. paragraf 1. sıraya sürüklenebiliyor, undo ile geri alınıyor
+- [x] Blok hover'ında sol kenarda tutamaç (⠿) + artı butonu
+- [x] Sürükleme sırasında: bırakma göstergesi çizgisi, otomatik kaydırma
+- [x] Çoklu blok seçimini birlikte sürükleme
+- [x] **Kabul:** 5 paragraflık dokümanda 3. paragraf 1. sıraya sürüklenebiliyor, undo ile geri alınıyor
+
+**Hayalet önizleme yapılmadı.** Uzun bir blokta hayalet ekranın yarısını
+kaplıyor ve "nereye düşecek" sorusunu cevaplamak yerine gizliyor; bırakma
+çizgisi o soruyu tek başına cevaplıyor. Kabul kriteri hayaleti istemiyor.
+
+**Sürükle-bırak tek yol değil** (F3-10'un gereği): `Ctrl+Shift+↑/↓` aynı
+işi yapıyor ve sonucu canlı bölgeye duyuruluyor (`live-region.ts`).
+
+**Sol boşluk arayüz katmanının:** `.kalem-ui` `padding-left` ayırıyor.
+Tutamaç metnin üstüne binerse tıklamaları ve sürükleyerek seçimi yutuyor
+— e2e'de bağlantı ve bloklar arası seçim testleri bunu yakaladı. Yer
+yoksa tutamaç hiç çıkmıyor.
+
+**Yan bulgu — e2e eski kodu test ediyordu.** Demo sayfası paketleri
+`dist/`ten, temaları kaynaktan yüklüyor; Playwright derleme yapmıyordu.
+CSS düzeltmeleri anında görünüyor, TypeScript düzeltmeleri hiç
+görünmüyordu. `serve-demo.mjs` artık açılışta derliyor ve
+`reuseExistingServer: false` — açık duran sunucu kendinden sonra yazılan
+kodu bilmiyor.
 
 ### F3-05 · Blok bağlam menüsü `[M]` ⬜
 Tutamaca tıklayınca: sil, çoğalt, blok tipini değiştir, yukarı/aşağı taşı, kopyala

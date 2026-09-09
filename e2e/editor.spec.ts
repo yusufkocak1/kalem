@@ -980,9 +980,10 @@ test.describe("pano", () => {
 test.describe("eklentiler", () => {
 	test("yerleşik eklentiler varsayılan olarak kayıtlı", async ({ page }) => {
 		const adlar = await page.evaluate(() => window.kalem.editor.plugins);
-		// Demo sayfası `mountUi` çağırıyor; arayüz katmanı Ctrl+K kısayolunu
-		// da eklenti olarak kaydediyor (F3-02).
-		expect(adlar).toEqual(["input-rules", "task-list", "ui-link-shortcut"]);
+		// Demo sayfası `mountUi` çağırıyor; arayüz katmanı kendi kısayollarını
+		// da eklenti olarak kaydediyor: Ctrl+K (F3-02) ve Ctrl+Shift+↑/↓ ile
+		// blok taşıma (F3-04). Sıra kayıt sırası — çakışma kuralı o.
+		expect(adlar).toEqual(["input-rules", "task-list", "ui-link-shortcut", "ui-block-move"]);
 	});
 
 	test("giriş kuralı eklentisi kaldırılınca dönüşüm duruyor", async ({ page }) => {
