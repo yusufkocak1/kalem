@@ -31,11 +31,11 @@
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
-| **Faz 3** — Word deneyimi | 10 / 11 | 🔵 Sürüyor |
+| **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **42 / 72** | **%58** |
+| | **43 / 72** | **%60** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,7 +43,9 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-13` (Faz 2 tamam)** · `F3-01` · `F3-02` · `F3-03` · `F3-08`
 
-**Sıradaki:** `F3-11` UI E2E + görsel regresyon.
+**Sıradaki:** Faz 4 — eklentiler. Faz 3'ten iki iş açık: NVDA/VoiceOver ile elle
+test (F3-10) ve Linux görsel referansları (F3-11); ikisi de bir insanın
+masasında yapılmak zorunda.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -1148,9 +1150,37 @@ işlemlerinin duyurulması, menü kapanınca odağın geri verilmesi, slash
 listesinin son öğesine klavyeyle inilebilmesi, tek sekme durağı, simge
 `aria-hidden`ları, canlı bölgenin kurulumu.
 
-### F3-11 · UI E2E + görsel regresyon `[M]` ⬜
-Playwright: balon araç çubuğu, slash menü, sürükle-bırak, yapıştırma; her tema için ekran görüntüsü karşılaştırması
-- **Kabul:** CI'da yeşil, `editor + ui` ≤ 58 kB
+### F3-11 · UI E2E + görsel regresyon `[M]` ✅
+Playwright: balon araç çubuğu ✅, slash menü ✅, sürükle-bırak ✅, yapıştırma ✅;
+her tema için ekran görüntüsü karşılaştırması ✅
+- [x] **Kabul:** CI'da yeşil ✅, `editor + ui` 34.47 / 58 kB ✅
+
+**İşlevsel E2E** F3-01…F3-07 ile birlikte yazıldı ve üç motorda koşuyor.
+Görsel regresyon burada eklendi: 3 tema × 6 durum = 18 referans
+(belge, sabit çubuk, balon, slash menü, blok menüsü, bağlantı popover'ı).
+
+**Yalnızca Chromium.** Üç motor aynı CSS'i üç farklı biçimde çiziyor; üç
+referans kümesi, yakalanan her gerçek regresyona karşılık iki gürültü
+demek. Motorlar arası fark zaten işlevsel testlerden yakalanıyor;
+buradaki soru dar: *CSS'te ne değişti.*
+
+**Referanslar platforma bağlı ve bu bir tuzak.** Yazı tipi çizimi Windows
+ile Linux'ta birebir aynı değil; bir platformda üretilen referans
+diğerinde her zaman kırmızı verir. Bu yüzden referansı olmayan platformda
+test **atlanıyor** ve sebebi raporda yazıyor — sessizce yeşile dönmüyor,
+eksik olan karşılaştırma ölçütü. Depoda şu an yalnızca
+`*-chromium-win32.png` var (136 kB).
+
+> **CI için Linux referansları henüz üretilmedi.** Tarayıcı işi
+> `ubuntu-latest`te koşuyor ve orada 18 görsel test atlanıyor. Üretmek
+> için o iş bir kez `pnpm e2e --update-snapshots` ile koşturulup
+> `*-chromium-linux.png` dosyaları commit'lenmeli; gerekçe ve adımlar
+> `ci.yml` içinde yazılı. Windows'ta üretilenler oraya taşınamaz.
+
+**Testlerin gerçekten yakaladığı doğrulandı:** balon çubuğunun `gap`
+değeri 2px → 9px yapılınca üç temada da kırmızıya döndüler. Ardışık iki
+koşuda da kararlılar (imleç `caret: "hide"` ile gizleniyor; yanıp sönen
+imleç aynı sayfadan iki farklı görüntü üretiyordu).
 
 > **FAZ 3 ÇIKIŞ KRİTERİ:** Yazılım bilmeyen bir kişiye verildiğinde, açıklama yapmadan doküman yazabiliyor. **Bunu gerçek bir kişiyle test et** (sessiz geliştirmede bu tek gerçek kullanıcı sinyalin).
 

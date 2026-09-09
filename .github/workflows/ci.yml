@@ -85,6 +85,14 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium firefox webkit
+      # Görsel regresyon (F3-11) referansları platforma bağlı: yazı tipi
+      # çizimi Windows ile Linux arasında birebir aynı değil. Bu iş
+      # `ubuntu-latest`te koşuyor; Linux referansları depoda yoksa o
+      # testler **atlanıyor** ve sebebi raporda yazıyor.
+      #
+      # Linux referanslarını üretmek için bu iş bir kez
+      # `pnpm e2e --update-snapshots` ile koşturulup üretilen
+      # `e2e/visual.spec.ts-snapshots/*-linux.png` dosyaları commit'lenmeli.
       - run: pnpm e2e
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
