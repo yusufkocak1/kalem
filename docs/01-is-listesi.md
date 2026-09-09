@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 518/518
+> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · 994 birim + 794 tarayıcı testi
 
 | Faz | Görev | Durum |
 |---|---|---|
@@ -41,7 +41,9 @@
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-13` (Faz 2 tamam)** · `F3-01` · `F3-02` · `F3-03` · `F3-08`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
+**`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
+referansları hariç)**
 
 **Sıradaki:** Faz 4 — eklentiler. Faz 3'ten iki iş açık: NVDA/VoiceOver ile elle
 test (F3-10) ve Linux görsel referansları (F3-11); ikisi de bir insanın
