@@ -14,5 +14,7 @@ export type { FloatingOptions, FloatingResult, Placement } from "./floating.js";
 export { computePosition, position, selectionRect } from "./floating.js";
 export type { UiLabels } from "./labels.js";
 export { enLabels, labelsFor, trLabels } from "./labels.js";
+export type { LinkPopover, LinkPopoverOptions } from "./link-popover.js";
+export { createLinkPopover, normalizeUrl } from "./link-popover.js";
 export type { Ui, UiOptions } from "./ui.js";
 export { mountUi } from "./ui.js";

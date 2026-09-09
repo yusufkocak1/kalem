@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 423/423
+> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 458/458
 
 | Faz | Görev | Durum |
 |---|---|---|
@@ -31,20 +31,19 @@
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
-| **Faz 3** — Word deneyimi | 1 / 11 | 🔵 Sürüyor |
+| **Faz 3** — Word deneyimi | 2 / 11 | 🔵 Sürüyor |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **33 / 72** | **%46** |
+| | **34 / 72** | **%47** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-13` (Faz 2 tamam)** · `F3-01`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-13` (Faz 2 tamam)** · `F3-01` · `F3-02`
 
-**Sıradaki:** `F3-02` bağlantı düzenleme akışı — balon araç çubuğundaki
-bağlantı düğmesi onu bekliyor.
+**Sıradaki:** `F3-03` slash menü — `/` ile blok ekleme, locale duyarlı arama.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -67,9 +66,9 @@ bağlantı düğmesi onu bekliyor.
 > | `@kalem/viewer` | 2.68 kB | 14 kB |
 > | `@kalem/themes/viewer.css` | 1.16 kB | 3 kB |
 > | `@kalem/themes/editor.css` | 340 B | 2 kB |
-> | `@kalem/themes/ui.css` | 843 B | 3 kB |
-> | `@kalem/editor` (core + viewer dâhil) | 22.05 kB | 38 kB |
-> | `@kalem/editor` + `@kalem/ui` | 24.44 kB | 58 kB |
+> | `@kalem/themes/ui.css` | 1.03 kB | 3 kB |
+> | `@kalem/editor` (core + viewer dâhil) | 22.3 kB | 38 kB |
+> | `@kalem/editor` + `@kalem/ui` | 25.52 kB | 58 kB |
 >
 > Gerekçe ikisinde de aynı: yalnızca Markdown işleyen kullanıcı (SSR,
 > derleme betiği) editör komutlarını ve yapıştırma dönüştürücüsünü
@@ -92,8 +91,8 @@ ayrıştırıcı, serileştirici, güvenlik katmanı, komutlar, HTML dönüştü
 `@kalem/editor` — blok kapsayıcı, model↔DOM eşlemesi, satır içi geri okuma,
 iki seviyeli seçim, satır içi biçimlendirme, klavye ve blok yapısı düzenleme,
 geri al/yinele, giriş kuralları, pano, eklenti sistemi. **Faz 2 kapandı.**
-`@kalem/ui` — balon araç çubuğu, kendi konumlandırma hesabımız.
-**898 birim testi** + **423 tarayıcı testi** (Chromium · Firefox · WebKit),
+`@kalem/ui` — balon araç çubuğu, bağlantı akışı, kendi konumlandırma hesabımız.
+**909 birim testi** + **458 tarayıcı testi** (Chromium · Firefox · WebKit),
 axe ile WCAG 2.1 A/AA taraması ve CDP ile IME bileşimi dâhil.
 `parse(md)` ↔ `serialize(ast)` gidiş-dönüş 17/17 byte-birebir;
 `renderToDOM` ↔ `renderToString` üç motorda byte-birebir.
@@ -826,9 +825,43 @@ Metin seçilince seçimin üstünde beliren araç çubuğu ✅
 >
 > Testler: 17 birim (konumlandırma hesabı + sözlükler) + 18 tarayıcı testi × 3 motor.
 
-### F3-02 · Link düzenleme akışı `[M]` ⬜
-Link ekleme popover'ı, URL doğrulama, mevcut linki düzenle/kaldır, Ctrl+K
-- **Kabul:** URL yapıştırırken seçili metin otomatik linkleniyor
+### F3-02 · Link düzenleme akışı `[M]` ✅
+Link ekleme popover'ı ✅, URL doğrulama ✅, mevcut linki düzenle/kaldır ✅, Ctrl+K ✅
+- **Kabul:** URL yapıştırırken seçili metin otomatik linkleniyor ✅
+
+> **Üç giriş yolu, tek popover:** araç çubuğu düğmesi, Ctrl+K, ve var olan
+> bağlantıya tıklamak. Bağlantının içindeyken **seçim yapmak gerekmiyor** —
+> `getActiveLink()` imlecin durduğu bağlantıyı buluyor ve uygulama onun
+> tamamını değiştiriyor.
+>
+> **Doğrulama çekirdekten:** `isSafeUrl` (F1-10) hem render hem giriş
+> tarafında aynı beyaz listeyi uyguluyor. `javascript:` yazan kullanıcı
+> uyarı görüyor ve bağlantı kurulmuyor; sessizce `#`e çevirmek ona
+> çalıştığını düşündürürdü. Uyarı hem kırmızı çerçeve hem **yazı** —
+> renk tek başına bilgi taşıyıcısı olamaz (WCAG 1.4.1).
+>
+> **Şemasız adres kabul ediliyor:** `ornek.com` → `https://ornek.com`.
+> Kullanıcıların çoğu şema yazmıyor; `/yol`, `#bolum` ve `mailto:` gibi
+> zaten anlamlı biçimlere dokunulmuyor.
+>
+> **İki gerçek hata buradan çıktı:**
+> 1. **Popover açılınca editörün seçimi kayboluyordu** — girdiye odak
+>    gitmesi seçimi düşürüyor ve uygulama anında `setLink` bakacak bir
+>    aralık bulamıyordu. Açılışta `Range` kopyalanıyor, uygulamadan önce
+>    geri yükleniyor.
+> 2. **`getSelection()` bayat cevap veriyordu.** Önbelleğe alınmış ve
+>    `selectionchange` bir sonraki göreve ertelenebiliyor; klavye
+>    kısayolundan hemen sonra sorulduğunda eski değeri veriyordu — Ctrl+K
+>    ve URL yapıştırma sessizce çalışmıyordu. Editöre canlı okuyan
+>    `getTextRange()` eklendi. Bu, kütüphaneyi kullanan herkesi
+>    etkileyecek bir tuzaktı.
+>
+> **Ctrl+K bir eklenti olarak kaydediliyor** (F2-12 API'si), doğrudan
+> dinleyici olarak değil: çakışma kuralı (kayıt sırası) tek yerde kalıyor.
+>
+> Testler: 11 birim (adres normalleştirme) + 12 tarayıcı testi × 3 motor.
+> *(Yapıştırma testi Firefox'ta atlanıyor: sentetik `paste` olayında
+> `clipboardData` okutulmuyor — F2-11'deki kopyalama kısıtının eşi.)*
 
 ### F3-03 · Slash menü `[L]` ⬜
 `/` yazınca açılan blok ekleme menüsü

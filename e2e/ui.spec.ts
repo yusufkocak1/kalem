@@ -193,3 +193,131 @@ test.describe("yaşam döngüsü", () => {
 		await expect(page.locator(BALON)).toHaveCount(0);
 	});
 });
+
+/**
+ * Bağlantı düzenleme akışı  (İş listesi: F3-02)
+ *
+ * Üç giriş yolu var (araç çubuğu düğmesi, Ctrl+K, bağlantıya tıklamak) ve
+ * üçü de aynı popover'ı açıyor; testler üçünü de ayrı ayrı ölçüyor.
+ */
+const POPOVER = ".kalem-link-popover";
+
+test.describe("bağlantı akışı", () => {
+	test("Ctrl+K popover'ı açıyor", async ({ page }) => {
+		await secimYap(page, "bağlanacak");
+		await page.keyboard.press("ControlOrMeta+k");
+		await expect(page.locator(POPOVER)).toBeVisible();
+	});
+
+	test("araç çubuğu düğmesi de açıyor", async ({ page }) => {
+		await secimYap(page, "bağlanacak");
+		await page.locator(`${BALON} button`).nth(4).click();
+		await expect(page.locator(POPOVER)).toBeVisible();
+	});
+
+	test("adres girip Enter'a basmak bağlantı kuruyor", async ({ page }) => {
+		await secimYap(page, "bağlanacak");
+		await page.keyboard.press("ControlOrMeta+k");
+		await page.locator(".kalem-link-input").fill("ornek.com");
+		await page.keyboard.press("Enter");
+		await expect(page.locator("#cikti")).toHaveText("[bağlanacak](https://ornek.com)\n");
+		await expect(page.locator(POPOVER)).toBeHidden();
+	});
+
+	test("şemasız adrese https ekleniyor", async ({ page }) => {
+		await secimYap(page, "abc");
+		await page.keyboard.press("ControlOrMeta+k");
+		await page.locator(".kalem-link-input").fill("ornek.com/yol");
+		await page.keyboard.press("Enter");
+		await expect(page.locator("#cikti")).toContainText("https://ornek.com/yol");
+	});
+
+	/** Güvenlik kararı çekirdeğin beyaz listesinden geliyor. */
+	test("javascript: adresi reddediliyor ve uyarı gösteriliyor", async ({ page }) => {
+		await secimYap(page, "abc");
+		await page.keyboard.press("ControlOrMeta+k");
+		await page.locator(".kalem-link-input").fill("javascript:alert(1)");
+		await page.keyboard.press("Enter");
+		await expect(page.locator(".kalem-link-error")).toBeVisible();
+		await expect(page.locator(".kalem-link-input")).toHaveAttribute("aria-invalid", "true");
+		// Bağlantı kurulmamalı — sessizce `#`e çevirmek kullanıcıya
+		// çalıştığını düşündürürdü.
+		await expect(page.locator("#cikti")).toHaveText("abc\n");
+	});
+
+	test("Escape kapatıyor, bağlantı kurulmuyor", async ({ page }) => {
+		await secimYap(page, "abc");
+		await page.keyboard.press("ControlOrMeta+k");
+		await page.locator(".kalem-link-input").fill("ornek.com");
+		await page.keyboard.press("Escape");
+		await expect(page.locator(POPOVER)).toBeHidden();
+		await expect(page.locator("#cikti")).toHaveText("abc\n");
+	});
+
+	test("var olan bağlantıya tıklamak düzenleme açıyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("[bağ](https://eski.com)\n"));
+		await page.locator("#editor a").click();
+		await expect(page.locator(POPOVER)).toBeVisible();
+		await expect(page.locator(".kalem-link-input")).toHaveValue("https://eski.com");
+	});
+
+	test("var olan bağlantı seçim yapmadan düzenlenebiliyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("[bağ](https://eski.com)\n"));
+		await page.locator("#editor a").click();
+		await page.locator(".kalem-link-input").fill("https://yeni.com");
+		await page.keyboard.press("Enter");
+		await expect(page.locator("#cikti")).toHaveText("[bağ](https://yeni.com)\n");
+	});
+
+	test("kaldır düğmesi bağlantıyı söküyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("[bağ](https://eski.com)\n"));
+		await page.locator("#editor a").click();
+		await page.locator(".kalem-link-button").last().click();
+		await expect(page.locator("#cikti")).toHaveText("bağ\n");
+	});
+
+	/**
+	 * F3-02'nin kabul kriteri.
+	 *
+	 * Firefox sentetik (güvenilmeyen) bir `paste` olayında
+	 * `clipboardData.getData`'yı boş döndürüyor — kopyalama tarafında da aynı
+	 * kısıtla karşılaşmıştık (F2-11). Gerçek pano izin gerektiriyor ve o izin
+	 * yalnızca Chromium'da veriliyor. Ölçülemeyen şey davranış değil,
+	 * Firefox'ta sentetik olayın okunabilirliği.
+	 */
+	test("URL yapıştırınca seçili metin bağlantılanıyor", async ({ page, browserName }) => {
+		test.skip(browserName === "firefox", "Firefox sentetik paste verisini okutmuyor");
+		await secimYap(page, "seçili metin");
+		await page.evaluate(() => {
+			const veri = new DataTransfer();
+			veri.setData("text/plain", "https://ornek.com");
+			document
+				.getElementById("editor")
+				?.dispatchEvent(
+					new ClipboardEvent("paste", { clipboardData: veri, bubbles: true, cancelable: true }),
+				);
+		});
+		await expect(page.locator("#cikti")).toHaveText("[seçili metin](https://ornek.com)\n");
+	});
+
+	test("düz metin yapıştırmak bağlantı kurmuyor", async ({ page }) => {
+		await secimYap(page, "abc");
+		await page.evaluate(() => {
+			const veri = new DataTransfer();
+			veri.setData("text/plain", "sadece metin");
+			document
+				.getElementById("editor")
+				?.dispatchEvent(
+					new ClipboardEvent("paste", { clipboardData: veri, bubbles: true, cancelable: true }),
+				);
+		});
+		await expect(page.locator("#cikti")).not.toContainText("](");
+	});
+
+	test("popover dialog olarak duyuruluyor", async ({ page }) => {
+		await secimYap(page, "abc");
+		await page.keyboard.press("ControlOrMeta+k");
+		await expect(page.locator(POPOVER)).toHaveAttribute("role", "dialog");
+		await expect(page.locator(".kalem-link-input")).toHaveAttribute("aria-label", /.+/);
+	});
+});

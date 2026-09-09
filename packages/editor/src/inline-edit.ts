@@ -165,3 +165,41 @@ export function applyLink(
 		{ type: "link", url, title: null, children: normalizeInline(duz) },
 	]);
 }
+
+/**
+ * Ofsetteki bağlantıyı ve sınırlarını bulur.
+ *
+ * İmleç bir bağlantının **içinde** duruyorsa (seçim boş olsa bile) o
+ * bağlantı bulunuyor: kullanıcı bağlantıya tıklayıp düzenlemek istediğinde
+ * seçim yapmak zorunda kalmamalı.
+ *
+ * Sınırlar da dönüyor çünkü düzenleme akışı bağlantının tamamını
+ * değiştiriyor — yalnızca imlecin durduğu karakteri değil.
+ */
+export function linkAt(
+	nodes: readonly Inline[],
+	offset: number,
+): {
+	readonly url: string;
+	readonly title: string | null;
+	readonly from: number;
+	readonly to: number;
+} | null {
+	let pos = 0;
+	for (const node of nodes) {
+		const len = inlineLength(node);
+		const bas = pos;
+		const bit = pos + len;
+		pos = bit;
+		if (node.type === "link" && offset >= bas && offset <= bit) {
+			return { url: node.url, title: node.title, from: bas, to: bit };
+		}
+		// İç içe düğümlerde de aranıyor: `**[a](/y)**` gibi bir yapıda
+		// bağlantı bir seviye aşağıda.
+		if ("children" in node && offset >= bas && offset <= bit) {
+			const ic = linkAt(node.children, offset - bas);
+			if (ic !== null) return { ...ic, from: ic.from + bas, to: ic.to + bas };
+		}
+	}
+	return null;
+}

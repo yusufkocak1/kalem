@@ -40,7 +40,14 @@ import { blocksPayload, inlinePayload } from "./clipboard.js";
 import type { HistoryState } from "./history.js";
 import { History } from "./history.js";
 import { assignIds, newId } from "./ids.js";
-import { applyLink, applyMark, markActive, sliceInline, spliceInline } from "./inline-edit.js";
+import {
+	applyLink,
+	applyMark,
+	linkAt,
+	markActive,
+	sliceInline,
+	spliceInline,
+} from "./inline-edit.js";
 import { contentLength, offsetOf, selectRange } from "./offsets.js";
 import type { Plugin, PluginContext } from "./plugin.js";
 import { PluginRegistry } from "./plugin.js";
@@ -398,6 +405,22 @@ export class Editor {
 		return true;
 	}
 
+	/**
+	 * Blok içi seçimin **canlı** karakter aralığı.
+	 *
+	 * `getSelection()` önbelleğe alınmış: `selectionchange` olayıyla
+	 * güncelleniyor ve o olay bir sonraki göreve ertelenebiliyor. Klavye
+	 * kısayolundan hemen sonra sorulduğunda eski cevabı veriyordu — Ctrl+K
+	 * ve URL yapıştırma bu yüzden sessizce çalışmıyordu. Bu fonksiyon DOM'u
+	 * o an okuyor, yani her zaman güncel.
+	 *
+	 * Seçim tek bir satır içi taşıyıcıya düşmüyorsa `null`.
+	 */
+	getTextRange(): { from: number; to: number } | null {
+		const hedef = this.#rangeTarget();
+		return hedef === null ? null : { from: hedef.from, to: hedef.to };
+	}
+
 	/** Güncel seçim — blok içi ya da bloklar arası. */
 	getSelection(): EditorSelection {
 		return this.#selection;
@@ -453,7 +476,31 @@ export class Editor {
 
 	/** Seçili aralığı bağlantıya çevirir; `url` boşsa bağlantıyı kaldırır. */
 	setLink(url: string): boolean {
+		const etkin = this.getActiveLink();
+		// İmleç bir bağlantının içindeyse seçim boş olsa bile **tamamı**
+		// değiştiriliyor: kullanıcı bağlantıyı düzenlemek için önce onu
+		// seçmek zorunda kalmamalı.
+		if (etkin !== null) {
+			const hedef = this.#rangeTarget();
+			if (hedef !== null && hedef.from === hedef.to) {
+				return this.#editRangeAt(hedef.blockIndex, hedef.path, etkin.from, etkin.to, (children) =>
+					applyLink(children, etkin.from, etkin.to, url),
+				);
+			}
+		}
 		return this.#editRange((children, from, to) => applyLink(children, from, to, url));
+	}
+
+	/**
+	 * İmlecin içinde bulunduğu bağlantı.
+	 *
+	 * Seçim boş olsa da çalışıyor; bağlantı düzenleme akışı (F3-02) buna
+	 * dayanıyor.
+	 */
+	getActiveLink(): { url: string; title: string | null; from: number; to: number } | null {
+		const hedef = this.#rangeTarget();
+		if (hedef === null) return null;
+		return linkAt(hedef.children, hedef.from);
 	}
 
 	/** İlk bloğa odaklanır. */
@@ -1130,6 +1177,29 @@ export class Editor {
 		if (this.#readOnly) return false;
 		const hedef = this.#rangeTarget();
 		if (hedef === null || hedef.from >= hedef.to) return false;
+		return this.#editRangeAt(hedef.blockIndex, hedef.path, hedef.from, hedef.to, donustur);
+	}
+
+	/**
+	 * Verilen aralığı dönüştürür.
+	 *
+	 * `#editRange`ten ayrı: orası aralığı **seçimden** alıyor, burası
+	 * çağırandan. Bağlantı düzenlemede imleç boş olsa bile bağlantının
+	 * tamamı değiştiriliyor ve o aralık seçimde yok.
+	 */
+	#editRangeAt(
+		blockIndex: number,
+		path: readonly number[],
+		from: number,
+		to: number,
+		donustur: (children: readonly Inline[], from: number, to: number) => Inline[],
+	): boolean {
+		if (this.#readOnly) return false;
+		const dugumHam = nodeAt(this.#doc.children[blockIndex], path) as
+			| { children?: readonly Inline[] }
+			| undefined;
+		if (dugumHam?.children === undefined) return false;
+		const hedef = { blockIndex, path, children: dugumHam.children, from, to };
 
 		const donusen = donustur(hedef.children, hedef.from, hedef.to);
 		const dugum = nodeAt(this.#doc.children[hedef.blockIndex], hedef.path) as object;

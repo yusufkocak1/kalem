@@ -23,6 +23,7 @@ export {
 	applyLink,
 	applyMark,
 	inlineLength,
+	linkAt,
 	listLength,
 	markActive,
 	sliceInline,
