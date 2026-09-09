@@ -1,0 +1,97 @@
+/*
+ * @kalem/themes — Görsel yükleme eklentisi  (İş listesi: F4-01)
+ *
+ * Yalnızca `@kalem/plugin-image-upload` kullanılıyorsa yükleniyor. Ayrı
+ * dosya olmasının sebebi eklentinin isteğe bağlı olması: görsel yüklemeyen
+ * bir kullanıcı bu kuralları indirmemeli.
+ *
+ * Sözlük yine `tokens.css`ten (F3-09); burada hiçbir renk tanımlanmıyor.
+ */
+
+/* Dosya sürüklenirken editörün tamamı hedef olduğunu gösteriyor. */
+.kalem-drop-target {
+	outline: 2px dashed var(--kalem-accent);
+	outline-offset: 4px;
+	border-radius: var(--kalem-radius);
+}
+
+/*
+ * Yüklenen görsel.
+ *
+ * `--kalem-upload` eklentinin yazdığı 0–100 arası sayı. Görselin kendisi
+ * soluk, üstünde ilerlemeyi gösteren bir şerit var.
+ */
+.kalem-uploading {
+	opacity: 0.55;
+	/*
+	 * Şerit `background` ile çiziliyor, ayrı bir eleman ile değil:
+	 * `contenteditable` içine eklenen her eleman kullanıcının silebileceği
+	 * içerik hâline geliyor ve seçim onun üstünden geçiyor (F3-04'te aynı
+	 * gerekçeyle tutamaç `<body>`ye taşınmıştı).
+	 */
+	background-image: linear-gradient(
+		to right,
+		var(--kalem-accent) 0 calc(var(--kalem-upload, 0) * 1%),
+		var(--kalem-bg-subtle) calc(var(--kalem-upload, 0) * 1%) 100%
+	);
+	background-repeat: no-repeat;
+	background-size: 100% 3px;
+	background-position: bottom left;
+	padding-bottom: 3px;
+}
+
+/*
+ * Yükleme sürerken kullanıcı bekliyor; hareket bunu söylüyor. Hareketi
+ * kapatan kullanıcıya dayatılmıyor.
+ */
+@media (prefers-reduced-motion: no-preference) {
+	.kalem-uploading {
+		animation: kalem-upload-pulse 1.6s ease-in-out infinite;
+	}
+}
+
+@keyframes kalem-upload-pulse {
+	50% {
+		opacity: 0.75;
+	}
+}
+
+/*
+ * Alt metni olmayan görsel işaretleniyor.
+ *
+ * Alt metin erişilebilirliğin en sık atlanan parçası ve yazması en ucuz
+ * olanı. Kırmızı bir hata değil, hatırlatma: belge yine de geçerli.
+ */
+.kalem-doc img[alt=""] {
+	outline: 1px dashed color-mix(in srgb, var(--kalem-fg-muted) 60%, transparent);
+	outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Alt metin düzenleyici
+ * ------------------------------------------------------------------------- */
+
+.kalem-alt-editor {
+	padding: 6px;
+	max-width: min(22rem, calc(100vw - 16px));
+}
+
+.kalem-alt-editor[hidden] {
+	display: none !important;
+}
+
+.kalem-alt-input {
+	width: 18rem;
+	max-width: 100%;
+	padding: 4px 6px;
+	border: 1px solid var(--kalem-border);
+	border-radius: 5px;
+	background: var(--kalem-surface);
+	color: inherit;
+	font: inherit;
+}
+
+.kalem-alt-input:focus-visible {
+	outline: 2px solid var(--kalem-accent);
+	outline-offset: 1px;
+}

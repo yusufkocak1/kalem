@@ -983,8 +983,15 @@ test.describe("eklentiler", () => {
 		const adlar = await page.evaluate(() => window.kalem.editor.plugins);
 		// Demo sayfası `mountUi` çağırıyor; arayüz katmanı kendi kısayollarını
 		// da eklenti olarak kaydediyor: Ctrl+K (F3-02) ve Ctrl+Shift+↑/↓ ile
-		// blok taşıma (F3-04). Sıra kayıt sırası — çakışma kuralı o.
-		expect(adlar).toEqual(["input-rules", "task-list", "ui-link-shortcut", "ui-block-move"]);
+		// blok taşıma (F3-04). Görsel yükleme (F4-01) demo tarafından ayrıca
+		// kaydediliyor. Sıra kayıt sırası — çakışma kuralı o.
+		expect(adlar).toEqual([
+			"input-rules",
+			"task-list",
+			"ui-link-shortcut",
+			"ui-block-move",
+			"image-upload",
+		]);
 	});
 
 	test("giriş kuralı eklentisi kaldırılınca dönüşüm duruyor", async ({ page }) => {

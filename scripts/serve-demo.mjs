@@ -67,6 +67,10 @@ const PAKETLER = [
 		onEk: "/@kalem/ui/",
 		kok: fileURLToPath(new URL("../packages/ui/dist/", import.meta.url)),
 	},
+	{
+		onEk: "/@kalem/plugin-image-upload/",
+		kok: fileURLToPath(new URL("../packages/plugin-image-upload/dist/", import.meta.url)),
+	},
 	// Temalar saf CSS; derleme adımı yok, kaynak doğrudan servis ediliyor.
 	{
 		onEk: "/@kalem/themes/",

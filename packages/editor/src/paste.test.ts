@@ -132,7 +132,7 @@ describe("belgeye yerleştirme", () => {
 	it("tek paragraf satır içi ekleniyor", () => {
 		const sonuc = insertFragment(belge("abcd\n"), imlec(0, 2), parse("XY"));
 		expect(md(sonuc)).toBe("abXYcd\n");
-		expect(sonuc?.caret.offset).toBe(4);
+		expect(sonuc?.caret?.offset).toBe(4);
 	});
 
 	it("satır içi ekleme biçimi koruyor", () => {

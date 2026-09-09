@@ -68,13 +68,13 @@ describe("blok kuralları", () => {
 		// Sondaki boş paragraf modelde gerçekten var: kullanıcı çizginin
 		// altına yazmaya devam edebilmeli.
 		expect(md(sonuc)).toBe("---\n\n\n");
-		expect(sonuc?.caret.blockIndex).toBe(1);
+		expect(sonuc?.caret?.blockIndex).toBe(1);
 	});
 
 	it("işaretten sonraki metin korunuyor", () => {
 		const sonuc = applyBlockRule(metinBelgesi("# Işık"), imlec(2));
 		expect(md(sonuc)).toBe("# Işık\n");
-		expect(sonuc?.caret.offset).toBe(0);
+		expect(sonuc?.caret?.offset).toBe(0);
 	});
 
 	/** İmleç işaretin hemen sonunda değilse sürpriz dönüşüm olmamalı. */
@@ -121,7 +121,7 @@ describe("satır içi kuralları", () => {
 	});
 
 	it("imleç işaretin sonuna geliyor", () => {
-		expect(applyInlineRule(metinBelgesi("**abc**"), imlec(7))?.caret.offset).toBe(3);
+		expect(applyInlineRule(metinBelgesi("**abc**"), imlec(7))?.caret?.offset).toBe(3);
 	});
 
 	it("boş gövde dönüştürülmüyor", () => {

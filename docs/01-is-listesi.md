@@ -32,10 +32,10 @@
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
-| **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
+| **Faz 4** — Eklentiler | 1 / 7 | 🔵 Sürüyor |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **43 / 72** | **%60** |
+| | **44 / 72** | **%61** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -45,9 +45,11 @@
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
 referansları hariç)**
 
-**Sıradaki:** Faz 4 — eklentiler. Faz 3'ten iki iş açık: NVDA/VoiceOver ile elle
-test (F3-10) ve Linux görsel referansları (F3-11); ikisi de bir insanın
-masasında yapılmak zorunda.
+**Sıradaki:** `F4-02` `plugin-code-highlight`.
+
+**Açık işler:** NVDA/VoiceOver ile elle test (F3-10) ve Linux görsel
+referansları (F3-11) — ikisi de bir insanın masasında yapılmak zorunda.
+Ayrıca atomik düğümlere ofset uzunluğu 1 verilmesi (F4-01'de bulundu).
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -1193,9 +1195,57 @@ imleç aynı sayfadan iki farklı görüntü üretiyordu).
 
 > Tümü ayrı paket, tümü halka açık eklenti API'sini kullanır, tümü isteğe bağlı.
 
-### F4-01 · `plugin-image-upload` `[L]` ⬜
-Sürükle-bırak / yapıştırarak görsel, yükleme kancası (`onUpload`), yer tutucu + ilerleme + hata durumu, alt metin düzenleme, yeniden boyutlandırma
-- **Kabul:** sahte bir S3 yükleyiciyle uçtan uca çalışıyor
+### F4-01 · `plugin-image-upload` `[L]` ✅
+- [x] Sürükle-bırak / yapıştırarak görsel
+- [x] Yükleme kancası (`upload`), iptal (`AbortSignal`) ve ilerleme
+- [x] Yer tutucu + ilerleme + hata durumu
+- [x] Alt metin düzenleme (görsele tıklayınca)
+- ⬜ **Yeniden boyutlandırma — yapılmadı, gerekçesi aşağıda**
+- [x] **Kabul:** sahte bir S3 yükleyiciyle uçtan uca çalışıyor (23 tarayıcı testi)
+
+**Yeniden boyutlandırma neden yok.** Markdown'da görsel boyutu diye bir
+sözdizimi yok. Yapılabilecek tek şey `<img width="...">` ham HTML'i
+yazmak; o da temiz bir Markdown görselini ham HTML'e çeviriyor, başka
+araçlarda görünmez kılıyor ve belgeyi taşınamaz hâle getiriyor. Bunun
+kullanıcının belgesine yapılıp yapılmayacağı kütüphanenin kararı değil —
+`onResize` kancası veriliyor, ne yapacağına gömen uygulama karar veriyor.
+
+**Geçici adres `blob:` olamadı.** İlk hâli `blob:` idi ve çalışmadı:
+çekirdeğin URL beyaz listesi (F1-10) `blob:`i tanımıyor, render adresi
+`#`e çeviriyor ve önizleme hiç görünmüyordu. Beyaz liste **haklı ve
+gevşetilmedi**: `data:` görselinin MIME türü adresin içinde yazıyor ve
+`image/svg+xml` oradan ayıklanabiliyor, `blob:` adresinde tür bilgisi
+yok. Denetleyemediğin bir şemayı açmak beyaz listeyi anlamsız kılar.
+Modele `kalem-upload:<n>` giriyor, gerçek önizlemeyi eklenti DOM'a
+kendisi yazıyor.
+
+**Eklenti API'sinde iki boşluk bulundu ve kapatıldı** — Faz 4'ün çıkış
+kriteri ("API kendi kullanımıyla doğrulanmış") tam olarak bunu istiyordu:
+- `PluginContext.on` yoktu. Editör bloğu yeniden çizdiğinde eklentinin
+  `<img>` üstüne koyduğu ilerleme süslemesi kayboluyordu ve eklentinin
+  bunu öğrenmesinin hiçbir yolu yoktu. Render kancası hâlâ yok; bu ondan
+  farklı — düğüm başına değil, değişiklik başına tek çağrı.
+- `EditResult.caret` zorunluydu. Arka planda biten bir düzenleme (yükleme
+  tamamlanması) imleci taşıyor, odak editörün dışındaysa oraya **geri
+  çekiyordu**. Artık `null` = "imlece dokunma".
+
+> **Editörde veri kaybına yol açan bir hata bulundu.** Görselin ofset
+> uzunluğu 0 ve sıfır uzunluklu bir düğüm hiçbir aralıkla çakışmadığı
+> için `sliceInline` onu hem baştan hem kuyruktan eliyordu: imleci
+> görselin yanına koyup bir şey yapıştırmak (ya da ikinci bir görsel
+> bırakmak) **görseli sessizce siliyordu**. Eklentiden bağımsız bir
+> `spliceInline` testiyle doğrulandı ve düzeltildi; 6 birim testiyle
+> sabitlendi.
+>
+> **Kalan iş:** görselin ofset uzunluğu hâlâ 0. Bunun ikinci bir sonucu
+> var — kullanıcı görselin yanına imleç koyamıyor, onu seçemiyor ve
+> Backspace ile silemiyor. Doğru çözüm atomik düğümlere uzunluk 1 vermek;
+> `offsets.ts`teki DOM↔model eşlemesini de değiştiriyor, üç tarayıcıda
+> imleç matematiği demek. F4-01'in ortasında yapılacak bir değişiklik
+> değildi, ayrı bir iş olarak duruyor.
+
+Boyut: eklenti tek başına 2.92 kB (çekirdek ve editör hariç),
+`plugin-image.css` 342 B.
 
 ### F4-02 · `plugin-code-highlight` `[M]` ⬜
 Kod bloğu vurgulama; **tembel yüklenir**, dil paketleri ayrı chunk. Shiki/Prism kullanıcının kendi tercihi olarak takılabilir (bizim bağımlılığımız değil)

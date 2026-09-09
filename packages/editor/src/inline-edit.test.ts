@@ -8,7 +8,14 @@
 import type { Inline } from "@kalem/core";
 import { serialize } from "@kalem/core";
 import { describe, expect, it } from "vitest";
-import { applyLink, applyMark, listLength, markActive, sliceInline } from "./inline-edit.js";
+import {
+	applyLink,
+	applyMark,
+	listLength,
+	markActive,
+	sliceInline,
+	spliceInline,
+} from "./inline-edit.js";
 
 const metin = (value: string): Inline => ({ type: "text", value });
 const kalin = (...children: Inline[]): Inline => ({ type: "strong", children });
@@ -182,5 +189,50 @@ describe("applyLink", () => {
 
 	it("bağlantı içindeki biçim korunuyor", () => {
 		expect(md(applyLink([kalin(metin("abc"))], 0, 3, "/y"))).toBe("[**abc**](/y)");
+	});
+});
+
+/**
+ * Sıfır uzunluklu düğümler  (F4-01'de bulundu)
+ *
+ * Görselin ofset uzunluğu 0. Sıfır uzunluklu bir düğüm hiçbir aralıkla
+ * çakışmadığı için eski kural onu hem baştan hem kuyruktan eliyordu:
+ * imleci görselin yanına koyup bir şey eklemek görseli **siliyordu**.
+ */
+describe("sıfır uzunluklu düğümler", () => {
+	const gorsel = (url = "u"): Inline => ({ type: "image", url, alt: "x", title: null });
+
+	it("görselin hemen önüne ekleme onu silmiyor", () => {
+		const nodes: Inline[] = [metin("ab"), gorsel()];
+		expect(spliceInline(nodes, 2, 2, [metin("Z")])).toEqual([metin("abZ"), gorsel()]);
+	});
+
+	it("görselin hemen arkasına ekleme onu silmiyor", () => {
+		const nodes: Inline[] = [gorsel(), metin("ab")];
+		expect(spliceInline(nodes, 0, 0, [metin("Z")])).toEqual([metin("Z"), gorsel(), metin("ab")]);
+	});
+
+	/** Listenin tam sonundaki görsel kuyruk diliminde kalmalı. */
+	it("sondaki görsel korunuyor", () => {
+		const nodes: Inline[] = [metin("ab"), gorsel()];
+		expect(spliceInline(nodes, 0, 1, [])).toEqual([metin("b"), gorsel()]);
+	});
+
+	it("iki görsel arasına ekleme ikisini de koruyor", () => {
+		const nodes: Inline[] = [gorsel("1"), gorsel("2")];
+		const sonuc = spliceInline(nodes, 0, 0, [metin("Z")]);
+		expect(sonuc.filter((n) => n.type === "image")).toHaveLength(2);
+	});
+
+	/** Aralığın **içinde** kalan görsel silinmeli — kullanıcı onu seçmiş. */
+	it("seçili aralıktaki görsel siliniyor", () => {
+		const nodes: Inline[] = [metin("ab"), gorsel(), metin("cd")];
+		expect(spliceInline(nodes, 1, 3, [])).toEqual([metin("ad")]);
+	});
+
+	it("dilim görseli ikilemiyor", () => {
+		const nodes: Inline[] = [metin("ab"), gorsel(), metin("cd")];
+		const sonuc = spliceInline(nodes, 2, 2, [metin("Z")]);
+		expect(sonuc.filter((n) => n.type === "image")).toHaveLength(1);
 	});
 });

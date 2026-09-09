@@ -33,6 +33,7 @@
  */
 import type { Root } from "@kalem/core";
 import type { Caret, EditResult } from "./block-edit.js";
+import type { Editor } from "./editor.js";
 
 /**
  * Eklentinin editöre erişimi.
@@ -51,6 +52,19 @@ export interface PluginContext {
 	readonly element: HTMLElement;
 	/** Salt okunur mod. */
 	isReadOnly(): boolean;
+	/**
+	 * Olay aboneliği; aboneliği bitiren fonksiyonu döndürüyor.
+	 *
+	 * `Editor.on` ile aynı. Eklentinin editörün durumuna **tepki
+	 * verebilmesi** için gerekli ve bu ihtiyaç F4-01 yazılırken çıktı:
+	 * yükleme sürerken editör bloğu yeniden çizince eklentinin `<img>`
+	 * üstüne koyduğu ilerleme süslemesi kayboluyordu ve eklentinin bunu
+	 * öğrenmesinin hiçbir yolu yoktu.
+	 *
+	 * Render kancası hâlâ yok (yukarıya bakın) ve bu ondan farklı: düğüm
+	 * başına değil, değişiklik başına tek çağrı.
+	 */
+	on: Editor["on"];
 }
 
 /** Tuş işleyicisi: olayı tükettiyse `true` döner. */

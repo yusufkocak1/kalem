@@ -89,8 +89,16 @@ test.describe("görünürlük", () => {
 });
 
 test.describe("konumlandırma", () => {
+	/*
+	 * Ölçmeden önce görünürlük bekleniyor.
+	 *
+	 * `boundingBox()` gizli elemanda `null` dönüyor ve balon seçimden bir
+	 * kare sonra beliriyor. Paralel yük altında bu fark testi rastgele
+	 * kırmızıya çeviriyordu — suite büyüdükçe daha sık.
+	 */
 	test("seçimin üstünde beliriyor", async ({ page }) => {
 		await secimYap(page);
+		await expect(page.locator(BALON)).toBeVisible();
 		const balon = await page.locator(BALON).boundingBox();
 		const secim = await page.evaluate(() => {
 			const r = window.getSelection()?.getRangeAt(0).getClientRects().item(0);
@@ -103,6 +111,7 @@ test.describe("konumlandırma", () => {
 
 	test("görünür alanın dışına taşmıyor", async ({ page }) => {
 		await secimYap(page);
+		await expect(page.locator(BALON)).toBeVisible();
 		const balon = await page.locator(BALON).boundingBox();
 		const genislik = await page.evaluate(() => window.innerWidth);
 		if (balon === null) throw new Error("ölçülemedi");

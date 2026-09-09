@@ -64,6 +64,12 @@
     "gzip": true
   },
   {
+    "name": "@kalem/themes/plugin-image.css",
+    "path": "packages/themes/css/plugin-image.css",
+    "limit": "1 kB",
+    "gzip": true
+  },
+  {
     "name": "@kalem/editor (core dahil)",
     "path": "packages/editor/dist/index.js",
     "import": "*",
@@ -76,5 +82,13 @@
     "import": "*",
     "limit": "58 kB",
     "gzip": true
+  },
+  {
+    "name": "@kalem/plugin-image-upload",
+    "path": "packages/plugin-image-upload/dist/index.js",
+    "limit": "4 kB",
+    "gzip": true,
+    "import": "{ imageUploadPlugin }",
+    "ignore": ["@kalem/core", "@kalem/editor"]
   }
 ]

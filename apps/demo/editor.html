@@ -124,6 +124,7 @@
 <link rel="stylesheet" href="/@kalem/themes/viewer.css">
 <link rel="stylesheet" href="/@kalem/themes/editor.css">
 <link rel="stylesheet" href="/@kalem/themes/ui.css">
+<link rel="stylesheet" href="/@kalem/themes/plugin-image.css">
 <!-- F3-09: tema seçici bu bağlantıyı çalışma anında değiştiriyor. -->
 <link rel="stylesheet" href="" id="temaEk">
 
@@ -191,6 +192,7 @@
 	<div class="olcum"><dt>Seçim</dt><dd id="secim">—</dd></div>
 	<div class="olcum"><dt>Etkin biçimler</dt><dd id="bicimler">—</dd></div>
 	<div class="olcum"><dt>Geçmiş</dt><dd id="gecmis">—</dd></div>
+	<div class="olcum"><dt>Görsel yükleme</dt><dd id="gorselHata">—</dd></div>
 </dl>
 
 <script type="importmap">
@@ -201,12 +203,14 @@
 			"@kalem/core/html": "/@kalem/core/html.js",
 			"@kalem/editor": "/@kalem/editor/index.js",
 			"@kalem/viewer": "/@kalem/viewer/index.js",
-			"@kalem/ui": "/@kalem/ui/index.js"
+			"@kalem/ui": "/@kalem/ui/index.js",
+			"@kalem/plugin-image-upload": "/@kalem/plugin-image-upload/index.js"
 		}
 	}
 </script>
 <script type="module">
 	import { Editor, inputRulesPlugin, taskListPlugin } from "@kalem/editor";
+	import { imageUploadPlugin } from "@kalem/plugin-image-upload";
 	import { mountUi } from "@kalem/ui";
 
 	const ORNEK = `# Işık ve Gölge
@@ -342,9 +346,43 @@ Son paragraf.
 	// Konsol ve Playwright için; kütüphane global'e yazmaz.
 	let ui = mountUi(editor);
 
+	/*
+	 * F4-01 — sahte S3 yükleyicisi.
+	 *
+	 * Gerçek bir servis yok; kabul kriterinin ("sahte bir S3 yükleyiciyle
+	 * uçtan uca çalışıyor") istediği de bu. Yükleme, ilerleme bildirerek
+	 * adım adım ilerliyor ve sonunda kalıcı bir adres döndürüyor.
+	 *
+	 * `window.kalemYukleme` ile davranışı dışarıdan ayarlanabiliyor:
+	 * testler yavaşlatıp ilerlemeyi, `hata` ile de başarısızlık yolunu
+	 * ölçebilsin diye.
+	 */
+	window.kalemYukleme = { gecikme: 40, adim: 4, hata: false, sonAdres: null };
+
+	const gorselEklentisi = imageUploadPlugin({
+		maxSize: 5 * 1024 * 1024,
+		async upload({ file, onProgress, signal }) {
+			const ayar = window.kalemYukleme;
+			for (let i = 1; i <= ayar.adim; i++) {
+				await new Promise((r) => setTimeout(r, ayar.gecikme));
+				if (signal.aborted) throw new Error("iptal");
+				onProgress(i / ayar.adim);
+			}
+			if (ayar.hata) throw new Error("Yükleme başarısız (sahte)");
+			// Gerçek bir S3 yanıtı gibi: kalıcı ve öngörülebilir bir adres.
+			const adres = `https://sahte-s3.ornek/${encodeURIComponent(file.name)}`;
+			ayar.sonAdres = adres;
+			return adres;
+		},
+		onError(hata) {
+			document.getElementById("gorselHata").textContent = hata.message;
+		},
+	});
+	editor.addPlugin(gorselEklentisi);
+
 	// `mountUi` de veriliyor: F3-06'nın grup yapılandırması testten
 	// doğrudan kurulabilsin diye.
-	window.kalem = { editor, mountUi, get ui() { return ui; } };
+	window.kalem = { editor, mountUi, gorselEklentisi, get ui() { return ui; } };
 
 	// Araç çubuğu kipini değiştirmek arayüzü baştan kuruyor: `mountUi`
 	// tek seferlik bir montaj, kip bir çalışma zamanı anahtarı değil.

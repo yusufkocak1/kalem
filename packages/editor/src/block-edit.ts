@@ -48,7 +48,15 @@ export function sameCaret(a: Caret | null, b: Caret | null): boolean {
 
 export interface EditResult {
 	readonly doc: Root;
-	readonly caret: Caret;
+	/**
+	 * Düzenlemeden sonra imlecin gideceği yer.
+	 *
+	 * `null` = **imlece dokunma**. Kullanıcının başlatmadığı, arka planda
+	 * biten düzenlemeler için gerekli: bir görsel yüklemesi tamamlandığında
+	 * (F4-01) imleci taşımak, kullanıcıyı yazdığı yerden koparıyor — odak
+	 * editörün dışındaysa oraya geri **çekiyor**.
+	 */
+	readonly caret: Caret | null;
 }
 
 const paragraf = (children: readonly Inline[]): Paragraph => ({

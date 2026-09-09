@@ -243,6 +243,7 @@ export class Editor {
 			getCaret: () => this.#caret(),
 			applyEdit: (sonuc) => this.applyEdit(sonuc),
 			isReadOnly: () => this.#readOnly,
+			on: (event: never, handler: never) => this.on(event, handler),
 		};
 	}
 
@@ -1501,7 +1502,8 @@ export class Editor {
 		this.#doc = doc;
 		this.#defs = collectDefinitions(doc);
 		this.#sync();
-		this.#placeCaretAt(sonuc.caret);
+		// `null` imleç: düzenleme arka planda oldu, kullanıcı başka yerde.
+		if (sonuc.caret !== null) this.#placeCaretAt(sonuc.caret);
 		this.#emit();
 	}
 

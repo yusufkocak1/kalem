@@ -52,6 +52,19 @@ export function listLength(nodes: readonly Inline[]): number {
  *
  * Kısmen kapsanan **atomik** düğümler (görsel, referans) atlanıyor: bir
  * görselin yarısı diye bir şey yok. Tamamı kapsanıyorsa aynen geçiyor.
+ *
+ * ## Sıfır uzunluklu düğümler
+ *
+ * Görselin ofset uzunluğu 0 (`inlineLength`). Sıfır uzunluklu bir düğüm
+ * hiçbir aralıkla **çakışmıyor**, yani `bit <= from || bas >= to` kuralı
+ * onu her iki taraftan da eliyor. Sonuç veri kaybıydı: imleci görselin
+ * hemen yanına koyup bir şey yapıştırmak (ya da başka bir görsel bırakmak)
+ * görseli sessizce siliyordu — F4-01 yazılırken çıktı, bağımsız bir
+ * `spliceInline` testiyle doğrulandı.
+ *
+ * Kural: sıfır uzunluklu düğüm `from <= bas < to` ise aralığa ait.
+ * Böylece her düğüm **tam olarak bir** dilime düşüyor; ne kayboluyor ne
+ * ikileniyor.
  */
 export function sliceInline(nodes: readonly Inline[], from: number, to: number): Inline[] {
 	const out: Inline[] = [];
@@ -61,6 +74,11 @@ export function sliceInline(nodes: readonly Inline[], from: number, to: number):
 		const bas = pos;
 		const bit = pos + len;
 		pos = bit;
+
+		if (len === 0) {
+			if (bas >= from && bas < to) out.push(node);
+			continue;
+		}
 		if (bit <= from || bas >= to) continue;
 		out.push(...sliceNode(node, Math.max(from, bas) - bas, Math.min(to, bit) - bas));
 	}
@@ -102,11 +120,13 @@ export function spliceInline(
 	to: number,
 	replacement: readonly Inline[],
 ): Inline[] {
-	const uzunluk = listLength(nodes);
 	return normalizeInline([
 		...sliceInline(nodes, 0, from),
 		...replacement,
-		...sliceInline(nodes, to, uzunluk),
+		// Kuyruğun üst sınırı `Infinity`: listenin **tam sonunda** duran
+		// sıfır uzunluklu bir düğüm (son karakterden sonraki görsel)
+		// `bas < to` koşuluna takılıp düşerdi.
+		...sliceInline(nodes, to, Number.POSITIVE_INFINITY),
 	]);
 }
 

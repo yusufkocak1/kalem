@@ -17,6 +17,7 @@ function baglam(): PluginContext {
 			addEventListener: () => {},
 			removeEventListener: () => {},
 		} as unknown as HTMLElement,
+		on: (() => () => {}) as PluginContext["on"],
 		getDocument: () => doc,
 		getCaret: () => null,
 		applyEdit: () => true,

@@ -94,7 +94,7 @@ describe("Shift+Enter — satır sonu", () => {
 	it("sert satır sonu ekliyor", () => {
 		const sonuc = insertBreak(belge("abcd\n"), imlec(0, [], 2));
 		expect(md(sonuc)).toBe("ab\\\ncd\n");
-		expect(sonuc?.caret.offset).toBe(3);
+		expect(sonuc?.caret?.offset).toBe(3);
 	});
 });
 
