@@ -129,15 +129,26 @@ export function applyMark(
 	return spliceInline(nodes, from, to, toggleMark(secili, mark));
 }
 
-/** Aralığın tamamı bu biçimde mi — araç çubuğunun basılı durumu için. */
+/**
+ * Aralığın tamamı bu biçimde mi — araç çubuğunun basılı durumu için.
+ *
+ * **Boş aralıkta imlecin solundaki karaktere bakılıyor.** Sabit araç
+ * çubuğu (F3-06) seçim olmadan da duruyor ve kullanıcı imleci kalın bir
+ * kelimenin içine koyunca B'nin yanmasını bekliyor. Sol taraf seçiliyor
+ * çünkü yazmaya devam eden kullanıcı soldaki biçimi sürdürüyor; sağdaki
+ * karakter henüz girilmemiş bir metnin biçimi değil.
+ *
+ * Bloğun başında (`from === 0`) sol komşu yok; oradaki tek makul cevap
+ * sağdaki karakter.
+ */
 export function markActive(
 	nodes: readonly Inline[],
 	from: number,
 	to: number,
 	mark: MarkType,
 ): boolean {
-	if (from >= to) return false;
-	const secili = sliceInline(nodes, from, to);
+	const [bas, bit] = from >= to ? (from > 0 ? [from - 1, from] : [0, 1]) : [from, to];
+	const secili = sliceInline(nodes, bas, bit);
 	return secili.length > 0 && secili.every((node) => node.type === mark);
 }
 

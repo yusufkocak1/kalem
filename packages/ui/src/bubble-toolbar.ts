@@ -30,18 +30,7 @@ import type { Editor } from "@kalem/editor";
 import { button, el } from "./dom.js";
 import { position, selectionRect } from "./floating.js";
 import type { UiLabels } from "./labels.js";
-
-/** Araç çubuğundaki biçim düğmeleri. */
-const BICIMLER: readonly {
-	readonly mark: MarkType;
-	readonly glyph: string;
-	readonly key: keyof UiLabels;
-}[] = [
-	{ mark: "strong", glyph: "B", key: "bold" },
-	{ mark: "emphasis", glyph: "I", key: "italic" },
-	{ mark: "delete", glyph: "S", key: "strikethrough" },
-	{ mark: "inlineCode", glyph: "<>", key: "code" },
-];
+import { createBlockSelect, MARKS } from "./toolbar-actions.js";
 
 export interface BubbleToolbarOptions {
 	readonly prefix: string;
@@ -69,7 +58,7 @@ export function createBubbleToolbar(editor: Editor, options: BubbleToolbarOption
 	});
 
 	const dugmeler = new Map<MarkType, HTMLButtonElement>();
-	for (const { mark, glyph, key } of BICIMLER) {
+	for (const { mark, glyph, key } of MARKS) {
 		const b = button(doc, {
 			class: `${p}bubble-button`,
 			label: labels[key],
@@ -92,6 +81,7 @@ export function createBubbleToolbar(editor: Editor, options: BubbleToolbarOption
 	root.append(bagDugmesi);
 
 	const blokSecici = createBlockSelect(editor, p, labels);
+	blokSecici.element.classList.add(`${p}bubble-select`);
 	root.append(blokSecici.element);
 
 	doc.body.append(root);
@@ -159,64 +149,6 @@ export function createBubbleToolbar(editor: Editor, options: BubbleToolbarOption
 			doc.removeEventListener("scroll", yenidenKonumla, true);
 			doc.defaultView?.removeEventListener("resize", yenidenKonumla);
 			root.remove();
-		},
-	};
-}
-
-// ---------------------------------------------------------------------------
-// Blok türü listesi
-// ---------------------------------------------------------------------------
-
-/**
- * Blok türü açılır listesi.
- *
- * Yerel `<select>` kullanılıyor, özel bir açılır menü değil: klavye
- * gezinmesi, ekran okuyucu duyurusu, dokunmatik davranış ve mobil yerel
- * tekerlek hepsi bedava geliyor. Özel menü bunların hepsini yeniden
- * yazmak demek ve hiçbiri bu düğme için değerli değil.
- */
-function createBlockSelect(editor: Editor, p: string, labels: UiLabels) {
-	const doc = editor.getElement().ownerDocument;
-	const secim = el(doc, "select", {
-		class: `${p}bubble-select`,
-		attrs: { "aria-label": labels.blockType },
-	});
-
-	const secenekler: readonly [string, string][] = [
-		["paragraph", labels.paragraph],
-		["heading-1", labels.heading1],
-		["heading-2", labels.heading2],
-		["heading-3", labels.heading3],
-		["blockquote", labels.quote],
-		["code", labels.codeBlock],
-	];
-	for (const [value, text] of secenekler) {
-		secim.append(el(doc, "option", { text, attrs: { value } }));
-	}
-
-	// `mousedown` engellenmiyor: `<select>` açılırken seçim zaten korunuyor
-	// ve engellemek listeyi açılamaz hâle getiriyor.
-	secim.addEventListener("change", () => {
-		const deger = secim.value;
-		if (deger.startsWith("heading-")) {
-			const depth = Number(deger.slice(8)) as 1 | 2 | 3;
-			editor.setBlockType({ type: "heading", depth });
-		} else if (deger === "blockquote") editor.setBlockType({ type: "blockquote" });
-		else if (deger === "code") editor.setBlockType({ type: "code" });
-		else editor.setBlockType({ type: "paragraph" });
-		editor.focus();
-	});
-
-	return {
-		element: secim,
-		sync() {
-			const tur = editor.getBlockType();
-			secim.value =
-				tur === null
-					? "paragraph"
-					: tur.type === "heading"
-						? `heading-${Math.min(tur.depth, 3)}`
-						: tur.type;
 		},
 	};
 }

@@ -18,6 +18,8 @@ import type { BlockMenu } from "./block-menu.js";
 import { createBlockMenu } from "./block-menu.js";
 import type { BubbleToolbar } from "./bubble-toolbar.js";
 import { createBubbleToolbar } from "./bubble-toolbar.js";
+import type { FixedToolbar, ToolbarGroup } from "./fixed-toolbar.js";
+import { createFixedToolbar } from "./fixed-toolbar.js";
 import type { UiLabels } from "./labels.js";
 import { labelsFor } from "./labels.js";
 import type { LinkPopover } from "./link-popover.js";
@@ -30,12 +32,23 @@ import { createSlashMenu } from "./slash-menu.js";
 
 export interface UiOptions {
 	/**
-	 * Balon araç çubuğu (varsayılan açık).
+	 * Hangi araç çubuğu (varsayılan `"bubble"`).
 	 *
-	 * Segment A için biçimlendirmenin **görünür** tek yolu: kısayolları
-	 * bilmeyen kullanıcı Ctrl+B'yi keşfetmiyor.
+	 * - `"bubble"` — seçim yapılınca beliren balon (F3-01). Segment A için
+	 *   biçimlendirmenin **görünür** yolu: kısayolları bilmeyen kullanıcı
+	 *   Ctrl+B'yi keşfetmiyor.
+	 * - `"fixed"` — editörün üstünde duran sabit çubuk (F3-06). Word'e
+	 *   alışkın kullanıcı "burada neler var"ı seçim yapmadan görüyor.
+	 * - `"both"` — ikisi birden; biri keşif, diğeri erişim için.
+	 * - `false` — hiçbiri.
 	 */
-	readonly bubbleToolbar?: boolean;
+	readonly toolbar?: "fixed" | "bubble" | "both" | false;
+	/**
+	 * Sabit çubuktaki düğme grupları ve sıraları.
+	 *
+	 * Varsayılan hepsi. `toolbar` sabit çubuğu içermiyorsa etkisiz.
+	 */
+	readonly toolbarGroups?: readonly ToolbarGroup[];
 	/**
 	 * Arayüz metinleri.
 	 *
@@ -89,6 +102,8 @@ export interface UiOptions {
 export interface Ui {
 	/** Balon araç çubuğu — kapalıysa `null`. */
 	readonly bubbleToolbar: BubbleToolbar | null;
+	/** Sabit üst araç çubuğu — kapalıysa `null`. */
+	readonly fixedToolbar: FixedToolbar | null;
 	/** Bağlantı popover'ı — kapalıysa `null`. */
 	readonly linkPopover: LinkPopover | null;
 	/** Slash menü — kapalıysa `null`. */
@@ -209,8 +224,24 @@ export function mountUi(editor: Editor, options: UiOptions = {}): Ui {
 		sokucular.push(() => blockHandle?.destroy());
 	}
 
+	const toolbar = options.toolbar ?? "bubble";
+
+	let fixedToolbar: FixedToolbar | null = null;
+	if (toolbar === "fixed" || toolbar === "both") {
+		fixedToolbar = createFixedToolbar(editor, {
+			prefix,
+			labels,
+			...(options.toolbarGroups !== undefined ? { groups: options.toolbarGroups } : {}),
+			onLink: () => linkPopover?.open(),
+		});
+		sokucular.push(() => fixedToolbar?.destroy());
+		sokucular.push(editor.on("selectionchange", () => fixedToolbar?.update()));
+		sokucular.push(editor.on("change", () => fixedToolbar?.update()));
+		sokucular.push(editor.on("readonlychange", () => fixedToolbar?.update()));
+	}
+
 	let bubbleToolbar: BubbleToolbar | null = null;
-	if (options.bubbleToolbar !== false) {
+	if (toolbar === "bubble" || toolbar === "both") {
 		bubbleToolbar = createBubbleToolbar(editor, {
 			prefix,
 			labels,
@@ -226,6 +257,7 @@ export function mountUi(editor: Editor, options: UiOptions = {}): Ui {
 
 	return {
 		bubbleToolbar,
+		fixedToolbar,
 		linkPopover,
 		slashMenu,
 		blockHandle,

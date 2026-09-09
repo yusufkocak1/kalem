@@ -20,8 +20,11 @@
  */
 
 export interface UiLabels {
-	// Balon araç çubuğu
+	// Araç çubukları
 	readonly formatting: string;
+	readonly toolbar: string;
+	readonly undo: string;
+	readonly redo: string;
 	readonly bold: string;
 	readonly italic: string;
 	readonly strikethrough: string;
@@ -75,6 +78,9 @@ export interface UiLabels {
 
 export const enLabels: UiLabels = {
 	formatting: "Formatting",
+	toolbar: "Toolbar",
+	undo: "Undo",
+	redo: "Redo",
 	bold: "Bold",
 	italic: "Italic",
 	strikethrough: "Strikethrough",
@@ -123,6 +129,9 @@ export const enLabels: UiLabels = {
 
 export const trLabels: UiLabels = {
 	formatting: "Biçimlendirme",
+	toolbar: "Araç çubuğu",
+	undo: "Geri al",
+	redo: "Yinele",
 	bold: "Kalın",
 	italic: "İtalik",
 	strikethrough: "Üstü çizili",

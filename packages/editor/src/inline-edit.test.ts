@@ -139,8 +139,28 @@ describe("markActive", () => {
 		expect(markActive([metin("ab"), kalin(metin("cd"))], 0, 4, "strong")).toBe(false);
 	});
 
-	it("boş aralık yanlış", () => {
-		expect(markActive([kalin(metin("abc"))], 1, 1, "strong")).toBe(false);
+	/**
+	 * Sabit araç çubuğu (F3-06) seçim olmadan da duruyor: imleç kalın bir
+	 * kelimenin içindeyken B yanmalı. Balon çubuğu boş seçimde gizlendiği
+	 * için bu durumu hiç göstermiyordu.
+	 */
+	it("boş imleçte soldaki karakterin biçimi geçerli", () => {
+		expect(markActive([kalin(metin("abc"))], 1, 1, "strong")).toBe(true);
+	});
+
+	/** Yazmaya devam eden kullanıcı soldaki biçimi sürdürüyor. */
+	it("kalın metnin hemen sağında hâlâ kalın", () => {
+		expect(markActive([kalin(metin("ab")), metin("cd")], 2, 2, "strong")).toBe(true);
+	});
+
+	it("düz metnin içinde yanlış", () => {
+		expect(markActive([metin("abcd")], 2, 2, "strong")).toBe(false);
+	});
+
+	/** Bloğun başında sol komşu yok; tek makul cevap sağdaki karakter. */
+	it("blok başında sağdaki karaktere bakılıyor", () => {
+		expect(markActive([kalin(metin("ab"))], 0, 0, "strong")).toBe(true);
+		expect(markActive([metin("ab")], 0, 0, "strong")).toBe(false);
 	});
 });
 

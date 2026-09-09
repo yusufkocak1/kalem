@@ -562,3 +562,100 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
+
+/* ---------------------------------------------------------------------------
+ * Sabit üst araç çubuğu  (F3-06)
+ * ------------------------------------------------------------------------- */
+
+/*
+ * Yüzen parçaların aksine bu çubuk belgenin akışında ve editörün kardeşi.
+ * `sticky` kaydırmada üstte tutuyor; `fixed` olsaydı gömen sayfanın kendi
+ * başlığının altına kayardı.
+ */
+.kalem-toolbar {
+	position: sticky;
+	top: 0;
+	z-index: 10;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 2px;
+	padding: 4px 6px;
+	background: var(--kalem-ui-bg);
+	color: var(--kalem-ui-fg);
+	border: 1px solid var(--kalem-ui-border);
+	border-radius: var(--kalem-ui-radius);
+	margin-bottom: 8px;
+	font:
+		500 13px / 1 system-ui,
+		-apple-system,
+		"Segoe UI",
+		sans-serif;
+	/* Çubuğa sürüklemek seçimi bozar. */
+	user-select: none;
+}
+
+/* Gruplar arası ayırıcı — ilk grup hariç. */
+.kalem-toolbar-group {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.kalem-toolbar-group + .kalem-toolbar-group {
+	margin-inline-start: 4px;
+	padding-inline-start: 6px;
+	border-inline-start: 1px solid var(--kalem-ui-border);
+}
+
+.kalem-toolbar-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.9em;
+	height: 1.9em;
+	padding: 0 4px;
+	border: 0;
+	border-radius: 5px;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+}
+
+.kalem-toolbar-button:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--kalem-ui-fg) 8%, transparent);
+}
+
+.kalem-toolbar-button:focus-visible,
+.kalem-toolbar .kalem-block-select:focus-visible {
+	outline: 2px solid var(--kalem-ui-accent);
+	outline-offset: 1px;
+}
+
+/*
+ * Basılı durum `aria-pressed`ten okunuyor: görsel durum ile ekran
+ * okuyucunun duyurduğu durum tek kaynaktan geliyor, ayrışamaz.
+ */
+.kalem-toolbar-button[aria-pressed="true"] {
+	background: var(--kalem-ui-accent);
+	color: var(--kalem-ui-active-fg);
+}
+
+/*
+ * Kullanılamayan düğme görünür kalıyor ama soluk: kaybolsaydı çubuk her
+ * geri alma adımında yeniden düzenlenirdi.
+ */
+.kalem-toolbar-button:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.kalem-toolbar .kalem-block-select {
+	height: 1.9em;
+	border: 1px solid var(--kalem-ui-border);
+	border-radius: 5px;
+	background: var(--kalem-ui-bg);
+	color: inherit;
+	font: inherit;
+}

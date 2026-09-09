@@ -73,7 +73,7 @@ import {
 } from "./selection.js";
 
 /** Editörün yayımladığı olaylar. */
-export type EditorEvent = "change" | "selectionchange";
+export type EditorEvent = "change" | "selectionchange" | "readonlychange";
 
 export interface EditorOptions {
 	/** Başlangıç Markdown metni. */
@@ -279,8 +279,13 @@ export class Editor {
 	}
 
 	setReadOnly(readOnly: boolean): void {
+		if (this.#readOnly === readOnly) return;
 		this.#readOnly = readOnly;
 		this.#applyReadOnly();
+		// Arayüz katmanı düğmelerini buna göre kapatıyor; yoklamak yerine
+		// haber vermek, `@kalem/ui`nin editörü sürekli sorgulamasını
+		// gereksiz kılıyor.
+		this.#dispatch("readonlychange", readOnly);
 	}
 
 	isReadOnly(): boolean {
@@ -341,6 +346,7 @@ export class Editor {
 	 */
 	on(event: "change", handler: (value: string, doc: Root) => void): () => void;
 	on(event: "selectionchange", handler: (selection: EditorSelection) => void): () => void;
+	on(event: "readonlychange", handler: (readOnly: boolean) => void): () => void;
 	on(event: EditorEvent, handler: (...args: never[]) => void): () => void {
 		const küme = this.#listeners.get(event) ?? new Set();
 		küme.add(handler);

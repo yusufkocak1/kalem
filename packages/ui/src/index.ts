@@ -14,6 +14,8 @@ export type { BubbleToolbar, BubbleToolbarOptions } from "./bubble-toolbar.js";
 export { createBubbleToolbar } from "./bubble-toolbar.js";
 export type { ButtonOptions, ElementOptions } from "./dom.js";
 export { button, el, icon } from "./dom.js";
+export type { FixedToolbar, FixedToolbarOptions, ToolbarGroup } from "./fixed-toolbar.js";
+export { createFixedToolbar, DEFAULT_GROUPS } from "./fixed-toolbar.js";
 export type { FloatingOptions, FloatingResult, Placement } from "./floating.js";
 export { computePosition, position, selectionRect } from "./floating.js";
 export type { UiLabels } from "./labels.js";
@@ -27,5 +29,12 @@ export { createPlaceholder } from "./placeholder.js";
 export { foldForSearch, matches, score } from "./search.js";
 export type { SlashItem, SlashMenu, SlashMenuOptions } from "./slash-menu.js";
 export { createSlashMenu } from "./slash-menu.js";
+export type { BlockSelect, ToolbarAction } from "./toolbar-actions.js";
+export {
+	createBlockSelect,
+	formatActions,
+	historyActions,
+	listActions,
+} from "./toolbar-actions.js";
 export type { Ui, UiOptions } from "./ui.js";
 export { mountUi } from "./ui.js";

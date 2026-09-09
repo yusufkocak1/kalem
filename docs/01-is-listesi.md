@@ -31,11 +31,11 @@
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
-| **Faz 3** — Word deneyimi | 6 / 11 | 🔵 Sürüyor |
+| **Faz 3** — Word deneyimi | 7 / 11 | 🔵 Sürüyor |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **38 / 72** | **%53** |
+| | **39 / 72** | **%54** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,7 +43,7 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-13` (Faz 2 tamam)** · `F3-01` · `F3-02` · `F3-03` · `F3-08`
 
-**Sıradaki:** `F3-06` sabit üst araç çubuğu — Word'e alışkın kullanıcı için.
+**Sıradaki:** `F3-07` yapıştırma boru hattı — Word'den gelen içerik.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -959,9 +959,36 @@ denetimi bunu kendiliğinden yakaladı.
   gövdeye düşürüyordu. Kural genelleştirildi: *odağı barındıran tutamaç
   gizlenmiyor.*
 
-### F3-06 · Üst araç çubuğu (opsiyonel ribbon) `[M]` ⬜
-Word'e alışkın kullanıcı için sabit araç çubuğu; yapılandırılabilir buton grupları
-- **Kabul:** `toolbar: 'fixed' | 'bubble' | 'both' | false` seçeneğiyle çalışıyor
+### F3-06 · Üst araç çubuğu (opsiyonel ribbon) `[M]` ✅
+Word'e alışkın kullanıcı için sabit araç çubuğu ✅; yapılandırılabilir buton grupları ✅
+- [x] **Kabul:** `toolbar: 'fixed' | 'bubble' | 'both' | false` seçeneğiyle çalışıyor
+
+**Şerit değil, tek satır.** Word'ün sekmeli şeridi yüzlerce komut için
+var; burada onlarca komut yok, sekmeler boş sekmeler olurdu. Gruplar
+(`history`, `blockType`, `format`, `list`, `link`) tek satırda,
+`toolbarGroups` ile sıralanabilir ve kısaltılabilir.
+
+**Editörün kardeşi, `<body>`nin çocuğu değil.** Yüzen parçaların aksine
+çubuk belgenin akışında; `position: sticky` kaydırmada üstte tutuyor.
+Sarmalayıcı eklenmiyor ki gömen sayfanın kendi düzeni bozulmasın.
+
+**Eylemler `toolbar-actions.ts`'te ortak.** Balon çubuğu da oradan
+okuyor; "kalın" davranışının iki yerde ayrışması engellendi.
+
+**Sabit çubuk gizli bir kusuru ortaya çıkardı.** `markActive` boş imleçte
+her zaman `false` dönüyordu ve balon çubuğu boş seçimde gizlendiği için
+bu hiç görünmemişti. Sabit çubuk kapanmadığı için imleç kalın metnin
+içindeyken B yanmıyordu. Artık boş imleçte **soldaki** karaktere
+bakılıyor (yazmaya devam eden kullanıcı soldaki biçimi sürdürüyor);
+blok başında sağdakine. Eski beklentiyi sabitleyen test gerekçesiyle
+değiştirildi.
+
+**Kapalı düğmeler klavye gezinmesinde atlanıyor** — geri al geçmiş boşken
+kapalı ve odak alamıyor; listede bırakılsaydı ok tuşu hiçbir yere
+götürmüyor gibi görünürdü.
+
+Editöre `readonlychange` olayı eklendi: arayüz düğmelerini yoklamak
+yerine haberle kapatıyor.
 
 ### F3-07 · Yapıştırma boru hattı `[L]` ⬜
 F1-09'daki HTML→AST dönüştürücüyü editöre bağla

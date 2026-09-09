@@ -17,6 +17,7 @@ declare global {
 				getValue(): string;
 				setReadOnly(v: boolean): void;
 			};
+			mountUi: (el: unknown, options?: unknown) => { destroy(): void };
 			ui: {
 				destroy(): void;
 				labels: Record<string, string>;
@@ -866,5 +867,164 @@ test.describe("blok menüsü — klavye", () => {
 			),
 		);
 		expect(new Set(roller)).toEqual(new Set(["menuitem"]));
+	});
+});
+
+/**
+ * Sabit üst araç çubuğu  (İş listesi: F3-06)
+ *
+ * Kabul kriteri seçeneğin kendisi: `toolbar: 'fixed' | 'bubble' | 'both' |
+ * false`. Dördü de burada ölçülüyor — demo sayfası kipi değiştirince
+ * arayüzü baştan kuruyor, yani test gerçek montaj yolundan geçiyor.
+ */
+
+const CUBUK = ".kalem-toolbar";
+
+/** Araç çubuğu kipini değiştirir ve yeniden montajı bekler. */
+async function kip(page: import("@playwright/test").Page, deger: string) {
+	await page.locator("#aracCubugu").selectOption(deger);
+}
+
+test.describe("araç çubuğu kipi", () => {
+	test("varsayılan yalnızca balon", async ({ page }) => {
+		await expect(page.locator(CUBUK)).toHaveCount(0);
+	});
+
+	test("fixed sabit çubuğu getiriyor, balonu kaldırıyor", async ({ page }) => {
+		await kip(page, "fixed");
+		await expect(page.locator(CUBUK)).toBeVisible();
+		await secimYap(page);
+		await expect(page.locator(BALON)).toHaveCount(0);
+	});
+
+	test("both ikisini birden veriyor", async ({ page }) => {
+		await kip(page, "both");
+		await expect(page.locator(CUBUK)).toBeVisible();
+		await secimYap(page);
+		await expect(page.locator(BALON)).toBeVisible();
+	});
+
+	test("false hiçbirini vermiyor", async ({ page }) => {
+		await kip(page, "false");
+		await expect(page.locator(CUBUK)).toHaveCount(0);
+		await secimYap(page);
+		await expect(page.locator(BALON)).toHaveCount(0);
+	});
+});
+
+test.describe("sabit araç çubuğu", () => {
+	test.beforeEach(async ({ page }) => {
+		await kip(page, "fixed");
+		await expect(page.locator(CUBUK)).toBeVisible();
+	});
+
+	/** Çubuk editörün akışında, kardeşi olarak duruyor. */
+	test("editörün hemen üstünde", async ({ page }) => {
+		const once = await page.evaluate(
+			() => document.querySelector("#editor")?.previousElementSibling?.className,
+		);
+		expect(once).toContain("kalem-toolbar");
+	});
+
+	test("toolbar olarak duyuruluyor", async ({ page }) => {
+		await expect(page.locator(CUBUK)).toHaveAttribute("role", "toolbar");
+		await expect(page.locator(CUBUK)).toHaveAttribute("aria-label", "Araç çubuğu");
+	});
+
+	test("kalın düğmesi biçim uyguluyor", async ({ page }) => {
+		await secimYap(page, "metin");
+		await page.locator(`${CUBUK} button[aria-label="Kalın"]`).click();
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("**metin**\n");
+	});
+
+	test("basılı durum seçime göre yansıyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("**kalın** düz\n"));
+		await page.locator("#editor > p strong").click();
+		await expect(page.locator(`${CUBUK} button[aria-label="Kalın"]`)).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		);
+	});
+
+	test("liste düğmesi listeye çeviriyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("madde\n"));
+		await page.locator("#editor > p").first().click();
+		await page.locator(`${CUBUK} button[aria-label="Madde imli liste"]`).click();
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("- madde\n");
+	});
+
+	/** Geçmiş boşken geri al düğmesi kullanılamaz olmalı — ama kaybolmamalı. */
+	test("geri al düğmesi geçmiş boşken kapalı", async ({ page }) => {
+		await expect(page.locator(`${CUBUK} button[aria-label="Geri al"]`)).toBeDisabled();
+		await expect(page.locator(`${CUBUK} button[aria-label="Geri al"]`)).toBeVisible();
+	});
+
+	test("yazdıktan sonra geri al açılıyor ve çalışıyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("bir\n"));
+		await page.locator("#editor > p").first().click();
+		await page.keyboard.press("End");
+		await page.keyboard.type(" iki");
+		await expect(page.locator(`${CUBUK} button[aria-label="Geri al"]`)).toBeEnabled();
+		await page.locator(`${CUBUK} button[aria-label="Geri al"]`).click();
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("bir\n");
+	});
+
+	test("blok türü listesi başlığa çeviriyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("metin\n"));
+		await page.locator("#editor > p").first().click();
+		await page.locator(`${CUBUK} .kalem-block-select`).selectOption("heading-2");
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("## metin\n");
+	});
+
+	test("salt okunur modda düğmeler kapanıyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setReadOnly(true));
+		await expect(page.locator(`${CUBUK} button[aria-label="Kalın"]`)).toBeDisabled();
+		await expect(page.locator(`${CUBUK} .kalem-block-select`)).toBeDisabled();
+	});
+
+	/** Gezgin sekme sırası: çubuğa tek Tab ile giriliyor, içinde oklarla geziliyor. */
+	test("çubukta tek odaklanabilir düğme var", async ({ page }) => {
+		const sayi = await page.evaluate(
+			() => document.querySelectorAll('.kalem-toolbar [tabindex="0"]').length,
+		);
+		expect(sayi).toBe(1);
+	});
+
+	test("ok tuşlarıyla düğmeler arasında geziliyor", async ({ page }) => {
+		const dugmeler = page.locator(`${CUBUK} button:not(:disabled), ${CUBUK} select`);
+		await dugmeler.first().focus();
+		await page.keyboard.press("ArrowRight");
+		await expect(dugmeler.nth(1)).toBeFocused();
+		await page.keyboard.press("ArrowLeft");
+		await expect(dugmeler.first()).toBeFocused();
+	});
+
+	/**
+	 * Geçmiş boşken geri al/yinele kapalı ve odak alamıyor; listede
+	 * bırakılsalardı ok tuşu klavye kullanıcısını hiçbir yere götürmüyor
+	 * gibi görünürdü.
+	 */
+	test("kapalı düğmeler gezinmede atlanıyor", async ({ page }) => {
+		await expect(page.locator(`${CUBUK} button[aria-label="Geri al"]`)).toBeDisabled();
+		// Tab ile giriş noktası kapalı bir düğme olamaz.
+		const girisKapali = await page.evaluate(() =>
+			document.querySelector('.kalem-toolbar [tabindex="0"]')?.hasAttribute("disabled"),
+		);
+		expect(girisKapali).toBe(false);
+	});
+
+	/** Gruplar yapılandırılabilir; `mountUi` seçeneği doğrudan sınanıyor. */
+	test("gruplar yapılandırılabiliyor", async ({ page }) => {
+		const sayi = await page.evaluate(() => {
+			window.kalem.ui.destroy();
+			const ui = window.kalem.mountUi(window.kalem.editor, {
+				toolbar: "fixed",
+				toolbarGroups: ["format"],
+			});
+			const n = document.querySelectorAll(".kalem-toolbar .kalem-toolbar-group").length;
+			ui.destroy();
+			return n;
+		});
+		expect(sayi).toBe(1);
 	});
 });
