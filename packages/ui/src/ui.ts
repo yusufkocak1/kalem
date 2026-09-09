@@ -18,6 +18,7 @@ import type { UiLabels } from "./labels.js";
 import { labelsFor } from "./labels.js";
 import type { LinkPopover } from "./link-popover.js";
 import { createLinkPopover, normalizeUrl } from "./link-popover.js";
+import { createPlaceholder } from "./placeholder.js";
 
 export interface UiOptions {
 	/**
@@ -43,6 +44,12 @@ export interface UiOptions {
 	 * tıklamak — üçü de aynı popover'ı açıyor.
 	 */
 	readonly linkPopover?: boolean;
+	/**
+	 * Boş belgede ipucu metni (varsayılan açık).
+	 *
+	 * Kapatmak için `false`; metni değiştirmek için `labels.placeholder`.
+	 */
+	readonly placeholder?: boolean;
 }
 
 export interface Ui {
@@ -61,6 +68,11 @@ export function mountUi(editor: Editor, options: UiOptions = {}): Ui {
 	const sokucular: (() => void)[] = [];
 
 	element.classList.add(`${prefix}ui`);
+
+	if (options.placeholder !== false) {
+		const yerTutucu = createPlaceholder(editor, { prefix, text: labels.placeholder });
+		sokucular.push(() => yerTutucu.destroy());
+	}
 
 	let linkPopover: LinkPopover | null = null;
 	if (options.linkPopover !== false) {

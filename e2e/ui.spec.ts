@@ -321,3 +321,63 @@ test.describe("bağlantı akışı", () => {
 		await expect(page.locator(".kalem-link-input")).toHaveAttribute("aria-label", /.+/);
 	});
 });
+
+/**
+ * Yer tutucu  (İş listesi: F3-08)
+ *
+ * F3-08'in açık şartı: "ipucu odaklanınca kaybolmuyor, yazınca kayboluyor".
+ * Odakta gizlemek, kullanıcı tıklar tıklamaz ipucunu kaybettiriyor — oysa
+ * okumaya en çok o an ihtiyacı var.
+ */
+test.describe("yer tutucu", () => {
+	/** `::before` içeriği DOM'da yok; hesaplanmış stilden okunuyor. */
+	async function ipucu(page: import("@playwright/test").Page) {
+		return page.evaluate(() => {
+			const p = document.querySelector("#editor > p");
+			if (p === null) return "";
+			return getComputedStyle(p, "::before").content;
+		});
+	}
+
+	test("boş belgede görünüyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue(""));
+		await expect(page.locator("#editor")).toHaveClass(/kalem-empty/);
+		expect(await ipucu(page)).toContain("komut");
+	});
+
+	test("odaklanınca kaybolmuyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue(""));
+		await page.locator("#editor > p").click();
+		await expect(page.locator("#editor")).toHaveClass(/kalem-empty/);
+		expect(await ipucu(page)).toContain("komut");
+	});
+
+	test("yazınca kayboluyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue(""));
+		await page.locator("#editor > p").click();
+		await page.keyboard.type("a");
+		await expect(page.locator("#editor")).not.toHaveClass(/kalem-empty/);
+	});
+
+	test("silince geri geliyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue(""));
+		await page.locator("#editor > p").click();
+		await page.keyboard.type("a");
+		await page.keyboard.press("Backspace");
+		await expect(page.locator("#editor")).toHaveClass(/kalem-empty/);
+	});
+
+	/** İki boş paragraf varsa kullanıcı Enter'a basmıştır; ipucu oraya ait değil. */
+	test("dolu belgede görünmüyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("metin\n"));
+		await expect(page.locator("#editor")).not.toHaveClass(/kalem-empty/);
+	});
+
+	/** İpucu metni DOM'da olmadığı için modele de giremez. */
+	test("ipucu içeriğe karışmıyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue(""));
+		await page.locator("#editor > p").click();
+		await page.keyboard.type("x");
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("x");
+	});
+});

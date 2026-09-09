@@ -16,5 +16,7 @@ export type { UiLabels } from "./labels.js";
 export { enLabels, labelsFor, trLabels } from "./labels.js";
 export type { LinkPopover, LinkPopoverOptions } from "./link-popover.js";
 export { createLinkPopover, normalizeUrl } from "./link-popover.js";
+export type { Placeholder, PlaceholderOptions } from "./placeholder.js";
+export { createPlaceholder } from "./placeholder.js";
 export type { Ui, UiOptions } from "./ui.js";
 export { mountUi } from "./ui.js";

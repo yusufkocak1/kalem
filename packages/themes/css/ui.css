@@ -247,3 +247,36 @@
 	color: #b3402a;
 	font-size: 12px;
 }
+
+/* ---------------------------------------------------------------------- */
+/* Yer tutucu  (F3-08)                                                    */
+/* ---------------------------------------------------------------------- */
+
+/*
+ * İpucu `::before` ile çiziliyor, gerçek bir düğüm olarak değil: DOM'da
+ * olmayan metin ne seçilebilir ne de modele girebilir.
+ *
+ * `position: absolute` yerine `float` kullanılmıyor çünkü ipucu, imlecin
+ * bulunduğu satırın hizasında durmalı; mutlak konum satır yüksekliğini
+ * takip etmiyor. Bunun yerine sıfır genişlikli bir kutu olarak akışta
+ * kalıyor ve imleci itmiyor.
+ */
+.kalem-editor.kalem-empty > p:first-child::before {
+	content: var(--kalem-placeholder, "");
+	color: var(--kalem-fg-muted);
+	pointer-events: none;
+	/* Sıfır genişlik: metin akışta yer kaplamıyor, imleç başta kalıyor. */
+	display: inline-block;
+	width: 0;
+	white-space: nowrap;
+	/* Yüksek kontrast modunda da okunur kalsın. */
+	opacity: 0.75;
+}
+
+/*
+ * Boş paragraftaki doldurucu `<br>` gizleniyor: `::before` zaten satır
+ * kutusunu ayakta tutuyor ve ikisi birlikte iki satır yüksekliği üretiyor.
+ */
+.kalem-editor.kalem-empty > p:first-child > br:only-child {
+	display: none;
+}

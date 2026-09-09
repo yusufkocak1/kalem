@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 458/458
+> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 476/476
 
 | Faz | Görev | Durum |
 |---|---|---|
@@ -31,17 +31,17 @@
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
-| **Faz 3** — Word deneyimi | 2 / 11 | 🔵 Sürüyor |
+| **Faz 3** — Word deneyimi | 3 / 11 | 🔵 Sürüyor |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **34 / 72** | **%47** |
+| | **35 / 72** | **%49** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-13` (Faz 2 tamam)** · `F3-01` · `F3-02`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-13` (Faz 2 tamam)** · `F3-01` · `F3-02` · `F3-08`
 
 **Sıradaki:** `F3-03` slash menü — `/` ile blok ekleme, locale duyarlı arama.
 
@@ -66,9 +66,9 @@
 > | `@kalem/viewer` | 2.68 kB | 14 kB |
 > | `@kalem/themes/viewer.css` | 1.16 kB | 3 kB |
 > | `@kalem/themes/editor.css` | 340 B | 2 kB |
-> | `@kalem/themes/ui.css` | 1.03 kB | 3 kB |
+> | `@kalem/themes/ui.css` | 1.13 kB | 3 kB |
 > | `@kalem/editor` (core + viewer dâhil) | 22.3 kB | 38 kB |
-> | `@kalem/editor` + `@kalem/ui` | 25.52 kB | 58 kB |
+> | `@kalem/editor` + `@kalem/ui` | 25.7 kB | 58 kB |
 >
 > Gerekçe ikisinde de aynı: yalnızca Markdown işleyen kullanıcı (SSR,
 > derleme betiği) editör komutlarını ve yapıştırma dönüştürücüsünü
@@ -91,8 +91,8 @@ ayrıştırıcı, serileştirici, güvenlik katmanı, komutlar, HTML dönüştü
 `@kalem/editor` — blok kapsayıcı, model↔DOM eşlemesi, satır içi geri okuma,
 iki seviyeli seçim, satır içi biçimlendirme, klavye ve blok yapısı düzenleme,
 geri al/yinele, giriş kuralları, pano, eklenti sistemi. **Faz 2 kapandı.**
-`@kalem/ui` — balon araç çubuğu, bağlantı akışı, kendi konumlandırma hesabımız.
-**909 birim testi** + **458 tarayıcı testi** (Chromium · Firefox · WebKit),
+`@kalem/ui` — balon araç çubuğu, bağlantı akışı, yer tutucu.
+**909 birim testi** + **476 tarayıcı testi** (Chromium · Firefox · WebKit),
 axe ile WCAG 2.1 A/AA taraması ve CDP ile IME bileşimi dâhil.
 `parse(md)` ↔ `serialize(ast)` gidiş-dönüş 17/17 byte-birebir;
 `renderToDOM` ↔ `renderToString` üç motorda byte-birebir.
@@ -893,9 +893,24 @@ F1-09'daki HTML→AST dönüştürücüyü editöre bağla
 - Ctrl+Shift+V = biçimsiz yapıştır
 - **Kabul:** Word'den kopyalanan 3 sayfalık biçimli doküman doğru yapıya dönüşüyor
 
-### F3-08 · Yer tutucu ve boş durumlar `[S]` ⬜
-Boş dokümanda "Yazmaya başlayın veya `/` ile komut çalıştırın" ipucu
-- **Kabul:** ipucu odaklanınca kaybolmuyor, yazınca kayboluyor
+### F3-08 · Yer tutucu ve boş durumlar `[S]` ✅
+Boş dokümanda "Yazmaya başlayın veya `/` ile komut çalıştırın" ipucu ✅
+- **Kabul:** ipucu odaklanınca kaybolmuyor ✅, yazınca kayboluyor ✅
+
+> **İpucu `::before` ile çiziliyor, gerçek bir düğüm olarak değil.**
+> Düzenlenebilir alana metin koymanın iki yan etkisi var: metin
+> seçilebilir hâle geliyor ve `readInline` onu **içerik sanıyor**.
+> `content` ile çizilen metin DOM'da yok, yani modele de giremez —
+> test bunu ayrıca ölçüyor.
+>
+> **Odakta gizlenmiyor.** Kullanıcı tıklar tıklamaz ipucunu kaybetmek,
+> okumaya en çok ihtiyacı olduğu anda onu almak demek.
+>
+> **"Boş" = tek blok ve o blok içeriksiz paragraf.** İki boş paragraf
+> varsa kullanıcı Enter'a basmıştır; artık boş bir belgeye değil boş bir
+> satıra bakıyordur ve ipucu oraya ait değil.
+>
+> Testler: 6 tarayıcı testi × 3 motor.
 
 ### F3-09 · Tema sistemi `[M]` ⬜
 `@kalem/themes`: CSS değişkeni token seti, `default` + `dark` + `minimal`; `prefers-color-scheme` + `[data-theme]`
