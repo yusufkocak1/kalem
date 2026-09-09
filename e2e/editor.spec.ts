@@ -27,8 +27,12 @@ declare global {
 				canUndo(): boolean;
 				canRedo(): boolean;
 				destroy(): void;
+				readonly plugins: readonly string[];
+				addPlugin(plugin: unknown): void;
+				removePlugin(name: string): boolean;
 			};
 		};
+		kalemEditor: { inputRulesPlugin(): unknown };
 	}
 }
 
@@ -962,5 +966,82 @@ test.describe("pano", () => {
 		await page.locator("#saltOkunur").check();
 		await kopyala(page, "cut");
 		await expect(page.locator("#cikti")).toHaveText("kalacak\n");
+	});
+});
+
+/**
+ * Eklenti sistemi  (İş listesi: F2-12)
+ *
+ * F2-12'nin kabul kriteri: **çekirdek bir özellik eklenti olarak
+ * çıkarılıp tekrar takılabiliyor.** Giriş kuralları ve görev listesi
+ * davranışı gerçekten eklentiye taşındı; aşağıdaki testler kaldırınca
+ * davranışın kaybolduğunu, geri ekleyince döndüğünü ölçüyor.
+ */
+test.describe("eklentiler", () => {
+	test("yerleşik eklentiler varsayılan olarak kayıtlı", async ({ page }) => {
+		const adlar = await page.evaluate(() => window.kalem.editor.plugins);
+		expect(adlar).toEqual(["input-rules", "task-list"]);
+	});
+
+	test("giriş kuralı eklentisi kaldırılınca dönüşüm duruyor", async ({ page }) => {
+		await page.evaluate(() => {
+			window.kalem.editor.setValue("");
+			window.kalem.editor.removePlugin("input-rules");
+		});
+		await page.locator("#editor > p").first().click();
+		await page.keyboard.type("# Başlık");
+		await expect(page.locator("#editor > h1")).toHaveCount(0);
+		await expect(page.locator("#cikti")).toContainText("# Başlık");
+	});
+
+	test("geri eklenince dönüşüm dönüyor", async ({ page }) => {
+		await page.evaluate(() => {
+			window.kalem.editor.removePlugin("input-rules");
+			window.kalem.editor.addPlugin(window.kalemEditor.inputRulesPlugin());
+			window.kalem.editor.setValue("");
+		});
+		await page.locator("#editor > p").first().click();
+		await page.keyboard.type("# Başlık");
+		await expect(page.locator("#editor > h1")).toHaveText("Başlık");
+	});
+
+	test("görev listesi eklentisi kaldırılınca kutu modeli değiştirmiyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.removePlugin("task-list"));
+		await page.locator("#editor .kalem-task input[type=checkbox]").nth(1).click();
+		await expect(page.locator("#cikti")).toContainText("- [ ] Enter ile blok bölme");
+	});
+
+	test("aynı ad iki kez kaydedilemiyor", async ({ page }) => {
+		const hata = await page.evaluate(() => {
+			try {
+				window.kalem.editor.addPlugin(window.kalemEditor.inputRulesPlugin());
+				return null;
+			} catch (e) {
+				return String(e);
+			}
+		});
+		expect(hata).toContain("zaten kayıtlı");
+	});
+
+	test("özel eklenti tuşu çekirdekten önce yakalıyor", async ({ page }) => {
+		await page.evaluate(() => {
+			window.kalem.editor.setValue("abc\n");
+			window.kalem.editor.addPlugin({
+				name: "test-kisayol",
+				keymap: (event, ctx) => {
+					if (!event.ctrlKey || event.key !== "b") return false;
+					ctx.applyEdit({
+						doc: { ...ctx.getDocument(), children: [] },
+						caret: { blockIndex: 0, path: [], offset: 0 },
+					});
+					return true;
+				},
+			});
+		});
+		await page.locator("#editor > p").first().click();
+		await page.keyboard.press("ControlOrMeta+a");
+		await page.keyboard.press("Control+b");
+		// Çekirdek Ctrl+B kalın yapardı; eklenti onu tüketti.
+		await expect(page.locator("#cikti")).not.toContainText("**");
 	});
 });

@@ -41,8 +41,10 @@ import type { HistoryState } from "./history.js";
 import { History } from "./history.js";
 import { assignIds, newId } from "./ids.js";
 import { applyLink, applyMark, markActive, sliceInline, spliceInline } from "./inline-edit.js";
-import { applyBlockRule, applyInlineRule } from "./input-rules.js";
 import { contentLength, offsetOf, selectRange } from "./offsets.js";
+import type { Plugin, PluginContext } from "./plugin.js";
+import { PluginRegistry } from "./plugin.js";
+import { defaultPlugins } from "./plugins-builtin.js";
 import { readCode, readInline } from "./read.js";
 import {
 	CODE_ATTR,
@@ -97,6 +99,16 @@ export interface EditorOptions {
 	 * alanı) sürprizin istenmemesi.
 	 */
 	inputRules?: boolean;
+	/**
+	 * Eklentiler.
+	 *
+	 * Verilmezse yerleşikler kullanılıyor (giriş kuralları, görev listesi).
+	 * **Boş dizi vermek onları kapatır** — F2-12'nin dogfooding kanıtı da
+	 * bu: çekirdek özellikler gerçekten eklenti olarak çıkarılabiliyor.
+	 *
+	 * Sıra önemli: önce kayıtlı eklenti tuşu ve giriş kuralını önce görür.
+	 */
+	plugins?: readonly Plugin[];
 }
 
 export class Editor {
@@ -117,6 +129,7 @@ export class Editor {
 	/** Sürükleme blok moduna geçti mi (bkz. `#onPointerMove`). */
 	#blockDrag = false;
 	readonly #history: History;
+	readonly #plugins: PluginRegistry;
 	/**
 	 * Tuşa basıldığı andaki imleç.
 	 *
@@ -141,7 +154,6 @@ export class Editor {
 		if (options.lang !== undefined) element.lang = options.lang;
 
 		element.addEventListener("input", this.#onInput);
-		element.addEventListener("change", this.#onCheckbox);
 		element.addEventListener("keydown", this.#onKeyDown);
 		element.addEventListener("beforeinput", this.#onBeforeInput);
 		element.addEventListener("copy", this.#onCopy);
@@ -153,7 +165,53 @@ export class Editor {
 		// bağlanamaz. Sökülürken kaldırılması bu yüzden önemli.
 		element.ownerDocument.addEventListener("selectionchange", this.#onSelectionChange);
 
+		this.#plugins = new PluginRegistry(this.#pluginContext());
+		for (const plugin of options.plugins ?? defaultPlugins()) this.#plugins.add(plugin);
+
 		this.#sync();
+	}
+
+	/** Eklentilere verilen dar yüzey. */
+	#pluginContext(): PluginContext {
+		return {
+			element: this.#element,
+			getDocument: () => this.#doc,
+			getCaret: () => this.#caret(),
+			applyEdit: (sonuc) => this.applyEdit(sonuc),
+			isReadOnly: () => this.#readOnly,
+		};
+	}
+
+	// -----------------------------------------------------------------------
+	// Eklentiler  (F2-12)
+	// -----------------------------------------------------------------------
+
+	/** Kayıtlı eklenti adları, kayıt sırasıyla. */
+	get plugins(): readonly string[] {
+		return this.#plugins.names;
+	}
+
+	/** Eklenti ekler; aynı ad zaten kayıtlıysa hata atar. */
+	addPlugin(plugin: Plugin): void {
+		this.#plugins.add(plugin);
+	}
+
+	/** Eklentiyi kaldırır ve temizleyicisini çağırır. */
+	removePlugin(name: string): boolean {
+		return this.#plugins.remove(name);
+	}
+
+	/**
+	 * Bir düzenleme sonucunu uygular.
+	 *
+	 * Eklentiler için açık: modeli değiştiren her yol geçmişe de yazılmalı
+	 * ve DOM'a hedefli yansımalı; bunu eklentinin kendisinin yapması
+	 * gerekseydi API yanlış yerden bölünmüş olurdu.
+	 */
+	applyEdit(sonuc: EditResult | null): boolean {
+		if (sonuc === null || this.#readOnly) return false;
+		this.#applyEdit(sonuc);
+		return true;
 	}
 
 	// -----------------------------------------------------------------------
@@ -319,7 +377,7 @@ export class Editor {
 		if (this.#destroyed) return;
 		this.#destroyed = true;
 		this.#element.removeEventListener("input", this.#onInput);
-		this.#element.removeEventListener("change", this.#onCheckbox);
+		this.#plugins.destroy();
 		this.#element.removeEventListener("keydown", this.#onKeyDown);
 		this.#element.removeEventListener("beforeinput", this.#onBeforeInput);
 		this.#element.removeEventListener("copy", this.#onCopy);
@@ -458,7 +516,7 @@ export class Editor {
 		if (this.#options.inputRules === false) return;
 		const caret = this.#caret();
 		if (caret === null) return;
-		this.#applyEdit(applyBlockRule(this.#doc, caret) ?? applyInlineRule(this.#doc, caret));
+		this.#applyEdit(this.#plugins.runInputRules(this.#doc, caret));
 	}
 
 	/**
@@ -545,28 +603,6 @@ export class Editor {
 		this.#placeCaretAt({ blockIndex: hedef.blockIndex, path: hedef.path, offset: hedef.from });
 		this.#emit();
 	}
-
-	/** Görev listesi kutusu — içerik değil, maddenin durumu değişiyor. */
-	#onCheckbox = (event: Event): void => {
-		if (this.#readOnly) return;
-		const target = event.target;
-		if (!(target instanceof HTMLInputElement) || target.type !== "checkbox") return;
-		const li = target.closest("li");
-		const blockElement = target.closest(`[${ID_ATTR}]`);
-		if (li === null || !(blockElement instanceof HTMLElement)) return;
-
-		const blockIndex = this.#indexOf(blockElement);
-		const block = this.#doc.children[blockIndex];
-		if (block === undefined || block.type !== "list") return;
-
-		const index = Array.from(blockElement.querySelectorAll("li")).indexOf(li);
-		const item = block.children[index];
-		if (item === undefined) return;
-
-		this.#replaceDocument(
-			replaceAt(this.#doc, [blockIndex, index], { ...item, checked: target.checked }),
-		);
-	};
 
 	// -----------------------------------------------------------------------
 	// Seçim  (F2-06)
@@ -700,6 +736,12 @@ export class Editor {
 		if (this.#readOnly) return;
 		// Tarayıcı henüz hiçbir şeye dokunmadı; geri almanın döneceği yer bu.
 		this.#caretBeforeKey = this.#caret();
+
+		// Eklentiler çekirdekten önce: kayıt sırası tek çakışma kuralı.
+		if (this.#plugins.handleKey(event)) {
+			event.preventDefault();
+			return;
+		}
 
 		if (this.#selection?.kind === "block") {
 			if (event.key !== "Backspace" && event.key !== "Delete") return;

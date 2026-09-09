@@ -27,8 +27,12 @@ export {
 	sliceInline,
 	spliceInline,
 } from "./inline-edit.js";
+export { applyBlockRule, applyInlineRule, plainInline } from "./input-rules.js";
 export type { DomPoint } from "./offsets.js";
 export { contentLength, offsetOf, pointAt, selectRange } from "./offsets.js";
+export type { Plugin, PluginContext, PluginInputRule, PluginKeyHandler } from "./plugin.js";
+export { PluginRegistry } from "./plugin.js";
+export { defaultPlugins, inputRulesPlugin, taskListPlugin } from "./plugins-builtin.js";
 export { normalizeInline, readCode, readInline } from "./read.js";
 export type { TopNode } from "./render.js";
 export { CODE_ATTR, ID_ATTR, PATH_ATTR } from "./render.js";

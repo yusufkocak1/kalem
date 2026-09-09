@@ -23,28 +23,27 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 345/345
+> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 363/363
 
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
-| **Faz 2** — Viewer + başsız editör | 11 / 13 | 🔵 2B sürüyor |
+| **Faz 2** — Viewer + başsız editör | 12 / 13 | 🔵 2B sürüyor |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **30 / 72** | **%42** |
+| | **31 / 72** | **%43** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-04` (2A tamam)** · `F2-05` … `F2-11`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-04` (2A tamam)** · `F2-05` … `F2-12`
 
-**Sıradaki:** `F2-12` eklenti sistemi, ardından `F2-13` editör E2E paketi
-— ikisiyle birlikte Faz 2 kapanıyor.
+**Sıradaki:** `F2-13` editör E2E paketi — Faz 2'nin son adımı.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -67,7 +66,7 @@
 > | `@kalem/viewer` | 2.68 kB | 14 kB |
 > | `@kalem/themes/viewer.css` | 1.16 kB | 3 kB |
 > | `@kalem/themes/editor.css` | 340 B | 2 kB |
-> | `@kalem/editor` (core + viewer dâhil) | 21.2 kB | 38 kB |
+> | `@kalem/editor` (core + viewer dâhil) | 21.79 kB | 38 kB |
 >
 > Gerekçe ikisinde de aynı: yalnızca Markdown işleyen kullanıcı (SSR,
 > derleme betiği) editör komutlarını ve yapıştırma dönüştürücüsünü
@@ -89,8 +88,8 @@ ayrıştırıcı, serileştirici, güvenlik katmanı, komutlar, HTML dönüştü
 `@kalem/themes` — görüntüleyici ve editör stilleri (saf CSS).
 `@kalem/editor` — blok kapsayıcı, model↔DOM eşlemesi, satır içi geri okuma,
 iki seviyeli seçim, satır içi biçimlendirme, klavye ve blok yapısı düzenleme,
-geri al/yinele, giriş kuralları, pano.
-**870 birim testi** + **345 tarayıcı testi** (Chromium · Firefox · WebKit),
+geri al/yinele, giriş kuralları, pano, eklenti sistemi.
+**881 birim testi** + **363 tarayıcı testi** (Chromium · Firefox · WebKit),
 axe ile WCAG 2.1 A/AA taraması dâhil.
 `parse(md)` ↔ `serialize(ast)` gidiş-dönüş 17/17 byte-birebir;
 `renderToDOM` ↔ `renderToString` üç motorda byte-birebir.
@@ -723,10 +722,35 @@ Yazarken otomatik dönüşüm: `# ` → başlık ✅, `- ` / `* ` → liste ✅,
 > Testler: 9 birim + 7 tarayıcı testi × 3 motor.
 > *(Yapıştırma bu adımda değil: kirli HTML normalleştirmesi F3-07.)*
 
-### F2-12 · Eklenti sistemi `[M]` ⬜
-Analiz §5.9'daki `Plugin` arayüzü; kayıt, yaşam döngüsü, çakışma çözümü
-- **Dogfooding kuralı:** görev listesi ve kod bloğu bu API üzerinden yeniden yazılır
-- **Kabul:** çekirdek bir özellik eklenti olarak çıkarılıp tekrar takılabiliyor
+### F2-12 · Eklenti sistemi `[M]` ✅
+Analiz §5.9'daki `Plugin` arayüzü; kayıt ✅, yaşam döngüsü ✅, çakışma çözümü ✅
+- **Dogfooding kuralı:** görev listesi ve kod bloğu bu API üzerinden yeniden yazılır 🟡 *(görev listesi ✅ + giriş kuralları ✅; kod bloğu render'ı çekirdekte kaldı — gerekçe aşağıda)*
+- **Kabul:** çekirdek bir özellik eklenti olarak çıkarılıp tekrar takılabiliyor ✅
+
+> **Yüzey üç noktayla sınırlı:** `keymap` (tuş yakalama), `inputRules`
+> (yazarken dönüşüm), `setup` (kurulum + temizleyici). Bu üçü editörün
+> gerçekten genişletme noktası olan yerleri.
+>
+> **Render'a kanca bilerek yok.** Düğüm başına bir kanca, blok motorunun
+> en sıcak yolunda her düğüm için bir dolaylı çağrı demek; ihtiyaç
+> ölçülmeden ödenecek bir bedel değil. Görsel genişletme Faz 3'ün
+> (`@kalem/ui`) işi. **Kod bloğu render'ının eklentiye çıkarılmaması bu
+> yüzden** — çıkarmak, ölçülmemiş bir maliyeti tüm bloklara yaymak
+> olurdu. Görev listesinin **davranışı** (kutuya tıklayınca durum
+> değişmesi) eklentiye taşındı, **çizimi** çekirdekte kaldı.
+>
+> **Çakışma çözümü tek kural: kayıt sırası.** Önce kayıtlı eklenti önce
+> deneniyor, ilk `true` döndüren kazanıyor, çekirdek en sonda. Öncelik
+> numarası ya da bağımlılık grafiği yok — ikisi de eklenti yazarını kendi
+> eklentisini başkalarına göre konumlandırmaya zorluyor ve sistem tahmin
+> edilemez hâle geliyor. Sıra çağıranın elinde ve görünür.
+>
+> **Dogfooding gerçek:** giriş kuralları (F2-10) ve görev listesi davranışı
+> artık eklenti; ikisi de varsayılan olarak kayıtlı ve `plugins: []` ile
+> kapatılabiliyor. E2E testi kaldırınca davranışın gerçekten kaybolduğunu,
+> geri ekleyince döndüğünü ölçüyor — kabul kriterinin ta kendisi.
+>
+> Testler: 11 birim (kayıt, yaşam döngüsü, çakışma) + 6 tarayıcı testi × 3 motor.
 
 ### F2-13 · Editör E2E test paketi `[L]` ⬜
 Playwright ile: yazma, seçim, kısayollar, giriş kuralları, undo/redo, kopyala-yapıştır, IME (CDP `Input.imeSetComposition`)

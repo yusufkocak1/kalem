@@ -185,7 +185,7 @@
 	}
 </script>
 <script type="module">
-	import { Editor } from "@kalem/editor";
+	import { Editor, inputRulesPlugin, taskListPlugin } from "@kalem/editor";
 
 	const ORNEK = `# Işık ve Gölge
 
@@ -319,4 +319,6 @@ Son paragraf.
 	document.documentElement.lang = "tr";
 	// Konsol ve Playwright için; kütüphane global'e yazmaz.
 	window.kalem = { editor };
+	// Eklenti API'sini konsoldan ve testlerden denemek için.
+	window.kalemEditor = { inputRulesPlugin, taskListPlugin };
 </script>
