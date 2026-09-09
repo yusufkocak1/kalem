@@ -23,28 +23,28 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 324/324
+> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 345/345
 
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
-| **Faz 2** — Viewer + başsız editör | 10 / 13 | 🔵 2B sürüyor |
+| **Faz 2** — Viewer + başsız editör | 11 / 13 | 🔵 2B sürüyor |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **29 / 72** | **%40** |
+| | **30 / 72** | **%42** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-04` (2A tamam)** · `F2-05` … `F2-10`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-04` (2A tamam)** · `F2-05` … `F2-11`
 
-**Sıradaki:** `F2-11` kopyala/kesme — panoya hem `text/html` hem
-`text/plain` (Markdown) yazma.
+**Sıradaki:** `F2-12` eklenti sistemi, ardından `F2-13` editör E2E paketi
+— ikisiyle birlikte Faz 2 kapanıyor.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -67,7 +67,7 @@
 > | `@kalem/viewer` | 2.68 kB | 14 kB |
 > | `@kalem/themes/viewer.css` | 1.16 kB | 3 kB |
 > | `@kalem/themes/editor.css` | 340 B | 2 kB |
-> | `@kalem/editor` (core dâhil) | 19.56 kB | 38 kB |
+> | `@kalem/editor` (core + viewer dâhil) | 21.2 kB | 38 kB |
 >
 > Gerekçe ikisinde de aynı: yalnızca Markdown işleyen kullanıcı (SSR,
 > derleme betiği) editör komutlarını ve yapıştırma dönüştürücüsünü
@@ -89,8 +89,8 @@ ayrıştırıcı, serileştirici, güvenlik katmanı, komutlar, HTML dönüştü
 `@kalem/themes` — görüntüleyici ve editör stilleri (saf CSS).
 `@kalem/editor` — blok kapsayıcı, model↔DOM eşlemesi, satır içi geri okuma,
 iki seviyeli seçim, satır içi biçimlendirme, klavye ve blok yapısı düzenleme,
-geri al/yinele, giriş kuralları.
-**861 birim testi** + **324 tarayıcı testi** (Chromium · Firefox · WebKit),
+geri al/yinele, giriş kuralları, pano.
+**870 birim testi** + **345 tarayıcı testi** (Chromium · Firefox · WebKit),
 axe ile WCAG 2.1 A/AA taraması dâhil.
 `parse(md)` ↔ `serialize(ast)` gidiş-dönüş 17/17 byte-birebir;
 `renderToDOM` ↔ `renderToString` üç motorda byte-birebir.
@@ -692,10 +692,36 @@ Yazarken otomatik dönüşüm: `# ` → başlık ✅, `- ` / `* ` → liste ✅,
 >
 > Testler: 23 birim (kalıplar ve dönüşümler, saf) + 11 tarayıcı testi × 3 motor.
 
-### F2-11 · Kopyala / kesme `[M]` ⬜
-- Kopyalarken panoya **hem** `text/html` **hem** `text/plain` (= Markdown) yaz
-- Blok arası seçimin doğru kopyalanması
-- **Kabul:** Kalem'den kopyalayıp Word'e yapıştırınca biçim korunuyor; not defterine yapıştırınca Markdown çıkıyor
+### F2-11 · Kopyala / kesme `[M]` ✅
+- Kopyalarken panoya **hem** `text/html` **hem** `text/plain` (= Markdown) yaz ✅
+- Blok arası seçimin doğru kopyalanması ✅
+- **Kabul:** Kalem'den kopyalayıp Word'e yapıştırınca biçim korunuyor ✅; not defterine yapıştırınca Markdown çıkıyor ✅
+
+> **İki biçim, tek kaynak.** İkisi de aynı AST parçasından üretiliyor:
+> `text/html` Word ve Google Docs için, `text/plain` **Markdown** olarak.
+> Not defterine yapıştıran kullanıcı `**kalın**` görüyor, düz "kalın"
+> değil — projenin "doğru kaynak Markdown metnidir" kararının panoya
+> yansıması.
+>
+> **Tarayıcıya hiç bırakılmıyor**, blok içi seçimde bile: asıl kazanç
+> zaten orada, çünkü tarayıcının `text/plain`'i biçim işaretlerini atıyor.
+>
+> **Editör artık `@kalem/viewer`'a bağımlı.** `render.ts`'te "editör
+> viewer'ı kullanmaz" yazıyordu ve editör *render'ı* için hâlâ doğru
+> (farklı ihtiyaç). Ama pano için tam olarak viewer'ın ürettiği şey
+> gerekiyordu: sunum amaçlı, kimliksiz, düzenleme özniteliği taşımayan
+> HTML. Kopyalanan HTML'de `data-kalem-*` ya da `contenteditable`
+> bulunmadığı test ediliyor.
+>
+> Satır içi kopyalamada paragraf sarmalayıcısı çıkarılıyor: cümle
+> ortasından kopyalanan metin yapıştırıldığında yeni paragraf açmamalı.
+>
+> **Bir test tekniği notu:** Firefox sentetik pano olayında `getData`'yı
+> boş döndürüyor (güvenlik). Test artık `setData`'yı gözleyerek editörün
+> **yazdığını** okuyor; üç motorda da aynı şeyi ölçüyor.
+>
+> Testler: 9 birim + 7 tarayıcı testi × 3 motor.
+> *(Yapıştırma bu adımda değil: kirli HTML normalleştirmesi F3-07.)*
 
 ### F2-12 · Eklenti sistemi `[M]` ⬜
 Analiz §5.9'daki `Plugin` arayüzü; kayıt, yaşam döngüsü, çakışma çözümü

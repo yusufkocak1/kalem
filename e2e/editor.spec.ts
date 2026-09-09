@@ -846,3 +846,121 @@ test.describe("giriş kuralları", () => {
 		await expect(page.locator("#editor h1")).toHaveCount(0);
 	});
 });
+
+/**
+ * Kopyala / kes  (İş listesi: F2-11)
+ *
+ * Pano API'si tarayıcı izinlerine takılabildiği için testler `copy`/`cut`
+ * olayını doğrudan tetikleyip `DataTransfer`'a yazılanı okuyor: ölçülen
+ * şey tam olarak kullanıcının panosuna giden içerik.
+ */
+test.describe("pano", () => {
+	/**
+	 * `copy`/`cut` olayını tetikler ve editörün panoya **yazdığını** döndürür.
+	 *
+	 * Yazılan içerik `setData` gözlenerek okunuyor, `getData` ile değil:
+	 * Firefox sentetik (güvenilmeyen) bir pano olayında `getData`'yı boş
+	 * döndürüyor. Gözlemci üç motorda da çalışıyor ve ölçtüğü şey aynı —
+	 * kullanıcının panosuna giden içerik.
+	 */
+	async function kopyala(page: import("@playwright/test").Page, tur: "copy" | "cut" = "copy") {
+		return page.evaluate((olayAdi) => {
+			const kayit: [string, string][] = [];
+			const orijinal = DataTransfer.prototype.setData;
+			DataTransfer.prototype.setData = function (tip: string, deger: string) {
+				kayit.push([tip, deger]);
+				return orijinal.call(this, tip, deger);
+			};
+			try {
+				const olay = new ClipboardEvent(olayAdi, {
+					clipboardData: new DataTransfer(),
+					bubbles: true,
+					cancelable: true,
+				});
+				// Olay kapsayıcıya gönderiliyor: dinleyici orada ve bloklar
+				// arası seçimde odak editörün dışında olabiliyor.
+				document.getElementById("editor")?.dispatchEvent(olay);
+			} finally {
+				DataTransfer.prototype.setData = orijinal;
+			}
+			const bul = (tip: string) => kayit.find(([t]) => t === tip)?.[1] ?? "";
+			return { text: bul("text/plain"), html: bul("text/html") };
+		}, tur);
+	}
+
+	test("blok içi seçim Markdown olarak kopyalanıyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("bir **iki** üç\n"));
+		await page.locator("#editor > p").first().click();
+		await page.keyboard.press("ControlOrMeta+a");
+
+		const pano = await kopyala(page);
+		// Asıl kazanç: not defterine yapıştıran kullanıcı işaretleri görür.
+		expect(pano.text).toBe("bir **iki** üç");
+		expect(pano.html).toContain("<strong>iki</strong>");
+	});
+
+	test("kopyalanan HTML'de düzenleme öznitelikleri yok", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("# Başlık\n\nmetin\n"));
+		await page.locator("#editor > h1").click();
+		await page.keyboard.press("ControlOrMeta+a");
+		const pano = await kopyala(page);
+		expect(pano.html).not.toContain("data-kalem");
+		expect(pano.html).not.toContain("contenteditable");
+	});
+
+	test("bloklar arası seçim yapısıyla kopyalanıyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("# Başlık\n\n- bir\n- iki\n"));
+		const secildi = await page.evaluate(() => {
+			const bloklar = document.querySelectorAll("#editor > [data-kalem-id]");
+			const id = (n: number) => bloklar[n]?.getAttribute("data-kalem-id") as string;
+			window.kalem.editor.selectBlocks(id(0), id(1));
+			return document.querySelectorAll("#editor .kalem-selected").length;
+		});
+		expect(secildi).toBe(2);
+
+		const pano = await kopyala(page);
+		expect(pano.text).toBe("# Başlık\n\n- bir\n- iki");
+		expect(pano.html).toContain("<h1>Başlık</h1>");
+		expect(pano.html).toContain("<ul>");
+	});
+
+	test("kesme kopyalayıp siliyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("silinecek\n"));
+		await page.locator("#editor > p").first().click();
+		await page.keyboard.press("ControlOrMeta+a");
+
+		const pano = await kopyala(page, "cut");
+		expect(pano.text).toBe("silinecek");
+		await expect(page.locator("#cikti")).toHaveText("\n");
+	});
+
+	test("bloklar arası kesme blokları siliyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("bir\n\niki\n\nüç\n"));
+		await page.evaluate(() => {
+			const bloklar = document.querySelectorAll("#editor > [data-kalem-id]");
+			const id = (n: number) => bloklar[n]?.getAttribute("data-kalem-id") as string;
+			window.kalem.editor.selectBlocks(id(0), id(1));
+		});
+		await kopyala(page, "cut");
+		await expect(page.locator(BLOK)).toHaveCount(1);
+		await expect(page.locator("#cikti")).toHaveText("üç\n");
+	});
+
+	test("kesme geri alınabiliyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("silinecek\n"));
+		await page.locator("#editor > p").first().click();
+		await page.keyboard.press("ControlOrMeta+a");
+		await kopyala(page, "cut");
+		await page.keyboard.press("ControlOrMeta+z");
+		await expect(page.locator("#cikti")).toHaveText("silinecek\n");
+	});
+
+	test("salt okunur modda kesme silmiyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("kalacak\n"));
+		await page.locator("#editor > p").first().click();
+		await page.keyboard.press("ControlOrMeta+a");
+		await page.locator("#saltOkunur").check();
+		await kopyala(page, "cut");
+		await expect(page.locator("#cikti")).toHaveText("kalacak\n");
+	});
+});

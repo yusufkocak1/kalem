@@ -36,10 +36,11 @@ import {
 	splitAtCaret,
 	toggleList,
 } from "./block-edit.js";
+import { blocksPayload, inlinePayload } from "./clipboard.js";
 import type { HistoryState } from "./history.js";
 import { History } from "./history.js";
 import { assignIds, newId } from "./ids.js";
-import { applyLink, applyMark, markActive } from "./inline-edit.js";
+import { applyLink, applyMark, markActive, sliceInline, spliceInline } from "./inline-edit.js";
 import { applyBlockRule, applyInlineRule } from "./input-rules.js";
 import { contentLength, offsetOf, selectRange } from "./offsets.js";
 import { readCode, readInline } from "./read.js";
@@ -143,6 +144,8 @@ export class Editor {
 		element.addEventListener("change", this.#onCheckbox);
 		element.addEventListener("keydown", this.#onKeyDown);
 		element.addEventListener("beforeinput", this.#onBeforeInput);
+		element.addEventListener("copy", this.#onCopy);
+		element.addEventListener("cut", this.#onCut);
 		element.addEventListener("pointerdown", this.#onPointerDown);
 		element.addEventListener("pointermove", this.#onPointerMove);
 		element.ownerDocument.addEventListener("pointerup", this.#onPointerUp);
@@ -319,6 +322,8 @@ export class Editor {
 		this.#element.removeEventListener("change", this.#onCheckbox);
 		this.#element.removeEventListener("keydown", this.#onKeyDown);
 		this.#element.removeEventListener("beforeinput", this.#onBeforeInput);
+		this.#element.removeEventListener("copy", this.#onCopy);
+		this.#element.removeEventListener("cut", this.#onCut);
 		this.#element.removeEventListener("pointerdown", this.#onPointerDown);
 		this.#element.removeEventListener("pointermove", this.#onPointerMove);
 		this.#element.ownerDocument.removeEventListener("pointerup", this.#onPointerUp);
@@ -473,6 +478,73 @@ export class Editor {
 		if (event.inputType === "historyUndo") this.undo();
 		else this.redo();
 	};
+
+	// -----------------------------------------------------------------------
+	// Pano  (F2-11)
+	// -----------------------------------------------------------------------
+
+	#onCopy = (event: ClipboardEvent): void => {
+		this.#writeClipboard(event);
+	};
+
+	#onCut = (event: ClipboardEvent): void => {
+		if (this.#readOnly) return;
+		if (!this.#writeClipboard(event)) return;
+		// Kesme, kopyalamanın ardından silme. Tarayıcının kendi silmesi
+		// `preventDefault` ile durduruldu; model üzerinden yapılıyor ki
+		// bloklar arası kesme de çalışsın.
+		if (this.#selection?.kind === "block") this.#deleteSelectedBlocks();
+		else this.#deleteSelectedText();
+	};
+
+	/**
+	 * Seçimi panoya yazar; yazacak bir şey yoksa `false` döner.
+	 *
+	 * Boş seçimde hiçbir şey yapılmıyor ve olay tarayıcıya bırakılıyor —
+	 * imleçle Ctrl+C basmak bir şey kopyalamaz.
+	 */
+	#writeClipboard(event: ClipboardEvent): boolean {
+		const veri = event.clipboardData;
+		if (veri === null) return false;
+
+		if (this.#selection?.kind === "block") {
+			const secili = new Set(selectedRange(this.#selection, this.#blockOrder()));
+			const bloklar = this.#doc.children.filter((c) => secili.has(c.id as NodeId));
+			if (bloklar.length === 0) return false;
+			const yuk = blocksPayload({ type: "root", children: bloklar as Root["children"] });
+			event.preventDefault();
+			veri.setData("text/plain", yuk.text);
+			veri.setData("text/html", yuk.html);
+			return true;
+		}
+
+		const hedef = this.#rangeTarget();
+		if (hedef === null || hedef.from >= hedef.to) return false;
+		const yuk = inlinePayload(sliceInline(hedef.children, hedef.from, hedef.to));
+		event.preventDefault();
+		veri.setData("text/plain", yuk.text);
+		veri.setData("text/html", yuk.html);
+		return true;
+	}
+
+	/** Blok içi seçili aralığı siler ve imleci başına koyar. */
+	#deleteSelectedText(): void {
+		const hedef = this.#rangeTarget();
+		if (hedef === null || hedef.from >= hedef.to) return;
+
+		const dugum = nodeAt(this.#doc.children[hedef.blockIndex], hedef.path) as object;
+		const doc = replaceAt(this.#doc, [hedef.blockIndex, ...hedef.path], {
+			...dugum,
+			children: spliceInline(hedef.children, hedef.from, hedef.to, []),
+		} as never);
+
+		this.#record({ blockIndex: hedef.blockIndex, path: hedef.path, offset: hedef.from }, doc, null);
+		this.#doc = doc;
+		this.#defs = collectDefinitions(doc);
+		this.#sync();
+		this.#placeCaretAt({ blockIndex: hedef.blockIndex, path: hedef.path, offset: hedef.from });
+		this.#emit();
+	}
 
 	/** Görev listesi kutusu — içerik değil, maddenin durumu değişiyor. */
 	#onCheckbox = (event: Event): void => {

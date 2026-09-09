@@ -32,7 +32,8 @@
     "dev": "tsdown --watch"
   },
   "dependencies": {
-    "@kalem/core": "workspace:^"
+    "@kalem/core": "workspace:^",
+    "@kalem/viewer": "workspace:^"
   },
   "devDependencies": {
     "tsdown": "catalog:",

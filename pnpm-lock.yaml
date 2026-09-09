@@ -132,6 +132,9 @@ importers:
       '@kalem/core':
         specifier: workspace:^
         version: link:../core
+      '@kalem/viewer':
+        specifier: workspace:^
+        version: link:../viewer
     devDependencies:
       tsdown:
         specifier: 'catalog:'
