@@ -1,0 +1,161 @@
+/*
+ * @kalem/themes — Arayüz katmanı  (İş listesi: F3-01)
+ *
+ * `viewer.css` + `editor.css` üstüne yükleniyor. Belge tipografisi ve
+ * düzenleme davranışı oradan gelir; burada yalnızca **arayüz parçaları**
+ * var: balon araç çubuğu, menüler, tutamaçlar.
+ *
+ * ## Kapsam
+ *
+ * Yüzen parçalar `document.body` altına konuyor, editörün içine değil —
+ * `overflow: hidden` taşıyan bir kapsayıcı onları kırpardı. Bu yüzden bu
+ * dosyadaki seçiciler `.kalem-editor` altında **değil**, kendi sınıflarıyla
+ * başlıyor. Yine de her biri `kalem-` önekli, yani sayfanın geri kalanına
+ * karışmıyor.
+ *
+ * ## Değişkenler
+ *
+ * `viewer.css` `--kalem-*` değişkenlerini `.kalem-doc` üzerinde tanımlıyor;
+ * yüzen parçalar o ağacın dışında olduğu için buradaki değişkenler
+ * kendi başlarına tanımlanıyor. Aynı isimler kullanıldı: bir temayı
+ * değiştiren, ikisini birden değiştiriyor.
+ */
+
+.kalem-bubble,
+.kalem-menu {
+	--kalem-ui-bg: #ffffff;
+	--kalem-ui-fg: #22201d;
+	--kalem-ui-muted: #6f6a62;
+	--kalem-ui-border: #e3e0da;
+	--kalem-ui-accent: #0f4e4a;
+	--kalem-ui-active-fg: #ffffff;
+	--kalem-ui-shadow: 0 6px 24px rgb(34 32 29 / 14%), 0 1px 2px rgb(34 32 29 / 10%);
+	--kalem-ui-radius: 9px;
+}
+
+@media (prefers-color-scheme: dark) {
+	.kalem-bubble:not([data-theme="light"]),
+	.kalem-menu:not([data-theme="light"]) {
+		--kalem-ui-bg: #24232a;
+		--kalem-ui-fg: #e8e6e1;
+		--kalem-ui-muted: #9d978d;
+		--kalem-ui-border: #3a3844;
+		--kalem-ui-accent: #6fd3c6;
+		--kalem-ui-active-fg: #16151a;
+		--kalem-ui-shadow: 0 6px 24px rgb(0 0 0 / 45%);
+	}
+}
+
+.kalem-bubble[data-theme="dark"],
+.kalem-menu[data-theme="dark"] {
+	--kalem-ui-bg: #24232a;
+	--kalem-ui-fg: #e8e6e1;
+	--kalem-ui-muted: #9d978d;
+	--kalem-ui-border: #3a3844;
+	--kalem-ui-accent: #6fd3c6;
+	--kalem-ui-active-fg: #16151a;
+	--kalem-ui-shadow: 0 6px 24px rgb(0 0 0 / 45%);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Balon araç çubuğu                                                      */
+/* ---------------------------------------------------------------------- */
+
+.kalem-bubble {
+	/*
+	 * `z-index` yüksek ama sonsuz değil: kütüphane, gömüldüğü uygulamanın
+	 * kendi katmanlarının (modal, bildirim) üstüne çıkmamalı.
+	 */
+	z-index: 900;
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	padding: 4px;
+	background: var(--kalem-ui-bg);
+	color: var(--kalem-ui-fg);
+	border: 1px solid var(--kalem-ui-border);
+	border-radius: var(--kalem-ui-radius);
+	box-shadow: var(--kalem-ui-shadow);
+	font:
+		500 13px / 1 system-ui,
+		-apple-system,
+		"Segoe UI",
+		sans-serif;
+	/* Araç çubuğuna sürüklemek seçimi bozar; metin seçimi kapalı. */
+	user-select: none;
+}
+
+.kalem-bubble-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 28px;
+	height: 28px;
+	padding: 0 6px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+}
+
+.kalem-bubble-button:hover {
+	background: color-mix(in srgb, var(--kalem-ui-fg) 8%, transparent);
+}
+
+.kalem-bubble-button:focus-visible {
+	outline: 2px solid var(--kalem-ui-accent);
+	outline-offset: -2px;
+}
+
+/* Basılı durum `aria-pressed`ten okunuyor: görsel durum ile ekran
+   okuyucunun duyurduğu durum aynı kaynaktan geliyor, ayrışamaz. */
+.kalem-bubble-button[aria-pressed="true"] {
+	background: var(--kalem-ui-accent);
+	color: var(--kalem-ui-active-fg);
+}
+
+/* Her simge kendi yazı tipini istiyor: B kalın, I italik, S üstü çizili. */
+.kalem-bubble-button-glyph {
+	font-size: 13px;
+	line-height: 1;
+}
+.kalem-bubble-button:nth-child(1) .kalem-bubble-button-glyph {
+	font-weight: 800;
+}
+.kalem-bubble-button:nth-child(2) .kalem-bubble-button-glyph {
+	font-style: italic;
+	font-family: Georgia, "Times New Roman", serif;
+}
+.kalem-bubble-button:nth-child(3) .kalem-bubble-button-glyph {
+	text-decoration: line-through;
+}
+.kalem-bubble-button:nth-child(4) .kalem-bubble-button-glyph {
+	font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+	font-size: 11px;
+}
+
+.kalem-bubble-select {
+	height: 28px;
+	margin-left: 4px;
+	padding: 0 4px;
+	border: 1px solid var(--kalem-ui-border);
+	border-radius: 6px;
+	background: var(--kalem-ui-bg);
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+	max-width: 9em;
+}
+
+.kalem-bubble-select:focus-visible {
+	outline: 2px solid var(--kalem-ui-accent);
+	outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.kalem-bubble {
+		transition: none !important;
+	}
+}

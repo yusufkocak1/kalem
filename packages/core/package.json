@@ -13,6 +13,7 @@
   ],
   "exports": {
     ".": {
+      "kalem-source": "./src/index.ts",
       "import": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.js"
@@ -23,6 +24,7 @@
       }
     },
     "./commands": {
+      "kalem-source": "./src/commands.ts",
       "import": {
         "types": "./dist/commands.d.ts",
         "default": "./dist/commands.js"
@@ -33,6 +35,7 @@
       }
     },
     "./html": {
+      "kalem-source": "./src/html.ts",
       "import": {
         "types": "./dist/html.d.ts",
         "default": "./dist/html.js"

@@ -65,6 +65,9 @@ import {
 	selectedRange,
 } from "./selection.js";
 
+/** Editörün yayımladığı olaylar. */
+export type EditorEvent = "change" | "selectionchange";
+
 export interface EditorOptions {
 	/** Başlangıç Markdown metni. */
 	value?: string;
@@ -129,6 +132,14 @@ export class Editor {
 	/** Sürükleme blok moduna geçti mi (bkz. `#onPointerMove`). */
 	#blockDrag = false;
 	readonly #history: History;
+	/**
+	 * Olay aboneleri.
+	 *
+	 * Kurucudaki `onChange`/`onSelectionChange` seçenekleri tek dinleyici
+	 * alıyor ve editör kurulduktan **sonra** eklenemiyor. Arayüz katmanı
+	 * (`@kalem/ui`) editöre dışarıdan takılıyor, o yüzden abonelik gerekli.
+	 */
+	readonly #listeners = new Map<EditorEvent, Set<(...args: never[]) => void>>();
 	readonly #plugins: PluginRegistry;
 	/**
 	 * Tuşa basıldığı andaki imleç.
@@ -312,6 +323,81 @@ export class Editor {
 		this.#history.push({ doc, caret: before }, before, coalesceKey, Date.now());
 	}
 
+	// -----------------------------------------------------------------------
+	// Arayüz katmanına açılan yüzey  (F3-01)
+	// -----------------------------------------------------------------------
+
+	/**
+	 * Olay aboneliği; aboneliği bitiren fonksiyonu döndürür.
+	 *
+	 * Kurucudaki kancalarla aynı anda çalışıyor; ikisi de tetikleniyor.
+	 */
+	on(event: "change", handler: (value: string, doc: Root) => void): () => void;
+	on(event: "selectionchange", handler: (selection: EditorSelection) => void): () => void;
+	on(event: EditorEvent, handler: (...args: never[]) => void): () => void {
+		const küme = this.#listeners.get(event) ?? new Set();
+		küme.add(handler);
+		this.#listeners.set(event, küme);
+		return () => {
+			küme.delete(handler);
+		};
+	}
+
+	#dispatch(event: EditorEvent, ...args: unknown[]): void {
+		for (const handler of this.#listeners.get(event) ?? []) {
+			(handler as (...a: unknown[]) => void)(...args);
+		}
+	}
+
+	/** Editörün kök elemanı — arayüz katmanı buraya konumlanıyor. */
+	getElement(): HTMLElement {
+		return this.#element;
+	}
+
+	/** İmlecin model konumu; seçim tek bir taşıyıcıda değilse `null`. */
+	getCaret(): Caret | null {
+		return this.#caret();
+	}
+
+	/** Belgedeki üst düzey blokların kimlikleri, sırayla. */
+	getBlockIds(): readonly NodeId[] {
+		return this.#blockOrder();
+	}
+
+	/** Kimliğe karşılık gelen blok elemanı. */
+	getBlockElement(id: NodeId): HTMLElement | undefined {
+		return this.#elements.get(id);
+	}
+
+	/**
+	 * İmlecin bulunduğu üst düzey bloğun türü.
+	 *
+	 * Araç çubuğundaki blok türü listesi bunu okuyor. Seçim bir bloğa
+	 * düşmüyorsa `null`.
+	 */
+	getBlockType(): BlockType | null {
+		const caret = this.#caret();
+		if (caret === null) return null;
+		const blok = this.#doc.children[caret.blockIndex];
+		if (blok === undefined) return null;
+		if (blok.type === "heading") return { type: "heading", depth: blok.depth };
+		if (blok.type === "paragraph") return { type: "paragraph" };
+		if (blok.type === "blockquote") return { type: "blockquote" };
+		if (blok.type === "code") return { type: "code", lang: blok.lang };
+		return null;
+	}
+
+	/** İmlecin bulunduğu bloğu başka bir türe çevirir. */
+	setBlockType(target: BlockType): boolean {
+		const caret = this.#caret();
+		if (caret === null || this.#readOnly) return false;
+		this.#applyEdit({
+			doc: setBlockType(this.#doc, [caret.blockIndex], target),
+			caret: { blockIndex: caret.blockIndex, path: [], offset: caret.offset },
+		});
+		return true;
+	}
+
 	/** Güncel seçim — blok içi ya da bloklar arası. */
 	getSelection(): EditorSelection {
 		return this.#selection;
@@ -405,6 +491,7 @@ export class Editor {
 		for (const el of this.#elements.values()) el.removeAttribute("contenteditable");
 		this.#elements.clear();
 		this.#rendered.clear();
+		this.#listeners.clear();
 	}
 
 	// -----------------------------------------------------------------------
@@ -494,8 +581,12 @@ export class Editor {
 
 	#emit(): void {
 		const onChange = this.#options.onChange;
-		if (onChange === undefined) return;
-		onChange(serialize(this.#doc), this.#doc);
+		const aboneler = this.#listeners.get("change");
+		// Serileştirme yalnızca dinleyen varsa çalışıyor.
+		if (onChange === undefined && (aboneler === undefined || aboneler.size === 0)) return;
+		const value = serialize(this.#doc);
+		onChange?.(value, this.#doc);
+		this.#dispatch("change", value, this.#doc);
 	}
 
 	/**
@@ -651,6 +742,7 @@ export class Editor {
 		this.#selection = okunan;
 		this.#paintSelection(okunan);
 		this.#options.onSelectionChange?.(okunan);
+		this.#dispatch("selectionchange", okunan);
 	}
 
 	/**

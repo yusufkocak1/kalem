@@ -11,9 +11,10 @@
  * uygulamanın tasarımına yabancı kalırdı ya da ezilmek zorunda kalırdı.
  */
 
+export type { Caret, EditResult } from "./block-edit.js";
 export type { ClipboardPayload } from "./clipboard.js";
 export { blocksPayload, inlinePayload } from "./clipboard.js";
-export type { EditorOptions } from "./editor.js";
+export type { EditorEvent, EditorOptions } from "./editor.js";
 export { Editor } from "./editor.js";
 export type { HistoryState } from "./history.js";
 export { History } from "./history.js";

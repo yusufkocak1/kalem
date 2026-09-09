@@ -40,6 +40,12 @@
     "gzip": true
   },
   {
+    "name": "@kalem/themes/ui.css",
+    "path": "packages/themes/css/ui.css",
+    "limit": "3 kB",
+    "gzip": true
+  },
+  {
     "name": "@kalem/editor (core dahil)",
     "path": "packages/editor/dist/index.js",
     "import": "*",
@@ -48,7 +54,7 @@
   },
   {
     "name": "@kalem/editor + @kalem/ui — Word deneyimi",
-    "path": ["packages/editor/dist/index.js", "packages/ui/dist/index.js"],
+    "path": "scripts/size/word-deneyimi.js",
     "import": "*",
     "limit": "58 kB",
     "gzip": true
