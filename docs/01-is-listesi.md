@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 476/476
+> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 518/518
 
 | Faz | Görev | Durum |
 |---|---|---|
@@ -31,19 +31,19 @@
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
-| **Faz 3** — Word deneyimi | 3 / 11 | 🔵 Sürüyor |
+| **Faz 3** — Word deneyimi | 4 / 11 | 🔵 Sürüyor |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **35 / 72** | **%49** |
+| | **36 / 72** | **%50** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-13` (Faz 2 tamam)** · `F3-01` · `F3-02` · `F3-08`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-13` (Faz 2 tamam)** · `F3-01` · `F3-02` · `F3-03` · `F3-08`
 
-**Sıradaki:** `F3-03` slash menü — `/` ile blok ekleme, locale duyarlı arama.
+**Sıradaki:** `F3-04` blok sürükle-bırak — kullanıcının açıkça istediği özellik.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -66,9 +66,9 @@
 > | `@kalem/viewer` | 2.68 kB | 14 kB |
 > | `@kalem/themes/viewer.css` | 1.16 kB | 3 kB |
 > | `@kalem/themes/editor.css` | 340 B | 2 kB |
-> | `@kalem/themes/ui.css` | 1.13 kB | 3 kB |
-> | `@kalem/editor` (core + viewer dâhil) | 22.3 kB | 38 kB |
-> | `@kalem/editor` + `@kalem/ui` | 25.7 kB | 58 kB |
+> | `@kalem/themes/ui.css` | 1.35 kB | 3 kB |
+> | `@kalem/editor` (core + viewer dâhil) | 22.38 kB | 38 kB |
+> | `@kalem/editor` + `@kalem/ui` | 27.58 kB | 58 kB |
 >
 > Gerekçe ikisinde de aynı: yalnızca Markdown işleyen kullanıcı (SSR,
 > derleme betiği) editör komutlarını ve yapıştırma dönüştürücüsünü
@@ -91,8 +91,8 @@ ayrıştırıcı, serileştirici, güvenlik katmanı, komutlar, HTML dönüştü
 `@kalem/editor` — blok kapsayıcı, model↔DOM eşlemesi, satır içi geri okuma,
 iki seviyeli seçim, satır içi biçimlendirme, klavye ve blok yapısı düzenleme,
 geri al/yinele, giriş kuralları, pano, eklenti sistemi. **Faz 2 kapandı.**
-`@kalem/ui` — balon araç çubuğu, bağlantı akışı, yer tutucu.
-**909 birim testi** + **476 tarayıcı testi** (Chromium · Firefox · WebKit),
+`@kalem/ui` — balon araç çubuğu, bağlantı akışı, slash menü, yer tutucu.
+**924 birim testi** + **518 tarayıcı testi** (Chromium · Firefox · WebKit),
 axe ile WCAG 2.1 A/AA taraması ve CDP ile IME bileşimi dâhil.
 `parse(md)` ↔ `serialize(ast)` gidiş-dönüş 17/17 byte-birebir;
 `renderToDOM` ↔ `renderToString` üç motorda byte-birebir.
@@ -863,13 +863,50 @@ Link ekleme popover'ı ✅, URL doğrulama ✅, mevcut linki düzenle/kaldır �
 > *(Yapıştırma testi Firefox'ta atlanıyor: sentetik `paste` olayında
 > `clipboardData` okutulmuyor — F2-11'deki kopyalama kısıtının eşi.)*
 
-### F3-03 · Slash menü `[L]` ⬜
-`/` yazınca açılan blok ekleme menüsü
-- Aranabilir liste, klavye ile gezinme, ikonlar, kategori grupları, i18n'e hazır etiketler
-- Eklentiler bu menüye öğe ekleyebilmeli
-- Arama, editörün `lang`'ine göre locale duyarlı karşılaştırma yapar
-- **Kabul:** `/bas` yazınca "Başlık 1" filtreleniyor, Enter ile ekleniyor
-- **Kabul (locale):** `lang="tr"` iken `/ba**ş**` ve `/BAŞ` aynı sonucu veriyor; `/ıst` ile "İstatistik" gibi bir öğe eşleşiyor
+### F3-03 · Slash menü `[L]` ✅
+`/` yazınca açılan blok ekleme menüsü ✅
+- Aranabilir liste ✅, klavye ile gezinme ✅, ikonlar ✅, kategori grupları ✅, i18n'e hazır etiketler ✅
+- Eklentiler bu menüye öğe ekleyebilmeli ✅
+- Arama, editörün `lang`'ine göre locale duyarlı karşılaştırma yapar ✅
+- **Kabul:** `/bas` yazınca "Başlık 1" filtreleniyor ✅, Enter ile ekleniyor ✅
+- **Kabul (locale):** `lang="tr"` iken `/ba**ş**` ve `/BAŞ` aynı sonucu veriyor ✅; `/ıst` ile "İstatistik" gibi bir öğe eşleşiyor ✅
+
+> **Locale kriteri iki ayrı iş gerektirdi**, ikisi de sıradan
+> `toLowerCase()` ile yanlış sonuç veriyor:
+> 1. **Büyük/küçük katlaması.** `"BAŞLIK".toLowerCase()` → `"başlik"`;
+>    doğrusu `"başlık"`. `toLocaleLowerCase("tr")` noktalı/noktasız i
+>    ayrımını biliyor.
+> 2. **Aksan katlaması.** `/bas` yazan kullanıcı "Başlık"ı bulmalı.
+>
+> **Noktasız `ı` ayrıca eşlendi:** o bir aksanlı harf değil, ayrı bir
+> harf — Unicode ayrıştırması onu `i`ye indirmiyor. `/ıst` ile
+> "İstatistik" kriterinin sınadığı şey tam olarak bu: `İ` katlanınca `i`
+> oluyor, `ı` de eşlenmezse ikisi buluşmuyor. Toplam 10 satır; en küçük
+> hazır alternatif ~8 kB.
+>
+> **Yazılan `/sorgu` metni gerçekten belgede kalıyor.** Ayrı bir kutuda
+> toplamak, bileşimli yazımı (IME) ve imleç davranışını yeniden yazmak
+> demekti. Öğe seçilince metnin silinmesi ve blok dönüşümü **tek bir
+> düzenleme**: tek Ctrl+Z hepsini geri alıyor.
+>
+> **`/` yalnızca kelime başında açıyor** — `and/or` yazan kullanıcının
+> karşısına menü çıkmamalı.
+>
+> **Odak editörde kalıyor**, menüye taşınmıyor: kullanıcı yazmaya devam
+> ediyor ve seçili öğe `aria-activedescendant` ile duyuruluyor.
+>
+> **İki gerçek hata çıktı:**
+> 1. **Editör `event.defaultPrevented`'ı yok sayıyordu.** `preventDefault()`
+>    yayılmayı durdurmuyor; menünün yakaladığı Enter hem öğe seçiyor **hem
+>    de** bloğu bölüyordu, ayrıca tek Ctrl+Z'yi bozuyordu. Dışarıdan gelen
+>    hiçbir işleyici tuşu gerçekten tüketemiyordu — kütüphaneyi kullanan
+>    herkesi etkileyecek bir hata.
+> 2. Menü, yoldaki düğümün yalnızca `children` alanını okuyordu; ondan
+>    kurulan yeni düğüm `type`'ı kaybediyor ve "Madde imli liste" sessizce
+>    hiçbir şey yapmıyordu. Başlıklar çalışıyordu çünkü `setBlockType` türü
+>    kendisi yazıyor.
+>
+> Testler: 15 birim (arama katlaması) + 13 tarayıcı testi × 3 motor.
 
 ### F3-04 · Blok drag handle + sürükle-bırak ⭐ `[L]` ⬜
 Kullanıcının açıkça istediği özellik.

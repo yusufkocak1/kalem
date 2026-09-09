@@ -19,6 +19,8 @@ import { labelsFor } from "./labels.js";
 import type { LinkPopover } from "./link-popover.js";
 import { createLinkPopover, normalizeUrl } from "./link-popover.js";
 import { createPlaceholder } from "./placeholder.js";
+import type { SlashItem, SlashMenu } from "./slash-menu.js";
+import { createSlashMenu } from "./slash-menu.js";
 
 export interface UiOptions {
 	/**
@@ -50,6 +52,24 @@ export interface UiOptions {
 	 * Kapatmak için `false`; metni değiştirmek için `labels.placeholder`.
 	 */
 	readonly placeholder?: boolean;
+	/**
+	 * Slash menü (varsayılan açık).
+	 *
+	 * Segment A için "ne ekleyebilirim" sorusunun tek görünür cevabı:
+	 * kısayolları bilmeyen kullanıcı Ctrl+Alt+2'yi keşfetmiyor ama `/`
+	 * yazmayı bir kez öğreniyor.
+	 */
+	readonly slashMenu?: boolean;
+	/** Slash menüye eklenen öğeler (eklentiler için). */
+	readonly slashItems?: readonly SlashItem[];
+	/**
+	 * Arama karşılaştırmasının dili.
+	 *
+	 * Verilmezse belgenin `lang`i kullanılıyor. Türkçe'de büyük/küçük
+	 * katlaması noktalı/noktasız i yüzünden farklı çalışıyor; ayrıntı
+	 * `search.ts` içinde.
+	 */
+	readonly locale?: string;
 }
 
 export interface Ui {
@@ -57,6 +77,8 @@ export interface Ui {
 	readonly bubbleToolbar: BubbleToolbar | null;
 	/** Bağlantı popover'ı — kapalıysa `null`. */
 	readonly linkPopover: LinkPopover | null;
+	/** Slash menü — kapalıysa `null`. */
+	readonly slashMenu: SlashMenu | null;
 	readonly labels: UiLabels;
 	destroy(): void;
 }
@@ -64,7 +86,9 @@ export interface Ui {
 export function mountUi(editor: Editor, options: UiOptions = {}): Ui {
 	const element = editor.getElement();
 	const prefix = options.classPrefix ?? "kalem-";
-	const labels = options.labels ?? labelsFor(element.closest("[lang]")?.getAttribute("lang"));
+	const belgeDili = element.closest("[lang]")?.getAttribute("lang") ?? "en";
+	const labels = options.labels ?? labelsFor(belgeDili);
+	const locale = options.locale ?? belgeDili;
 	const sokucular: (() => void)[] = [];
 
 	element.classList.add(`${prefix}ui`);
@@ -125,6 +149,17 @@ export function mountUi(editor: Editor, options: UiOptions = {}): Ui {
 		sokucular.push(() => element.removeEventListener("paste", yapistir));
 	}
 
+	let slashMenu: SlashMenu | null = null;
+	if (options.slashMenu !== false) {
+		slashMenu = createSlashMenu(editor, {
+			prefix,
+			labels,
+			locale,
+			extraItems: options.slashItems ?? [],
+		});
+		sokucular.push(() => slashMenu?.destroy());
+	}
+
 	let bubbleToolbar: BubbleToolbar | null = null;
 	if (options.bubbleToolbar !== false) {
 		bubbleToolbar = createBubbleToolbar(editor, {
@@ -143,6 +178,7 @@ export function mountUi(editor: Editor, options: UiOptions = {}): Ui {
 	return {
 		bubbleToolbar,
 		linkPopover,
+		slashMenu,
 		labels,
 		destroy() {
 			for (const sok of sokucular.reverse()) sok();

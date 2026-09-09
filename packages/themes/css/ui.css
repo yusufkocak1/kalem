@@ -280,3 +280,78 @@
 .kalem-editor.kalem-empty > p:first-child > br:only-child {
 	display: none;
 }
+
+/* ---------------------------------------------------------------------- */
+/* Slash menü  (F3-03)                                                    */
+/* ---------------------------------------------------------------------- */
+
+.kalem-slash {
+	width: 16rem;
+	max-width: calc(100vw - 16px);
+	padding: 4px;
+	overflow: hidden;
+}
+
+.kalem-slash-list {
+	/*
+	 * Liste kaydırmalı: on beş öğe bir ekrana sığmıyor ve menünün kendisi
+	 * büyüyüp görünür alanı doldurmamalı.
+	 */
+	max-height: 17rem;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+
+.kalem-slash-group {
+	padding: 6px 8px 3px;
+	color: var(--kalem-ui-muted);
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+}
+
+.kalem-slash-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 5px 8px;
+	border-radius: 6px;
+	cursor: pointer;
+}
+
+/*
+ * Seçili öğe `aria-selected`ten okunuyor: görsel durum ile ekran
+ * okuyucunun duyurduğu durum aynı kaynaktan geliyor, ayrışamaz.
+ */
+.kalem-slash-item[aria-selected="true"] {
+	background: var(--kalem-ui-accent);
+	color: var(--kalem-ui-active-fg);
+}
+
+.kalem-slash-glyph {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.6em;
+	height: 1.6em;
+	border-radius: 4px;
+	background: color-mix(in srgb, currentcolor 12%, transparent);
+	font-size: 11px;
+	font-weight: 600;
+}
+
+.kalem-slash-label {
+	flex: 1;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.kalem-slash-empty {
+	padding: 10px 8px;
+	color: var(--kalem-ui-muted);
+}
+
+.kalem-slash-empty[hidden] {
+	display: none;
+}

@@ -12,6 +12,17 @@
  */
 
 export type { Caret, EditResult } from "./block-edit.js";
+export {
+	indentItem,
+	insertBreak,
+	mergeWithNext,
+	mergeWithPrevious,
+	newParagraph,
+	normalizeDocument,
+	outdentItem,
+	splitAtCaret,
+	toggleList,
+} from "./block-edit.js";
 export type { ClipboardPayload } from "./clipboard.js";
 export { blocksPayload, inlinePayload } from "./clipboard.js";
 export type { EditorEvent, EditorOptions } from "./editor.js";

@@ -18,5 +18,8 @@ export type { LinkPopover, LinkPopoverOptions } from "./link-popover.js";
 export { createLinkPopover, normalizeUrl } from "./link-popover.js";
 export type { Placeholder, PlaceholderOptions } from "./placeholder.js";
 export { createPlaceholder } from "./placeholder.js";
+export { foldForSearch, matches, score } from "./search.js";
+export type { SlashItem, SlashMenu, SlashMenuOptions } from "./slash-menu.js";
+export { createSlashMenu } from "./slash-menu.js";
 export type { Ui, UiOptions } from "./ui.js";
 export { mountUi } from "./ui.js";

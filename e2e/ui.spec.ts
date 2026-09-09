@@ -17,7 +17,11 @@ declare global {
 				getValue(): string;
 				setReadOnly(v: boolean): void;
 			};
-			ui: { destroy(): void; labels: Record<string, string> };
+			ui: {
+				destroy(): void;
+				labels: Record<string, string>;
+				slashMenu: { register(item: unknown): void } | null;
+			};
 		};
 	}
 }
@@ -379,5 +383,141 @@ test.describe("yer tutucu", () => {
 		await page.locator("#editor > p").click();
 		await page.keyboard.type("x");
 		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("x");
+	});
+});
+
+/**
+ * Slash menü  (İş listesi: F3-03)
+ *
+ * Arama katlamasının saf kısmı birim testinde (`search.test.ts`);
+ * buradaki testler `/` yazmaktan bloğun dönüşmesine kadar olan zinciri
+ * ölçüyor.
+ */
+const SLASH = ".kalem-slash";
+
+test.describe("slash menü", () => {
+	async function bosBlok(page: import("@playwright/test").Page) {
+		await page.evaluate(() => window.kalem.editor.setValue(""));
+		await page.locator("#editor > p").first().click();
+	}
+
+	test("`/` yazınca açılıyor", async ({ page }) => {
+		await bosBlok(page);
+		await page.keyboard.type("/");
+		await expect(page.locator(SLASH)).toBeVisible();
+		await expect(page.locator(".kalem-slash-item")).not.toHaveCount(0);
+	});
+
+	/** `and/or` yazan kullanıcının karşısına menü çıkmamalı. */
+	test("kelime ortasındaki `/` açmıyor", async ({ page }) => {
+		await bosBlok(page);
+		await page.keyboard.type("and/");
+		await expect(page.locator(SLASH)).toBeHidden();
+	});
+
+	/** F3-03'ün kabul kriteri. */
+	test("`/bas` yazınca Başlık 1 filtreleniyor", async ({ page }) => {
+		await bosBlok(page);
+		await page.keyboard.type("/bas");
+		await expect(page.locator(".kalem-slash-item").first()).toContainText("Başlık 1");
+	});
+
+	/** F3-03 locale kriteri: `/baş` ve `/BAŞ` aynı sonucu veriyor. */
+	test("büyük ve küçük sorgu aynı sonucu veriyor", async ({ page }) => {
+		await bosBlok(page);
+		await page.keyboard.type("/baş");
+		const kucuk = await page.locator(".kalem-slash-item").allTextContents();
+		await page.keyboard.press("ControlOrMeta+a");
+		await page.keyboard.type("/BAŞ");
+		const buyuk = await page.locator(".kalem-slash-item").allTextContents();
+		expect(buyuk).toEqual(kucuk);
+	});
+
+	test("Enter ile öğe ekleniyor ve `/sorgu` metni siliniyor", async ({ page }) => {
+		await bosBlok(page);
+		await page.keyboard.type("/bas");
+		await page.keyboard.press("Enter");
+		await expect(page.locator("#editor > h1")).toHaveCount(1);
+		// `/bas` metni belgede kalmamalı.
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).not.toContain("/bas");
+	});
+
+	test("seçilen öğeden sonra yazmaya devam edilebiliyor", async ({ page }) => {
+		await bosBlok(page);
+		await page.keyboard.type("/bas");
+		await page.keyboard.press("Enter");
+		await page.keyboard.type("Işık");
+		await expect(page.locator("#editor > h1")).toHaveText("Işık");
+	});
+
+	/** Tek Ctrl+Z hem metni hem dönüşümü geri almalı. */
+	test("tek Ctrl+Z ekleme işlemini geri alıyor", async ({ page }) => {
+		await bosBlok(page);
+		await page.keyboard.type("/bas");
+		await page.keyboard.press("Enter");
+		await expect(page.locator("#editor > h1")).toHaveCount(1);
+		await page.keyboard.press("ControlOrMeta+z");
+		await expect(page.locator("#editor > h1")).toHaveCount(0);
+	});
+
+	test("ok tuşlarıyla seçim değişiyor", async ({ page }) => {
+		await bosBlok(page);
+		await page.keyboard.type("/");
+		const ilk = await page.locator('.kalem-slash-item[aria-selected="true"]').textContent();
+		await page.keyboard.press("ArrowDown");
+		const ikinci = await page.locator('.kalem-slash-item[aria-selected="true"]').textContent();
+		expect(ikinci).not.toBe(ilk);
+	});
+
+	test("Escape kapatıyor, metin kalıyor", async ({ page }) => {
+		await bosBlok(page);
+		await page.keyboard.type("/bas");
+		await page.keyboard.press("Escape");
+		await expect(page.locator(SLASH)).toBeHidden();
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toContain("/bas");
+	});
+
+	test("boşluk yazınca kapanıyor", async ({ page }) => {
+		await bosBlok(page);
+		await page.keyboard.type("/bas ");
+		await expect(page.locator(SLASH)).toBeHidden();
+	});
+
+	test("eşleşme yoksa boş durum gösteriliyor", async ({ page }) => {
+		await bosBlok(page);
+		await page.keyboard.type("/zzzz");
+		await expect(page.locator(".kalem-slash-empty")).toBeVisible();
+	});
+
+	test("liste öğesi de eklenebiliyor", async ({ page }) => {
+		await bosBlok(page);
+		await page.keyboard.type("/madde");
+		await page.keyboard.press("Enter");
+		await page.keyboard.type("bir");
+		await expect(page.locator("#cikti")).toHaveText("- bir");
+	});
+
+	test("listbox olarak duyuruluyor", async ({ page }) => {
+		await bosBlok(page);
+		await page.keyboard.type("/");
+		await expect(page.locator(".kalem-slash-list")).toHaveAttribute("role", "listbox");
+		// Odak editörde kalıyor; seçili öğe `aria-activedescendant` ile bildiriliyor.
+		await expect(page.locator("#editor")).toHaveAttribute("aria-activedescendant", /kalem-slash-/);
+	});
+
+	test("eklentiler menüye öğe ekleyebiliyor", async ({ page }) => {
+		await page.evaluate(() => {
+			window.kalem.ui.slashMenu?.register({
+				id: "test-oge",
+				label: "İstatistik",
+				group: "Test",
+				glyph: "Σ",
+				apply: (doc: unknown, caret: unknown) => ({ doc, caret }),
+			});
+		});
+		await bosBlok(page);
+		// F3-03 locale kriteri: `/ıst` ile "İstatistik" eşleşiyor.
+		await page.keyboard.type("/ıst");
+		await expect(page.locator(".kalem-slash-item").first()).toContainText("İstatistik");
 	});
 });

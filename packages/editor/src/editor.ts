@@ -899,6 +899,14 @@ export class Editor {
 	 */
 	#onKeyDown = (event: KeyboardEvent): void => {
 		if (this.#readOnly) return;
+		// Dışarıdan bir işleyici tuşu zaten tükettiyse editör ona dokunmuyor.
+		//
+		// `preventDefault()` yayılmayı durdurmuyor, yalnızca varsayılan
+		// davranışı iptal ediyor. Bu kontrol olmadan arayüz katmanının
+		// yakaladığı Enter hem menüde öğe seçiyor **hem de** bloğu bölüyordu —
+		// slash menü yazılırken tam olarak bu oldu ve tek Ctrl+Z'yi de
+		// bozuyordu.
+		if (event.defaultPrevented) return;
 		// Tarayıcı henüz hiçbir şeye dokunmadı; geri almanın döneceği yer bu.
 		this.#caretBeforeKey = this.#caret();
 
