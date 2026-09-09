@@ -36,6 +36,8 @@ import {
 	splitAtCaret,
 	toggleList,
 } from "./block-edit.js";
+import type { HistoryState } from "./history.js";
+import { History } from "./history.js";
 import { assignIds, newId } from "./ids.js";
 import { applyLink, applyMark, markActive } from "./inline-edit.js";
 import { contentLength, offsetOf, selectRange } from "./offsets.js";
@@ -104,6 +106,14 @@ export class Editor {
 	#dragAnchor: NodeId | null = null;
 	/** Sürükleme blok moduna geçti mi (bkz. `#onPointerMove`). */
 	#blockDrag = false;
+	readonly #history: History;
+	/**
+	 * Tuşa basıldığı andaki imleç.
+	 *
+	 * Geri alma "değişiklikten önceki" konuma dönmeli; o konum ancak
+	 * tarayıcı DOM'a dokunmadan **önce** okunabiliyor.
+	 */
+	#caretBeforeKey: Caret | null = null;
 
 	constructor(element: HTMLElement, options: EditorOptions = {}) {
 		this.#element = element;
@@ -113,6 +123,7 @@ export class Editor {
 
 		this.#doc = this.#load(options.value ?? "");
 		this.#defs = collectDefinitions(this.#doc);
+		this.#history = new History({ doc: this.#doc, caret: null });
 
 		element.classList.add(`${this.#prefix}editor`, `${this.#prefix}doc`);
 		element.setAttribute("role", "textbox");
@@ -122,6 +133,7 @@ export class Editor {
 		element.addEventListener("input", this.#onInput);
 		element.addEventListener("change", this.#onCheckbox);
 		element.addEventListener("keydown", this.#onKeyDown);
+		element.addEventListener("beforeinput", this.#onBeforeInput);
 		element.addEventListener("pointerdown", this.#onPointerDown);
 		element.addEventListener("pointermove", this.#onPointerMove);
 		element.ownerDocument.addEventListener("pointerup", this.#onPointerUp);
@@ -153,7 +165,14 @@ export class Editor {
 	 * çağrılmamalı — `setValue` "başka bir belge aç" demek.
 	 */
 	setValue(markdown: string): void {
-		this.#replaceDocument(this.#load(markdown));
+		const doc = this.#load(markdown);
+		// Başka bir belge açmak geçmişi de sıfırlar: önceki belgenin
+		// adımlarına geri dönmek anlamsız ve tehlikeli olurdu.
+		this.#doc = doc;
+		this.#defs = collectDefinitions(doc);
+		this.#history.reset({ doc, caret: null });
+		this.#sync();
+		this.#emit();
 	}
 
 	/** Markdown'ı düzenlenebilir bir belgeye çevirir. */
@@ -168,6 +187,49 @@ export class Editor {
 
 	isReadOnly(): boolean {
 		return this.#readOnly;
+	}
+
+	// -----------------------------------------------------------------------
+	// Geçmiş  (F2-09)
+	// -----------------------------------------------------------------------
+
+	/** Son adımı geri alır. */
+	undo(): boolean {
+		return this.#travel(this.#history.undo());
+	}
+
+	/** Geri alınan adımı yineler. */
+	redo(): boolean {
+		return this.#travel(this.#history.redo());
+	}
+
+	canUndo(): boolean {
+		return this.#history.canUndo;
+	}
+
+	canRedo(): boolean {
+		return this.#history.canRedo;
+	}
+
+	#travel(durum: HistoryState | null): boolean {
+		if (durum === null || this.#readOnly) return false;
+		this.#doc = durum.doc;
+		this.#defs = collectDefinitions(durum.doc);
+		this.#selection = null;
+		this.#sync();
+		if (durum.caret !== null) this.#placeCaretAt(durum.caret);
+		this.#emit();
+		return true;
+	}
+
+	/**
+	 * Yeni durumu geçmişe yazar.
+	 *
+	 * Kaydedilen imleç **değişiklikten önceki** konum: geri alan kullanıcı
+	 * o adımı yaptığı yere dönmeli.
+	 */
+	#record(before: Caret | null, doc: Root, coalesceKey: string | null): void {
+		this.#history.push({ doc, caret: before }, before, coalesceKey, Date.now());
 	}
 
 	/** Güncel seçim — blok içi ya da bloklar arası. */
@@ -247,6 +309,7 @@ export class Editor {
 		this.#element.removeEventListener("input", this.#onInput);
 		this.#element.removeEventListener("change", this.#onCheckbox);
 		this.#element.removeEventListener("keydown", this.#onKeyDown);
+		this.#element.removeEventListener("beforeinput", this.#onBeforeInput);
 		this.#element.removeEventListener("pointerdown", this.#onPointerDown);
 		this.#element.removeEventListener("pointermove", this.#onPointerMove);
 		this.#element.ownerDocument.removeEventListener("pointerup", this.#onPointerUp);
@@ -273,6 +336,7 @@ export class Editor {
 	}
 
 	#replaceDocument(doc: Root): void {
+		this.#record(this.#caret(), doc, null);
 		this.#doc = doc;
 		this.#defs = collectDefinitions(doc);
 		this.#sync();
@@ -359,6 +423,24 @@ export class Editor {
 		const blockElement = active?.closest?.(`[${ID_ATTR}]`);
 		if (!(blockElement instanceof HTMLElement)) return;
 		this.#syncFromDom(blockElement);
+	};
+
+	/**
+	 * Tarayıcının kendi geri alma yığınını devre dışı bırakır.
+	 *
+	 * `contenteditable` her tarayıcıda kendi geçmişini tutuyor ve o geçmiş
+	 * bizim modelimizden habersiz: kullanıcı Ctrl+Z'ye bastığında tarayıcı
+	 * DOM'u eski hâline döndürüp modeli olduğu yerde bırakabiliyor, ikisi
+	 * ayrışıyor. Menüden ya da dokunmatik jestle gelen geri alma da
+	 * `beforeinput` üzerinden geçiyor — klavye kısayolunu engellemek tek
+	 * başına yetmez.
+	 */
+	#onBeforeInput = (event: InputEvent): void => {
+		if (event.inputType !== "historyUndo" && event.inputType !== "historyRedo") return;
+		event.preventDefault();
+		if (this.#readOnly) return;
+		if (event.inputType === "historyUndo") this.undo();
+		else this.redo();
 	};
 
 	/** Görev listesi kutusu — içerik değil, maddenin durumu değişiyor. */
@@ -513,6 +595,8 @@ export class Editor {
 	 */
 	#onKeyDown = (event: KeyboardEvent): void => {
 		if (this.#readOnly) return;
+		// Tarayıcı henüz hiçbir şeye dokunmadı; geri almanın döneceği yer bu.
+		this.#caretBeforeKey = this.#caret();
 
 		if (this.#selection?.kind === "block") {
 			if (event.key !== "Backspace" && event.key !== "Delete") return;
@@ -665,6 +749,19 @@ export class Editor {
 		// kalem-locale-ok: tuş adları ASCII; Türkçe kuralı burada zarar verir
 		const tus = event.key.toLowerCase();
 
+		if (tus === "z") {
+			event.preventDefault();
+			// Ctrl+Shift+Z, Ctrl+Y'nin yaygın ikizi.
+			if (event.shiftKey) this.redo();
+			else this.undo();
+			return;
+		}
+		if (tus === "y") {
+			event.preventDefault();
+			this.redo();
+			return;
+		}
+
 		if (tus === "u") {
 			event.preventDefault();
 			return;
@@ -784,6 +881,7 @@ export class Editor {
 		// seçim henüz kurulmamışken çağrılırdı; o anda `isMarkActive`
 		// sorulunca cevap yanlış çıkıyordu (demo düğmeleri bunu yakaladı).
 		// Dinleyici her zaman tutarlı bir durum görmeli.
+		this.#record({ blockIndex: hedef.blockIndex, path: hedef.path, offset: hedef.from }, doc, null);
 		this.#doc = doc;
 		this.#defs = collectDefinitions(doc);
 		this.#sync();
@@ -833,6 +931,7 @@ export class Editor {
 		const deger = dugum.value.slice(0, bas) + metin + dugum.value.slice(bit);
 
 		const doc = replaceAt(this.#doc, [blockIndex, ...path], { ...dugum, value: deger } as never);
+		this.#record({ blockIndex, path, offset: bas }, doc, null);
 		this.#doc = doc;
 		this.#defs = collectDefinitions(doc);
 		this.#sync();
@@ -909,6 +1008,9 @@ export class Editor {
 	#applyEdit(sonuc: EditResult | null): void {
 		if (sonuc === null) return;
 		const doc = assignIds(sonuc.doc);
+		// Yapısal değişiklikler hiç gruplanmıyor: Enter, silme ve girinti
+		// kullanıcının kafasında ayrı birer adım.
+		this.#record(this.#caret(), doc, null);
 		this.#doc = doc;
 		this.#defs = collectDefinitions(doc);
 		this.#sync();
@@ -968,10 +1070,15 @@ export class Editor {
 
 		if (!degisti) return;
 
+		// Yazma değişiklikleri blok başına gruplanıyor: harf harf geri alma
+		// kimsenin istediği şey değil.
+		const id = blockElement.getAttribute(ID_ATTR) as string;
+		// Tuşa basılmadan önceki imleç: geri alan kullanıcı yazmaya
+		// **başladığı** yere dönmeli.
+		this.#record(this.#caretBeforeKey, doc, `type:${id}`);
 		this.#doc = doc;
 		this.#defs = collectDefinitions(doc);
 		// DOM zaten doğru: yeni düğümü "basılmış" say, yeniden kurma.
-		const id = blockElement.getAttribute(ID_ATTR) as string;
 		this.#rendered.set(id, doc.children[blockIndex] as TopNode);
 		this.#emit();
 	}

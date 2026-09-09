@@ -23,28 +23,28 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 258/258
+> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 291/291
 
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
-| **Faz 2** — Viewer + başsız editör | 8 / 13 | 🔵 2B sürüyor |
+| **Faz 2** — Viewer + başsız editör | 9 / 13 | 🔵 2B sürüyor |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **27 / 72** | **%38** |
+| | **28 / 72** | **%39** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-04` (2A tamam)** · `F2-05` … `F2-08`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-04` (2A tamam)** · `F2-05` … `F2-09`
 
-**Sıradaki:** `F2-09` geçmiş (undo/redo) — işlem tabanlı yığın, tarayıcının
-kendi geri almasıyla çakışmayı engelleme.
+**Sıradaki:** `F2-10` giriş kuralları — `# ` yazınca başlık, `- ` yazınca
+liste; yazarken otomatik dönüşüm.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -67,7 +67,7 @@ kendi geri almasıyla çakışmayı engelleme.
 > | `@kalem/viewer` | 2.68 kB | 14 kB |
 > | `@kalem/themes/viewer.css` | 1.16 kB | 3 kB |
 > | `@kalem/themes/editor.css` | 340 B | 2 kB |
-> | `@kalem/editor` (core dâhil) | 18.19 kB | 38 kB |
+> | `@kalem/editor` (core dâhil) | 18.7 kB | 38 kB |
 >
 > Gerekçe ikisinde de aynı: yalnızca Markdown işleyen kullanıcı (SSR,
 > derleme betiği) editör komutlarını ve yapıştırma dönüştürücüsünü
@@ -88,8 +88,9 @@ ayrıştırıcı, serileştirici, güvenlik katmanı, komutlar, HTML dönüştü
 `@kalem/viewer` — render planı, `renderToDOM`, `renderToString`.
 `@kalem/themes` — görüntüleyici ve editör stilleri (saf CSS).
 `@kalem/editor` — blok kapsayıcı, model↔DOM eşlemesi, satır içi geri okuma,
-iki seviyeli seçim, satır içi biçimlendirme, klavye ve blok yapısı düzenleme.
-**824 birim testi** + **258 tarayıcı testi** (Chromium · Firefox · WebKit),
+iki seviyeli seçim, satır içi biçimlendirme, klavye ve blok yapısı düzenleme,
+geri al/yinele.
+**837 birim testi** + **291 tarayıcı testi** (Chromium · Firefox · WebKit),
 axe ile WCAG 2.1 A/AA taraması dâhil.
 `parse(md)` ↔ `serialize(ast)` gidiş-dönüş 17/17 byte-birebir;
 `renderToDOM` ↔ `renderToString` üç motorda byte-birebir.
@@ -628,12 +629,40 @@ Blok içi `strong`/`emphasis`/`delete`/`inlineCode`/`link` uygulama ve kaldırma
 > Testler: 26 birim (saf model işlemleri) + 17 tarayıcı testi × 3 motor,
 > sonuncusu baştan sona klavyeyle bir belge yazıyor.
 
-### F2-09 · Geçmiş (undo/redo) `[L]` ⬜
-- İşlem tabanlı (transaction) geçmiş yığını; her komut tersine çevrilebilir bir işlem üretir
-- **Kritik:** tarayıcının kendi undo'sunu devre dışı bırak, çakışmayı engelle
-- Yazma işlemlerinde akıllı gruplama (harf harf undo olmasın)
-- Geçmişte seçim durumunu da sakla ve geri yükle
-- **Kabul:** 50 adımlık karmaşık düzenleme dizisi doğru geri alınıyor
+### F2-09 · Geçmiş (undo/redo) `[L]` ✅
+- İşlem tabanlı (transaction) geçmiş yığını; her komut tersine çevrilebilir bir işlem üretir ✅ *(anlık görüntü olarak — aşağıya bakın)*
+- **Kritik:** tarayıcının kendi undo'sunu devre dışı bırak, çakışmayı engelle ✅
+- Yazma işlemlerinde akıllı gruplama (harf harf undo olmasın) ✅
+- Geçmişte seçim durumunu da sakla ve geri yükle ✅
+- **Kabul:** 50 adımlık karmaşık düzenleme dizisi doğru geri alınıyor ✅
+
+> **Ters işlem yerine anlık görüntü.** Plan "her komut tersine çevrilebilir
+> bir işlem üretir" diyordu; uygulama daha basit bir yoldan aynı sonucu
+> veriyor ve gerekçesi şu: `@kalem/core`'un düzenleme işlemleri değişmez ve
+> **yapısal paylaşımlı** (F1-02), yani bir anlık görüntü tüm belgeyi
+> kopyalamıyor — yalnızca değişen yoldaki ataları. Bir geçmiş kaydı
+> pratikte tek bir kök referansı.
+>
+> Ters işlem yaklaşımının bedeli, her yeni komutun ayrıca tersini yazmak
+> zorunda olması ve o terslerin zamanla sessizce yanlışlanmasıydı. Bu, F1-02'de
+> *"geri al/yinele anlık görüntüleri bir kök referansına iner"* diye yazılan
+> gerekçenin karşılığını aldığı yer.
+>
+> **Tarayıcının kendi geçmişi iki yerden kapatılıyor:** Ctrl+Z/Y kısayolu
+> **ve** `beforeinput`'un `historyUndo`/`historyRedo` türü. İkincisi şart:
+> menüden ya da dokunmatik jestle gelen geri alma klavyeden geçmiyor ve
+> engellenmezse tarayıcı DOM'u eski hâline döndürüp modeli olduğu yerde
+> bırakıyor — ikisi ayrışıyor.
+>
+> **Bir tasarım hatası test sırasında çıktı:** kayıtta "değişiklikten
+> **sonraki**" imleç tutuluyordu. İlk kaydın imleci hiç dolmadığı için geri
+> alan kullanıcı bloğun başına düşüyor ve yazmaya oradan devam ediyordu.
+> Doğrusu "değişiklikten **önceki**" imleci, terk edilen kayda yazmak;
+> o konum da ancak tarayıcı DOM'a dokunmadan önce (`keydown` anında)
+> okunabiliyor.
+>
+> Testler: 13 birim (gruplama zamanı dışarıdan veriliyor, `Date.now()`'a
+> bağlı kırılgan test yok) + 11 tarayıcı testi × 3 motor.
 
 ### F2-10 · Giriş kuralları (input rules) `[M]` ⬜
 Yazarken otomatik dönüşüm: `# ` → başlık, `- ` / `* ` → liste, `1. ` → sıralı liste, `> ` → alıntı, ` ``` ` → kod bloğu, `---` → yatay çizgi, `**x**` → kalın, `` `x` `` → kod

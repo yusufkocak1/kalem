@@ -22,6 +22,10 @@ declare global {
 				isMarkActive(mark: string): boolean;
 				setLink(url: string): boolean;
 				setReadOnly(readOnly: boolean): void;
+				undo(): boolean;
+				redo(): boolean;
+				canUndo(): boolean;
+				canRedo(): boolean;
 				destroy(): void;
 			};
 		};
@@ -632,5 +636,113 @@ test.describe("klavye", () => {
 		expect(value).toContain("- bir");
 		expect(value).toContain("  - iki");
 		expect(value).toContain("Son paragraf.");
+	});
+});
+
+/**
+ * Geçmiş — geri al / yinele  (İş listesi: F2-09)
+ *
+ * Yığının kendisi birim testinde (`history.test.ts`). Buradaki testler
+ * tarayıcı tarafını ölçüyor: kısayolların bağlanması, imlecin geri
+ * gelmesi ve **tarayıcının kendi geri almasının** devre dışı kaldığı.
+ */
+test.describe("geçmiş", () => {
+	async function tekBlok(page: import("@playwright/test").Page, metin: string) {
+		await page.evaluate((m) => window.kalem.editor.setValue(`${m}\n`), metin);
+		await page.locator("#editor > p").first().click();
+		await page.keyboard.press("ControlOrMeta+End");
+	}
+
+	test("Ctrl+Z yazılanı geri alıyor", async ({ page }) => {
+		await tekBlok(page, "abc");
+		await page.keyboard.type("def");
+		await expect(page.locator("#cikti")).toHaveText("abcdef\n");
+		await page.keyboard.press("ControlOrMeta+z");
+		await expect(page.locator("#cikti")).toHaveText("abc\n");
+	});
+
+	test("Ctrl+Y geri alınanı yineliyor", async ({ page }) => {
+		await tekBlok(page, "abc");
+		await page.keyboard.type("def");
+		await page.keyboard.press("ControlOrMeta+z");
+		await page.keyboard.press("ControlOrMeta+y");
+		await expect(page.locator("#cikti")).toHaveText("abcdef\n");
+	});
+
+	test("Ctrl+Shift+Z de yineliyor", async ({ page }) => {
+		await tekBlok(page, "abc");
+		await page.keyboard.type("def");
+		await page.keyboard.press("ControlOrMeta+z");
+		await page.keyboard.press("ControlOrMeta+Shift+z");
+		await expect(page.locator("#cikti")).toHaveText("abcdef\n");
+	});
+
+	/** Harf harf geri alma kimsenin istediği şey değil. */
+	test("hızlı yazma tek adımda geri alınıyor", async ({ page }) => {
+		await tekBlok(page, "abc");
+		await page.keyboard.type("defghi", { delay: 20 });
+		await page.keyboard.press("ControlOrMeta+z");
+		await expect(page.locator("#cikti")).toHaveText("abc\n");
+	});
+
+	test("yapısal değişiklik geri alınıyor", async ({ page }) => {
+		await tekBlok(page, "abc");
+		await page.keyboard.press("Enter");
+		await expect(page.locator("#editor > p")).toHaveCount(2);
+		await page.keyboard.press("ControlOrMeta+z");
+		await expect(page.locator("#editor > p")).toHaveCount(1);
+	});
+
+	test("biçimlendirme geri alınıyor", async ({ page }) => {
+		await tekBlok(page, "kalın");
+		await page.keyboard.press("ControlOrMeta+a");
+		await page.keyboard.press("ControlOrMeta+b");
+		await expect(page.locator("#cikti")).toHaveText("**kalın**\n");
+		await page.keyboard.press("ControlOrMeta+z");
+		await expect(page.locator("#cikti")).toHaveText("kalın\n");
+	});
+
+	test("geri aldıktan sonra yazmak ileri dalı atıyor", async ({ page }) => {
+		await tekBlok(page, "abc");
+		await page.keyboard.type("def");
+		await page.keyboard.press("ControlOrMeta+z");
+		await page.keyboard.type("xyz");
+		await expect(page.locator("#ileri")).toBeDisabled();
+		await expect(page.locator("#cikti")).toHaveText("abcxyz\n");
+	});
+
+	test("geri alma imleci de geri getiriyor", async ({ page }) => {
+		await tekBlok(page, "abc");
+		await page.keyboard.press("Enter");
+		await page.keyboard.type("ikinci");
+		await page.keyboard.press("ControlOrMeta+z");
+		await page.keyboard.press("ControlOrMeta+z");
+		// İmleç ilk bloğa dönmeli; yazmaya devam edilebilmeli.
+		const odakMetni = await page.evaluate(() => document.activeElement?.textContent ?? "");
+		expect(odakMetni).toBe("abc");
+	});
+
+	test("araç çubuğu düğmeleri de çalışıyor", async ({ page }) => {
+		await tekBlok(page, "abc");
+		await page.keyboard.type("def");
+		await page.locator("#geri").click();
+		await expect(page.locator("#cikti")).toHaveText("abc\n");
+		await page.locator("#ileri").click();
+		await expect(page.locator("#cikti")).toHaveText("abcdef\n");
+	});
+
+	test("setValue geçmişi sıfırlıyor", async ({ page }) => {
+		await tekBlok(page, "abc");
+		await page.keyboard.type("def");
+		await page.evaluate(() => window.kalem.editor.setValue("yeni\n"));
+		expect(await page.evaluate(() => window.kalem.editor.canUndo())).toBe(false);
+	});
+
+	test("salt okunur modda geri alma çalışmıyor", async ({ page }) => {
+		await tekBlok(page, "abc");
+		await page.keyboard.type("def");
+		await page.locator("#saltOkunur").check();
+		await page.keyboard.press("ControlOrMeta+z");
+		await expect(page.locator("#cikti")).toHaveText("abcdef\n");
 	});
 });

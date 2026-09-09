@@ -12,6 +12,8 @@
  */
 export type { EditorOptions } from "./editor.js";
 export { Editor } from "./editor.js";
+export type { HistoryState } from "./history.js";
+export { History } from "./history.js";
 export { assignIds, newId } from "./ids.js";
 export {
 	applyLink,

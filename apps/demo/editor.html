@@ -131,6 +131,8 @@
 			<button type="button" data-bicim="delete" title="Ctrl+Shift+X"><s>S</s></button>
 			<button type="button" data-bicim="inlineCode" title="Ctrl+E"><code>&lt;&gt;</code></button>
 			<button type="button" id="bag" title="Seçime bağlantı ver">Bağlantı</button>
+			<button type="button" id="geri" title="Ctrl+Z">↶</button>
+			<button type="button" id="ileri" title="Ctrl+Y">↷</button>
 		</span>
 		<button type="button" id="ornek">Örneği yükle</button>
 		<label class="secim"><input type="checkbox" id="saltOkunur"> salt okunur</label>
@@ -168,6 +170,7 @@
 	<div class="olcum"><dt>Yazım tercihleri</dt><dd id="tercih">—</dd></div>
 	<div class="olcum"><dt>Seçim</dt><dd id="secim">—</dd></div>
 	<div class="olcum"><dt>Etkin biçimler</dt><dd id="bicimler">—</dd></div>
+	<div class="olcum"><dt>Geçmiş</dt><dd id="gecmis">—</dd></div>
 </dl>
 
 <script type="importmap">
@@ -229,6 +232,13 @@ Son paragraf.
 		// Biçim uygulandığında seçim aynı kalır, yani `onSelectionChange`
 		// tetiklenmez; düğmelerin basılı durumu buradan tazeleniyor.
 		bicimleriTazele();
+
+		const gecmis = document.getElementById("gecmis");
+		const geri = editor.canUndo();
+		const ileri = editor.canRedo();
+		gecmis.textContent = geri || ileri ? `geri: ${geri ? "var" : "yok"} · ileri: ${ileri ? "var" : "yok"}` : "boş";
+		document.getElementById("geri").disabled = !geri;
+		document.getElementById("ileri").disabled = !ileri;
 	}
 
 	const editor = new Editor(tuval, {
@@ -281,6 +291,15 @@ Son paragraf.
 		editor.setLink("https://ornek.com");
 		bicimleriTazele();
 	});
+
+	for (const [id, islem] of [["geri", () => editor.undo()], ["ileri", () => editor.redo()]]) {
+		const dugme = document.getElementById(id);
+		dugme.addEventListener("mousedown", (e) => e.preventDefault());
+		dugme.addEventListener("click", () => {
+			islem();
+			rapor(editor.getValue(), editor.getDocument());
+		});
+	}
 
 	document.getElementById("dil").textContent = tuval.getAttribute("lang") ?? "—";
 	rapor(editor.getValue(), editor.getDocument());
