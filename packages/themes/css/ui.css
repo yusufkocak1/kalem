@@ -15,47 +15,14 @@
  *
  * ## Değişkenler
  *
- * `viewer.css` `--kalem-*` değişkenlerini `.kalem-doc` üzerinde tanımlıyor;
- * yüzen parçalar o ağacın dışında olduğu için buradaki değişkenler
- * kendi başlarına tanımlanıyor. Aynı isimler kullanıldı: bir temayı
- * değiştiren, ikisini birden değiştiriyor.
+ * Burada **tanımlanmıyor**, yalnızca tüketiliyor. Sözlüğün tamamı
+ * `tokens.css` içinde (F3-09) ve yüzen parçalar ondan okuyabilsin diye
+ * `@kalem/ui` her birine `kalem-theme` sınıfını ekliyor — `<body>` altında
+ * durdukları için gömen sayfanın sarmalayıcısından miras alamıyorlar.
+ *
+ * Eskiden bu dosyanın kendi sözlüğü vardı (`--kalem-ui-*`) ve marka rengini
+ * değiştirmek iki ayrı yeri bulmayı gerektiriyordu.
  */
-
-.kalem-bubble,
-.kalem-menu {
-	--kalem-ui-bg: #ffffff;
-	--kalem-ui-fg: #22201d;
-	--kalem-ui-muted: #6f6a62;
-	--kalem-ui-border: #e3e0da;
-	--kalem-ui-accent: #0f4e4a;
-	--kalem-ui-active-fg: #ffffff;
-	--kalem-ui-shadow: 0 6px 24px rgb(34 32 29 / 14%), 0 1px 2px rgb(34 32 29 / 10%);
-	--kalem-ui-radius: 9px;
-}
-
-@media (prefers-color-scheme: dark) {
-	.kalem-bubble:not([data-theme="light"]),
-	.kalem-menu:not([data-theme="light"]) {
-		--kalem-ui-bg: #24232a;
-		--kalem-ui-fg: #e8e6e1;
-		--kalem-ui-muted: #9d978d;
-		--kalem-ui-border: #3a3844;
-		--kalem-ui-accent: #6fd3c6;
-		--kalem-ui-active-fg: #16151a;
-		--kalem-ui-shadow: 0 6px 24px rgb(0 0 0 / 45%);
-	}
-}
-
-.kalem-bubble[data-theme="dark"],
-.kalem-menu[data-theme="dark"] {
-	--kalem-ui-bg: #24232a;
-	--kalem-ui-fg: #e8e6e1;
-	--kalem-ui-muted: #9d978d;
-	--kalem-ui-border: #3a3844;
-	--kalem-ui-accent: #6fd3c6;
-	--kalem-ui-active-fg: #16151a;
-	--kalem-ui-shadow: 0 6px 24px rgb(0 0 0 / 45%);
-}
 
 /* ---------------------------------------------------------------------- */
 /* Balon araç çubuğu                                                      */
@@ -71,16 +38,12 @@
 	align-items: center;
 	gap: 2px;
 	padding: 4px;
-	background: var(--kalem-ui-bg);
-	color: var(--kalem-ui-fg);
-	border: 1px solid var(--kalem-ui-border);
-	border-radius: var(--kalem-ui-radius);
-	box-shadow: var(--kalem-ui-shadow);
-	font:
-		500 13px / 1 system-ui,
-		-apple-system,
-		"Segoe UI",
-		sans-serif;
+	background: var(--kalem-surface);
+	color: var(--kalem-fg);
+	border: 1px solid var(--kalem-border);
+	border-radius: var(--kalem-radius-ui);
+	box-shadow: var(--kalem-shadow);
+	font: 500 var(--kalem-ui-size) / 1 var(--kalem-font);
 	/* Araç çubuğuna sürüklemek seçimi bozar; metin seçimi kapalı. */
 	user-select: none;
 }
@@ -111,24 +74,24 @@
 }
 
 .kalem-bubble-button:hover {
-	background: color-mix(in srgb, var(--kalem-ui-fg) 8%, transparent);
+	background: color-mix(in srgb, var(--kalem-fg) 8%, transparent);
 }
 
 .kalem-bubble-button:focus-visible {
-	outline: 2px solid var(--kalem-ui-accent);
+	outline: 2px solid var(--kalem-accent);
 	outline-offset: -2px;
 }
 
 /* Basılı durum `aria-pressed`ten okunuyor: görsel durum ile ekran
    okuyucunun duyurduğu durum aynı kaynaktan geliyor, ayrışamaz. */
 .kalem-bubble-button[aria-pressed="true"] {
-	background: var(--kalem-ui-accent);
-	color: var(--kalem-ui-active-fg);
+	background: var(--kalem-accent);
+	color: var(--kalem-accent-fg);
 }
 
 /* Her simge kendi yazı tipini istiyor: B kalın, I italik, S üstü çizili. */
 .kalem-bubble-button-glyph {
-	font-size: 13px;
+	font-size: var(--kalem-ui-size);
 	line-height: 1;
 }
 .kalem-bubble-button:nth-child(1) .kalem-bubble-button-glyph {
@@ -150,9 +113,9 @@
 	height: 28px;
 	margin-left: 4px;
 	padding: 0 4px;
-	border: 1px solid var(--kalem-ui-border);
+	border: 1px solid var(--kalem-border);
 	border-radius: 6px;
-	background: var(--kalem-ui-bg);
+	background: var(--kalem-surface);
 	color: inherit;
 	font: inherit;
 	cursor: pointer;
@@ -160,7 +123,7 @@
 }
 
 .kalem-bubble-select:focus-visible {
-	outline: 2px solid var(--kalem-ui-accent);
+	outline: 2px solid var(--kalem-accent);
 	outline-offset: -2px;
 }
 
@@ -184,16 +147,12 @@
 	top: 0;
 	left: 0;
 	z-index: 900;
-	background: var(--kalem-ui-bg);
-	color: var(--kalem-ui-fg);
-	border: 1px solid var(--kalem-ui-border);
-	border-radius: var(--kalem-ui-radius);
-	box-shadow: var(--kalem-ui-shadow);
-	font:
-		13px / 1.4 system-ui,
-		-apple-system,
-		"Segoe UI",
-		sans-serif;
+	background: var(--kalem-surface);
+	color: var(--kalem-fg);
+	border: 1px solid var(--kalem-border);
+	border-radius: var(--kalem-radius-ui);
+	box-shadow: var(--kalem-shadow);
+	font: var(--kalem-ui-size) / 1.4 var(--kalem-font);
 }
 
 .kalem-link-popover {
@@ -210,15 +169,15 @@
 	min-width: 12rem;
 	height: 28px;
 	padding: 0 8px;
-	border: 1px solid var(--kalem-ui-border);
+	border: 1px solid var(--kalem-border);
 	border-radius: 6px;
-	background: var(--kalem-ui-bg);
+	background: var(--kalem-surface);
 	color: inherit;
 	font: inherit;
 }
 
 .kalem-link-input:focus-visible {
-	outline: 2px solid var(--kalem-ui-accent);
+	outline: 2px solid var(--kalem-accent);
 	outline-offset: -1px;
 }
 
@@ -233,20 +192,20 @@
 	padding: 0 10px;
 	border: 0;
 	border-radius: 6px;
-	background: var(--kalem-ui-accent);
-	color: var(--kalem-ui-active-fg);
+	background: var(--kalem-accent);
+	color: var(--kalem-accent-fg);
 	font: inherit;
 	cursor: pointer;
 }
 
 .kalem-link-button:last-of-type {
 	background: transparent;
-	color: var(--kalem-ui-muted);
+	color: var(--kalem-fg-muted);
 	padding: 0 8px;
 }
 
 .kalem-link-button:focus-visible {
-	outline: 2px solid var(--kalem-ui-accent);
+	outline: 2px solid var(--kalem-accent);
 	outline-offset: 2px;
 }
 
@@ -312,7 +271,7 @@
 
 .kalem-slash-group {
 	padding: 6px 8px 3px;
-	color: var(--kalem-ui-muted);
+	color: var(--kalem-fg-muted);
 	font-size: 11px;
 	text-transform: uppercase;
 	letter-spacing: 0.06em;
@@ -332,8 +291,8 @@
  * okuyucunun duyurduğu durum aynı kaynaktan geliyor, ayrışamaz.
  */
 .kalem-slash-item[aria-selected="true"] {
-	background: var(--kalem-ui-accent);
-	color: var(--kalem-ui-active-fg);
+	background: var(--kalem-accent);
+	color: var(--kalem-accent-fg);
 }
 
 .kalem-slash-glyph {
@@ -357,7 +316,7 @@
 
 .kalem-slash-empty {
 	padding: 10px 8px;
-	color: var(--kalem-ui-muted);
+	color: var(--kalem-fg-muted);
 }
 
 .kalem-slash-empty[hidden] {
@@ -420,7 +379,7 @@
 	border: 0;
 	border-radius: 4px;
 	background: transparent;
-	color: var(--kalem-ui-muted);
+	color: var(--kalem-fg-muted);
 	font: inherit;
 	line-height: 1;
 	cursor: grab;
@@ -432,13 +391,13 @@
 
 .kalem-handle-grip:hover,
 .kalem-handle-add:hover {
-	background: color-mix(in srgb, var(--kalem-ui-fg) 8%, transparent);
-	color: var(--kalem-ui-fg);
+	background: color-mix(in srgb, var(--kalem-fg) 8%, transparent);
+	color: var(--kalem-fg);
 }
 
 .kalem-handle-grip:focus-visible,
 .kalem-handle-add:focus-visible {
-	outline: 2px solid var(--kalem-ui-accent);
+	outline: 2px solid var(--kalem-accent);
 	outline-offset: 1px;
 }
 
@@ -459,7 +418,7 @@
 	z-index: 41;
 	height: 2px;
 	border-radius: 1px;
-	background: var(--kalem-ui-accent);
+	background: var(--kalem-accent);
 	pointer-events: none;
 }
 
@@ -509,7 +468,7 @@
 
 .kalem-menu-group {
 	padding: 6px 8px 3px;
-	color: var(--kalem-ui-muted);
+	color: var(--kalem-fg-muted);
 	font-size: 11px;
 	text-transform: uppercase;
 	letter-spacing: 0.06em;
@@ -531,7 +490,7 @@
 }
 
 .kalem-menu-item:hover {
-	background: color-mix(in srgb, var(--kalem-ui-fg) 8%, transparent);
+	background: color-mix(in srgb, var(--kalem-fg) 8%, transparent);
 }
 
 /*
@@ -539,9 +498,9 @@
  * kriteri) ve seçili öğe gerçek odak, `aria-selected` değil.
  */
 .kalem-menu-item:focus-visible {
-	outline: 2px solid var(--kalem-ui-accent);
+	outline: 2px solid var(--kalem-accent);
 	outline-offset: -2px;
-	background: color-mix(in srgb, var(--kalem-ui-accent) 12%, transparent);
+	background: color-mix(in srgb, var(--kalem-accent) 12%, transparent);
 }
 
 .kalem-menu-glyph {
@@ -581,16 +540,12 @@
 	align-items: center;
 	gap: 2px;
 	padding: 4px 6px;
-	background: var(--kalem-ui-bg);
-	color: var(--kalem-ui-fg);
-	border: 1px solid var(--kalem-ui-border);
-	border-radius: var(--kalem-ui-radius);
+	background: var(--kalem-surface);
+	color: var(--kalem-fg);
+	border: 1px solid var(--kalem-border);
+	border-radius: var(--kalem-radius-ui);
 	margin-bottom: 8px;
-	font:
-		500 13px / 1 system-ui,
-		-apple-system,
-		"Segoe UI",
-		sans-serif;
+	font: 500 var(--kalem-ui-size) / 1 var(--kalem-font);
 	/* Çubuğa sürüklemek seçimi bozar. */
 	user-select: none;
 }
@@ -605,7 +560,7 @@
 .kalem-toolbar-group + .kalem-toolbar-group {
 	margin-inline-start: 4px;
 	padding-inline-start: 6px;
-	border-inline-start: 1px solid var(--kalem-ui-border);
+	border-inline-start: 1px solid var(--kalem-border);
 }
 
 .kalem-toolbar-button {
@@ -624,12 +579,12 @@
 }
 
 .kalem-toolbar-button:hover:not(:disabled) {
-	background: color-mix(in srgb, var(--kalem-ui-fg) 8%, transparent);
+	background: color-mix(in srgb, var(--kalem-fg) 8%, transparent);
 }
 
 .kalem-toolbar-button:focus-visible,
 .kalem-toolbar .kalem-block-select:focus-visible {
-	outline: 2px solid var(--kalem-ui-accent);
+	outline: 2px solid var(--kalem-accent);
 	outline-offset: 1px;
 }
 
@@ -638,8 +593,8 @@
  * okuyucunun duyurduğu durum tek kaynaktan geliyor, ayrışamaz.
  */
 .kalem-toolbar-button[aria-pressed="true"] {
-	background: var(--kalem-ui-accent);
-	color: var(--kalem-ui-active-fg);
+	background: var(--kalem-accent);
+	color: var(--kalem-accent-fg);
 }
 
 /*
@@ -653,9 +608,9 @@
 
 .kalem-toolbar .kalem-block-select {
 	height: 1.9em;
-	border: 1px solid var(--kalem-ui-border);
+	border: 1px solid var(--kalem-border);
 	border-radius: 5px;
-	background: var(--kalem-ui-bg);
+	background: var(--kalem-surface);
 	color: inherit;
 	font: inherit;
 }

@@ -45,6 +45,19 @@ export function el<K extends keyof HTMLElementTagNameMap>(
  *
  * `aria-hidden`: simge süs, anlamı düğmenin erişilebilir adı taşıyor.
  */
+/**
+ * Yüzen bir parçanın kök elemanına tema sınıfını ekler.
+ *
+ * Yüzen parçalar `document.body` altına konuyor (bir `overflow: hidden`
+ * kapsayıcı onları kırpardı) ve orada gömen sayfanın tema sarmalayıcısının
+ * **dışında** kalıyorlar. Sözlüğü miras alamadıkları için sınıfı kendileri
+ * taşıyor (F3-09).
+ */
+export function themed<T extends HTMLElement>(element: T, prefix: string): T {
+	element.classList.add(`${prefix}theme`);
+	return element;
+}
+
 export function icon(doc: Document, glyph: string, className: string): HTMLElement {
 	return el(doc, "span", {
 		class: className,

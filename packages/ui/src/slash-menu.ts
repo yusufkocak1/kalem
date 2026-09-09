@@ -30,7 +30,7 @@ import { replaceAt } from "@kalem/core";
 import { setBlockType } from "@kalem/core/commands";
 import type { Caret, Editor, EditResult } from "@kalem/editor";
 import { spliceInline, toggleList } from "@kalem/editor";
-import { el } from "./dom.js";
+import { el, themed } from "./dom.js";
 import { position } from "./floating.js";
 import type { UiLabels } from "./labels.js";
 import { score } from "./search.js";
@@ -185,7 +185,7 @@ export function createSlashMenu(editor: Editor, options: SlashMenuOptions): Slas
 		attrs: { hidden: "" },
 		children: [liste, bos],
 	});
-	doc.body.append(root);
+	doc.body.append(themed(root, p));
 
 	/** Menü açıkken `/` karakterinin bulunduğu ofset; kapalıyken `null`. */
 	let slashOfseti: number | null = null;

@@ -24,7 +24,7 @@
  */
 import { isSafeUrl } from "@kalem/core";
 import type { Editor } from "@kalem/editor";
-import { button, el } from "./dom.js";
+import { button, el, themed } from "./dom.js";
 import { position } from "./floating.js";
 import type { UiLabels } from "./labels.js";
 
@@ -100,7 +100,7 @@ export function createLinkPopover(editor: Editor, options: LinkPopoverOptions): 
 		attrs: { role: "dialog", "aria-label": labels.link, hidden: "" },
 		children: [girdi, uygula, kaldir, uyari],
 	});
-	doc.body.append(root);
+	doc.body.append(themed(root, p));
 
 	let acik = false;
 	/**

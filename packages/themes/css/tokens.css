@@ -1,0 +1,132 @@
+/*
+ * @kalem/themes — Tema sözlüğü  (İş listesi: F3-09)
+ *
+ * Kalem'in bütün renkleri, tipografisi ve ölçüleri burada **bir kez**
+ * tanımlanıyor. `viewer.css`, `editor.css` ve `ui.css` yalnızca tüketiyor.
+ *
+ * ## Neden tek dosya
+ *
+ * Önce her katman kendi sözlüğünü taşıyordu: görüntüleyicide
+ * `--kalem-accent`, arayüzde `--kalem-ui-accent`. Marka rengini
+ * değiştirmek isteyen kişi ikisini birden bulmak zorundaydı ve biri
+ * unutulduğunda araç çubuğu belgeden farklı renkte kalıyordu. F3-09'un
+ * kabul kriteri ("tek CSS bloğuyla marka rengi değiştirilebiliyor") bu
+ * ayrışmayla karşılanamıyordu.
+ *
+ * ## Değiştirme
+ *
+ * Seçiciler `:where()` içinde, yani **sıfır özgüllükte**. Gömen sayfanın
+ * yazdığı her kural bunu yeniyor; `!important` ya da uzun seçici zincirine
+ * gerek yok:
+ *
+ *     .kalem-theme { --kalem-accent: #7c3aed; }
+ *
+ * `@kalem/ui` ürettiği her yüzen parçaya (araç çubuğu, menü, tutamaç)
+ * `kalem-theme` sınıfını kendisi ekliyor; onlar `<body>` altında durduğu
+ * için gömen sayfanın sarmalayıcısından miras alamıyorlardı. Görüntüleyici
+ * kapsayıcısına sınıfı gömen sayfa yazıyor: `class="kalem-doc kalem-theme"`.
+ *
+ * ## `:root` neden yok
+ *
+ * Bir Markdown kütüphanesinin, gömüldüğü uygulamanın düğmelerinin rengini
+ * değiştirmesi kabul edilemez. Sözlük yalnızca Kalem'in kendi yüzeylerine
+ * iniyor.
+ *
+ * ## Koyu tema
+ *
+ * Üç durum var ve üçü de karşılanıyor: kullanıcı seçim yapmadıysa
+ * `prefers-color-scheme`, açıkça seçtiyse `[data-theme]`. Hiçbir renk
+ * yalnızca media sorgusunun içinde tanımlanmıyor — o, klasik "açık temada
+ * okunmaz metin" hatası.
+ */
+
+:where(
+	.kalem-theme,
+	.kalem-doc,
+	.kalem-editor,
+	.kalem-ui,
+	.kalem-bubble,
+	.kalem-menu,
+	.kalem-toolbar,
+	.kalem-handle,
+	.kalem-drop-line
+) {
+	/* --- Renk: açık tema ------------------------------------------------
+	 * Nötrler hafifçe sıcak: saf gri "seçilmemiş" durur.
+	 */
+	--kalem-fg: #22201d;
+	--kalem-fg-muted: #6f6a62;
+	/* Belge zemini saydam: gömen sayfanın kendi zemini görünsün. */
+	--kalem-bg: transparent;
+	/* Panel zemini opak olmak zorunda: menü ve araç çubuğu metnin üstünde. */
+	--kalem-surface: #ffffff;
+	--kalem-bg-subtle: rgb(34 32 29 / 5%);
+	--kalem-border: #e3e0da;
+	--kalem-accent: #0f4e4a;
+	/* Vurgu üstündeki metin — kontrastı vurgu rengiyle birlikte değişmeli. */
+	--kalem-accent-fg: #ffffff;
+
+	/* --- Tipografi --- */
+	--kalem-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	--kalem-font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, monospace;
+	--kalem-size: 1rem;
+	--kalem-leading: 1.65;
+	/* Arayüz metni belgeden bağımsız: kullanıcı yazı boyutunu büyütünce
+	 * menüler de büyümeli ama başlık ölçeğini izlememeli. */
+	--kalem-ui-size: 13px;
+
+	/* --- Ölçü: bloklar arası boşluk tek bir değerden türetiliyor --- */
+	--kalem-space: 1em;
+	--kalem-radius: 6px;
+	--kalem-radius-ui: 9px;
+	--kalem-shadow: 0 6px 24px rgb(34 32 29 / 14%), 0 1px 2px rgb(34 32 29 / 10%);
+}
+
+/* --- Koyu tema: sistem tercihi ------------------------------------------
+ * `:not([data-theme="light"])` şart: kullanıcı açık temayı **açıkça**
+ * seçtiyse sistem tercihi onu ezmemeli.
+ */
+@media (prefers-color-scheme: dark) {
+	:where(
+		.kalem-theme,
+		.kalem-doc,
+		.kalem-editor,
+		.kalem-ui,
+		.kalem-bubble,
+		.kalem-menu,
+		.kalem-toolbar,
+		.kalem-handle,
+		.kalem-drop-line
+	):not([data-theme="light"]) {
+		--kalem-fg: #e8e6e1;
+		--kalem-fg-muted: #9d978d;
+		--kalem-surface: #24232a;
+		--kalem-bg-subtle: rgb(232 230 225 / 8%);
+		--kalem-border: #34323b;
+		--kalem-accent: #6fd3c6;
+		--kalem-accent-fg: #16151a;
+		--kalem-shadow: 0 6px 24px rgb(0 0 0 / 45%);
+	}
+}
+
+/* --- Koyu tema: açık seçim --- */
+:where(
+	.kalem-theme,
+	.kalem-doc,
+	.kalem-editor,
+	.kalem-ui,
+	.kalem-bubble,
+	.kalem-menu,
+	.kalem-toolbar,
+	.kalem-handle,
+	.kalem-drop-line
+)[data-theme="dark"] {
+	--kalem-fg: #e8e6e1;
+	--kalem-fg-muted: #9d978d;
+	--kalem-surface: #24232a;
+	--kalem-bg-subtle: rgb(232 230 225 / 8%);
+	--kalem-border: #34323b;
+	--kalem-accent: #6fd3c6;
+	--kalem-accent-fg: #16151a;
+	--kalem-shadow: 0 6px 24px rgb(0 0 0 / 45%);
+}

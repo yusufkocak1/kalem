@@ -126,7 +126,11 @@ export function mountUi(editor: Editor, options: UiOptions = {}): Ui {
 	const locale = options.locale ?? belgeDili;
 	const sokucular: (() => void)[] = [];
 
-	element.classList.add(`${prefix}ui`);
+	// Tema sözlüğü `tokens.css` içinde ve `kalem-theme` üzerinden geliyor
+	// (F3-09). Yüzen parçalar `<body>` altında durduğu için gömen sayfanın
+	// sarmalayıcısından miras alamıyorlar; sınıfı `dom.ts` her elemana
+	// kendisi ekliyor.
+	element.classList.add(`${prefix}ui`, `${prefix}theme`);
 
 	const liveRegion = createLiveRegion(element.ownerDocument, prefix);
 	sokucular.push(() => liveRegion.destroy());
@@ -271,7 +275,7 @@ export function mountUi(editor: Editor, options: UiOptions = {}): Ui {
 		labels,
 		destroy() {
 			for (const sok of sokucular.reverse()) sok();
-			element.classList.remove(`${prefix}ui`);
+			element.classList.remove(`${prefix}ui`, `${prefix}theme`);
 		},
 	};
 }

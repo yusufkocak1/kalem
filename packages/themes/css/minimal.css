@@ -1,0 +1,54 @@
+/*
+ * @kalem/themes — Yalın tema  (İş listesi: F3-09)
+ *
+ * Kalem'in kendi görsel kimliğini geri çeken tema. Gölge yok, yuvarlatma
+ * yok, vurgu rengi metnin kendisi.
+ *
+ * ## Ne işe yarıyor
+ *
+ * Kendi tasarım sistemi olan bir uygulamaya gömülünce, kütüphanenin
+ * renkleri yabancı duruyor. `minimal.css` ile Kalem gömüldüğü yerin
+ * tipografisini ve rengini miras alıyor: `--kalem-font` ve `--kalem-fg`
+ * `inherit` olduğu için sayfanın kendi ayarları geçerli.
+ *
+ * `tokens.css`in **üstüne** yükleniyor; onun yerine değil. Burada
+ * tanımlanmayan her token varsayılan değerinde kalıyor.
+ */
+
+:where(
+	.kalem-theme,
+	.kalem-doc,
+	.kalem-editor,
+	.kalem-ui,
+	.kalem-bubble,
+	.kalem-menu,
+	.kalem-toolbar,
+	.kalem-handle,
+	.kalem-drop-line
+) {
+	/* Sayfanın kendi metin rengi ve yazı tipi geçerli. */
+	--kalem-fg: inherit;
+	--kalem-font: inherit;
+	/* Panel zemini yine de opak olmak zorunda — menü metnin üstünde durur. */
+	--kalem-surface: Canvas;
+	--kalem-fg-muted: color-mix(in srgb, currentcolor 55%, transparent);
+	--kalem-bg-subtle: color-mix(in srgb, currentcolor 6%, transparent);
+	--kalem-border: color-mix(in srgb, currentcolor 20%, transparent);
+
+	/* Vurgu, metnin kendisi: kütüphane sayfaya kendi rengini dayatmıyor. */
+	--kalem-accent: currentcolor;
+	--kalem-accent-fg: Canvas;
+
+	/* Süs yok. */
+	--kalem-radius: 0;
+	--kalem-radius-ui: 0;
+	--kalem-shadow: none;
+}
+
+/*
+ * Gölge kalkınca panelin kenarı görünür olmalı; aksi hâlde açılır menü
+ * metnin üstünde nerede başlayıp bittiği belli olmayan bir leke oluyor.
+ */
+:where(.kalem-bubble, .kalem-menu, .kalem-toolbar) {
+	border: 1px solid var(--kalem-border);
+}

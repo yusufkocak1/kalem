@@ -1028,3 +1028,100 @@ test.describe("sabit araç çubuğu", () => {
 		expect(sayi).toBe(1);
 	});
 });
+
+/**
+ * Tema sistemi  (İş listesi: F3-09)
+ *
+ * Kabul kriteri tek cümle: *tek CSS bloğuyla marka rengi
+ * değiştirilebiliyor.* Bu, ölçülebilir bir iddia — ve önceki hâlde
+ * **yanlıştı**: görüntüleyici `--kalem-accent`, arayüz `--kalem-ui-accent`
+ * kullanıyordu, biri unutulunca araç çubuğu belgeden farklı renk kalıyordu.
+ */
+test.describe("tema", () => {
+	/** Bir elemanın hesaplanmış vurgu rengi. */
+	const vurgu = (page: import("@playwright/test").Page, secici: string) =>
+		page.evaluate(
+			(s) =>
+				getComputedStyle(document.querySelector(s) as Element)
+					.getPropertyValue("--kalem-accent")
+					.trim(),
+			secici,
+		);
+
+	/** F3-09'un kabul kriteri. */
+	test("tek blok bütün yüzeylerin marka rengini değiştiriyor", async ({ page }) => {
+		// `both`: iki çubuk da aynı anda ekranda olsun ki tek blokla
+		// ikisinin birden değiştiği görülebilsin.
+		await kip(page, "both");
+		await expect(page.locator(CUBUK)).toBeVisible();
+		await secimYap(page, "metin");
+		await expect(page.locator(BALON)).toBeVisible();
+
+		await page.addStyleTag({ content: ".kalem-theme { --kalem-accent: rgb(124, 58, 237); }" });
+
+		// Editör, sabit çubuk ve balon — üçü de aynı sözlükten okumalı.
+		expect(await vurgu(page, "#editor")).toBe("rgb(124, 58, 237)");
+		expect(await vurgu(page, ".kalem-toolbar")).toBe("rgb(124, 58, 237)");
+		expect(await vurgu(page, ".kalem-bubble")).toBe("rgb(124, 58, 237)");
+	});
+
+	/**
+	 * Yüzen parçalar `<body>` altında; gömen sayfanın sarmalayıcısından
+	 * miras alamıyorlar, bu yüzden sınıfı kendileri taşıyor.
+	 */
+	test("yüzen parçalar tema sınıfını taşıyor", async ({ page }) => {
+		await kip(page, "both");
+		await secimYap(page, "metin");
+		await expect(page.locator(BALON)).toBeVisible();
+		for (const secici of [".kalem-bubble", ".kalem-toolbar", ".kalem-slash", ".kalem-handle"]) {
+			const varMi = await page.evaluate(
+				(s) => document.querySelector(s)?.classList.contains("kalem-theme") ?? null,
+				secici,
+			);
+			expect(varMi, secici).toBe(true);
+		}
+	});
+
+	/** Sözlük yalnızca Kalem'in yüzeylerine iniyor; sayfaya sızmıyor. */
+	test("tokenlar :root'a yazılmıyor", async ({ page }) => {
+		const govde = await page.evaluate(() =>
+			getComputedStyle(document.documentElement).getPropertyValue("--kalem-accent").trim(),
+		);
+		expect(govde).toBe("");
+	});
+
+	test("koyu tema dosyası paleti değiştiriyor", async ({ page }) => {
+		const once = await vurgu(page, "#editor");
+		await page.locator("#tema").selectOption("dark");
+		await expect.poll(() => vurgu(page, "#editor")).not.toBe(once);
+	});
+
+	/** Yalın tema kütüphanenin kendi rengini geri çekiyor. */
+	test("yalın tema vurgusu metnin kendisi", async ({ page }) => {
+		await page.locator("#tema").selectOption("minimal");
+		await expect.poll(() => vurgu(page, "#editor")).toBe("currentcolor");
+	});
+
+	test("yalın temada gölge ve yuvarlatma yok", async ({ page }) => {
+		await page.locator("#tema").selectOption("minimal");
+		await expect
+			.poll(() =>
+				page.evaluate(() =>
+					getComputedStyle(document.querySelector("#editor") as Element)
+						.getPropertyValue("--kalem-shadow")
+						.trim(),
+				),
+			)
+			.toBe("none");
+	});
+
+	/** Açık temayı **açıkça** seçen kullanıcıyı sistem tercihi ezmemeli. */
+	test("data-theme sistem tercihini eziyor", async ({ page }) => {
+		await page.emulateMedia({ colorScheme: "dark" });
+		const sistemKoyu = await vurgu(page, "#editor");
+		await page.evaluate(() =>
+			document.getElementById("editor")?.setAttribute("data-theme", "light"),
+		);
+		expect(await vurgu(page, "#editor")).not.toBe(sistemKoyu);
+	});
+});

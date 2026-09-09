@@ -31,11 +31,11 @@
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
-| **Faz 3** — Word deneyimi | 8 / 11 | 🔵 Sürüyor |
+| **Faz 3** — Word deneyimi | 9 / 11 | 🔵 Sürüyor |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **40 / 72** | **%56** |
+| | **41 / 72** | **%57** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,7 +43,7 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-13` (Faz 2 tamam)** · `F3-01` · `F3-02` · `F3-03` · `F3-08`
 
-**Sıradaki:** `F3-09` tema sistemi — marka rengi tek CSS bloğuyla.
+**Sıradaki:** `F3-10` erişilebilirlik geçişi.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -1058,9 +1058,43 @@ Boş dokümanda "Yazmaya başlayın veya `/` ile komut çalıştırın" ipucu �
 >
 > Testler: 6 tarayıcı testi × 3 motor.
 
-### F3-09 · Tema sistemi `[M]` ⬜
-`@kalem/themes`: CSS değişkeni token seti, `default` + `dark` + `minimal`; `prefers-color-scheme` + `[data-theme]`
-- **Kabul:** tek CSS bloğuyla marka rengi değiştirilebiliyor
+### F3-09 · Tema sistemi `[M]` ✅
+`@kalem/themes`: CSS değişkeni token seti ✅, `default` + `dark` + `minimal` ✅;
+`prefers-color-scheme` + `[data-theme]` ✅
+- [x] **Kabul:** tek CSS bloğuyla marka rengi değiştirilebiliyor
+
+**Kabul kriteri önceden karşılanmıyordu.** Her katmanın kendi sözlüğü
+vardı: görüntüleyicide `--kalem-accent`, arayüzde `--kalem-ui-accent`.
+Marka rengini değiştiren kişi ikisini birden bulmak zorundaydı ve biri
+unutulunca araç çubuğu belgeden farklı renkte kalıyordu. Sözlük artık
+`tokens.css`te bir kez tanımlanıyor; `viewer.css`, `editor.css` ve
+`ui.css` yalnızca tüketiyor.
+
+**Seçiciler `:where()` içinde, sıfır özgüllükte.** Gömen sayfanın yazdığı
+her kural bunu yeniyor; `!important` ya da uzun seçici zinciri gerekmiyor.
+
+**Yüzen parçalar tema sınıfını kendileri taşıyor.** Araç çubuğu, menüler
+ve tutamaç `<body>` altında duruyor (bir `overflow: hidden` kapsayıcı
+onları kırpardı) ve orada gömen sayfanın sarmalayıcısından miras
+alamıyorlar. `@kalem/ui` her birine `kalem-theme` ekliyor — testle
+sabitlendi.
+
+**`:root` yine yok.** Bir Markdown kütüphanesinin gömüldüğü uygulamanın
+düğmelerinin rengini değiştirmesi kabul edilemez; test `:root`ta token
+olmadığını ayrıca ölçüyor.
+
+**`minimal` ne işe yarıyor:** kütüphanenin kendi görsel kimliğini geri
+çekiyor. `--kalem-fg` ve `--kalem-font` `inherit`, vurgu `currentcolor`,
+gölge ve yuvarlatma yok — kendi tasarım sistemi olan bir uygulamaya
+gömülünce Kalem yabancı durmuyor.
+
+**`dark` neden ayrı dosya:** `tokens.css` koyu temayı zaten sistem
+tercihinden ve `[data-theme]`den veriyor. Ayrı dosya, kök elemana
+öznitelik yazamayan gömme senaryoları için (bir CMS bloğu), çünkü hangi
+CSS'in yükleneceğine karar verebiliyorlar.
+
+Boyut: `tokens.css` 467 B, `dark.css` 191 B, `minimal.css` 221 B;
+`viewer.css` 1.16 kB → 869 B. Üç yeni dosyaya rağmen toplam CSS düştü.
 
 ### F3-10 · Erişilebilirlik geçişi `[L]` ⬜
 - ARIA rolleri (`role="textbox"`, `aria-multiline`), menüler için `role="menu"` + `aria-activedescendant`

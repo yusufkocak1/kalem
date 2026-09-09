@@ -13,7 +13,7 @@ export { createBlockMenu } from "./block-menu.js";
 export type { BubbleToolbar, BubbleToolbarOptions } from "./bubble-toolbar.js";
 export { createBubbleToolbar } from "./bubble-toolbar.js";
 export type { ButtonOptions, ElementOptions } from "./dom.js";
-export { button, el, icon } from "./dom.js";
+export { button, el, icon, themed } from "./dom.js";
 export type { FixedToolbar, FixedToolbarOptions, ToolbarGroup } from "./fixed-toolbar.js";
 export { createFixedToolbar, DEFAULT_GROUPS } from "./fixed-toolbar.js";
 export type { FloatingOptions, FloatingResult, Placement } from "./floating.js";

@@ -10,17 +10,9 @@
  *
  * ## Değiştirme
  *
- * Aşağıdaki `--kalem-*` değişkenleri sözleşmedir. Temayı değiştirmek için
- * kuralları ezmek gerekmiyor, değişkeni yeniden tanımlamak yeterli:
- *
- *     .kalem-doc { --kalem-accent: #7c3aed; --kalem-radius: 2px; }
- *
- * ## Koyu tema
- *
- * Üç durum var ve üçü de karşılanıyor: kullanıcı seçim yapmadıysa
- * `prefers-color-scheme`, açıkça seçtiyse `[data-theme]`. Renk yalnızca
- * media sorgusunun içinde tanımlanmıyor — o klasik "açık temada okunmaz
- * metin" hatasıdır.
+ * Renkler ve ölçüler burada **tanımlanmıyor**, yalnızca tüketiliyor.
+ * Sözlüğün tamamı `tokens.css` içinde ve o dosya bu dosyadan önce
+ * yüklenmek zorunda (F3-09).
  *
  * ## Sınıf öneki
  *
@@ -30,48 +22,12 @@
  */
 
 .kalem-doc {
-	/* Renk — açık tema. Nötrler hafifçe sıcak: saf gri "seçilmemiş" durur. */
-	--kalem-fg: #22201d;
-	--kalem-fg-muted: #6f6a62;
-	--kalem-bg: transparent;
-	--kalem-bg-subtle: rgb(34 32 29 / 5%);
-	--kalem-border: #e3e0da;
-	--kalem-accent: #0f4e4a;
-
-	/* Tipografi */
-	--kalem-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-	--kalem-font-mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, monospace;
-	--kalem-size: 1rem;
-	--kalem-leading: 1.65;
-
-	/* Ritim: bloklar arası boşluk tek bir değerden türetiliyor. */
-	--kalem-space: 1em;
-	--kalem-radius: 6px;
-
 	color: var(--kalem-fg);
 	background: var(--kalem-bg);
 	font-family: var(--kalem-font);
 	font-size: var(--kalem-size);
 	line-height: var(--kalem-leading);
 	overflow-wrap: break-word;
-}
-
-@media (prefers-color-scheme: dark) {
-	.kalem-doc:not([data-theme="light"]) {
-		--kalem-fg: #e8e6e1;
-		--kalem-fg-muted: #9d978d;
-		--kalem-bg-subtle: rgb(232 230 225 / 8%);
-		--kalem-border: #34323b;
-		--kalem-accent: #6fd3c6;
-	}
-}
-
-.kalem-doc[data-theme="dark"] {
-	--kalem-fg: #e8e6e1;
-	--kalem-fg-muted: #9d978d;
-	--kalem-bg-subtle: rgb(232 230 225 / 8%);
-	--kalem-border: #34323b;
-	--kalem-accent: #6fd3c6;
 }
 
 /* --------------------------------------------------------------------- */

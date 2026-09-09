@@ -29,7 +29,7 @@ import type { NodeId } from "@kalem/core";
 import type { BlockType } from "@kalem/core/commands";
 import type { Editor } from "@kalem/editor";
 import { blocksPayload, deleteBlocks, duplicateBlocks, nudgeBlock } from "@kalem/editor";
-import { el } from "./dom.js";
+import { el, themed } from "./dom.js";
 import { position } from "./floating.js";
 import type { UiLabels } from "./labels.js";
 
@@ -69,7 +69,7 @@ export function createBlockMenu(editor: Editor, options: BlockMenuOptions): Bloc
 		class: `${p}menu ${p}block-menu`,
 		attrs: { hidden: "", role: "menu", "aria-label": labels.blockMenu },
 	});
-	doc.body.append(root);
+	doc.body.append(themed(root, p));
 
 	/** Menü açıkken hangi blok için açıldığı. */
 	let hedefId: NodeId | null = null;

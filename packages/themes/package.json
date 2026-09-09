@@ -11,9 +11,12 @@
     "css"
   ],
   "exports": {
+    "./tokens.css": "./css/tokens.css",
     "./viewer.css": "./css/viewer.css",
     "./editor.css": "./css/editor.css",
     "./ui.css": "./css/ui.css",
+    "./dark.css": "./css/dark.css",
+    "./minimal.css": "./css/minimal.css",
     "./package.json": "./package.json"
   },
   "publishConfig": {

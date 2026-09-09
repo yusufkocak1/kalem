@@ -28,6 +28,12 @@
     "gzip": true
   },
   {
+    "name": "@kalem/themes/tokens.css",
+    "path": "packages/themes/css/tokens.css",
+    "limit": "1 kB",
+    "gzip": true
+  },
+  {
     "name": "@kalem/themes/viewer.css",
     "path": "packages/themes/css/viewer.css",
     "limit": "3 kB",
@@ -43,6 +49,18 @@
     "name": "@kalem/themes/ui.css",
     "path": "packages/themes/css/ui.css",
     "limit": "3 kB",
+    "gzip": true
+  },
+  {
+    "name": "@kalem/themes/dark.css",
+    "path": "packages/themes/css/dark.css",
+    "limit": "1 kB",
+    "gzip": true
+  },
+  {
+    "name": "@kalem/themes/minimal.css",
+    "path": "packages/themes/css/minimal.css",
+    "limit": "1 kB",
     "gzip": true
   },
   {

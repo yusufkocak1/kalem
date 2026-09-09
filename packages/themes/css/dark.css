@@ -1,0 +1,35 @@
+/*
+ * @kalem/themes — Koyu tema  (İş listesi: F3-09)
+ *
+ * `tokens.css` koyu temayı zaten iki yoldan veriyor: sistem tercihi
+ * (`prefers-color-scheme`) ve açık seçim (`[data-theme="dark"]`). Bu dosya
+ * üçüncü bir durum için: **sayfanın tamamı koyu** ve kullanıcıya seçim
+ * sunulmuyor.
+ *
+ * Ayrı dosya olmasının sebebi, `[data-theme]` yazamayan gömme senaryoları:
+ * bir CMS bloğuna kütüphaneyi koyan kişi kök elemana öznitelik ekleyemiyor
+ * olabilir ama hangi CSS'in yükleneceğine karar verebiliyor.
+ *
+ * Renkler `tokens.css`teki koyu değerlerin aynısı; tek bir palet var.
+ */
+
+:where(
+	.kalem-theme,
+	.kalem-doc,
+	.kalem-editor,
+	.kalem-ui,
+	.kalem-bubble,
+	.kalem-menu,
+	.kalem-toolbar,
+	.kalem-handle,
+	.kalem-drop-line
+) {
+	--kalem-fg: #e8e6e1;
+	--kalem-fg-muted: #9d978d;
+	--kalem-surface: #24232a;
+	--kalem-bg-subtle: rgb(232 230 225 / 8%);
+	--kalem-border: #34323b;
+	--kalem-accent: #6fd3c6;
+	--kalem-accent-fg: #16151a;
+	--kalem-shadow: 0 6px 24px rgb(0 0 0 / 45%);
+}

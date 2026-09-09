@@ -26,7 +26,7 @@
  * editörün *kardeşi* oluyor, sarmalayıcı eklenmiyor.
  */
 import type { Editor } from "@kalem/editor";
-import { button, el } from "./dom.js";
+import { button, el, themed } from "./dom.js";
 import type { UiLabels } from "./labels.js";
 import type { BlockSelect, ToolbarAction } from "./toolbar-actions.js";
 import {
@@ -136,7 +136,7 @@ export function createFixedToolbar(editor: Editor, options: FixedToolbarOptions)
 
 	// Editörün hemen üstüne. `before` sarmalayıcı eklemiyor: gömen sayfanın
 	// kendi düzeni (grid/flex) bozulmadan kalıyor.
-	element.before(root);
+	element.before(themed(root, p));
 
 	// -----------------------------------------------------------------------
 	// Durum

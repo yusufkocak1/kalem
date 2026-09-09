@@ -27,7 +27,7 @@
  */
 import type { MarkType } from "@kalem/core/commands";
 import type { Editor } from "@kalem/editor";
-import { button, el } from "./dom.js";
+import { button, el, themed } from "./dom.js";
 import { position, selectionRect } from "./floating.js";
 import type { UiLabels } from "./labels.js";
 import { createBlockSelect, MARKS } from "./toolbar-actions.js";
@@ -84,7 +84,7 @@ export function createBubbleToolbar(editor: Editor, options: BubbleToolbarOption
 	blokSecici.element.classList.add(`${p}bubble-select`);
 	root.append(blokSecici.element);
 
-	doc.body.append(root);
+	doc.body.append(themed(root, p));
 
 	// -----------------------------------------------------------------------
 	// Görünürlük ve konum

@@ -27,7 +27,7 @@
 import type { NodeId } from "@kalem/core";
 import type { Editor } from "@kalem/editor";
 import { moveBlocks, newParagraph, nudgeBlock } from "@kalem/editor";
-import { button, el } from "./dom.js";
+import { button, el, themed } from "./dom.js";
 import type { UiLabels } from "./labels.js";
 
 export interface BlockHandleOptions {
@@ -90,13 +90,13 @@ export function createBlockHandle(editor: Editor, options: BlockHandleOptions): 
 		attrs: { hidden: "" },
 		children: [ekle, tutamac],
 	});
-	doc.body.append(kok);
+	doc.body.append(themed(kok, p));
 
 	const gosterge = el(doc, "div", {
 		class: `${p}drop-line`,
 		attrs: { hidden: "", "aria-hidden": "true" },
 	});
-	doc.body.append(gosterge);
+	doc.body.append(themed(gosterge, p));
 
 	/** Tutamacın şu an hangi bloğu gösterdiği. */
 	let hoverId: string | null = null;
