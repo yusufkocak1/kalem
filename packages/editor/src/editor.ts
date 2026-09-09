@@ -137,6 +137,14 @@ export class Editor {
 	 * tarayıcı DOM'a dokunmadan **önce** okunabiliyor.
 	 */
 	#caretBeforeKey: Caret | null = null;
+	/**
+	 * IME bileşimi sürüyor mu.
+	 *
+	 * Bileşim (Japonca/Çince/Korece yazımda tuş vuruşlarıyla son karakter
+	 * arasındaki ara durum) sırasında bloğu yeniden basmak, tarayıcının
+	 * bileşim durumunu düşürüyor ve yarım kalan hece kayboluyor.
+	 */
+	#composing = false;
 
 	constructor(element: HTMLElement, options: EditorOptions = {}) {
 		this.#element = element;
@@ -156,6 +164,8 @@ export class Editor {
 		element.addEventListener("input", this.#onInput);
 		element.addEventListener("keydown", this.#onKeyDown);
 		element.addEventListener("beforeinput", this.#onBeforeInput);
+		element.addEventListener("compositionstart", this.#onCompositionStart);
+		element.addEventListener("compositionend", this.#onCompositionEnd);
 		element.addEventListener("copy", this.#onCopy);
 		element.addEventListener("cut", this.#onCut);
 		element.addEventListener("pointerdown", this.#onPointerDown);
@@ -380,6 +390,8 @@ export class Editor {
 		this.#plugins.destroy();
 		this.#element.removeEventListener("keydown", this.#onKeyDown);
 		this.#element.removeEventListener("beforeinput", this.#onBeforeInput);
+		this.#element.removeEventListener("compositionstart", this.#onCompositionStart);
+		this.#element.removeEventListener("compositionend", this.#onCompositionEnd);
 		this.#element.removeEventListener("copy", this.#onCopy);
 		this.#element.removeEventListener("cut", this.#onCut);
 		this.#element.removeEventListener("pointerdown", this.#onPointerDown);
@@ -512,8 +524,22 @@ export class Editor {
 	 * bırakıyor — "`# ` yazdım ama başlık istemiyordum" durumunun tek makul
 	 * cevabı bu.
 	 */
+	#onCompositionStart = (): void => {
+		this.#composing = true;
+	};
+
+	/**
+	 * Bileşim bitti: model zaten `input` üzerinden güncellendi, geriye
+	 * kuralları çalıştırmak kalıyor. Bileşim **sırasında** çalıştırılamazlar
+	 * çünkü dönüşüm bloğu yeniden basar ve yarım kalan heceyi düşürür.
+	 */
+	#onCompositionEnd = (): void => {
+		this.#composing = false;
+		this.#runInputRules();
+	};
+
 	#runInputRules(): void {
-		if (this.#options.inputRules === false) return;
+		if (this.#options.inputRules === false || this.#composing) return;
 		const caret = this.#caret();
 		if (caret === null) return;
 		this.#applyEdit(this.#plugins.runInputRules(this.#doc, caret));

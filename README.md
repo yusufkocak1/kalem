@@ -6,9 +6,10 @@ Framework-bağımsız, küçük ve modüler bir **WYSIWYG Markdown editör küt�
 Yazılım bilmeyen kullanıcıların Word rahatlığında doküman yazabilmesi, geliştiricilerin
 ise projelerine 0 bağımlılıkla gömebilmesi için tasarlanıyor.
 
-**Durum: 24 / 72 görev (%33).** `@kalem/core` (ayrıştırıcı + serileştirici) ve
-`@kalem/viewer` tamam; `@kalem/editor` blok motoru yazılıyor. Henüz npm'de değil —
-ilk yayın v1.0 olacak.
+**Durum: 32 / 72 görev (%44).** `@kalem/core`, `@kalem/viewer` ve
+`@kalem/editor` tamam — **UI olmadan, sadece klavyeyle tam işlevli bir
+Markdown editörü** çalışıyor. Sırada `@kalem/ui` (Word deneyimi).
+Henüz npm'de değil; ilk yayın v1.0 olacak.
 
 ---
 
@@ -20,13 +21,13 @@ ilk yayın v1.0 olacak.
 | [docs/01-is-listesi.md](docs/01-is-listesi.md) | Faz faz, görev görev v1.0 yol haritası (7 faz, ~60 görev) |
 | [packages/core/](packages/core/) | **Çalışan** Markdown ayrıştırıcı + serileştirici. 0 bağımlılık, DOM'suz. |
 | [packages/viewer/](packages/viewer/) | **Çalışan** `renderToDOM` + `renderToString`. `innerHTML` hiç kullanılmıyor. |
-| [packages/editor/](packages/editor/) | Blok motoru — yazılıyor (F2-05 indi; seçim, klavye, geçmiş sırada) |
+| [packages/editor/](packages/editor/) | **Çalışan** blok motoru: seçim, klavye, biçimlendirme, geri alma, giriş kuralları, pano, eklentiler |
 | [packages/themes/](packages/themes/) | Saf CSS: görüntüleyici tipografisi ve editör katmanı |
 | [apps/demo/](apps/demo/) | Üç canlı sayfa (aşağıda) + Faz 0 mimari prototipi |
 | [apps/docs/](apps/docs/) | Astro Starlight dokümantasyon sitesi (planlanan API'yi dokümante eder) |
 | [docs/02-faz0-sonuc.md](docs/02-faz0-sonuc.md) | Faz 0 sonuç raporu — ne kuruldu, ne doğrulandı, ne kapsanmadı |
 
-**758 birim testi** + **147 tarayıcı testi** (Chromium · Firefox · WebKit).
+**881 birim testi** + **369 tarayıcı testi** (Chromium · Firefox · WebKit).
 `serialize(parse(md)) === md` gidiş-dönüş 17/17 byte-birebir;
 `renderToDOM` ile `renderToString` çıktıları üç motorda byte-birebir aynı.
 
@@ -69,7 +70,7 @@ Node ≥ 20 (önerilen 22, `.nvmrc`), pnpm 10.
 |---|---|
 | `pnpm guard:purity` | Çekirdekte 3rd-party bağımlılık ve framework sızıntısı yok; `core` DOM'a dokunmuyor |
 | `pnpm guard:locale` | Çıplak `toLowerCase` / `toUpperCase` / tek argümanlı `localeCompare` yok |
-| `pnpm size` | Boyut bütçeleri — şu an `core` 11.51/12 · `viewer` 2.68/14 · `editor` 13.37/38 kB |
+| `pnpm size` | Boyut bütçeleri — şu an `core` 11.51/12 · `viewer` 2.68/14 · `editor` 21.85/38 kB |
 | `pnpm guard:selftest` | **Kapıların kendisi hâlâ ihlalleri yakalıyor mu** |
 
 Ayrıntı: [CONTRIBUTING.md](CONTRIBUTING.md)
@@ -105,9 +106,9 @@ pnpm docs:dev        # http://localhost:4321
 
 ## Sonraki adım
 
-[İş listesindeki](docs/01-is-listesi.md) **F2-06 seçim modeli** — blok içi seçim
-tarayıcının, bloklar arası seçim kendi modelimizin. Ardından klavye/gezinme,
-geri alma ve giriş kuralları.
+[İş listesindeki](docs/01-is-listesi.md) **Faz 3 — Word deneyimi**
+(`@kalem/ui`): balon araç çubuğu, slash menü, blok sürükleme, yapıştırma
+boru hattı. Ürünün kalbi.
 
 ## Lisans
 

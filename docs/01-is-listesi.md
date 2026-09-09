@@ -23,27 +23,28 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 363/363
+> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 369/369
 
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
-| **Faz 2** — Viewer + başsız editör | 12 / 13 | 🔵 2B sürüyor |
+| **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **31 / 72** | **%43** |
+| | **32 / 72** | **%44** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-04` (2A tamam)** · `F2-05` … `F2-12`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-13` (Faz 2 tamam)**
 
-**Sıradaki:** `F2-13` editör E2E paketi — Faz 2'nin son adımı.
+**Sıradaki:** **Faz 3 — Word deneyimi (`@kalem/ui`).** `F3-01` balon araç
+çubuğuyla başlıyor; ürünün kalbi ve en büyük ikinci faz (~6–8 hafta).
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -66,7 +67,7 @@
 > | `@kalem/viewer` | 2.68 kB | 14 kB |
 > | `@kalem/themes/viewer.css` | 1.16 kB | 3 kB |
 > | `@kalem/themes/editor.css` | 340 B | 2 kB |
-> | `@kalem/editor` (core + viewer dâhil) | 21.79 kB | 38 kB |
+> | `@kalem/editor` (core + viewer dâhil) | 21.85 kB | 38 kB |
 >
 > Gerekçe ikisinde de aynı: yalnızca Markdown işleyen kullanıcı (SSR,
 > derleme betiği) editör komutlarını ve yapıştırma dönüştürücüsünü
@@ -88,9 +89,9 @@ ayrıştırıcı, serileştirici, güvenlik katmanı, komutlar, HTML dönüştü
 `@kalem/themes` — görüntüleyici ve editör stilleri (saf CSS).
 `@kalem/editor` — blok kapsayıcı, model↔DOM eşlemesi, satır içi geri okuma,
 iki seviyeli seçim, satır içi biçimlendirme, klavye ve blok yapısı düzenleme,
-geri al/yinele, giriş kuralları, pano, eklenti sistemi.
-**881 birim testi** + **363 tarayıcı testi** (Chromium · Firefox · WebKit),
-axe ile WCAG 2.1 A/AA taraması dâhil.
+geri al/yinele, giriş kuralları, pano, eklenti sistemi. **Faz 2 kapandı.**
+**881 birim testi** + **369 tarayıcı testi** (Chromium · Firefox · WebKit),
+axe ile WCAG 2.1 A/AA taraması ve CDP ile IME bileşimi dâhil.
 `parse(md)` ↔ `serialize(ast)` gidiş-dönüş 17/17 byte-birebir;
 `renderToDOM` ↔ `renderToString` üç motorda byte-birebir.
 
@@ -382,7 +383,7 @@ Sonuçları değerlendir ve **açıkça karar ver**:
 
 ---
 
-# FAZ 2 — Viewer + Başsız Editör
+# FAZ 2 — Viewer + Başsız Editör ✅ TAMAMLANDI (2026-09-09)
 **Amaç:** Görsel olmadan çalışan bir editör motoru. **Süre: ~7–9 hafta**
 
 ## 2A · `@kalem/viewer` (~1 hafta) ✅ TAMAMLANDI
@@ -453,7 +454,7 @@ Render doğruluğu + XSS fixture'ları + a11y (axe)
 > Tek dev bağımlılık eklendi: `@axe-core/playwright`. Yayımlanan hiçbir
 > pakete girmiyor.
 
-## 2B · `@kalem/editor` — blok motoru (~6–8 hafta) 🔵 SÜRÜYOR
+## 2B · `@kalem/editor` — blok motoru (~6–8 hafta) ✅ TAMAMLANDI
 
 ### F2-05 · Blok kapsayıcı ve yaşam döngüsü `[L]` ✅
 - `Editor` sınıfı: `new Editor(el, { value, onChange, readOnly, plugins })` ✅ *(`plugins` F2-12'de)*
@@ -752,11 +753,36 @@ Analiz §5.9'daki `Plugin` arayüzü; kayıt ✅, yaşam döngüsü ✅, çakı�
 >
 > Testler: 11 birim (kayıt, yaşam döngüsü, çakışma) + 6 tarayıcı testi × 3 motor.
 
-### F2-13 · Editör E2E test paketi `[L]` ⬜
-Playwright ile: yazma, seçim, kısayollar, giriş kuralları, undo/redo, kopyala-yapıştır, IME (CDP `Input.imeSetComposition`)
-- **Kabul:** Chromium + Firefox + WebKit'te yeşil
+### F2-13 · Editör E2E test paketi `[L]` ✅
+Playwright ile: yazma ✅, seçim ✅, kısayollar ✅, giriş kuralları ✅, undo/redo ✅, kopyala-yapıştır 🟡 *(kopyala/kes ✅, yapıştırma F3-07)*, IME (CDP `Input.imeSetComposition`) ✅
+- **Kabul:** Chromium + Firefox + WebKit'te yeşil ✅ (369 test)
 
-> **FAZ 2 ÇIKIŞ KRİTERİ:** UI olmadan, sadece klavyeyle tam işlevli bir Markdown editörü. `@kalem/editor` ≤ 38 kB.
+> **IME nihayet ölçüldü.** Bileşim (composition) Playwright'ın klavye
+> API'siyle taklit edilemiyor; gerçek bir IME durumu gerekiyor ve onu
+> yalnızca Chrome DevTools Protocol'ün `Input.imeSetComposition` komutu
+> kuruyor. CDP yalnızca Chromium'da olduğu için o testler diğer iki
+> motorda atlanıyor (12 atlanan test).
+>
+> Bu, F1.5-02 matrisindeki *"IME ile Japonca/Çince yazım"* satırıydı.
+> Matris doldurulmadı; ölçüm gerçek koda düştü ve **mimarinin en kırılgan
+> varsayımını** doğruladı: bileşim sırasında DOM'a karışmıyoruz, o yüzden
+> yarım kalan hece kaybolmuyor. F2-05'te satır içi içeriğin DOM'dan
+> okunmasının gerekçesi tam olarak buydu.
+>
+> **Bir gerçek koruma eklendi:** giriş kuralları bileşim sırasında
+> çalışmıyor. Çalışsalardı `# ` kalıbını bileşim metninin içinde görüp
+> bloğu başlığa çevirir, bloğu yeniden basar ve bileşimi düşürürlerdi.
+> Kurallar artık `compositionend`'de bir kez çalışıyor.
+>
+> **Yapıştırma bu adımda değil:** kirli HTML normalleştirmesi F3-07'nin
+> boru hattı ve `@kalem/core/html` (F1-09) onu bekliyor.
+
+> **FAZ 2 ÇIKIŞ KRİTERİ:** UI olmadan, sadece klavyeyle tam işlevli bir Markdown editörü ✅ · `@kalem/editor` ≤ 38 kB ✅ (21.85 kB)
+>
+> **Faz 1.5 atlandığı için matrise düşen üç riskin ikisi burada ölçüldü:**
+> bloklar arası sürükleyerek seçim (F2-06) ve IME bileşimi (F2-13). Üçüncüsü
+> — mobil klavye ve otomatik düzeltme — hâlâ ölçülmedi; F6-09 tarayıcı ve
+> mobil geçişine kaldı.
 
 ---
 
