@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { WORD_HTML, WORD_TEXT } from "./fixtures/word-clipboard.js";
 
 /**
  * `@kalem/editor` — blok motoru  (İş listesi: F2-05)
@@ -1046,5 +1047,237 @@ test.describe("eklentiler", () => {
 		await page.keyboard.press("Control+b");
 		// Çekirdek Ctrl+B kalın yapardı; eklenti onu tüketti.
 		await expect(page.locator("#cikti")).not.toContainText("**");
+	});
+});
+
+/**
+ * Yapıştırma boru hattı  (İş listesi: F3-07)
+ *
+ * Birim testleri kaynak tespitini ve yerleştirmeyi sabitliyor; burada
+ * ölçülen, `paste` olayının gerçekten boru hattına bağlandığı ve
+ * tarayıcının kendi yapıştırmasının devreye girmediği.
+ *
+ * Firefox sentetik bir `paste` olayında `clipboardData`yı okutmuyor
+ * (F2-11 ve F3-02'de aynı kısıt); gerçek pano izni yalnızca Chromium'da
+ * veriliyor. Ölçülemeyen şey davranış değil, sentetik olayın
+ * okunabilirliği.
+ */
+test.describe("yapıştırma", () => {
+	/** Editöre sentetik bir yapıştırma olayı gönderir. */
+	async function yapistir(
+		page: import("@playwright/test").Page,
+		veri: { html?: string; text?: string },
+	) {
+		await page.evaluate((d) => {
+			const dt = new DataTransfer();
+			if (d.html !== undefined) dt.setData("text/html", d.html);
+			if (d.text !== undefined) dt.setData("text/plain", d.text);
+			document
+				.getElementById("editor")
+				?.dispatchEvent(
+					new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }),
+				);
+		}, veri);
+	}
+
+	/** İmleci ilk bloğun sonuna koyar. */
+	async function imlecSona(page: import("@playwright/test").Page) {
+		await page.locator("#editor > [data-kalem-id]").first().click();
+		await page.keyboard.press("End");
+	}
+
+	test.beforeEach(async ({ browserName }) => {
+		test.skip(browserName === "firefox", "Firefox sentetik paste verisini okutmuyor");
+	});
+
+	test("düz metin satır içi ekleniyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("abcd\n"));
+		await imlecSona(page);
+		await yapistir(page, { text: "XY" });
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("abcdXY\n");
+	});
+
+	test("Markdown metni yapısıyla geliyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("\n"));
+		await page.locator("#editor > [data-kalem-id]").first().click();
+		await yapistir(page, { text: "# Başlık\n\nmetin\n" });
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("# Başlık\n\nmetin\n");
+	});
+
+	/** `2 * 3 * 4` yazan kullanıcının metni bozulmamalı. */
+	test("Markdown'a benzemeyen metin olduğu gibi kalıyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("\n"));
+		await page.locator("#editor > [data-kalem-id]").first().click();
+		await yapistir(page, { text: "2 * 3 * 4" });
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("2 * 3 * 4\n");
+	});
+
+	/** Tarayıcının kendi yapıştırması devreye girerse DOM'a ham HTML sızar. */
+	test("HTML modele giriyor, DOM'a değil", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("\n"));
+		await page.locator("#editor > [data-kalem-id]").first().click();
+		await yapistir(page, { html: "<p>bir <b>kalın</b></p><p>iki</p>", text: "bir kalın\niki" });
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe(
+			"bir **kalın**\n\niki\n",
+		);
+		// Word'ün stil öznitelikleri DOM'da hiç görünmemeli.
+		expect(await page.locator("#editor").innerHTML()).not.toContain("style=");
+	});
+
+	test("seçili metnin yerine geçiyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("abcd\n"));
+		await page.locator("#editor > [data-kalem-id]").first().click();
+		await page.keyboard.press("ControlOrMeta+a");
+		await yapistir(page, { text: "yeni" });
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("yeni\n");
+	});
+
+	test("yapıştırma tek Ctrl+Z ile geri alınıyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("abcd\n"));
+		await imlecSona(page);
+		await yapistir(page, { text: "XY" });
+		await page.keyboard.press("ControlOrMeta+z");
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("abcd\n");
+	});
+
+	test("Ctrl+Shift+V biçimi atıyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("\n"));
+		await page.locator("#editor > [data-kalem-id]").first().click();
+		await page.keyboard.press("ControlOrMeta+Shift+v");
+		await yapistir(page, { html: "<p>bir <b>kalın</b></p>", text: "bir kalın" });
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("bir kalın\n");
+	});
+
+	/** Bayrak tek seferlik: sonraki yapıştırma yeniden biçimli. */
+	test("biçimsiz yapıştırma kalıcı değil", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("\n"));
+		await page.locator("#editor > [data-kalem-id]").first().click();
+		await page.keyboard.press("ControlOrMeta+Shift+v");
+		await yapistir(page, { html: "<p>bir</p>", text: "bir" });
+		await yapistir(page, { html: "<p><b>iki</b></p>", text: "iki" });
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toContain("**iki**");
+	});
+
+	test("salt okunur modda yapıştırma yok", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("abcd\n"));
+		await page.evaluate(() => window.kalem.editor.setReadOnly(true));
+		await yapistir(page, { text: "XY" });
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("abcd\n");
+	});
+});
+
+/**
+ * F3-07'nin kabul kriteri  (İş listesi)
+ *
+ * > "Word'den kopyalanan 3 sayfalık biçimli doküman doğru yapıya
+ * > dönüşüyor."
+ *
+ * Playwright'a Word kurulamıyor. Ölçülebilen ve aslında ölçülmesi gereken
+ * şey, Word'ün **panoya yazdığı HTML'in** doğru işlenmesi;
+ * `fixtures/word-clipboard.ts` o çıktının yapısını birebir taşıyor.
+ * Taklit olduğu orada da yazıyor.
+ */
+test.describe("Word belgesi yapıştırma", () => {
+	test.beforeEach(async ({ page, browserName }) => {
+		test.skip(browserName === "firefox", "Firefox sentetik paste verisini okutmuyor");
+		await page.evaluate(() => window.kalem.editor.setValue("\n"));
+		await page.locator("#editor > [data-kalem-id]").first().click();
+		await page.evaluate(
+			([html, text]) => {
+				const dt = new DataTransfer();
+				dt.setData("text/html", html as string);
+				dt.setData("text/plain", text as string);
+				document
+					.getElementById("editor")
+					?.dispatchEvent(
+						new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }),
+					);
+			},
+			[WORD_HTML, WORD_TEXT],
+		);
+	});
+
+	const cikti = (page: import("@playwright/test").Page) =>
+		page.evaluate(() => window.kalem.editor.getValue());
+
+	test("başlık hiyerarşisi korunuyor", async ({ page }) => {
+		const md = await cikti(page);
+		expect(md).toContain("# Yıllık Değerlendirme");
+		expect(md).toContain("## Başarılar");
+		expect(md).toContain("## Öncelikler");
+		expect(md).toContain("### Bütçe");
+	});
+
+	test("stille verilen biçimler taşınıyor", async ({ page }) => {
+		const md = await cikti(page);
+		// Fixture'da `<b>` içeriği iki satıra yayılıyor; HTML'de satır sonu
+		// boşluktur ve normalleştirme onu tek boşluğa indiriyor.
+		expect(md).toContain("**öne çıkan başlıklarını**");
+		expect(md).toContain("*planını*");
+	});
+
+	/** Word `<ul>` üretmiyor; listeler `mso-list` paragraflarından kuruluyor. */
+	test("sahte listeler gerçek listeye dönüşüyor", async ({ page }) => {
+		const md = await cikti(page);
+		expect(md).toContain("- Gelirde artış");
+		expect(md).toContain("- Müşteri memnuniyeti");
+		expect(md).toContain("- Yeni pazarlar");
+	});
+
+	test("iç içe liste seviyesi korunuyor", async ({ page }) => {
+		expect(await cikti(page)).toContain("  - Destek süresi kısaldı");
+	});
+
+	test("numaralı liste sıralı kalıyor", async ({ page }) => {
+		const md = await cikti(page);
+		expect(md).toContain("1. Altyapı yenileme");
+		expect(md).toContain("2. Ekip büyütme");
+	});
+
+	/** Madde imi kullanıcının metni değil. */
+	test("madde imleri metne karışmıyor", async ({ page }) => {
+		const md = await cikti(page);
+		expect(md).not.toContain("·");
+		expect(md).not.toContain("o\u00a0");
+	});
+
+	test("bağlantı korunuyor", async ({ page }) => {
+		expect(await cikti(page)).toContain("[rapor sayfasında](https://ornek.com/rapor)");
+	});
+
+	test("tablo tablo olarak geliyor", async ({ page }) => {
+		const md = await cikti(page);
+		expect(md).toContain("Kalem");
+		expect(md).toContain("1.200.000");
+		expect(md).toContain("|");
+	});
+
+	/** Word'ün çöpü çıktıya sızmamalı. */
+	test("mso stilleri ve o:p etiketleri düşüyor", async ({ page }) => {
+		const md = await cikti(page);
+		expect(md).not.toContain("mso-");
+		expect(md).not.toContain("o:p");
+		expect(md).not.toContain("MsoNormal");
+		expect(md).not.toContain("Calibri");
+	});
+
+	test("gizli style bloğu içeriğe girmiyor", async ({ page }) => {
+		const md = await cikti(page);
+		expect(md).not.toContain("font-face");
+		expect(md).not.toContain("panose");
+	});
+
+	test("DOM'a ham Word biçimlemesi sızmıyor", async ({ page }) => {
+		const html = await page.locator("#editor").innerHTML();
+		expect(html).not.toContain("mso-");
+		expect(html).not.toContain("MsoNormal");
+	});
+
+	/** Yapıştırmanın tamamı tek geçmiş adımı olmalı. */
+	test("tek Ctrl+Z ile tamamı geri alınıyor", async ({ page }) => {
+		await page.keyboard.press("ControlOrMeta+z");
+		// Boş belgenin Markdown karşılığı boş dize: tek boş paragraf hiçbir
+		// karakter üretmiyor.
+		expect(await cikti(page)).toBe("");
 	});
 });

@@ -372,3 +372,88 @@ describe("eksik düğümlere dayanıklılık", () => {
 		expect(md(yalin("BODY", [yalin("UL", [yalin("LI", [t("a")])])]))).toBe("- a");
 	});
 });
+
+/**
+ * Word'ün sahte listeleri  (İş listesi: F3-07)
+ *
+ * Word `<ul>`/`<ol>` üretmiyor: her madde bir `<p>` ve madde imi
+ * paragrafın içine gömülü bir `<span style='mso-list:Ignore'>`. İşlenmezse
+ * yapıştırılan belgede liste kalmıyor, madde imi de kullanıcının metnine
+ * karışıyor.
+ */
+describe("Word listeleri", () => {
+	/** Bir Word madde paragrafı. */
+	const wp = (im: string, metin: string, level = 1) =>
+		e("p", [e("span", [t(im)], { style: "mso-list:Ignore" }), t(metin)], {
+			class: "MsoListParagraphCxSpMiddle",
+			style: `mso-list:l0 level${level} lfo1`,
+		});
+
+	it("ardışık maddeler tek listeye dönüşüyor", () => {
+		const root = e("body", [wp("·", "bir"), wp("·", "iki"), wp("·", "üç")]);
+		expect(md(root)).toBe("- bir\n- iki\n- üç");
+	});
+
+	/** Madde imi kullanıcının metni değil; çıktıya sızmamalı. */
+	it("madde imi metne karışmıyor", () => {
+		expect(md(e("body", [wp("·", "bir")]))).not.toContain("·");
+	});
+
+	it("sayı imi sıralı liste yapıyor", () => {
+		const root = e("body", [wp("1.", "bir"), wp("2.", "iki")]);
+		expect(md(root)).toBe("1. bir\n2. iki");
+	});
+
+	it("harf imi de sıralı sayılıyor", () => {
+		expect(md(e("body", [wp("a)", "bir")]))).toBe("1. bir");
+	});
+
+	it("seviye numarası iç içe liste kuruyor", () => {
+		const root = e("body", [wp("·", "bir"), wp("o", "ic", 2), wp("·", "iki")]);
+		expect(md(root)).toBe("- bir\n  - ic\n- iki");
+	});
+
+	/** Liste bitince sıradan paragraf yeniden paragraf olmalı. */
+	it("listeden sonra paragraf listeye girmiyor", () => {
+		const root = e("body", [wp("·", "bir"), e("p", [t("sonra")])]);
+		expect(md(root)).toBe("- bir\n\nsonra");
+	});
+
+	it("iki liste arasında paragraf varsa listeler ayrılıyor", () => {
+		const root = e("body", [wp("·", "bir"), e("p", [t("ara")]), wp("·", "iki")]);
+		expect(md(root)).toBe("- bir\n\nara\n\n- iki");
+	});
+
+	/** Word atlamalı seviye üretebiliyor; madde kaybolmamalı. */
+	it("atlamalı seviye çökmüyor", () => {
+		const root = e("body", [wp("·", "bir", 3)]);
+		expect(md(root)).toContain("bir");
+	});
+
+	it("madde içindeki biçim korunuyor", () => {
+		const root = e("body", [
+			e("p", [e("span", [t("·")], { style: "mso-list:Ignore" }), e("b", [t("kalın")]), t(" düz")], {
+				style: "mso-list:l0 level1 lfo1",
+			}),
+		]);
+		expect(md(root)).toBe("- **kalın** düz");
+	});
+});
+
+/**
+ * Word aynı biçimi hem etiketle hem stille yazıyor: `<b><span
+ * style="font-weight:bold">`. İkisi de `strong` üretiyor ve saf sarma
+ * `__**metin**__` çıkarıyor.
+ */
+describe("çift işaretleme", () => {
+	it("etiket ve stil aynı biçmi veriyorsa bir kez sarılıyor", () => {
+		const root = e("body", [e("b", [e("span", [t("metin")], { style: "font-weight:bold" })])]);
+		expect(md(root)).toBe("**metin**");
+	});
+
+	/** Yalnızca **aynı** biçim tekilleşiyor; farklı olanlar iç içe kalmalı. */
+	it("farklı biçimler iç içe kalıyor", () => {
+		const root = e("body", [e("b", [e("i", [t("metin")])])]);
+		expect(md(root)).toBe("__*metin*__");
+	});
+});

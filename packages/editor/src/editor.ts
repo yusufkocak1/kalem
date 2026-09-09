@@ -33,6 +33,7 @@ import {
 	mergeWithPrevious,
 	normalizeDocument,
 	outdentItem,
+	sameCaret,
 	splitAtCaret,
 	toggleList,
 } from "./block-edit.js";
@@ -49,6 +50,8 @@ import {
 	spliceInline,
 } from "./inline-edit.js";
 import { contentLength, offsetOf, selectRange } from "./offsets.js";
+import type { PasteInput } from "./paste.js";
+import { insertFragment, pasteFragment } from "./paste.js";
 import type { Plugin, PluginContext } from "./plugin.js";
 import { PluginRegistry } from "./plugin.js";
 import { defaultPlugins } from "./plugins-builtin.js";
@@ -110,6 +113,13 @@ export interface EditorOptions {
 	 */
 	inputRules?: boolean;
 	/**
+	 * Yapıştırılan düz metni Markdown olarak ayrıştır (varsayılan `true`).
+	 *
+	 * Yalnızca metin gerçekten Markdown'a benziyorsa ayrıştırılıyor
+	 * (`looksLikeMarkdown`); ayrıntı ve gerekçe `paste.ts` içinde.
+	 */
+	parseMarkdownOnPaste?: boolean;
+	/**
 	 * Eklentiler.
 	 *
 	 * Verilmezse yerleşikler kullanılıyor (giriş kuralları, görev listesi).
@@ -148,6 +158,10 @@ export class Editor {
 	 */
 	readonly #listeners = new Map<EditorEvent, Set<(...args: never[]) => void>>();
 	readonly #plugins: PluginRegistry;
+	/** Sıradaki yapıştırma biçimsiz mi (Ctrl+Shift+V). */
+	#plainPaste = false;
+	/** En son bildirilen imleç; blok içi hareketi yakalamak için. */
+	#lastCaret: Caret | null = null;
 	/**
 	 * Tuşa basıldığı andaki imleç.
 	 *
@@ -186,6 +200,7 @@ export class Editor {
 		element.addEventListener("compositionend", this.#onCompositionEnd);
 		element.addEventListener("copy", this.#onCopy);
 		element.addEventListener("cut", this.#onCut);
+		element.addEventListener("paste", this.#onPaste);
 		element.addEventListener("pointerdown", this.#onPointerDown);
 		element.addEventListener("pointermove", this.#onPointerMove);
 		element.ownerDocument.addEventListener("pointerup", this.#onPointerUp);
@@ -715,6 +730,79 @@ export class Editor {
 		this.#writeClipboard(event);
 	};
 
+	/**
+	 * Yapıştırma  (F3-07)
+	 *
+	 * Tarayıcının kendi yapıştırması **her zaman** durduruluyor: HTML'i
+	 * olduğu gibi `contenteditable`'a gömmek, Word'ün `mso-*` çöpünü
+	 * modele sokmak demek. İçerik `paste.ts` boru hattından geçip belgeye
+	 * model olarak giriyor.
+	 */
+	#onPaste = (event: ClipboardEvent): void => {
+		if (this.#readOnly) return;
+		// Dışarıdan bir işleyici yapıştırmayı zaten tükettiyse editör ona
+		// dokunmuyor — `keydown`daki kuralın aynısı (F3-03). Arayüz katmanı
+		// URL yapıştırmayı böyle devralıyor (F3-02) ve olayı **yakalama
+		// evresinde** dinlediği için buradan önce çalışıyor.
+		if (event.defaultPrevented) return;
+		const veri = event.clipboardData;
+		if (veri === null) return;
+
+		const girdi: PasteInput = {
+			html: veri.getData("text/html"),
+			text: veri.getData("text/plain"),
+		};
+		if (girdi.html === "" && girdi.text === "") return;
+
+		event.preventDefault();
+		const parca = pasteFragment(girdi, (html) => this.#parseHtml(html), {
+			// Ctrl+Shift+V: bir sonraki yapıştırma biçimsiz.
+			plainOnly: this.#plainPaste,
+			...(this.#options.parseMarkdownOnPaste !== undefined
+				? { parseMarkdown: this.#options.parseMarkdownOnPaste }
+				: {}),
+		});
+		this.#plainPaste = false;
+		this.#insertPaste(parca);
+	};
+
+	/**
+	 * HTML metnini ayrıştırır.
+	 *
+	 * `DOMParser` kullanılıyor, `innerHTML` değil: ayrıştırılan belge
+	 * **bağlantısız** (inert) — script çalışmıyor, `<img>` istek atmıyor.
+	 * Yapıştırılan içerik kullanıcının yazdığı bir şey değil ve ona
+	 * güvenilmiyor.
+	 */
+	#parseHtml(html: string): Element | null {
+		const view = this.#element.ownerDocument.defaultView;
+		if (view === undefined || view === null) return null;
+		const belge = new view.DOMParser().parseFromString(html, "text/html");
+		return belge.body;
+	}
+
+	/** Parçayı seçimin yerine koyar. */
+	#insertPaste(parca: Root): void {
+		// Seçili metin varsa önce siliniyor: yapıştırma her editörde
+		// seçimin **yerine** geçiyor.
+		if (this.#selection?.kind === "block") this.#deleteSelectedBlocks();
+		else this.#deleteSelectedText();
+
+		const caret = this.getCaret();
+		if (caret === null) return;
+		this.applyEdit(insertFragment(this.#doc, caret, parca));
+	}
+
+	/**
+	 * Sıradaki yapıştırmayı biçimsiz yapar (Ctrl+Shift+V).
+	 *
+	 * Bayrak tek seferlik: bir kez biçimsiz yapıştıran kullanıcı, bundan
+	 * sonraki bütün yapıştırmaların da biçimsiz olmasını istemiyor.
+	 */
+	pasteWithoutFormatting(): void {
+		this.#plainPaste = true;
+	}
+
 	#onCut = (event: ClipboardEvent): void => {
 		if (this.#readOnly) return;
 		if (!this.#writeClipboard(event)) return;
@@ -790,10 +878,32 @@ export class Editor {
 		this.#applySelection(readSelection(this.#element));
 	}
 
+	/**
+	 * Okunan seçimi uygular ve gerekiyorsa haber verir.
+	 *
+	 * `EditorSelection` kaba: metin seçiminde yalnızca hangi blokta olduğu
+	 * ve boş olup olmadığı yazıyor, **ofset yazmıyor**. Bloğun içinde imleci
+	 * gezdirmek o tanımı değiştirmiyor ve olay hiç doğmuyordu. Sabit araç
+	 * çubuğu (F3-06) bunu ortaya çıkardı: kalın bir kelimenin içine tıklamak
+	 * B düğmesini yakmıyordu, çünkü çubuğa haber gitmiyordu.
+	 *
+	 * Bu yüzden imlecin kendisi de karşılaştırılıyor. `EditorSelection`e
+	 * ofset **eklenmedi**: o tip bloklar arası seçimi de anlatıyor ve
+	 * ofsetin orada karşılığı yok.
+	 */
 	#applySelection(okunan: EditorSelection): void {
-		if (sameSelection(okunan, this.#selection)) return;
-		this.#selection = okunan;
-		this.#paintSelection(okunan);
+		const caret = this.#caret();
+		const secimDegisti = !sameSelection(okunan, this.#selection);
+		const imlecDegisti = !sameCaret(caret, this.#lastCaret);
+		if (!secimDegisti && !imlecDegisti) return;
+
+		this.#lastCaret = caret;
+		// Boyama yalnızca seçim tanımı değişince: imleç gezdirmek blok
+		// vurgularını yeniden çizmeyi gerektirmiyor.
+		if (secimDegisti) {
+			this.#selection = okunan;
+			this.#paintSelection(okunan);
+		}
 		this.#options.onSelectionChange?.(okunan);
 		this.#dispatch("selectionchange", okunan);
 	}
@@ -930,6 +1040,15 @@ export class Editor {
 		}
 
 		if (event.ctrlKey || event.metaKey) {
+			// Ctrl+Shift+V — biçimsiz yapıştır. Olay engellenmiyor: tarayıcı
+			// kendi `paste` olayını üretmeye devam ediyor, biz yalnızca onu
+			// nasıl işleyeceğimizi işaretliyoruz. Engellemek, bazı
+			// tarayıcılarda pano olayının hiç doğmamasına yol açıyor.
+			// kalem-locale-ok: tuş adları ASCII; Türkçe kuralı burada zarar verir
+			if (event.shiftKey && event.key.toLowerCase() === "v") {
+				this.#plainPaste = true;
+				return;
+			}
 			this.#formatShortcut(event);
 			if (!event.defaultPrevented) this.#blockShortcut(event);
 			return;

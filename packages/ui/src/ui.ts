@@ -183,8 +183,13 @@ export function mountUi(editor: Editor, options: UiOptions = {}): Ui {
 			event.preventDefault();
 			editor.setLink(url);
 		};
-		element.addEventListener("paste", yapistir);
-		sokucular.push(() => element.removeEventListener("paste", yapistir));
+		// **Yakalama evresi.** Editörün kendi yapıştırma boru hattı (F3-07)
+		// aynı elemanda dinliyor ve önce kaydolduğu için köpürme evresinde
+		// bizden önce çalışırdı; URL, bağlantı olacağı yerde düz metin
+		// olarak yapıştırılıyordu. Yakalama evresi sırayı kayıt sırasından
+		// bağımsız hâle getiriyor.
+		element.addEventListener("paste", yapistir, true);
+		sokucular.push(() => element.removeEventListener("paste", yapistir, true));
 	}
 
 	let slashMenu: SlashMenu | null = null;

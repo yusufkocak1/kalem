@@ -24,7 +24,7 @@
  * Bilinmeyen etiket = **içeriği düz metne düşür**. Kara liste yaklaşımı
  * Word'ün her sürümde yeni ürettiği çöple baş edemez; beyaz liste eder.
  */
-import type { Block, Inline, Root } from "./ast.js";
+import type { Block, Inline, List, Root } from "./ast.js";
 import { isSafeUrl, NEUTRALIZED_URL } from "./security.js";
 
 /**
@@ -216,9 +216,21 @@ function collectBlocks(nodes: readonly HtmlNode[], o: FromHtmlOptions): Block[] 
 	/** Blok kabına girmeyen satır içi parçalar burada birikir. */
 	let pending: Inline[] = [];
 
+	/** Ardışık Word liste maddeleri; `flushList` onları listeye çeviriyor. */
+	let wordItems: WordListItem[] = [];
+
+	const flushList = (): void => {
+		if (wordItems.length === 0) return;
+		out.push(...wordList(wordItems));
+		wordItems = [];
+	};
+
 	const flush = (): void => {
 		const trimmed = trimInlines(pending);
-		if (trimmed.length > 0) out.push({ type: "paragraph", children: trimmed });
+		if (trimmed.length > 0) {
+			flushList();
+			out.push({ type: "paragraph", children: trimmed });
+		}
 		pending = [];
 	};
 
@@ -233,9 +245,19 @@ function collectBlocks(nodes: readonly HtmlNode[], o: FromHtmlOptions): Block[] 
 		if (DROPPED.has(tag)) continue;
 		if (isEmptyShell(node)) continue;
 
+		// Word'ün sahte liste maddeleri: ardışık olanlar biriktirilip tek
+		// listeye çevriliyor (aşağıya bakın).
+		const wordItem = wordListItem(node, tag, o);
+		if (wordItem !== null) {
+			flush();
+			wordItems.push(wordItem);
+			continue;
+		}
+
 		const block = toBlock(node, tag, o);
 		if (block !== null) {
 			flush();
+			flushList();
 			out.push(...block);
 			continue;
 		}
@@ -243,6 +265,7 @@ function collectBlocks(nodes: readonly HtmlNode[], o: FromHtmlOptions): Block[] 
 	}
 
 	flush();
+	flushList();
 	return out;
 }
 
@@ -377,6 +400,10 @@ function toInlines(node: HtmlNode, o: FromHtmlOptions): Inline[] {
 
 	const tag = tagOf(node);
 	if (DROPPED.has(tag)) return [];
+	// `mso-list:Ignore` Word'ün kendi işareti: "bu içerik değil, çizim".
+	// Madde imleri bu şekilde geliyor ve metne karışırsa kullanıcının
+	// yazısının parçası hâline geliyorlar.
+	if (styleMap(node).get("mso-list") === "ignore") return [];
 	if (tag === "BR") return [{ type: "break" }];
 
 	if (tag === "IMG") {
@@ -417,11 +444,21 @@ function toInlines(node: HtmlNode, o: FromHtmlOptions): Inline[] {
 	return applyMarks(children, dedupe(marks));
 }
 
-/** Biçimleri iç içe sarar. */
+/**
+ * Biçimleri iç içe sarar.
+ *
+ * **Aynı biçim iki kez sarılmıyor.** Word semantik etiketi *ve* stili
+ * birlikte yazıyor: `<b><span style="font-weight:bold">metin</span></b>`.
+ * İkisi de `strong` üretiyor ve saf sarma `strong > strong` veriyor;
+ * Markdown'a `__**metin**__` diye çıkıyor. `dedupe` bunu yakalayamıyor
+ * çünkü işaretler **ayrı düğümlerden** geliyor.
+ */
 function applyMarks(children: Inline[], marks: readonly string[]): Inline[] {
 	if (children.length === 0) return [];
 	let out = children;
 	for (const mark of marks) {
+		const tek = out.length === 1 ? out[0] : undefined;
+		if (tek?.type === mark) continue;
 		out = [{ type: mark, children: out } as Inline];
 	}
 	return out;
@@ -467,4 +504,119 @@ function trimInlines(nodes: readonly Inline[]): Inline[] {
 	const last = copy[copy.length - 1];
 	if (last?.type === "text") last.value = last.value.replace(/ +$/, "");
 	return copy.filter((n) => !(n.type === "text" && n.value === ""));
+}
+
+// ---------------------------------------------------------------------------
+// Word'ün sahte listeleri
+// ---------------------------------------------------------------------------
+
+/**
+ * Word listeleri `<ul>`/`<ol>` üretmez.
+ *
+ * Her madde ayrı bir `<p class=MsoListParagraph style='mso-list:l0 level1
+ * lfo1'>` ve madde imi, paragrafın içine gömülü bir `<span
+ * style='mso-list:Ignore'>·</span>` metnidir. İşlenmezse yapıştırılan
+ * belgede liste diye bir şey kalmaz: ekranda "· Madde bir" yazan düz
+ * paragraflar olur ve Markdown çıktısında madde imi kullanıcının **metni**
+ * hâline gelir.
+ *
+ * Bu yüzden ardışık madde paragrafları toplanıp `level` numaralarına göre
+ * yeniden iç içe listelere çevriliyor.
+ */
+interface WordListItem {
+	readonly level: number;
+	readonly ordered: boolean;
+	readonly children: Inline[];
+}
+
+/** `mso-list:Ignore` taşıyan ilk torun — madde iminin kendisi. */
+function msoMarker(node: HtmlNode): HtmlNode | null {
+	for (const child of childrenOf(node)) {
+		if (child.nodeType !== ELEMENT) continue;
+		if (styleMap(child).get("mso-list") === "ignore") return child;
+		const inner = msoMarker(child);
+		if (inner !== null) return inner;
+	}
+	return null;
+}
+
+/**
+ * Madde imi sıralı mı.
+ *
+ * Word sırasız listelerde `·`, `o`, `§` gibi simgeler; sıralı listelerde
+ * `1.`, `a)`, `iv.` gibi diziler kullanır. Ayrım tek kurala iniyor: im bir
+ * sayı ya da harf dizisiyse sıralı.
+ */
+const SIRALI_IM = /^\s*(?:\d+|[a-z]+|[ivxlcdm]+)\s*[.)]/i;
+
+/** Paragraf bir Word liste maddesiyse onu döndürür. */
+function wordListItem(node: HtmlNode, tag: string, o: FromHtmlOptions): WordListItem | null {
+	if (tag !== "P") return null;
+	const msoList = styleMap(node).get("mso-list");
+	if (msoList === undefined) return null;
+
+	const seviye = /level(\d+)/.exec(msoList);
+	const im = msoMarker(node);
+	const imMetni = (im?.textContent ?? "").trim();
+
+	// İmin kendisi `toInlines` içinde düşüyor (`mso-list:Ignore`); burada
+	// yalnızca sıralı mı sırasız mı olduğu okunuyor.
+	const children = trimInlines(collectInlines(childrenOf(node), o));
+
+	return {
+		level: seviye?.[1] === undefined ? 1 : Number(seviye[1]),
+		ordered: SIRALI_IM.test(imMetni),
+		children,
+	};
+}
+
+/**
+ * Düz madde listesini iç içe listelere çevirir.
+ *
+ * `level` numaraları bir yığınla okunuyor: numara artınca yeni bir iç liste
+ * açılıyor, azalınca kapanıyor. Word atlamalı seviye üretebiliyor
+ * (1 → 3); o durumda ara seviye açılmıyor, madde en yakın kaba giriyor.
+ */
+function wordList(items: readonly WordListItem[]): Block[] {
+	if (items.length === 0) return [];
+
+	const yeniListe = (ordered: boolean): List => ({
+		type: "list",
+		ordered,
+		start: ordered ? 1 : null,
+		spread: false,
+		children: [],
+	});
+
+	const kok = yeniListe(items[0]?.ordered === true);
+	/** Açık listeler, en dıştan içe. */
+	const yigin: List[] = [kok];
+
+	for (const item of items) {
+		while (yigin.length > item.level && yigin.length > 1) yigin.pop();
+
+		while (yigin.length < item.level) {
+			const ust = yigin[yigin.length - 1] as List;
+			const sonMadde = ust.children[ust.children.length - 1];
+			const ic = yeniListe(item.ordered);
+			// İç liste bir maddenin çocuğu olmak zorunda; üst listede madde
+			// yoksa (atlamalı seviye) boş bir madde açılıyor.
+			if (sonMadde === undefined) {
+				ust.children.push({ type: "listItem", checked: null, spread: false, children: [ic] });
+			} else {
+				sonMadde.children.push(ic);
+			}
+			yigin.push(ic);
+		}
+
+		const hedef = yigin[yigin.length - 1] as List;
+		hedef.children.push({
+			type: "listItem",
+			checked: null,
+			spread: false,
+			children: [{ type: "paragraph", children: item.children }],
+		});
+	}
+
+	return [kok];
 }

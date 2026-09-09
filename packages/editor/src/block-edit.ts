@@ -35,6 +35,17 @@ export interface Caret {
 	readonly offset: number;
 }
 
+/** İki imleç aynı yeri mi gösteriyor. */
+export function sameCaret(a: Caret | null, b: Caret | null): boolean {
+	if (a === null || b === null) return a === b;
+	return (
+		a.blockIndex === b.blockIndex &&
+		a.offset === b.offset &&
+		a.path.length === b.path.length &&
+		a.path.every((n, i) => n === b.path[i])
+	);
+}
+
 export interface EditResult {
 	readonly doc: Root;
 	readonly caret: Caret;
@@ -74,8 +85,11 @@ function yeniBlok<T extends Block>(node: T): T {
  *
  * Kural tek cümle: *önceki komşusu değişen blok konumunu kaybeder.*
  * Dokunulmayan blokların özgün boş satır sayısı böylece korunuyor.
+ *
+ * Paket dışına açılmıyor; blok dizisini yeniden kuran her işlem
+ * (`block-edit.ts`, `paste.ts`) bunu kullanmak zorunda.
  */
-function komsulukTazele<T extends { position?: unknown }>(
+export function komsulukTazele<T extends { position?: unknown }>(
 	onceki: readonly T[],
 	yeni: readonly T[],
 ): T[] {

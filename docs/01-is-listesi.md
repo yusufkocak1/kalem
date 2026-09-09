@@ -31,11 +31,11 @@
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
-| **Faz 3** — Word deneyimi | 7 / 11 | 🔵 Sürüyor |
+| **Faz 3** — Word deneyimi | 8 / 11 | 🔵 Sürüyor |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **39 / 72** | **%54** |
+| | **40 / 72** | **%56** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,7 +43,7 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-13` (Faz 2 tamam)** · `F3-01` · `F3-02` · `F3-03` · `F3-08`
 
-**Sıradaki:** `F3-07` yapıştırma boru hattı — Word'den gelen içerik.
+**Sıradaki:** `F3-09` tema sistemi — marka rengi tek CSS bloğuyla.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -990,12 +990,54 @@ götürmüyor gibi görünürdü.
 Editöre `readonlychange` olayı eklendi: arayüz düğmelerini yoklamak
 yerine haberle kapatıyor.
 
-### F3-07 · Yapıştırma boru hattı `[L]` ⬜
-F1-09'daki HTML→AST dönüştürücüyü editöre bağla
-- Yapıştırma anında kaynak tespiti (Word / GDocs / düz metin / Markdown metni)
-- Düz metin yapıştırılırken Markdown olarak ayrıştırma seçeneği
-- Ctrl+Shift+V = biçimsiz yapıştır
-- **Kabul:** Word'den kopyalanan 3 sayfalık biçimli doküman doğru yapıya dönüşüyor
+### F3-07 · Yapıştırma boru hattı `[L]` ✅
+F1-09'daki HTML→AST dönüştürücüyü editöre bağla ✅
+- [x] Yapıştırma anında kaynak tespiti (Word / GDocs / HTML / Markdown metni / düz metin)
+- [x] Düz metin yapıştırılırken Markdown olarak ayrıştırma seçeneği
+      (`parseMarkdownOnPaste`, varsayılan açık)
+- [x] Ctrl+Shift+V = biçimsiz yapıştır
+- [x] **Kabul:** Word'den kopyalanan 3 sayfalık biçimli doküman doğru yapıya dönüşüyor
+
+**Kabul kriteri nasıl ölçüldü.** Playwright'a Word kurulamıyor; ölçülen
+şey Word'ün **panoya yazdığı HTML**. `e2e/fixtures/word-clipboard.ts` o
+çıktının yapısını birebir taşıyor: `urn:schemas-microsoft-com` ad
+alanları, `Generator` etiketi, `MsoNormal`, `mso-list` sahte listeleri,
+`mso-list:Ignore` madde imleri, iç içe boş `<span>`'lar, `<o:p>` ve gizli
+`<style>` blokları. Taklit olduğu fixture'ın başında yazıyor. 12 kabul
+testi: başlık hiyerarşisi, stille verilen biçimler, listeler (iç içe ve
+numaralı), bağlantı, tablo, çöpün düşmesi, tek Ctrl+Z.
+
+**Word listeleri dönüştürücüye eklendi.** Word `<ul>`/`<ol>` üretmiyor:
+her madde bir `<p style='mso-list:...level1...'>` ve madde imi paragrafın
+içine gömülü bir `<span style='mso-list:Ignore'>`. İşlenmeden bırakılınca
+liste diye bir şey kalmıyor ve madde imi kullanıcının **metnine**
+karışıyor. Ardışık maddeler artık `level` numarasına göre iç içe
+listelere çevriliyor.
+
+**Çift işaretleme kusuru.** Word aynı biçimi hem etiketle hem stille
+yazıyor (`<b><span style="font-weight:bold">`); ikisi de `strong`
+üretiyordu ve çıktı `__**metin**__` oluyordu. Aynı biçim artık iki kez
+sarılmıyor.
+
+**Yapıştırma modelde yapılıyor, DOM'da değil.** Tarayıcının kendi
+yapıştırması HTML'i olduğu gibi `contenteditable`'a gömüyor. Test bunu
+ayrıca ölçüyor: yapıştırma sonrası editörün DOM'unda `mso-` geçmiyor.
+
+**Markdown sezgisi dar tutuldu.** Yalnızca satır başı yapısal işaretler
+(başlık, liste, alıntı, çit, çizgi) ve bağlantı/satır içi kod aranıyor.
+Satır içi `*` ve `_` bilerek dışarıda: `2 * 3 * 4` yazan kullanıcının
+metnini bozmak, kazanılan kolaylıktan pahalı.
+
+**İki gizli kusur daha çıktı:**
+- Editörün yapıştırma işleyicisi arayüzünkinden önce çalışıyordu ve URL
+  yapıştırma akışını (F3-02) bozuyordu. Arayüz artık **yakalama
+  evresinde** dinliyor, editör de `defaultPrevented` olayı görmezden
+  geliyor (F3-03'teki kuralın aynısı).
+- `selectionchange` blok **içinde** imleç gezdirilince hiç doğmuyordu:
+  `EditorSelection` ofset taşımıyor. Sabit araç çubuğu bunu ortaya
+  çıkardı (kalın kelimeye tıklamak B'yi yakmıyordu). Artık imlecin
+  kendisi de karşılaştırılıyor; `EditorSelection`e ofset eklenmedi çünkü
+  o tip bloklar arası seçimi de anlatıyor.
 
 ### F3-08 · Yer tutucu ve boş durumlar `[S]` ✅
 Boş dokümanda "Yazmaya başlayın veya `/` ile komut çalıştırın" ipucu ✅

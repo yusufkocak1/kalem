@@ -47,6 +47,8 @@ export {
 export { applyBlockRule, applyInlineRule, plainInline } from "./input-rules.js";
 export type { DomPoint } from "./offsets.js";
 export { contentLength, offsetOf, pointAt, selectRange } from "./offsets.js";
+export type { PasteInput, PasteOptions, PasteSource } from "./paste.js";
+export { detectPasteSource, insertFragment, looksLikeMarkdown, pasteFragment } from "./paste.js";
 export type { Plugin, PluginContext, PluginInputRule, PluginKeyHandler } from "./plugin.js";
 export { PluginRegistry } from "./plugin.js";
 export { defaultPlugins, inputRulesPlugin, taskListPlugin } from "./plugins-builtin.js";
