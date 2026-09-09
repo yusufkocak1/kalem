@@ -23,11 +23,22 @@
  */
 import type { Definition, Inline, NodeId, Root } from "@kalem/core";
 import { parse, removeAt, replaceAt, serialize } from "@kalem/core";
-import type { MarkType } from "@kalem/core/commands";
-import { emptyParagraph } from "@kalem/core/commands";
+import type { BlockType, MarkType } from "@kalem/core/commands";
+import { emptyParagraph, setBlockType } from "@kalem/core/commands";
+import type { Caret, EditResult } from "./block-edit.js";
+import {
+	indentItem,
+	insertBreak,
+	mergeWithNext,
+	mergeWithPrevious,
+	normalizeDocument,
+	outdentItem,
+	splitAtCaret,
+	toggleList,
+} from "./block-edit.js";
 import { assignIds, newId } from "./ids.js";
 import { applyLink, applyMark, markActive } from "./inline-edit.js";
-import { offsetOf, selectRange } from "./offsets.js";
+import { contentLength, offsetOf, selectRange } from "./offsets.js";
 import { readCode, readInline } from "./read.js";
 import {
 	CODE_ATTR,
@@ -100,7 +111,7 @@ export class Editor {
 		this.#prefix = options.classPrefix ?? "kalem-";
 		this.#readOnly = options.readOnly ?? false;
 
-		this.#doc = assignIds(parse(options.value ?? ""));
+		this.#doc = this.#load(options.value ?? "");
 		this.#defs = collectDefinitions(this.#doc);
 
 		element.classList.add(`${this.#prefix}editor`, `${this.#prefix}doc`);
@@ -142,7 +153,12 @@ export class Editor {
 	 * çağrılmamalı — `setValue` "başka bir belge aç" demek.
 	 */
 	setValue(markdown: string): void {
-		this.#replaceDocument(assignIds(parse(markdown)));
+		this.#replaceDocument(this.#load(markdown));
+	}
+
+	/** Markdown'ı düzenlenebilir bir belgeye çevirir. */
+	#load(markdown: string): Root {
+		return assignIds(normalizeDocument(parse(markdown)));
 	}
 
 	setReadOnly(readOnly: boolean): void {
@@ -451,8 +467,17 @@ export class Editor {
 		this.#dragAnchor = null;
 	};
 
-	#blockOf(target: EventTarget | null): HTMLElement | null {
-		const element = target instanceof Element ? target : null;
+	/**
+	 * Bir olay hedefinin ya da DOM düğümünün ait olduğu blok elemanı.
+	 *
+	 * Metin düğümü de kabul ediyor: seçim sınırları neredeyse her zaman
+	 * metin düğümüdür ve yalnızca `Element` beklemek sessizce `null`
+	 * döndürüyordu — bloklar arası ok tuşu gezinmesi tam bu yüzden hiç
+	 * çalışmıyordu.
+	 */
+	#blockOf(target: EventTarget | Node | null): HTMLElement | null {
+		const element =
+			target instanceof Element ? target : target instanceof Node ? target.parentElement : null;
 		const blok = element?.closest(`[${ID_ATTR}]`);
 		return blok instanceof HTMLElement && this.#element.contains(blok) ? blok : null;
 	}
@@ -496,8 +521,135 @@ export class Editor {
 			return;
 		}
 
-		if (event.ctrlKey || event.metaKey) this.#formatShortcut(event);
+		if (event.ctrlKey || event.metaKey) {
+			this.#formatShortcut(event);
+			if (!event.defaultPrevented) this.#blockShortcut(event);
+			return;
+		}
+		this.#structureKey(event);
 	};
+
+	/**
+	 * Blok yapısını değiştiren tuşlar.
+	 *
+	 * Hepsinde ortak kalıp: imleci bul, saf bir model işlemi çağır, sonucu
+	 * uygula. Karar verme işi `block-edit.ts`'te ve DOM'a hiç dokunmuyor;
+	 * burada yalnızca hangi tuşun hangi işleme gittiği yazıyor.
+	 */
+	#structureKey(event: KeyboardEvent): void {
+		// Kaynak blokları (kod, ham HTML, frontmatter) `#caret()`'ten **önce**
+		// ele alınıyor: onların satır içi taşıyıcısı yok, dolayısıyla `#caret()`
+		// her zaman `null` dönüyor ve aşağıdaki erken çıkış Enter'ı sessizce
+		// tarayıcıya bırakıyordu. WebKit de `<pre contenteditable>` içinde
+		// Enter'a basınca içeriği yeniden yapılandırıp mevcut satırı yutuyordu.
+		if (event.key === "Enter" && this.#sourceHolder() !== null) {
+			event.preventDefault();
+			this.#insertIntoSource(SATIR_SONU);
+			return;
+		}
+
+		const caret = this.#caret();
+		if (caret === null) return;
+
+		if (event.key === "Enter") {
+			event.preventDefault();
+			this.#applyEdit(
+				event.shiftKey ? insertBreak(this.#doc, caret) : splitAtCaret(this.#doc, caret),
+			);
+			return;
+		}
+
+		if (event.key === "Tab" && caret.path.length >= 2) {
+			event.preventDefault();
+			this.#applyEdit(
+				event.shiftKey ? outdentItem(this.#doc, caret) : indentItem(this.#doc, caret),
+			);
+			return;
+		}
+
+		if (event.key === "Backspace" && this.#atStart()) {
+			const sonuc = mergeWithPrevious(this.#doc, caret);
+			if (sonuc === null) return;
+			event.preventDefault();
+			this.#applyEdit(sonuc);
+			return;
+		}
+
+		if (event.key === "Delete" && this.#atEnd()) {
+			const sonuc = mergeWithNext(this.#doc, caret);
+			if (sonuc === null) return;
+			event.preventDefault();
+			this.#applyEdit(sonuc);
+			return;
+		}
+
+		this.#arrowKey(event, caret);
+	}
+
+	/**
+	 * Bloklar arası ok tuşu gezinmesi.
+	 *
+	 * Blok içinde tarayıcıya karışılmıyor — satır sarması, çift yönlü metin
+	 * ve grapheme sınırları onun işi. Yalnızca **sınırda** devralınıyor:
+	 * bloğun ilk satırında yukarı, son satırında aşağı.
+	 *
+	 * Satırın ilk/son olup olmadığı imlecin ekran konumundan anlaşılıyor;
+	 * ofsete bakmak sarmalanmış paragrafta yanlış cevap verirdi (3 satırlık
+	 * bir paragrafın 2. satırında ofset ne baştadır ne sonda).
+	 */
+	#arrowKey(event: KeyboardEvent, caret: Caret): void {
+		const yon =
+			event.key === "ArrowUp" || (event.key === "ArrowLeft" && this.#atStart())
+				? -1
+				: event.key === "ArrowDown" || (event.key === "ArrowRight" && this.#atEnd())
+					? 1
+					: 0;
+		if (yon === 0 || event.shiftKey) return;
+
+		if (event.key === "ArrowUp" && !this.#atEdge("start")) return;
+		if (event.key === "ArrowDown" && !this.#atEdge("end")) return;
+
+		const hedef = this.#doc.children[caret.blockIndex + yon];
+		if (hedef === undefined) return;
+		const element = this.#elements.get(hedef.id as string);
+		if (element === undefined) return;
+
+		event.preventDefault();
+		placeCaret(element, yon === -1 ? "end" : "start");
+	}
+
+	/** Blok türü kısayolları: başlık, paragraf, liste, alıntı. */
+	#blockShortcut(event: KeyboardEvent): void {
+		const caret = this.#caret();
+		if (caret === null) return;
+
+		if (event.altKey) {
+			const derinlik = Number(event.key);
+			if (!Number.isInteger(derinlik) || derinlik < 0 || derinlik > 6) return;
+			event.preventDefault();
+			const hedef: BlockType =
+				derinlik === 0
+					? { type: "paragraph" }
+					: { type: "heading", depth: derinlik as 1 | 2 | 3 | 4 | 5 | 6 };
+			this.#applyEdit({
+				doc: setBlockType(this.#doc, [caret.blockIndex], hedef),
+				caret: { ...caret, path: [] },
+			});
+			return;
+		}
+
+		if (!event.shiftKey) return;
+		// Word ve GitHub ile aynı: Ctrl+Shift+8 madde imli, 7 numaralı liste.
+		if (event.key === "*" || event.key === "8") {
+			event.preventDefault();
+			this.#applyEdit(toggleList(this.#doc, caret, false));
+			return;
+		}
+		if (event.key === "&" || event.key === "7") {
+			event.preventDefault();
+			this.#applyEdit(toggleList(this.#doc, caret, true));
+		}
+	}
 
 	/**
 	 * Biçim kısayolları.
@@ -644,6 +796,139 @@ export class Editor {
 		return true;
 	}
 
+	/**
+	 * Kaynak bloğunun metnine imleçte metin ekler.
+	 *
+	 * Satır içi taşıyıcılardan ayrı bir yol, çünkü içerik `Inline[]` değil
+	 * düz bir `value`: kesme, biçim ve normalleştirme burada geçerli değil.
+	 */
+	#sourceHolder(): HTMLElement | null {
+		const selection = this.#element.ownerDocument.getSelection();
+		if (selection === null || selection.rangeCount === 0) return null;
+		const node = selection.getRangeAt(0).startContainer;
+		const element = node instanceof Element ? node : node.parentElement;
+		const holder = element?.closest(`[${CODE_ATTR}]`);
+		return holder instanceof HTMLElement && this.#element.contains(holder) ? holder : null;
+	}
+
+	#insertIntoSource(metin: string): void {
+		const selection = this.#element.ownerDocument.getSelection();
+		if (selection === null || selection.rangeCount === 0) return;
+		const range = selection.getRangeAt(0);
+
+		const holder = this.#sourceHolder();
+		if (holder === null) return;
+
+		const blockElement = holder.closest(`[${ID_ATTR}]`);
+		if (!(blockElement instanceof HTMLElement)) return;
+		const blockIndex = this.#indexOf(blockElement);
+		if (blockIndex < 0) return;
+
+		const path = parsePath(holder.getAttribute(CODE_ATTR));
+		const dugum = nodeAt(this.#doc.children[blockIndex], path) as { value?: string } | undefined;
+		if (dugum?.value === undefined) return;
+
+		const bas = offsetOf(holder, range.startContainer, range.startOffset);
+		const bit = offsetOf(holder, range.endContainer, range.endOffset);
+		const deger = dugum.value.slice(0, bas) + metin + dugum.value.slice(bit);
+
+		const doc = replaceAt(this.#doc, [blockIndex, ...path], { ...dugum, value: deger } as never);
+		this.#doc = doc;
+		this.#defs = collectDefinitions(doc);
+		this.#sync();
+
+		const yeniBlok = this.#elements.get(doc.children[blockIndex]?.id as string);
+		const yeniHolder = yeniBlok?.querySelector(`[${CODE_ATTR}]`);
+		if (yeniHolder instanceof HTMLElement) {
+			selectRange(yeniHolder, bas + metin.length, bas + metin.length);
+			(yeniBlok as HTMLElement).focus({ preventScroll: true });
+		}
+		this.#emit();
+	}
+
+	/** İmlecin model konumu; seçim tek bir taşıyıcıda değilse `null`. */
+	#caret(): Caret | null {
+		const hedef = this.#rangeTarget();
+		if (hedef === null) return null;
+		return { blockIndex: hedef.blockIndex, path: hedef.path, offset: hedef.from };
+	}
+
+	#atStart(): boolean {
+		const hedef = this.#rangeTarget();
+		return hedef !== null && hedef.from === 0 && hedef.to === 0;
+	}
+
+	#atEnd(): boolean {
+		const hedef = this.#rangeTarget();
+		if (hedef === null || hedef.from !== hedef.to) return false;
+		return hedef.from === contentLength(hedef.holder);
+	}
+
+	/**
+	 * İmleç bloğun ilk/son **görsel satırında** mı.
+	 *
+	 * Ofsete bakmak yetmiyor: sarmalanmış bir paragrafın ortasındaki satırda
+	 * imleç ne baştadır ne sonda, ama ArrowUp yine de bir üst satıra gitmeli.
+	 * Karar imlecin ekran konumundan veriliyor.
+	 */
+	#atEdge(kenar: "start" | "end"): boolean {
+		const selection = this.#element.ownerDocument.getSelection();
+		if (selection === null || selection.rangeCount === 0) return false;
+		const range = selection.getRangeAt(0);
+		const blok = this.#blockOf(range.startContainer);
+		if (blok === null) return false;
+
+		const imlec = range.getBoundingClientRect();
+		// Boş blokta imleç dikdörtgeni sıfır gelir; orada tek satır vardır.
+		if (imlec.top === 0 && imlec.bottom === 0) return true;
+
+		// Bloğun **kutusuyla** karşılaştırmak yetmiyordu: satır yüksekliği
+		// metnin kendisinden büyük olduğu için tek satırlık bir blokta bile
+		// imleç kutunun altına birkaç piksel uzakta kalıyor ve "son satırda
+		// değilim" cevabı çıkıyordu. Onun yerine bloğun ilk/son satırının
+		// dikdörtgeni ölçülüyor — imleç oraya oturuyorsa kenardayız.
+		const doc = this.#element.ownerDocument;
+		const kenarAralik = doc.createRange();
+		kenarAralik.selectNodeContents(blok);
+		kenarAralik.collapse(kenar === "start");
+		const hedef = kenarAralik.getBoundingClientRect();
+		if (hedef.top === 0 && hedef.bottom === 0) return true;
+
+		const pay = 2;
+		return kenar === "start"
+			? Math.abs(imlec.top - hedef.top) < pay
+			: Math.abs(imlec.bottom - hedef.bottom) < pay;
+	}
+
+	/**
+	 * Model işleminin sonucunu uygular ve imleci yeni yerine koyar.
+	 *
+	 * Seçim yine `onChange`'den önce kuruluyor (F2-07'de yakalanan sıralama
+	 * hatasının aynısı burada da geçerli).
+	 */
+	#applyEdit(sonuc: EditResult | null): void {
+		if (sonuc === null) return;
+		const doc = assignIds(sonuc.doc);
+		this.#doc = doc;
+		this.#defs = collectDefinitions(doc);
+		this.#sync();
+		this.#placeCaretAt(sonuc.caret);
+		this.#emit();
+	}
+
+	#placeCaretAt(caret: Caret): void {
+		const blok = this.#doc.children[caret.blockIndex];
+		const element = blok === undefined ? undefined : this.#elements.get(blok.id as string);
+		if (element === undefined) return;
+		const holder = holderAt(element, caret.path);
+		if (holder === null) {
+			placeCaret(element, "start");
+			return;
+		}
+		selectRange(holder, caret.offset, caret.offset);
+		element.focus({ preventScroll: true });
+	}
+
 	#indexOf(blockElement: HTMLElement): number {
 		const id = blockElement.getAttribute(ID_ATTR);
 		return this.#doc.children.findIndex((child) => child.id === id);
@@ -695,6 +980,14 @@ export class Editor {
 // ---------------------------------------------------------------------------
 // Yardımcılar
 // ---------------------------------------------------------------------------
+
+/**
+ * Kaynak bloğuna eklenen satır sonu.
+ *
+ * Kaçış dizisi yerine kod noktası: bu dosyanın içinden geçen yama
+ * betikleri ters bölüyü bir kez yiyip kaynağı bozdu.
+ */
+const SATIR_SONU = String.fromCharCode(10);
 
 /** Klavye kısayolu → biçim. */
 const KISAYOLLAR: Record<string, MarkType | undefined> = {

@@ -160,9 +160,14 @@ describe("yazım tercihi olmayan düğümler — varsayılanlar", () => {
 		expect(satirIci({ type: "break" })).toBe("");
 	});
 
-	it("iki metin arasındaki sert satır sonu iki boşlukla yazılıyor", () => {
+	/**
+	 * Varsayılan ters bölü: iki boşluk görünmez ve satır sonu boşluğunu
+	 * kırpan her araç onu sessizce yok eder. Kaynakta iki boşlukla yazılmış
+	 * satır sonları `syntax.marker` sayesinde korunuyor (aşağıdaki test).
+	 */
+	it("iki metin arasındaki sert satır sonu ters bölüyle yazılıyor", () => {
 		expect(blok({ type: "paragraph", children: [metin("a"), { type: "break" }, metin("b")] })).toBe(
-			"a  \nb",
+			"a\\\nb",
 		);
 	});
 

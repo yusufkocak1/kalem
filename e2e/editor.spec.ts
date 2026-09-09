@@ -449,3 +449,188 @@ test.describe("biçimlendirme", () => {
 		await expect(page.locator("#cikti")).toContainText("**ışık** ve gölge");
 	});
 });
+
+/**
+ * Klavye ve gezinme  (İş listesi: F2-08)
+ *
+ * Kabul kriteri "klavye ile fare kullanmadan tam doküman yazılabiliyor".
+ * Aşağıdaki testler o cümleyi parçalarına ayırıyor; en sonda da baştan
+ * sona klavyeyle bir belge yazan bir test var.
+ */
+test.describe("klavye", () => {
+	/** Editörü boşaltıp tek bir paragrafla başlar. */
+	async function bosla(page: import("@playwright/test").Page, metin = "") {
+		await page.evaluate((m) => window.kalem.editor.setValue(m === "" ? "\n" : `${m}\n`), metin);
+		const ilk = page.locator("#editor > p").first();
+		await ilk.click();
+		await page.keyboard.press("ControlOrMeta+a");
+		if (metin !== "") await page.keyboard.press("ArrowRight");
+		else await page.keyboard.press("Delete");
+	}
+
+	test("Enter paragrafı ikiye bölüyor", async ({ page }) => {
+		await bosla(page, "abcdef");
+		for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowLeft");
+		await page.keyboard.press("Enter");
+		await expect(page.locator("#cikti")).toHaveText("abc\n\ndef\n");
+		await expect(page.locator("#editor > p")).toHaveCount(2);
+	});
+
+	test("Enter'dan sonra yazmak ikinci bloğa gidiyor", async ({ page }) => {
+		await bosla(page, "abc");
+		await page.keyboard.press("Enter");
+		await page.keyboard.type("def");
+		await expect(page.locator("#cikti")).toHaveText("abc\n\ndef\n");
+	});
+
+	test("Shift+Enter satır sonu ekliyor, blok bölmüyor", async ({ page }) => {
+		await bosla(page, "abc");
+		await page.keyboard.press("Shift+Enter");
+		await page.keyboard.type("def");
+		await expect(page.locator("#editor > p")).toHaveCount(1);
+		// Ters bölülü satır sonu: iki boşluk görünmez ve kırpılınca kaybolur.
+		await expect(page.locator("#cikti")).toHaveText("abc\\\ndef\n");
+	});
+
+	test("blok başında Backspace önceki blokla birleştiriyor", async ({ page }) => {
+		await bosla(page, "abc");
+		await page.keyboard.press("Enter");
+		await page.keyboard.type("def");
+		await page.keyboard.press("Home");
+		await page.keyboard.press("Backspace");
+		await expect(page.locator("#editor > p")).toHaveCount(1);
+		await expect(page.locator("#cikti")).toHaveText("abcdef\n");
+	});
+
+	test("blok sonunda Delete sonraki bloğu çekiyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("abc\n\ndef\n"));
+		await page.locator("#editor > p").first().click();
+		// Ctrl+A + ArrowRight üç motorda farklı davranıyor (Firefox listede
+		// tüm bloğu seçiyor, WebKit `<pre>` içinde başa dönüyor). Ctrl+End
+		// doğrudan düzenleme kökünün sonuna gidiyor ve üçünde de aynı.
+		await page.keyboard.press("ControlOrMeta+End");
+		await page.keyboard.press("Delete");
+		await expect(page.locator("#cikti")).toHaveText("abcdef\n");
+	});
+
+	test("liste maddesinde Enter yeni madde açıyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("- bir\n"));
+		await page.locator("#editor li").first().click();
+		// Ctrl+A + ArrowRight üç motorda farklı davranıyor (Firefox listede
+		// tüm bloğu seçiyor, WebKit `<pre>` içinde başa dönüyor). Ctrl+End
+		// doğrudan düzenleme kökünün sonuna gidiyor ve üçünde de aynı.
+		await page.keyboard.press("ControlOrMeta+End");
+		await page.keyboard.press("Enter");
+		await page.keyboard.type("iki");
+		await expect(page.locator("#cikti")).toHaveText("- bir\n- iki\n");
+	});
+
+	test("boş maddede Enter listeden çıkarıyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("- bir\n"));
+		await page.locator("#editor li").first().click();
+		// Ctrl+A + ArrowRight üç motorda farklı davranıyor (Firefox listede
+		// tüm bloğu seçiyor, WebKit `<pre>` içinde başa dönüyor). Ctrl+End
+		// doğrudan düzenleme kökünün sonuna gidiyor ve üçünde de aynı.
+		await page.keyboard.press("ControlOrMeta+End");
+		await page.keyboard.press("Enter");
+		await page.keyboard.press("Enter");
+		await page.keyboard.type("düz");
+		await expect(page.locator("#editor > ul")).toHaveCount(1);
+		await expect(page.locator("#cikti")).toContainText("- bir");
+		await expect(page.locator("#cikti")).toContainText("düz");
+	});
+
+	test("Tab liste maddesini içeri alıyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("- bir\n- iki\n"));
+		await page.locator("#editor li").nth(1).click();
+		await page.keyboard.press("Tab");
+		await expect(page.locator("#cikti")).toHaveText("- bir\n  - iki\n");
+	});
+
+	test("Shift+Tab maddeyi dışarı alıyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("- bir\n  - ic\n"));
+		await page.locator("#editor li li").first().click();
+		await page.keyboard.press("Shift+Tab");
+		await expect(page.locator("#cikti")).toHaveText("- bir\n- ic\n");
+	});
+
+	test("Ctrl+Alt+2 paragrafı başlığa çeviriyor", async ({ page }) => {
+		await bosla(page, "başlık");
+		await page.keyboard.press("ControlOrMeta+Alt+2");
+		await expect(page.locator("#editor > h2")).toHaveText("başlık");
+		await expect(page.locator("#cikti")).toHaveText("## başlık\n");
+	});
+
+	test("Ctrl+Alt+0 başlığı paragrafa döndürüyor", async ({ page }) => {
+		await bosla(page, "metin");
+		await page.keyboard.press("ControlOrMeta+Alt+3");
+		await page.keyboard.press("ControlOrMeta+Alt+0");
+		await expect(page.locator("#editor > p")).toHaveCount(1);
+		await expect(page.locator("#cikti")).toHaveText("metin\n");
+	});
+
+	test("Ctrl+Shift+8 madde imli liste yapıyor", async ({ page }) => {
+		await bosla(page, "madde");
+		await page.keyboard.press("ControlOrMeta+Shift+8");
+		await expect(page.locator("#cikti")).toHaveText("- madde\n");
+	});
+
+	test("Ctrl+Shift+7 numaralı liste yapıyor", async ({ page }) => {
+		await bosla(page, "madde");
+		await page.keyboard.press("ControlOrMeta+Shift+7");
+		await expect(page.locator("#cikti")).toHaveText("1. madde\n");
+	});
+
+	test("ok tuşları bloklar arasında geziniyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("bir\n\niki\n\nüç\n"));
+		await page.locator("#editor > p").first().click();
+		const kimlik = () => page.evaluate(() => document.activeElement?.textContent ?? "");
+
+		await page.keyboard.press("ArrowDown");
+		expect(await kimlik()).toBe("iki");
+		await page.keyboard.press("ArrowDown");
+		expect(await kimlik()).toBe("üç");
+		await page.keyboard.press("ArrowUp");
+		expect(await kimlik()).toBe("iki");
+	});
+
+	test("kod bloğunda Enter blok bölmüyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("```\nbir\n```\n"));
+		await page.locator("#editor > pre").click();
+		// `<pre>` içinde Ctrl+End WebKit'te içeriği yutuyor; tek satırlık kod
+		// için `End` zaten satırın sonuna götürüyor.
+		await page.keyboard.press("End");
+		await page.keyboard.press("Enter");
+		await page.keyboard.type("iki");
+		await expect(page.locator("#editor > pre")).toHaveCount(1);
+		await expect(page.locator("#cikti")).toContainText("bir\niki");
+	});
+
+	/** F2-08'in kabul kriteri: fareye hiç dokunmadan bir belge. */
+	test("fare kullanmadan tam belge yazılabiliyor", async ({ page }) => {
+		await bosla(page);
+		await page.keyboard.type("Işık ve Gölge");
+		await page.keyboard.press("ControlOrMeta+Alt+1");
+		await page.keyboard.press("Enter");
+
+		await page.keyboard.type("İlk paragraf.");
+		await page.keyboard.press("Enter");
+
+		await page.keyboard.press("ControlOrMeta+Shift+8");
+		await page.keyboard.type("bir");
+		await page.keyboard.press("Enter");
+		await page.keyboard.type("iki");
+		await page.keyboard.press("Tab");
+		await page.keyboard.press("Enter");
+		await page.keyboard.press("Enter");
+
+		await page.keyboard.type("Son paragraf.");
+
+		const value = await page.evaluate(() => window.kalem.editor.getValue());
+		expect(value).toContain("# Işık ve Gölge");
+		expect(value).toContain("İlk paragraf.");
+		expect(value).toContain("- bir");
+		expect(value).toContain("  - iki");
+		expect(value).toContain("Son paragraf.");
+	});
+});

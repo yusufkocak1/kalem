@@ -444,7 +444,14 @@ function inline(node: Inline, o: Resolved, startsLine = false, enclosing = ""): 
 		case "imageReference":
 			return reference(node.alt ?? "", node.label, node.syntax?.referenceType, true);
 		case "break":
-			return node.syntax?.marker === "backslash" ? "\\\n" : "  \n";
+			// Varsayılan ters bölü, iki boşluk değil.
+			//
+			// Kaynakta iki boşlukla yazılmış satır sonları `syntax` sayesinde
+			// olduğu gibi kalıyor; buradaki seçim yalnızca **yeni** düğümler
+			// için. İki boşluk görünmez: çoğu editör, linter ve `git` yapılandırması
+			// satır sonundaki boşluğu kırpar ve kırpınca satır sonu sessizce
+			// kaybolur. remark de aynı sebeple ters bölü yazar.
+			return node.syntax?.marker === "spaces" ? "  \n" : "\\\n";
 		case "html":
 			return node.value;
 	}

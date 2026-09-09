@@ -144,7 +144,10 @@ function collect(element: Element): Inline[] {
  */
 function normalize(nodes: readonly Inline[]): Inline[] {
 	const merged = normalizeInline(nodes);
-	while (merged.length > 0 && merged[merged.length - 1]?.type === "break") merged.pop();
+	// **Tek** bir sondaki satır sonu atılıyor, hepsi değil: `render.ts`
+	// gerçek bir sondaki satır sonunun arkasına bir doldurucu koyuyor, o
+	// yüzden ikisi arasındaki fark tam olarak bir düğüm.
+	if (merged[merged.length - 1]?.type === "break") merged.pop();
 	return merged;
 }
 
@@ -193,20 +196,6 @@ function isMark(node: Inline | undefined): node is MarkNode {
 	return node?.type === "strong" || node?.type === "emphasis" || node?.type === "delete";
 }
 
-/** Bitişik metin düğümlerini tek düğüme indirir. */
-function mergeTexts(nodes: readonly Inline[]): Inline[] {
-	const out: Inline[] = [];
-	for (const node of nodes) {
-		const last = out[out.length - 1];
-		if (node.type === "text" && last?.type === "text") {
-			out[out.length - 1] = { type: "text", value: last.value + node.value };
-			continue;
-		}
-		out.push(node);
-	}
-	return out;
-}
-
 /**
  * İç içe aynı biçimi tek seviyeye indirir.
  *
@@ -224,7 +213,7 @@ function flattenInto(out: Inline[], node: Inline, insideMark: string | null): vo
 		}
 		const inner: Inline[] = [];
 		for (const child of node.children) flattenInto(inner, child, node.type);
-		const merged = mergeTexts(inner);
+		const merged = mergeAdjacent(inner);
 		if (merged.length === 0) return;
 		out.push({ ...node, children: merged });
 		return;

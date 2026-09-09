@@ -102,7 +102,9 @@ describe("satır içi biçimler", () => {
 	});
 
 	it("satır sonu", () => {
-		expect(md(e("BODY", [e("P", [t("a"), e("BR"), t("b")])]))).toBe("a  \nb");
+		// Yapıştırmadan gelen satır sonunun kaynak tercihi yok; serileştirici
+		// varsayılanı ters bölü (iki boşluk kırpılınca sessizce kaybolur).
+		expect(md(e("BODY", [e("P", [t("a"), e("BR"), t("b")])]))).toBe("a\\\nb");
 	});
 
 	it("bağlantı", () => {

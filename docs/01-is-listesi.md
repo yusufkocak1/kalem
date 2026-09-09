@@ -23,28 +23,28 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 210/210
+> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 258/258
 
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
-| **Faz 2** — Viewer + başsız editör | 7 / 13 | 🔵 2B sürüyor |
+| **Faz 2** — Viewer + başsız editör | 8 / 13 | 🔵 2B sürüyor |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **26 / 72** | **%36** |
+| | **27 / 72** | **%38** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-04` (2A tamam)** · `F2-05` · `F2-06` · `F2-07`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-04` (2A tamam)** · `F2-05` … `F2-08`
 
-**Sıradaki:** `F2-08` klavye ve gezinme — Enter ile blok bölme, Backspace
-ile birleştirme, bloklar arası ok tuşları.
+**Sıradaki:** `F2-09` geçmiş (undo/redo) — işlem tabanlı yığın, tarayıcının
+kendi geri almasıyla çakışmayı engelleme.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -67,7 +67,7 @@ ile birleştirme, bloklar arası ok tuşları.
 > | `@kalem/viewer` | 2.68 kB | 14 kB |
 > | `@kalem/themes/viewer.css` | 1.16 kB | 3 kB |
 > | `@kalem/themes/editor.css` | 340 B | 2 kB |
-> | `@kalem/editor` (core dâhil) | 15.91 kB | 38 kB |
+> | `@kalem/editor` (core dâhil) | 18.19 kB | 38 kB |
 >
 > Gerekçe ikisinde de aynı: yalnızca Markdown işleyen kullanıcı (SSR,
 > derleme betiği) editör komutlarını ve yapıştırma dönüştürücüsünü
@@ -88,8 +88,8 @@ ayrıştırıcı, serileştirici, güvenlik katmanı, komutlar, HTML dönüştü
 `@kalem/viewer` — render planı, `renderToDOM`, `renderToString`.
 `@kalem/themes` — görüntüleyici ve editör stilleri (saf CSS).
 `@kalem/editor` — blok kapsayıcı, model↔DOM eşlemesi, satır içi geri okuma,
-iki seviyeli seçim, satır içi biçimlendirme.
-**798 birim testi** + **210 tarayıcı testi** (Chromium · Firefox · WebKit),
+iki seviyeli seçim, satır içi biçimlendirme, klavye ve blok yapısı düzenleme.
+**824 birim testi** + **258 tarayıcı testi** (Chromium · Firefox · WebKit),
 axe ile WCAG 2.1 A/AA taraması dâhil.
 `parse(md)` ↔ `serialize(ast)` gidiş-dönüş 17/17 byte-birebir;
 `renderToDOM` ↔ `renderToString` üç motorda byte-birebir.
@@ -582,11 +582,51 @@ Blok içi `strong`/`emphasis`/`delete`/`inlineCode`/`link` uygulama ve kaldırma
 > Testler: 27 birim (kesme, birleştirme, işaret durumu — hepsi saf) +
 > 13 tarayıcı testi × 3 motor.
 
-### F2-08 · Klavye ve gezinme `[L]` ⬜
-- Enter (blok böl), Shift+Enter (satır sonu), Backspace/Delete (birleş, sınır durumları), Tab/Shift+Tab (liste girinti)
-- Ok tuşlarıyla bloklar arası geçiş, Home/End/PageUp/PageDown
-- Kısayollar: Ctrl+B/I/U/K/Z/Y, Ctrl+Alt+1..6, Ctrl+Shift+8/7 (liste)
-- **Kabul:** klavye ile fare kullanmadan tam doküman yazılabiliyor
+### F2-08 · Klavye ve gezinme `[L]` ✅
+- Enter (blok böl), Shift+Enter (satır sonu), Backspace/Delete (birleş, sınır durumları), Tab/Shift+Tab (liste girinti) ✅
+- Ok tuşlarıyla bloklar arası geçiş ✅, Home/End/PageUp/PageDown ⏭️ *(tarayıcıya bırakıldı)*
+- Kısayollar: Ctrl+B/I/U/K/Z/Y ✅🟡, Ctrl+Alt+1..6 ✅, Ctrl+Shift+8/7 (liste) ✅
+- **Kabul:** klavye ile fare kullanmadan tam doküman yazılabiliyor ✅
+
+> **Tuşların kararı modelde, DOM'da değil.** `block-edit.ts` tamamen saf:
+> girdi bir belge ve bir imleç, çıktı yeni belge ve imlecin yeni yeri.
+> Davranış 26 birim testiyle sabitleniyor; tarayıcı testleri yalnızca
+> tuşun oraya doğru bağlandığını doğruluyor.
+>
+> **Home/End/PageUp/PageDown bilerek tarayıcıda bırakıldı:** hepsi görsel
+> satır ve kaydırma geometrisiyle ilgili ve tarayıcı bunu bizden iyi
+> biliyor. Ctrl+Z/Y F2-09'un işi; Ctrl+K bağlantı akışıyla birlikte
+> F3-02'de.
+>
+> **Bu adımda çıkan dört gerçek hata:**
+> 1. **Boş belgede hiç blok yoktu.** `new Editor(el)` — yani en sık
+>    başlangıç hâli — tıklanacak yeri olmayan bir editör üretiyordu.
+>    `normalizeDocument` artık en az bir paragraf garanti ediyor.
+> 2. **Boş liste maddesi düzenlenemiyordu.** Ayrıştırıcı `- ` maddesini
+>    çocuksuz üretiyor (doğru); ama çocuksuz maddenin içerik taşıyıcısı
+>    olmuyor. Editör her maddeye boş bir paragraf koyuyor.
+> 3. **Sondaki satır sonu tarayıcının doldurucusuyla karışıyordu.**
+>    Tarayıcı sondaki tek `<br>`'yi "satır kutusunu ayakta tut"
+>    doldurucusu sayıp imleci **önüne** koyuyor; kullanıcı yeni satıra
+>    yazdığını sanırken metin bir üst satıra gidiyordu. Gerçek satır
+>    sonunun arkasına bir doldurucu daha konuyor, okurken **tek** bir
+>    sondaki satır sonu atılıyor.
+> 4. **Ok tuşu gezinmesi hiç çalışmıyordu.** Blok arama yardımcısı yalnızca
+>    `Element` kabul ediyordu, oysa seçim sınırları neredeyse her zaman
+>    metin düğümü — sessizce `null` dönüyordu.
+>
+> **İki tarayıcı farkı ayrıca çıktı:** WebKit `<pre contenteditable>`
+> içinde Enter'a basınca içeriği yeniden yapılandırıp mevcut satırı
+> yutuyor. Kaynak bloklarında satır sonu da artık modele elle yazılıyor.
+>
+> **Çekirdekte bir varsayılan değişti:** yeni sert satır sonu artık `\`
+> ile yazılıyor, iki boşlukla değil. İki boşluk görünmez; çoğu editör ve
+> linter satır sonu boşluğunu kırpar ve kırpınca satır sonu sessizce
+> kaybolur. Kaynakta iki boşlukla yazılmış olanlar `syntax` sayesinde
+> korunuyor. remark de aynı sebeple ters bölü yazıyor.
+>
+> Testler: 26 birim (saf model işlemleri) + 17 tarayıcı testi × 3 motor,
+> sonuncusu baştan sona klavyeyle bir belge yazıyor.
 
 ### F2-09 · Geçmiş (undo/redo) `[L]` ⬜
 - İşlem tabanlı (transaction) geçmiş yığını; her komut tersine çevrilebilir bir işlem üretir

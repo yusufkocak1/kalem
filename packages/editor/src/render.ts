@@ -290,6 +290,15 @@ export function renderInline(
 		return;
 	}
 	for (const node of nodes) appendInline(target, node, ctx);
+
+	// İçerik sert satır sonuyla bitiyorsa bir doldurucu `<br>` daha
+	// gerekiyor. Tarayıcı, sondaki tek `<br>`yi "satır kutusunu ayakta tut"
+	// doldurucusu sayıyor ve imleci onun **önüne** koyuyor; kullanıcı yeni
+	// satıra yazdığını sanırken metin bir üst satıra gidiyordu.
+	// `read.ts` buna karşılık **tek** bir sondaki satır sonunu atıyor.
+	if (nodes[nodes.length - 1]?.type === "break") {
+		target.append(ctx.document.createElement("br"));
+	}
 }
 
 function appendInline(target: HTMLElement, node: Inline, ctx: RenderContext): void {
