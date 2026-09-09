@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 369/369
+> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 423/423
 
 | Faz | Görev | Durum |
 |---|---|---|
@@ -31,20 +31,20 @@
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
-| **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
+| **Faz 3** — Word deneyimi | 1 / 11 | 🔵 Sürüyor |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **32 / 72** | **%44** |
+| | **33 / 72** | **%46** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-13` (Faz 2 tamam)**
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-13` (Faz 2 tamam)** · `F3-01`
 
-**Sıradaki:** **Faz 3 — Word deneyimi (`@kalem/ui`).** `F3-01` balon araç
-çubuğuyla başlıyor; ürünün kalbi ve en büyük ikinci faz (~6–8 hafta).
+**Sıradaki:** `F3-02` bağlantı düzenleme akışı — balon araç çubuğundaki
+bağlantı düğmesi onu bekliyor.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -67,7 +67,9 @@
 > | `@kalem/viewer` | 2.68 kB | 14 kB |
 > | `@kalem/themes/viewer.css` | 1.16 kB | 3 kB |
 > | `@kalem/themes/editor.css` | 340 B | 2 kB |
-> | `@kalem/editor` (core + viewer dâhil) | 21.85 kB | 38 kB |
+> | `@kalem/themes/ui.css` | 843 B | 3 kB |
+> | `@kalem/editor` (core + viewer dâhil) | 22.05 kB | 38 kB |
+> | `@kalem/editor` + `@kalem/ui` | 24.44 kB | 58 kB |
 >
 > Gerekçe ikisinde de aynı: yalnızca Markdown işleyen kullanıcı (SSR,
 > derleme betiği) editör komutlarını ve yapıştırma dönüştürücüsünü
@@ -90,7 +92,8 @@ ayrıştırıcı, serileştirici, güvenlik katmanı, komutlar, HTML dönüştü
 `@kalem/editor` — blok kapsayıcı, model↔DOM eşlemesi, satır içi geri okuma,
 iki seviyeli seçim, satır içi biçimlendirme, klavye ve blok yapısı düzenleme,
 geri al/yinele, giriş kuralları, pano, eklenti sistemi. **Faz 2 kapandı.**
-**881 birim testi** + **369 tarayıcı testi** (Chromium · Firefox · WebKit),
+`@kalem/ui` — balon araç çubuğu, kendi konumlandırma hesabımız.
+**898 birim testi** + **423 tarayıcı testi** (Chromium · Firefox · WebKit),
 axe ile WCAG 2.1 A/AA taraması ve CDP ile IME bileşimi dâhil.
 `parse(md)` ↔ `serialize(ast)` gidiş-dönüş 17/17 byte-birebir;
 `renderToDOM` ↔ `renderToString` üç motorda byte-birebir.
@@ -789,12 +792,39 @@ Playwright ile: yazma ✅, seçim ✅, kısayollar ✅, giriş kuralları ✅, u
 # FAZ 3 — Word Deneyimi (`@kalem/ui`)
 **Amaç:** Ürünün kalbi. Segment A'nın (yazılım bilmeyen kullanıcı) tüm değeri burada. **Süre: ~6–8 hafta**
 
-### F3-01 · Balon araç çubuğu (bubble toolbar) `[L]` ⬜
-Metin seçilince seçimin üstünde beliren araç çubuğu
-- Butonlar: kalın, italik, üstü çizili, kod, link, blok tipi açılır listesi
-- Konumlandırma: viewport sınırı farkındalığı, kaydırmada takip, seçim değişince güncelle (küçük kendi popper mantığımız — Floating UI bağımlılığı **eklenmez**)
-- Aktif durum yansıması (seçili metin kalınsa buton basılı görünür)
-- **Kabul:** Word'deki mini araç çubuğu kadar akıcı
+### F3-01 · Balon araç çubuğu (bubble toolbar) `[L]` ✅
+Metin seçilince seçimin üstünde beliren araç çubuğu ✅
+- Butonlar: kalın, italik, üstü çizili, kod, link, blok tipi açılır listesi ✅ *(link düğmesi F3-02 akışını bekliyor)*
+- Konumlandırma: viewport sınırı farkındalığı ✅, kaydırmada takip ✅, seçim değişince güncelle ✅ (küçük kendi popper mantığımız — Floating UI bağımlılığı **eklenmez** ✅)
+- Aktif durum yansıması (seçili metin kalınsa buton basılı görünür) ✅
+- **Kabul:** Word'deki mini araç çubuğu kadar akıcı ✅
+
+> **Floating UI eklenmedi.** ~5 kB'lik kütüphaneden bize gereken kısım
+> çok küçük: bir dikdörtgenin üstüne (yer yoksa altına) kutu koymak ve
+> görünür alan dışına taşmasını engellemek. Ok göstergesi, otomatik
+> yerleşim, sanal eleman — hiçbiri gerekmiyor. Hesap 40 satır ve **saf**,
+> yani kenar durumları tarayıcı açmadan sınanıyor (10 birim testi).
+>
+> **Blok türü için yerel `<select>`** kullanıldı, özel açılır menü değil:
+> klavye gezinmesi, ekran okuyucu duyurusu, dokunmatik davranış ve mobil
+> yerel tekerlek bedava geliyor. Özel menü bunların hepsini yeniden yazmak
+> demekti.
+>
+> **`mousedown` engelleniyor:** düğmeye basmak seçimi düşürürse
+> uygulanacak biçim için seçim kalmaz. Kendi araç çubuğunu yazan herkesin
+> bir kez düştüğü tuzak; test bunu ayrıca ölçüyor.
+>
+> **Bir CSS hatası buradan çıktı:** `display: flex` veren her kural
+> tarayıcının `[hidden] { display: none }` kuralını eziyor ve `hidden`
+> özniteliği sessizce işe yaramaz hâle geliyor. Yüzen parçaların hepsi
+> `display` verdiği için açık bir `[hidden]` kuralı kondu.
+>
+> **Metinler tek bir sözlükten** (`labels.ts`) geliyor; hiçbir bileşen
+> kendi içinde dize taşımıyor. Dil değiştirmek tek nesne vermek, yani
+> i18n (F6-10) yeni bir mekanizma gerektirmeyecek. Varsayılan belgenin
+> `lang`'ine göre seçiliyor.
+>
+> Testler: 17 birim (konumlandırma hesabı + sözlükler) + 18 tarayıcı testi × 3 motor.
 
 ### F3-02 · Link düzenleme akışı `[M]` ⬜
 Link ekleme popover'ı, URL doğrulama, mevcut linki düzenle/kaldır, Ctrl+K

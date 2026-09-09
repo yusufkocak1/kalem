@@ -121,9 +121,10 @@
 </style>
 <link rel="stylesheet" href="/@kalem/themes/viewer.css">
 <link rel="stylesheet" href="/@kalem/themes/editor.css">
+<link rel="stylesheet" href="/@kalem/themes/ui.css">
 
 <header>
-	<h1>Kalem Editör <span>— blok motoru</span></h1>
+	<h1>Kalem Editör <span>— blok motoru + arayüz</span></h1>
 	<nav>
 		<span class="araclar">
 			<button type="button" data-bicim="strong" title="Ctrl+B"><b>B</b></button>
@@ -145,8 +146,8 @@
 	elemanı; yazdıkça model DOM'dan geri okunuyor ve sağda gerçek Markdown
 	çıktısı beliriyor. <b>Birden çok bloğu sürükleyerek seçip Delete'e basın</b> —
 	tarayıcının yapamadığı şey burada bizim modelimize düşüyor.
-	Metin seçip <b>Ctrl+B</b>'ye ya da yukarıdaki düğmelere basın; biçim
-	modelde uygulanıyor, çıktı gerçek Markdown.
+	<b>Metin seçin</b> — seçimin üstünde balon araç çubuğu beliriyor.
+	Biçim modelde uygulanıyor, çıktı gerçek Markdown.
 	Enter bloğu böler, Backspace blok başında birleştirir, Tab liste
 	girintisini değiştirir, Ctrl+Alt+1..6 başlık yapar.
 	<b>Henüz yok:</b> geri alma (F2-09) ve yazarken otomatik dönüşüm (F2-10).
@@ -180,12 +181,14 @@
 			"@kalem/core/commands": "/@kalem/core/commands.js",
 			"@kalem/core/html": "/@kalem/core/html.js",
 			"@kalem/editor": "/@kalem/editor/index.js",
-			"@kalem/viewer": "/@kalem/viewer/index.js"
+			"@kalem/viewer": "/@kalem/viewer/index.js",
+			"@kalem/ui": "/@kalem/ui/index.js"
 		}
 	}
 </script>
 <script type="module">
 	import { Editor, inputRulesPlugin, taskListPlugin } from "@kalem/editor";
+	import { mountUi } from "@kalem/ui";
 
 	const ORNEK = `# Işık ve Gölge
 
@@ -318,7 +321,9 @@ Son paragraf.
 
 	document.documentElement.lang = "tr";
 	// Konsol ve Playwright için; kütüphane global'e yazmaz.
-	window.kalem = { editor };
+	const ui = mountUi(editor);
+
+	window.kalem = { editor, ui };
 	// Eklenti API'sini konsoldan ve testlerden denemek için.
 	window.kalemEditor = { inputRulesPlugin, taskListPlugin };
 </script>

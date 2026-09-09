@@ -85,6 +85,16 @@
 	user-select: none;
 }
 
+/*
+ * `display` veren her kural, tarayıcının `[hidden] { display: none }`
+ * kuralını ezer — `hidden` özniteliği sessizce işe yaramaz hâle gelir.
+ * Yüzen parçaların hepsi `display` verdiği için bu kural şart.
+ */
+.kalem-bubble[hidden],
+.kalem-menu[hidden] {
+	display: none !important;
+}
+
 .kalem-bubble-button {
 	display: inline-flex;
 	align-items: center;
