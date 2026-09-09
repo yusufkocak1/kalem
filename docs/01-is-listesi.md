@@ -23,28 +23,28 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 291/291
+> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 324/324
 
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
-| **Faz 2** — Viewer + başsız editör | 9 / 13 | 🔵 2B sürüyor |
+| **Faz 2** — Viewer + başsız editör | 10 / 13 | 🔵 2B sürüyor |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **28 / 72** | **%39** |
+| | **29 / 72** | **%40** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-04` (2A tamam)** · `F2-05` … `F2-09`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-04` (2A tamam)** · `F2-05` … `F2-10`
 
-**Sıradaki:** `F2-10` giriş kuralları — `# ` yazınca başlık, `- ` yazınca
-liste; yazarken otomatik dönüşüm.
+**Sıradaki:** `F2-11` kopyala/kesme — panoya hem `text/html` hem
+`text/plain` (Markdown) yazma.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -67,7 +67,7 @@ liste; yazarken otomatik dönüşüm.
 > | `@kalem/viewer` | 2.68 kB | 14 kB |
 > | `@kalem/themes/viewer.css` | 1.16 kB | 3 kB |
 > | `@kalem/themes/editor.css` | 340 B | 2 kB |
-> | `@kalem/editor` (core dâhil) | 18.7 kB | 38 kB |
+> | `@kalem/editor` (core dâhil) | 19.56 kB | 38 kB |
 >
 > Gerekçe ikisinde de aynı: yalnızca Markdown işleyen kullanıcı (SSR,
 > derleme betiği) editör komutlarını ve yapıştırma dönüştürücüsünü
@@ -89,8 +89,8 @@ ayrıştırıcı, serileştirici, güvenlik katmanı, komutlar, HTML dönüştü
 `@kalem/themes` — görüntüleyici ve editör stilleri (saf CSS).
 `@kalem/editor` — blok kapsayıcı, model↔DOM eşlemesi, satır içi geri okuma,
 iki seviyeli seçim, satır içi biçimlendirme, klavye ve blok yapısı düzenleme,
-geri al/yinele.
-**837 birim testi** + **291 tarayıcı testi** (Chromium · Firefox · WebKit),
+geri al/yinele, giriş kuralları.
+**861 birim testi** + **324 tarayıcı testi** (Chromium · Firefox · WebKit),
 axe ile WCAG 2.1 A/AA taraması dâhil.
 `parse(md)` ↔ `serialize(ast)` gidiş-dönüş 17/17 byte-birebir;
 `renderToDOM` ↔ `renderToString` üç motorda byte-birebir.
@@ -664,10 +664,33 @@ Blok içi `strong`/`emphasis`/`delete`/`inlineCode`/`link` uygulama ve kaldırma
 > Testler: 13 birim (gruplama zamanı dışarıdan veriliyor, `Date.now()`'a
 > bağlı kırılgan test yok) + 11 tarayıcı testi × 3 motor.
 
-### F2-10 · Giriş kuralları (input rules) `[M]` ⬜
-Yazarken otomatik dönüşüm: `# ` → başlık, `- ` / `* ` → liste, `1. ` → sıralı liste, `> ` → alıntı, ` ``` ` → kod bloğu, `---` → yatay çizgi, `**x**` → kalın, `` `x` `` → kod
-- Undo ile dönüşüm geri alınabilmeli (bir kez Ctrl+Z = kuralı iptal et, metni koru)
-- **Kabul:** her kural test edilmiş; segment C kullanıcısı Markdown yazar gibi yazabiliyor
+### F2-10 · Giriş kuralları (input rules) `[M]` ✅
+Yazarken otomatik dönüşüm: `# ` → başlık ✅, `- ` / `* ` → liste ✅, `1. ` → sıralı liste ✅, `> ` → alıntı ✅, ` ``` ` → kod bloğu ✅, `---` → yatay çizgi ✅, `**x**` → kalın ✅, `` `x` `` → kod ✅
+- Undo ile dönüşüm geri alınabilmeli (bir kez Ctrl+Z = kuralı iptal et, metni koru) ✅
+- **Kabul:** her kural test edilmiş ✅; segment C kullanıcısı Markdown yazar gibi yazabiliyor ✅
+
+> **Kullanıcının yazdığı işaret korunuyor.** `* ` yazan `*` görüyor, `- `
+> yazan `-`; `3) ` yazan hem 3'ü hem parantezi. Kural işareti metinden
+> silerken `syntax` alanına taşıyor — projenin "yazdığın gibi geri yaz"
+> kuralı burada da geçerli.
+>
+> **Geri alınabilirlik nasıl bedava geldi:** dönüşüm ayrı bir geçmiş kaydı
+> olarak yazılıyor (gruplanmıyor), yani dönüşümün hemen ardından basılan
+> tek bir Ctrl+Z onu iptal edip yazılan metni olduğu gibi bırakıyor.
+> F2-09'un anlık görüntü tasarımı sayesinde ek bir mekanizma gerekmedi.
+>
+> **Kurallar yalnızca paragrafta çalışıyor.** Başlıkta `- ` yazmak listeye
+> çevirmiyor; kullanıcı orada gerçekten tire yazıyor olabilir. Kod
+> bloklarında da hiç çalışmıyor.
+>
+> **Bir çökme hatası burada yakalandı:** blok etiketi değişince (paragraf →
+> başlık) `#sync` kaldırılmış bir düğüme `insertBefore` yapıyor,
+> `NotFoundError` atıyor ve **tüm editör DOM'u boş kalıyordu**. İmleç
+> göstergesi artık kaldırmadan önce ilerletiliyor. Hata blok türü
+> değiştiren her yolu etkiliyordu; giriş kuralları onu her tuşta
+> tetiklediği için görünür oldu.
+>
+> Testler: 23 birim (kalıplar ve dönüşümler, saf) + 11 tarayıcı testi × 3 motor.
 
 ### F2-11 · Kopyala / kesme `[M]` ⬜
 - Kopyalarken panoya **hem** `text/html` **hem** `text/plain` (= Markdown) yaz

@@ -746,3 +746,103 @@ test.describe("geçmiş", () => {
 		await expect(page.locator("#cikti")).toHaveText("abcdef\n");
 	});
 });
+
+/**
+ * Giriş kuralları — yazarken otomatik dönüşüm  (İş listesi: F2-10)
+ *
+ * Kuralların kendisi birim testinde (`input-rules.test.ts`). Buradaki
+ * testler tuş dizisinden dönüşüme kadar olan zincirin gerçekten
+ * kapandığını ve imlecin doğru yerde kaldığını ölçüyor.
+ */
+test.describe("giriş kuralları", () => {
+	async function bosBelge(page: import("@playwright/test").Page) {
+		await page.evaluate(() => window.kalem.editor.setValue(""));
+		await page.locator("#editor > p").first().click();
+	}
+
+	test("`# ` başlık yapıyor", async ({ page }) => {
+		await bosBelge(page);
+		await page.keyboard.type("# Başlık");
+		await expect(page.locator("#editor > h1")).toHaveText("Başlık");
+		await expect(page.locator("#cikti")).toHaveText("# Başlık\n");
+	});
+
+	test("`### ` üçüncü seviye başlık yapıyor", async ({ page }) => {
+		await bosBelge(page);
+		await page.keyboard.type("### Alt");
+		await expect(page.locator("#editor > h3")).toHaveText("Alt");
+	});
+
+	test("`- ` liste yapıyor", async ({ page }) => {
+		await bosBelge(page);
+		await page.keyboard.type("- madde");
+		await expect(page.locator("#editor > ul li")).toHaveText("madde");
+		await expect(page.locator("#cikti")).toHaveText("- madde\n");
+	});
+
+	/** Kullanıcının yazdığı işaret korunuyor. */
+	test("`* ` yıldız işaretini koruyor", async ({ page }) => {
+		await bosBelge(page);
+		await page.keyboard.type("* madde");
+		await expect(page.locator("#cikti")).toHaveText("* madde\n");
+	});
+
+	test("`1. ` numaralı liste yapıyor", async ({ page }) => {
+		await bosBelge(page);
+		await page.keyboard.type("1. madde");
+		await expect(page.locator("#editor > ol li")).toHaveText("madde");
+	});
+
+	test("`> ` alıntı yapıyor", async ({ page }) => {
+		await bosBelge(page);
+		await page.keyboard.type("> söz");
+		await expect(page.locator("#editor > blockquote")).toContainText("söz");
+	});
+
+	test("`**a**` kalın yapıyor", async ({ page }) => {
+		await bosBelge(page);
+		await page.keyboard.type("bir **iki**");
+		await expect(page.locator("#editor > p strong")).toHaveText("iki");
+		await expect(page.locator("#cikti")).toHaveText("bir **iki**\n");
+	});
+
+	test("`` `a` `` kod yapıyor", async ({ page }) => {
+		await bosBelge(page);
+		await page.keyboard.type("bir `kod`");
+		await expect(page.locator("#editor > p code")).toHaveText("kod");
+	});
+
+	test("dönüşümden sonra yazmaya devam edilebiliyor", async ({ page }) => {
+		await bosBelge(page);
+		await page.keyboard.type("- madde");
+		await page.keyboard.type(" devam");
+		await expect(page.locator("#cikti")).toHaveText("- madde devam\n");
+	});
+
+	/**
+	 * F2-10'un açık şartı: bir Ctrl+Z kuralı iptal eder, metni korur.
+	 *
+	 * "Bir kez" ifadesi **dönüşümün hemen ardından** demek. Araya yazı
+	 * girerse ilk Ctrl+Z doğal olarak o yazıyı geri alır; kural iptali
+	 * bir sonraki adımdadır.
+	 */
+	test("tek Ctrl+Z dönüşümü iptal edip metni bırakıyor", async ({ page }) => {
+		await bosBelge(page);
+		await page.keyboard.type("# ");
+		await expect(page.locator("#editor > h1")).toHaveCount(1);
+
+		await page.keyboard.press("ControlOrMeta+z");
+		await expect(page.locator("#editor > h1")).toHaveCount(0);
+		// İşaret metinde kalmalı: kullanıcı yazdığını kaybetmemeli.
+		await expect(page.locator("#cikti")).toContainText("#");
+	});
+
+	test("kod bloğu içinde kural çalışmıyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("```\nx\n```\n"));
+		await page.locator("#editor > pre").click();
+		await page.keyboard.press("End");
+		await page.keyboard.type(" # not");
+		await expect(page.locator("#editor > pre")).toHaveCount(1);
+		await expect(page.locator("#editor h1")).toHaveCount(0);
+	});
+});

@@ -40,6 +40,7 @@ import type { HistoryState } from "./history.js";
 import { History } from "./history.js";
 import { assignIds, newId } from "./ids.js";
 import { applyLink, applyMark, markActive } from "./inline-edit.js";
+import { applyBlockRule, applyInlineRule } from "./input-rules.js";
 import { contentLength, offsetOf, selectRange } from "./offsets.js";
 import { readCode, readInline } from "./read.js";
 import {
@@ -87,6 +88,14 @@ export interface EditorOptions {
 	classPrefix?: string;
 	/** Seçim her değiştiğinde çağrılır (bloklar arası seçim dâhil). */
 	onSelectionChange?: (selection: EditorSelection) => void;
+	/**
+	 * Yazarken otomatik dönüşüm (varsayılan `true`).
+	 *
+	 * `# ` yazınca başlık, `- ` yazınca liste, `**a**` yazınca kalın.
+	 * Kapatılabilir olmasının sebebi, bazı bağlamlarda (kod notu, düz metin
+	 * alanı) sürprizin istenmemesi.
+	 */
+	inputRules?: boolean;
 }
 
 export class Editor {
@@ -364,6 +373,11 @@ export class Editor {
 			// Etiket değiştiyse (paragraf → başlık) eleman yeniden kurulmalı:
 			// bir `<p>` `<h2>`ye dönüşemez.
 			if (element !== undefined && element.localName !== tagOf(node)) {
+				// İmleç bu elemanı gösteriyorsa **önce** ilerletiliyor.
+				// Kaldırılmış bir düğüme `insertBefore` yapmak
+				// `NotFoundError` atıyor ve o hata tüm editör DOM'unu boş
+				// bırakıyordu — giriş kuralları yazılırken tam olarak bu oldu.
+				if (cursor === element) cursor = element.nextSibling;
 				element.remove();
 				element = undefined;
 			}
@@ -423,7 +437,24 @@ export class Editor {
 		const blockElement = active?.closest?.(`[${ID_ATTR}]`);
 		if (!(blockElement instanceof HTMLElement)) return;
 		this.#syncFromDom(blockElement);
+		this.#runInputRules();
 	};
+
+	/**
+	 * Giriş kurallarını çalıştırır.
+	 *
+	 * Yazma modele işlendikten **sonra** çalışıyor: kural, kullanıcının
+	 * gerçekten yazdığı metni görmeli. Dönüşüm ayrı bir geçmiş kaydı olarak
+	 * yazılıyor, yani tek bir Ctrl+Z kuralı iptal edip metni olduğu gibi
+	 * bırakıyor — "`# ` yazdım ama başlık istemiyordum" durumunun tek makul
+	 * cevabı bu.
+	 */
+	#runInputRules(): void {
+		if (this.#options.inputRules === false) return;
+		const caret = this.#caret();
+		if (caret === null) return;
+		this.#applyEdit(applyBlockRule(this.#doc, caret) ?? applyInlineRule(this.#doc, caret));
+	}
 
 	/**
 	 * Tarayıcının kendi geri alma yığınını devre dışı bırakır.
