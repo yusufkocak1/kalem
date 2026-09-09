@@ -74,3 +74,36 @@
 .kalem-editor[aria-readonly="true"] > [contenteditable="false"]:focus {
 	outline: none;
 }
+
+/* ---------------------------------------------------------------------- */
+/* Bloklar arası seçim  (F2-06)                                           */
+/* ---------------------------------------------------------------------- */
+
+/*
+ * Blok seçimi etkinken tarayıcının kendi vurgusu susturuluyor.
+ *
+ * Sebep: seçim iki ayrı düzenleme kökünü kapsadığında tarayıcı onu kısmen
+ * boyar ama üzerinde hiçbir işlem yapmaz — kullanıcıya "metin seçtim"
+ * dedirtir, oysa seçili olan **bloklar**. İki vurgu üst üste binince de
+ * okunmaz bir görüntü çıkar.
+ */
+.kalem-editor.kalem-block-selecting ::selection {
+	background: transparent;
+}
+
+.kalem-editor .kalem-selected {
+	/*
+	 * `background-color` yerine `box-shadow` yayılımı: arka plan, blok
+	 * kutusunun tam sınırında biter ve satırlar arası boşlukta kesintili
+	 * görünür. Yayılan gölge bitişik blokları tek bir seçili alan gibi
+	 * gösteriyor.
+	 */
+	background: color-mix(in srgb, var(--kalem-accent) 18%, transparent);
+	box-shadow: 0 0 0 4px color-mix(in srgb, var(--kalem-accent) 18%, transparent);
+	border-radius: 2px;
+}
+
+/* Seçili blokta odak halkası ikinci bir çerçeve olur; gerek yok. */
+.kalem-editor .kalem-selected:focus {
+	outline: none;
+}

@@ -21,9 +21,10 @@
  * yer: `replaceAt` yalnızca yoldaki ataları kopyaladığı için, dokunulmayan
  * blokların referansı **aynı kalıyor** ve karşılaştırma tek bir `!==`.
  */
-import type { Definition, Inline, Root } from "@kalem/core";
-import { parse, replaceAt, serialize } from "@kalem/core";
-import { assignIds } from "./ids.js";
+import type { Definition, Inline, NodeId, Root } from "@kalem/core";
+import { parse, removeAt, replaceAt, serialize } from "@kalem/core";
+import { emptyParagraph } from "@kalem/core/commands";
+import { assignIds, newId } from "./ids.js";
 import { readCode, readInline } from "./read.js";
 import {
 	CODE_ATTR,
@@ -36,6 +37,13 @@ import {
 	type TopNode,
 	tagOf,
 } from "./render.js";
+import {
+	type EditorSelection,
+	placeCaret,
+	readSelection,
+	sameSelection,
+	selectedRange,
+} from "./selection.js";
 
 export interface EditorOptions {
 	/** Başlangıç Markdown metni. */
@@ -61,6 +69,8 @@ export interface EditorOptions {
 	lang?: string;
 	/** CSS sınıf öneki (varsayılan `"kalem-"`). */
 	classPrefix?: string;
+	/** Seçim her değiştiğinde çağrılır (bloklar arası seçim dâhil). */
+	onSelectionChange?: (selection: EditorSelection) => void;
 }
 
 export class Editor {
@@ -75,6 +85,11 @@ export class Editor {
 	#defs: ReadonlyMap<string, Definition>;
 	#readOnly: boolean;
 	#destroyed = false;
+	#selection: EditorSelection = null;
+	/** Sürüklemenin başladığı blok; işaretçi basılı değilse `null`. */
+	#dragAnchor: NodeId | null = null;
+	/** Sürükleme blok moduna geçti mi (bkz. `#onPointerMove`). */
+	#blockDrag = false;
 
 	constructor(element: HTMLElement, options: EditorOptions = {}) {
 		this.#element = element;
@@ -92,6 +107,13 @@ export class Editor {
 
 		element.addEventListener("input", this.#onInput);
 		element.addEventListener("change", this.#onCheckbox);
+		element.addEventListener("keydown", this.#onKeyDown);
+		element.addEventListener("pointerdown", this.#onPointerDown);
+		element.addEventListener("pointermove", this.#onPointerMove);
+		element.ownerDocument.addEventListener("pointerup", this.#onPointerUp);
+		// `selectionchange` yalnızca belge üzerinde tetiklenir; elemana
+		// bağlanamaz. Sökülürken kaldırılması bu yüzden önemli.
+		element.ownerDocument.addEventListener("selectionchange", this.#onSelectionChange);
 
 		this.#sync();
 	}
@@ -129,6 +151,36 @@ export class Editor {
 		return this.#readOnly;
 	}
 
+	/** Güncel seçim — blok içi ya da bloklar arası. */
+	getSelection(): EditorSelection {
+		return this.#selection;
+	}
+
+	/**
+	 * Verilen aralıktaki blokları seçer.
+	 *
+	 * Tek blok verilirse bloklar arası seçim kurulmuyor: tek bloğun içi
+	 * tarayıcının işi, oraya karışmak seçim tutamaçlarını ve IME'yi bozar.
+	 */
+	selectBlocks(anchor: NodeId, focus: NodeId = anchor): void {
+		const ilk = this.#elements.get(anchor);
+		const son = this.#elements.get(focus);
+		if (ilk === undefined || son === undefined) return;
+
+		if (anchor === focus) {
+			placeCaret(ilk, "start");
+			return;
+		}
+		const selection = this.#element.ownerDocument.getSelection();
+		if (selection === null) return;
+		const range = this.#element.ownerDocument.createRange();
+		range.setStartBefore(ilk);
+		range.setEndAfter(son);
+		selection.removeAllRanges();
+		selection.addRange(range);
+		this.#refreshSelection();
+	}
+
 	/** İlk bloğa odaklanır. */
 	focus(): void {
 		const ilk = this.#element.firstElementChild;
@@ -147,6 +199,12 @@ export class Editor {
 		this.#destroyed = true;
 		this.#element.removeEventListener("input", this.#onInput);
 		this.#element.removeEventListener("change", this.#onCheckbox);
+		this.#element.removeEventListener("keydown", this.#onKeyDown);
+		this.#element.removeEventListener("pointerdown", this.#onPointerDown);
+		this.#element.removeEventListener("pointermove", this.#onPointerMove);
+		this.#element.ownerDocument.removeEventListener("pointerup", this.#onPointerUp);
+		this.#element.ownerDocument.removeEventListener("selectionchange", this.#onSelectionChange);
+		this.#paintSelection(null);
 		this.#element.removeAttribute("role");
 		this.#element.removeAttribute("aria-multiline");
 		this.#element.classList.remove(`${this.#prefix}editor`);
@@ -277,6 +335,167 @@ export class Editor {
 			replaceAt(this.#doc, [blockIndex, index], { ...item, checked: target.checked }),
 		);
 	};
+
+	// -----------------------------------------------------------------------
+	// Seçim  (F2-06)
+	// -----------------------------------------------------------------------
+
+	#onSelectionChange = (): void => {
+		// Sürükleyerek blok seçerken tarayıcının seçimi bizimkinin gerisinde
+		// kalıyor (aşağıdaki `#onPointerMove` onu zaten temizledi); onu
+		// dinlemek kendi seçimimizi silerdi.
+		if (this.#blockDrag) return;
+		this.#refreshSelection();
+	};
+
+	#refreshSelection(): void {
+		this.#applySelection(readSelection(this.#element));
+	}
+
+	#applySelection(okunan: EditorSelection): void {
+		if (sameSelection(okunan, this.#selection)) return;
+		this.#selection = okunan;
+		this.#paintSelection(okunan);
+		this.#options.onSelectionChange?.(okunan);
+	}
+
+	/**
+	 * Bloklar arası sürükleyerek seçim.
+	 *
+	 * ## Neden elle yazmak zorunda kaldık
+	 *
+	 * `contenteditable` blok başına verilince (F2-05) Chrome, bir düzenleme
+	 * kökünün içinde başlayan seçimi **o kökün dışına taşımıyor**: kullanıcı
+	 * fareyi bir sonraki bloğa sürüklese de seçim ilk blokta kalıyor. Firefox
+	 * ve WebKit daha izin verici, ama üçünde aynı davranışı vaat ediyorsak
+	 * en kısıtlayıcısına göre yazmak gerekiyor.
+	 *
+	 * Bu, F1.5 doğrulama matrisinin sınayacağı riskli senaryolardan biriydi
+	 * ve atlandığı için burada, gerçek kodda karşımıza çıktı.
+	 *
+	 * ## Nasıl
+	 *
+	 * İşaretçi bir blokta basılıp **başka** bir bloğa geçtiği anda blok
+	 * moduna geçiliyor: tarayıcının aralığı temizleniyor, seçim kendi
+	 * modelimizde tutuluyor. Tek blok içinde kalındığı sürece hiç
+	 * karışmıyoruz — orada tarayıcı bizden iyi.
+	 *
+	 * `pointer` olayları kullanılıyor, `mouse` değil: aynı kod dokunmatik
+	 * ekranda da çalışsın.
+	 */
+	#onPointerDown = (event: PointerEvent): void => {
+		if (!event.isPrimary) return;
+		const blok = this.#blockOf(event.target);
+		this.#dragAnchor = blok === null ? null : (blok.getAttribute(ID_ATTR) as NodeId);
+		this.#blockDrag = false;
+	};
+
+	#onPointerMove = (event: PointerEvent): void => {
+		const anchor = this.#dragAnchor;
+		if (anchor === null) return;
+		// Birincil düğme bırakılmışsa sürükleme bitmiştir (pointerup kaçmış olabilir).
+		if ((event.buttons & 1) === 0) {
+			this.#dragAnchor = null;
+			return;
+		}
+
+		const blok = this.#blockOf(event.target);
+		if (blok === null) return;
+		const focus = blok.getAttribute(ID_ATTR) as NodeId;
+
+		// Hâlâ başladığımız bloktayız: metin seçimi tarayıcının işi.
+		if (focus === anchor && !this.#blockDrag) return;
+
+		if (!this.#blockDrag) {
+			this.#blockDrag = true;
+			// Tarayıcının kısmi vurgusu ekranda kalmasın; artık blok seçiyoruz.
+			this.#element.ownerDocument.getSelection()?.removeAllRanges();
+		}
+		// Metnin sürükle-bırak ile taşınmaya başlamasını engelliyor.
+		event.preventDefault();
+		this.#applySelection({ kind: "block", anchor, focus });
+	};
+
+	#onPointerUp = (): void => {
+		this.#dragAnchor = null;
+	};
+
+	#blockOf(target: EventTarget | null): HTMLElement | null {
+		const element = target instanceof Element ? target : null;
+		const blok = element?.closest(`[${ID_ATTR}]`);
+		return blok instanceof HTMLElement && this.#element.contains(blok) ? blok : null;
+	}
+
+	/**
+	 * Bloklar arası seçimi görünür kılar.
+	 *
+	 * Tarayıcının kendi vurgusu bu durumda yanıltıcı: iki düzenleme kökünü
+	 * kapsayan seçimi kısmen boyar ama üzerinde hiçbir işlem yapmaz.
+	 * Kapsayıcıya konan sınıf, tema CSS'inde `::selection`'ı saydamlaştırıp
+	 * yerine blok vurgusunu koyuyor — kullanıcı **blok seçtiğini** görsün.
+	 */
+	#paintSelection(selection: EditorSelection): void {
+		const secili = new Set<string>(
+			selection?.kind === "block" ? selectedRange(selection, this.#blockOrder()) : [],
+		);
+		for (const [id, element] of this.#elements) {
+			element.classList.toggle(`${this.#prefix}selected`, secili.has(id));
+		}
+		this.#element.classList.toggle(`${this.#prefix}block-selecting`, secili.size > 0);
+	}
+
+	#blockOrder(): NodeId[] {
+		return this.#doc.children.map((child) => child.id as NodeId);
+	}
+
+	/**
+	 * Klavye — şimdilik yalnızca bloklar arası silme.
+	 *
+	 * Blok içi tuşlar tarayıcıya bırakılıyor; Enter/Backspace'in blok
+	 * sınırındaki davranışı F2-08'in işi. Buradaki tek iş, tarayıcının
+	 * **yapamadığı** şey: birden çok düzenleme kökünü kapsayan seçimi silmek.
+	 */
+	#onKeyDown = (event: KeyboardEvent): void => {
+		if (this.#readOnly) return;
+		if (this.#selection?.kind !== "block") return;
+		if (event.key !== "Backspace" && event.key !== "Delete") return;
+		event.preventDefault();
+		this.#deleteSelectedBlocks();
+	};
+
+	/**
+	 * Seçili blokları siler.
+	 *
+	 * Belge tamamen boşalırsa yerine boş bir paragraf konuyor: bloğu
+	 * olmayan editöre tıklanacak yer kalmaz, kullanıcı yazmaya devam
+	 * edemez.
+	 */
+	#deleteSelectedBlocks(): void {
+		const selection = this.#selection;
+		if (selection?.kind !== "block") return;
+
+		const order = this.#blockOrder();
+		const secili = selectedRange(selection, order);
+		if (secili.length === 0) return;
+
+		const ilk = order.indexOf(secili[0] as NodeId);
+		let doc = this.#doc;
+		for (let i = secili.length - 1; i >= 0; i--) doc = removeAt(doc, [ilk + i]);
+		if (doc.children.length === 0) {
+			doc = { ...doc, children: [{ ...emptyParagraph(), id: newId() }] };
+		}
+
+		this.#selection = null;
+		this.#blockDrag = false;
+		this.#dragAnchor = null;
+		this.#replaceDocument(doc);
+
+		// İmleç silinen aralığın **öncesine** gidiyor; öncesi yoksa ilk bloğa.
+		// Silmenin ardından odak kaybolursa kullanıcı yazmaya devam edemez.
+		const hedefIndex = Math.max(0, ilk - 1);
+		const hedef = this.#elements.get(doc.children[hedefIndex]?.id as NodeId);
+		if (hedef !== undefined) placeCaret(hedef, ilk === 0 ? "start" : "end");
+	}
 
 	#indexOf(blockElement: HTMLElement): number {
 		const id = blockElement.getAttribute(ID_ATTR);

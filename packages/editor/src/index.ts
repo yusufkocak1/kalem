@@ -16,3 +16,5 @@ export { assignIds, newId } from "./ids.js";
 export { readCode, readInline } from "./read.js";
 export type { TopNode } from "./render.js";
 export { CODE_ATTR, ID_ATTR, PATH_ATTR } from "./render.js";
+export type { BlockSelection, EditorSelection, TextSelection } from "./selection.js";
+export { placeCaret, readSelection, selectedRange } from "./selection.js";

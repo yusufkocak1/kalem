@@ -17,6 +17,7 @@ declare global {
 				getValue(): string;
 				getDocument(): { children: { type: string; id?: string }[] };
 				setValue(markdown: string): void;
+				selectBlocks(anchor: string, focus?: string): void;
 				setReadOnly(readOnly: boolean): void;
 				destroy(): void;
 			};
@@ -27,8 +28,19 @@ declare global {
 const BLOK = "#editor > [data-kalem-id]";
 
 test.beforeEach(async ({ page }) => {
+	// Sayfa hatalarını yakala.
+	//
+	// Bu olmadan bir modül yükleme hatası, aşağıdaki `waitForFunction`ın 30
+	// saniyelik zaman aşımı olarak görünüyor ve gerçek sebep (örneğin
+	// importmap eksiği) hiçbir yerde yazmıyor. Bir kez tam olarak bu oldu.
+	const hatalar: string[] = [];
+	page.on("pageerror", (hata) => hatalar.push(String(hata)));
 	await page.goto("/editor.html");
-	await page.waitForFunction(() => "kalem" in window);
+	await page
+		.waitForFunction(() => "kalem" in window)
+		.catch((sebep) => {
+			throw new Error(hatalar.length > 0 ? `Sayfa hatası: ${hatalar.join(" · ")}` : String(sebep));
+		});
 });
 
 test.describe("render", () => {
@@ -213,5 +225,99 @@ test.describe("erişilebilirlik", () => {
 	test("kapsayıcı çok satırlı metin kutusu olarak duyuruluyor", async ({ page }) => {
 		await expect(page.locator("#editor")).toHaveAttribute("role", "textbox");
 		await expect(page.locator("#editor")).toHaveAttribute("aria-multiline", "true");
+	});
+});
+
+/**
+ * Seçim modeli  (İş listesi: F2-06)
+ *
+ * `contenteditable` blok başına verildiği için (F2-05) seçim de ikiye
+ * bölünüyor: tek blok içinde tarayıcı, bloklar arasında biz. Sınırın
+ * doğru yerde olduğu ancak gerçek fare sürüklemesiyle ölçülebilir.
+ */
+test.describe("seçim", () => {
+	/** İki blok elemanının üzerinden fareyle sürükler. */
+	async function surukle(page: import("@playwright/test").Page, ilk: number, son: number) {
+		const bloklar = page.locator(BLOK);
+		const bas = await bloklar.nth(ilk).boundingBox();
+		const bit = await bloklar.nth(son).boundingBox();
+		if (bas === null || bit === null) throw new Error("blok kutusu ölçülemedi");
+		await page.mouse.move(bas.x + 6, bas.y + bas.height / 2);
+		await page.mouse.down();
+		await page.mouse.move(bit.x + bit.width - 6, bit.y + bit.height / 2, { steps: 12 });
+		await page.mouse.up();
+	}
+
+	test("tek blok içindeki seçim tarayıcıda kalıyor", async ({ page }) => {
+		await page.locator("#editor > p").first().click();
+		await page.keyboard.press("ControlOrMeta+a");
+		await expect(page.locator("#secim")).toHaveText("metin (blok içi)");
+		await expect(page.locator("#editor .kalem-selected")).toHaveCount(0);
+	});
+
+	test("bloklar arası sürükleme blok seçimi kuruyor", async ({ page }) => {
+		await surukle(page, 0, 2);
+		await expect(page.locator("#editor .kalem-selected")).toHaveCount(3);
+		await expect(page.locator("#secim")).toHaveText("3 blok seçili");
+		await expect(page.locator("#editor")).toHaveClass(/kalem-block-selecting/);
+	});
+
+	/** F2-06'nın kabul kriteri. */
+	test("sürükleyerek seçilen bloklar Delete ile siliniyor", async ({ page }) => {
+		const once = await page.locator(BLOK).count();
+		await surukle(page, 0, 2);
+		await expect(page.locator("#editor .kalem-selected")).toHaveCount(3);
+
+		await page.keyboard.press("Delete");
+		await expect(page.locator(BLOK)).toHaveCount(once - 3);
+		// Silinen başlık ve ilk paragraf çıktıda kalmamalı.
+		await expect(page.locator("#cikti")).not.toContainText("# Işık ve Gölge");
+		await expect(page.locator("#editor .kalem-selected")).toHaveCount(0);
+	});
+
+	test("Backspace de aynı işi yapıyor", async ({ page }) => {
+		const once = await page.locator(BLOK).count();
+		await surukle(page, 1, 2);
+		await page.keyboard.press("Backspace");
+		await expect(page.locator(BLOK)).toHaveCount(once - 2);
+	});
+
+	test("silmeden sonra imleç bir önceki blokta", async ({ page }) => {
+		await surukle(page, 1, 2);
+		await page.keyboard.press("Delete");
+		const odakta = await page.evaluate(
+			() => document.activeElement?.getAttribute("data-kalem-id") ?? null,
+		);
+		const ilkId = await page.evaluate(() =>
+			document.querySelector("#editor > [data-kalem-id]")?.getAttribute("data-kalem-id"),
+		);
+		expect(odakta).toBe(ilkId);
+	});
+
+	test("tüm belge silinince boş paragraf kalıyor", async ({ page }) => {
+		const son = (await page.locator(BLOK).count()) - 1;
+		await surukle(page, 0, son);
+		await page.keyboard.press("Delete");
+		// Bloksuz editöre tıklanacak yer kalmaz; yerine boş paragraf konuyor.
+		await expect(page.locator(BLOK)).toHaveCount(1);
+		await expect(page.locator("#editor > p")).toHaveCount(1);
+	});
+
+	test("selectBlocks API ile seçim kurulabiliyor", async ({ page }) => {
+		const secili = await page.evaluate(() => {
+			const id = (n: number) =>
+				document.querySelectorAll("#editor > [data-kalem-id]")[n]?.getAttribute("data-kalem-id");
+			window.kalem.editor.selectBlocks(id(0) as string, id(1) as string);
+			return document.querySelectorAll("#editor .kalem-selected").length;
+		});
+		expect(secili).toBe(2);
+	});
+
+	test("salt okunur modda blok seçimi silinmiyor", async ({ page }) => {
+		await page.locator("#saltOkunur").check();
+		const once = await page.locator(BLOK).count();
+		await surukle(page, 0, 2);
+		await page.keyboard.press("Delete");
+		await expect(page.locator(BLOK)).toHaveCount(once);
 	});
 });

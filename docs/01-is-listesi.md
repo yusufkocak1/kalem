@@ -23,34 +23,37 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 147/147
+> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · Playwright 171/171
 
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
 | **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
-| **Faz 2** — Viewer + başsız editör | 5 / 13 | 🔵 2B sürüyor |
+| **Faz 2** — Viewer + başsız editör | 6 / 13 | 🔵 2B sürüyor |
 | **Faz 3** — Word deneyimi | 0 / 11 | ⬜ Başlanmadı |
 | **Faz 4** — Eklentiler | 0 / 7 | ⬜ Başlanmadı |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **24 / 72** | **%33** |
+| | **25 / 72** | **%35** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
 ### 👉 Şu an buradayız
 
-**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-04` (2A tamam)** · `F2-05`
+**Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · **`F2-01` … `F2-04` (2A tamam)** · `F2-05` · `F2-06`
 
-**Sıradaki:** `F2-06` seçim modeli — blok içi seçim tarayıcıdan, bloklar
-arası seçim kendi modelimizden.
+**Sıradaki:** `F2-07` satır içi format motoru — Ctrl+B ile kalın, iç içe
+biçim normalleştirmesi.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
-> Bunun bedeli, matrisin sınayacağı şeylerin — IME, bloklar arası
-> sürükleyerek seçim, mobil klavye — **2B'de gerçek kodda** karşımıza
-> çıkması. `F2-06` ve `F2-13` bunu üstlenmek zorunda.
+>
+> **Faturası kesildi:** matristeki *"bloklar arası sürükleyerek seçim"*
+> satırı F2-06'da gerçek kodda patladı — Chrome seçimi `contenteditable`
+> köküne hapsediyor, plan bunun tersini varsayıyordu. Bir günlük ek iş
+> oldu, mimariyi değiştirmedi. Kalan riskler: IME ve mobil klavye
+> (`F2-13`).
 
 > **Boyut kararı (uygulandı):** editöre özgü iki modül ayrı giriş
 > noktalarına alındı. Boyut kapısı bunu kendisi dayattı — core bütçeyi
@@ -63,8 +66,8 @@ arası seçim kendi modelimizden.
 > | `@kalem/core/html` | 2.21 kB | 6 kB |
 > | `@kalem/viewer` | 2.68 kB | 14 kB |
 > | `@kalem/themes/viewer.css` | 1.16 kB | 3 kB |
-> | `@kalem/themes/editor.css` | 252 B | 2 kB |
-> | `@kalem/editor` (core dâhil) | 13.37 kB | 38 kB |
+> | `@kalem/themes/editor.css` | 340 B | 2 kB |
+> | `@kalem/editor` (core dâhil) | 14.53 kB | 38 kB |
 >
 > Gerekçe ikisinde de aynı: yalnızca Markdown işleyen kullanıcı (SSR,
 > derleme betiği) editör komutlarını ve yapıştırma dönüştürücüsünü
@@ -84,8 +87,9 @@ gezinme/konum/düzenleme yardımcıları, kaynak tarayıcı, blok ve satır içi
 ayrıştırıcı, serileştirici, güvenlik katmanı, komutlar, HTML dönüştürücü.
 `@kalem/viewer` — render planı, `renderToDOM`, `renderToString`.
 `@kalem/themes` — görüntüleyici ve editör stilleri (saf CSS).
-`@kalem/editor` — blok kapsayıcı, model↔DOM eşlemesi, satır içi geri okuma.
-**758 birim testi** + **147 tarayıcı testi** (Chromium · Firefox · WebKit),
+`@kalem/editor` — blok kapsayıcı, model↔DOM eşlemesi, satır içi geri okuma,
+iki seviyeli seçim.
+**771 birim testi** + **171 tarayıcı testi** (Chromium · Firefox · WebKit),
 axe ile WCAG 2.1 A/AA taraması dâhil.
 `parse(md)` ↔ `serialize(ast)` gidiş-dönüş 17/17 byte-birebir;
 `renderToDOM` ↔ `renderToString` üç motorda byte-birebir.
@@ -490,12 +494,47 @@ Render doğruluğu + XSS fixture'ları + a11y (axe)
 > Testler: 29 birim (sahte DOM'la normalleştirme mantığı) + 17 tarayıcı
 > testi × 3 motor. `@kalem/editor` 13.37 / 38 kB.
 
-### F2-06 · Seçim modeli `[L]` ⬜
+### F2-06 · Seçim modeli `[L]` ✅
 İki seviyeli seçim:
-- **Blok içi** → tarayıcının native `Selection`'ı (bedava, IME dahil)
-- **Blok arası** → kendi `BlockSelection` modelimiz (`{ anchorBlock, focusBlock }`), görsel vurgu ile
-- `selectionchange` dinleyicisi, model↔DOM seçim eşleme
-- **Kabul:** üç paragrafı sürükleyerek seçip Delete ile silmek çalışıyor
+- **Blok içi** → tarayıcının native `Selection`'ı (bedava, IME dahil) ✅
+- **Blok arası** → kendi `BlockSelection` modelimiz (`{ anchorBlock, focusBlock }`), görsel vurgu ile ✅
+- `selectionchange` dinleyicisi, model↔DOM seçim eşleme ✅
+- **Kabul:** üç paragrafı sürükleyerek seçip Delete ile silmek çalışıyor ✅
+
+> ### ⚠️ F1.5'in atlanmasının ilk faturası burada geldi
+>
+> Plan "blok arası seçim tarayıcıdan gelir, biz sadece vurgularız"
+> varsayıyordu. **Gelmiyor.** Chrome, bir `contenteditable` içinde başlayan
+> seçimi o düzenleme kökünün dışına taşımıyor: kullanıcı fareyi bir sonraki
+> bloğa sürüklese de seçim ilk blokta kalıyor. Firefox ve WebKit daha
+> izin verici, ama üç motorda aynı davranışı vaat ediyorsak en
+> kısıtlayıcısına göre yazmak gerekiyor.
+>
+> Bu, F1.5-02 matrisindeki *"Bloklar arası sürükleyerek seçim + kopyala"*
+> satırıydı — prototipte eksik olan tek maddeydi ve atlandığı için gerçek
+> kodda karşımıza çıktı. Maliyeti bir günlük iş oldu, mimariyi değiştirmedi;
+> matris doldurulsaydı aynı sonuca daha ucuza varılırdı.
+>
+> **Çözüm:** işaretçi bir blokta basılıp **başka** bir bloğa geçtiği anda
+> blok moduna geçiliyor — tarayıcının aralığı temizleniyor, seçim kendi
+> modelimizde tutuluyor. Tek blok içinde kalındığı sürece hiç
+> karışılmıyor; orada tarayıcı bizden iyi (karakter sınırları, çift
+> tıklama, IME, dokunmatik tutamaçlar). `pointer` olayları kullanıldı,
+> `mouse` değil: aynı kod dokunmatikte de çalışıyor.
+>
+> **İkinci hata:** seçim sınırı okunurken `anchorNode`/`focusNode` yetmiyor.
+> Kapsayıcının kendisi sınır düğümü olduğunda `offset` çocuğu değil
+> **çocuklar arası boşluğu** gösteriyor; aralığın bitişi düzeltilmeden
+> okununca seçime bir fazla blok giriyordu. Artık `Range`'in başı ve sonu
+> ayrı ayrı, hangi tarafta oldukları bilinerek çözülüyor.
+>
+> **Görsel:** blok modundayken tarayıcının kısmi vurgusu
+> `::selection { background: transparent }` ile susturuluyor — iki vurgu
+> üst üste binince okunmaz bir görüntü çıkıyor ve kullanıcı "metin
+> seçtim" sanıyor, oysa seçili olan bloklar.
+>
+> Testler: 13 birim (yön normalleştirmesi, karşılaştırma) + 8 tarayıcı
+> testi × 3 motor. Gerçek fare sürüklemesiyle ölçülüyor.
 
 ### F2-07 · Satır içi format motoru `[L]` ⬜
 Blok içi `strong`/`emphasis`/`delete`/`inlineCode`/`link` uygulama ve kaldırma
