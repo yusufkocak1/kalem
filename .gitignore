@@ -14,6 +14,10 @@ blob-report/
 apps/docs/.astro/
 apps/docs/dist/
 
+# next.js (examples/nextjs)
+.next/
+next-env.d.ts
+
 # editör / işletim sistemi
 .DS_Store
 Thumbs.db

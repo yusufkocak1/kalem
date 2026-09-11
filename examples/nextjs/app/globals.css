@@ -1,0 +1,36 @@
+body {
+	margin: 0;
+	font:
+		15px / 1.6 system-ui,
+		sans-serif;
+	color: #22201d;
+	background: #fbfaf8;
+}
+
+main {
+	max-width: 46rem;
+	margin: 0 auto;
+	padding: 24px 20px 60px;
+}
+
+h1 {
+	font-size: 18px;
+}
+
+.not {
+	font-size: 13px;
+	color: #6f6a62;
+}
+
+.editor {
+	min-height: 12rem;
+	padding: 14px 16px;
+	background: #fff;
+	border: 1px solid #e3e0da;
+	border-radius: 8px;
+}
+
+.durum {
+	font-size: 13px;
+	color: #6f6a62;
+}

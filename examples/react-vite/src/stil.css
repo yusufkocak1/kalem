@@ -1,0 +1,59 @@
+/* Örneğin kendi stili; Kalem'in tema dosyalarından bağımsız. */
+body {
+	margin: 0;
+	font:
+		15px / 1.6 system-ui,
+		sans-serif;
+	color: #22201d;
+	background: #fbfaf8;
+}
+
+main {
+	max-width: 46rem;
+	margin: 0 auto;
+	padding: 24px 20px 60px;
+}
+
+header {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: baseline;
+	justify-content: space-between;
+}
+
+h1 {
+	font-size: 18px;
+}
+
+nav {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	font-size: 13px;
+}
+
+.editor {
+	min-height: 12rem;
+	padding: 14px 16px;
+	background: #fff;
+	border: 1px solid #e3e0da;
+	border-radius: 8px;
+}
+
+.durum {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	font-size: 13px;
+	color: #6f6a62;
+}
+
+pre {
+	padding: 12px 14px;
+	background: #fff;
+	border: 1px solid #e3e0da;
+	border-radius: 8px;
+	white-space: pre-wrap;
+	font-size: 13px;
+}

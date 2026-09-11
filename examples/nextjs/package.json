@@ -1,0 +1,23 @@
+{
+  "name": "example-nextjs",
+  "private": true,
+  "version": "0.0.0",
+  "description": "@kalem/react — Next.js App Router örneği",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@kalem/react": "workspace:^",
+    "@kalem/themes": "workspace:^",
+    "next": "^16.3.5",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:"
+  }
+}

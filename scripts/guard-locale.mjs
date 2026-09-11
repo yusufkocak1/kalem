@@ -14,13 +14,16 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
-const VARSAYILAN = ["packages", "scripts", "apps/docs/src"];
+const VARSAYILAN = ["packages", "scripts", "apps/docs/src", "examples"];
 const UZANTI = /\.(ts|tsx|mts|cts|js|mjs|cjs)$/;
 // Üretilmiş çıktılar taranmaz: kaynak zaten denetleniyor, üretilmiş kopya
 // yalnızca gürültü ve bayat sonuç üretir (`.tsbuild` tsc'nin ara çıktısı).
 const ATLA = new Set([
 	"node_modules",
 	"dist",
+	// Örnek uygulamaların derleme çıktısı: içindeki üçüncü parti kod
+	// bizim kuralımıza uymak zorunda değil ve uymuyor da.
+	".next",
 	".tsbuild",
 	"coverage",
 	".astro",

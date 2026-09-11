@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-11 · `master` · `pnpm verify` yeşil · 1252 birim + 1047 tarayıcı testi
+> Son güncelleme: 2026-09-11 · `master` · `pnpm verify` yeşil · 1252 birim + 1047 tarayıcı + 11 örnek testi
 
 | Faz | Görev | Durum |
 |---|---|---|
@@ -33,9 +33,9 @@
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
 | **Faz 4** — Eklentiler | 7 / 7 | ✅ **Tamamlandı** |
-| **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
+| **Faz 5** — Sarmalayıcılar | 1 / 5 | 🔵 Sürüyor |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **50 / 72** | **%69** |
+| | **51 / 72** | **%71** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,9 +43,9 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)**
+referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01`
 
-**Sıradaki:** `F5-01` `@kalem/react`.
+**Sıradaki:** `F5-02` `@kalem/vue`.
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10) ve Linux görsel
 referansları (F3-11) — ikisi de bir insanın masasında yapılmak zorunda.
@@ -1565,12 +1565,61 @@ testi.
 **Amaç:** "Framework bağımsız" vaadinin kanıtı. **Süre: ~2–3 hafta**
 **Not:** Faz 3 ile paralel yürütülebilir ve yürütülmeli — API'yi erken sınar.
 
-### F5-01 · `@kalem/react` `[M]` ⬜
-- `<KalemEditor value onChange />` — hem kontrollü hem kontrolsüz
-- `useSyncExternalStore` ile abonelik, `useKalem()` hook'u ile imperatif erişim
-- `peerDependencies: { react: ">=17" }`, kendi boyutu ≤ 1.5 kB
-- React 19 + Strict Mode + Next.js App Router (`'use client'`) uyumu
-- **Kabul:** `examples/react-vite` ve `examples/nextjs` çalışıyor
+### F5-01 · `@kalem/react` `[M]` ✅
+- [x] `<KalemEditor value onChange />` — hem kontrollü hem kontrolsüz
+- [x] `useSyncExternalStore` ile abonelik (`useKalemValue`), `useKalem()` ile imperatif erişim
+- [x] `peerDependencies: { react: ">=17" }`, kendi boyutu **903 B** (sınır 1.5 kB)
+- [x] React 19 + Strict Mode + Next.js App Router (`'use client'`) uyumu
+- [x] **Kabul:** `examples/react-vite` ve `examples/nextjs` çalışıyor (11 tarayıcı testi)
+
+**Kontrollü kipin sonsuz döngüsü nasıl kırıldı.** Kullanıcı yazıyor →
+`onChange` → üst bileşen `setState` → `value` değişiyor → editöre
+yazılıyor → imleç başa kaçıyor. Çözüm, editörün **kendi yaydığı** metni
+bir ref'te tutmak: gelen `value` ona eşitse hiçbir şey yapılmıyor, yani
+yalnızca gerçekten dışarıdan gelen bir değişiklik editöre iniyor. Örnek
+uygulamada art arda yazılan harflerin aynı yere gittiği testle sabit.
+
+**Editör yalnızca bir kez kuruluyor.** Kurulum imleci, seçimi ve geçmişi
+sıfırlıyor; `lang`, `plugins`, `label` bu yüzden montaj anında okunuyor.
+Geri çağırmalar istisnası bir ref'te tutuluyor — aksi hâlde satır içi
+yazılan her `onChange={() => …}` editörü yeniden kurardı.
+
+**`useSyncExternalStore` neden.** Editörün metni React'in dışında
+yaşıyor. `useEffect` + `useState` iki yerden yanlış olurdu: eşzamanlı
+render'da yırtılma (aynı ağacın iki bileşeni farklı metin görebiliyor) ve
+abonelik ile render arasında kaçırılan güncelleme. Anlık görüntü bir
+ref'te saklanıyor, her okumada `getValue()` çağrılmıyor: `change` olayı
+metni zaten taşıyor ve üç okuyucu bileşen, tuş başına üç serileştirme
+demekti.
+
+**React 17 için on satırlık yedek.** `useSyncExternalStore` 18'de geldi
+ama peer aralığı `>=17`. Kanca yoksa `useReducer` + `useEffect` yedeği
+devreye giriyor; yırtılmaya karşı korumuyor ama React 17'de eşzamanlı
+render de yok. Seçim modül düzeyinde bir kez yapılıyor, koşullu kanca
+çağrısı değil.
+
+> **Paketleyici `"use client"` yönergesini düşürüyordu.** Kaynakta
+> `KalemEditor.tsx`in başında duruyor, rolldown modülleri birleştirirken
+> atıyor. Sonuç: Next.js App Router'da bir sunucu bileşeni
+> `<KalemEditor>` import ettiğinde "useState yalnızca istemci
+> bileşenlerinde çalışır" hatası — yani F5-01'in uyumluluk sözü, derleme
+> çıktısında **sessizce** bozulmuştu. Yönerge artık bant (banner) olarak
+> yeniden yazılıyor ve örnek uygulama bunu `transpilePackages` ya da
+> `dynamic(… ssr: false)` olmadan kanıtlıyor.
+
+**Örnekler yayımlanacak çıktıdan çalışıyor.** Kaynağa takma ad veren bir
+geliştirme sunucusu, `exports` haritasındaki bir hatayı gizlerdi. Her iki
+örnek de Playwright yapılandırmasının sunucu komutunda önce derleniyor
+(`playwright.examples.config.ts`), sonra sınanıyor.
+
+Örnek testleri ana e2e paketinden **ayrı** (`pnpm e2e:examples`): Next.js
+üretim derlemesi yarım dakika sürüyor ve her e2e koşusunda bu bedeli
+ödemek hızlı geri bildirimi öldürürdü. CI'da kendi işi var.
+
+> **Yan düzeltme: `pnpm attw` zaten kırıktı.** `node10` çözümlemesi
+> `exports` haritasıyla mümkün değil ve araç bunu hata sayıyordu; gate
+> F5-01'den **önce** de kırmızıydı. `--profile node16` ile node10
+> bilerek yok sayılıyor — paketler zaten `node >= 18` istiyor.
 
 ### F5-02 · `@kalem/vue` `[M]` ⬜
 - `<KalemEditor v-model />`, `defineComponent`, `peerDependencies: { vue: "^3" }`

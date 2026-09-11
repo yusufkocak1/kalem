@@ -100,3 +100,23 @@ jobs:
           name: playwright-raporu
           path: playwright-report/
           retention-days: 7
+
+  ornekler:
+    name: örnek uygulamalar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Örnekler paketlerin **yayımlanacak çıktısını** tüketiyor; kaynağa
+      # takma ad verilmiyor. Bu yüzden önce paketler derleniyor.
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      # Örnek uygulamaların kendi derlemesi, Playwright yapılandırmasındaki
+      # sunucu komutunun içinde (`playwright.examples.config.ts`): derleme
+      # kırılırsa test hiç başlamıyor ve sebebi günlükte yazıyor.
+      - run: pnpm e2e:examples

@@ -181,5 +181,13 @@
     "gzip": true,
     "import": "{ autosavePlugin }",
     "ignore": ["@kalem/core", "@kalem/editor"]
+  },
+  {
+    "name": "@kalem/react (React ve editör hariç)",
+    "path": "packages/react/dist/index.js",
+    "limit": "1.5 kB",
+    "gzip": true,
+    "import": "*",
+    "ignore": ["react", "react/jsx-runtime", "@kalem/core", "@kalem/editor"]
   }
 ]

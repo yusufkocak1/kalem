@@ -19,6 +19,16 @@ catalog:
   typescript: ^7.0.2
   vitest: ^5.0.0
 
+# Faz 5 — sarmalayıcılar ve örnek uygulamalar. React burada `catalog:`
+# çünkü hem paketin devDeps'inde hem örneklerde geçiyor; sürüm kayması
+# "hangi React ile test edildi" sorusunu cevapsız bırakırdı.
+  react: ^19.3.0
+  react-dom: ^19.3.0
+  '@types/react': ^19.3.0
+  '@types/react-dom': ^19.3.0
+  '@vitejs/plugin-react': ^5.1.0
+  vite: ^6.4.3
+
 # sharp yalnızca dokümantasyon sitesi (apps/docs) için; yayımlanan
 # paketlerin hiçbirine girmez.
 onlyBuiltDependencies:
