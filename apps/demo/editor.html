@@ -119,6 +119,7 @@
 		padding: 11px 13px;
 		background: var(--kart);
 	}
+	.durum { padding: 10px 22px 0; }
 	.olcum dt { font-size: 11.5px; color: var(--soluk); margin: 0 0 3px; }
 	.olcum dd { margin: 0; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
 	.iyi { color: var(--iyi); }
@@ -132,6 +133,7 @@
 <link rel="stylesheet" href="/@kalem/themes/plugin-code.css">
 <link rel="stylesheet" href="/@kalem/themes/plugin-find.css">
 <link rel="stylesheet" href="/@kalem/themes/plugin-outline.css">
+<link rel="stylesheet" href="/@kalem/themes/plugin-word-count.css">
 <!-- F3-09: tema seçici bu bağlantıyı çalışma anında değiştiriyor. -->
 <link rel="stylesheet" href="" id="temaEk">
 
@@ -195,6 +197,8 @@
 	</section>
 </main>
 
+<div id="durum" class="durum"></div>
+
 <dl class="rapor">
 	<div class="olcum"><dt>Belge dili</dt><dd id="dil">—</dd></div>
 	<div class="olcum"><dt>Blok sayısı</dt><dd id="blok">—</dd></div>
@@ -219,7 +223,8 @@
 			"@kalem/plugin-image-upload": "/@kalem/plugin-image-upload/index.js",
 			"@kalem/plugin-code-highlight": "/@kalem/plugin-code-highlight/index.js",
 			"@kalem/plugin-find-replace": "/@kalem/plugin-find-replace/index.js",
-			"@kalem/plugin-outline": "/@kalem/plugin-outline/index.js"
+			"@kalem/plugin-outline": "/@kalem/plugin-outline/index.js",
+			"@kalem/plugin-word-count": "/@kalem/plugin-word-count/index.js"
 		}
 	}
 </script>
@@ -229,6 +234,7 @@
 	import { findReplacePlugin } from "@kalem/plugin-find-replace";
 	import { imageUploadPlugin } from "@kalem/plugin-image-upload";
 	import { outlinePlugin } from "@kalem/plugin-outline";
+	import { wordCountPlugin } from "@kalem/plugin-word-count";
 	import { mountUi } from "@kalem/ui";
 
 	const ORNEK = `# Işık ve Gölge
@@ -432,10 +438,14 @@ Son paragraf.
 	const anahatEklentisi = outlinePlugin({ container: document.getElementById("icindekiler") });
 	editor.addPlugin(anahatEklentisi);
 
+	/* F4-05 — kelime sayacı; durum çubuğu raporun yanında. */
+	const sayacEklentisi = wordCountPlugin({ container: document.getElementById("durum") });
+	editor.addPlugin(sayacEklentisi);
+
 
 	// `mountUi` de veriliyor: F3-06'nın grup yapılandırması testten
 	// doğrudan kurulabilsin diye.
-	window.kalem = { editor, mountUi, gorselEklentisi, kodEklentisi, aramaEklentisi, anahatEklentisi, get ui() { return ui; } };
+	window.kalem = { editor, mountUi, gorselEklentisi, kodEklentisi, aramaEklentisi, anahatEklentisi, sayacEklentisi, get ui() { return ui; } };
 
 	// Araç çubuğu kipini değiştirmek arayüzü baştan kuruyor: `mountUi`
 	// tek seferlik bir montaj, kip bir çalışma zamanı anahtarı değil.

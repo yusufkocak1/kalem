@@ -1,0 +1,38 @@
+/*
+ * @kalem/themes — Kelime sayacı  (İş listesi: F4-05)
+ *
+ * Yalnızca `@kalem/plugin-word-count` kullanılıyorsa yükleniyor. Sözlük
+ * `tokens.css`ten; burada hiçbir renk tanımlanmıyor.
+ *
+ * Şerit, gömen uygulamanın verdiği kapsayıcıya çiziliyor; konumu ve
+ * genişliği buraya ait değil.
+ */
+
+.kalem-wordcount {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 14px;
+	font: var(--kalem-ui-size) / 1.5 var(--kalem-font);
+	color: var(--kalem-fg-muted);
+	/*
+	 * Sayılar değişirken şerit kıpırdamasın: rakamlar eşit genişlikte.
+	 * "9 kelime" → "10 kelime" geçişinde yanındaki bilgi yer
+	 * değiştirmiyor.
+	 */
+	font-variant-numeric: tabular-nums;
+}
+
+.kalem-wordcount-item {
+	white-space: nowrap;
+}
+
+/* Öğeler arasında ince bir ayraç; ayrı bir eleman eklemeden. */
+.kalem-wordcount-item + .kalem-wordcount-item::before {
+	content: "";
+	display: inline-block;
+	width: 1px;
+	height: 0.9em;
+	margin-right: 14px;
+	vertical-align: -0.1em;
+	background: var(--kalem-border);
+}

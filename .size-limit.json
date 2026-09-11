@@ -102,6 +102,12 @@
     "gzip": true
   },
   {
+    "name": "@kalem/themes/plugin-word-count.css",
+    "path": "packages/themes/css/plugin-word-count.css",
+    "limit": "1 kB",
+    "gzip": true
+  },
+  {
     "name": "@kalem/plugin-image-upload",
     "path": "packages/plugin-image-upload/dist/index.js",
     "limit": "4 kB",
@@ -138,6 +144,14 @@
     "limit": "3 kB",
     "gzip": true,
     "import": "{ outlinePlugin }",
+    "ignore": ["@kalem/core", "@kalem/editor"]
+  },
+  {
+    "name": "@kalem/plugin-word-count",
+    "path": "packages/plugin-word-count/dist/index.js",
+    "limit": "3 kB",
+    "gzip": true,
+    "import": "{ wordCountPlugin }",
     "ignore": ["@kalem/core", "@kalem/editor"]
   }
 ]

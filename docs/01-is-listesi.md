@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-11 · `master` · `pnpm verify` yeşil · 1184 birim + 966 tarayıcı testi
+> Son güncelleme: 2026-09-11 · `master` · `pnpm verify` yeşil · 1211 birim + 990 tarayıcı testi
 
 | Faz | Görev | Durum |
 |---|---|---|
@@ -32,10 +32,10 @@
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
-| **Faz 4** — Eklentiler | 4 / 7 | 🔵 Sürüyor |
+| **Faz 4** — Eklentiler | 5 / 7 | 🔵 Sürüyor |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **47 / 72** | **%65** |
+| | **48 / 72** | **%67** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,9 +43,9 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04`
+referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05`
 
-**Sıradaki:** `F4-05` `plugin-word-count`.
+**Sıradaki:** `F4-06` `plugin-source-mode`.
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10) ve Linux görsel
 referansları (F3-11) — ikisi de bir insanın masasında yapılmak zorunda.
@@ -1426,8 +1426,45 @@ Kapsayıcı dışarıdan geliyor; demo sayfasında varsayılan olarak kapalı,
 Boyut: eklenti 1.92 kB, `plugin-outline.css` 435 B (gzip, çekirdek ve
 editör hariç). 16 birim + 33 tarayıcı testi.
 
-### F4-05 · `plugin-word-count` `[S]` ⬜
-Kelime / karakter / okuma süresi; durum çubuğu bileşeni
+### F4-05 · `plugin-word-count` `[S]` ✅
+- [x] Kelime, karakter (boşluklu/boşluksuz) ve okuma süresi
+- [x] Durum çubuğu bileşeni; kapsayıcı verilmezse yalnızca sayıyor
+- [x] Yazma durunca sayıyor (varsayılan 200 ms)
+
+**Kelime sınırı `Intl.Segmenter`dan geliyor.** "Boşluklara böl" yalnızca
+boşluk kullanan diller için doğru: Japonca bir cümle o yolla **1 kelime**
+sayılıyor. Tarayıcının sözcük sınırı tablosu zaten orada ve hiçbir
+düzenli ifadenin ulaşamayacağı doğrulukta — ek bir byte indirilmiyor.
+`Segmenter` yoksa boşluk ayırmaya düşülüyor: sayaç kırılmıyor,
+CJK'da kabalaşıyor.
+
+**Karakter kod noktası sayılıyor.** `String.length` kod **birimi**
+sayıyor: bir emoji 2 çıkıyor. Kullanıcının "karakter" dediği şey ve
+yayıncılıkta kullanılan sınır kod noktası.
+
+**Sayaç gecikmeli.** Sayma belge uzunluğunda doğrusal ve `Segmenter` ucuz
+değil; 100 sayfalık belgeyi her tuş vuruşunda saymak yazmayı hissedilir
+biçimde ağırlaştırıyor. Sayaç yazmanın sonucu, kendisi değil.
+
+**Kod blokları varsayılan olarak sayılıyor**, seçenekle çıkarılabiliyor:
+teknik bir belgede kod yazının parçası ve okuma süresine giriyor.
+Görselin alt metni ve bağlantı tanımları sayılmıyor — ekranda
+görünmüyorlar.
+
+**Durum çubuğu canlı bölge değil.** `aria-live` koymak, ekran okuyucu
+kullanan birine yazdığı her kelimeden sonra "247 kelime" dedirtmek
+demekti. Şerit adlandırılmış bir grup; kullanıcı istediğinde okuyor.
+
+Etiketlerin hepsi fonksiyon, çünkü çoğul kuralı dile bağlı: İngilizce'de
+"1 word / 2 words", Türkçe'de ikisi de "kelime".
+
+Boyut: eklenti 1.39 kB, `plugin-word-count.css` 210 B (gzip, çekirdek ve
+editör hariç). 27 birim + 24 tarayıcı testi.
+
+> **Yan düzeltme:** `editor.spec.ts`teki "yazarken diğer blokların
+> elemanları yeniden kurulmuyor" testi sabit bir makro görev bekliyordu
+> ve yüklü bir makinede Firefox'ta rastgele kırmızıya dönüyordu. Artık
+> modelin değişmesini bekliyor.
 
 ### F4-06 · `plugin-source-mode` `[M]` ⬜
 WYSIWYG ↔ ham Markdown geçişi; basit metin alanı (CodeMirror bağımlılığı **yok**)

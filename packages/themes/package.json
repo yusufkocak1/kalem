@@ -21,6 +21,7 @@
     "./plugin-code.css": "./css/plugin-code.css",
     "./plugin-find.css": "./css/plugin-find.css",
     "./plugin-outline.css": "./css/plugin-outline.css",
+    "./plugin-word-count.css": "./css/plugin-word-count.css",
     "./package.json": "./package.json"
   },
   "publishConfig": {

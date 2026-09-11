@@ -169,7 +169,14 @@ test.describe("yaşam döngüsü", () => {
 			// `input` olayını gerçek düzenleme gibi tetikle.
 			h1.append(document.createTextNode("!"));
 			h1.dispatchEvent(new Event("input", { bubbles: true }));
-			await new Promise((r) => setTimeout(r, 0));
+			// Modelin değişmesi **beklenir**, sabit bir gecikmeyle tahmin
+			// edilmez: tek bir makro görev, yüklü bir makinede editörün
+			// `input` işleyicisinden önce bitebiliyor ve test o zaman
+			// ölçmediği bir şeyi doğrulamış oluyordu.
+			const bekle = Date.now() + 2000;
+			while (!window.kalem.editor.getValue().includes("Gölge!") && Date.now() < bekle) {
+				await new Promise((r) => setTimeout(r, 10));
+			}
 			const sonra = bloklar();
 			return once.length === sonra.length && once.every((el, i) => el === sonra[i]);
 		});
@@ -984,8 +991,9 @@ test.describe("eklentiler", () => {
 		// Demo sayfası `mountUi` çağırıyor; arayüz katmanı kendi kısayollarını
 		// da eklenti olarak kaydediyor: Ctrl+K (F3-02) ve Ctrl+Shift+↑/↓ ile
 		// blok taşıma (F3-04). Görsel yükleme (F4-01), kod vurgulama (F4-02),
-		// bul-değiştir (F4-03) ve içindekiler (F4-04) demo tarafından ayrıca
-		// kaydediliyor. Sıra kayıt sırası — çakışma kuralı o.
+		// bul-değiştir (F4-03), içindekiler (F4-04) ve kelime sayacı (F4-05)
+		// demo tarafından ayrıca kaydediliyor. Sıra kayıt sırası — çakışma
+		// kuralı o.
 		expect(adlar).toEqual([
 			"input-rules",
 			"task-list",
@@ -995,6 +1003,7 @@ test.describe("eklentiler", () => {
 			"code-highlight",
 			"find-replace",
 			"outline",
+			"word-count",
 		]);
 	});
 

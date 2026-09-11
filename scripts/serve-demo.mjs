@@ -85,6 +85,10 @@ const PAKETLER = [
 		onEk: "/@kalem/plugin-outline/",
 		kok: fileURLToPath(new URL("../packages/plugin-outline/dist/", import.meta.url)),
 	},
+	{
+		onEk: "/@kalem/plugin-word-count/",
+		kok: fileURLToPath(new URL("../packages/plugin-word-count/dist/", import.meta.url)),
+	},
 	// Temalar saf CSS; derleme adımı yok, kaynak doğrudan servis ediliyor.
 	{
 		onEk: "/@kalem/themes/",

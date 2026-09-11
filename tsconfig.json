@@ -24,6 +24,9 @@
     },
     {
       "path": "./packages/plugin-outline"
+    },
+    {
+      "path": "./packages/plugin-word-count"
     }
   ]
 }
