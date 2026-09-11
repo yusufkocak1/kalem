@@ -96,6 +96,12 @@
     "gzip": true
   },
   {
+    "name": "@kalem/themes/plugin-outline.css",
+    "path": "packages/themes/css/plugin-outline.css",
+    "limit": "1 kB",
+    "gzip": true
+  },
+  {
     "name": "@kalem/plugin-image-upload",
     "path": "packages/plugin-image-upload/dist/index.js",
     "limit": "4 kB",
@@ -124,6 +130,14 @@
     "limit": "5 kB",
     "gzip": true,
     "import": "{ findReplacePlugin }",
+    "ignore": ["@kalem/core", "@kalem/editor"]
+  },
+  {
+    "name": "@kalem/plugin-outline",
+    "path": "packages/plugin-outline/dist/index.js",
+    "limit": "3 kB",
+    "gzip": true,
+    "import": "{ outlinePlugin }",
     "ignore": ["@kalem/core", "@kalem/editor"]
   }
 ]

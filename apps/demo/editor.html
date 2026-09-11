@@ -102,6 +102,10 @@
 		word-break: break-word;
 	}
 	.tuval { flex: 1; overflow: auto; padding: 20px 22px; }
+	/* İçindekiler kapalıyken hiç yer kaplamıyor: editörün genişliği
+	   varsayılan sayfada aynı kalsın (görsel referanslar ona bakıyor). */
+	.govde { display: flex; flex: 1; min-height: 0; }
+	.yan { width: 190px; border-right: 1px solid var(--kenar); overflow: auto; padding: 8px 4px; }
 
 	.rapor {
 		padding: 12px 22px 22px;
@@ -127,6 +131,7 @@
 <link rel="stylesheet" href="/@kalem/themes/plugin-image.css">
 <link rel="stylesheet" href="/@kalem/themes/plugin-code.css">
 <link rel="stylesheet" href="/@kalem/themes/plugin-find.css">
+<link rel="stylesheet" href="/@kalem/themes/plugin-outline.css">
 <!-- F3-09: tema seçici bu bağlantıyı çalışma anında değiştiriyor. -->
 <link rel="stylesheet" href="" id="temaEk">
 
@@ -144,6 +149,7 @@
 		</span>
 		<button type="button" id="ornek">Örneği yükle</button>
 		<label class="secim"><input type="checkbox" id="saltOkunur"> salt okunur</label>
+		<label class="secim"><input type="checkbox" id="anahat"> içindekiler</label>
 		<label class="secim">tema
 			<select id="tema">
 				<option value="">varsayılan</option>
@@ -178,7 +184,10 @@
 <main>
 	<section>
 		<div class="baslik"><span>Editör</span><span class="ek" id="blokBilgi"></span></div>
-		<div class="tuval"><div id="editor" lang="tr"></div></div>
+		<div class="govde">
+			<aside class="yan" id="icindekiler" hidden></aside>
+			<div class="tuval"><div id="editor" lang="tr"></div></div>
+		</div>
 	</section>
 	<section>
 		<div class="baslik"><span>Markdown çıktısı</span><span class="ek" id="ciktiBilgi"></span></div>
@@ -209,7 +218,8 @@
 			"@kalem/ui": "/@kalem/ui/index.js",
 			"@kalem/plugin-image-upload": "/@kalem/plugin-image-upload/index.js",
 			"@kalem/plugin-code-highlight": "/@kalem/plugin-code-highlight/index.js",
-			"@kalem/plugin-find-replace": "/@kalem/plugin-find-replace/index.js"
+			"@kalem/plugin-find-replace": "/@kalem/plugin-find-replace/index.js",
+			"@kalem/plugin-outline": "/@kalem/plugin-outline/index.js"
 		}
 	}
 </script>
@@ -218,6 +228,7 @@
 	import { codeHighlightPlugin } from "@kalem/plugin-code-highlight";
 	import { findReplacePlugin } from "@kalem/plugin-find-replace";
 	import { imageUploadPlugin } from "@kalem/plugin-image-upload";
+	import { outlinePlugin } from "@kalem/plugin-outline";
 	import { mountUi } from "@kalem/ui";
 
 	const ORNEK = `# Işık ve Gölge
@@ -411,10 +422,20 @@ Son paragraf.
 	const aramaEklentisi = findReplacePlugin();
 	editor.addPlugin(aramaEklentisi);
 
+	/*
+	 * F4-04 — içindekiler.
+	 *
+	 * Panel, uygulamanın verdiği kapsayıcıya çiziliyor; kütüphane ekranın
+	 * bir köşesini kendi başına sahiplenmiyor. Yan sütun varsayılan olarak
+	 * kapalı, çünkü açmak editörün genişliğini değiştiriyor.
+	 */
+	const anahatEklentisi = outlinePlugin({ container: document.getElementById("icindekiler") });
+	editor.addPlugin(anahatEklentisi);
+
 
 	// `mountUi` de veriliyor: F3-06'nın grup yapılandırması testten
 	// doğrudan kurulabilsin diye.
-	window.kalem = { editor, mountUi, gorselEklentisi, kodEklentisi, aramaEklentisi, get ui() { return ui; } };
+	window.kalem = { editor, mountUi, gorselEklentisi, kodEklentisi, aramaEklentisi, anahatEklentisi, get ui() { return ui; } };
 
 	// Araç çubuğu kipini değiştirmek arayüzü baştan kuruyor: `mountUi`
 	// tek seferlik bir montaj, kip bir çalışma zamanı anahtarı değil.
@@ -423,6 +444,10 @@ Son paragraf.
 	document.getElementById("tema").addEventListener("change", (e) => {
 		const ek = document.getElementById("temaEk");
 		ek.href = e.target.value === "" ? "" : `/@kalem/themes/${e.target.value}.css`;
+	});
+
+	document.getElementById("anahat").addEventListener("change", (e) => {
+		document.getElementById("icindekiler").hidden = !e.target.checked;
 	});
 
 	document.getElementById("aracCubugu").addEventListener("change", (e) => {

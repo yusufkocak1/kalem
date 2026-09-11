@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-11 · `master` · `pnpm verify` yeşil · 1168 birim + 933 tarayıcı testi
+> Son güncelleme: 2026-09-11 · `master` · `pnpm verify` yeşil · 1184 birim + 966 tarayıcı testi
 
 | Faz | Görev | Durum |
 |---|---|---|
@@ -32,10 +32,10 @@
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
-| **Faz 4** — Eklentiler | 3 / 7 | 🔵 Sürüyor |
+| **Faz 4** — Eklentiler | 4 / 7 | 🔵 Sürüyor |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **46 / 72** | **%64** |
+| | **47 / 72** | **%65** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,9 +43,9 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02` · `F4-03`
+referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04`
 
-**Sıradaki:** `F4-04` `plugin-outline`.
+**Sıradaki:** `F4-05` `plugin-word-count`.
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10) ve Linux görsel
 referansları (F3-11) — ikisi de bir insanın masasında yapılmak zorunda.
@@ -1379,8 +1379,52 @@ kullanıcının hizalamasını bozmak olurdu.
 Boyut: eklenti 4.46 kB, `plugin-find.css` 649 B (gzip, çekirdek ve
 editör hariç). 59 birim + 51 tarayıcı testi.
 
-### F4-04 · `plugin-outline` `[S]` ⬜
-İçindekiler paneli, başlıklara tıklayarak atlama, aktif başlık takibi
+### F4-04 · `plugin-outline` `[S]` ✅
+- [x] Başlık listesi, belge değiştikçe güncelleniyor
+- [x] Tıklayarak atlama — imleç başlığa taşınıyor, görünür alana geliyor
+- [x] Etkin başlık takibi: imleçten **ve** kaydırmadan
+- [x] Panel gömen uygulamanın verdiği kapsayıcıya çiziliyor; verilmezse liste yine API'den okunabiliyor
+
+**Girinti dereceden değil seviyeden geliyor.** Gerçek belgeler başlık
+derecelerini atlıyor: `#` sonrası gelen bir `###`, girintiyi `depth`ten
+alsaydı iki kat boşluk bırakırdı. Bir başlık, kendisinden daha sığ en
+yakın atanın bir altına giriyor — belgenin ne demek istediği korunuyor,
+kullanıcının yazım alışkanlığı cezalandırılmıyor.
+
+**Etkin başlık iki sinyalden, son gelen kazanıyor.** Kullanıcının dikkati
+yazarken imleçte, okurken görünür alanda; yalnızca kaydırmayı dinlemek
+yazarken paneli donduruyor, yalnızca imleci dinlemek odak dışarıdayken
+hiç güncellememek demek. İmleç sinyali **yalnızca odak editördeyken**
+dinleniyor: bu ayrım olmadan salt okunur bir belgede panelden atlamak işe
+yaramıyordu, çünkü tıklamanın ürettiği `selectionchange` az önce
+işaretlenen başlığı eskisine geri çeviriyordu.
+
+**Kaydırma eşiği kaydıran kaba göre ölçülüyor.** İlk hâli görünür alanın
+üst kenarını (0) referans alıyordu ve editörü kendi kutusunda kaydıran
+uygulamalarda hiçbir başlık etkin olmuyordu: kutu sayfanın 200 piksel
+aşağısındaysa, kutunun tepesindeki başlığın `top`u 200 çıkıyor. Artık
+editörü kaydıran ata bulunup eşik ona göre alınıyor.
+
+**Ölçüm hiçbir başlık bulamazsa varsayımda bulunmuyor.** "Hiçbiri eşiğin
+üstünde değilse ilki etkin olsun" kuralı, ekrana sığan bir belgede
+atlamayı işe yaramaz kılıyordu: atlamanın tetiklediği kaydırma olayı
+seçimi ilk başlığa geri alıyordu. Varsayım artık yalnızca **henüz bir
+seçim yokken** yapılıyor.
+
+**`@kalem/editor`e üç fonksiyon eklendi** (`blockElementOf`, `holderIn`,
+`holderFor`). Model konumundan DOM elemanına gitmek, F4-03'te de F4-04'te
+de gerekti ve eklentiler birbirine bağlanamıyor (her biri bağımsız
+paket). İki eklentinin aynı on satırı kopyalaması, `render.ts`in
+işaretleme biçimi değiştiğinde ikisinin birden sessizce bozulması
+demekti. Bul-değiştir'in yerel kopyası silindi.
+
+**Panel neden yüzen bir kutu değil.** Bul-değiştir paneli geçici, bu
+kalıcı bir kenar çubuğu ve nereye konacağı uygulamanın yerleşim kararı.
+Kapsayıcı dışarıdan geliyor; demo sayfasında varsayılan olarak kapalı,
+çünkü açmak editörün genişliğini değiştiriyor.
+
+Boyut: eklenti 1.92 kB, `plugin-outline.css` 435 B (gzip, çekirdek ve
+editör hariç). 16 birim + 33 tarayıcı testi.
 
 ### F4-05 · `plugin-word-count` `[S]` ⬜
 Kelime / karakter / okuma süresi; durum çubuğu bileşeni

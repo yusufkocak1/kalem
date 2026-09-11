@@ -24,8 +24,8 @@
  * olması, salt okunur belgede de en çok işe yarayan şey.
  */
 import type { Plugin, PluginContext } from "@kalem/editor";
-import { selectRange } from "@kalem/editor";
-import { blockElement, createDecorator, holderFor } from "./decorate.js";
+import { blockElementOf, holderIn, selectRange } from "@kalem/editor";
+import { createDecorator } from "./decorate.js";
 import type { FindLabels } from "./labels.js";
 import { labelsFor } from "./labels.js";
 import { createPanel } from "./panel.js";
@@ -189,9 +189,8 @@ export function findReplacePlugin(options: FindReplaceOptions = {}): FindReplace
 		if (ctx === null) return;
 		const caret = ctx.getCaret();
 		const id = caret === null ? null : (ctx.getDocument().children[caret.blockIndex]?.id ?? null);
-		const blok = id === null ? null : blockElement(ctx.element, id);
-		const holder =
-			blok === null || caret === null ? null : holderFor(ctx.element, blok, caret.path);
+		const blok = id === null ? null : blockElementOf(ctx.element, id);
+		const holder = blok === null || caret === null ? null : holderIn(blok, caret.path);
 
 		if (blok !== null && holder !== null && caret !== null) {
 			blok.focus();

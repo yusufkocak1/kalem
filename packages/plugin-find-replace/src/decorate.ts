@@ -35,7 +35,7 @@
  * ayrı bir `<style>` yazmak demekti — aynı sayfada iki arama panelini
  * birden açık tutmanın bedeli olarak fazla.
  */
-import { ID_ATTR, pointAt } from "@kalem/editor";
+import { blockElementOf, holderIn, pointAt } from "@kalem/editor";
 import type { Match } from "./search.js";
 
 /** Bütün eşleşmeler. */
@@ -62,35 +62,6 @@ function kayitDefteri(view: Window | null): VurguKaydi | null {
 	return css?.highlights ?? null;
 }
 
-/**
- * Blok elemanı ve yol → içerik taşıyıcısı.
- *
- * Editörün kendi `holderAt`i ile aynı kural, iki öznitelikle: satır içi
- * taşıyıcılar `data-kalem-path`, kaynak bloklar `data-kalem-code`
- * (`render.ts`). Panelin kapanışta odağı geri vermesi de buna dayanıyor.
- */
-export function holderFor(
-	root: HTMLElement,
-	blok: HTMLElement,
-	path: readonly number[],
-): HTMLElement | null {
-	const aranan = path.join(".");
-	for (const attr of ["data-kalem-path", "data-kalem-code"]) {
-		if (blok.getAttribute(attr) === aranan) return blok;
-		const bulunan = blok.querySelector(`[${attr}="${aranan}"]`);
-		if (bulunan instanceof HTMLElement && root.contains(bulunan)) return bulunan;
-	}
-	return null;
-}
-
-/** Kimliğiyle blok elemanı. */
-export function blockElement(root: HTMLElement, id: string): HTMLElement | null {
-	// Kimlikler bizim ürettiğimiz ASCII dizeler (`ids.ts`) ama seçiciye
-	// giren her değer kaçırılmalı.
-	const el = root.querySelector(`[${ID_ATTR}="${CSS.escape(id)}"]`);
-	return el instanceof HTMLElement ? el : null;
-}
-
 export interface Decorator {
 	/** Eşleşmeleri boyar; `current` geçerli eşleşmenin indisi (yoksa -1). */
 	paint(matches: readonly Match[], current: number): void;
@@ -107,10 +78,10 @@ export function createDecorator(root: HTMLElement, getBlockId: (index: number) =
 	function aralik(match: Match): Range | null {
 		const id = getBlockId(match.blockIndex);
 		if (id === null) return null;
-		const blok = blockElement(root, id);
+		const blok = blockElementOf(root, id);
 		if (blok === null) return null;
 
-		const holder = tasiyici(blok, match.path);
+		const holder = holderIn(blok, match.path);
 		if (holder === null) return null;
 
 		try {
@@ -125,10 +96,6 @@ export function createDecorator(root: HTMLElement, getBlockId: (index: number) =
 			// aralık üretmektense o eşleşmeyi atlıyoruz.
 			return null;
 		}
-	}
-
-	function tasiyici(blok: HTMLElement, path: readonly number[]): HTMLElement | null {
-		return holderFor(root, blok, path);
 	}
 
 	const decorator: Decorator = {

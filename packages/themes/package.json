@@ -20,6 +20,7 @@
     "./plugin-image.css": "./css/plugin-image.css",
     "./plugin-code.css": "./css/plugin-code.css",
     "./plugin-find.css": "./css/plugin-find.css",
+    "./plugin-outline.css": "./css/plugin-outline.css",
     "./package.json": "./package.json"
   },
   "publishConfig": {

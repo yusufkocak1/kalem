@@ -1,0 +1,118 @@
+/*
+ * @kalem/themes — İçindekiler  (İş listesi: F4-04)
+ *
+ * Yalnızca `@kalem/plugin-outline` kullanılıyorsa yükleniyor. Sözlük
+ * `tokens.css`ten; burada hiçbir renk tanımlanmıyor.
+ *
+ * Panel, gömen uygulamanın verdiği kapsayıcıya çiziliyor (`plugin.ts`),
+ * yani genişliği ve konumu buraya ait değil: kurallar yalnızca listenin
+ * kendi tipografisini ve girintisini veriyor.
+ */
+
+.kalem-outline {
+	font: var(--kalem-ui-size) / 1.5 var(--kalem-font);
+	color: var(--kalem-fg);
+}
+
+.kalem-outline-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.kalem-outline-empty {
+	margin: 0;
+	padding: 6px 8px;
+	color: var(--kalem-fg-muted);
+}
+
+.kalem-outline-item {
+	display: block;
+	width: 100%;
+	box-sizing: border-box;
+	font: inherit;
+	text-align: left;
+	padding: 4px 8px;
+	color: inherit;
+	background: none;
+	border: 0;
+	border-left: 2px solid transparent;
+	border-radius: 0 6px 6px 0;
+	cursor: pointer;
+	/*
+	 * Uzun başlık kesiliyor, sarmalanmıyor.
+	 *
+	 * İçindekiler bir tarama listesi: iki satıra taşan bir başlık, göz
+	 * için satır sayısını ve dolayısıyla yapıyı bulanıklaştırıyor. Tam
+	 * metin `title` özniteliğinde değil — ekran okuyucu zaten tamamını
+	 * okuyor, görsel kullanıcı da tıklayıp başlığın kendisine gidiyor.
+	 */
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/*
+ * Girinti seviye başına bir kural.
+ *
+ * `data-level` eklentinin yazdığı 1–6 arası **görsel** seviye, Markdown
+ * derecesi değil: `#` sonrası gelen bir `###` iki kat girinti alıyor, üç
+ * değil (bkz. `outline.ts`).
+ *
+ * `calc(attr(...))` ile tek satırda yazılabilirdi ama `attr()`ın sayı
+ * okuyan biçimi şu an yalnızca bir motorda var; kalan ikisi kuralı
+ * sessizce düşürür ve liste girintisiz kalırdı. Altı satır, üç tarayıcıda
+ * da aynı sonucu veriyor.
+ */
+.kalem-outline-item[data-level="2"] {
+	padding-left: 20px;
+}
+
+.kalem-outline-item[data-level="3"] {
+	padding-left: 32px;
+}
+
+.kalem-outline-item[data-level="4"] {
+	padding-left: 44px;
+}
+
+.kalem-outline-item[data-level="5"] {
+	padding-left: 56px;
+}
+
+.kalem-outline-item[data-level="6"] {
+	padding-left: 68px;
+}
+
+/* Birinci seviye belgenin iskeleti; biraz daha baskın. */
+.kalem-outline-item[data-level="1"] {
+	font-weight: 600;
+}
+
+.kalem-outline-item:hover {
+	background: var(--kalem-bg-subtle);
+}
+
+.kalem-outline-item:focus-visible {
+	outline: 2px solid var(--kalem-accent);
+	outline-offset: -2px;
+}
+
+/*
+ * Etkin başlık.
+ *
+ * İşaret hem renk hem **kenar çizgisi**: yalnızca renkle ayırmak, renk
+ * körlüğü olan kullanıcı için görünmez bir bilgi olurdu.
+ */
+.kalem-outline-item[aria-current] {
+	color: var(--kalem-accent);
+	border-left-color: var(--kalem-accent);
+	background: var(--kalem-bg-subtle);
+}
+
+@media (forced-colors: active) {
+	.kalem-outline-item[aria-current] {
+		border-left-color: Highlight;
+		color: Highlight;
+	}
+}
