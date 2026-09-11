@@ -22,6 +22,8 @@
     "./plugin-find.css": "./css/plugin-find.css",
     "./plugin-outline.css": "./css/plugin-outline.css",
     "./plugin-word-count.css": "./css/plugin-word-count.css",
+    "./plugin-source.css": "./css/plugin-source.css",
+    "./plugin-autosave.css": "./css/plugin-autosave.css",
     "./package.json": "./package.json"
   },
   "publishConfig": {

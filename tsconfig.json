@@ -27,6 +27,12 @@
     },
     {
       "path": "./packages/plugin-word-count"
+    },
+    {
+      "path": "./packages/plugin-source-mode"
+    },
+    {
+      "path": "./packages/plugin-autosave"
     }
   ]
 }

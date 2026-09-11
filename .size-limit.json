@@ -108,6 +108,18 @@
     "gzip": true
   },
   {
+    "name": "@kalem/themes/plugin-source.css",
+    "path": "packages/themes/css/plugin-source.css",
+    "limit": "1 kB",
+    "gzip": true
+  },
+  {
+    "name": "@kalem/themes/plugin-autosave.css",
+    "path": "packages/themes/css/plugin-autosave.css",
+    "limit": "1 kB",
+    "gzip": true
+  },
+  {
     "name": "@kalem/plugin-image-upload",
     "path": "packages/plugin-image-upload/dist/index.js",
     "limit": "4 kB",
@@ -152,6 +164,22 @@
     "limit": "3 kB",
     "gzip": true,
     "import": "{ wordCountPlugin }",
+    "ignore": ["@kalem/core", "@kalem/editor"]
+  },
+  {
+    "name": "@kalem/plugin-source-mode",
+    "path": "packages/plugin-source-mode/dist/index.js",
+    "limit": "3 kB",
+    "gzip": true,
+    "import": "{ sourceModePlugin }",
+    "ignore": ["@kalem/core", "@kalem/editor"]
+  },
+  {
+    "name": "@kalem/plugin-autosave",
+    "path": "packages/plugin-autosave/dist/index.js",
+    "limit": "3 kB",
+    "gzip": true,
+    "import": "{ autosavePlugin }",
     "ignore": ["@kalem/core", "@kalem/editor"]
   }
 ]

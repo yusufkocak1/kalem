@@ -119,7 +119,7 @@
 		padding: 11px 13px;
 		background: var(--kart);
 	}
-	.durum { padding: 10px 22px 0; }
+	.durum { padding: 10px 22px 0; display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; }
 	.olcum dt { font-size: 11.5px; color: var(--soluk); margin: 0 0 3px; }
 	.olcum dd { margin: 0; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
 	.iyi { color: var(--iyi); }
@@ -134,11 +134,13 @@
 <link rel="stylesheet" href="/@kalem/themes/plugin-find.css">
 <link rel="stylesheet" href="/@kalem/themes/plugin-outline.css">
 <link rel="stylesheet" href="/@kalem/themes/plugin-word-count.css">
+<link rel="stylesheet" href="/@kalem/themes/plugin-source.css">
+<link rel="stylesheet" href="/@kalem/themes/plugin-autosave.css">
 <!-- F3-09: tema seçici bu bağlantıyı çalışma anında değiştiriyor. -->
 <link rel="stylesheet" href="" id="temaEk">
 
 <header>
-	<h1>Kalem Editör <span>— blok motoru + arayüz</span></h1>
+	<h1>Kalem Editör <span>— blok motoru + arayüz + yedi eklenti</span></h1>
 	<nav>
 		<span class="araclar">
 			<button type="button" data-bicim="strong" title="Ctrl+B"><b>B</b></button>
@@ -167,20 +169,25 @@
 				<option value="false">yok</option>
 			</select>
 		</label>
+		<button type="button" id="kaynak" aria-pressed="false" title="Ctrl+Shift+M">Kaynak</button>
 		<button type="button" id="viewer">Viewer →</button>
 	</nav>
 </header>
 
 <p class="uyari">
-	<b>Blok motorunun ilk hâli.</b> Her blok kendi <code>contenteditable</code>
-	elemanı; yazdıkça model DOM'dan geri okunuyor ve sağda gerçek Markdown
-	çıktısı beliriyor. <b>Birden çok bloğu sürükleyerek seçip Delete'e basın</b> —
-	tarayıcının yapamadığı şey burada bizim modelimize düşüyor.
-	<b>Metin seçin</b> — seçimin üstünde balon araç çubuğu beliriyor.
-	Biçim modelde uygulanıyor, çıktı gerçek Markdown.
-	Enter bloğu böler, Backspace blok başında birleştirir, Tab liste
-	girintisini değiştirir, Ctrl+Alt+1..6 başlık yapar.
-	<b>Henüz yok:</b> geri alma (F2-09) ve yazarken otomatik dönüşüm (F2-10).
+	<b>Faz 4 bitti: yedi eklentinin hepsi bu sayfada kayıtlı.</b>
+	<b>Ctrl+F</b> bul, <b>Ctrl+H</b> değiştir — Türkçe kasa duyarlı, yani
+	<code>ışık</code> araması <code>IŞIK</code>ı buluyor, <code>İŞİK</code>i
+	bulmuyor. <b>Ctrl+Shift+M</b> ham Markdown kipine geçiyor (Escape geri
+	dönüyor). Kod bloğu kendiliğinden vurgulanıyor; dil paketi yalnızca o dil
+	belgede geçtiğinde iniyor. <b>Görsel sürükleyin ya da yapıştırın</b> —
+	sahte bir S3'e yükleniyor. <b>içindekiler</b> kutucuğu başlık panelini
+	açıyor. Altta kelime sayacı ve kaydetme durumu.
+	<br>
+	Blok motoru da burada: her blok kendi <code>contenteditable</code> elemanı,
+	yazdıkça model DOM'dan geri okunuyor ve sağda gerçek Markdown çıktısı
+	beliriyor. Birden çok bloğu sürükleyerek seçip Delete'e basın, metin seçip
+	balon araç çubuğunu kullanın, Enter'la bölün, Tab'la girintileyin.
 </p>
 
 <main>
@@ -197,7 +204,7 @@
 	</section>
 </main>
 
-<div id="durum" class="durum"></div>
+<div id="durum" class="durum"><span id="kayitDurum"></span></div>
 
 <dl class="rapor">
 	<div class="olcum"><dt>Belge dili</dt><dd id="dil">—</dd></div>
@@ -224,16 +231,20 @@
 			"@kalem/plugin-code-highlight": "/@kalem/plugin-code-highlight/index.js",
 			"@kalem/plugin-find-replace": "/@kalem/plugin-find-replace/index.js",
 			"@kalem/plugin-outline": "/@kalem/plugin-outline/index.js",
-			"@kalem/plugin-word-count": "/@kalem/plugin-word-count/index.js"
+			"@kalem/plugin-word-count": "/@kalem/plugin-word-count/index.js",
+			"@kalem/plugin-source-mode": "/@kalem/plugin-source-mode/index.js",
+			"@kalem/plugin-autosave": "/@kalem/plugin-autosave/index.js"
 		}
 	}
 </script>
 <script type="module">
 	import { Editor, inputRulesPlugin, taskListPlugin } from "@kalem/editor";
+	import { autosavePlugin, createIndicator, trAutosaveLabels } from "@kalem/plugin-autosave";
 	import { codeHighlightPlugin } from "@kalem/plugin-code-highlight";
 	import { findReplacePlugin } from "@kalem/plugin-find-replace";
 	import { imageUploadPlugin } from "@kalem/plugin-image-upload";
 	import { outlinePlugin } from "@kalem/plugin-outline";
+	import { sourceModePlugin } from "@kalem/plugin-source-mode";
 	import { wordCountPlugin } from "@kalem/plugin-word-count";
 	import { mountUi } from "@kalem/ui";
 
@@ -442,10 +453,46 @@ Son paragraf.
 	const sayacEklentisi = wordCountPlugin({ container: document.getElementById("durum") });
 	editor.addPlugin(sayacEklentisi);
 
+	/*
+	 * F4-06 — ham Markdown kipi. Ctrl+Shift+M ya da düğme; Escape geri
+	 * dönüyor. Kaynak tarafı sıradan bir `<textarea>`.
+	 */
+	const kaynakEklentisi = sourceModePlugin({
+		onModeChange: (kaynakta) => {
+			document.getElementById("kaynak").setAttribute("aria-pressed", String(kaynakta));
+		},
+	});
+	editor.addPlugin(kaynakEklentisi);
+
+	/*
+	 * F4-07 — otomatik kaydetme.
+	 *
+	 * Sahte bir sunucu: `window.kalemKayit` ile gecikmesi ve hatası
+	 * dışarıdan ayarlanabiliyor (F4-01'deki sahte S3 ile aynı düzen).
+	 */
+	window.kalemKayit = { gecikme: 30, hata: false, sonMetin: null };
+	const kayitEklentisi = autosavePlugin({
+		delay: 400,
+		storageKey: "kalem:demo:taslak",
+		async save(markdown, signal) {
+			const ayar = window.kalemKayit;
+			await new Promise((r) => setTimeout(r, ayar.gecikme));
+			if (signal.aborted) throw new Error("iptal");
+			if (ayar.hata) throw new Error("Sunucuya ulaşılamadı (sahte)");
+			ayar.sonMetin = markdown;
+		},
+		onStateChange: (durum) => gosterge.render(durum),
+	});
+	const gosterge = createIndicator(document.getElementById("kayitDurum"), {
+		prefix: "kalem-",
+		labels: trAutosaveLabels,
+	});
+	editor.addPlugin(kayitEklentisi);
+
 
 	// `mountUi` de veriliyor: F3-06'nın grup yapılandırması testten
 	// doğrudan kurulabilsin diye.
-	window.kalem = { editor, mountUi, gorselEklentisi, kodEklentisi, aramaEklentisi, anahatEklentisi, sayacEklentisi, get ui() { return ui; } };
+	window.kalem = { editor, mountUi, gorselEklentisi, kodEklentisi, aramaEklentisi, anahatEklentisi, sayacEklentisi, kaynakEklentisi, kayitEklentisi, get ui() { return ui; } };
 
 	// Araç çubuğu kipini değiştirmek arayüzü baştan kuruyor: `mountUi`
 	// tek seferlik bir montaj, kip bir çalışma zamanı anahtarı değil.
@@ -454,6 +501,10 @@ Son paragraf.
 	document.getElementById("tema").addEventListener("change", (e) => {
 		const ek = document.getElementById("temaEk");
 		ek.href = e.target.value === "" ? "" : `/@kalem/themes/${e.target.value}.css`;
+	});
+
+	document.getElementById("kaynak").addEventListener("click", () => {
+		kaynakEklentisi.toggle();
 	});
 
 	document.getElementById("anahat").addEventListener("change", (e) => {

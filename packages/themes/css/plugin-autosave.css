@@ -1,0 +1,53 @@
+/*
+ * @kalem/themes — Otomatik kaydetme  (İş listesi: F4-07)
+ *
+ * Yalnızca `@kalem/plugin-autosave` kullanılıyorsa yükleniyor.
+ *
+ * Hata durumu dışında bütün renkler sözlükten. Hata kendi rengini
+ * taşıyor çünkü `tokens.css`te bir "hata" rengi yok ve onu ana sözlüğe
+ * eklemek, otomatik kaydetme kullanmayan herkese indirtmek olurdu.
+ */
+
+/*
+ * Açık tema değeri burada, koyu karşılıkları aşağıda: hiçbir renk
+ * yalnızca media sorgusunun içinde tanımlanmıyor (`tokens.css` kuralı).
+ */
+:where(.kalem-theme, .kalem-doc, .kalem-editor) {
+	--kalem-autosave-error: #b3402a;
+}
+
+.kalem-autosave {
+	font: var(--kalem-ui-size) / 1.5 var(--kalem-font);
+	color: var(--kalem-fg-muted);
+	white-space: nowrap;
+}
+
+/*
+ * Kaydedilmiş durumu soluk, kaydedilmemiş belirgin: kullanıcının
+ * bakması gereken durum "kaydedilmedi".
+ */
+.kalem-autosave[data-state="dirty"],
+.kalem-autosave[data-state="saving"] {
+	color: var(--kalem-fg);
+}
+
+.kalem-autosave[data-state="error"] {
+	color: var(--kalem-autosave-error, #b3402a);
+	font-weight: 600;
+}
+
+@media (prefers-color-scheme: dark) {
+	:where(.kalem-theme, .kalem-doc, .kalem-editor):not([data-theme="light"]) {
+		--kalem-autosave-error: #ff9b82;
+	}
+}
+
+:where(.kalem-theme, .kalem-doc, .kalem-editor)[data-theme="dark"] {
+	--kalem-autosave-error: #ff9b82;
+}
+
+@media (forced-colors: active) {
+	.kalem-autosave[data-state="error"] {
+		color: LinkText;
+	}
+}

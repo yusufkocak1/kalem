@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-11 · `master` · `pnpm verify` yeşil · 1211 birim + 990 tarayıcı testi
+> Son güncelleme: 2026-09-11 · `master` · `pnpm verify` yeşil · 1252 birim + 1047 tarayıcı testi
 
 | Faz | Görev | Durum |
 |---|---|---|
@@ -32,10 +32,10 @@
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
-| **Faz 4** — Eklentiler | 5 / 7 | 🔵 Sürüyor |
+| **Faz 4** — Eklentiler | 7 / 7 | ✅ **Tamamlandı** |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **48 / 72** | **%67** |
+| | **50 / 72** | **%69** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,9 +43,9 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05`
+referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)**
 
-**Sıradaki:** `F4-06` `plugin-source-mode`.
+**Sıradaki:** `F5-01` `@kalem/react`.
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10) ve Linux görsel
 referansları (F3-11) — ikisi de bir insanın masasında yapılmak zorunda.
@@ -1466,14 +1466,98 @@ editör hariç). 27 birim + 24 tarayıcı testi.
 > ve yüklü bir makinede Firefox'ta rastgele kırmızıya dönüyordu. Artık
 > modelin değişmesini bekliyor.
 
-### F4-06 · `plugin-source-mode` `[M]` ⬜
-WYSIWYG ↔ ham Markdown geçişi; basit metin alanı (CodeMirror bağımlılığı **yok**)
-- **Kabul:** iki mod arası geçişte içerik kaybı yok
+### F4-06 · `plugin-source-mode` `[M]` ✅
+- [x] WYSIWYG ↔ ham Markdown geçişi; Ctrl/Cmd+Shift+M ve Escape
+- [x] Basit `<textarea>` — CodeMirror bağımlılığı yok
+- [x] Salt okunur belgede kaynak da salt okunur
+- [x] **Kabul:** iki mod arası geçişte içerik kaybı yok
 
-### F4-07 · `plugin-autosave` `[S]` ⬜
-Debounce'lu `onSave`, "kaydediliyor / kaydedildi" durumu, localStorage kurtarma
+**Neden CodeMirror yok.** Boyut: tek başına Kalem'in tamamından büyük.
+Ham Markdown kipi kullanıcının **kaçış kapısı** — "editör bunu yanlış
+yaptı, kaynağı kendim düzelteyim" anı. O an için sözdizimi vurgulaması,
+kod katlama ve çoklu imleç gerekmiyor; metnin kendisi gerekiyor.
+`<textarea>` ayrıca bedavaya doğru davranıyor: yerel geri alma, IME,
+ekran okuyucu, mobil klavye.
 
-> **FAZ 4 ÇIKIŞ KRİTERİ:** 7 eklenti, tümü halka açık API ile yazılmış. Eklenti API'si kendi kullanımıyla doğrulanmış.
+**İçerik kaybı olmaması iki yerden geliyor.** Kaynağa geçerken belge
+`serialize` ile metne çevriliyor (çekirdeğin gidiş-dönüş garantisi,
+F1-07); geri dönerken metin **değişmediyse belgeye hiç dokunulmuyor**.
+İkincisi asıl önemli olan: `setValue` çağırmak belgeyi yeniden ayrıştırır,
+düğüm kimliklerini değiştirir ve geçmişe anlamsız bir adım yazardı.
+Kullanıcı kaynağa bakıp hiçbir şey yapmadan döndüğünde hiçbir şey
+olmuyor — bir tarayıcı testi bunu Ctrl+Z ile sabitliyor.
+
+**İmleç korunmuyor ve bu bilinçli.** Model konumunu kaynak ofsetine
+çeviren bir eşleme gerekiyor; serileştirici onu üretmiyor (konum bilgisi
+ayrıştırmadan geliyor, üretimden değil). Yanlış yere konan bir imleç, hiç
+konmayandan kötü.
+
+**Editör gizleniyor, DOM'dan çıkarılmıyor.** Çıkarıp geri koymak blok
+elemanlarını yeniden kurar ve editörün eleman haritasını (F2-05)
+geçersizler; gizlemek geri dönüldüğünde hiçbir şeyin değişmemesini
+garanti ediyor.
+
+> **CSS hatası bulundu ve düzeltildi.** `.kalem-source { display: block }`
+> kuralı, tarayıcının `[hidden] { display: none }` kuralını özgüllükle
+> eziyordu: kipten çıkıldığında kutu ekranda kalıyordu. `ui.css` aynı
+> tuzağa `!important` ile karşılık vermiş; burada `.kalem-source[hidden]`
+> zaten daha özgül olduğu için gerekmedi.
+
+Boyut: eklenti 1.01 kB, `plugin-source.css` 269 B. 23 birim + 36 tarayıcı
+testi.
+
+### F4-07 · `plugin-autosave` `[S]` ✅
+- [x] Gecikmeli `save` kancası (varsayılan 1500 ms)
+- [x] "kaydediliyor / kaydedildi / kaydedilemedi" durumu ve göstergesi
+- [x] `localStorage` kurtarma — başarısız kayıt ve sekme kapanışı
+
+**Ağ hakkında hiçbir şey bilmiyor.** `save(markdown, signal)` çağrılıyor,
+gerisi gömen uygulamanın (F4-01'deki aynı karar).
+
+**Aynı anda tek kayıt.** Kullanıcı yazmaya devam ederken önceki kayıt
+sürüyor olabiliyor; paralel istek göndermek sunucuya **sırası karışmış**
+sürümler yollamak demek — ağda geciken eski bir kayıt yenisinin üstüne
+yazabiliyor. Bir kayıt sürerken yenisi başlatılmıyor, biterken belge yine
+değiştiyse bir kez daha çalışıyor. Art arda gelen birden çok değişiklik
+tek bir tekrara düşüyor.
+
+**Kurtarma neden `localStorage`.** `beforeunload` sırasında çalışan tek
+depo o: `IndexedDB` asenkron olduğu için sekme kapanırken yazma sözü
+verip tutamıyor. Kurtarma kaydı **otomatik uygulanmıyor** — editör
+açılışında yerel kopyayı sessizce yüklemek, sunucudaki daha yeni sürümü
+gizleyebilir. `recovered()` soruluyor, kararı uygulama veriyor.
+
+**Anahtar verilmezse kurtarma kapalı.** Rastgele bir anahtar üretmek,
+başka bir belgenin taslağını bu belgeye getirme riski taşıyor.
+
+**Gösterge canlı bölge (`role="status"`), kelime sayacının tersine.**
+Kaydetme durumu seyrek değişiyor ve kullanıcının bilmesi gereken bir şey;
+"kaydedildi mi?" sorusunun cevabı küçük gri bir yazıysa göremeyen
+kullanıcı onu hiç öğrenemiyor.
+
+Açılıştaki içerik "kaydedilmiş" sayılıyor: kurulur kurulmaz sunucuya
+istek atmak, açılan her editörün gereksiz bir yazma yapması demekti.
+
+Boyut: eklenti 652 B, `plugin-autosave.css` 256 B. 18 birim + 24 tarayıcı
+testi.
+
+> **FAZ 4 ÇIKIŞ KRİTERİ KARŞILANDI.** Yedi eklentinin yedisi de yalnızca
+> halka açık API ile yazıldı: `Plugin`, `PluginContext`, `keymap`,
+> `inputRules` ve editörün dışa açtığı saf yardımcılar. Hiçbiri editörün
+> içine uzanmadı, hiçbiri bir diğerine bağlanmadı.
+>
+> **API kendi kullanımıyla doğrulandı** ve üç yerde eksik çıktı:
+> - `PluginContext.on` yoktu (F4-01) — eklentinin editörün durumuna tepki
+>   vermesinin hiçbir yolu yoktu.
+> - `EditResult.caret` zorunluydu (F4-01) — arka planda biten bir
+>   düzenleme imleci kullanıcının yazdığı yerden koparıyordu.
+> - Model konumundan DOM elemanına gitmenin yolu yoktu (F4-04) —
+>   `blockElementOf` / `holderIn` / `holderFor` eklendi; iki eklenti aynı
+>   on satırı kopyalamak zorundaydı.
+>
+> Render kancası hâlâ **yok** ve yedi eklenti boyunca gerekmedi: süsleme
+> çizimden sonra uygulanıp `change`te yenileniyor (F4-01, F4-02) ya da
+> DOM'a hiç dokunulmuyor (F4-03'ün Özel Vurgu API'si).
 
 ---
 

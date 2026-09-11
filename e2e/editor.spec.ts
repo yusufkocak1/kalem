@@ -991,9 +991,8 @@ test.describe("eklentiler", () => {
 		// Demo sayfası `mountUi` çağırıyor; arayüz katmanı kendi kısayollarını
 		// da eklenti olarak kaydediyor: Ctrl+K (F3-02) ve Ctrl+Shift+↑/↓ ile
 		// blok taşıma (F3-04). Görsel yükleme (F4-01), kod vurgulama (F4-02),
-		// bul-değiştir (F4-03), içindekiler (F4-04) ve kelime sayacı (F4-05)
-		// demo tarafından ayrıca kaydediliyor. Sıra kayıt sırası — çakışma
-		// kuralı o.
+		// F4-01…F4-07 eklentileri demo tarafından ayrıca kaydediliyor. Sıra
+		// kayıt sırası — çakışma kuralı o.
 		expect(adlar).toEqual([
 			"input-rules",
 			"task-list",
@@ -1004,6 +1003,8 @@ test.describe("eklentiler", () => {
 			"find-replace",
 			"outline",
 			"word-count",
+			"source-mode",
+			"autosave",
 		]);
 	});
 

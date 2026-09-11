@@ -89,6 +89,14 @@ const PAKETLER = [
 		onEk: "/@kalem/plugin-word-count/",
 		kok: fileURLToPath(new URL("../packages/plugin-word-count/dist/", import.meta.url)),
 	},
+	{
+		onEk: "/@kalem/plugin-source-mode/",
+		kok: fileURLToPath(new URL("../packages/plugin-source-mode/dist/", import.meta.url)),
+	},
+	{
+		onEk: "/@kalem/plugin-autosave/",
+		kok: fileURLToPath(new URL("../packages/plugin-autosave/dist/", import.meta.url)),
+	},
 	// Temalar saf CSS; derleme adımı yok, kaynak doğrudan servis ediliyor.
 	{
 		onEk: "/@kalem/themes/",

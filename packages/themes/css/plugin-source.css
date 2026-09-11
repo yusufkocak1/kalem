@@ -1,0 +1,53 @@
+/*
+ * @kalem/themes — Ham Markdown kipi  (İş listesi: F4-06)
+ *
+ * Yalnızca `@kalem/plugin-source-mode` kullanılıyorsa yükleniyor.
+ * Sözlük `tokens.css`ten; burada hiçbir renk tanımlanmıyor.
+ */
+
+/*
+ * `hidden` özniteliği `display`ten güçsüz.
+ *
+ * Tarayıcının `[hidden] { display: none }` kuralı özgüllük olarak
+ * `.kalem-source`un altında kalıyor, yani aşağıdaki `display: block`
+ * onu eziyor ve gizlenmesi istenen kutu ekranda duruyor. Eklenti
+ * kipten çıkarken tam olarak bunu yapıyordu.
+ *
+ * `!important` gerekmiyor: `.kalem-source[hidden]` zaten daha özgül.
+ */
+.kalem-source[hidden] {
+	display: none;
+}
+
+.kalem-source {
+	display: block;
+	width: 100%;
+	box-sizing: border-box;
+	resize: vertical;
+	padding: 12px 14px;
+	/*
+	 * Tek aralıklı yazı tipi ve `tab-size`: kaynak kipinde girinti
+	 * anlamlı. Liste girintisi ve kod bloğu, WYSIWYG'de göründüğü gibi
+	 * hizalanmalı.
+	 */
+	font-family: var(--kalem-font-mono);
+	font-size: 0.9rem;
+	line-height: 1.6;
+	tab-size: 2;
+	color: var(--kalem-fg);
+	background: var(--kalem-bg-subtle);
+	border: 1px solid var(--kalem-border);
+	border-radius: var(--kalem-radius);
+	/* Uzun satır yana kaymasın: kaynakta satır sarması okumayı kolaylaştırıyor. */
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+.kalem-source:focus-visible {
+	outline: 2px solid var(--kalem-accent);
+	outline-offset: 2px;
+}
+
+.kalem-source[readonly] {
+	color: var(--kalem-fg-muted);
+}
