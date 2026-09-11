@@ -1,0 +1,56 @@
+{
+  "name": "@kalem/plugin-code-highlight",
+  "version": "0.0.0",
+  "description": "Kod bloğu vurgulama eklentisi — tembel yüklenen dil paketleri, sıfır bağımlılık",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "kalem-source": "./src/index.ts",
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./langs/*": {
+      "import": {
+        "types": "./dist/langs/*.d.ts",
+        "default": "./dist/langs/*.js"
+      },
+      "require": {
+        "types": "./dist/langs/*.d.cts",
+        "default": "./dist/langs/*.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch"
+  },
+  "dependencies": {
+    "@kalem/editor": "workspace:^"
+  },
+  "devDependencies": {
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

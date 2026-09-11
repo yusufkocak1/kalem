@@ -84,11 +84,32 @@
     "gzip": true
   },
   {
+    "name": "@kalem/themes/plugin-code.css",
+    "path": "packages/themes/css/plugin-code.css",
+    "limit": "2 kB",
+    "gzip": true
+  },
+  {
     "name": "@kalem/plugin-image-upload",
     "path": "packages/plugin-image-upload/dist/index.js",
     "limit": "4 kB",
     "gzip": true,
     "import": "{ imageUploadPlugin }",
     "ignore": ["@kalem/core", "@kalem/editor"]
+  },
+  {
+    "name": "@kalem/plugin-code-highlight (sekiz dil paketi dahil)",
+    "path": "packages/plugin-code-highlight/dist/index.js",
+    "limit": "4 kB",
+    "gzip": true,
+    "import": "{ codeHighlightPlugin }",
+    "ignore": ["@kalem/core", "@kalem/editor"]
+  },
+  {
+    "name": "@kalem/plugin-code-highlight — tek dil paketi (ayrı parça)",
+    "path": "packages/plugin-code-highlight/dist/langs/javascript.js",
+    "limit": "2 kB",
+    "gzip": true,
+    "import": "*"
   }
 ]

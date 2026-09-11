@@ -43,4 +43,29 @@
 	--kalem-accent: #6fd3c6;
 	--kalem-accent-fg: #16151a;
 	--kalem-shadow: 0 6px 24px rgb(0 0 0 / 45%);
+
+	/*
+	 * Kod vurgulama renkleri (F4-02).
+	 *
+	 * `plugin-code.css` koyu paleti `prefers-color-scheme` ve
+	 * `[data-theme="dark"]` için veriyor; bu dosyanın durumu ikisiyle de
+	 * anlaşılmıyor (sayfa koyu ama kök elemana öznitelik yazılamıyor, o
+	 * yüzden bu dosya var). Tekrar bilerek: alternatifi, vurgulama
+	 * eklentisi kurulu koyu bir sayfada okunmayan kod bloğu.
+	 *
+	 * Eklenti kurulu değilse bu değişkenler kullanılmıyor — kimseye görünür
+	 * bir bedeli yok.
+	 */
+	--kalem-tok-comment: #8f9a86;
+	--kalem-tok-string: #7ed9a8;
+	--kalem-tok-number: #e8b17a;
+	--kalem-tok-keyword: #f09bc0;
+	--kalem-tok-boolean: #c9a6f5;
+	--kalem-tok-function: #8fc2f5;
+	--kalem-tok-type: #7fd6d0;
+	--kalem-tok-property: #9fd1ff;
+	--kalem-tok-tag: #f2a08f;
+	--kalem-tok-attr: #d9c07e;
+	--kalem-tok-variable: #efb0b0;
+	--kalem-tok-operator: #b9b3a8;
 }

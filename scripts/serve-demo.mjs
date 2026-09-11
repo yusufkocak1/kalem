@@ -71,6 +71,12 @@ const PAKETLER = [
 		onEk: "/@kalem/plugin-image-upload/",
 		kok: fileURLToPath(new URL("../packages/plugin-image-upload/dist/", import.meta.url)),
 	},
+	// Dil paketleri `dist/langs/` altında; önek eşlemesi alt klasörü de
+	// taşıyor, yani tarayıcının `import()` çağrısı doğrudan çalışıyor.
+	{
+		onEk: "/@kalem/plugin-code-highlight/",
+		kok: fileURLToPath(new URL("../packages/plugin-code-highlight/dist/", import.meta.url)),
+	},
 	// Temalar saf CSS; derleme adımı yok, kaynak doğrudan servis ediliyor.
 	{
 		onEk: "/@kalem/themes/",

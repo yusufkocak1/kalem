@@ -1,0 +1,167 @@
+/*
+ * @kalem/themes — Kod vurgulama  (İş listesi: F4-02)
+ *
+ * Yalnızca `@kalem/plugin-code-highlight` kullanılıyorsa yükleniyor.
+ * Eklenti her belirtece `kalem-tok-<tür>` sınıfı veriyor; renkler burada.
+ *
+ * ## Neden ayrı bir sözlük
+ *
+ * `tokens.css` beş nötr ve bir vurgu rengi taşıyor; vurgulama on üç ayrı
+ * renk istiyor ve hiçbiri belgenin başka bir yerinde kullanılmıyor. Onları
+ * ana sözlüğe koymak, vurgulama kullanmayan herkese on üç değişken
+ * indirtmek olurdu.
+ *
+ * Yine de **değiştirilebilir** olmaları gerekiyor: kendi renk şemasını
+ * getiren kullanıcı `--kalem-tok-keyword`u ezebilmeli. O yüzden doğrudan
+ * sınıfa renk yazmak yerine yine değişkenlerden geçiliyor ve seçiciler
+ * `:where()` içinde, yani sıfır özgüllükte.
+ *
+ * ## Kontrast
+ *
+ * Her renk, kod bloğunun zemininde (`--kalem-bg-subtle`, açık temada
+ * ≈#f3f2f1, koyu temada ≈#2a292f) WCAG AA'yı (4.5:1) geçecek şekilde
+ * seçildi. Vurgulamanın amacı okunurluk; okunmayan bir renk amacın
+ * kendisini bozuyor. Noktalama için ayrı bir renk yok — `--kalem-fg-muted`
+ * iki temada da sınırı geçiyor ve sözlükle tutarlı kalıyor.
+ *
+ * ## Üç tema durumu
+ *
+ * `tokens.css` ile aynı: sistem tercihi, açık seçim (`[data-theme]`) ve
+ * hiçbir renk yalnızca media sorgusunun içinde tanımlanmıyor. Dördüncü bir
+ * durum olan `dark.css` (sayfanın tamamı koyu, seçim sunulmuyor) CSS'ten
+ * algılanamıyor; koyu belirteç renkleri o yüzden `dark.css` içinde de
+ * tekrar ediyor.
+ */
+
+/* --- Açık tema ---------------------------------------------------------
+ * Nötrler `tokens.css` ile aynı sıcaklıkta; renkler kırılmış (doygunluğu
+ * düşürülmüş) ki uzun bir kod bloğu yorucu olmasın.
+ */
+:where(.kalem-theme, .kalem-doc, .kalem-editor) {
+	--kalem-tok-comment: #5a6553;
+	--kalem-tok-string: #0b6b4f;
+	--kalem-tok-number: #8a4b16;
+	--kalem-tok-keyword: #93275f;
+	--kalem-tok-boolean: #7a3aa8;
+	--kalem-tok-function: #1f5fa8;
+	--kalem-tok-type: #2a6a7a;
+	--kalem-tok-property: #7a3aa8;
+	--kalem-tok-tag: #a03030;
+	--kalem-tok-attr: #8a4b16;
+	--kalem-tok-variable: #a03030;
+	--kalem-tok-operator: #5a5750;
+}
+
+/* --- Koyu tema: sistem tercihi --- */
+@media (prefers-color-scheme: dark) {
+	:where(.kalem-theme, .kalem-doc, .kalem-editor):not([data-theme="light"]) {
+		--kalem-tok-comment: #8f9a86;
+		--kalem-tok-string: #7ed9a8;
+		--kalem-tok-number: #e8b17a;
+		--kalem-tok-keyword: #f09bc0;
+		--kalem-tok-boolean: #c9a6f5;
+		--kalem-tok-function: #8fc2f5;
+		--kalem-tok-type: #7fd6d0;
+		--kalem-tok-property: #9fd1ff;
+		--kalem-tok-tag: #f2a08f;
+		--kalem-tok-attr: #d9c07e;
+		--kalem-tok-variable: #efb0b0;
+		--kalem-tok-operator: #b9b3a8;
+	}
+}
+
+/* --- Koyu tema: açık seçim --- */
+:where(.kalem-theme, .kalem-doc, .kalem-editor)[data-theme="dark"] {
+	--kalem-tok-comment: #8f9a86;
+	--kalem-tok-string: #7ed9a8;
+	--kalem-tok-number: #e8b17a;
+	--kalem-tok-keyword: #f09bc0;
+	--kalem-tok-boolean: #c9a6f5;
+	--kalem-tok-function: #8fc2f5;
+	--kalem-tok-type: #7fd6d0;
+	--kalem-tok-property: #9fd1ff;
+	--kalem-tok-tag: #f2a08f;
+	--kalem-tok-attr: #d9c07e;
+	--kalem-tok-variable: #efb0b0;
+	--kalem-tok-operator: #b9b3a8;
+}
+
+/* --------------------------------------------------------------------- */
+/* Belirteçler                                                            */
+/* --------------------------------------------------------------------- */
+
+/*
+ * Kalın ve eğik **yok**.
+ *
+ * Kod bloğu tek aralıklı bir yazı tipiyle yazılıyor ve eğik/kalın
+ * kesimleri çoğu sistemde sentetik üretiliyor: karakter genişliği
+ * kayıyor, hizalanmış sütunlar bozuluyor. Ayrım yalnızca renkten
+ * geliyor — bu, renk körlüğü için de doğru karar değil ama kodda anlamın
+ * taşıyıcısı zaten metnin kendisi; vurgulama ek bir ipucu, tek ipucu
+ * değil.
+ */
+.kalem-tok-comment {
+	color: var(--kalem-tok-comment);
+}
+
+.kalem-tok-string {
+	color: var(--kalem-tok-string);
+}
+
+.kalem-tok-number {
+	color: var(--kalem-tok-number);
+}
+
+.kalem-tok-keyword {
+	color: var(--kalem-tok-keyword);
+}
+
+.kalem-tok-boolean {
+	color: var(--kalem-tok-boolean);
+}
+
+.kalem-tok-function {
+	color: var(--kalem-tok-function);
+}
+
+.kalem-tok-type {
+	color: var(--kalem-tok-type);
+}
+
+.kalem-tok-property {
+	color: var(--kalem-tok-property);
+}
+
+.kalem-tok-tag {
+	color: var(--kalem-tok-tag);
+}
+
+.kalem-tok-attr {
+	color: var(--kalem-tok-attr);
+}
+
+.kalem-tok-variable {
+	color: var(--kalem-tok-variable);
+}
+
+.kalem-tok-operator {
+	color: var(--kalem-tok-operator);
+}
+
+.kalem-tok-punctuation {
+	color: var(--kalem-fg-muted);
+}
+
+/*
+ * Yüksek kontrast modu.
+ *
+ * Windows'un yüksek kontrast temasında sistem kendi paletini dayatıyor ve
+ * araya giren renkler okunurluğu bozabiliyor; belirteçler sistem metin
+ * rengine bırakılıyor.
+ */
+@media (forced-colors: active) {
+	[class^="kalem-tok-"],
+	[class*=" kalem-tok-"] {
+		color: CanvasText;
+	}
+}

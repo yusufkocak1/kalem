@@ -125,6 +125,7 @@
 <link rel="stylesheet" href="/@kalem/themes/editor.css">
 <link rel="stylesheet" href="/@kalem/themes/ui.css">
 <link rel="stylesheet" href="/@kalem/themes/plugin-image.css">
+<link rel="stylesheet" href="/@kalem/themes/plugin-code.css">
 <!-- F3-09: tema seçici bu bağlantıyı çalışma anında değiştiriyor. -->
 <link rel="stylesheet" href="" id="temaEk">
 
@@ -193,6 +194,7 @@
 	<div class="olcum"><dt>Etkin biçimler</dt><dd id="bicimler">—</dd></div>
 	<div class="olcum"><dt>Geçmiş</dt><dd id="gecmis">—</dd></div>
 	<div class="olcum"><dt>Görsel yükleme</dt><dd id="gorselHata">—</dd></div>
+	<div class="olcum"><dt>Kod vurgulama</dt><dd id="kodHata">—</dd></div>
 </dl>
 
 <script type="importmap">
@@ -204,12 +206,14 @@
 			"@kalem/editor": "/@kalem/editor/index.js",
 			"@kalem/viewer": "/@kalem/viewer/index.js",
 			"@kalem/ui": "/@kalem/ui/index.js",
-			"@kalem/plugin-image-upload": "/@kalem/plugin-image-upload/index.js"
+			"@kalem/plugin-image-upload": "/@kalem/plugin-image-upload/index.js",
+			"@kalem/plugin-code-highlight": "/@kalem/plugin-code-highlight/index.js"
 		}
 	}
 </script>
 <script type="module">
 	import { Editor, inputRulesPlugin, taskListPlugin } from "@kalem/editor";
+	import { codeHighlightPlugin } from "@kalem/plugin-code-highlight";
 	import { imageUploadPlugin } from "@kalem/plugin-image-upload";
 	import { mountUi } from "@kalem/ui";
 
@@ -380,9 +384,24 @@ Son paragraf.
 	});
 	editor.addPlugin(gorselEklentisi);
 
+	/*
+	 * F4-02 — kod bloğu vurgulama.
+	 *
+	 * Tek satır: eklenti kod bloklarını kendisi buluyor, dil paketini
+	 * `import()` ile getiriyor ve modele hiç dokunmuyor. Sağdaki Markdown
+	 * çıktısının değişmemesi bunun kanıtı.
+	 */
+	const kodEklentisi = codeHighlightPlugin({
+		onError(hata, dil) {
+			document.getElementById("kodHata").textContent = `${dil}: ${hata.message}`;
+		},
+	});
+	editor.addPlugin(kodEklentisi);
+
+
 	// `mountUi` de veriliyor: F3-06'nın grup yapılandırması testten
 	// doğrudan kurulabilsin diye.
-	window.kalem = { editor, mountUi, gorselEklentisi, get ui() { return ui; } };
+	window.kalem = { editor, mountUi, gorselEklentisi, kodEklentisi, get ui() { return ui; } };
 
 	// Araç çubuğu kipini değiştirmek arayüzü baştan kuruyor: `mountUi`
 	// tek seferlik bir montaj, kip bir çalışma zamanı anahtarı değil.

@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-09 · `master` · `pnpm verify` yeşil · 994 birim + 794 tarayıcı testi
+> Son güncelleme: 2026-09-11 · `master` · `pnpm verify` yeşil · 1109 birim + 882 tarayıcı testi
 
 | Faz | Görev | Durum |
 |---|---|---|
@@ -32,10 +32,10 @@
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
-| **Faz 4** — Eklentiler | 1 / 7 | 🔵 Sürüyor |
+| **Faz 4** — Eklentiler | 2 / 7 | 🔵 Sürüyor |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **44 / 72** | **%61** |
+| | **45 / 72** | **%63** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,9 +43,9 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)**
+referansları hariç)** · `F4-01` · `F4-02`
 
-**Sıradaki:** `F4-02` `plugin-code-highlight`.
+**Sıradaki:** `F4-03` `plugin-find-replace`.
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10) ve Linux görsel
 referansları (F3-11) — ikisi de bir insanın masasında yapılmak zorunda.
@@ -1247,9 +1247,63 @@ kriteri ("API kendi kullanımıyla doğrulanmış") tam olarak bunu istiyordu:
 Boyut: eklenti tek başına 2.92 kB (çekirdek ve editör hariç),
 `plugin-image.css` 342 B.
 
-### F4-02 · `plugin-code-highlight` `[M]` ⬜
-Kod bloğu vurgulama; **tembel yüklenir**, dil paketleri ayrı chunk. Shiki/Prism kullanıcının kendi tercihi olarak takılabilir (bizim bağımlılığımız değil)
-- **Kabul:** vurgulama kullanılmadığında ana bundle'a 0 byte ekliyor
+### F4-02 · `plugin-code-highlight` `[M]` ✅
+- [x] Kendi belirteçleyicimiz — sıfır bağımlılık, 8 dil (JS/TS, JSON, CSS, HTML, Python, Shell, SQL, Markdown)
+- [x] Dil paketleri `import()` ile **tembel**, her biri ayrı chunk
+- [x] Prism ve Shiki adaptörleri (`prismTokens`, `shikiTokens`) — ikisi de bağımlılık değil
+- [x] Görüntüleyici için editörsüz yol: `highlightAll(root)`
+- [x] Tema sözlüğü `plugin-code.css`, açık/koyu paletler AA kontrastında
+- [x] **Kabul:** vurgulama kullanılmadığında ana bundle'a 0 byte ekliyor
+
+**"0 byte" iki parçadan geliyor ve ikisi de makine tarafından ölçülüyor.**
+İlki paket ayrımı: eklentiyi kurmayan hiçbir şey indirmiyor ve
+`@kalem/editor` bütçesi (38 kB) değişmedi — hâlâ 25.92 kB. İkincisi dil
+paketlerinin ayrı chunk olması: `.size-limit.json` tek bir dil paketini
+adıyla ölçüyor (599 B), yani chunk'lar birleşirse kapı kırmızıya döner.
+Çalışma zamanı tarafı e2e'de: sayfanın ağ istekleri izleniyor ve
+belgede geçmeyen dilin hiç inmediği, geçen dilin **bir kez** indiği
+sabitlendi.
+
+**Neden kendi belirteçleyicimiz var.** Shiki tek başına bu kütüphanenin
+tamamından büyük; Prism'in kolay arayüzü HTML dizesi döndürüyor ve onu
+ekrana koymanın tek yolu `innerHTML` — kod bloğunun içeriği kullanıcının
+yazdığı metin olduğu için o kapı doğrudan bir XSS yüzeyi. Buradaki ~90
+satır **doğru ayrıştırıcı değil** ve öyle olduğunu iddia etmiyor:
+düzenli ifadelerle tarıyor, sözdizimini anlamıyor. Yetmediğinde çıkış
+yolu açık — `highlight` seçeneği ve iki adaptör.
+
+**Vurgulama modele dokunmuyor.** Belirteçler `<code>` içine `<span>`
+olarak yazılıyor; `offsets.ts` elemanları şeffaf saydığı için editörün
+imleç matematiği ve `readCode()` süslemeyi hiç görmüyor. Yani Markdown
+çıktısı değişmiyor (e2e ile sabit) ve eklenti söküldüğünde blok düz
+metne dönüyor.
+
+**Boyama imleci taşıyor.** Kullanıcı kod bloğunun içinde yazarken her
+tuş vuruşundan sonra elemanın çocukları baştan kuruluyor; ofset boyama
+**öncesinde** ölçülüp sonrasında geri kuruluyor. Ofset fonksiyonları
+editörden içe aktarıldı, kopyalanmadı — ayrışırlarsa imleç kayar.
+Bileşim (IME) sürerken boyama bekliyor, `change` olayları tek kareye
+birleşiyor.
+
+**Geri bakış (`(?<=`) gramerlerde yasak.** Eski Safari onu düzenli ifade
+değişmezi olarak ayrıştıramıyor ve hata **modülün tamamını** yükletmiyor
+— vurgulama o tarayıcıda sessizce kapanırdı. Bir testle sabitlendi.
+
+**Metin `textContent` ile okunmuyor.** `textContent` `<br>` elemanını
+görmüyor (`<code>a<br>b</code>` → "ab") ve tarayıcı `contenteditable`
+içinde Enter'a basınca `<br>` üretebiliyor; o hâlde boyama kullanıcının
+satır sonunu yutardı. Editörün `readCode`u da aynı sebeple kendi
+okuyucusunu yazıyor.
+
+**Koyu belirteç renkleri `dark.css`te tekrar ediyor.** `plugin-code.css`
+üç tema durumunu karşılıyor (varsayılan, `prefers-color-scheme`,
+`[data-theme]`); dördüncüsü olan `dark.css` — sayfa tamamen koyu ama kök
+elemana öznitelik yazılamıyor — CSS'ten algılanamıyor. Tekrar bilerek:
+alternatifi, o senaryoda okunmayan bir kod bloğu.
+
+Boyut: eklenti sekiz dil paketiyle birlikte 3.69 kB, tek dil paketi
+599 B, `plugin-code.css` 474 B (hepsi gzip, çekirdek ve editör hariç).
+80 birim + 21 tarayıcı testi.
 
 ### F4-03 · `plugin-find-replace` `[M]` ⬜
 Ctrl+F / Ctrl+H, eşleşme vurgulama, tümünü değiştir, büyük/küçük harf + tam kelime seçenekleri

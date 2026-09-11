@@ -18,6 +18,7 @@
     "./dark.css": "./css/dark.css",
     "./minimal.css": "./css/minimal.css",
     "./plugin-image.css": "./css/plugin-image.css",
+    "./plugin-code.css": "./css/plugin-code.css",
     "./package.json": "./package.json"
   },
   "publishConfig": {
