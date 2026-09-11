@@ -36,6 +36,9 @@
     },
     {
       "path": "./packages/react"
+    },
+    {
+      "path": "./packages/vue"
     }
   ]
 }

@@ -18,6 +18,10 @@ apps/docs/dist/
 .next/
 next-env.d.ts
 
+# nuxt (examples/nuxt)
+.nuxt/
+.output/
+
 # editör / işletim sistemi
 .DS_Store
 Thumbs.db

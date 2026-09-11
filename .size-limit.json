@@ -189,5 +189,13 @@
     "gzip": true,
     "import": "*",
     "ignore": ["react", "react/jsx-runtime", "@kalem/core", "@kalem/editor"]
+  },
+  {
+    "name": "@kalem/vue (Vue ve editör hariç)",
+    "path": "packages/vue/dist/index.js",
+    "limit": "2 kB",
+    "gzip": true,
+    "import": "*",
+    "ignore": ["vue", "@kalem/core", "@kalem/editor", "@kalem/viewer"]
   }
 ]

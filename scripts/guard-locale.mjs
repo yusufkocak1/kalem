@@ -24,6 +24,8 @@ const ATLA = new Set([
 	// Örnek uygulamaların derleme çıktısı: içindeki üçüncü parti kod
 	// bizim kuralımıza uymak zorunda değil ve uymuyor da.
 	".next",
+	".nuxt",
+	".output",
 	".tsbuild",
 	"coverage",
 	".astro",

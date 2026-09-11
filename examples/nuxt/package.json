@@ -1,0 +1,22 @@
+{
+  "name": "example-nuxt",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "@kalem/vue — Nuxt SSR örneği (ClientOnly gerekmiyor)",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@kalem/themes": "workspace:^",
+    "@kalem/vue": "workspace:^",
+    "nuxt": "^4.5.2",
+    "vue": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

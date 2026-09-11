@@ -1,0 +1,22 @@
+{
+  "name": "example-vue-vite",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "@kalem/vue — Vite + Vue örneği",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@kalem/themes": "workspace:^",
+    "@kalem/vue": "workspace:^",
+    "vue": "catalog:"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

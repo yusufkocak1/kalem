@@ -49,5 +49,23 @@ export default defineConfig({
 			timeout: 300_000,
 			stdout: "pipe",
 		},
+		{
+			command:
+				"pnpm --filter example-vue-vite build && pnpm --filter example-vue-vite preview --port 4174 --strictPort",
+			url: "http://localhost:4174",
+			reuseExistingServer: false,
+			timeout: 180_000,
+			stdout: "pipe",
+		},
+		{
+			// Nitro sunucusu doğrudan çalıştırılıyor: `nuxt preview` bir
+			// sarmalayıcı ve port bayrağını sürümden sürüme farklı okuyor.
+			command: "pnpm --filter example-nuxt build && node examples/nuxt/.output/server/index.mjs",
+			url: "http://localhost:3200",
+			env: { PORT: "3200" },
+			reuseExistingServer: false,
+			timeout: 300_000,
+			stdout: "pipe",
+		},
 	],
 });

@@ -11,6 +11,8 @@
       "!**/dist",
       "!**/coverage",
       "!**/.next",
+      "!**/.nuxt",
+      "!**/.output",
       "!examples/*/next-env.d.ts",
       "!**/.astro",
       "!apps/demo/index.html",
@@ -101,6 +103,17 @@
         "rules": {
           "correctness": {
             "useImportExtensions": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/*.vue"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedImports": "off",
+            "noUnusedVariables": "off"
           }
         }
       }

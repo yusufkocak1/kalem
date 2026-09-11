@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-11 · `master` · `pnpm verify` yeşil · 1252 birim + 1047 tarayıcı + 11 örnek testi
+> Son güncelleme: 2026-09-11 · `master` · `pnpm verify` yeşil · 1252 birim + 1047 tarayıcı + 22 örnek testi
 
 | Faz | Görev | Durum |
 |---|---|---|
@@ -33,9 +33,9 @@
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
 | **Faz 4** — Eklentiler | 7 / 7 | ✅ **Tamamlandı** |
-| **Faz 5** — Sarmalayıcılar | 1 / 5 | 🔵 Sürüyor |
+| **Faz 5** — Sarmalayıcılar | 2 / 5 | 🔵 Sürüyor |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **51 / 72** | **%71** |
+| | **52 / 72** | **%72** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,9 +43,9 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01`
+referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02`
 
-**Sıradaki:** `F5-02` `@kalem/vue`.
+**Sıradaki:** `F5-03` `@kalem/wc`.
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10) ve Linux görsel
 referansları (F3-11) — ikisi de bir insanın masasında yapılmak zorunda.
@@ -1621,10 +1621,58 @@ geliştirme sunucusu, `exports` haritasındaki bir hatayı gizlerdi. Her iki
 > F5-01'den **önce** de kırmızıydı. `--profile node16` ile node10
 > bilerek yok sayılıyor — paketler zaten `node >= 18` istiyor.
 
-### F5-02 · `@kalem/vue` `[M]` ⬜
-- `<KalemEditor v-model />`, `defineComponent`, `peerDependencies: { vue: "^3" }`
-- Nuxt 3 SSR uyumu (`<ClientOnly>` gereksiz olmalı — viewer SSR'de render edebilmeli)
-- **Kabul:** `examples/vue-vite` ve `examples/nuxt` çalışıyor
+### F5-02 · `@kalem/vue` `[M]` ✅
+- [x] `<KalemEditor v-model />`, `defineComponent`, `peerDependencies: { vue: "^3" }`
+- [x] Nuxt SSR uyumu — **`<ClientOnly>` gerekmiyor**, belge sunucuda çiziliyor
+- [x] `useKalem()` ile imperatif erişim (provide/inject)
+- [x] **Kabul:** `examples/vue-vite` ve `examples/nuxt` çalışıyor (11 tarayıcı testi)
+
+**Sunucu belgeyi gerçekten çiziyor.** İş listesinin bu maddeyi ayrıca
+yazmasının sebebi, Vue dünyasında editör sarmalayıcılarının neredeyse
+hepsinin `<ClientOnly>` istemesi; bedeli görünür — sunucu boş bir kutu
+gönderiyor, içerik sonradan beliriyor, arama motoru metni hiç görmüyor.
+Burada `@kalem/viewer.renderToString` ile üretilen HTML sunucudan geliyor;
+bir test, ham yanıtta `<h1>Işık ve Gölge</h1>` ve `<li>` olduğunu
+doğruluyor.
+
+**Hidrasyon uyuşmazlığı `innerHTML`i dondurarak engelleniyor.** Dize bir
+kez hesaplanıyor ve bileşen yaşadığı sürece değişmiyor:
+
+- Sunucu ile istemcinin ilk render'ı aynı çıktıyı veriyor → uyuşmazlık yok
+  (test konsolda tek bir uyarı bile olmadığını sabitliyor).
+- `v-model` sonradan değişince `innerHTML` prop'u **güncellenmiyor**;
+  güncellenseydi Vue elemanın içini silip yeniden yazardı ve editörün
+  DOM'u, imleci, geçmişi onunla birlikte giderdi. Değişiklikler editöre
+  `setValue` ile iniyor.
+
+**`v-model` döngüsü React'teki gibi kırılıyor:** editörün kendi yaydığı
+metin bir değişkende tutuluyor, geri geldiğinde hiçbir şey yapılmıyor.
+Art arda yazılan harflerin aynı yere gittiği testle sabit.
+
+> **Öznitelikler sessizce düşüyordu.** Bileşenin kökü tek bir eleman
+> değil — düzenlenebilir kutu ve yuva içeriği kardeş. Vue böyle bir
+> bileşende `class`, `style`, `id` gibi öznitelikleri kendiliğinden
+> aktaramıyor ve **uyarı da vermiyor**: `<KalemEditor class="editor" />`
+> yazan kullanıcı stilsiz bir kutu görüyordu. `inheritAttrs: false` +
+> elle aktarma ile düzeltildi; bir test `.editor` sınıfının kutuya
+> indiğini sabitliyor.
+
+**Yuva içeriği kutunun yanında, içinde değil.** Düzenlenebilir alanın içi
+modelden çiziliyor; Vue'nun oraya koyduğu her düğüm editörün ilk
+çiziminde silinirdi.
+
+**Nuxt sürümü:** örnek, güncel ana sürüm olan **Nuxt 4**'ü sabitliyor
+(madde Nuxt 3 güncelken yazılmıştı). Sarmalayıcıda Nuxt'a özel tek satır
+yok; ölçülen şey Vue 3 SSR davranışı ve ikisinde de aynı.
+
+Boyut: 662 B (gzip; Vue, editör ve görüntüleyici hariç).
+
+> **Yan düzeltme — Biome yapılandırması.** `.nuxt` ve `.output` tarama
+> dışına alındı: Biome üretilmiş dosyaları düzeltmeye kalkıyordu.
+> `noUnusedImports` / `noUnusedVariables` `*.vue` dosyalarında kapatıldı —
+> Biome SFC'nin `<template>` bloğunu ayrıştırmıyor, yani yalnızca şablonda
+> kullanılan her import'u "kullanılmamış" sayıyor ve `--unsafe` bir
+> düzeltmede onları silerdi.
 
 ### F5-03 · `@kalem/wc` `[M]` ⬜
 `<kalem-editor>` Custom Element; Shadow DOM **opsiyonel, varsayılan kapalı**; attribute/property/event köprüsü; `ElementInternals` ile form entegrasyonu
