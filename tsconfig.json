@@ -18,6 +18,9 @@
     },
     {
       "path": "./packages/plugin-code-highlight"
+    },
+    {
+      "path": "./packages/plugin-find-replace"
     }
   ]
 }

@@ -77,6 +77,10 @@ const PAKETLER = [
 		onEk: "/@kalem/plugin-code-highlight/",
 		kok: fileURLToPath(new URL("../packages/plugin-code-highlight/dist/", import.meta.url)),
 	},
+	{
+		onEk: "/@kalem/plugin-find-replace/",
+		kok: fileURLToPath(new URL("../packages/plugin-find-replace/dist/", import.meta.url)),
+	},
 	// Temalar saf CSS; derleme adımı yok, kaynak doğrudan servis ediliyor.
 	{
 		onEk: "/@kalem/themes/",

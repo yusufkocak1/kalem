@@ -85,17 +85,22 @@ test("dil paketi ayrı bir istek olarak ve yalnızca gerekince iniyor", async ({
 	await yaz(page, KOD);
 	expect(inenler).toEqual([]);
 
+	// `expect.poll`: `request` olayı test sürecine ağ isteğinden **sonra**
+	// ulaşıyor ve WebKit'te bu gecikme `whenIdle`ın ötesine taşabiliyor.
+	// Beklenen liste yine tam — yalnızca varışı bekleniyor.
 	await yaz(page, '```json\n{"a": 1}\n```\n');
-	expect(inenler).toEqual(["/@kalem/plugin-code-highlight/langs/json.js"]);
+	await expect.poll(() => inenler).toEqual(["/@kalem/plugin-code-highlight/langs/json.js"]);
 	await expect(page.locator("#editor pre code .kalem-tok-property")).toHaveText('"a"');
 
 	// Belgede geçmeyen diller hiç inmiyor — kabul kriterinin çalışma
 	// zamanı tarafı.
 	await yaz(page, '```json\n{"a": 1}\n```\n\n```sql\nSELECT 1\n```\n');
-	expect(inenler).toEqual([
-		"/@kalem/plugin-code-highlight/langs/json.js",
-		"/@kalem/plugin-code-highlight/langs/sql.js",
-	]);
+	await expect
+		.poll(() => inenler)
+		.toEqual([
+			"/@kalem/plugin-code-highlight/langs/json.js",
+			"/@kalem/plugin-code-highlight/langs/sql.js",
+		]);
 });
 
 test("bilinmeyen dil boyanmadan kalıyor, hata vermiyor", async ({ page }) => {

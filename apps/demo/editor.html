@@ -126,6 +126,7 @@
 <link rel="stylesheet" href="/@kalem/themes/ui.css">
 <link rel="stylesheet" href="/@kalem/themes/plugin-image.css">
 <link rel="stylesheet" href="/@kalem/themes/plugin-code.css">
+<link rel="stylesheet" href="/@kalem/themes/plugin-find.css">
 <!-- F3-09: tema seçici bu bağlantıyı çalışma anında değiştiriyor. -->
 <link rel="stylesheet" href="" id="temaEk">
 
@@ -207,13 +208,15 @@
 			"@kalem/viewer": "/@kalem/viewer/index.js",
 			"@kalem/ui": "/@kalem/ui/index.js",
 			"@kalem/plugin-image-upload": "/@kalem/plugin-image-upload/index.js",
-			"@kalem/plugin-code-highlight": "/@kalem/plugin-code-highlight/index.js"
+			"@kalem/plugin-code-highlight": "/@kalem/plugin-code-highlight/index.js",
+			"@kalem/plugin-find-replace": "/@kalem/plugin-find-replace/index.js"
 		}
 	}
 </script>
 <script type="module">
 	import { Editor, inputRulesPlugin, taskListPlugin } from "@kalem/editor";
 	import { codeHighlightPlugin } from "@kalem/plugin-code-highlight";
+	import { findReplacePlugin } from "@kalem/plugin-find-replace";
 	import { imageUploadPlugin } from "@kalem/plugin-image-upload";
 	import { mountUi } from "@kalem/ui";
 
@@ -398,10 +401,20 @@ Son paragraf.
 	});
 	editor.addPlugin(kodEklentisi);
 
+	/*
+	 * F4-03 — bul ve değiştir.
+	 *
+	 * Ctrl+F arar, Ctrl+H değiştirir. Kasa katlaması belgenin diline göre:
+	 * bu sayfa `lang="tr"` olduğu için `ışık` araması `IŞIK`ı buluyor,
+	 * `İŞİK`i bulmuyor.
+	 */
+	const aramaEklentisi = findReplacePlugin();
+	editor.addPlugin(aramaEklentisi);
+
 
 	// `mountUi` de veriliyor: F3-06'nın grup yapılandırması testten
 	// doğrudan kurulabilsin diye.
-	window.kalem = { editor, mountUi, gorselEklentisi, kodEklentisi, get ui() { return ui; } };
+	window.kalem = { editor, mountUi, gorselEklentisi, kodEklentisi, aramaEklentisi, get ui() { return ui; } };
 
 	// Araç çubuğu kipini değiştirmek arayüzü baştan kuruyor: `mountUi`
 	// tek seferlik bir montaj, kip bir çalışma zamanı anahtarı değil.

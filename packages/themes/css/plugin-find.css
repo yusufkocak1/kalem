@@ -1,0 +1,168 @@
+/*
+ * @kalem/themes — Bul ve değiştir  (İş listesi: F4-03)
+ *
+ * Yalnızca `@kalem/plugin-find-replace` kullanılıyorsa yükleniyor.
+ * Sözlük `tokens.css`ten; burada yalnızca eşleşme boyaması kendi rengini
+ * tanımlıyor (aşağıya bakın).
+ *
+ * Panel `.kalem-menu` ve `.kalem-theme` sınıflarını taşıyor, yani zemin,
+ * kenarlık ve gölge `ui.css`ten geliyor. Eklenti `@kalem/ui`ye
+ * bağlanmıyor ama arayüz katmanı yüklüyse görsel olarak onunla aynı
+ * dünyada duruyor; yüklü değilse buradaki kurallar tek başına yetiyor.
+ */
+
+.kalem-find {
+	position: fixed;
+	z-index: 40;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 8px;
+	/* `ui.css` yüklü değilse panel yine de okunur olmalı. */
+	background: var(--kalem-surface);
+	color: var(--kalem-fg);
+	border: 1px solid var(--kalem-border);
+	border-radius: var(--kalem-radius-ui);
+	box-shadow: var(--kalem-shadow);
+	font: var(--kalem-ui-size) / 1.4 var(--kalem-font);
+}
+
+.kalem-find-row {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.kalem-find-input {
+	font: inherit;
+	padding: 4px 7px;
+	min-width: 0;
+	width: 15ch;
+	color: var(--kalem-fg);
+	background: var(--kalem-bg-subtle);
+	border: 1px solid var(--kalem-border);
+	border-radius: 6px;
+}
+
+.kalem-find-input:focus-visible {
+	outline: 2px solid var(--kalem-accent);
+	outline-offset: 1px;
+}
+
+/*
+ * Sayaç sabit genişlikte.
+ *
+ * "1 / 12" ile "Sonuç yok" arasında gidip gelen bir metin, yanındaki
+ * düğmeleri her tuş vuruşunda kaydırırdı; kullanıcı "sonraki"ye basmaya
+ * çalışırken düğme yer değiştiriyor olurdu.
+ */
+.kalem-find-count {
+	min-width: 8ch;
+	text-align: center;
+	color: var(--kalem-fg-muted);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.kalem-find-btn {
+	font: inherit;
+	min-width: 26px;
+	height: 26px;
+	padding: 0 6px;
+	color: var(--kalem-fg);
+	background: none;
+	border: 1px solid transparent;
+	border-radius: 6px;
+	cursor: pointer;
+}
+
+.kalem-find-btn-text {
+	padding: 0 10px;
+}
+
+.kalem-find-btn:hover:not(:disabled) {
+	border-color: var(--kalem-border);
+	background: var(--kalem-bg-subtle);
+}
+
+.kalem-find-btn:focus-visible {
+	outline: 2px solid var(--kalem-accent);
+	outline-offset: 1px;
+}
+
+.kalem-find-btn:disabled {
+	color: var(--kalem-fg-muted);
+	cursor: default;
+}
+
+.kalem-find-options {
+	display: flex;
+	gap: 12px;
+	color: var(--kalem-fg-muted);
+}
+
+.kalem-find-option {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	cursor: pointer;
+}
+
+/* --------------------------------------------------------------------- */
+/* Eşleşme boyaması                                                       */
+/* --------------------------------------------------------------------- */
+
+/*
+ * `::highlight()` CSS Özel Vurgu API'si (`decorate.ts`).
+ *
+ * Renkler `tokens.css`te değil burada: yalnızca bu eklentiye ait iki renk
+ * ve ana sözlüğe girmeleri, arama kullanmayan herkese iki değişken
+ * indirtmek olurdu. Yine de değişkenden geçiyorlar — kendi renk şemasını
+ * getiren kullanıcı ezebilmeli.
+ *
+ * Kontrast: ikisi de metin renginin **arkasında** duruyor, yani
+ * `--kalem-fg` ile okunur kalmak zorunda. Sarı ve turuncu tonları açık
+ * temada 4.5:1'in üstünde; koyu temada aynı renkler metni yutacağı için
+ * doygunluğu düşük, koyu karşılıkları kullanılıyor.
+ *
+ * `::highlight()` yalnızca birkaç özelliği kabul ediyor (renk, zemin,
+ * alt çizgi, gölge) — kenarlık ya da dolgu yazılamıyor; geçerli eşleşme
+ * bu yüzden çerçeveyle değil daha güçlü bir zeminle ayrılıyor.
+ */
+:where(.kalem-theme, .kalem-doc, .kalem-editor) {
+	--kalem-find-match: #ffe08a;
+	--kalem-find-current: #ffb02e;
+}
+
+@media (prefers-color-scheme: dark) {
+	:where(.kalem-theme, .kalem-doc, .kalem-editor):not([data-theme="light"]) {
+		--kalem-find-match: #5c4a1f;
+		--kalem-find-current: #8a6a1a;
+	}
+}
+
+:where(.kalem-theme, .kalem-doc, .kalem-editor)[data-theme="dark"] {
+	--kalem-find-match: #5c4a1f;
+	--kalem-find-current: #8a6a1a;
+}
+
+::highlight(kalem-find) {
+	background-color: var(--kalem-find-match, #ffe08a);
+}
+
+::highlight(kalem-find-current) {
+	background-color: var(--kalem-find-current, #ffb02e);
+}
+
+/*
+ * Yüksek kontrast modunda sistem kendi paletini dayatıyor; eşleşme
+ * zemininin okunurluğu garanti edilemiyor, ters çevrilmiş renk
+ * kullanılıyor.
+ */
+@media (forced-colors: active) {
+	::highlight(kalem-find),
+	::highlight(kalem-find-current) {
+		background-color: Highlight;
+		color: HighlightText;
+	}
+}

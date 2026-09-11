@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-11 · `master` · `pnpm verify` yeşil · 1109 birim + 882 tarayıcı testi
+> Son güncelleme: 2026-09-11 · `master` · `pnpm verify` yeşil · 1168 birim + 933 tarayıcı testi
 
 | Faz | Görev | Durum |
 |---|---|---|
@@ -32,10 +32,10 @@
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
-| **Faz 4** — Eklentiler | 2 / 7 | 🔵 Sürüyor |
+| **Faz 4** — Eklentiler | 3 / 7 | 🔵 Sürüyor |
 | **Faz 5** — Sarmalayıcılar | 0 / 5 | ⬜ Başlanmadı |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **45 / 72** | **%63** |
+| | **46 / 72** | **%64** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,13 +43,15 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02`
+referansları hariç)** · `F4-01` · `F4-02` · `F4-03`
 
-**Sıradaki:** `F4-03` `plugin-find-replace`.
+**Sıradaki:** `F4-04` `plugin-outline`.
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10) ve Linux görsel
 referansları (F3-11) — ikisi de bir insanın masasında yapılmak zorunda.
-Ayrıca atomik düğümlere ofset uzunluğu 1 verilmesi (F4-01'de bulundu).
+Ayrıca atomik düğümlere ofset uzunluğu 1 verilmesi (F4-01'de bulundu) ve
+tablo hücrelerinin düzenlenebilir çizilmesi (F4-03'te bulundu: yazılan
+metin çıktıya hiç girmiyor).
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -1305,11 +1307,77 @@ Boyut: eklenti sekiz dil paketiyle birlikte 3.69 kB, tek dil paketi
 599 B, `plugin-code.css` 474 B (hepsi gzip, çekirdek ve editör hariç).
 80 birim + 21 tarayıcı testi.
 
-### F4-03 · `plugin-find-replace` `[M]` ⬜
-Ctrl+F / Ctrl+H, eşleşme vurgulama, tümünü değiştir, büyük/küçük harf + tam kelime seçenekleri
-- "Büyük/küçük harf duyarsız" arama, editörün `lang`'ine göre çalışır — aksi halde Türkçe'de `İSTANBUL` araması `istanbul`'u bulamaz
-- **Kabul:** 100 sayfalık dokümanda takılmadan çalışıyor
-- **Kabul (locale):** `lang="tr"` iken `ışık` ↔ `IŞIK` ve `iyi` ↔ `İYİ` çiftleri eşleşiyor, `ışık` ↔ `İŞİK` eşleşmiyor
+### F4-03 · `plugin-find-replace` `[M]` ✅
+- [x] Ctrl+F / Ctrl+H, panel, sonraki/önceki, sayaç
+- [x] Eşleşme vurgulama — CSS Özel Vurgu API'si, DOM'a düğüm eklemeden
+- [x] Tümünü değiştir — tek düzenleme, tek Ctrl+Z
+- [x] Büyük/küçük harf duyarlılığı ve tam kelime seçenekleri
+- [x] Salt okunur belgede arama açık, değiştirme kapalı
+- [x] **Kabul:** 100 sayfalık dokümanda takılmadan çalışıyor
+- [x] **Kabul (locale):** `lang="tr"` iken `ışık` ↔ `IŞIK` ve `iyi` ↔ `İYİ` eşleşiyor, `ışık` ↔ `İŞİK` eşleşmiyor
+
+**F3-03'ün `foldForSearch`u kullanılamadı.** Slash menüsü için yazılan
+katlama aksanları da atıyor (`baş` → `bas`) ve orada doğru; burada kabul
+kriterini **düşürüyor**, çünkü `ışık` ile `İŞİK` ikisi de `isik` olurdu.
+Menüde kaçırılan bir öğenin bedeli ile bul-değiştir'de yanlış kelimeyi
+değiştirmenin bedeli aynı değil. Bu yüzden yalnızca kasa katlanıyor, o da
+`toLocaleLowerCase(locale)` ile.
+
+**Katlama uzunluğu değiştiriyor ve bu sessiz bir hata kaynağı.**
+`"İ".toLocaleLowerCase("en")` iki kod birimi veriyor (i + birleştirici
+nokta), `"ß".toLocaleUpperCase("de")` iki harf. Eşleşme konumu özgün
+metne göre verilmek zorunda — değiştirme orada yapılıyor. Katlama bu
+yüzden kod noktası başına yapılıyor ve her katlanmış birim için özgün
+indis bir tabloda tutuluyor. Tablo olmasa İngilizce locale'de
+`İstanbul` içinde arama yapmak bir karakter kaymış aralık üretirdi.
+
+**Düzenli ifade kullanılmadı.** Kullanıcının yazdığı şey desen değil
+metin (`C++` geçersiz desen, `a.b` fazla eşleşir), `i` bayrağı Türkçe'yi
+bilmiyor ve kullanıcının yazdığı desenin çalışma süresi denetlenemiyor.
+Katlanmış metinde `indexOf`: öngörülebilir, locale'i doğru.
+
+**Vurgulama DOM'a hiç dokunmuyor.** F4-02'deki `<span>` yolu burada daha
+pahalıya gelirdi: imleç editörde dururken her tuşta paragraf içi yeniden
+kurulacak, bir eşleşme biçim sınırını aşınca (`**ka**lın`) metin
+düğümlerini `contenteditable` içinde elle bölmek gerekecekti. CSS Özel
+Vurgu API'si (`CSS.highlights`) üç motorda da destekleniyor; olmayan bir
+tarayıcıda boyama sessizce düşüyor, arama çalışmaya devam ediyor. Bir
+tarayıcı testi, panel açıkken editörün `innerHTML`inin **byte olarak
+aynı** kaldığını sabitliyor.
+
+**Biçim yerinde değişiklikle korunuyor.** `**kedi**` içinde "kedi"
+değiştirilince kalınlık duruyor: eşleşme tek bir metin düğümünün
+içindeyse o düğüm yerinde güncelleniyor, kesilip yapıştırılmıyor.
+Sınırı aşan eşleşme düz metne dönüyor — iki farklı biçimden hangisinin
+kazanacağı keyfî olurdu.
+
+**Tümünü değiştir sondan başa gidiyor.** Değişmeyen kısım hep solda
+kalıyor, yani henüz kullanılmamış ofsetler geçerli; belge eşleşme sayısı
+kadar yeniden taranmıyor. Sonuç tek bir `EditResult`, yani tek Ctrl+Z.
+
+**Tablo ve bağlantı tanımı taranmıyor.** İkisi de aynı sebepten:
+değiştirilemiyorlar. Serileştirici tabloyu `TableSyntax.raw`dan geri
+yazıyor (Karar #5: v1'de tablo düzenleme yok), `definition` ise ekranda
+kaynak metin gibi görünse de modelde üç ayrı alan. Bulunup
+değiştirilemeyen metin, kullanıcı için kırık bir özellik; ham metni
+düşürüp tabloyu yeniden üretmek ise bir kelime değiştirdiği için
+kullanıcının hizalamasını bozmak olurdu.
+
+> **Editörde sessiz veri kaybı bulundu (F4-03 dışında, düzeltilmedi).**
+> Tablo hücreleri `contenteditable` çiziliyor — kullanıcı içlerine
+> yazabiliyor, model güncelleniyor, ama `serialize` tabloyu
+> `TableSyntax.raw`dan geri yazdığı için **yazdığı hiçbir şey çıktıya
+> girmiyor**. Tarayıcıda doğrulandı: bir hücreye "XX" yazmak Markdown
+> çıktısını değiştirmiyor.
+>
+> Karar #5 ile tutarlı çözüm, v1'de tablo hücrelerini düzenlenebilir
+> çizmemek (`render.ts`): kullanıcıyı kaybolacak bir metni yazmaya davet
+> etmemek. Gerçek çözüm `@kalem/plugin-table` (v1.1) ile tablo üreticisi.
+> F4-03'ün ortasında yapılacak bir değişiklik değildi, ayrı bir iş
+> olarak duruyor.
+
+Boyut: eklenti 4.46 kB, `plugin-find.css` 649 B (gzip, çekirdek ve
+editör hariç). 59 birim + 51 tarayıcı testi.
 
 ### F4-04 · `plugin-outline` `[S]` ⬜
 İçindekiler paneli, başlıklara tıklayarak atlama, aktif başlık takibi

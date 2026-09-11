@@ -90,6 +90,12 @@
     "gzip": true
   },
   {
+    "name": "@kalem/themes/plugin-find.css",
+    "path": "packages/themes/css/plugin-find.css",
+    "limit": "2 kB",
+    "gzip": true
+  },
+  {
     "name": "@kalem/plugin-image-upload",
     "path": "packages/plugin-image-upload/dist/index.js",
     "limit": "4 kB",
@@ -111,5 +117,13 @@
     "limit": "2 kB",
     "gzip": true,
     "import": "*"
+  },
+  {
+    "name": "@kalem/plugin-find-replace",
+    "path": "packages/plugin-find-replace/dist/index.js",
+    "limit": "5 kB",
+    "gzip": true,
+    "import": "{ findReplacePlugin }",
+    "ignore": ["@kalem/core", "@kalem/editor"]
   }
 ]

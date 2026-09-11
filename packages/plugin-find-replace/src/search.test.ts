@@ -1,0 +1,291 @@
+/**
+ * Bölge çıkarma, arama ve değiştirme — testler  (İş listesi: F4-03)
+ *
+ * Eklentinin saf yarısı. Kabul kriterlerinin ikisi de burada ölçülüyor:
+ * Türkçe eşleşme çiftleri ve 100 sayfalık belgede tarama süresi.
+ */
+import { parse, serialize } from "@kalem/core";
+import { describe, expect, it } from "vitest";
+import { regionsOf } from "./regions.js";
+import { replaceAll, replaceOne } from "./replace.js";
+import type { SearchOptions } from "./search.js";
+import { createIndex, findMatches, nextFrom, previousFrom } from "./search.js";
+
+/** Belgedeki eşleşmelerin metinleri — testi okunur kılan kısayol. */
+function bul(md: string, query: string, options: SearchOptions = {}, locale = "tr"): string[] {
+	const doc = parse(md);
+	const index = createIndex(doc, locale);
+	return findMatches(index, query, options).map((m) =>
+		(index.regions[m.regionIndex] as { text: string }).text.slice(m.from, m.to),
+	);
+}
+
+/** Değiştirilmiş belgenin Markdown çıktısı. */
+function degistir(md: string, query: string, value: string, options: SearchOptions = {}): string {
+	const doc = parse(md);
+	const index = createIndex(doc, "tr");
+	const matches = findMatches(index, query, options);
+	const sonuc = replaceAll(doc, index.regions, matches, value);
+	return sonuc === null ? serialize(doc) : serialize(sonuc.doc);
+}
+
+describe("regionsOf", () => {
+	it("paragraf ve başlık ayrı bölgeler", () => {
+		const bolgeler = regionsOf(parse("# Başlık\n\nParagraf.\n"));
+		expect(bolgeler.map((r) => r.text)).toEqual(["Başlık", "Paragraf."]);
+		expect(bolgeler.map((r) => r.kind)).toEqual(["inline", "inline"]);
+	});
+
+	it("blok kimliği ve yol imleçle aynı biçimde", () => {
+		const bolgeler = regionsOf(parse("> Alıntı içinde.\n"));
+		expect(bolgeler[0]).toMatchObject({ blockIndex: 0, path: [0], kind: "inline" });
+	});
+
+	it("liste maddeleri ayrı bölgeler", () => {
+		expect(regionsOf(parse("- bir\n- iki\n")).map((r) => r.text)).toEqual(["bir", "iki"]);
+	});
+
+	it("tablo taranmıyor", () => {
+		// Serileştirici tabloyu ham metinden geri yazıyor (Karar #5), yani
+		// burada bulunan bir eşleşme değiştirilemezdi.
+		expect(regionsOf(parse("| a | b |\n|---|---|\n| c | d |\n"))).toHaveLength(0);
+	});
+
+	it("kod bloğu kaynak metin bölgesi", () => {
+		const bolgeler = regionsOf(parse("```js\nconst x = 1;\n```\n"));
+		expect(bolgeler).toHaveLength(1);
+		// Değer satır sonuyla duruyor: ayrıştırıcı kod bloğunun kaynağını
+		// olduğu gibi saklıyor.
+		expect(bolgeler[0]).toMatchObject({ kind: "source", text: "const x = 1;\n" });
+	});
+
+	it("bağlantı tanımı taranmıyor", () => {
+		// Değiştirilemediği için aranmıyor da (dosya başındaki gerekçe).
+		expect(regionsOf(parse("[a]: https://ornek.com\n"))).toHaveLength(0);
+	});
+
+	it("biçimlendirme metne dahil, işaretler değil", () => {
+		expect(regionsOf(parse("bu **kalın** metin\n"))[0]?.text).toBe("bu kalın metin");
+	});
+
+	it("görsel sıfır uzunlukta ve atomik olarak işaretli", () => {
+		const bolge = regionsOf(parse("a![alt](x.png)b\n"))[0];
+		expect(bolge?.text).toBe("ab");
+		expect(bolge?.atomics).toEqual([1]);
+	});
+
+	it("satır sonu tek karakter", () => {
+		// `offsets.ts` `<br>` için 1 sayıyor; ayrışırsak seçim kayar.
+		expect(regionsOf(parse("a  \nb\n"))[0]?.text).toBe("a\nb");
+	});
+});
+
+describe("findMatches — Türkçe kabul kriteri", () => {
+	it("ışık araması IŞIK'ı buluyor", () => {
+		expect(bul("IŞIK ve gölge\n", "ışık")).toEqual(["IŞIK"]);
+	});
+
+	it("IŞIK araması ışık'ı buluyor", () => {
+		expect(bul("ışık ve gölge\n", "IŞIK")).toEqual(["ışık"]);
+	});
+
+	it("iyi ↔ İYİ eşleşiyor", () => {
+		expect(bul("İYİ günler\n", "iyi")).toEqual(["İYİ"]);
+		expect(bul("iyi günler\n", "İYİ")).toEqual(["iyi"]);
+	});
+
+	it("ışık araması İŞİK'i bulmuyor", () => {
+		expect(bul("İŞİK diye bir kelime\n", "ışık")).toEqual([]);
+	});
+
+	it("locale İngilizce iken Türkçe çifti eşleşmiyor", () => {
+		// Kuralın gerçekten locale'den geldiğini gösteriyor.
+		expect(bul("IŞIK\n", "ışık", {}, "en")).toEqual([]);
+	});
+});
+
+describe("findMatches", () => {
+	it("boş sorgu hiçbir şey bulmuyor", () => {
+		expect(bul("metin\n", "")).toEqual([]);
+	});
+
+	it("aynı paragraftaki bütün geçişleri buluyor", () => {
+		expect(bul("kedi kedi kedi\n", "kedi")).toHaveLength(3);
+	});
+
+	it("eşleşmeler örtüşmüyor", () => {
+		expect(bul("aaaa\n", "aa")).toHaveLength(2);
+	});
+
+	it("belge sırasını koruyor", () => {
+		const doc = parse("# bir x\n\nparagraf x\n\n- madde x\n");
+		const index = createIndex(doc, "tr");
+		const matches = findMatches(index, "x");
+		expect(matches.map((m) => m.regionIndex)).toEqual([0, 1, 2]);
+	});
+
+	it("duyarlı arama kasayı ayırt ediyor", () => {
+		expect(bul("Kedi kedi\n", "kedi", { caseSensitive: true })).toEqual(["kedi"]);
+	});
+
+	it("tam kelime seçeneği ekleri dışlıyor", () => {
+		expect(bul("kedi kediler\n", "kedi", { wholeWord: true })).toHaveLength(1);
+	});
+
+	it("tam kelime Türkçe harfte yanlış sınır üretmiyor", () => {
+		expect(bul("şeker\n", "eker", { wholeWord: true })).toEqual([]);
+	});
+
+	it("kod bloğunun içinde de arıyor", () => {
+		expect(bul("```js\nconst kedi = 1;\n```\n", "kedi")).toEqual(["kedi"]);
+	});
+
+	it("sınır aşılınca duruyor", () => {
+		expect(bul("aaaaaa\n", "a", { limit: 3 })).toHaveLength(3);
+	});
+
+	it("uzayan katlamadan sonraki aralık kaymıyor", () => {
+		// İngilizce locale'de "İ" iki kod birimine katlanıyor (i + nokta).
+		// Eşleşme ondan **sonra** başlıyor; eşleme tablosu olmasaydı aralık
+		// bir karakter kayar ve "tanbul" dönerdi.
+		expect(bul("İstanbul\n", "stanbul", {}, "en")).toEqual(["stanbul"]);
+	});
+});
+
+describe("gezinme", () => {
+	const doc = parse("bir kedi\n\niki kedi\n\nüç kedi\n");
+	const index = createIndex(doc, "tr");
+	const matches = findMatches(index, "kedi");
+
+	it("imleçten sonraki eşleşmeye gidiyor", () => {
+		expect(nextFrom(matches, 0, 0)).toBe(0);
+		expect(nextFrom(matches, 0, 5)).toBe(1);
+		expect(nextFrom(matches, 1, 0)).toBe(1);
+	});
+
+	it("sonda başa sarıyor", () => {
+		expect(nextFrom(matches, 2, 99)).toBe(0);
+	});
+
+	it("geri giderken sona sarıyor", () => {
+		expect(previousFrom(matches, 0, 0)).toBe(2);
+		expect(previousFrom(matches, 1, 8)).toBe(1);
+	});
+
+	it("eşleşme yoksa -1", () => {
+		expect(nextFrom([], 0, 0)).toBe(-1);
+		expect(previousFrom([], 0, 0)).toBe(-1);
+	});
+});
+
+describe("değiştirme", () => {
+	it("tek eşleşmeyi değiştiriyor", () => {
+		expect(degistir("bir kedi var\n", "kedi", "köpek")).toBe("bir köpek var\n");
+	});
+
+	it("aynı paragraftaki bütün eşleşmeleri değiştiriyor", () => {
+		expect(degistir("kedi kedi kedi\n", "kedi", "köpek")).toBe("köpek köpek köpek\n");
+	});
+
+	it("uzunluk değişse de sonraki eşleşmeler kaymıyor", () => {
+		// Sondan başa gidilmesinin sebebi bu (bkz. `replace.ts`).
+		expect(degistir("a a a\n", "a", "uzunbirkelime")).toBe(
+			"uzunbirkelime uzunbirkelime uzunbirkelime\n",
+		);
+	});
+
+	it("boş metinle değiştirmek siliyor", () => {
+		expect(degistir("bir kedi var\n", "kedi ", "")).toBe("bir var\n");
+	});
+
+	it("başlıkta ve listede de çalışıyor", () => {
+		expect(degistir("# kedi\n\n- kedi\n", "kedi", "köpek")).toBe("# köpek\n\n- köpek\n");
+	});
+
+	it("tablo değişmeden kalıyor", () => {
+		const md = "| kedi | b |\n| --- | --- |\n| c | kedi |\n";
+		expect(degistir(md, "kedi", "köpek")).toBe(md);
+	});
+
+	it("kod bloğunda çalışıyor", () => {
+		expect(degistir("```js\nconst kedi = 1;\n```\n", "kedi", "kopek")).toBe(
+			"```js\nconst kopek = 1;\n```\n",
+		);
+	});
+
+	it("biçimin tamamı eşleşince biçim korunuyor", () => {
+		expect(degistir("bu **kedi** metni\n", "kedi", "köpek")).toBe("bu **köpek** metni\n");
+	});
+
+	it("biçim sınırını aşan eşleşme düz metne dönüyor", () => {
+		// Bilinçli: iki farklı biçimden hangisinin kazanacağı keyfî olurdu.
+		expect(degistir("**ka**lın\n", "kalın", "ince")).toBe("ince\n");
+	});
+
+	it("görsel silinmiyor", () => {
+		// Görselin ofset uzunluğu 0, yani eşleşme üstünden geçebiliyor.
+		const sonuc = degistir("a![alt](x.png)b\n", "ab", "c");
+		expect(sonuc).toContain("![alt](x.png)");
+		expect(sonuc).toContain("c");
+	});
+
+	it("eşleşme yoksa belge değişmiyor", () => {
+		const doc = parse("metin\n");
+		const index = createIndex(doc, "tr");
+		expect(replaceAll(doc, index.regions, [], "x")).toBeNull();
+	});
+
+	it("tek eşleşme değiştirince imleç metnin sonunda", () => {
+		const doc = parse("bir kedi\n");
+		const index = createIndex(doc, "tr");
+		const [match] = findMatches(index, "kedi");
+		const sonuc = replaceOne(doc, index.regions, match as never, "köpek");
+		expect(sonuc?.caret).toEqual({ blockIndex: 0, path: [], offset: 4 + 5 });
+	});
+
+	it("belge nesnesi yeniden kullanılabiliyor (değişmezlik)", () => {
+		const doc = parse("kedi\n");
+		const index = createIndex(doc, "tr");
+		replaceAll(doc, index.regions, findMatches(index, "kedi"), "köpek");
+		expect(serialize(doc)).toBe("kedi\n");
+	});
+});
+
+describe("100 sayfalık belge", () => {
+	/**
+	 * Kabul kriteri: "100 sayfalık dokümanda takılmadan çalışıyor."
+	 *
+	 * Sayfa ~500 kelime sayılıyor; 100 sayfa ≈ 50 000 kelime. Süre sınırı
+	 * cömert tutuldu (CI makineleri yavaş ve paylaşımlı) ama büyüklük
+	 * sırasını sabitlemeye yetiyor: doğrusal olmayan bir tarama buraya
+	 * saniyeler getirirdi.
+	 */
+	const paragraf = `${"kelime ".repeat(100)}kedi\n\n`;
+	const md = paragraf.repeat(500);
+	const doc = parse(md);
+
+	it("bölge çıkarma ve katlama bir kez yapılıyor", () => {
+		const bas = performance.now();
+		const index = createIndex(doc, "tr");
+		expect(index.regions).toHaveLength(500);
+		expect(performance.now() - bas).toBeLessThan(2000);
+	});
+
+	it("her tuş vuruşunda yeniden tarama hızlı", () => {
+		const index = createIndex(doc, "tr");
+		const bas = performance.now();
+		for (const sorgu of ["k", "ke", "ked", "kedi"]) findMatches(index, sorgu);
+		// Dört tarama: kullanıcının "kedi" yazması.
+		expect(performance.now() - bas).toBeLessThan(1000);
+	});
+
+	it("tümünü değiştir tek geçişte bitiyor", () => {
+		const index = createIndex(doc, "tr");
+		const matches = findMatches(index, "kedi");
+		expect(matches).toHaveLength(500);
+		const bas = performance.now();
+		const sonuc = replaceAll(doc, index.regions, matches, "köpek");
+		expect(sonuc).not.toBeNull();
+		expect(performance.now() - bas).toBeLessThan(3000);
+	});
+});
