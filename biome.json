@@ -100,7 +100,7 @@
       }
     },
     {
-      "includes": ["examples/**", "apps/notlar/**"],
+      "includes": ["examples/**", "apps/**"],
       "linter": {
         "rules": {
           "correctness": {

@@ -1,0 +1,130 @@
+---
+title: Canlı deneyin
+description: Aynı sayfada vanilla, React ve Vue — üçü de gerçek, üçü de aynı anda çalışıyor.
+---
+
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+import CanliVanilla from '../../components/CanliVanilla.astro';
+import { CanliReact } from '../../components/CanliReact.tsx';
+import CanliVue from '../../components/CanliVue.vue';
+
+Aşağıdaki üç editör **gerçekten çalışıyor** ve üçü de aynı anda, aynı
+sayfada yaşıyor. Farklı olan tek şey montaj kodu: motor, arayüz ve çıktı
+aynı.
+
+Yazmayı deneyin. Sağdaki Markdown her tuşta güncelleniyor — ve yıldızlı
+liste `-` olmuyor, `1)` ayracı `1.` olmuyor.
+
+<Tabs syncKey="cerceve">
+  <TabItem label="Vanilla">
+
+<CanliVanilla />
+
+```ts
+import { Editor } from '@kalem/editor';
+import { mountUi } from '@kalem/ui';
+
+const editor = new Editor(kap, {
+  value: ORNEK_BELGE,
+  lang: 'tr',
+  label: 'Canlı örnek — vanilla',
+  onChange: (markdown) => { cikti.textContent = markdown; },
+});
+
+mountUi(editor, { toolbar: 'both' });
+```
+
+  </TabItem>
+  <TabItem label="React">
+
+<CanliReact client:load />
+
+```tsx
+import { KalemEditor, useKalemValue } from '@kalem/react';
+import { mountUi } from '@kalem/ui';
+
+function Cikti() {
+  const metin = useKalemValue(ORNEK_BELGE);
+  return <pre>{metin}</pre>;
+}
+
+<KalemEditor
+  defaultValue={ORNEK_BELGE}
+  lang="tr"
+  label="Canlı örnek — React"
+  onReady={(editor) => mountUi(editor, { toolbar: 'both' })}
+>
+  <Cikti />
+</KalemEditor>
+```
+
+  </TabItem>
+  <TabItem label="Vue">
+
+<CanliVue client:load />
+
+```vue
+<script setup lang="ts">
+import { KalemEditor } from '@kalem/vue';
+import { mountUi } from '@kalem/ui';
+import { ref } from 'vue';
+
+const metin = ref(ORNEK_BELGE);
+</script>
+
+<template>
+  <KalemEditor
+    v-model="metin"
+    lang="tr"
+    label="Canlı örnek — Vue"
+    @ready="(editor) => mountUi(editor, { toolbar: 'both' })"
+  />
+  <pre>{{ metin }}</pre>
+</template>
+```
+
+  </TabItem>
+</Tabs>
+
+## Bu sayfa bir iddianın kanıtı
+
+Kalem'in ana iddiası çerçeve bağımsızlığı. Bir kütüphane bunu söyleyebilir;
+kanıtlaması başka bir şey.
+
+Bu site [Astro Starlight](https://starlight.astro.build) ile kurulu ve
+**hem React hem Vue adalarını** aynı anda çalıştırıyor. Yukarıdaki üç
+editör tek bir sayfada, tek bir `@kalem/editor` motoruyla yaşıyor.
+
+Vue tabanlı VitePress ya da React tabanlı Docusaurus ile bu sayfa
+yazılamazdı — dokümantasyon aracının seçimi de mesajın parçası.
+
+<Aside type="tip" title="Deneyebilecekleriniz">
+- Bir kelimeyi **seçin** — biçimlendirme balonu beliriyor
+- Boş satırda `/` yazın — blok menüsü açılıyor
+- `# ` ya da `- ` yazın — satır kendiliğinden başlığa, listeye dönüyor
+- `Ctrl+B`, `Ctrl+I`, `Ctrl+K` — Word'deki tuşlar
+- Blok tutamacını sürükleyin ya da `Ctrl+Shift+↑/↓` ile taşıyın
+</Aside>
+
+## Vue örneği sunucuda çiziliyor
+
+React ve Vue adaları `client:load` ile kurulu, yani **önce sunucuda**
+çiziliyorlar. Vue sekmesinde bunun görünür bir sonucu var: sayfanın
+kaynağına bakarsanız belgenin `<h1>`i ve listesi orada — JavaScript
+yüklenmeden önce.
+
+[Nuxt sayfasında](/frameworkler/nuxt/) anlatılan "`<ClientOnly>`
+gerekmiyor" iddiası, bu sayfanın kendi HTML'inde duruyor.
+
+## Üç örnek de aynı belgeyle açılıyor
+
+Başlangıç metni tek bir modülde ve üçü de onu import ediyor. Fark yalnızca
+montaj kodunda olsun diye: aynı girdi, aynı çıktı, üç farklı çerçeve.
+
+## Sonraki adım
+
+- [Başlangıç](/baslangic/) — kendi projenize eklemek
+- [Editör rehberi](/rehber/editor/) — seçenekler, API ve kısayollar
+- Çerçeveniz: [React](/frameworkler/react/) · [Vue](/frameworkler/vue/) ·
+  [Svelte](/frameworkler/svelte/) · [Angular](/frameworkler/angular/) ·
+  [CDN](/frameworkler/cdn/)

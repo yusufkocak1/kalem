@@ -1,0 +1,110 @@
+/*
+ * Canlı örnek kutuları  (İş listesi: F6-03)
+ *
+ * Kalem'in tema dosyaları belgenin içini boyuyor; burası kutunun kendisi.
+ * Renkler Starlight'ın sözlüğünden geliyor, yani site teması değiştiğinde
+ * kutular da onunla dönüyor.
+ *
+ * ## Yerleşim neden `grid-template-areas`
+ *
+ * `mountUi` sabit araç çubuğunu editörün **önceki kardeşi** olarak
+ * ekliyor (`element.before(...)`). Yani kutunun çocukları DOM sırasıyla
+ * rozet, araç çubuğu, editör ve çıktı oluyor — ilk denemede iki sütunlu
+ * grid bunları sırayla hücrelere dağıttı ve araç çubuğu, editörün
+ * yanındaki dar sütuna dikey olarak sıkıştı.
+ *
+ * Alan adları yerleşimi DOM sırasından bağımsız kılıyor: hangi çocuk
+ * nereye giderse gitsin, araç çubuğu editörün üstünde, çıktı sağda
+ * kalıyor. Aynı CSS üç çerçevede de çalışıyor, çünkü üçünde de bu dört
+ * eleman kutunun **doğrudan** çocuğu.
+ */
+
+.canli {
+	display: grid;
+	grid-template-areas:
+		"rozet rozet"
+		"arac  cikti"
+		"yazi  cikti";
+	grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+	grid-template-rows: auto auto minmax(0, 1fr);
+	border: 1px solid var(--sl-color-gray-5);
+	border-radius: 8px;
+	overflow: hidden;
+	margin-block: 1rem;
+}
+
+@media (max-width: 62rem) {
+	.canli {
+		grid-template-areas:
+			"rozet"
+			"arac"
+			"yazi"
+			"cikti";
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-rows: auto auto auto auto;
+	}
+}
+
+.canli-rozet {
+	grid-area: rozet;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin: 0;
+	padding: 0.45rem 0.85rem;
+	background: var(--sl-color-gray-6);
+	border-bottom: 1px solid var(--sl-color-gray-5);
+	font-size: 0.78rem;
+	color: var(--sl-color-gray-2);
+}
+
+.canli-rozet b {
+	color: var(--sl-color-white);
+}
+
+.canli > .kalem-toolbar {
+	grid-area: arac;
+	margin: 0;
+	padding: 0.35rem 0.85rem;
+	/* Kendi kutusu yok: kutunun içinde bir şerit. */
+	border: 0;
+	border-bottom: 1px solid var(--sl-color-gray-5);
+	border-radius: 0;
+	box-shadow: none;
+	background: var(--sl-color-gray-7);
+}
+
+.canli-yazi {
+	grid-area: yazi;
+	padding: 0.9rem 1rem;
+	min-height: 15rem;
+	max-height: 26rem;
+	overflow-y: auto;
+}
+
+.canli-cikti {
+	grid-area: cikti;
+	margin: 0;
+	padding: 0.9rem 1rem;
+	background: var(--sl-color-gray-7);
+	border-inline-start: 1px solid var(--sl-color-gray-5);
+	font-family: var(--sl-font-mono);
+	font-size: 0.74rem;
+	line-height: 1.6;
+	white-space: pre-wrap;
+	overflow: auto;
+	max-height: none;
+}
+
+@media (max-width: 62rem) {
+	.canli-cikti {
+		border-inline-start: 0;
+		border-block-start: 1px solid var(--sl-color-gray-5);
+		max-height: 14rem;
+	}
+}
+
+/* Belge tipografisi doküman sayfasınınkini ezmemeli. */
+.canli-yazi :is(h1, h2, h3) {
+	margin-block-start: 0.4em;
+}

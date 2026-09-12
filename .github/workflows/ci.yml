@@ -149,6 +149,8 @@ jobs:
       # boyunca kimse fark etmeden yanlış kaldı.
       - run: pnpm guard:docs
 
-      # Site kütüphaneyi henüz gömmüyor (F6-03) ama derlemesi kırılırsa
-      # sessizce çürümesin: duyuru günü eksik doküman = kaybedilmiş fırsat.
+      # Site artık kütüphaneyi **gerçekten gömüyor** (F6-03: `/canli/`
+      # sayfasında vanilla, React ve Vue örnekleri aynı anda çalışıyor),
+      # yani paketlerin derlenmiş çıktısına ihtiyacı var.
+      - run: pnpm build
       - run: pnpm docs:build

@@ -12,11 +12,25 @@
     "preview": "astro preview"
   },
   "dependencies": {
+    "@astrojs/react": "^6.0.5",
     "@astrojs/starlight": "^0.42.0",
+    "@astrojs/vue": "^7.0.2",
+    "@kalem/core": "workspace:^",
+    "@kalem/editor": "workspace:^",
+    "@kalem/react": "workspace:^",
+    "@kalem/themes": "workspace:^",
+    "@kalem/ui": "workspace:^",
+    "@kalem/viewer": "workspace:^",
+    "@kalem/vue": "workspace:^",
     "astro": "^7.3.2",
-    "sharp": "^0.35.4"
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "sharp": "^0.35.4",
+    "vue": "catalog:"
   },
   "devDependencies": {
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
     "typescript": "^5.9.0"
   }
 }

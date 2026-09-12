@@ -5,13 +5,14 @@ template: splash
 hero:
   tagline: Word kadar kolay, Markdown kadar taşınabilir. Herhangi bir framework ile — ya da framework olmadan.
   actions:
+    - text: Canlı deneyin
+      link: /canli/
+      icon: rocket
+      variant: primary
     - text: Başlangıç
       link: /baslangic/
       icon: right-arrow
-      variant: primary
-    - text: Mimari
-      link: /mimari/
-      icon: document
+      variant: minimal
 ---
 
 import { Card, CardGrid, Aside, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -107,6 +108,9 @@ const metin = ref('# Merhaba');
 Dört sekme de aynı editörü kuruyor. Sonuncusunda derleme adımı, paketleyici
 ve yazılmış JavaScript yok.
 
+Üçünü **çalışır hâlde** görmek için: [Canlı deneyin](/canli/) — vanilla,
+React ve Vue örnekleri aynı sayfada, aynı anda.
+
 ## Neden Kalem?
 
 Yapay zekâ araçlarının çıktı formatı fiilen Markdown oldu. Ancak yazılım
@@ -131,6 +135,7 @@ doğrulanıyor. Rakip değerleri yaklaşıktır (min+gzip) ve bağımsız
 
 ## Sonraki adım
 
+- [Canlı deneyin](/canli/) — üç çerçeve, aynı sayfada, gerçekten çalışıyor
 - [Başlangıç](/baslangic/) — kurulum ve ilk editör
 - [Viewer rehberi](/rehber/viewer/) — sadece göstermek istiyorsanız
 - [Editör rehberi](/rehber/editor/) — seçenekler, API, kısayollar

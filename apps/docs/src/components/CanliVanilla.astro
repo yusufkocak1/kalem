@@ -1,0 +1,40 @@
+---
+/**
+ * Canlı örnek — vanilla  (İş listesi: F6-03)
+ *
+ * Çerçeve yok: bir `<div>`, bir `new Editor(...)`, bir `mountUi(...)`.
+ * Aşağıdaki `<script>` Astro tarafından paketlenip **istemcide**
+ * çalışıyor; sunucuda hiçbir şey yapmıyor.
+ */
+import "./canli.css";
+---
+
+<div class="canli">
+	<p class="canli-rozet">
+		<b>vanilla</b> · <code>new Editor(el)</code> + <code>mountUi(editor)</code>
+	</p>
+	<div class="canli-yazi kalem-theme" data-canli-vanilla lang="tr"></div>
+	<pre class="canli-cikti" data-canli-vanilla-cikti></pre>
+</div>
+
+<script>
+	import { Editor } from "@kalem/editor";
+	import { mountUi } from "@kalem/ui";
+	import { ORNEK_BELGE } from "./ornek-belge";
+
+	const kap = document.querySelector<HTMLElement>("[data-canli-vanilla]");
+	const cikti = document.querySelector<HTMLElement>("[data-canli-vanilla-cikti]");
+
+	if (kap !== null && cikti !== null) {
+		const editor = new Editor(kap, {
+			value: ORNEK_BELGE,
+			lang: "tr",
+			label: "Canlı örnek — vanilla",
+			onChange: (markdown) => {
+				cikti.textContent = markdown;
+			},
+		});
+		mountUi(editor, { toolbar: "both" });
+		cikti.textContent = editor.getValue();
+	}
+</script>

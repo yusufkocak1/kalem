@@ -5,8 +5,9 @@ import { defineConfig, devices } from "@playwright/test";
  *
  * ## Neden ana yapılandırmadan ayrı
  *
- * Yedi örneği ve dogfooding uygulamasını kurup başlatmak dakikalar
- * sürüyor (Next.js, Nuxt ve Angular üretim derlemeleri dâhil) ve ana e2e paketi her çalıştığında bu bedeli
+ * Yedi örneği, dogfooding uygulamasını ve doküman sitesini kurup
+ * başlatmak dakikalar sürüyor (Next.js, Nuxt ve Angular üretim
+ * derlemeleri dâhil) ve ana e2e paketi her çalıştığında bu bedeli
  * ödemek, hızlı geri bildirimi öldürürdü. Burada ölçülen şey de farklı:
  * editörün davranışı değil, **paketin bir uygulamaya gerçekten
  * takılabildiği**.
@@ -102,6 +103,16 @@ export default defineConfig({
 			// paketlerin gerçek bir uygulamada çalışması.
 			command: "node scripts/serve-static.mjs apps/notlar/dist 4178",
 			url: "http://localhost:4178",
+			reuseExistingServer: false,
+			timeout: 60_000,
+			stdout: "pipe",
+		},
+		{
+			// Doküman sitesi: `/canli/` sayfasında vanilla, React ve Vue
+			// örnekleri aynı anda çalışıyor (F6-03). Ölçülen şey yine aynı —
+			// derlenmiş paketlerin gerçek bir uygulamada çalışması.
+			command: "node scripts/serve-static.mjs apps/docs/dist 4179",
+			url: "http://localhost:4179",
 			reuseExistingServer: false,
 			timeout: 60_000,
 			stdout: "pipe",

@@ -18,8 +18,12 @@ pnpm guard:docs    # örneklerdeki API adları gerçekten var mı
 
 Kütüphanenin ana iddiası framework bağımsızlığı. Starlight, **aynı doküman
 sayfasında** vanilla, React ve Vue canlı örneklerini gömebildiği için bu
-iddiayı sitenin kendisi kanıtlar (görev F6-03). Vue tabanlı VitePress veya
-React tabanlı Docusaurus bu mesajla çelişirdi.
+iddiayı sitenin kendisi kanıtlıyor: `/canli/` sayfasında üç editör aynı
+anda çalışıyor ve dokuz tarayıcı testi bunu sabitliyor. Vue tabanlı
+VitePress veya React tabanlı Docusaurus bu mesajla çelişirdi.
+
+Site artık paketleri **gerçekten tüketiyor**, yani `pnpm docs:build`
+öncesinde `pnpm build` gerekiyor.
 
 Ayrıca yerleşik gelen: Pagefind araması, i18n, koyu tema, erişilebilir
 varsayılanlar.
@@ -45,7 +49,7 @@ Kenar çubuğu etiketleri iki dilde de yazılı (`astro.config.mjs`), içerik
 | Sayfa | Durum | Görev |
 |---|---|---|
 | Başlangıç · Rehber (7) · Framework'ler (9) · Tarifler (5) · Mimari | ✅ Gerçek API'ye göre yazıldı | F6-02 |
-| Canlı gömülü örnekler | Eksik | F6-03 |
+| Canlı gömülü örnekler (`/canli/`) | ✅ vanilla + React + Vue, aynı sayfada | F6-03 |
 | API referansı (TypeDoc) | Eksik | F6-04 |
 | Landing sayfası | Taslak | F6-05 |
 | Playground | Eksik | F6-07 |

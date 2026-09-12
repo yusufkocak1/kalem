@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-12 · `master` · `pnpm verify` yeşil · 1284 birim + 1104 tarayıcı + 58 örnek/uygulama testi
+> Son güncelleme: 2026-09-12 · `master` · `pnpm verify` yeşil · 1284 birim + 1104 tarayıcı + 67 örnek/uygulama testi
 
 | Faz | Görev | Durum |
 |---|---|---|
@@ -34,8 +34,8 @@
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
 | **Faz 4** — Eklentiler | 7 / 7 | ✅ **Tamamlandı** |
 | **Faz 5** — Sarmalayıcılar | 5 / 5 | 🟡 Bitti (2 haftalık kullanım sürüyor) |
-| **Faz 6** — Cila ve yayın | 2 / 14 | 🔵 Sürüyor |
-| | **57 / 72** | **%79** |
+| **Faz 6** — Cila ve yayın | 3 / 14 | 🔵 Sürüyor |
+| | **58 / 72** | **%81** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,9 +43,9 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02`
+referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03`
 
-**Sıradaki:** `F6-03` canlı gömülü örnekler — aynı doküman sayfasında vanilla, React ve Vue.
+**Sıradaki:** `F6-04` API referansı (TypeDoc → Starlight).
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10), Linux görsel
 referansları (F3-11) ve `apps/notlar`ın iki haftalık günlük kullanımı
@@ -2054,9 +2054,62 @@ dilinizde yok" diyor. Çeviri F6-10.
 Bir bağlantı denetimi tüm iç bağlantıların hedefinin gerçekten
 üretildiğini doğruladı.
 
-### F6-03 · Canlı gömülü örnekler ⭐ `[M]` ⬜
-Starlight'ın framework-agnostikliğinden faydalan: **aynı sayfada** vanilla, React ve Vue sekmeli canlı örnek
-- **Kabul:** ürünün ana iddiası doküman sitesinin kendisiyle kanıtlanıyor
+### F6-03 · Canlı gömülü örnekler ⭐ `[M]` ✅
+- [x] `/canli/` sayfasında vanilla, React ve Vue örnekleri **aynı anda** çalışıyor
+- [x] Üçü de aynı belgeyle açılıyor; fark yalnızca montaj kodunda
+- [x] React ve Vue adaları `client:load` — Vue örneği sunucuda çiziliyor
+- [x] **Kabul:** ürünün ana iddiası sitenin kendisiyle kanıtlanıyor (9 tarayıcı testi)
+
+**Site artık kütüphaneyi gerçekten gömüyor.** Astro'ya hem React hem Vue
+ada motoru kuruldu ve `/canli/` sayfasında üç editör aynı anda yaşıyor:
+biri `new Editor(el)` ile, biri `<KalemEditor />` ile, biri
+`<KalemEditor v-model />` ile. Üçü de aynı `@kalem/editor` motorunu
+kullanıyor ve aynı başlangıç belgesini tek bir modülden alıyor — fark
+yalnızca montaj kodunda olsun diye.
+
+Vue tabanlı VitePress ya da React tabanlı Docusaurus ile bu sayfa
+yazılamazdı. Dokümantasyon aracının seçimi de mesajın parçası ve bu
+madde onu görünür kılıyor.
+
+**Vue örneği sunucuda çiziliyor.** Ada `client:load` ile kurulu, yani
+bileşen önce sunucuda render ediliyor; bir test ham HTTP yanıtında
+belgenin `<h1>`ini ve liste öğesini arıyor. Nuxt sayfasındaki
+"`<ClientOnly>` gerekmiyor" iddiası artık sitenin **kendi HTML'inde**
+duruyor.
+
+> **Doküman sitesi Kalem'in CSS'ini hiç yüklemiyormuş.** Canlı örnekler
+> ilk denemede stilsiz çıktı — ama tuhaf bir şekilde belge içeriği düzgün
+> görünüyordu: Starlight'ın kendi element kuralları `h1`, `ul`, `blockquote`
+> için devreye giriyor ve editörü **tesadüfen** biçimlendiriyordu. Araç
+> çubuğu ise düz bir `<div>` yığınıydı; `display: flex` uygulanmadığı için
+> beş düğme grubu alt alta diziliyordu. `@kalem/themes` dosyaları
+> `customCss`e eklendi.
+
+> **Araç çubuğu grid'e üçüncü hücre olarak giriyordu.** `mountUi` sabit
+> çubuğu editörün **önceki kardeşi** olarak ekliyor (`element.before`),
+> yani kutunun çocukları rozet, çubuk, editör ve çıktı oluyor. İki sütunlu
+> grid bunları sırayla dağıtınca çubuk, editörün yanındaki dar sütuna
+> dikey olarak sıkıştı. `grid-template-areas` yerleşimi DOM sırasından
+> bağımsız kıldı ve aynı CSS üç çerçevede de çalışıyor — çünkü üçünde de
+> bu dört eleman kutunun doğrudan çocuğu.
+
+**İddia testle sabit.** Dokuz tarayıcı testi: üç editörün de kurulduğu,
+rozetlerin üç çerçeveyi adlandırdığı, her sekmede gerçekten
+düzenlenebildiği, yazım tercihinin (`*` listesi, `1)` ayracı) üçünde de
+korunduğu, araç çubuğundan `Ctrl+B`nin `**kalın**` ürettiği, Vue adasının
+sunucuda çizildiği ve konsola tek bir hata bile düşmediği. Bu testler
+olmasa bir ada kurulmayı bıraktığında sayfa yine derlenir, yalnızca
+kutulardan biri boş kalırdı.
+
+> **Yan düzeltme — Biome üçüncü kez CSS importunu bozdu.**
+> `useImportExtensions` kuralı `import "./canli.css"` satırını
+> `./canli.js`e çevirdi ve doküman derlemesi kırıldı. Aynı tuzak
+> F5-01'de örneklerde, F5-05'te `apps/notlar`da yaşanmıştı; kural artık
+> `apps/**` altında da kapalı. Üç kez tekrarlayan bir şey tesadüf değil:
+> kuralın CSS'e hiç dokunmaması gerekiyor.
+
+Site 51 rota üretiyor (iki dil). CI'ın doküman işi artık önce `pnpm build`
+çalıştırıyor — site paketlerin derlenmiş çıktısına ihtiyaç duyuyor.
 
 ### F6-04 · API referansı `[M]` ⬜
 TypeDoc → Starlight entegrasyonu, otomatik üretim CI'da
