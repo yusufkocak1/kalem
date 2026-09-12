@@ -80,7 +80,7 @@
   },
   "overrides": [
     {
-      "includes": ["scripts/**", "*.config.ts", "*.config.mjs"],
+      "includes": ["scripts/**", "*.config.ts", "*.config.mjs", "examples/**/*.mjs"],
       "linter": {
         "rules": {
           "suspicious": {

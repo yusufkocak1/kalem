@@ -43,7 +43,15 @@ test("useKalemValue SSR'de patlamıyor, istemcide gerçek değeri veriyor", asyn
 	await page.goto(KOK);
 	const sayac = page.locator(".durum").first();
 	await expect(sayac).toContainText("karakter");
-	const metin = (await sayac.textContent()) ?? "";
-	// Sunucu anlık görüntüsü boş dize; istemcide gerçek belge uzunluğu.
-	expect(Number.parseInt(metin, 10)).toBeGreaterThan(50);
+	/*
+	 * Sayı **beklenerek** okunuyor, bir kez değil.
+	 *
+	 * Sunucu anlık görüntüsü boş dize, yani ilk boyada "0 karakter"
+	 * yazıyor ve bu da `toContainText("karakter")` koşulunu sağlıyor.
+	 * Tek seferlik okuma hidrasyondan önceye denk geldiğinde 0 görüyordu —
+	 * testi arada bir düşüren gerçek bir yarış.
+	 */
+	await expect
+		.poll(async () => Number.parseInt((await sayac.textContent()) ?? "", 10))
+		.toBeGreaterThan(50);
 });

@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-12 · `master` · `pnpm verify` yeşil · 1260 birim + 1098 tarayıcı + 40 örnek testi
+> Son güncelleme: 2026-09-12 · `master` · `pnpm verify` yeşil · 1260 birim + 1098 tarayıcı + 47 örnek testi
 
 | Faz | Görev | Durum |
 |---|---|---|
@@ -33,9 +33,9 @@
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
 | **Faz 4** — Eklentiler | 7 / 7 | ✅ **Tamamlandı** |
-| **Faz 5** — Sarmalayıcılar | 3 / 5 | 🔵 Sürüyor |
+| **Faz 5** — Sarmalayıcılar | 4 / 5 | 🔵 Sürüyor |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **53 / 72** | **%74** |
+| | **54 / 72** | **%75** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,9 +43,9 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03`
+referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04`
 
-**Sıradaki:** `F5-04` örnek uygulamalar (`cdn-vanilla` ve CI kapsaması; diğer altı örnek F5-01…F5-03 ile birlikte yazıldı).
+**Sıradaki:** `F5-05` dogfooding — Kalem'i gerçek bir projede kullanmak. Faz 5'in tek kalan maddesi ve tek insan gerektireni.
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10) ve Linux görsel
 referansları (F3-11) — ikisi de bir insanın masasında yapılmak zorunda.
@@ -1804,10 +1804,68 @@ aynıysa duruyor.
 Boyut: 1.98 kB (gzip; editör hariç). 8 birim + 48 tarayıcı testi
 (3 motor) + 20 örnek testi.
 
-### F5-04 · Örnek uygulamalar `[M]` ⬜
-`examples/`: `react-vite`, `vue-vite`, `nextjs`, `nuxt`, `svelte`, `angular`, `cdn-vanilla`
-- Her biri minimal, kopyalanabilir, CI'da build ediliyor
-- **Kabul:** CI her örneği build ediyor; `cdn-vanilla` tek `<script>` ile çalışıyor
+### F5-04 · Örnek uygulamalar `[M]` ✅
+- [x] `react-vite` · `nextjs` · `vue-vite` · `nuxt` · `svelte` · `angular` · `cdn-vanilla`
+- [x] Her biri minimal ve kopyalanabilir; kendi README'si var
+- [x] **Kabul:** CI her örneği ayrı bir adımda derliyor; `cdn-vanilla` tek `<script>` ile çalışıyor (47 tarayıcı testi)
+
+Altısı F5-01…F5-03 ile birlikte yazılmıştı; bu madde yedinciyi ve
+kapsamayı tamamlıyor.
+
+**`cdn-vanilla`'da yalnızca tek script değil, hiç yazılmış JavaScript de
+yok.** Kabul kriteri "tek `<script>`" diyor ve sayfanın kendi mantığı için
+ikinci bir satır yazmak onu zaten bozardı — ama asıl nokta o değil: özel
+eleman bildirimsel olduğu için yazacak bir şey kalmıyor. Metin elemanın
+içinde duruyor, form alanının `name`'i var, Gönder'e basınca metin adres
+çubuğunda görünüyor. Arada JavaScript yok, `ElementInternals` var. Bir
+test sayfadaki script etiketlerini sayıyor ve listenin tam olarak tek
+elemanlı olduğunu doğruluyor.
+
+**IIFE derlemesi bir zorunluluktan doğdu.** ESM çıktısı `@kalem/core` ve
+`@kalem/editor`i **dışarıda** bırakıyor; paketleyici kullanan uygulamada
+doğrusu bu, yoksa aynı kod iki kez paketlenirdi. Ama CDN kullanıcısının
+paketleyicisi yok ve çıplak `import "@kalem/editor"` satırı tarayıcıda
+çözülmez. `kalem-editor.iife.js` hepsini içine alıyor: **26,7 kB** gzip,
+tek istek, `type="module"` bile gerekmiyor. Bir test dosyada `@kalem/`
+geçmediğini doğruluyor — dışarıda kalan tek bir import bu sözü sessizce
+bozardı.
+
+**Bu derlemede eleman kendiliğinden kaydoluyor.** Modül girişlerinde kayıt
+açık bir çağrı, çünkü aynı sayfada iki sürümü bulunan bir uygulamayı
+açılışta patlatmamak gerekiyor (F5-03). Script etiketi düşen kişinin
+beklentisi ise tersine. Çelişki yok: çağrı zaten **tekrarlanabilir** — ad
+kayıtlıysa sessizce geçiliyor — yani script sayfaya iki kez eklenirse hata
+vermiyor.
+
+> **`exports` haritasına konmadı.** `./global` girişi eklendiğinde tip
+> yayın denetimi (`attw`) haklı olarak "tipsiz giriş" dedi: bu dosya bir
+> modül değil, `import` edilecek bir yüzeyi ve dolayısıyla tip bildirimi
+> yok. Uydurma bir `.d.ts` yazmak yerine giriş kaldırıldı; jsDelivr ve
+> unpkg dosyayı `exports`a bakmadan, tarball'daki yolundan servis ediyor.
+
+**Stil ayrı bir `<link>` ve öyle kalıyor.** Kriter "tek `<script>`" diyor,
+"tek etiket" değil. CSS'i JavaScript'in içine gömmek üç şeyi bozardı:
+tarayıcı stili paralel indiremezdi, katı bir CSP `<style>` enjeksiyonunu
+engelleyebilirdi ve tema seçmek (`dark.css`, `minimal.css`) imkânsız
+hâle gelirdi.
+
+> **Örnekler artık bir kez derleniyor.** Derleme her sunucu komutunun
+> içindeydi (`pnpm --filter … build && … preview`) ve amacı "derleme
+> kırılırsa test hiç başlamasın"dı. CI'a ayrı bir derleme adımı eklenince
+> yedi uygulama **iki kez** derlenecekti. Derleme `e2e:examples`
+> script'inin başına taşındı: güvence aynı (`&&`), süre yarıya indi —
+> test koşusu 1,2 dakikadan 27 saniyeye.
+
+**CI'da kendi adımı var:** `pnpm build:examples`. Tarayıcı testlerinin
+arasında kaybolan bir derleme hatası yerine, rapor doğrudan hangi örneğin
+kırıldığını gösteriyor.
+
+Yedi örneğin her birinin kendi README'si var: ne gösterdiği, hangi paketi
+kullandığı ve o örneğe özgü karar. `examples/README.md` hepsini bir
+tabloda topluyor.
+
+Boyut: `kalem-editor.iife.js` 26,7 kB (gzip; çekirdek ve editör dâhil).
+47 örnek testi.
 
 ### F5-05 · Dogfooding ⭐ `[M]` ⬜
 **Kalem'i kendi gerçek projelerinden birine entegre et ve gerçekten kullan.**

@@ -205,5 +205,11 @@
     "gzip": true,
     "import": "*",
     "ignore": ["@kalem/core", "@kalem/editor"]
+  },
+  {
+    "name": "@kalem/wc — <script> ile düşen tam paket (çekirdek + editör dâhil)",
+    "path": "packages/wc/dist/kalem-editor.iife.js",
+    "limit": "30 kB",
+    "gzip": true
   }
 ]

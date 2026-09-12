@@ -1,20 +1,33 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Örnek uygulamalar için ayrı yapılandırma  (İş listesi: F5-01)
+ * Örnek uygulamalar için ayrı yapılandırma  (İş listesi: F5-01 … F5-04)
  *
  * ## Neden ana yapılandırmadan ayrı
  *
- * Örnekleri kurup başlatmak yarım dakika sürüyor (Next.js üretim derlemesi
- * dâhil) ve ana e2e paketi her çalıştığında bu bedeli ödemek, hızlı geri
- * bildirimi öldürürdü. Burada ölçülen şey de farklı: editörün davranışı
- * değil, **paketin bir uygulamaya gerçekten takılabildiği**.
+ * Yedi örneği kurup başlatmak dakikalar sürüyor (Next.js, Nuxt ve Angular
+ * üretim derlemeleri dâhil) ve ana e2e paketi her çalıştığında bu bedeli
+ * ödemek, hızlı geri bildirimi öldürürdü. Burada ölçülen şey de farklı:
+ * editörün davranışı değil, **paketin bir uygulamaya gerçekten
+ * takılabildiği**.
  *
  * ## Tek motor
  *
- * Sarmalayıcı DOM davranışı üretmiyor; ürettiği şey React yaşam döngüsü.
- * Üç motorda koşturmak aynı React'i üç kez sınamak olurdu — tarayıcı
- * farkları zaten `e2e/*.spec.ts` tarafında ölçülüyor.
+ * Sarmalayıcılar DOM davranışı üretmiyor; ürettikleri şey çerçevenin
+ * yaşam döngüsü. Üç motorda koşturmak aynı React'i üç kez sınamak olurdu —
+ * tarayıcı farkları zaten `e2e/*.spec.ts` tarafında ölçülüyor,
+ * `<kalem-editor>`ünkiler dâhil (`e2e/wc.spec.ts`).
+ *
+ * ## Derleme burada değil, `pnpm e2e:examples`in içinde
+ *
+ * Script önce `pnpm build:examples` çalıştırıyor, sonra bu yapılandırmayı.
+ * Yani derleme kırılırsa test hiç başlamıyor — derlemeyi her sunucu
+ * komutunun içine koymanın sağladığı güvence aynen duruyor ama örnekler
+ * **bir kez** derleniyor. Aşağıdaki komutlar yalnızca servis ediyor.
+ *
+ * Örnekler yayımlanacak çıktıdan çalışıyor; kaynağa takma ad veren bir
+ * geliştirme sunucusu, paketin `exports` haritasındaki bir hatayı
+ * gizlerdi.
  */
 export default defineConfig({
 	testDir: "e2e/examples",
@@ -28,61 +41,59 @@ export default defineConfig({
 		trace: "on-first-retry",
 	},
 	projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-	/*
-	 * Derleme sunucu komutunun içinde: örnek, **yayımlanacak çıktıdan**
-	 * çalışmak zorunda. Kaynağa takma ad veren bir geliştirme sunucusu,
-	 * paketin `exports` haritasındaki bir hatayı gizlerdi.
-	 */
 	webServer: [
 		{
-			command:
-				"pnpm --filter example-react-vite build && pnpm --filter example-react-vite preview --port 4173 --strictPort",
+			command: "pnpm --filter example-react-vite preview --port 4173 --strictPort",
 			url: "http://localhost:4173",
 			reuseExistingServer: false,
-			timeout: 180_000,
+			timeout: 60_000,
 			stdout: "pipe",
 		},
 		{
-			command: "pnpm --filter example-nextjs build && pnpm --filter example-nextjs start -p 3100",
+			command: "pnpm --filter example-nextjs start -p 3100",
 			url: "http://localhost:3100",
 			reuseExistingServer: false,
-			timeout: 300_000,
+			timeout: 120_000,
 			stdout: "pipe",
 		},
 		{
-			command:
-				"pnpm --filter example-vue-vite build && pnpm --filter example-vue-vite preview --port 4174 --strictPort",
+			command: "pnpm --filter example-vue-vite preview --port 4174 --strictPort",
 			url: "http://localhost:4174",
 			reuseExistingServer: false,
-			timeout: 180_000,
+			timeout: 60_000,
 			stdout: "pipe",
 		},
 		{
 			// Nitro sunucusu doğrudan çalıştırılıyor: `nuxt preview` bir
 			// sarmalayıcı ve port bayrağını sürümden sürüme farklı okuyor.
-			command: "pnpm --filter example-nuxt build && node examples/nuxt/.output/server/index.mjs",
+			command: "node examples/nuxt/.output/server/index.mjs",
 			url: "http://localhost:3200",
 			env: { PORT: "3200" },
 			reuseExistingServer: false,
-			timeout: 300_000,
+			timeout: 120_000,
 			stdout: "pipe",
 		},
 		{
-			command:
-				"pnpm --filter example-svelte build && pnpm --filter example-svelte preview --port 4175 --strictPort",
+			command: "pnpm --filter example-svelte preview --port 4175 --strictPort",
 			url: "http://localhost:4175",
 			reuseExistingServer: false,
-			timeout: 180_000,
+			timeout: 60_000,
 			stdout: "pipe",
 		},
 		{
-			// Angular'ın kendi önizleme sunucusu yok; üretim çıktısı
-			// depodaki sıfır bağımlılıklı statik sunucuyla yayınlanıyor.
-			command:
-				"pnpm --filter example-angular build && node scripts/serve-static.mjs examples/angular/dist/browser 4176",
+			// Angular'ın ve düz HTML örneğinin kendi önizleme sunucusu yok;
+			// üretim çıktısı depodaki sıfır bağımlılıklı sunucuyla yayınlanıyor.
+			command: "node scripts/serve-static.mjs examples/angular/dist/browser 4176",
 			url: "http://localhost:4176",
 			reuseExistingServer: false,
-			timeout: 300_000,
+			timeout: 60_000,
+			stdout: "pipe",
+		},
+		{
+			command: "node scripts/serve-static.mjs examples/cdn-vanilla/dist 4177",
+			url: "http://localhost:4177",
+			reuseExistingServer: false,
+			timeout: 60_000,
 			stdout: "pipe",
 		},
 	],

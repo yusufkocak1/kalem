@@ -9,7 +9,8 @@
   "type": "module",
   "sideEffects": [
     "./dist/define-side-effect.js",
-    "./dist/define-side-effect.cjs"
+    "./dist/define-side-effect.cjs",
+    "./dist/kalem-editor.iife.js"
   ],
   "files": [
     "dist"

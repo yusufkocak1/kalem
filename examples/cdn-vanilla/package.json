@@ -1,0 +1,16 @@
+{
+  "name": "example-cdn-vanilla",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "@kalem/wc — derlemesiz, tek <script> ile CDN örneği",
+  "scripts": {
+    "build": "node kur.mjs",
+    "dev": "node kur.mjs && node ../../scripts/serve-static.mjs dist 4177",
+    "preview": "node ../../scripts/serve-static.mjs dist 4177"
+  },
+  "dependencies": {
+    "@kalem/themes": "workspace:^",
+    "@kalem/wc": "workspace:^"
+  }
+}

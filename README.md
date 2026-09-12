@@ -6,11 +6,11 @@ Framework-bağımsız, küçük ve modüler bir **WYSIWYG Markdown editör küt�
 Yazılım bilmeyen kullanıcıların Word rahatlığında doküman yazabilmesi, geliştiricilerin
 ise projelerine 0 bağımlılıkla gömebilmesi için tasarlanıyor.
 
-**Durum: 53 / 72 görev (%74).** Çekirdek, görüntüleyici, editör, arayüz ve
+**Durum: 54 / 72 görev (%75).** Çekirdek, görüntüleyici, editör, arayüz ve
 yedi eklenti tamam. Sarmalayıcılardan `@kalem/react`, `@kalem/vue` ve
-`@kalem/wc` (`<kalem-editor>` özel elemanı) çalışıyor; altı örnek uygulama
-CI'da derlenip sınanıyor. Sırada kalan örnekler ve dogfooding.
-Henüz npm'de değil; ilk yayın v1.0 olacak.
+`@kalem/wc` (`<kalem-editor>` özel elemanı) çalışıyor; yedi örnek uygulama
+CI'da derlenip sınanıyor — düz HTML örneği tek bir `<script>` etiketiyle.
+Sırada dogfooding. Henüz npm'de değil; ilk yayın v1.0 olacak.
 
 ---
 
@@ -23,14 +23,19 @@ Henüz npm'de değil; ilk yayın v1.0 olacak.
 | [packages/core/](packages/core/) | **Çalışan** Markdown ayrıştırıcı + serileştirici. 0 bağımlılık, DOM'suz. |
 | [packages/viewer/](packages/viewer/) | **Çalışan** `renderToDOM` + `renderToString`. `innerHTML` hiç kullanılmıyor. |
 | [packages/editor/](packages/editor/) | **Çalışan** blok motoru: seçim, klavye, biçimlendirme, geri alma, giriş kuralları, pano, eklentiler |
+| [packages/ui/](packages/ui/) | **Çalışan** Word deneyimi: balon araç çubuğu, slash menü, blok tutamağı, bağlantı balonu |
+| [packages/plugin-*/](packages/) | Yedi eklenti: görsel yükleme, kod vurgulama, ara-değiştir, içindekiler, kelime sayacı, kaynak kipi, otomatik kaydetme |
+| [packages/react/](packages/react/) · [vue/](packages/vue/) · [wc/](packages/wc/) | Sarmalayıcılar — ve `<kalem-editor>` özel elemanı (sarmalayıcı gerektirmeyen yol) |
 | [packages/themes/](packages/themes/) | Saf CSS: görüntüleyici tipografisi ve editör katmanı |
-| [apps/demo/](apps/demo/) | Üç canlı sayfa (aşağıda) + Faz 0 mimari prototipi |
+| [examples/](examples/) | Yedi çalışan uygulama: React, Next.js, Vue, Nuxt, Svelte, Angular, düz HTML — hepsi CI'da derleniyor |
+| [apps/demo/](apps/demo/) | Dört canlı sayfa (aşağıda) + Faz 0 mimari prototipi |
 | [apps/docs/](apps/docs/) | Astro Starlight dokümantasyon sitesi (planlanan API'yi dokümante eder) |
 | [docs/02-faz0-sonuc.md](docs/02-faz0-sonuc.md) | Faz 0 sonuç raporu — ne kuruldu, ne doğrulandı, ne kapsanmadı |
 
-**881 birim testi** + **369 tarayıcı testi** (Chromium · Firefox · WebKit).
-`serialize(parse(md)) === md` gidiş-dönüş 17/17 byte-birebir;
-`renderToDOM` ile `renderToString` çıktıları üç motorda byte-birebir aynı.
+**1260 birim testi** + **1098 tarayıcı testi** (Chromium · Firefox · WebKit)
++ **47 örnek uygulama testi**. `serialize(parse(md)) === md` gidiş-dönüş
+17/17 byte-birebir; `renderToDOM` ile `renderToString` çıktıları üç motorda
+byte-birebir aynı.
 
 ## Kararlar
 

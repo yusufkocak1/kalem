@@ -16,7 +16,7 @@
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "e2e": "playwright test",
-    "e2e:examples": "playwright test --config playwright.examples.config.ts",
+    "e2e:examples": "pnpm build:examples && playwright test --config playwright.examples.config.ts",
     "build:examples": "pnpm --filter \"example-*\" build",
     "demo": "node scripts/serve-demo.mjs",
     "size": "size-limit",

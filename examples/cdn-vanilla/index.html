@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="tr">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Kalem — CDN örneği</title>
+
+	<!--
+		Tema dosyaları. Yayımlandığında:
+		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/tokens.css">
+	-->
+	<link rel="stylesheet" href="./tokens.css">
+	<link rel="stylesheet" href="./viewer.css">
+	<link rel="stylesheet" href="./editor.css">
+
+	<style>
+		body {
+			margin: 0;
+			font: 15px/1.6 system-ui, sans-serif;
+			color: #22201d;
+			background: #fbfaf8;
+		}
+		main { max-width: 46rem; margin: 0 auto; padding: 24px 20px 60px; }
+		h1 { font-size: 18px; }
+		h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em; color: #6f6a62; }
+		p.not { font-size: 13px; color: #6f6a62; }
+		kalem-editor {
+			min-height: 12rem;
+			padding: 14px 16px;
+			background: #fff;
+			border: 1px solid #e3e0da;
+			border-radius: 8px;
+		}
+		kalem-editor.kucuk { min-height: 5rem; }
+		button {
+			font: inherit;
+			font-size: 13px;
+			margin-top: 10px;
+			padding: 6px 14px;
+			border: 1px solid #e3e0da;
+			border-radius: 6px;
+			background: #fff;
+			cursor: pointer;
+		}
+		code { font-size: 0.92em; background: #f1efea; padding: 1px 4px; border-radius: 3px; }
+	</style>
+</head>
+<body class="kalem-theme">
+<main>
+	<h1>Kalem — CDN örneği</h1>
+	<p class="not">
+		Bu sayfada <b>tek bir <code>&lt;script&gt;</code> etiketi</b> var ve
+		sayfanın kendi yazdığı JavaScript <b>hiç yok</b>. Derleme adımı,
+		paketleyici, import haritası da yok — <code>&lt;kalem-editor&gt;</code>
+		tarayıcının kendi bileşen modeli olduğu için hepsi gereksiz.
+	</p>
+
+	<!--
+		Başlangıç metni elemanın içinde duruyor; ortak girinti söküldüğü
+		için sayfanın biçimlendirmesi Markdown'ı kod bloğuna çevirmiyor.
+	-->
+	<kalem-editor label="Belge">
+		# Işık ve Gölge
+
+		Bu editör bir **özel eleman**. Sayfada tek bir script etiketi var ve
+		o da kütüphanenin kendisi.
+
+		* yıldız işareti korunuyor
+		* çünkü yazım tercihi modelde duruyor
+	</kalem-editor>
+
+	<h2>Form entegrasyonu</h2>
+	<p class="not">
+		Aşağıdaki editör sıradan bir form alanı: <code>name</code> ve
+		<code>required</code> tarayıcının kendi doğrulamasından geçiyor.
+		Gönder'e basınca metin adres çubuğunda görünüyor — arada JavaScript
+		yok, <code>ElementInternals</code> var.
+	</p>
+	<form action="./index.html" method="get">
+		<kalem-editor class="kucuk" name="ozet" required label="Özet">Kısa bir özet.</kalem-editor>
+		<button type="submit">Gönder</button>
+	</form>
+</main>
+
+<!--
+	Tek script. Yayımlandığında:
+	<script src="https://cdn.jsdelivr.net/npm/@kalem/wc/dist/kalem-editor.iife.js"></script>
+
+	`defer` gerekmiyor: dosyanın sonunda ve zaten tüm elemanlardan sonra
+	çalışıyor. Daha yukarıda dursaydı da sorun olmazdı — özel elemanlar
+	geç kaydolabiliyor ve tarayıcı sayfada duran etiketleri o anda
+	yükseltiyor.
+-->
+<script src="./kalem-editor.iife.js"></script>
+</body>
+</html>

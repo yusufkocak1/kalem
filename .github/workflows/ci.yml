@@ -115,8 +115,13 @@ jobs:
       # Örnekler paketlerin **yayımlanacak çıktısını** tüketiyor; kaynağa
       # takma ad verilmiyor. Bu yüzden önce paketler derleniyor.
       - run: pnpm build
+
+      # Yedi örneğin derlemesi kendi adımında: biri kırıldığında rapor
+      # doğrudan onu gösteriyor, tarayıcı testlerinin arasında kaybolmuyor.
+      - name: Örnekleri derle (react-vite · nextjs · vue-vite · nuxt · svelte · angular · cdn-vanilla)
+        run: pnpm build:examples
+
       - run: pnpm exec playwright install --with-deps chromium
-      # Örnek uygulamaların kendi derlemesi, Playwright yapılandırmasındaki
-      # sunucu komutunun içinde (`playwright.examples.config.ts`): derleme
-      # kırılırsa test hiç başlamıyor ve sebebi günlükte yazıyor.
+      # `e2e:examples` derlemeyi kendisi de çalıştırıyor (yukarıdakinden
+      # sonra artımlı): derleme kırılırsa test hiç başlamıyor.
       - run: pnpm e2e:examples

@@ -210,6 +210,15 @@ importers:
         specifier: catalog:ng
         version: 5.9.3
 
+  examples/cdn-vanilla:
+    dependencies:
+      '@kalem/themes':
+        specifier: workspace:^
+        version: link:../../packages/themes
+      '@kalem/wc':
+        specifier: workspace:^
+        version: link:../../packages/wc
+
   examples/nextjs:
     dependencies:
       '@kalem/react':
