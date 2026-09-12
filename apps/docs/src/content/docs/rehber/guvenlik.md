@@ -1,66 +1,105 @@
 ---
 title: Güvenlik
-description: Kalem'in XSS'e karşı yapısal savunması.
+description: XSS yüzeyi, URL beyaz listesi ve ham HTML politikası.
 ---
 
-## Yapısal savunma
+Bir Markdown editörü, kullanıcı metnini ekrana basan bir program. Bu onu
+doğrudan XSS hedefi yapıyor ve Kalem'in birkaç kuralı bu yüzden
+**pazarlığa kapalı**.
 
-Kalem render sırasında **hiçbir yerde `innerHTML` kullanmaz.** AST, `createElement`
-ve `textContent` ile DOM'a çevrilir. Hiçbir noktada bir HTML string'i parse
-edilmez.
+## `innerHTML` hiç kullanılmıyor
 
-Bu, enjeksiyon yüzeyinin büyük kısmını baştan yok eder. Kalem'in DOMPurify gibi
-bir temizleyiciye bağımlılığı yoktur — güvenlik bir kütüphane eklemekle değil,
-mimariyle sağlanır.
+Ne görüntüleyici ne editör kullanıcı içeriğini HTML olarak ayrıştırıyor.
+Her düğüm `createElement` / `createTextNode` ile kuruluyor;
+`renderToString` de kaçışı kendisi yapıyor.
 
-Geriye üç yüzey kalır ve üçü de varsayılan olarak kapalıdır.
+Tek bir `innerHTML` satırı tüm yüzeyi geri getirdiği için bu bir üslup
+tercihi değil, sürdürülen bir sınır.
 
-## 1. URL protokol beyaz listesi
+## URL beyaz listesi
 
-Bağlantı ve görsel adreslerinde yalnızca şu protokoller kabul edilir:
-
-`http:` · `https:` · `mailto:` · `tel:` · göreli adresler · `#` çapaları
-
-`javascript:`, `vbscript:` ve (görsel istisnası dışında) `data:` reddedilir.
+Bağlantı ve görsel adresleri bir **beyaz listeden** geçiyor:
 
 ```ts
-new Editor(el, {
-  allowedProtocols: ['http:', 'https:', 'mailto:'], // daha da daraltabilirsiniz
-});
+import { ALLOWED_PROTOCOLS, isSafeUrl, sanitizeUrl } from '@kalem/core';
+
+ALLOWED_PROTOCOLS; // ["http:", "https:", "mailto:", "tel:", "ftp:"]
+
+isSafeUrl('javascript:alert(1)');  // false
+sanitizeUrl('javascript:alert(1)'); // "#"
 ```
 
-## 2. Ham HTML
+Kara liste değil beyaz liste: `javascript:` yazımının kaç varyantı olduğunu
+(`java\tscript:`, `JaVaScRiPt:`, sıfır genişlikli karakterler) saymak
+yerine, bilinen güvenli şemaların dışındaki her şey reddediliyor.
 
-Markdown içindeki ham HTML varsayılan olarak **çalıştırılmaz**, kaçış
-karakterlenip metin olarak gösterilir.
+Güvensiz URL **silinmiyor, etkisizleştiriliyor** (`#` oluyor): bağlantının
+metni yerinde kalıyor, yani kullanıcı içeriğinin bir parçasının sessizce
+yok olduğunu görmüyor.
+
+### Görsellerde `data:`
+
+Görseller için ayrıca birkaç `data:` MIME türüne izin var: `image/png`,
+`image/jpeg`, `image/gif`, `image/webp`, `image/avif`.
+
+`data:image/svg+xml` **kasten dışarıda**: SVG içinde script çalışıyor ve
+bu, `<img>` üzerinden bile bazı bağlamlarda tehlikeli.
+
+## Ham HTML politikası
+
+Markdown ham HTML'e izin veriyor. Kalem varsayılan olarak onu
+kaçırıyor:
 
 ```ts
-renderToString(ast, {
-  allowHtml: true,
+renderToString(ast, { html: 'escape' }); // varsayılan
+```
+
+| Politika | Davranış | Ne zaman |
+|---|---|---|
+| `"escape"` | HTML metin olarak görünüyor | Varsayılan; güvenli |
+| `"strip"` | Tamamen atılıyor | HTML'in hiç görünmemesi gerektiğinde |
+| `"allow"` | Çağıranın kancasına veriliyor | Güvendiğiniz içerik |
+
+`"allow"` seçtiğinizde iş size geçiyor — kütüphane HTML ayrıştırmıyor:
+
+```ts
+import DOMPurify from 'dompurify';
+
+renderToDOM(ast, el, {
+  html: 'allow',
   sanitizeHtml: (html) => DOMPurify.sanitize(html),
+  renderRawHtml: (html) => {
+    const sablon = document.createElement('template');
+    sablon.innerHTML = html;   // temizlenmiş HTML — sorumluluk sizde
+    return sablon.content;
+  },
 });
 ```
 
-`allowHtml: true` verip `sanitizeHtml` vermezseniz Kalem geliştirme modunda
-konsola uyarı basar.
+Kanca vermezseniz ham HTML **metin olarak** basılıyor: sessizce
+kaybolmaktansa görünür ve zararsız olması tercih edildi.
 
-## 3. Yapıştırma
+## Yapıştırma
 
-Panodan gelen HTML asla doğrudan DOM'a konmaz. Önce ayrıştırılıp AST'ye çevrilir;
-beyaz listede olmayan her etiket ve öznitelik atılır. Bilinmeyen bir etiket
-içeriğini düz metne düşürür.
+Word ve Google Docs'tan yapıştırılan HTML, tarayıcının `DOMParser`ı ile
+değil Kalem'in kendi dönüştürücüsüyle (`@kalem/core/html`) işleniyor ve
+sonuç **AST'ye** çevriliyor. Yani yapıştırılan içerik de aynı beyaz
+listeden ve aynı kaçış kurallarından geçiyor; `<script>` ya da
+`onerror=` taşıyan bir yapıştırma belgeye giremiyor.
 
-## Sunucu tarafı
+## Çekirdek sunucuda çalışıyor
 
-`renderToString` çıktı HTML'ini kaçış karakterler. Yine de sonucu kendi sayfanıza
-gömerken CSP kullanmanızı öneririz:
+`@kalem/core` ve `@kalem/viewer` DOM'a dokunmuyor. Bunu bir **kapı**
+(`pnpm guard:purity`) doğruluyor: çekirdek bundle'ında `document`,
+`window`, `navigator`, `localStorage` ya da `HTMLElement` geçmesi CI'ı
+kırıyor.
 
-```
-Content-Security-Policy: default-src 'self'; script-src 'self'
-```
+Pratik sonucu: Markdown'ı sunucuda HTML'e çevirirken tarayıcı taklidi
+(jsdom) kurmanıza gerek yok — ve kullanıcı içeriği, bir DOM
+uygulamasının tuhaflıklarına hiç uğramadan işleniyor.
 
-## Açıkların bildirimi
+## Bildirim
 
-Güvenlik açığı bulduysanız lütfen public issue açmayın.
-`security@kalem.dev` adresine yazın — 48 saat içinde dönüş yapılır.
-Ayrıntılı süreç için depodaki `SECURITY.md` dosyasına bakın.
+Güvenlik açığı bulursanız issue açmak yerine
+[güvenlik politikasını](https://github.com/kalem-editor/kalem/security)
+izleyin.

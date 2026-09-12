@@ -8,6 +8,7 @@
 pnpm install
 pnpm docs:dev      # http://localhost:4321
 pnpm docs:build    # dist/ + Pagefind arama indeksi
+pnpm guard:docs    # örneklerdeki API adları gerçekten var mı
 ```
 
 > Astro 7 **Node 22.12+** istiyor; deponun geri kalanı Node 20'de de
@@ -43,14 +44,25 @@ Kenar çubuğu etiketleri iki dilde de yazılı (`astro.config.mjs`), içerik
 
 | Sayfa | Durum | Görev |
 |---|---|---|
-| Başlangıç · Rehber (6) · Framework'ler (4) · Mimari | **Planlanan API'yi anlatıyor** — kütüphane artık yazıldı, içerik yenilenecek | F6-02 |
-| Framework rehberleri: Svelte, Angular, Next.js, Nuxt | Eksik | F6-02 |
-| Tarifler (cookbook) | Eksik | F6-02 |
+| Başlangıç · Rehber (7) · Framework'ler (9) · Tarifler (5) · Mimari | ✅ Gerçek API'ye göre yazıldı | F6-02 |
 | Canlı gömülü örnekler | Eksik | F6-03 |
 | API referansı (TypeDoc) | Eksik | F6-04 |
 | Landing sayfası | Taslak | F6-05 |
 | Playground | Eksik | F6-07 |
 | İngilizce çeviri (`en/`) | İskelet var, içerik yok | F6-10 |
+
+## Doküman kapısı
+
+Site bir kez, kütüphane yazılmadan önce yazıldı ve on beş görev boyunca
+kimse fark etmeden yanlış kaldı: "beş satırda ilk editör" örneği
+`toolbar()`, `slashMenu()` ve `dragHandle()` çağırıyordu — üçü de hiç var
+olmadı.
+
+`pnpm guard:docs` bunu bir daha olmaz hâle getiriyor: her
+`import { … } from "@kalem/…"` satırındaki her adın paketin gerçek dışa
+aktarmaları arasında olup olmadığına bakıyor. Tip denetimi değil —
+örnekler kısaltılmış olduğu için derlenmeleri beklenmiyor — ama yazılan
+adların var olması beklenebilir.
 
 ## Dizin yapısı
 

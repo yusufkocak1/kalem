@@ -143,6 +143,12 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+
+      # Örneklerdeki her `import { … } from "@kalem/…"` adı gerçekten var
+      # mı: site bir kez, kütüphane yazılmadan önce yazıldı ve on beş görev
+      # boyunca kimse fark etmeden yanlış kaldı.
+      - run: pnpm guard:docs
+
       # Site kütüphaneyi henüz gömmüyor (F6-03) ama derlemesi kırılırsa
       # sessizce çürümesin: duyuru günü eksik doküman = kaybedilmiş fırsat.
       - run: pnpm docs:build

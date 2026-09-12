@@ -61,17 +61,50 @@ bloğu ``` ile mi açılmıştı. Serileştirici bu tercihleri kullanır.
 Bu yüzden hazır bir ayrıştırıcı (marked, markdown-it) kullanılamadı — hiçbiri bu
 bilgiyi vermez.
 
+## Eklenti mimarisi
+
+Eklentiler dört alanlı nesneler: `name`, `setup`, `keymap`, `inputRules`.
+Aldıkları bağlam (`PluginContext`) dar ve bilerek öyle — belge, imleç,
+`applyEdit`, kök eleman, salt okunur durumu ve olay aboneliği.
+
+**Render kancası yok.** Böyle bir kanca, editörün imleç koruyan yama
+mantığını eklentilere açardı ve her eklenti kendi imleç hatasını
+üretirdi. Yedi resmî eklentinin hiçbirinde ihtiyaç duyulmadı; pratikte
+gereken şey "değişiklik başına tek çağrı"ydı ve onu `ctx.on('change', …)`
+veriyor.
+
+Çakışma kuralı tek: **kayıt sırası**. Eklentiler çekirdekten önce tuşu
+görür, aralarında önce kaydedilen kazanır. Öncelik sayısı, faz sistemi ya
+da "yüksek öncelikli eklenti" kavramı yoktur.
+
 ## Ölçülen vaatler
 
-İki vaat CI'da otomatik olarak korunur; ikisi de bir testtir, bir niyet değil:
+Üç vaat CI'da otomatik olarak korunur; üçü de birer testtir, niyet değil:
 
 - **Boyut kapısı** — `size-limit` bütçeyi aşan build'i kırar.
 - **Saflık kapısı** — çekirdek paketlerin `dependencies` alanı boş mu, üretim
   bundle'ında `react`/`vue` izi var mı, `core` bundle'ı `document`/`window`'a
   dokunuyor mu (SSR güvenliği).
+- **Locale kapısı** — bölgesiz `toLowerCase()` / `toUpperCase()` çağrısı
+  build'i kırar. Türkçe'de `I` ve `ı` sessizce yanlış katlanır; hata
+  patlamaz, yalnızca yanlış cevap verir.
 
-Bir vaat ölçülmüyorsa zamanla erir. Bu iki kapı, projenin ilk gününden itibaren
-vardır.
+Bir vaat ölçülmüyorsa zamanla erir. Bu kapılar projenin ilk gününden
+itibaren vardır ve kendi öz-testleri de var (`pnpm guard:selftest`).
+
+## Bugünkü ölçüler
+
+| Paket | min+gzip |
+|---|---|
+| `@kalem/core` | 11,5 kB |
+| `@kalem/viewer` | 2,7 kB |
+| `@kalem/editor` (çekirdek dâhil) | 26,1 kB |
+| `@kalem/editor` + `@kalem/ui` | 34,6 kB |
+| `@kalem/wc` — tek `<script>` derlemesi | 26,7 kB |
+| Sarmalayıcılar (react / vue / wc) | 903 B / 682 B / 1,98 kB |
+
+Doğrulama: 1284 birim testi, 1104 tarayıcı testi (Chromium · Firefox ·
+WebKit) ve 58 örnek/uygulama testi.
 
 ## Bilinçli kapsam dışı
 

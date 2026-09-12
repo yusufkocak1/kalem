@@ -1,74 +1,136 @@
 ---
 title: Markdown uyumu
-description: Hangi sözdizimi destekleniyor ve gidiş-dönüş nasıl garanti ediliyor.
+description: Hangi sözdizimi destekleniyor ve yazım tercihiniz neden korunuyor.
 ---
+
+Kalem'in doğru kaynağı **Markdown metninin kendisi**. Bu bir slogan değil,
+test edilen bir garanti:
+
+```ts
+import { parse, serialize } from '@kalem/core';
+
+serialize(parse(md)) === md; // dokunulmamış belgede her zaman
+```
+
+Gidiş-dönüş 17 gerçek belgede byte-birebir doğrulanıyor ve her CI
+koşusunda yeniden ölçülüyor.
+
+## Yazım tercihiniz korunuyor
+
+Çoğu editör Markdown'ı kendi "kanonik" biçimine normalize ediyor: `*`
+ile yazdığınız liste `-` olarak, `1)` ayracı `1.` olarak geri geliyor.
+Kalem bunu yapmıyor — tercih AST'de saklanıyor.
+
+| Yazdığınız | Saklanan |
+|---|---|
+| `- ` · `* ` · `+ ` | Liste işareti |
+| `1.` · `1)` | Sıralı liste ayracı |
+| `1. 2. 3.` · `1. 1. 1.` | Numaralandırma biçimi |
+| `**kalın**` · `__kalın__` | Vurgu işaretleyicisi |
+| `# Başlık` · alt çizgiyle yazılan başlık | ATX mi setext mi |
+| `## Başlık ##` | Kapanış diyezleri |
+| ` ``` ` · `~~~` · girintili | Kod bloğu biçimi ve çit uzunluğu |
+| `[m](u)` · `<url>` · çıplak URL | Bağlantı biçimi |
+| `---` · `***` · `___` | Yatay çizginin ham hâli |
+
+Sonuç pratikte şu: bir ekip Markdown dosyalarını git'te tutuyorsa,
+Kalem'le açılan bir belgenin diff'i **yalnızca gerçekten değişen
+satırları** gösteriyor.
 
 ## Desteklenen sözdizimi
 
-**CommonMark çekirdeği** — paragraf, ATX ve setext başlık, fenced ve girintili kod,
-alıntı, sıralı/sırasız liste (iç içe dahil), yatay çizgi, bağlantı, referanslı
-bağlantı, görsel, autolink, vurgu, kod span, kaçış karakterleri, sert satır sonu.
+CommonMark'ın tamamı, artı GFM'in şu parçaları:
 
-**GFM** — üstü çizili (`~~`), görev listesi (`- [ ]`), otomatik bağlantı,
-tablo *(v1'de ayrıştırılır ve korunur; düzenleme arayüzü v1.1)*.
+**Bloklar** — paragraf, ATX ve setext başlık, çitli ve girintili kod
+bloğu, alıntı, sırasız/sıralı liste, görev listesi (`- [x]`), tablo,
+yatay çizgi, ham HTML bloğu, bağlantı tanımı (`[ad]: url`),
+frontmatter (YAML ve TOML).
 
-**Ekstra** — YAML/TOML frontmatter opak olarak korunur. Kalem onu ayrıştırmaz,
-sadece bozmadan geri yazar. (Bu, bir YAML parser bağımlılığından kaçınmak için
-bilinçli bir tercihtir.)
+**Satır içi** — kalın, italik, satır içi kod, üstü çizili (`~~`),
+bağlantı, autolink (`<url>`), çıplak URL, görsel, başvurulu bağlantı ve
+görsel (`[m][ad]`), satır sonu (iki boşluk ve ters bölü), ham HTML.
 
-## Gidiş-dönüş garantisi
+### Desteklenmeyenler
 
-Kalem'in en önemli teknik vaadi:
+- **Dipnot** (`[^1]`) — CommonMark'ta ve GFM'in çekirdeğinde yok.
+- **Tanım listesi** (`<dl>`) — Markdown standardında yok.
+- **Matematik** (`$...$`) — ayrı bir eklentinin işi.
 
-```ts
-serialize(parse(md)) === md
-```
+Bunlar ham metin olarak korunuyor; yani bir belgede varsa
+**kaybolmuyorlar**, yalnızca biçimlendirilmiyorlar.
 
-Bunu mümkün kılan şey, ayrıştırıcının **sözdizimi tercihlerini** saklamasıdır.
-Belgenizde madde işareti olarak `*` kullandıysanız Kalem `*` üretir, `-` değil.
-Başlıklarınız setext ise setext kalır. Kod bloklarınız `~~~` ile açılmışsa öyle
-kalır.
+## Tablolar
 
-### Bu neden bu kadar önemli?
+Tablolar ayrıştırılıyor ve gösteriliyor ama Markdown'a **ham hâlleriyle**
+geri yazılıyor (`TableSyntax.raw`). Sebep hizalama: bir hücrenin metnini
+değiştirmek bütün sütun genişliklerini yeniden hesaplamayı gerektiriyor ve
+sonuç, kullanıcının elle hizaladığı tabloyu bozuyor.
 
-Kalem'in çıkardığı dosya git'e commit edilir. Kullanıcının dokunmadığı bir
-satırın değişmesi, diff'i gürültüyle doldurur ve değişikliği incelenemez hâle
-getirir. Bir editör bu testi geçemiyorsa ciddi projelerde kullanılamaz.
+:::caution[Bilinen kısıt]
+Tablo hücreleri şu an düzenlenebilir çiziliyor ama yazılan metin çıktıya
+**girmiyor**. Tablo düzenleme v1.0 öncesinde ya tamamlanacak ya da hücreler
+salt okunur hâle gelecek. Takip:
+[iş listesi, açık işler](https://github.com/kalem-editor/kalem/blob/main/docs/01-is-listesi.md).
+:::
 
-### Yeni içerik için varsayılanlar
+## Locale duyarlı davranış
 
-Belgede örneği olmayan yeni düğümler için tercihleri siz belirlersiniz:
-
-```ts
-new Editor(el, {
-  markdown: {
-    bulletMarker: '-',    // '-' | '*' | '+'
-    emphasisMarker: '_',  // '_' | '*'
-    codeFence: '```',     // '```' | '~~~'
-    headingStyle: 'atx',  // 'atx' | 'setext'
-  },
-});
-```
-
-## Uyum oranı
-
-CommonMark ve GFM spec test paketleri CI'da her commit'te çalıştırılır ve güncel
-geçiş oranı sürüm notlarında yayımlanır.
-
-**%100 uyum bir v1 hedefi değildir.** Hedef, ölçülen ve şeffaf biçimde
-raporlanan bir orandır. Bunun yerine ağırlık, gerçek dünya dosyalarında
-gidiş-dönüş sadakatine verilmiştir: test korpusumuz CommonMark spec örneklerinin
-yanı sıra popüler depo README'lerini ve gerçek not koleksiyonlarını içerir.
-
-## Uç durumlara ihtiyacınız varsa
-
-Spec-mükemmel bir ayrıştırıcı gerekiyorsa adaptörü takabilirsiniz:
+Belgenin `lang`i tek kaynak ve her karşılaştırma onu kullanıyor.
 
 ```ts
-import { micromarkParser } from '@kalem/parser-micromark';
-
-new Editor(el, { parser: micromarkParser() });
+new Editor(el, { value: md, lang: 'tr' });
 ```
 
-Bu, boyut karşılığında tam uyum sağlar. Ayrıştırıcı bir arayüz arkasında
-soyutlandığı için çekirdeğin geri kalanı değişmeden çalışır.
+Türkçe'de `i/İ` ve `ı/I` çiftleri İngilizce'den farklı katlanıyor:
+
+```ts
+'IŞIK'.toLowerCase()            // "işik" — noktasız ı, noktalı i oldu
+'IŞIK'.toLocaleLowerCase('tr')  // "ışık" ✓
+```
+
+Hata **patlamıyor**, sessizce yanlış cevap veriyor: `ışık` arayan kullanıcı
+`IŞIK` yazan satırı bulamıyor ve sebebini anlamıyor.
+
+Bu yüzden depoda bir **lint kuralı** var: bölgesiz `toLowerCase()` /
+`toUpperCase()` çağrısı build'i kırıyor. Kaçınmak isteyen satırın
+gerekçesini yazmak zorunda (`// kalem-locale-ok: …`).
+
+Etkilediği yerler: slash menü araması, bul-değiştir, içindekiler
+sıralaması ve kelime sayımı (`Intl.Segmenter`).
+
+`lang` verilmezse kapsayıcının ya da atalarının `lang`i kullanılıyor —
+yani `<html lang="tr">` yazan bir sayfada ayrıca vermeniz gerekmiyor.
+
+## Ham HTML
+
+Markdown ham HTML'e izin veriyor; Kalem onu **varsayılan olarak kaçırıyor**
+(`html: "escape"`). Politika ayarlanabilir:
+
+| Değer | Ne oluyor |
+|---|---|
+| `"escape"` (varsayılan) | HTML metin olarak görünüyor |
+| `"strip"` | Tamamen atılıyor |
+| `"allow"` | Çağıranın kancasına veriliyor |
+
+Ayrıntı ve gerekçe: [Güvenlik](/rehber/guvenlik/).
+
+## Serileştirme seçenekleri
+
+```ts
+import { serialize } from '@kalem/core';
+
+serialize(doc, { /* SerializeOptions */ });
+```
+
+| Seçenek | Varsayılan |
+|---|---|
+| `bulletMarker` | `-` |
+| `emphasisMarker` | `*` |
+| `codeFence` | `` ` `` |
+| `orderedDelimiter` | `.` |
+| `thematicBreak` | `---` |
+| `lineEnding` | LF (kökün kendi tercihi varsa o kazanıyor) |
+
+Bu seçenekler yalnızca tercihin **bulunmadığı** düğümler için geçerli —
+yani kullanıcının yazdığı belgeyi yeniden biçimlendirmiyorlar, sıfırdan
+ürettiğiniz AST'nin nasıl yazılacağını belirliyorlar.

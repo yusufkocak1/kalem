@@ -34,8 +34,8 @@
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
 | **Faz 4** — Eklentiler | 7 / 7 | ✅ **Tamamlandı** |
 | **Faz 5** — Sarmalayıcılar | 5 / 5 | 🟡 Bitti (2 haftalık kullanım sürüyor) |
-| **Faz 6** — Cila ve yayın | 1 / 14 | 🔵 Sürüyor |
-| | **56 / 72** | **%78** |
+| **Faz 6** — Cila ve yayın | 2 / 14 | 🔵 Sürüyor |
+| | **57 / 72** | **%79** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,9 +43,9 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01`
+referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02`
 
-**Sıradaki:** `F6-02` doküman içeriği — sayfalar hâlâ planlanan API'yi anlatıyor.
+**Sıradaki:** `F6-03` canlı gömülü örnekler — aynı doküman sayfasında vanilla, React ve Vue.
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10), Linux görsel
 referansları (F3-11) ve `apps/notlar`ın iki haftalık günlük kullanımı
@@ -1996,13 +1996,63 @@ Türkçe bir menüyle karşılaşmıyor. İçerik çevirisi F6-10'un işi.
 `slashMenu()` gibi hiç var olmayan çağrılar dâhil). Yenilenmesi F6-02'nin
 işi ve bu madde onu kapsamıyor.
 
-### F6-02 · İçerik yazımı `[L]` ⬜
-Analiz §10.2'deki bilgi mimarisi:
-- Başlangıç (5 satırda ilk editör), Rehberler (viewer, editor, temalar, eklentiler, markdown uyumu, güvenlik, erişilebilirlik)
-- Framework rehberleri: vanilla, react, vue, svelte, angular, nextjs, nuxt, cdn
-- Tarifler (cookbook): otomatik kaydet, görsel yükleme, salt okunur, kontrollü bileşen, sunucuda md→HTML
-- Mimari sayfası (bu dokümanın halka açık özeti — katkıcı çeker)
-- **Kabul:** hiçbir sayfada "TODO" yok
+### F6-02 · İçerik yazımı `[L]` ✅
+- [x] Başlangıç, yedi rehber, dokuz framework sayfası, beş tarif, mimari — 24 sayfa
+- [x] Her örnek depodaki gerçek API'den yazıldı ve makineyle doğrulanıyor
+- [x] **Kabul:** hiçbir sayfada "TODO" yok; iç bağlantıların hepsi sağlam
+
+> **Site yanlış API'yi anlatıyordu ve kimse fark etmemişti.** Sayfalar
+> Faz 0'da, kütüphane yazılmadan önce yazılmıştı; aradan on beş görev
+> geçti ve içerik hiç güncellenmedi. "Beş satırda ilk editör" örneği
+> `toolbar()`, `slashMenu()` ve `dragHandle()` çağırıyordu — **üçü de hiç
+> var olmadı**, gerçek API `mountUi(editor)`. Editör sayfası `autofocus`
+> ve `placeholder` diye iki seçenek listeliyordu; `EditorOptions`ta ikisi
+> de yok. Bir okuyucu o satırı kopyalasa `is not a function` alır ve
+> kütüphaneyi bir daha denemezdi.
+
+**Bunun bir daha olmaması makineye bağlandı.** `pnpm guard:docs`
+(dördüncü koruyucu kapı) her `import { … } from "@kalem/…"` satırındaki
+her adı, o paketin **kaynak dosyasındaki gerçek dışa aktarmalarıyla**
+karşılaştırıyor. Tip denetimi değil — örnekler kısaltılmış ve bağlamsız
+olduğu için derlenmeleri beklenmiyor — ama yazılan adların var olması
+beklenebilir. Kapı, yazıldıktan sonra eski hatayla sınandı: `toolbar` ve
+`slashMenu` importu geri konunca ikisini de yakaladı.
+
+Şu an 24 sayfada 67 import adı doğrulanıyor. Kapı `pnpm verify`nin ve
+CI'ın doküman işinin içinde.
+
+**Her sayı ölçümden geldi.** Boyutlar `size-limit` çıktısından
+kopyalandı, tahmin edilmedi: çekirdek 11,5 kB, görüntüleyici 2,7 kB,
+editör 26,1 kB, Word deneyiminin tamamı 34,6 kB, tek `<script>` derlemesi
+26,7 kB. Giriş sayfasındaki karşılaştırma tablosunda Kalem'in sütunu
+ölçülen değer; rakiplerinkinin yaklaşık olduğu ayrıca yazıyor.
+
+**Yeni sayfalar.** Erişilebilirlik (rehberde eksikti), Web Components
+(`<kalem-editor>`in tam yüzeyi), Svelte, Angular, Next.js, Nuxt ve beş
+tariflik bir bölüm: otomatik kaydetme, görsel yükleme, salt okunur mod,
+kontrollü bileşen, sunucuda Markdown.
+
+**Giriş sayfası dört sekmeli.** Vanilla, React, Vue ve düz HTML aynı
+editörü kuruyor; sonuncusunda derleme adımı, paketleyici ve yazılmış
+JavaScript yok. Ürünün ana iddiası, iddianın yazıldığı sayfada görünüyor.
+
+**Bilinen kısıtlar gizlenmiyor.** Tablo hücrelerinin düzenlenebilir
+görünüp çıktıya girmemesi hem Markdown uyumu hem erişilebilirlik
+sayfasında yazıyor; ekran okuyucularla elle testin tamamlanmadığı da.
+Duyuru günü bunları saklamak, ilk issue'da ortaya çıkmaktan kötü.
+
+**İngilizce hâlâ yok** ve iskelet bunu taşıyabiliyor: Starlight
+çevrilmemiş sayfayı Türkçe'ye düşürüp okuyucuya "bu içerik henüz sizin
+dilinizde yok" diyor. Çeviri F6-10.
+
+> **Yan düzeltme — YAML frontmatter.** Bir açıklama satırındaki iki
+> nokta (`Çerçeve gerektirmeyen yol: …`) derlemeyi kırdı; YAML onu
+> eşleme ayracı sanıyor. Başlığı tırnakladım, açıklamada uzun tire
+> kullandım.
+
+24 sayfa, 49 üretilen rota (iki dil), Pagefind iki dili de indeksliyor.
+Bir bağlantı denetimi tüm iç bağlantıların hedefinin gerçekten
+üretildiğini doğruladı.
 
 ### F6-03 · Canlı gömülü örnekler ⭐ `[M]` ⬜
 Starlight'ın framework-agnostikliğinden faydalan: **aynı sayfada** vanilla, React ve Vue sekmeli canlı örnek

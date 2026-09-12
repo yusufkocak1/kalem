@@ -25,12 +25,13 @@
     "guard:selftest": "node scripts/guard-selftest.mjs",
     "publint": "pnpm -r --filter=@kalem/* --filter=!@kalem/docs exec publint",
     "attw": "pnpm -r --filter=@kalem/* --filter=!@kalem/docs exec attw --pack . --profile node16",
-    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm guard:purity && pnpm size && pnpm publint",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm guard:purity && pnpm guard:docs && pnpm size && pnpm publint",
     "docs:dev": "pnpm --filter @kalem/docs dev",
     "docs:build": "pnpm --filter @kalem/docs build",
     "changeset": "changeset",
     "prepare": "simple-git-hooks",
-    "build:notlar": "pnpm --filter kalem-notlar build"
+    "build:notlar": "pnpm --filter kalem-notlar build",
+    "guard:docs": "node scripts/guard-docs.mjs"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "catalog:",

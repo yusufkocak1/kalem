@@ -1,75 +1,127 @@
 ---
 title: Viewer (salt okunur)
-description: Markdown'ı güvenle render edin — tarayıcıda veya sunucuda.
+description: Markdown'ı DOM'a veya HTML dizesine çizin — düzenleme kodu indirmeden.
 ---
 
-`@kalem/viewer` yalnızca **görüntüler**. Editör kodunu içermez, bu yüzden bundle'ınıza
-sadece ~14 kB ekler.
+`@kalem/viewer` Markdown'ı **gösteriyor**, düzenlemiyor. 2,7 kB (min+gzip)
+ve düzenleme motorundan tamamen bağımsız: bir blog, bir yorum listesi ya da
+bir e-posta önizlemesi için editörün 26 kB'ını indirmenize gerek yok.
 
-## Tarayıcıda
-
-```ts
-import { parse } from '@kalem/core';
-import { renderToDOM } from '@kalem/viewer';
-import '@kalem/themes/default.css';
-
-const ast = parse('# Başlık\n\nMerhaba **dünya**.');
-renderToDOM(ast, document.getElementById('out')!);
-```
-
-## Sunucuda (SSR / statik üretim)
-
-`renderToString` saf bir fonksiyondur — DOM'a dokunmaz. Node, Deno, Cloudflare
-Workers, Next.js RSC ve Nuxt/Nitro içinde çalışır.
+İki çıkış var ve **aynı sonucu** veriyorlar:
 
 ```ts
 import { parse } from '@kalem/core';
-import { renderToString } from '@kalem/viewer';
+import { renderToDOM, renderToString } from '@kalem/viewer';
 
-export function GET() {
-  const html = renderToString(parse(markdown));
-  return new Response(`<article class="kalem">${html}</article>`, {
-    headers: { 'content-type': 'text/html' },
-  });
-}
+const ast = parse('# Başlık\n\nBir **paragraf**.');
+
+renderToDOM(ast, document.getElementById('app')!);   // tarayıcıda
+const html = renderToString(ast);                     // sunucuda
 ```
 
-Next.js App Router'da sunucu bileşeni olarak:
+Üç tarayıcı motorunda `renderToDOM` ve `renderToString` çıktılarının
+**byte-birebir** aynı olduğu testle sabit. Yani sunucuda ürettiğiniz HTML
+ile istemcinin çizdiği ağaç arasında hidrasyon uyuşmazlığı çıkmıyor.
 
-```tsx
-import { parse } from '@kalem/core';
-import { renderToString } from '@kalem/viewer';
+## `innerHTML` hiç kullanılmıyor
 
-export default async function Post({ markdown }: { markdown: string }) {
-  return (
-    <article
-      className="kalem"
-      dangerouslySetInnerHTML={{ __html: renderToString(parse(markdown)) }}
-    />
-  );
-}
-```
+`renderToDOM` her düğümü `createElement` / `createTextNode` ile kuruyor.
+Bu bir performans tercihi değil, güvenlik kararı: kullanıcı metnini HTML
+olarak ayrıştıran tek bir satır, tüm XSS yüzeyini geri getirir.
+`renderToString` de aynı sebeple kendi kaçışını yapıyor.
 
-`renderToString` çıktısı zaten kaçış karakterlenmiştir; ham HTML'i açmadığınız
-sürece bu kullanım güvenlidir.
+Ayrıntı: [Güvenlik](/rehber/guvenlik/).
 
-## Ham HTML politikası
-
-Varsayılan olarak Markdown içindeki ham HTML **çalıştırılmaz**, kaçış
-karakterlenip metin olarak gösterilir.
+## Seçenekler
 
 ```ts
 renderToString(ast, {
-  allowHtml: true,                          // ham HTML'i etkinleştir
-  sanitizeHtml: (html) => myPurifier(html), // kendi temizleyicinizi takın
+  html: 'escape',        // ham HTML politikası
+  classPrefix: 'kalem-', // CSS sınıf öneki
+  frontmatter: false,    // `---` bloğu gösterilsin mi
 });
 ```
 
-Ayrıntılar için [Güvenlik](/rehber/guvenlik/) sayfasına bakın.
+| Seçenek | Tip | Varsayılan | Açıklama |
+|---|---|---|---|
+| `html` | `"escape" \| "strip" \| "allow"` | `"escape"` | Markdown içindeki ham HTML'e ne yapılacağı |
+| `sanitizeHtml` | `(html: string) => string` | — | `html: "allow"` seçildiğinde temizleme kancası |
+| `classPrefix` | `string` | `"kalem-"` | Üretilen sınıfların öneki |
+| `frontmatter` | `boolean` | `false` | YAML/TOML frontmatter gösterilsin mi |
 
-## Neden `innerHTML` yok?
+`renderToDOM` bunlara iki tane daha ekliyor:
 
-Viewer, AST'yi `document.createElement` ve `textContent` ile DOM'a çevirir.
-Hiçbir noktada HTML string'i parse edilmez. Bu, XSS yüzeyini **yapısal olarak**
-ortadan kaldırır — Kalem'in DOMPurify gibi bir temizleyiciye bağımlılığı yoktur
-ve bu tek başına ~9 kB tasarruf demektir.
+| Seçenek | Tip | Varsayılan | Açıklama |
+|---|---|---|---|
+| `containerClass` | `string \| false` | `"<önek>doc"` | Kapsayıcıya eklenen sınıf; `false` ile kapatılıyor |
+| `renderRawHtml` | `(html: string) => Node \| null` | — | `html: "allow"` için düğüm üretme kancası |
+
+:::caution[`html: "allow"` tek başına yetmiyor]
+Kütüphane HTML **ayrıştırmıyor**. `allow` seçtiğinizde ham HTML'i düğüme
+çevirme işi size ait (`renderRawHtml`) ve temizlemesi de
+(`sanitizeHtml`). Kanca vermezseniz ham HTML **metin olarak** basılıyor:
+sessizce kaybolmaktansa görünür ve zararsız olması tercih edildi.
+:::
+
+## Sınıflar neden az
+
+Viewer "her elemana bir sınıf" yaklaşımını kullanmıyor. Sınıf yalnızca
+etiketin kendisinin anlatmadığı yerlerde veriliyor: görev listesi
+onay kutusu, tablo hücresi hizalaması, kod bloğunun dili. Gerisi düz
+semantik HTML — `<h1>`, `<p>`, `<ul>`, `<blockquote>`.
+
+Sebep hem boyut hem de gürültü: `class="kalem-paragraph"` taşıyan bir
+`<p>`, `<p>`den daha fazla bir şey söylemiyor ama her paragrafta 24 bayt
+yer kaplıyor ve sizin kendi CSS'inizle çakışıyor.
+
+## Stil
+
+Tipografi `@kalem/themes/viewer.css` içinde ve `.kalem-doc` altına
+kapatılı — sayfanın geri kalanına tek kural sızmıyor.
+
+```ts
+import '@kalem/themes/tokens.css';
+import '@kalem/themes/viewer.css';
+```
+
+`renderToString` kullanıyorsanız kapsayıcıyı kendiniz sarmalıyorsunuz:
+
+```html
+<article class="kalem-doc kalem-theme">
+  <!-- renderToString çıktısı -->
+</article>
+```
+
+`kalem-theme` sınıfı renk sözlüğünü getiriyor; ayrıntı
+[Temalar](/rehber/temalar/).
+
+## Sunucuda
+
+`@kalem/core` ve `@kalem/viewer` DOM'a dokunmuyor — Node'da, worker'da ve
+edge çalışma zamanlarında aynı şekilde çalışıyorlar. Bir saflık kapısı
+(`pnpm guard:purity`) bunu CI'da doğruluyor: çekirdek bundle'ında
+`document`, `window` ya da `navigator` geçmesi build'i kırıyor.
+
+```ts
+// Bir Astro / Next.js / Express sunucusunda
+import { parse } from '@kalem/core';
+import { renderToString } from '@kalem/viewer';
+
+export function markdownToHtml(md: string): string {
+  return renderToString(parse(md));
+}
+```
+
+Tam tarif: [Sunucuda Markdown → HTML](/tarifler/sunucuda-markdown/).
+
+## Ne zaman viewer, ne zaman editör?
+
+Aynı sayfada ikisini birden kurmayın. Editör zaten salt okunur moda
+geçebiliyor:
+
+```ts
+editor.setReadOnly(true);
+```
+
+Viewer'ı seçmenin tek sebebi **düzenleme kodunu hiç indirmemek**. Sayfada
+düzenleme ihtimali varsa editörü salt okunur başlatmak daha az iş.

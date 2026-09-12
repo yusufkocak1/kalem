@@ -1,84 +1,248 @@
 ---
 title: Eklentiler
-description: Hazır eklentiler ve kendi eklentinizi yazma.
+description: Yedi resmî eklenti ve kendi eklentinizi yazmak.
 ---
 
-Kalem'in çekirdek özellikleri de aynı halka açık eklenti API'siyle yazılmıştır.
-Bu bir tercih değil, bir denetim: API yetersiz kalsaydı kendi özelliklerimizi
-yazamazdık.
+Eklentiler `@kalem/editor`e takılan ayrı paketler. Hiçbiri varsayılan
+olarak gelmiyor — ödemediğiniz şeyi indirmiyorsunuz.
 
-## Hazır eklentiler
+```ts
+import { codeHighlightPlugin } from '@kalem/plugin-code-highlight';
 
-| Paket | Ne yapar |
-|---|---|
-| `@kalem/ui` | Balon araç çubuğu, slash menü, drag handle, üst araç çubuğu |
-| `@kalem/plugin-image-upload` | Sürükle-bırak görsel, yükleme kancası, yer tutucu |
-| `@kalem/plugin-code-highlight` | Kod bloğu vurgulama (tembel yüklenir) |
-| `@kalem/plugin-find-replace` | Ctrl+F / Ctrl+H |
-| `@kalem/plugin-outline` | İçindekiler paneli |
-| `@kalem/plugin-word-count` | Kelime · karakter · okuma süresi |
-| `@kalem/plugin-source-mode` | WYSIWYG ↔ ham Markdown geçişi |
-| `@kalem/plugin-autosave` | Debounce'lu kaydetme, localStorage kurtarma |
-| `@kalem/plugin-table` | Tablo düzenleme — *v1.1* |
+const editor = new Editor(el, {
+  value: md,
+  plugins: [codeHighlightPlugin()],
+});
 
-:::note[Tablo hakkında]
-v1'de tablo **düzenleme arayüzü** yoktur, ancak ayrıştırıcı ve serileştirici
-tabloları **kayıpsız korur**. Tablo içeren bir dosyayı Kalem'de açıp kaydettiğinizde
-tablo bozulmaz.
+// ya da sonradan
+editor.addPlugin(codeHighlightPlugin());
+editor.removePlugin('code-highlight');
+```
+
+:::note[Yerleşikler]
+`plugins` verilmezse editör iki yerleşik eklenti kuruyor: giriş kuralları
+ve görev listesi. **Boş dizi vermek onları kapatıyor** — çekirdek
+özelliklerin gerçekten eklenti olarak çıkarılabildiğinin kanıtı.
+
+`plugins` verdiğinizde yerleşikler gelmiyor; ikisini birden istiyorsanız
+`defaultPlugins()` çağırıp kendi listenizin başına ekleyin.
 :::
 
-## Kendi eklentiniz
+## Resmî eklentiler
+
+| Paket | Ne yapıyor | Boyut (gzip) |
+|---|---|---|
+| `@kalem/plugin-code-highlight` | Kod bloğu vurgulama, 8 dil | 3,7 kB |
+| `@kalem/plugin-find-replace` | Ctrl+F / Ctrl+H | 4,4 kB |
+| `@kalem/plugin-image-upload` | Sürükle-bırak / yapıştır görsel yükleme | 2,9 kB |
+| `@kalem/plugin-outline` | İçindekiler paneli | 1,9 kB |
+| `@kalem/plugin-word-count` | Kelime sayacı ve okuma süresi | 1,4 kB |
+| `@kalem/plugin-source-mode` | Ham Markdown kaynağı (Ctrl+Shift+M) | 1,0 kB |
+| `@kalem/plugin-autosave` | Gecikmeli kaydetme + durum göstergesi | 652 B |
+
+Her birinin kendi CSS dosyası var: `@kalem/themes/plugin-code.css`,
+`plugin-find.css`, `plugin-image.css`, `plugin-outline.css`,
+`plugin-word-count.css`, `plugin-source.css`, `plugin-autosave.css`.
+
+### Kod vurgulama
+
+```ts
+import { codeHighlightPlugin } from '@kalem/plugin-code-highlight';
+
+codeHighlightPlugin({
+  maxLength: 20_000,
+  onError: (hata, dil) => console.warn(dil, hata),
+});
+```
+
+Yerleşik diller: `javascript`, `typescript`, `json`, `html`, `css`,
+`markdown`, `python`, `shell`, `sql`. Her biri **ayrı bir parça** ve
+yalnızca belgede o dilde bir kod bloğu varken `import()` ile yükleniyor —
+tek dil paketi 599 B. Belgede kod yoksa **sıfır bayt** indiriliyor ve
+bunu bir tarayıcı testi (ağ isteği sayarak) doğruluyor.
+
+Eklenti modele hiç dokunmuyor: vurgulama yalnızca DOM'da yaşıyor, yani
+Markdown çıktısı değişmiyor.
+
+Kendi vurgulayıcınızı da verebilirsiniz — Prism ve Shiki için hazır
+dönüştürücüler var:
+
+```ts
+import { codeHighlightPlugin, prismTokens } from '@kalem/plugin-code-highlight';
+import Prism from 'prismjs';
+
+codeHighlightPlugin({
+  highlight: (kod, dil) => {
+    const gramer = Prism.languages[dil];
+    return gramer ? prismTokens(Prism.tokenize(kod, gramer)) : null;
+  },
+});
+```
+
+### Bul ve değiştir
+
+```ts
+import { findReplacePlugin } from '@kalem/plugin-find-replace';
+
+const arama = findReplacePlugin({ limit: 5000 });
+arama.open('replace');  // kendi düğmenizden
+```
+
+Kasa katlaması **belgenin diline** göre: `lang="tr"` bir belgede `ışık`
+araması `IŞIK`ı buluyor, `İŞİK`i bulmuyor. Aksanlar katlanmıyor — `şık`
+araması `sik` yazmıyor.
+
+:::caution[Tablolar aranmıyor]
+Tablolar Markdown'a ham metin olarak geri yazıldığı için değiştirme
+güvenli değil; arama bölgelerinden çıkarıldılar.
+:::
+
+### Görsel yükleme
+
+```ts
+import { imageUploadPlugin } from '@kalem/plugin-image-upload';
+
+imageUploadPlugin({
+  maxSize: 5 * 1024 * 1024,
+  async upload({ file, onProgress, signal }) {
+    const yanit = await fetch('/api/yukle', { method: 'POST', body: file, signal });
+    onProgress(1);
+    return (await yanit.json()).url;
+  },
+  onError: (hata) => alert(hata.message),
+});
+```
+
+Eklentinin ağ hakkında bildiği tek şey `upload` kancası: hangi servis,
+hangi kimlik doğrulama, hangi yeniden deneme — hepsi uygulamanın.
+Tam tarif: [Görsel yükleme](/tarifler/gorsel-yukleme/).
+
+### İçindekiler
+
+```ts
+import { outlinePlugin } from '@kalem/plugin-outline';
+
+outlinePlugin({
+  container: document.getElementById('icindekiler'),
+  scrollOffset: 80,
+  onActiveChange: (item, index) => { … },
+});
+```
+
+`container` verilmezse arayüz çizilmiyor; başlık listesi yine `items()`
+ve `activeIndex()` ile okunabiliyor. Kütüphane ekranın bir köşesini kendi
+başına sahiplenmiyor — nereye ait olduğunu uygulama biliyor.
+
+### Kelime sayacı
+
+```ts
+import { wordCountPlugin } from '@kalem/plugin-word-count';
+
+wordCountPlugin({
+  container: document.getElementById('durum'),
+  onChange: ({ words, characters, minutes }) => { … },
+});
+```
+
+Sayım `Intl.Segmenter` ile, yani belgenin diline göre. Markdown işaretleri
+sayılmıyor: `**kalın**` bir kelime, yedi değil.
+
+### Kaynak kipi
+
+```ts
+import { sourceModePlugin } from '@kalem/plugin-source-mode';
+
+const kaynak = sourceModePlugin({
+  shortcut: true,                       // Ctrl/Cmd+Shift+M
+  onModeChange: (kaynakta) => { … },
+});
+kaynak.toggle();
+```
+
+Kaynak tarafı sıradan bir `<textarea>`. Çıkışta metin belgeye yazılıyor ve
+gidiş-dönüşün kayıpsızlığı testle sabit.
+
+### Otomatik kaydetme
+
+```ts
+import { autosavePlugin, createIndicator, trAutosaveLabels } from '@kalem/plugin-autosave';
+
+const gosterge = createIndicator(document.getElementById('durum')!, {
+  prefix: 'kalem-',
+  labels: trAutosaveLabels,
+});
+
+autosavePlugin({
+  delay: 1500,
+  storageKey: `kalem:taslak:${belgeId}`,
+  save: async (markdown, signal) => {
+    await fetch('/api/kaydet', { method: 'POST', body: markdown, signal });
+  },
+  onStateChange: (durum) => gosterge.render(durum),
+});
+```
+
+Durumlar: `idle`, `dirty`, `saving`, `saved`, `error`. `save` kancası hata
+fırlatırsa durum `error` oluyor — sessizce yutulmuyor.
+
+`storageKey` **belgeye özgü** olmalı. Verilmezse yerel kurtarma kapalı:
+rastgele bir anahtar üretmek, başka bir belgenin taslağını bu belgeye
+getirme riski taşıyor.
+
+Tam tarif: [Otomatik kaydetme](/tarifler/otomatik-kaydet/).
+
+## Kendi eklentinizi yazmak
+
+Bir eklenti dört alanlı bir nesne:
 
 ```ts
 import type { Plugin } from '@kalem/editor';
 
-export function highlightMark(): Plugin {
+export function benimEklentim(): Plugin {
   return {
-    name: 'highlight',
-    nodes: [{ type: 'highlight', inline: true, tag: 'mark' }],
-    commands: {
-      toggleHighlight: (state) => state.toggleMark('highlight'),
+    name: 'benim-eklentim',
+
+    setup(ctx) {
+      const cikar = ctx.on('change', (value) => console.log(value.length));
+      return () => cikar();           // söküm temizleyicisi
     },
-    keymap: { 'Mod-Shift-h': 'toggleHighlight' },
-    inputRules: [{ match: /==([^=]+)==$/, node: 'highlight' }],
-    toolbar: [{ command: 'toggleHighlight', label: 'Vurgula', icon: 'H' }],
-    parse: (token) => ({ type: 'highlight', children: token.children }),
-    serialize: (node, ctx) => `==${ctx.serializeChildren(node)}==`,
+
+    keymap(event, ctx) {
+      if (!event.ctrlKey || event.key !== 'j') return false;
+      // …
+      return true;                     // olay tüketildi
+    },
+
+    inputRules: [
+      (doc, caret) => null,            // dönüşüm ürettiyse EditResult
+    ],
   };
 }
 ```
 
-Kullanımı:
+`PluginContext` dar ve bilerek öyle:
 
-```ts
-new Editor(el, { plugins: [highlightMark()] });
-```
-
-## Eklenti sözleşmesi
-
-| Alan | Ne için |
+| Üye | Ne veriyor |
 |---|---|
-| `nodes` | Yeni blok veya satır içi düğüm tipi |
-| `commands` | Çağrılabilir işlemler (`editor.exec`) |
-| `keymap` | Kısayol → komut eşlemesi (`Mod` = Ctrl/Cmd) |
-| `inputRules` | Yazarken dönüşüm |
-| `toolbar` | `@kalem/ui` araç çubuğuna katkı |
-| `parse` / `serialize` | Markdown ↔ AST dönüşümü |
-| `view` | Özel DOM davranışı (ör. Mermaid çizimi) |
-| `onDestroy` | Temizlik |
+| `getDocument()` | Güncel belge (değişmez `Root`) |
+| `getCaret()` | İmlecin model konumu; seçim tek taşıyıcıda değilse `null` |
+| `applyEdit(result)` | Düzenleme uygular, geçmişe de yazar |
+| `element` | Editörün kök elemanı |
+| `isReadOnly()` | Salt okunur mod |
+| `on(event, handler)` | `Editor.on` ile aynı; abonelikten çıkma döndürüyor |
 
-Bir eklenti `parse` **ve** `serialize` verirse, ürettiği sözdizimi gidiş-dönüş
-testlerine dahil edilir.
+### Çakışma kuralı: kayıt sırası
 
-## Tembel yükleme
+Eklentiler çekirdekten **önce** tuşu görüyor ve aralarında önce kaydedilen
+kazanıyor. Tek kural bu; öncelik sayısı, faz sistemi ya da "yüksek
+öncelikli eklenti" kavramı yok.
 
-Ağır eklentileri dinamik `import()` ile yükleyin — ana bundle'a sıfır byte eklenir.
+### Render kancası neden yok
 
-```ts
-const editor = new Editor(el);
+Eklentiler DOM'u doğrudan süslüyor (`element` üzerinden) ve modele
+`applyEdit` ile dokunuyor; arada bir "her düğüm için çağrılan" kanca
+bulunmuyor. Böyle bir kanca, editörün imleç koruyan yama mantığını
+eklentilere açardı ve her eklenti kendi imleç hatasını üretirdi.
 
-document.getElementById('kod')!.addEventListener('click', async () => {
-  const { codeHighlight } = await import('@kalem/plugin-code-highlight');
-  editor.use(codeHighlight({ languages: ['ts', 'python'] }));
-});
-```
+Yedi eklentinin hiçbirinde ihtiyaç duyulmadı. Pratikte gereken şey
+"değişiklik başına tek çağrı"ydı ve onu `ctx.on('change', …)` veriyor.

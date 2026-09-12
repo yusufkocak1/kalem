@@ -3,61 +3,125 @@ title: Başlangıç
 description: Kalem'i beş satırda projenize ekleyin.
 ---
 
-:::caution
-Planlanan v1.0 API'si. Paketler henüz npm'de değil.
+:::caution[Henüz npm'de değil]
+Kütüphane yazıldı ve çalışıyor; ilk yayın **v1.0** olacak. Aşağıdaki API
+depodaki koddan alınmıştır.
 :::
 
-## Kurulum
+## Hangi paket?
 
-İhtiyacınız kadarını kurun.
+Kalem tek bir paket değil. İhtiyacınız kadarını kurun — ödemediğiniz şeyi
+indirmezsiniz.
+
+| Ne yapmak istiyorsunuz | Paket | Boyut (min+gzip) |
+|---|---|---|
+| Markdown'ı **göstermek** (salt okunur) | `@kalem/viewer` | 2,7 kB |
+| Markdown'ı **ayrıştırmak** (sunucuda, betikte) | `@kalem/core` | 11,5 kB |
+| **Düzenlemek**, kendi arayüzünüzle | `@kalem/editor` | 26,1 kB |
+| **Word benzeri** tam deneyim | `@kalem/editor` + `@kalem/ui` | 34,6 kB |
+
+Çerçeve sarmalayıcıları bunların üstüne birkaç yüz bayt ekliyor:
+`@kalem/react` 903 B, `@kalem/vue` 682 B, `@kalem/wc` 1,98 kB.
 
 ```bash
-# Sadece görüntüleme (salt okunur)
-npm i @kalem/viewer
-
-# Düzenleme, kendi arayüzünüzle
-npm i @kalem/editor
-
 # Word benzeri tam deneyim
-npm i @kalem/editor @kalem/ui
+npm i @kalem/editor @kalem/ui @kalem/themes
 ```
 
 ## Beş satırda ilk editör
 
 ```ts
 import { Editor } from '@kalem/editor';
-import { toolbar, slashMenu, dragHandle } from '@kalem/ui';
-import '@kalem/themes/default.css';
+import { mountUi } from '@kalem/ui';
+
+import '@kalem/themes/tokens.css';
+import '@kalem/themes/viewer.css';
+import '@kalem/themes/editor.css';
+import '@kalem/themes/ui.css';
 
 const editor = new Editor(document.getElementById('app')!, {
   value: '# Merhaba\n\nYazmaya başlayın veya `/` ile komut çalıştırın.',
-  plugins: [toolbar(), slashMenu(), dragHandle()],
+  lang: 'tr',
+  label: 'Belge',
   onChange: (markdown) => console.log(markdown),
 });
+
+mountUi(editor);
 ```
+
+Bu kadar. `mountUi` balon araç çubuğunu, sabit çubuğu, slash menüsünü,
+blok tutamacını ve bağlantı balonunu kuruyor.
+
+:::note[`lang` süs değil]
+Tarayıcı yazım denetimi sözlüğünü, hecelemeyi ve tırnak biçimini bu
+özniteliğe göre seçiyor. Türkçe bir belgeyi İngilizce sözlükle denetlemek
+her kelimeyi kırmızı yapıyor. Kalem de arama ve büyük/küçük harf
+katlamasında aynı değeri kullanıyor — ayrıntı [Markdown uyumu](/rehber/markdown-uyumu/)
+sayfasında.
+:::
 
 ## Temel kavramlar
 
 ### Değer her zaman Markdown metnidir
 
-`editor.getValue()` size bir `string` döndürür, bir JSON ağacı değil. Bu yüzden
-Kalem'in çıktısı git'e commit edilebilir, başka araçlarda açılabilir, bir dil
-modeline doğrudan verilebilir.
+`editor.getValue()` size bir `string` döndürüyor, bir JSON ağacı değil.
+Kalem'in çıktısı git'e commit edilebiliyor, başka araçlarda açılabiliyor,
+bir dil modeline doğrudan verilebiliyor.
 
-### Blok-tabanlı düzenleme
+Dahası, dokunulmayan satır **byte düzeyinde** aynı kalıyor:
 
-Her paragraf, başlık ve liste öğesi kendi DOM elemanıdır. Kullanıcı bir bloğu
-tutamacından sürükleyerek taşıyabilir; `Ctrl+Shift+↑/↓` aynı işi klavyeyle yapar.
+```ts
+import { parse, serialize } from '@kalem/core';
 
-### Eklentiler isteğe bağlıdır
+const md = '* yıldızla yazılmış liste\n';
+serialize(parse(md)) === md; // true — `-` olarak geri gelmiyor
+```
 
-`@kalem/editor` tek başına çalışır ama görsel arayüzü yoktur — klavyeyle tam
-işlevlidir. Word benzeri deneyim için `@kalem/ui` eklentilerini takarsınız.
-Böylece kendi arayüzünü yazmak isteyen geliştirici, kullanmayacağı UI kodunu
-indirmez.
+Bu, editörün kullanıcının yazım tercihlerini (liste işareti, ayraç, başlık
+biçimi) modelde saklamasından geliyor. Ayrıntı: [Markdown uyumu](/rehber/markdown-uyumu/).
+
+### Her blok kendi elemanı
+
+Paragraf, başlık, liste öğesi — her biri kendi `contenteditable`
+elemanında. Kullanıcı bir bloğu tutamacından sürükleyerek taşıyabiliyor;
+`Ctrl+Shift+↑/↓` aynı işi klavyeyle yapıyor.
+
+Bunun bedeli ve kazancı [Mimari](/mimari/) sayfasında.
+
+### Arayüz ayrı bir paket
+
+`@kalem/editor` tek başına çalışıyor ama **hiçbir arayüz çizmiyor** —
+klavyeyle tam işlevli. Word benzeri deneyim `mountUi` ile geliyor.
+Kendi tasarım sistemi olan bir uygulama, arayüzü kendisi yazıp yalnızca
+motoru kullanabiliyor.
+
+## Kendi arayüzünüz
+
+`mountUi` çağırmadan, editörün imperatif API'siyle:
+
+```ts
+const editor = new Editor(el, { value: '# Merhaba' });
+
+document.getElementById('kalin')!.addEventListener('click', () => {
+  editor.toggleMark('strong');
+});
+
+editor.on('selectionchange', () => {
+  kalinDugmesi.setAttribute('aria-pressed', String(editor.isMarkActive('strong')));
+});
+```
+
+:::tip
+Düğmeye `mousedown` üzerinde `preventDefault()` çağırın; yoksa tıklama
+seçimi düşürüyor ve biçim uygulanacak metin kalmıyor.
+:::
 
 ## Sonraki adım
 
-- [Viewer rehberi](/rehber/viewer/) — sadece görüntülemek istiyorsanız
-- [Editör rehberi](/rehber/editor/) — seçenekler, API, kısayollar
-- [React](/frameworkler/react/) · [Vue](/frameworkler/vue/) · [CDN](/frameworkler/cdn/)
+- [Viewer rehberi](/rehber/viewer/) — sadece göstermek istiyorsanız
+- [Editör rehberi](/rehber/editor/) — bütün seçenekler, API ve kısayollar
+- [Eklentiler](/rehber/eklentiler/) — kod vurgulama, bul-değiştir, otomatik kaydetme
+- Çerçeveniz: [React](/frameworkler/react/) · [Vue](/frameworkler/vue/) ·
+  [Svelte](/frameworkler/svelte/) · [Angular](/frameworkler/angular/) ·
+  [Next.js](/frameworkler/nextjs/) · [Nuxt](/frameworkler/nuxt/) ·
+  [CDN](/frameworkler/cdn/)

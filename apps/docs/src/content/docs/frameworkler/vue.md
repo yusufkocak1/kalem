@@ -1,80 +1,98 @@
 ---
 title: Vue
-description: Vue 3 ve Nuxt ile kullanım — projenize React sızmadan.
+description: <KalemEditor v-model />, useKalem ve SSR.
 ---
 
 ```bash
-npm i @kalem/editor @kalem/ui @kalem/vue
+npm i @kalem/vue @kalem/editor @kalem/themes
 ```
 
-:::tip[Framework sızıntısı yok]
-`@kalem/editor` ve `@kalem/ui` saf TypeScript'tir; `dependencies` alanları boştur.
-`@kalem/vue` yalnızca Vue'yu `peerDependency` olarak alır. Bu kurulumdan sonra
-`node_modules` içinde React bulunmaz — CI'daki *saflık kapısı* testi bunu her
-commit'te doğrular.
-:::
+`vue` bir **peer bağımlılık** (`^3`). Kendi boyutu 682 B.
 
-## v-model ile
+## `v-model`
 
 ```vue
 <script setup lang="ts">
-import { ref } from 'vue';
 import { KalemEditor } from '@kalem/vue';
-import { toolbar, slashMenu, dragHandle } from '@kalem/ui';
-import '@kalem/themes/default.css';
+import { ref } from 'vue';
 
-const icerik = ref('# Merhaba\n\nYazmaya başlayın.');
+const metin = ref('# Merhaba');
 </script>
 
 <template>
-  <KalemEditor v-model="icerik" :plugins="[toolbar(), slashMenu(), dragHandle()]" />
-  <pre>{{ icerik }}</pre>
+  <KalemEditor v-model="metin" lang="tr" label="Belge" />
 </template>
 ```
 
-## Imperatif erişim
+Kontrolsüz kullanım da destekleniyor: `v-model` yerine `default-value`
+verin, metin editörde yaşasın, `update:modelValue` olayı yine yayılsın.
+
+## Prop'lar ve olaylar
+
+| Prop | Tip | Not |
+|---|---|---|
+| `modelValue` | `string` | `v-model` bağlantısı |
+| `defaultValue` | `string` | Kontrolsüz başlangıç metni |
+| `readOnly` | `boolean` | |
+| `lang` · `label` · `plugins` | | **Montaj anında** okunuyor |
+
+| Olay | İmza |
+|---|---|
+| `update:modelValue` | `(value: string)` |
+| `ready` | `(editor: Editor)` |
+
+## `useKalem()`
+
+`<KalemEditor>`in içindeki bileşenler editöre buradan erişiyor:
 
 ```vue
 <script setup lang="ts">
-import { ref } from 'vue';
-import { KalemEditor, type KalemHandle } from '@kalem/vue';
-
-const editor = ref<KalemHandle | null>(null);
-const kalinYap = () => editor.value?.exec('toggleMark', { mark: 'strong' });
+import { useKalem } from '@kalem/vue';
+const editor = useKalem();   // ShallowRef<Editor | null>
 </script>
 
 <template>
-  <button @click="kalinYap">Kalın</button>
-  <KalemEditor ref="editor" v-model="icerik" />
+  <button :disabled="!editor" @click="editor?.focus()">Odağı ver</button>
 </template>
 ```
 
-## Nuxt 3
+Dönen şey düz bir değer değil **ref**: editör `onMounted` içinde
+kuruluyor, yani alt bileşenin `setup`ı çalıştığında henüz yok. Ref olunca
+alt bileşen ona abone kalıyor ve editör hazır olduğunda kendiliğinden
+güncelleniyor.
 
-Editör istemci taraflıdır:
+## Nuxt / SSR — `<ClientOnly>` gerekmiyor
+
+Vue dünyasında editör sarmalayıcılarının neredeyse hepsi `<ClientOnly>`
+istiyor ve bedeli görünür: sunucu boş bir kutu gönderiyor, içerik
+sonradan beliriyor, arama motoru metni hiç görmüyor.
+
+Kalem'de sunucu belgeyi `@kalem/viewer` ile **gerçekten çiziyor**. İlk
+boyada okunabilir bir belge var; JavaScript yüklendiğinde editör aynı
+elemanı devralıyor.
+
+Hidrasyon uyuşmazlığı `innerHTML`i dondurarak engelleniyor: dize bir kez
+hesaplanıyor ve bileşen yaşadığı sürece değişmiyor. Değişseydi Vue
+elemanın içini silip yeniden yazar, editörün DOM'u, imleci ve geçmişi
+onunla giderdi. Değişiklikler editöre `setValue` ile iniyor.
+
+Ayrıntı: [Nuxt](/frameworkler/nuxt/).
+
+## Öznitelik aktarımı
+
+Bileşenin kökü tek bir eleman değil (düzenlenebilir kutu ve yuva içeriği
+kardeş), bu yüzden `class` ve `style` **elle** aktarılıyor
+(`inheritAttrs: false`). Yani `<KalemEditor class="editor" />` beklediğiniz
+gibi çalışıyor.
+
+## Yuva içeriği
+
+Yuva (slot) içeriği düzenlenebilir alanın **yanında**, içinde değil:
+kutunun içi modelden çiziliyor ve Vue'nun oraya koyduğu her düğüm editörün
+ilk çiziminde silinirdi.
 
 ```vue
-<template>
-  <ClientOnly>
-    <KalemEditor v-model="icerik" />
-  </ClientOnly>
-</template>
+<KalemEditor v-model="metin" lang="tr" label="Belge">
+  <Durum />
+</KalemEditor>
 ```
-
-Salt okunur içerik için `ClientOnly` **gerekmez** — `@kalem/viewer` Nitro içinde
-sunucuda çalışır:
-
-```ts
-// server/api/yazi.get.ts
-import { parse } from '@kalem/core';
-import { renderToString } from '@kalem/viewer';
-
-export default defineEventHandler(() => ({
-  html: renderToString(parse(markdown)),
-}));
-```
-
-## Temizlik
-
-Sarmalayıcı `onBeforeUnmount` içinde `editor.destroy()` çağırır; ayrıca bir şey
-yapmanız gerekmez.

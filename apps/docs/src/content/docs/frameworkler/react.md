@@ -1,98 +1,128 @@
 ---
 title: React
-description: React 17+ ve Next.js App Router ile kullanım.
+description: <KalemEditor />, useKalem ve useKalemValue.
 ---
 
 ```bash
-npm i @kalem/editor @kalem/ui @kalem/react
+npm i @kalem/react @kalem/editor @kalem/themes
 ```
 
-`@kalem/react` React'i `peerDependency` olarak alır ve kendisi ~1.5 kB'dır.
-React'i kendi projeniz sağlar; Kalem kendi kopyasını getirmez.
+`react` bir **peer bağımlılık** (`>=17`); paket kendi kopyasını getirmiyor.
+Kendi boyutu 903 B.
 
-## Kontrolsüz (önerilen)
+## Kontrolsüz (çoğu kullanım)
+
+Metin editörde yaşıyor, React karışmıyor:
 
 ```tsx
 import { KalemEditor } from '@kalem/react';
-import { toolbar, slashMenu, dragHandle } from '@kalem/ui';
-import '@kalem/themes/default.css';
 
-export function Yazi() {
-  return (
-    <KalemEditor
-      defaultValue="# Merhaba"
-      plugins={[toolbar(), slashMenu(), dragHandle()]}
-      onChange={(md) => console.log(md)}
-    />
-  );
-}
+<KalemEditor
+  defaultValue="# Merhaba"
+  lang="tr"
+  label="Belge"
+  onChange={(markdown) => kaydet(markdown)}
+/>
 ```
 
 ## Kontrollü
 
-```tsx
-const [md, setMd] = useState('# Merhaba');
+Metin üst bileşende:
 
-<KalemEditor value={md} onChange={setMd} />
+```tsx
+const [metin, setMetin] = useState('# Merhaba');
+
+<KalemEditor value={metin} onChange={setMetin} lang="tr" label="Belge" />
 ```
 
-:::caution
-Kontrollü modda her tuş vuruşunda üst bileşen yeniden render olur. Uzun
-belgelerde kontrolsüz modu tercih edin ve değeri `onChange` ile bir ref'te
-tutun.
+Kontrollü kipin klasik tuzağı sonsuz döngü: kullanıcı yazıyor → `onChange`
+→ `setState` → `value` değişiyor → editöre yazılıyor → **imleç başa
+kaçıyor**. Sarmalayıcı editörün kendi yaydığı metni hatırlıyor ve gelen
+`value` ona eşitse hiçbir şey yapmıyor. Yani yalnızca gerçekten dışarıdan
+gelen bir değişiklik editöre iniyor.
+
+## Prop'lar
+
+| Prop | Tip | Not |
+|---|---|---|
+| `value` | `string` | Kontrollü metin |
+| `defaultValue` | `string` | Kontrolsüz başlangıç metni |
+| `onChange` | `(value: string, doc: Root) => void` | |
+| `onReady` | `(editor: Editor) => void` | İmperatif erişim |
+| `readOnly` | `boolean` | |
+| `lang` · `label` · `plugins` | | **Montaj anında** okunuyor |
+| `className` · `style` · `id` | | Kutuya iniyor |
+| `children` | `ReactNode` | Editörün **yanına** çiziliyor |
+
+:::note[Neden bazıları montaj anında]
+Kurulum imleci, seçimi ve geçmişi sıfırlıyor. `lang`, `plugins` ve `label`
+sonradan değiştirilirse yeni bir editör gerekirdi; kullanıcının yazdığı
+yeri kaybetmesi, bir prop'un geç uygulanmasından kötü. Değişebilen iki şey
+— `value` ve `readOnly` — editörün kendi API'siyle güncelleniyor.
+
+Geri çağırmalar istisna: bir ref'te tutuluyorlar, yani satır içi yazılan
+`onChange={() => …}` editörü yeniden kurmuyor.
 :::
 
-## Imperatif erişim
+## Kancalar
+
+`<KalemEditor>`in **çocuğu** olan bileşenler için:
 
 ```tsx
-import { useRef } from 'react';
-import { KalemEditor, type KalemHandle } from '@kalem/react';
+import { KalemEditor, useKalem, useKalemValue } from '@kalem/react';
 
-export function Duzenle() {
-  const ref = useRef<KalemHandle>(null);
+function Durum() {
+  const editor = useKalem();          // Editor | null
+  const metin = useKalemValue();      // string, değiştikçe yeniden çiziyor
 
   return (
-    <>
-      <button onClick={() => ref.current?.exec('toggleMark', { mark: 'strong' })}>
-        Kalın
-      </button>
-      <button onClick={() => navigator.clipboard.writeText(ref.current!.getValue())}>
-        Markdown'ı kopyala
-      </button>
-      <KalemEditor ref={ref} defaultValue="# Merhaba" />
-    </>
+    <p>
+      {metin.length} karakter
+      <button onClick={() => editor?.focus()}>Odağı ver</button>
+    </p>
   );
 }
+
+<KalemEditor defaultValue={md} lang="tr" label="Belge">
+  <Durum />
+</KalemEditor>
 ```
+
+`useKalemValue` `useSyncExternalStore` üzerine kurulu: eşzamanlı render'da
+yırtılma (aynı ağacın iki bileşeninin farklı metin görmesi) ve abonelik
+öncesi kaçırılan güncelleme — ikisi de kapalı.
+
+:::tip[`children` editörün içine konmuyor]
+Düzenlenebilir alanın içi modelden çiziliyor; React'in oraya koyduğu her
+düğüm ilk render'da silinirdi. Yuva içeriği kutunun **yanında**.
+:::
+
+## Strict Mode
+
+React'in geliştirme kipi her etkiyi kurup söküp yeniden kuruyor.
+Sarmalayıcı bunu tek editörle atlatıyor ve bir tarayıcı testi bunu
+sabitliyor — `<StrictMode>`u kapatmanız gerekmiyor.
 
 ## Next.js App Router
 
-Editör tarayıcı API'lerine ihtiyaç duyar, bu yüzden istemci bileşenidir:
+Paket derleme çıktısında kendi `"use client"` yönergesini taşıyor, yani
+bir sunucu bileşeni `<KalemEditor>`ü doğrudan import edebiliyor —
+`transpilePackages` ya da `dynamic(… { ssr: false })` gerekmiyor.
+
+Ayrıntı: [Next.js](/frameworkler/nextjs/).
+
+## Eklentiler
+
+`plugins` montaj anında okunuyor; sonradan eklemek için `onReady`:
 
 ```tsx
-'use client';
-import { KalemEditor } from '@kalem/react';
+<KalemEditor
+  defaultValue={md}
+  onReady={(editor) => editor.addPlugin(codeHighlightPlugin())}
+/>
 ```
 
-Salt okunur içerik ise **sunucuda** render edilebilir — `@kalem/viewer`
-tamamen DOM'suz çalışır:
-
-```tsx
-// sunucu bileşeni — 'use client' yok
-import { parse } from '@kalem/core';
-import { renderToString } from '@kalem/viewer';
-
-export default function Post({ markdown }: { markdown: string }) {
-  return (
-    <article
-      className="kalem"
-      dangerouslySetInnerHTML={{ __html: renderToString(parse(markdown)) }}
-    />
-  );
-}
-```
-
-## Strict Mode ve temizlik
-
-Sarmalayıcı `useEffect` temizliğinde `editor.destroy()` çağırır; React 18/19
-Strict Mode'un çift-mount davranışıyla uyumludur.
+Panel isteyen eklentiler (içindekiler, kelime sayacı) React'in çizdiği bir
+kaba ihtiyaç duyuyor. Kalıbın tamamı için
+[Kalem Notlar](https://github.com/kalem-editor/kalem/blob/main/apps/notlar/src/Arayuz.tsx)
+uygulamasına bakın.
