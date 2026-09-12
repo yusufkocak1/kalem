@@ -1,0 +1,36 @@
+{
+  "name": "kalem-notlar",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Kalem ile yazılmış yerel not defteri — F5-05 dogfooding uygulaması",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@kalem/core": "workspace:^",
+    "@kalem/editor": "workspace:^",
+    "@kalem/plugin-autosave": "workspace:^",
+    "@kalem/plugin-code-highlight": "workspace:^",
+    "@kalem/plugin-find-replace": "workspace:^",
+    "@kalem/plugin-outline": "workspace:^",
+    "@kalem/plugin-source-mode": "workspace:^",
+    "@kalem/plugin-word-count": "workspace:^",
+    "@kalem/react": "workspace:^",
+    "@kalem/themes": "workspace:^",
+    "@kalem/ui": "workspace:^",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

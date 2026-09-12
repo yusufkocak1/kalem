@@ -135,12 +135,15 @@
 }
 
 @media (prefers-color-scheme: dark) {
-	:where(.kalem-theme, .kalem-doc, .kalem-editor):not([data-theme="light"]) {
+	:where(.kalem-theme, .kalem-doc, .kalem-editor):not(
+		:where([data-theme="light"], [data-theme="light"] *)
+	) {
 		--kalem-find-match: #5c4a1f;
 		--kalem-find-current: #8a6a1a;
 	}
 }
 
+:where([data-theme="dark"]) :where(.kalem-theme, .kalem-doc, .kalem-editor),
 :where(.kalem-theme, .kalem-doc, .kalem-editor)[data-theme="dark"] {
 	--kalem-find-match: #5c4a1f;
 	--kalem-find-current: #8a6a1a;

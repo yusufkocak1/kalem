@@ -1,0 +1,322 @@
+/*
+ * Kalem Notlar — Uygulama stili  (İş listesi: F5-05)
+ *
+ * Kalem'in tema dosyaları belgenin **içini** boyuyor (tipografi, liste
+ * işaretleri, kod blokları); burası kabuğu.
+ *
+ * ## Kabuk kendi paletini taşıyor
+ *
+ * `tokens.css` sözlüğü bilerek `:root`a inmiyor — bir Markdown
+ * kütüphanesinin, gömüldüğü uygulamanın düğmelerini boyaması kabul
+ * edilemez. Yani `--kalem-*` değişkenlerini buradan okumak **çalışmıyor**
+ * (ilk denemede kabuk renksiz kaldı: tanımsız değişken = geçersiz kural).
+ *
+ * Doğrusu bu: uygulamanın kendi paleti var ve aynı üç durumu karşılıyor —
+ * sistem tercihi, açık seçim, varsayılan. `<html data-theme>` ikisini
+ * birden çeviriyor; Kalem'in sözlüğü de aynı özniteliğe bakıyor, yani tek
+ * düğme her iki tarafı da döndürüyor.
+ */
+
+:root {
+	--n-bg: #fbfaf8;
+	--n-yuzey: #ffffff;
+	--n-fg: #22201d;
+	--n-soluk: #6f6a62;
+	--n-kenar: #e3e0da;
+	--n-vurgu: #0f4e4a;
+	--n-kotu: #b3402a;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) {
+		--n-bg: #16151a;
+		--n-yuzey: #1e1d23;
+		--n-fg: #e8e6e1;
+		--n-soluk: #9d978d;
+		--n-kenar: #34323b;
+		--n-vurgu: #6fd3c6;
+		--n-kotu: #ff9b82;
+	}
+}
+
+:root[data-theme="dark"] {
+	--n-bg: #16151a;
+	--n-yuzey: #1e1d23;
+	--n-fg: #e8e6e1;
+	--n-soluk: #9d978d;
+	--n-kenar: #34323b;
+	--n-vurgu: #6fd3c6;
+	--n-kotu: #ff9b82;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body,
+#kok {
+	height: 100%;
+}
+
+body {
+	margin: 0;
+	background: var(--n-bg);
+	color: var(--n-fg);
+	font:
+		15px / 1.6 system-ui,
+		-apple-system,
+		"Segoe UI",
+		sans-serif;
+}
+
+.uygulama {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+}
+
+/* --- Üst çubuk ------------------------------------------------------- */
+
+.ust {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	align-items: center;
+	justify-content: space-between;
+	padding: 10px 16px;
+	border-bottom: 1px solid var(--n-kenar);
+}
+
+.ust h1 {
+	margin: 0;
+	font-size: 15px;
+	letter-spacing: -0.01em;
+}
+
+.ust-araclar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+button {
+	font: inherit;
+	font-size: 13px;
+	padding: 5px 11px;
+	border: 1px solid var(--n-kenar);
+	border-radius: 6px;
+	background: var(--n-bg);
+	color: var(--n-fg);
+	cursor: pointer;
+}
+
+button:hover {
+	border-color: var(--n-vurgu);
+}
+
+button[aria-pressed="true"] {
+	background: color-mix(in srgb, var(--n-vurgu) 14%, var(--n-bg));
+	border-color: var(--n-vurgu);
+}
+
+button.birincil {
+	background: var(--n-vurgu);
+	border-color: var(--n-vurgu);
+	color: var(--n-bg);
+}
+
+.uyari {
+	margin: 0;
+	padding: 8px 16px;
+	background: color-mix(in srgb, var(--n-kotu) 14%, var(--n-bg));
+	border-bottom: 1px solid var(--n-kenar);
+	font-size: 13px;
+}
+
+/* --- Gövde ----------------------------------------------------------- */
+
+.govde {
+	display: flex;
+	flex: 1;
+	min-height: 0;
+}
+
+/* --- Kenar çubuğu ---------------------------------------------------- */
+
+.kenar {
+	display: flex;
+	flex-direction: column;
+	width: 17rem;
+	flex: 0 0 17rem;
+	border-right: 1px solid var(--n-kenar);
+	background: var(--n-yuzey);
+	overflow-y: auto;
+}
+
+.kenar-ust {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 12px;
+	border-bottom: 1px solid var(--n-kenar);
+	position: sticky;
+	top: 0;
+	background: var(--n-yuzey);
+}
+
+.ara {
+	font: inherit;
+	font-size: 13px;
+	padding: 6px 10px;
+	border: 1px solid var(--n-kenar);
+	border-radius: 6px;
+	background: var(--n-bg);
+	color: var(--n-fg);
+}
+
+.liste {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.liste li {
+	display: flex;
+	align-items: stretch;
+	border-bottom: 1px solid var(--n-kenar);
+}
+
+.satir {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	padding: 10px 12px;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	text-align: start;
+}
+
+.satir.secili {
+	background: color-mix(in srgb, var(--n-vurgu) 12%, transparent);
+	box-shadow: inset 3px 0 0 var(--n-vurgu);
+}
+
+.satir .ad {
+	font-weight: 600;
+	font-size: 13.5px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.satir .ozet,
+.satir .zaman {
+	font-size: 12px;
+	color: var(--n-soluk);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.sil {
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	color: var(--n-soluk);
+	font-size: 16px;
+	line-height: 1;
+	padding: 0 10px;
+}
+
+.sil:hover {
+	color: var(--n-kotu);
+}
+
+.bos {
+	padding: 16px;
+	color: var(--n-soluk);
+	font-size: 13px;
+}
+
+/* --- Yazma alanı ----------------------------------------------------- */
+
+.ana {
+	flex: 1;
+	min-width: 0;
+	overflow-y: auto;
+}
+
+.tuval {
+	max-width: 44rem;
+	margin: 0 auto;
+	padding: 0 24px 40px;
+}
+
+/*
+ * Sabit araç çubuğu editörün **önceki kardeşi** olarak ekleniyor
+ * (`element.before(...)`), yani bu kabın içinde. Yapışkan olması uzun
+ * belgede aşağı inildiğinde de erişilebilir kılıyor.
+ */
+.tuval > .kalem-toolbar {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	background: var(--n-bg);
+	padding: 8px 0;
+}
+
+.yazi {
+	min-height: 60vh;
+	padding: 8px 0 0;
+}
+
+/* --- İçindekiler ----------------------------------------------------- */
+
+.anahat {
+	width: 15rem;
+	flex: 0 0 15rem;
+	border-left: 1px solid var(--n-kenar);
+	background: var(--n-yuzey);
+	overflow-y: auto;
+	padding: 12px;
+}
+
+/* --- Durum çubuğu ---------------------------------------------------- */
+
+.durum {
+	display: flex;
+	gap: 16px;
+	align-items: center;
+	justify-content: space-between;
+	padding: 6px 16px;
+	border-top: 1px solid var(--n-kenar);
+	font-size: 12.5px;
+	color: var(--n-soluk);
+	min-height: 2rem;
+}
+
+/* --- Dar ekran ------------------------------------------------------- */
+
+@media (max-width: 56rem) {
+	.govde {
+		flex-direction: column;
+	}
+
+	.kenar,
+	.anahat {
+		width: auto;
+		flex: 0 0 auto;
+		max-height: 14rem;
+		border-right: 0;
+		border-left: 0;
+		border-bottom: 1px solid var(--n-kenar);
+	}
+
+	.tuval {
+		padding: 0 14px 30px;
+	}
+}

@@ -54,7 +54,9 @@
 
 /* --- Koyu tema: sistem tercihi --- */
 @media (prefers-color-scheme: dark) {
-	:where(.kalem-theme, .kalem-doc, .kalem-editor):not([data-theme="light"]) {
+	:where(.kalem-theme, .kalem-doc, .kalem-editor):not(
+		:where([data-theme="light"], [data-theme="light"] *)
+	) {
 		--kalem-tok-comment: #8f9a86;
 		--kalem-tok-string: #7ed9a8;
 		--kalem-tok-number: #e8b17a;
@@ -71,6 +73,7 @@
 }
 
 /* --- Koyu tema: açık seçim --- */
+:where([data-theme="dark"]) :where(.kalem-theme, .kalem-doc, .kalem-editor),
 :where(.kalem-theme, .kalem-doc, .kalem-editor)[data-theme="dark"] {
 	--kalem-tok-comment: #8f9a86;
 	--kalem-tok-string: #7ed9a8;

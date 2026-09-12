@@ -83,8 +83,9 @@
 }
 
 /* --- Koyu tema: sistem tercihi ------------------------------------------
- * `:not([data-theme="light"])` şart: kullanıcı açık temayı **açıkça**
- * seçtiyse sistem tercihi onu ezmemeli.
+ * Açık temayı **açıkça** seçen kullanıcıyı sistem tercihi ezmemeli. Seçim
+ * çoğu zaman `<html data-theme="light">` gibi bir **atada** duruyor, o
+ * yüzden hem elemanın kendisine hem atalarına bakılıyor.
  */
 @media (prefers-color-scheme: dark) {
 	:where(
@@ -97,7 +98,7 @@
 		.kalem-toolbar,
 		.kalem-handle,
 		.kalem-drop-line
-	):not([data-theme="light"]) {
+	):not(:where([data-theme="light"], [data-theme="light"] *)) {
 		--kalem-fg: #e8e6e1;
 		--kalem-fg-muted: #9d978d;
 		--kalem-surface: #24232a;
@@ -109,7 +110,29 @@
 	}
 }
 
-/* --- Koyu tema: açık seçim --- */
+/* --- Koyu tema: açık seçim ----------------------------------------------
+ * İki seçici, çünkü `data-theme` iki yerde olabiliyor:
+ *
+ * - **Atada** — olağan kullanım. `<html data-theme="dark">` yazan bir
+ *   uygulama, sınıfı editörün üstünde taşıyor; ikisi aynı eleman değil.
+ *   Yalnızca bileşik seçici (`:where(…)[data-theme]`) yazılıydı ve bu
+ *   durumda hiç eşleşmiyordu: sayfa koyuya dönüyor, belge açık kalıyordu.
+ *   F5-05'in not defteri bunu ilk gün ortaya çıkardı.
+ * - **Elemanın kendisinde** — tek bir editörü ötekilerden ayrı
+ *   temalandırmak isteyen sayfa için.
+ */
+:where([data-theme="dark"])
+:where(
+	.kalem-theme,
+	.kalem-doc,
+	.kalem-editor,
+	.kalem-ui,
+	.kalem-bubble,
+	.kalem-menu,
+	.kalem-toolbar,
+	.kalem-handle,
+	.kalem-drop-line
+),
 :where(
 	.kalem-theme,
 	.kalem-doc,

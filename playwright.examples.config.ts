@@ -1,12 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Örnek uygulamalar için ayrı yapılandırma  (İş listesi: F5-01 … F5-04)
+ * Örnek uygulamalar için ayrı yapılandırma  (İş listesi: F5-01 … F5-05)
  *
  * ## Neden ana yapılandırmadan ayrı
  *
- * Yedi örneği kurup başlatmak dakikalar sürüyor (Next.js, Nuxt ve Angular
- * üretim derlemeleri dâhil) ve ana e2e paketi her çalıştığında bu bedeli
+ * Yedi örneği ve dogfooding uygulamasını kurup başlatmak dakikalar
+ * sürüyor (Next.js, Nuxt ve Angular üretim derlemeleri dâhil) ve ana e2e paketi her çalıştığında bu bedeli
  * ödemek, hızlı geri bildirimi öldürürdü. Burada ölçülen şey de farklı:
  * editörün davranışı değil, **paketin bir uygulamaya gerçekten
  * takılabildiği**.
@@ -92,6 +92,16 @@ export default defineConfig({
 		{
 			command: "node scripts/serve-static.mjs examples/cdn-vanilla/dist 4177",
 			url: "http://localhost:4177",
+			reuseExistingServer: false,
+			timeout: 60_000,
+			stdout: "pipe",
+		},
+		{
+			// Örnek değil, **uygulama**: F5-05'in dogfooding not defteri.
+			// Aynı yapılandırmada duruyor çünkü ölçtüğü şey aynı — derlenmiş
+			// paketlerin gerçek bir uygulamada çalışması.
+			command: "node scripts/serve-static.mjs apps/notlar/dist 4178",
+			url: "http://localhost:4178",
 			reuseExistingServer: false,
 			timeout: 60_000,
 			stdout: "pipe",

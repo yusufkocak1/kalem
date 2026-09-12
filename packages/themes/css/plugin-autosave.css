@@ -37,11 +37,14 @@
 }
 
 @media (prefers-color-scheme: dark) {
-	:where(.kalem-theme, .kalem-doc, .kalem-editor):not([data-theme="light"]) {
+	:where(.kalem-theme, .kalem-doc, .kalem-editor):not(
+		:where([data-theme="light"], [data-theme="light"] *)
+	) {
 		--kalem-autosave-error: #ff9b82;
 	}
 }
 
+:where([data-theme="dark"]) :where(.kalem-theme, .kalem-doc, .kalem-editor),
 :where(.kalem-theme, .kalem-doc, .kalem-editor)[data-theme="dark"] {
 	--kalem-autosave-error: #ff9b82;
 }

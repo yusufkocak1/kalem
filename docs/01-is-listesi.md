@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-12 · `master` · `pnpm verify` yeşil · 1260 birim + 1098 tarayıcı + 47 örnek testi
+> Son güncelleme: 2026-09-12 · `master` · `pnpm verify` yeşil · 1284 birim + 1104 tarayıcı + 58 örnek/uygulama testi
 
 | Faz | Görev | Durum |
 |---|---|---|
@@ -33,9 +33,9 @@
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
 | **Faz 4** — Eklentiler | 7 / 7 | ✅ **Tamamlandı** |
-| **Faz 5** — Sarmalayıcılar | 4 / 5 | 🔵 Sürüyor |
+| **Faz 5** — Sarmalayıcılar | 5 / 5 | 🟡 Bitti (2 haftalık kullanım sürüyor) |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **54 / 72** | **%75** |
+| | **55 / 72** | **%76** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,12 +43,13 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04`
+referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)**
 
-**Sıradaki:** `F5-05` dogfooding — Kalem'i gerçek bir projede kullanmak. Faz 5'in tek kalan maddesi ve tek insan gerektireni.
+**Sıradaki:** Faz 6 — cila ve yayın (`F6-01` …).
 
-**Açık işler:** NVDA/VoiceOver ile elle test (F3-10) ve Linux görsel
-referansları (F3-11) — ikisi de bir insanın masasında yapılmak zorunda.
+**Açık işler:** NVDA/VoiceOver ile elle test (F3-10), Linux görsel
+referansları (F3-11) ve `apps/notlar`ın iki haftalık günlük kullanımı
+(F5-05) — üçü de bir insanın masasında yapılmak zorunda.
 Ayrıca atomik düğümlere ofset uzunluğu 1 verilmesi (F4-01'de bulundu) ve
 tablo hücrelerinin düzenlenebilir çizilmesi (F4-03'te bulundu: yazılan
 metin çıktıya hiç girmiyor).
@@ -1867,11 +1868,82 @@ tabloda topluyor.
 Boyut: `kalem-editor.iife.js` 26,7 kB (gzip; çekirdek ve editör dâhil).
 47 örnek testi.
 
-### F5-05 · Dogfooding ⭐ `[M]` ⬜
-**Kalem'i kendi gerçek projelerinden birine entegre et ve gerçekten kullan.**
-- Sessiz geliştirme stratejisinde bu, v1.0 öncesi elde edeceğin tek gerçek kullanım verisi. Atlanamaz.
-- **Çıktı:** kullanım sırasında bulunan sorunların listesi → v1.0 backlog'una alınır
-- **Kabul:** en az 2 hafta günlük kullanım
+### F5-05 · Dogfooding ⭐ `[M]` 🟡
+- [x] Gerçek bir uygulama yazıldı: **`apps/notlar`** — yerel not defteri
+- [x] Kütüphanenin neredeyse tamamı kullanımda: `@kalem/react`, `@kalem/ui` ve altı eklenti
+- [x] Kullanım sırasında bulunan üç sorun düzeltildi (aşağıda); ikisi kütüphanenin kendisindeydi
+- [x] 24 birim + 11 tarayıcı testi; CI'da derleniyor ve sınanıyor
+- [ ] **Kabul:** en az 2 hafta günlük kullanım — bu adım bir insanın masasında
+
+**Uygulama neden not defteri.** Dogfooding'in işe yaraması için yazılan
+şeyin gerçekten kullanılması gerekiyor; "editörün yüzeyini sergileyen"
+bir sayfa (demo) zaten vardı ve on iki görev boyunca hiçbir şey
+bulmamıştı. Not defteri ise yazmak için açılıyor: çoklu belge, arama,
+kalıcılık, tema — hepsi kütüphaneyi köşelerinden zorluyor.
+
+Kullanımda olanlar: `<KalemEditor>` (kontrolsüz kip, `useKalem`),
+`mountUi` (sabit çubuk + balon, slash menü, bağlantı balonu), kod
+vurgulama, ara-değiştir, içindekiler, kelime sayacı, kaynak kipi,
+otomatik kaydetme. Not listesinin arama kutusu bile kütüphaneden:
+`@kalem/ui`nin `matches`/`score` yardımcıları slash menüsü için
+yazılmıştı ama işi genel — Türkçe kasa ve aksan katlaması.
+
+> **Bulgu 1 — `[data-theme]` atadan gelince çalışmıyordu.** Kütüphanenin
+> koyu tema seçicisi yalnızca **bileşik** hâlde yazılıydı:
+> `:where(.kalem-theme, …)[data-theme="dark"]`. Yani öznitelik,
+> `kalem-theme` sınıfıyla **aynı** elemanda olmak zorundaydı. Olağan
+> kullanım ise `<html data-theme="dark">` — sınıf editörün üstünde, ikisi
+> ayrı eleman. Sonuç: uygulamanın kabuğu koyuya dönüyor, belge açık
+> kalıyordu.
+>
+> Var olan tarayıcı testi durumu kapsamıyordu çünkü özniteliği editörün
+> **kendisine** koyuyordu. Dört tema dosyasında düzeltildi
+> (`tokens.css`, `plugin-code`, `plugin-find`, `plugin-autosave`) ve iki
+> test eklendi: biri atadaki `data-theme="dark"`ı, öteki atadaki
+> `light`ın sistem tercihini ezdiğini sabitliyor.
+
+> **Bulgu 2 — `dark.css`i koşulsuz yüklemek tema düğmesini öldürüyor.**
+> Uygulama onu "koyu tema dosyası" sanıp yükledi; editör `data-theme`
+> ne olursa olsun koyu kaldı. Dosya aslında "sayfanın tamamı koyu,
+> kullanıcıya seçim sunulmuyor" senaryosu için ve `tokens.css` zaten üç
+> durumu da karşılıyor. Kütüphane hatası değil ama **adın yanılttığı**
+> bir durum; uygulamanın `main.tsx`i artık sebebini yazıyor.
+
+> **Bulgu 3 — yeni not açınca odak düğmede kalıyordu.** Uygulama hatası
+> ama kütüphanenin şeklinden doğuyor: yeni not `key`i değiştiriyor, yani
+> düğmenin tıklama işleyicisi çalışırken editör **henüz yok** ve
+> `focus()` çağırmak boşa gidiyor. Odak, kurulumu bildiren geri çağırmada
+> veriliyor.
+
+**Sözlük `:root`a inmiyor ve bu doğru.** Uygulamanın kabuğu ilk denemede
+renksiz çıktı: `--kalem-*` değişkenleri yalnızca `.kalem-theme` ve
+kardeşlerinin altında tanımlı, `:root`ta değil. Karar belgeli ve haklı —
+bir Markdown kütüphanesi, gömüldüğü uygulamanın düğmelerini boyamamalı.
+Uygulama kendi paletini yazıyor ve aynı `<html data-theme>`e bakıyor;
+tek düğme iki tarafı birden çeviriyor.
+
+**Editör not başına yeniden kuruluyor** (`key={not.id}`). `setValue`
+geçmişi zaten sıfırlıyor, yani kazandıracağı bir şey yok; yeniden
+kurmak ayrıca otomatik kaydetmenin kurtarma anahtarını nota bağlıyor.
+Bir test not değiştirdikten sonra tek editör ve tek araç çubuğu kaldığını
+sabitliyor.
+
+**İki ayrı kalıcılık yolu, bilerek:** `onChange` React durumunu
+güncelliyor (liste başlığı yazarken değişiyor), otomatik kaydetme
+eklentisi 800 ms sessizlikten sonra `localStorage`a yazıyor. Kota
+dolduğunda kaydetme kancası **hata fırlatıyor** ve gösterge
+"Kaydedilemedi" diyor — bir not uygulamasında sessizce yutmak
+yapılabilecek en kötü şey.
+
+> **Yan düzeltme — Biome `./stil.css`i `./stil.js`e çevirdi.** Aynı kural
+> örneklerde F5-01'de kapatılmıştı; `apps/notlar` kapsam dışındaydı ve
+> uygulama stil dosyasını sessizce kaybetmek üzereydi (Vite tesadüfen
+> çözdü). Kural artık bu uygulamada da kapalı. Ayrıca uygulamanın
+> derlemesi `tsc --noEmit` çalıştırıyor: Vite yalnızca dönüştürüyor ve
+> uygulama depo genelindeki `pnpm typecheck`e dâhil değil.
+
+Boyut: 383 kB ham / 119 kB gzip (React, editör, arayüz ve altı eklenti
+dâhil; sekiz dil paketi ayrı parçalarda). 24 birim + 11 tarayıcı testi.
 
 > **FAZ 5 ÇIKIŞ KRİTERİ:** Bir Vue projesine kurulduğunda `node_modules`'da React yok. Saflık kapısı (F0-07) bunu otomatik doğruluyor.
 

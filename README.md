@@ -6,11 +6,12 @@ Framework-bağımsız, küçük ve modüler bir **WYSIWYG Markdown editör küt�
 Yazılım bilmeyen kullanıcıların Word rahatlığında doküman yazabilmesi, geliştiricilerin
 ise projelerine 0 bağımlılıkla gömebilmesi için tasarlanıyor.
 
-**Durum: 54 / 72 görev (%75).** Çekirdek, görüntüleyici, editör, arayüz ve
-yedi eklenti tamam. Sarmalayıcılardan `@kalem/react`, `@kalem/vue` ve
-`@kalem/wc` (`<kalem-editor>` özel elemanı) çalışıyor; yedi örnek uygulama
-CI'da derlenip sınanıyor — düz HTML örneği tek bir `<script>` etiketiyle.
-Sırada dogfooding. Henüz npm'de değil; ilk yayın v1.0 olacak.
+**Durum: 55 / 72 görev (%76).** Faz 5 bitti: çekirdek, görüntüleyici,
+editör, arayüz, yedi eklenti ve üç sarmalayıcı (`@kalem/react`,
+`@kalem/vue`, `@kalem/wc`) çalışıyor. Yedi örnek uygulama CI'da derlenip
+sınanıyor — düz HTML örneği tek bir `<script>` etiketiyle. Kütüphane
+kendi yazdığı bir uygulamada kullanılıyor: [`apps/notlar`](apps/notlar/).
+Sırada Faz 6 — cila ve yayın. Henüz npm'de değil; ilk yayın v1.0 olacak.
 
 ---
 
@@ -28,12 +29,13 @@ Sırada dogfooding. Henüz npm'de değil; ilk yayın v1.0 olacak.
 | [packages/react/](packages/react/) · [vue/](packages/vue/) · [wc/](packages/wc/) | Sarmalayıcılar — ve `<kalem-editor>` özel elemanı (sarmalayıcı gerektirmeyen yol) |
 | [packages/themes/](packages/themes/) | Saf CSS: görüntüleyici tipografisi ve editör katmanı |
 | [examples/](examples/) | Yedi çalışan uygulama: React, Next.js, Vue, Nuxt, Svelte, Angular, düz HTML — hepsi CI'da derleniyor |
+| [apps/notlar/](apps/notlar/) | **Kalem Notlar** — kütüphanenin kendi kullanım denemesi (dogfooding): yerel not defteri, altı eklenti bir arada |
 | [apps/demo/](apps/demo/) | Dört canlı sayfa (aşağıda) + Faz 0 mimari prototipi |
 | [apps/docs/](apps/docs/) | Astro Starlight dokümantasyon sitesi (planlanan API'yi dokümante eder) |
 | [docs/02-faz0-sonuc.md](docs/02-faz0-sonuc.md) | Faz 0 sonuç raporu — ne kuruldu, ne doğrulandı, ne kapsanmadı |
 
-**1260 birim testi** + **1098 tarayıcı testi** (Chromium · Firefox · WebKit)
-+ **47 örnek uygulama testi**. `serialize(parse(md)) === md` gidiş-dönüş
+**1284 birim testi** + **1104 tarayıcı testi** (Chromium · Firefox · WebKit)
++ **58 örnek/uygulama testi**. `serialize(parse(md)) === md` gidiş-dönüş
 17/17 byte-birebir; `renderToDOM` ile `renderToString` çıktıları üç motorda
 byte-birebir aynı.
 

@@ -121,6 +121,11 @@ jobs:
       - name: Örnekleri derle (react-vite · nextjs · vue-vite · nuxt · svelte · angular · cdn-vanilla)
         run: pnpm build:examples
 
+      # F5-05 dogfooding uygulaması; örnek değil ama aynı boru hattından
+      # geçiyor — kütüphane kırıldığında ilk haber veren yer burası.
+      - name: Notlar uygulamasını derle
+        run: pnpm build:notlar
+
       - run: pnpm exec playwright install --with-deps chromium
       # `e2e:examples` derlemeyi kendisi de çalıştırıyor (yukarıdakinden
       # sonra artımlı): derleme kırılırsa test hiç başlamıyor.

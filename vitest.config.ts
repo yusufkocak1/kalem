@@ -19,7 +19,14 @@ export default defineConfig({
 		],
 	},
 	test: {
-		include: ["packages/*/src/**/*.test.ts"],
+		/*
+		 * Uygulamaların saf mantığı da sınanıyor.
+		 *
+		 * `apps/notlar` (F5-05) dogfooding uygulaması; not başlığı çıkarma
+		 * ve yerel depo gibi parçaları DOM'suz ve test edilebilir tutmak,
+		 * uygulamanın kendisini de kütüphanenin standardına bağlıyor.
+		 */
+		include: ["packages/*/src/**/*.test.ts", "apps/*/src/**/*.test.ts"],
 		environment: "node",
 		coverage: {
 			provider: "v8",

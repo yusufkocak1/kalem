@@ -1133,4 +1133,32 @@ test.describe("tema", () => {
 		);
 		expect(await vurgu(page, "#editor")).not.toBe(sistemKoyu);
 	});
+
+	/*
+	 * Öznitelik **atada**.
+	 *
+	 * Olağan kullanım bu: uygulama `<html data-theme="dark">` yazıyor,
+	 * `kalem-theme` sınıfı ise editörün üstünde — ikisi aynı eleman değil.
+	 * Yukarıdaki iki test özniteliği editörün kendisine koyduğu için bu
+	 * durum kapsanmıyordu ve seçici yalnızca bileşik hâlde yazılıydı:
+	 * sayfa koyuya dönüyor, belge açık kalıyordu. F5-05'in not defteri
+	 * bunu ilk gün ortaya çıkardı.
+	 */
+	test("atadaki data-theme koyu temayı uyguluyor", async ({ page }) => {
+		await page.emulateMedia({ colorScheme: "light" });
+		const acik = await vurgu(page, "#editor");
+		await page.evaluate(() => {
+			document.documentElement.dataset["theme"] = "dark";
+		});
+		expect(await vurgu(page, "#editor")).not.toBe(acik);
+	});
+
+	test("atadaki data-theme sistem tercihini de eziyor", async ({ page }) => {
+		await page.emulateMedia({ colorScheme: "dark" });
+		const sistemKoyu = await vurgu(page, "#editor");
+		await page.evaluate(() => {
+			document.documentElement.dataset["theme"] = "light";
+		});
+		expect(await vurgu(page, "#editor")).not.toBe(sistemKoyu);
+	});
 });
