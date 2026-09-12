@@ -34,8 +34,8 @@
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
 | **Faz 4** — Eklentiler | 7 / 7 | ✅ **Tamamlandı** |
 | **Faz 5** — Sarmalayıcılar | 5 / 5 | 🟡 Bitti (2 haftalık kullanım sürüyor) |
-| **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **55 / 72** | **%76** |
+| **Faz 6** — Cila ve yayın | 1 / 14 | 🔵 Sürüyor |
+| | **56 / 72** | **%78** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,9 +43,9 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)**
+referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01`
 
-**Sıradaki:** Faz 6 — cila ve yayın (`F6-01` …).
+**Sıradaki:** `F6-02` doküman içeriği — sayfalar hâlâ planlanan API'yi anlatıyor.
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10), Linux görsel
 referansları (F3-11) ve `apps/notlar`ın iki haftalık günlük kullanımı
@@ -1956,9 +1956,45 @@ dâhil; sekiz dil paketi ayrı parçalarda). 24 birim + 11 tarayıcı testi.
 
 ## 6A · Dokümantasyon Sitesi (Astro Starlight)
 
-### F6-01 · Site kurulumu `[M]` ⬜
-`apps/docs`: Astro + Starlight, marka teması, Pagefind arama, TR + EN i18n iskeleti
-- **Kabul:** `pnpm --filter docs dev` çalışıyor
+### F6-01 · Site kurulumu `[M]` ✅
+- [x] Astro 7 + Starlight 0.42, Pagefind araması (27 sayfa, iki dil indeksli)
+- [x] Marka teması — renkler `@kalem/themes/tokens.css` paletinin aynısı
+- [x] TR + EN i18n iskeleti; kenar çubuğu iki dilde
+- [x] Site CI'da derleniyor (`dokuman` işi)
+- [x] **Kabul:** `pnpm docs:dev` ve `pnpm docs:build` çalışıyor
+
+**Site zaten vardı ama iki ana sürüm geride kalmıştı** (Astro 5 /
+Starlight 0.30; güncel olanlar 7 ve 0.42). Yükseltme iki kırıcı değişiklik
+getirdi: `social` artık nesne değil **dizi**, `tagline` kök seçenek
+olmaktan çıkıp giriş sayfasının hero'suna taşınmış. İkisi de düzeltildi.
+
+**Renkler uydurulmuyor.** `kalem.css`, `@kalem/themes/tokens.css`teki
+paletin aynısını kullanıyor: açık temada `#22201d` metin / `#fbfaf8`
+zemin / `#0f4e4a` vurgu, koyu temada `#e8e6e1` / `#16151a` / `#6fd3c6`.
+Starlight'ın varsayılan gri merdiveni soğuk (maviye kaçık) olduğu için o
+da baştan yazıldı — Kalem'in nötrleri hafifçe sıcak, çünkü saf gri
+"seçilmemiş" duruyor. Okuyucunun ekran görüntüsündeki editörle sayfanın
+kendisi arasında kopukluk görmemesi gerekiyor.
+
+**Belge gövdesi serif.** Başlıklar ve arayüz IBM Plex Sans, kod IBM Plex
+Mono, akıcı metin Source Serif 4. Kalem bir yazma aracı; dokümanının da
+okunmak için yazılmış bir metin gibi görünmesi mesajın parçası.
+
+**İki dil iskeleti, yarım çeviriye dayanıklı.** Starlight çevrilmemiş bir
+sayfayı varsayılan dile **düşürüyor** ve okuyucuya "bu içerik henüz sizin
+dilinizde yok" diyor; yani `/en/` bölümü boşken bile site kırılmıyor.
+Kenar çubuğu etiketleri iki dilde de yazılı — dil değiştiren okuyucu
+Türkçe bir menüyle karşılaşmıyor. İçerik çevirisi F6-10'un işi.
+
+> **Site CI'da hiç derlenmiyordu.** Kütüphane on beş görev boyunca
+> değişirken doküman sitesi sessizce çürüyebilirdi; yükseltmenin kırdığı
+> yapılandırma da kimseye görünmezdi. Artık kendi işi var (`dokuman`).
+> Ayrı iş olmasının sebebi sürüm: Astro 7 **Node 22.12+** istiyor, deponun
+> geri kalanı 20'de de koşuyor.
+
+**İçeriğin kendisi hâlâ planlanan API'yi anlatıyor** (`toolbar()`,
+`slashMenu()` gibi hiç var olmayan çağrılar dâhil). Yenilenmesi F6-02'nin
+işi ve bu madde onu kapsamıyor.
 
 ### F6-02 · İçerik yazımı `[L]` ⬜
 Analiz §10.2'deki bilgi mimarisi:

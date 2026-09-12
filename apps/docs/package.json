@@ -1,16 +1,20 @@
 {
   "name": "@kalem/docs",
   "private": true,
+  "description": "Kalem dokümantasyon sitesi — Astro Starlight",
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.30.0",
-    "astro": "^5.1.0",
-    "sharp": "^0.33.5"
+    "@astrojs/starlight": "^0.42.0",
+    "astro": "^7.3.2",
+    "sharp": "^0.35.4"
   },
   "devDependencies": {
     "typescript": "^5.9.0"

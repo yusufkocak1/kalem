@@ -130,3 +130,19 @@ jobs:
       # `e2e:examples` derlemeyi kendisi de çalıştırıyor (yukarıdakinden
       # sonra artımlı): derleme kırılırsa test hiç başlamıyor.
       - run: pnpm e2e:examples
+
+  dokuman:
+    name: dokümantasyon sitesi
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          # Astro 7 Node 22.12+ istiyor; deponun geri kalanı 20'de de koşuyor.
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Site kütüphaneyi henüz gömmüyor (F6-03) ama derlemesi kırılırsa
+      # sessizce çürümesin: duyuru günü eksik doküman = kaybedilmiş fırsat.
+      - run: pnpm docs:build

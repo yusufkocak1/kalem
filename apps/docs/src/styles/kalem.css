@@ -1,24 +1,127 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap");
+/*
+ * Kalem dokümantasyon sitesi — marka teması  (İş listesi: F6-01)
+ *
+ * Renkler uydurulmuyor: `@kalem/themes/tokens.css`teki paletin aynısı.
+ * Sitenin ürünle aynı renkte olması süs değil — okuyucu, ekran
+ * görüntüsündeki editörle sayfanın kendisi arasında bir kopukluk
+ * görmemeli.
+ *
+ *     açık:  metin #22201d · zemin #fbfaf8 · vurgu #0f4e4a
+ *     koyu:  metin #e8e6e1 · zemin #16151a · vurgu #6fd3c6
+ *
+ * Starlight'ın varsayılan grileri soğuk (mavi kaçık); Kalem'inkiler
+ * hafifçe sıcak, çünkü saf gri "seçilmemiş" duruyor. O yüzden gri
+ * merdiveni de baştan yazılıyor.
+ *
+ * Tipografi üç yüzlü: başlıklar ve arayüz IBM Plex Sans, kod IBM Plex
+ * Mono, **belge gövdesi** Source Serif 4. Sonuncusu bilinçli — Kalem bir
+ * yazma aracı ve dokümanın kendisi de okunmak için yazılmış bir metin
+ * gibi görünmeli.
+ */
+
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap");
 
 :root {
-	--sl-font: "IBM Plex Sans", system-ui, sans-serif;
-	--sl-font-mono: "IBM Plex Mono", ui-monospace, monospace;
+	--sl-font: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+	--sl-font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
 
-	/* koyu tema (Starlight varsayılanı) */
+	/* --- Koyu tema (Starlight varsayılanı) --- */
 	--sl-color-accent-low: #16302f;
-	--sl-color-accent: #1f6f6b;
-	--sl-color-accent-high: #a9cfcb;
+	--sl-color-accent: #2c8b84;
+	--sl-color-accent-high: #6fd3c6;
+
+	--sl-color-white: #ffffff;
+	--sl-color-gray-1: #e8e6e1;
+	--sl-color-gray-2: #cbc7c0;
+	--sl-color-gray-3: #9d978d;
+	--sl-color-gray-4: #6a655e;
+	--sl-color-gray-5: #403d47;
+	--sl-color-gray-6: #24232a;
+	--sl-color-gray-7: #1e1d23;
+	--sl-color-black: #16151a;
+
+	--sl-color-bg-sidebar: #1a191f;
+	--sl-color-bg-inline-code: rgb(232 230 225 / 9%);
 }
 
 :root[data-theme="light"] {
 	--sl-color-accent-low: #dcecea;
 	--sl-color-accent: #1f6f6b;
 	--sl-color-accent-high: #0f4e4a;
+
+	--sl-color-white: #22201d;
+	--sl-color-gray-1: #2e2b27;
+	--sl-color-gray-2: #4a453e;
+	--sl-color-gray-3: #6f6a62;
+	--sl-color-gray-4: #948d83;
+	--sl-color-gray-5: #d8d4cd;
+	--sl-color-gray-6: #e9e6e0;
+	--sl-color-gray-7: #f2efe9;
+	--sl-color-black: #fbfaf8;
+
+	--sl-color-bg-sidebar: #f6f4f0;
+	--sl-color-bg-inline-code: rgb(34 32 29 / 6%);
 }
 
-/* Belge gövdesi serif — Kalem'in editör içeriğiyle aynı his */
+/* --- Belge metni ---------------------------------------------------------
+ * Gövde serif, başlıklar sans: Kalem'in editör içeriğiyle aynı his.
+ * Yalnızca akıcı metin serif — tablo, kod ve arayüz parçaları değil.
+ */
 .sl-markdown-content p,
-.sl-markdown-content li {
+.sl-markdown-content li,
+.sl-markdown-content blockquote {
 	font-family: "Source Serif 4", Georgia, serif;
-	font-size: 1.02rem;
+	font-size: 1.05rem;
+	line-height: 1.7;
+}
+
+.sl-markdown-content :is(h1, h2, h3, h4) {
+	letter-spacing: -0.015em;
+}
+
+/* Okuma genişliği: 75 karakterin ötesinde göz satır başını kaybediyor. */
+.sl-markdown-content > :is(p, ul, ol, blockquote) {
+	max-width: 72ch;
+}
+
+/* --- Kod -----------------------------------------------------------------
+ * Kod blokları editörün kendi kod bloklarına benziyor: aynı yuvarlatma,
+ * aynı ince kenarlık.
+ */
+.expressive-code .frame {
+	border-radius: 8px;
+}
+
+.sl-markdown-content code:not(:where(.expressive-code *)) {
+	font-size: 0.92em;
+	border-radius: 4px;
+	padding: 0.15em 0.35em;
+}
+
+/* --- Giriş sayfası -------------------------------------------------------
+ * Sloganın satır uzunluğu sınırlanıyor; geniş ekranda tek satıra yayılınca
+ * okunmuyor.
+ */
+.hero > .copy {
+	max-width: 34ch;
+}
+
+.hero h1 {
+	letter-spacing: -0.03em;
+}
+
+/* --- Tablolar ------------------------------------------------------------
+ * Karşılaştırma tablosu giriş sayfasının en yoğun parçası; hizalama ve
+ * ince ayırıcılar onu okunur kılıyor.
+ */
+.sl-markdown-content table {
+	font-size: 0.95rem;
+}
+
+.sl-markdown-content :is(th, td) {
+	border-color: var(--sl-color-gray-5);
+}
+
+.sl-markdown-content th {
+	font-weight: 600;
 }
