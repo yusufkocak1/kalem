@@ -5,6 +5,8 @@
  * editörü tanıyor, editör arayüzü tanımıyor.
  *
  * Stiller ayrı: `@kalem/themes/ui.css`.
+ *
+ * @module @kalem/ui
  */
 export type { BlockHandle, BlockHandleOptions } from "./block-handle.js";
 export { createBlockHandle } from "./block-handle.js";

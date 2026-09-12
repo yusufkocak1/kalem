@@ -10,6 +10,8 @@
  * SSR, derleme betiği — onların boyutunu ödemez.
  *
  * `scanner` de dışarıda: ayrıştırıcının iç tesisatı, kararlı API değil.
+ *
+ * @module @kalem/core
  */
 
 // --- AST tipleri (F1-01) ---

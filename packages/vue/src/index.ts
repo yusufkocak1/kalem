@@ -14,6 +14,8 @@
  * Vue bir **peer** bağımlılık. Sunucuda belge `@kalem/viewer` ile
  * çiziliyor, yani Nuxt'ta `<ClientOnly>` gerekmiyor: ilk boyada okunabilir
  * bir metin var ve JavaScript geldiğinde editör aynı elemanı devralıyor.
+ *
+ * @module @kalem/vue
  */
 
 export { KALEM_KEY, useKalem } from "./inject.js";

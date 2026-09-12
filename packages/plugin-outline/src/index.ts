@@ -15,6 +15,8 @@
  *
  * `outlineOf` ayrıca saf: editörsüz bir betikte de içindekiler
  * üretilebiliyor.
+ *
+ * @module @kalem/plugin-outline
  */
 export type { OutlineLabels } from "./labels.js";
 export { enOutlineLabels, labelsFor, trOutlineLabels } from "./labels.js";

@@ -16,6 +16,8 @@
  *
  * Ağ hakkında hiçbir şey bilmiyor: `save` kancası çağrılıyor, gerisi
  * gömen uygulamanın.
+ *
+ * @module @kalem/plugin-autosave
  */
 export type { AutosaveLabels } from "./labels.js";
 export { enAutosaveLabels, labelsFor, trAutosaveLabels } from "./labels.js";

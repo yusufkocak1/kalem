@@ -10,6 +10,8 @@
  *     const editor = new Editor(el, { plugins: [sourceModePlugin()] });
  *
  * Ctrl/Cmd+Shift+M kipi değiştiriyor, Escape geri dönüyor.
+ *
+ * @module @kalem/plugin-source-mode
  */
 export type { SourceLabels } from "./labels.js";
 export { enSourceLabels, labelsFor, trSourceLabels } from "./labels.js";

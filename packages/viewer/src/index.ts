@@ -9,6 +9,8 @@
  *
  * Editör (`@kalem/editor`) bu paketi kullanmaz; kendi artımlı DOM yamasını
  * uygular. Viewer'ın işi, düzenlenmeyen içeriği ucuza göstermek.
+ *
+ * @module @kalem/viewer
  */
 export type { RenderToDomOptions } from "./dom.js";
 export { renderToDOM } from "./dom.js";

@@ -50,10 +50,20 @@ Kenar çubuğu etiketleri iki dilde de yazılı (`astro.config.mjs`), içerik
 |---|---|---|
 | Başlangıç · Rehber (7) · Framework'ler (9) · Tarifler (5) · Mimari | ✅ Gerçek API'ye göre yazıldı | F6-02 |
 | Canlı gömülü örnekler (`/canli/`) | ✅ vanilla + React + Vue, aynı sayfada | F6-03 |
-| API referansı (TypeDoc) | Eksik | F6-04 |
+| API referansı (`/api/`) | ✅ TypeDoc'tan üretiliyor, 395 genel ad | F6-04 |
 | Landing sayfası | Taslak | F6-05 |
 | Playground | Eksik | F6-07 |
 | İngilizce çeviri (`en/`) | İskelet var, içerik yok | F6-10 |
+
+## API referansı
+
+`src/content/docs/api/` **üretilen** bir dizin ve `.gitignore`da:
+`pnpm docs:build` her koşuşunda TypeDoc paketlerin kaynağından yeniden
+yazıyor. Giriş listesi `astro.config.mjs`te; yeni bir paket eklerken oraya
+da eklenmeli — unutulursa doküman kapısı yakalıyor.
+
+TypeDoc, deponun TypeScript 7'siyle değil `apps/docs`un kendi 5.9'uyla
+çalışıyor (`typedoc` 6.0'ın üstünü desteklemiyor).
 
 ## Doküman kapısı
 
@@ -62,11 +72,15 @@ kimse fark etmeden yanlış kaldı: "beş satırda ilk editör" örneği
 `toolbar()`, `slashMenu()` ve `dragHandle()` çağırıyordu — üçü de hiç var
 olmadı.
 
-`pnpm guard:docs` bunu bir daha olmaz hâle getiriyor: her
-`import { … } from "@kalem/…"` satırındaki her adın paketin gerçek dışa
-aktarmaları arasında olup olmadığına bakıyor. Tip denetimi değil —
-örnekler kısaltılmış olduğu için derlenmeleri beklenmiyor — ama yazılan
-adların var olması beklenebilir.
+`pnpm guard:docs` bunu bir daha olmaz hâle getiriyor. İki denetimi var:
+
+1. **Elle yazılan sayfalar** — her `import { … } from "@kalem/…"`
+   satırındaki her adın paketin gerçek dışa aktarmaları arasında olup
+   olmadığı. Tip denetimi değil (örnekler kısaltılmış, derlenmeleri
+   beklenmiyor) ama yazılan adların var olması beklenebilir.
+2. **API referansı** — her genel dışa aktarmanın üretilen markdown'da
+   geçtiği. Referans üretilmemişse bu denetim atlanıyor ve rapor bunu
+   söylüyor; CI'da kapı `docs:build`ten **sonra** koşuyor.
 
 ## Dizin yapısı
 

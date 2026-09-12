@@ -28,6 +28,8 @@ const ATLA = new Set([
 	".output",
 	".angular",
 	"out-tsc",
+	// TypeDoc çıktısı (F6-04): kaynaktan üretiliyor, kaynağı zaten taranıyor.
+	"api",
 	".tsbuild",
 	"coverage",
 	".astro",

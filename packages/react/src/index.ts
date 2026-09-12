@@ -12,6 +12,8 @@
  * `react >= 17` yeterli — `useSyncExternalStore` 18'de geldi ama
  * `use-sync-external-store` shim'i olmadan da 17'de derleniyor; kancayı
  * yalnızca `useKalemValue` kullanıyor.
+ *
+ * @module @kalem/react
  */
 
 export { KalemContext, useKalem, useKalemValue } from "./context.js";

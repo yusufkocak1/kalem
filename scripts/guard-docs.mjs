@@ -18,6 +18,18 @@
  * derlenmeleri beklenmiyor; ama **yazılan adların** var olması
  * beklenebilir.
  *
+ * ## İkinci denetim: API referansı eksiksiz mi
+ *
+ * F6-04 referansı TypeDoc'tan üretiyor, yani sapması mümkün değil — ama
+ * bir girişin **listeden düşmesi** mümkün. Yeni bir paket eklenip
+ * `astro.config.mjs`e yazılmazsa referans sessizce eksik kalır ve kimse
+ * fark etmez.
+ *
+ * Bu yüzden her genel girişin dışa aktardığı her ad, üretilen markdown'da
+ * geçiyor mu diye bakılıyor. Referans üretilmemişse (yalnızca
+ * `pnpm docs:build` üretiyor) denetim **atlanıyor** ve rapor bunu
+ * söylüyor.
+ *
  * Kullanım: node scripts/guard-docs.mjs [--quiet]
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -108,7 +120,12 @@ const harita = paketHaritasi();
 const sayfaListesi = existsSync(ICERIK) ? sayfalar(ICERIK) : [];
 let denetlenen = 0;
 
+const API = join(ICERIK, "api");
+
 for (const sayfa of sayfaListesi) {
+	// Üretilen referans denetim dışı: kaynağın kendisinden üretiliyor,
+	// import adlarını ona sormak dairesel olurdu.
+	if (sayfa.startsWith(API)) continue;
 	const kod = readFileSync(sayfa, "utf8");
 	const kisaAd = sayfa.slice(ICERIK.length + 1).replaceAll("\\", "/");
 
@@ -140,13 +157,40 @@ for (const sayfa of sayfaListesi) {
 }
 
 // ---------------------------------------------------------------------------
+// API referansı eksiksiz mi
+// ---------------------------------------------------------------------------
+
+const apiSayfalari = existsSync(API) ? sayfalar(API) : [];
+const apiAtlandi = apiSayfalari.length === 0;
+let kapsanan = 0;
+
+if (!apiAtlandi) {
+	// Bütün referans tek dizede aranıyor: bir adın hangi sayfada geçtiği
+	// önemli değil, **geçip geçmediği** önemli.
+	const tumu = apiSayfalari.map((y) => readFileSync(y, "utf8")).join("\n");
+	for (const [paket, adlar] of harita) {
+		for (const ad of adlar) {
+			kapsanan++;
+			// Sözcük sınırı: `parse` adı `parseBlocks` içinde geçmiş sayılmamalı.
+			if (!new RegExp(`\\b${ad}\\b`).test(tumu)) {
+				hatalar.push({ sayfa: "api/", mesaj: `${paket} → "${ad}" referansta yok` });
+			}
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Rapor
 // ---------------------------------------------------------------------------
 
 if (hatalar.length === 0) {
 	if (!SESSIZ) {
+		const api = apiAtlandi
+			? "API referansı üretilmemiş (atlandı)"
+			: `${kapsanan} genel ad referansta`;
 		console.log(
-			`✓ doküman kapısı: ${sayfaListesi.length} sayfa, ${denetlenen} import adı doğrulandı`,
+			`✓ doküman kapısı: ${sayfaListesi.length - apiSayfalari.length} sayfa, ` +
+				`${denetlenen} import adı doğrulandı · ${api}`,
 		);
 	}
 	process.exit(0);

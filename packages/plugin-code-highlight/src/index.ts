@@ -18,6 +18,8 @@
  * Gramerler `import()` ile geliyor: belgede yalnızca JSON varsa yalnızca
  * JSON grameri iniyor. Bu paketi kurmayan bir uygulama ise hiçbir şey
  * indirmiyor — kabul kriterinin istediği "ana bundle'a 0 byte".
+ *
+ * @module @kalem/plugin-code-highlight
  */
 export type { PrismToken, ShikiToken } from "./adapters.js";
 export { prismTokens, shikiTokens } from "./adapters.js";

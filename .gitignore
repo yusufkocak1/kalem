@@ -13,6 +13,8 @@ blob-report/
 # astro
 apps/docs/.astro/
 apps/docs/dist/
+# TypeDoc çıktısı: her derlemede yeniden üretiliyor (F6-04)
+apps/docs/src/content/docs/api/
 
 # next.js (examples/nextjs)
 .next/

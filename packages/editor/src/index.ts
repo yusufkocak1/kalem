@@ -9,6 +9,8 @@
  * Ayrımın sebebi analiz §5.3: arayüzü olmayan bir editör, kendi tasarım
  * sistemi olan bir uygulamaya gömülebilir. Arayüz gömülü olsaydı ya
  * uygulamanın tasarımına yabancı kalırdı ya da ezilmek zorunda kalırdı.
+ *
+ * @module @kalem/editor
  */
 
 export type { Caret, EditResult } from "./block-edit.js";

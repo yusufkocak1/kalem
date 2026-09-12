@@ -23,6 +23,8 @@
  *
  * Bilinmeyen etiket = **içeriği düz metne düşür**. Kara liste yaklaşımı
  * Word'ün her sürümde yeni ürettiği çöple baş edemez; beyaz liste eder.
+ *
+ * @module @kalem/core/html
  */
 import type { Block, Inline, List, Root } from "./ast.js";
 import { isSafeUrl, NEUTRALIZED_URL } from "./security.js";

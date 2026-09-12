@@ -15,6 +15,8 @@
  *
  * Saf katman (`textOf`, `countText`) ayrıca dışa açık: bir derleme
  * betiğinde de aynı sayılar üretilebiliyor.
+ *
+ * @module @kalem/plugin-word-count
  */
 export type { CountOptions, Counts } from "./count.js";
 export { countText, countWords } from "./count.js";

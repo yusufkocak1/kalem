@@ -18,7 +18,8 @@
       "!apps/demo/index.html",
       "!pnpm-lock.yaml",
       "!**/.angular",
-      "!**/out-tsc"
+      "!**/out-tsc",
+      "!apps/docs/src/content/docs/api"
     ]
   },
   "formatter": {

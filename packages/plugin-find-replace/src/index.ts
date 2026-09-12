@@ -15,6 +15,8 @@
  *
  * Saf katman (`createIndex`, `findMatches`, `replaceAll`) ayrıca
  * dışa açık: editörsüz bir betikte de aynı arama yapılabiliyor.
+ *
+ * @module @kalem/plugin-find-replace
  */
 export type { FoldedText } from "./fold.js";
 export { atWordBoundary, foldCase, isWordChar } from "./fold.js";

@@ -12,6 +12,8 @@
  *
  * Editör bir seçim tutar ve seçim yollarla ifade edilir. Komutlar da aynı
  * dili konuşursa aradaki dönüşüm katmanı gerekmez.
+ *
+ * @module @kalem/core/commands
  */
 import type { Block, Heading, Inline, List, ListItem, Node, Paragraph, Root } from "./ast.js";
 import { insertAt, removeAt, replaceAt } from "./edit.js";

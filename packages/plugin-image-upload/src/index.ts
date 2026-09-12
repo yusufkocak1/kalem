@@ -6,6 +6,8 @@
  * yazıyor.
  *
  * Stiller ayrı: `@kalem/themes/plugin-image.css`.
+ *
+ * @module @kalem/plugin-image-upload
  */
 export type { AltEditor, AltEditorOptions } from "./alt-editor.js";
 export { createAltEditor } from "./alt-editor.js";

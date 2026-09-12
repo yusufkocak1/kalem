@@ -4,6 +4,33 @@ import react from "@astrojs/react";
 import starlight from "@astrojs/starlight";
 import vue from "@astrojs/vue";
 import { defineConfig } from "astro/config";
+import starlightTypeDoc, { typeDocSidebarGroup } from "starlight-typedoc";
+
+/**
+ * API referansının okuduğu giriş noktaları  (İş listesi: F6-04)
+ *
+ * Paketlerin `exports` haritasındaki her genel giriş burada. Kaynak
+ * okunuyor, `.d.ts` değil: derlenmiş bildirimlerde JSDoc yorumlarının bir
+ * kısmı kayboluyor ve referansın değerli yanı tam olarak o yorumlar.
+ */
+const GIRISLER = [
+	"core/src/index.ts",
+	"core/src/commands.ts",
+	"core/src/html.ts",
+	"viewer/src/index.ts",
+	"editor/src/index.ts",
+	"ui/src/index.ts",
+	"plugin-image-upload/src/index.ts",
+	"plugin-code-highlight/src/index.ts",
+	"plugin-find-replace/src/index.ts",
+	"plugin-outline/src/index.ts",
+	"plugin-word-count/src/index.ts",
+	"plugin-source-mode/src/index.ts",
+	"plugin-autosave/src/index.ts",
+	"react/src/index.ts",
+	"vue/src/index.ts",
+	"wc/src/index.ts",
+].map((yol) => `../../packages/${yol}`);
 
 /**
  * Kalem dokümantasyon sitesi  (İş listesi: F6-01, F6-02)
@@ -38,11 +65,86 @@ const bag = (label, en, link) => ({ label, translations: { en }, link });
 
 export default defineConfig({
 	site: "https://kalem.dev",
+	/*
+	 * `@kalem/core/html` modülünün dosyası `html-1.md` oluyor.
+	 *
+	 * TypeDoc'un dosya kaydı büyük/küçük harfe duyarsız ve `@kalem/core`
+	 * zaten `Html` adlı bir AST tipi dışa aktarıyor; iki ad çakışınca
+	 * sonrakine son ek veriliyor. Adresi elle yazan okuyucu ise `/html/`
+	 * deneyecek, o yüzden doğrusuna yönlendiriliyor.
+	 */
+	redirects: {
+		"/api/kalem/core/html": "/api/kalem/core/html-1/",
+		"/en/api/kalem/core/html": "/en/api/kalem/core/html-1/",
+	},
 	integrations: [
 		react(),
 		vue(),
 		starlight({
 			title: "Kalem",
+			plugins: [
+				/*
+				 * API referansı TypeDoc'tan üretiliyor (F6-04).
+				 *
+				 * Elle yazılan bir referans kaçınılmaz olarak koddan sapıyor;
+				 * F6-02 sitenin on beş görev boyunca yanlış API'yi anlattığını
+				 * gösterdi. Üretilen referansın sapması mümkün değil.
+				 *
+				 * Çıktı `src/content/docs/api/` altına yazılıyor ve **depoya
+				 * girmiyor** — her derlemede yeniden üretiliyor.
+				 */
+				starlightTypeDoc({
+					entryPoints: GIRISLER,
+					tsconfig: "./tsconfig.typedoc.json",
+					output: "api",
+					sidebar: { label: "API referansı", collapsed: true },
+					typeDoc: {
+						// Kök `package.json`ın adı ("kalem-monorepo") başlık
+						// olmamalı; okuyucunun gördüğü şey referansın kendisi.
+						name: "API referansı",
+						// Giriş sayfasının üst kısmı elle yazıldı: üretilen
+						// modül listesi tek başına "bu ne" sorusunu cevaplamıyor.
+						readme: "./src/api-giris.md",
+						// "Defined in" satırları kaynağa bağlanıyor; referans,
+						// koda açılan bir kapı olsun diye.
+						sourceLinkTemplate: "https://github.com/kalem-editor/kalem/blob/main/{path}#L{line}",
+						basePath: "../../",
+						// Her giriş ayrı bir modül sayfası; paket sınırları
+						// referansta da görünüyor.
+						entryPointStrategy: "resolve",
+						/*
+						 * Giriş başına **tek** sayfa.
+						 *
+						 * Varsayılan ("members") her dışa aktarma için ayrı bir
+						 * dosya üretiyor: 396 sayfa, iki dille 792 rota ve
+						 * Pagefind indeksi yirmi saniye. Okuyucunun istediği ise
+						 * "`@kalem/editor` neler veriyor" sorusunun tek yerde
+						 * cevabı; sayfa içi içindekiler zaten gezinmeyi
+						 * sağlıyor.
+						 */
+						outputFileStrategy: "modules",
+						useCodeBlocks: true,
+						expandObjects: true,
+						parametersFormat: "table",
+						propertiesFormat: "table",
+						typeDeclarationFormat: "table",
+						// İç tesisat dışarıda: yalnızca `export`lananlar.
+						excludeInternal: true,
+						excludePrivate: true,
+						/*
+						 * Miras alınan DOM üyeleri dışarıda.
+						 *
+						 * `KalemEditorElement` `HTMLElement`i genişletiyor ve
+						 * TypeDoc onun bütün üyelerini sayfaya döküyordu:
+						 * `@kalem/wc` referansı 140 kB, çekirdeğinkinden
+						 * büyük. Okuyucunun aradığı şey Kalem'in eklediği
+						 * yüzey; `HTMLElement`i MDN anlatıyor.
+						 */
+						excludeExternals: true,
+						githubPages: false,
+					},
+				}),
+			],
 			description: "Framework-bağımsız, küçük ve modüler bir WYSIWYG Markdown editör kütüphanesi.",
 			defaultLocale: "root",
 			locales: {
@@ -112,6 +214,7 @@ export default defineConfig({
 					],
 				},
 				bag("Mimari", "Architecture", "/mimari/"),
+				typeDocSidebarGroup,
 			],
 		}),
 	],

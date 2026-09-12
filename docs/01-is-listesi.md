@@ -34,8 +34,8 @@
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
 | **Faz 4** — Eklentiler | 7 / 7 | ✅ **Tamamlandı** |
 | **Faz 5** — Sarmalayıcılar | 5 / 5 | 🟡 Bitti (2 haftalık kullanım sürüyor) |
-| **Faz 6** — Cila ve yayın | 3 / 14 | 🔵 Sürüyor |
-| | **58 / 72** | **%81** |
+| **Faz 6** — Cila ve yayın | 4 / 14 | 🔵 Sürüyor |
+| | **59 / 72** | **%82** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,9 +43,9 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03`
+referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03` · `F6-04`
 
-**Sıradaki:** `F6-04` API referansı (TypeDoc → Starlight).
+**Sıradaki:** `F6-05` landing sayfası — canlı editör, boyut rozeti, 30 saniyelik anlatım.
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10), Linux görsel
 referansları (F3-11) ve `apps/notlar`ın iki haftalık günlük kullanımı
@@ -2111,9 +2111,69 @@ kutulardan biri boş kalırdı.
 Site 51 rota üretiyor (iki dil). CI'ın doküman işi artık önce `pnpm build`
 çalıştırıyor — site paketlerin derlenmiş çıktısına ihtiyaç duyuyor.
 
-### F6-04 · API referansı `[M]` ⬜
-TypeDoc → Starlight entegrasyonu, otomatik üretim CI'da
-- **Kabul:** her genel API tipi dokümante
+### F6-04 · API referansı `[M]` ✅
+- [x] TypeDoc → Starlight; on altı genel giriş, her derlemede yeniden üretiliyor
+- [x] Çıktı depoya girmiyor; "Defined in" satırları GitHub'da kaynağa bağlanıyor
+- [x] **Kabul:** her genel API tipi dokümante — **395 ad** doküman kapısıyla ölçülüyor
+
+**Elle yazılan referans sapıyor; üretilen sapamaz.** F6-02 sitenin on beş
+görev boyunca var olmayan bir API'yi anlattığını gösterdi. Referans artık
+paketlerin **kaynağından** üretiliyor: her tip, her fonksiyon ve her
+açıklama JSDoc yorumlarından geliyor.
+
+Kaynak okunuyor, `.d.ts` değil — derlenmiş bildirimlerde yorumların bir
+kısmı kayboluyor ve referansın değerli yanı tam olarak o yorumlar.
+TypeDoc'un okuduğu program ayrı bir `tsconfig.typedoc.json`da ve
+`customConditions: ["kalem-source"]` taşıyor, yani paketler arası
+`@kalem/*` import'ları da kaynağa çözülüyor.
+
+**Kabul kriteri ölçülebilir hâle getirildi.** Doküman kapısına ikinci bir
+denetim eklendi: her genel girişin dışa aktardığı her ad, üretilen
+markdown'da geçiyor mu. Şu an 395 ad doğrulanıyor. Kapı yazıldıktan sonra
+sınandı — üretilen bir modül dosyası silinince on iki eksiği tek tek
+saydı.
+
+Bu denetimin yakaladığı asıl şey sapma değil, **düşme**: yeni bir paket
+eklenip `astro.config.mjs`teki giriş listesine yazılmazsa referans
+sessizce eksik kalırdı ve kimse fark etmezdi.
+
+> **396 sayfa yerine 17.** Varsayılan çıktı her dışa aktarma için ayrı bir
+> dosya üretiyor: 396 sayfa, iki dille 792 rota ve yirmi saniyelik bir
+> Pagefind indeksi. Okuyucunun sorusu ise "`@kalem/editor` neler veriyor" —
+> ve onun cevabı tek sayfada, sayfa içi içindekilerle daha iyi duruyor.
+> `outputFileStrategy: "modules"` ile giriş başına tek sayfa; site 51
+> rotadan 87'ye çıktı, 843'e değil.
+
+> **`@kalem/wc` referansı 140 kB'tı — çekirdeğinkinden büyük.**
+> `KalemEditorElement` `HTMLElement`i genişletiyor ve TypeDoc onun bütün
+> miras alınan DOM üyelerini sayfaya döküyordu. Okuyucunun aradığı şey
+> Kalem'in **eklediği** yüzey; `HTMLElement`i MDN anlatıyor.
+> `excludeExternals` ile kesildi.
+
+**Modül adları paket adlarıyla aynı.** Her genel giriş dosyasının baş
+yorumuna `@module @kalem/…` eklendi; yoksa TypeDoc modülleri dosya
+yoluna göre adlandırıyor ve kenar çubuğunda "src" yazıyordu. Artık
+başlık, kenar çubuğu ve adres `npm i` ile yazdığınız adla aynı.
+
+> **Tek pürüz: `@kalem/core/html` sayfası `html-1` adresinde.** TypeDoc'un
+> dosya kaydı büyük/küçük harfe duyarsız ve `@kalem/core` zaten `Html`
+> adlı bir AST tipi dışa aktarıyor; çakışan ada son ek veriliyor. Başlık,
+> kenar çubuğu ve modül listesi doğru; yalnızca adres tuhaf. Elle
+> `/html/` yazan okuyucu için yönlendirme eklendi.
+
+**Bölüm başlıkları İngilizce kaldı.** "Interfaces", "Properties",
+"Defined in" gibi yapısal etiketler TypeDoc ve eklentisinden geliyor;
+bir kısmını çevirip bir kısmını bırakmak yarım bir sonuç verirdi.
+Açıklamaların tamamı Türkçe. Referansın giriş sayfası bunu söylüyor ve
+çeviri F6-10'a bırakıldı.
+
+**CI'da sıra önemli:** `pnpm build` → `pnpm docs:build` (referans burada
+üretiliyor) → `pnpm guard:docs`. Kapı derlemeden sonra koşuyor çünkü
+ikinci denetimi üretilen çıktıya bakıyor; referans yoksa o denetim
+atlanıyor ve rapor bunu açıkça yazıyor.
+
+Çıktı `.gitignore`da: her derlemede yeniden üretilen bir şeyi depoda
+tutmak, kaynakla arasına fark girmesine davetiye.
 
 ### F6-05 · Landing sayfası `[M]` ⬜
 Canlı editör (hemen dene), boyut rozeti, rakip karşılaştırma tablosu, 30 saniyelik GIF, kurulum tek satırı

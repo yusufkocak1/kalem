@@ -15,6 +15,8 @@
  *
  * `@kalem/themes/editor.css` yüklenmeli: eleman varsayılan olarak
  * `display: inline` ve tipografi oradan geliyor.
+ *
+ * @module @kalem/wc
  */
 
 export { defineKalemEditor } from "./define.js";

@@ -144,13 +144,16 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
-      # Örneklerdeki her `import { … } from "@kalem/…"` adı gerçekten var
-      # mı: site bir kez, kütüphane yazılmadan önce yazıldı ve on beş görev
-      # boyunca kimse fark etmeden yanlış kaldı.
-      - run: pnpm guard:docs
-
       # Site artık kütüphaneyi **gerçekten gömüyor** (F6-03: `/canli/`
       # sayfasında vanilla, React ve Vue örnekleri aynı anda çalışıyor),
       # yani paketlerin derlenmiş çıktısına ihtiyacı var.
       - run: pnpm build
+
+      # API referansı (F6-04) bu adımda TypeDoc'tan üretiliyor.
       - run: pnpm docs:build
+
+      # Kapı derlemeden **sonra**: iki denetimi var ve ikincisi üretilen
+      # referansa bakıyor. Birincisi elle yazılan sayfalardaki her
+      # `import { … } from "@kalem/…"` adının gerçekten var olduğunu,
+      # ikincisi her genel dışa aktarmanın referansta geçtiğini ölçüyor.
+      - run: pnpm guard:docs
