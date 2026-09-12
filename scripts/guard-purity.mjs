@@ -160,9 +160,47 @@ for (const ad of CEKIRDEK) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// 3. Gömülebilirlik: yayımlanan çıktıda ham kontrol karakteri yok
+//
+// Ham bir NUL, dosya olarak servis edildiğinde sorun çıkarmıyor ama paketi
+// bir HTML sayfasına **gömen** herkesi vuruyor: tarayıcının ayrıştırıcısı
+// `<script>` içindeki NUL'u U+FFFD'ye çeviriyor ve o karakter bir regex
+// sınıfının içindeyse sınıf geçersiz oluyor.
+//
+// Tam olarak bu yaşandı: `security.ts`in URL normalizasyon regex'i
+// kaynakta ham kontrol karakterleriyle yazılmıştı; `kalem-editor.iife.js`
+// bir sayfaya gömüldüğünde "Range out of order in character class" ile
+// açılışta düşüyordu. Dosya olarak yüklendiğinde ise sorunsuz — yani
+// mevcut testlerin hiçbiri yakalayamıyordu.
+//
+// Kaçış dizisi (`\u0000`) aynı anlamı taşıyor ve her bağlamda güvenli.
+// ---------------------------------------------------------------------------
+
+// biome-ignore lint/suspicious/noControlCharactersInRegex: aranan şey tam olarak bunlar
+const HAM_KONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/;
+
+for (const ad of readdirSync(join(KOK, "packages"))) {
+	for (const dosya of distDosyalari(join(KOK, "packages", ad, "dist"))) {
+		const kod = readFileSync(dosya, "utf8");
+		const m = HAM_KONTROL.exec(kod);
+		if (m === null) continue;
+		const kodNo = m[0].charCodeAt(0).toString(16).padStart(4, "0");
+		hata(
+			ad,
+			`${dosya.split(sep).slice(-2).join("/")} → ham kontrol karakteri U+${kodNo}`,
+			"Kaynakta kaçış dizisi kullanın (backslash-u0000 gibi). Ham hâli, paket bir HTML sayfasına gömüldüğünde tarayıcı tarafından U+FFFD'ye çevriliyor.",
+		);
+	}
+}
+
 if (hatalar.length === 0) {
-	if (!SESSIZ)
-		console.log(`✓ saflık kapısı: ${CEKIRDEK.length} paket temiz (0 framework izi, core DOM'suz)`);
+	if (!SESSIZ) {
+		console.log(
+			`✓ saflık kapısı: ${CEKIRDEK.length} paket temiz ` +
+				"(0 framework izi, core DOM'suz, çıktıda ham kontrol karakteri yok)",
+		);
+	}
 	process.exit(0);
 }
 

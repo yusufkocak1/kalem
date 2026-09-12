@@ -115,7 +115,7 @@ describe("scan — BOM ve NUL", () => {
 	});
 
 	it("NUL karakterini U+FFFD ile değiştiriyor", () => {
-		expect(scan("a\0b").lines[0]?.value).toBe("a�b");
+		expect(scan("a\0b").lines[0]?.value).toBe("a\ufffdb");
 	});
 });
 

@@ -64,7 +64,7 @@ export interface ScanResult {
  */
 export function scan(source: string): ScanResult {
 	const bom = source.charCodeAt(0) === 0xfeff;
-	const text = (bom ? source.slice(1) : source).replace(/\0/g, "�");
+	const text = (bom ? source.slice(1) : source).replace(/\0/g, "\ufffd");
 
 	const lines: Line[] = [];
 	const counts = { "\n": 0, "\r\n": 0, "\r": 0 };
