@@ -70,7 +70,7 @@ sonuç, kullanıcının elle hizaladığı tabloyu bozuyor.
 Tablo hücreleri şu an düzenlenebilir çiziliyor ama yazılan metin çıktıya
 **girmiyor**. Tablo düzenleme v1.0 öncesinde ya tamamlanacak ya da hücreler
 salt okunur hâle gelecek. Takip:
-[iş listesi, açık işler](https://github.com/kalem-editor/kalem/blob/main/docs/01-is-listesi.md).
+[iş listesi, açık işler](https://github.com/yusufkocak1/kalem/blob/main/docs/01-is-listesi.md).
 :::
 
 ## Locale duyarlı davranış

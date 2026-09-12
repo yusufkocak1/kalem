@@ -58,7 +58,7 @@ yüzen parçalar.
 `--kalem-*` değerlerini kendi düğmeleriniz için kullanmaya çalışırsanız
 kural **geçersiz** oluyor ve stil sessizce kayboluyor. Uygulamanın kendi
 paleti olmalı. Bu tam olarak
-[Kalem Notlar](https://github.com/kalem-editor/kalem/tree/main/apps/notlar)
+[Kalem Notlar](https://github.com/yusufkocak1/kalem/tree/main/apps/notlar)
 yazılırken yaşandı.
 :::
 

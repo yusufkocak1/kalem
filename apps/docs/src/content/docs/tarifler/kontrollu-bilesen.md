@@ -84,5 +84,5 @@ yeniden kurmak** çoğu zaman daha doğru:
 `setValue` geçmişi zaten sıfırlıyor, yani kazandıracağı bir şey yok;
 yeniden kurmak ayrıca otomatik kaydetmenin kurtarma anahtarını belgeye
 bağlıyor. Bu kalıbın tamamı
-[Kalem Notlar](https://github.com/kalem-editor/kalem/tree/main/apps/notlar)
+[Kalem Notlar](https://github.com/yusufkocak1/kalem/tree/main/apps/notlar)
 uygulamasında.

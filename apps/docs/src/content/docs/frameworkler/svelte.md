@@ -94,7 +94,7 @@ almıyorlar. Belge tipografisini `@kalem/themes` veriyor; kabuğu
 
 ## Çalışan örnek
 
-[`examples/svelte`](https://github.com/kalem-editor/kalem/tree/main/examples/svelte)
+[`examples/svelte`](https://github.com/yusufkocak1/kalem/tree/main/examples/svelte)
 — Vite + Svelte 5, CI'da derleniyor ve yedi tarayıcı testiyle sınanıyor.
 
 Elemanın tüm yüzeyi: [Web Components](/frameworkler/web-components/).

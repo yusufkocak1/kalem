@@ -87,5 +87,5 @@ CI'da doğruluyor.
 
 ## Çalışan örnek
 
-[`examples/nuxt`](https://github.com/kalem-editor/kalem/tree/main/examples/nuxt)
+[`examples/nuxt`](https://github.com/yusufkocak1/kalem/tree/main/examples/nuxt)
 — Nuxt 4, CI'da üretim derlemesi yapılıp dört tarayıcı testiyle sınanıyor.

@@ -95,6 +95,6 @@ Tam tarif: [Sunucuda Markdown](/tarifler/sunucuda-markdown/).
 
 ## Çalışan örnek
 
-[`examples/nextjs`](https://github.com/kalem-editor/kalem/tree/main/examples/nextjs)
+[`examples/nextjs`](https://github.com/yusufkocak1/kalem/tree/main/examples/nextjs)
 — Next 16 App Router, CI'da üretim derlemesi yapılıp dört tarayıcı testiyle
 sınanıyor.

@@ -124,5 +124,5 @@ Ayrıntı: [Next.js](/frameworkler/nextjs/).
 
 Panel isteyen eklentiler (içindekiler, kelime sayacı) React'in çizdiği bir
 kaba ihtiyaç duyuyor. Kalıbın tamamı için
-[Kalem Notlar](https://github.com/kalem-editor/kalem/blob/main/apps/notlar/src/Arayuz.tsx)
+[Kalem Notlar](https://github.com/yusufkocak1/kalem/blob/main/apps/notlar/src/Arayuz.tsx)
 uygulamasına bakın.

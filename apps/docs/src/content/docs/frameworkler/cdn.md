@@ -91,7 +91,7 @@ benzeri arayüz için ya bir paketleyici kullanın
 
 ## Çalışan örnek
 
-[`examples/cdn-vanilla`](https://github.com/kalem-editor/kalem/tree/main/examples/cdn-vanilla)
+[`examples/cdn-vanilla`](https://github.com/yusufkocak1/kalem/tree/main/examples/cdn-vanilla)
 — CI'da yedi tarayıcı testiyle sınanıyor; biri sayfadaki `<script>`
 etiketlerini sayıyor.
 

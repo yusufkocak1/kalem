@@ -107,7 +107,7 @@ export default defineConfig({
 						readme: "./src/api-giris.md",
 						// "Defined in" satırları kaynağa bağlanıyor; referans,
 						// koda açılan bir kapı olsun diye.
-						sourceLinkTemplate: "https://github.com/kalem-editor/kalem/blob/main/{path}#L{line}",
+						sourceLinkTemplate: "https://github.com/yusufkocak1/kalem/blob/main/{path}#L{line}",
 						basePath: "../../",
 						// Her giriş ayrı bir modül sayfası; paket sınırları
 						// referansta da görünüyor.
@@ -151,7 +151,7 @@ export default defineConfig({
 				root: { label: "Türkçe", lang: "tr" },
 				en: { label: "English", lang: "en" },
 			},
-			social: [{ icon: "github", label: "GitHub", href: "https://github.com/kalem-editor/kalem" }],
+			social: [{ icon: "github", label: "GitHub", href: "https://github.com/yusufkocak1/kalem" }],
 			/*
 			 * Kalem'in kendi tema dosyaları da yükleniyor (F6-03).
 			 *

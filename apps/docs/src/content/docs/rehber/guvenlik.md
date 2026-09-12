@@ -101,5 +101,5 @@ uygulamasının tuhaflıklarına hiç uğramadan işleniyor.
 ## Bildirim
 
 Güvenlik açığı bulursanız issue açmak yerine
-[güvenlik politikasını](https://github.com/kalem-editor/kalem/security)
+[güvenlik politikasını](https://github.com/yusufkocak1/kalem/security)
 izleyin.

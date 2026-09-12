@@ -106,7 +106,7 @@ için bir `ControlValueAccessor` yazmanız gerekiyor — eleman `value`,
 
 ## Çalışan örnek
 
-[`examples/angular`](https://github.com/kalem-editor/kalem/tree/main/examples/angular)
+[`examples/angular`](https://github.com/yusufkocak1/kalem/tree/main/examples/angular)
 — Angular 21, zonesiz, CI'da derleniyor ve sekiz tarayıcı testiyle
 sınanıyor.
 

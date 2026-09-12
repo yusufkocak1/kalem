@@ -9,6 +9,6 @@ daha iyi bir giriş noktası.
 :::note[Bölüm başlıkları İngilizce]
 "Interfaces", "Properties", "Defined in" gibi yapısal etiketler TypeDoc'tan
 geliyor ve İngilizce. Açıklamaların tamamı Türkçe; yapısal etiketlerin
-çevirisi [i18n görevinde](https://github.com/kalem-editor/kalem/blob/main/docs/01-is-listesi.md)
+çevirisi [i18n görevinde](https://github.com/yusufkocak1/kalem/blob/main/docs/01-is-listesi.md)
 ele alınacak.
 :::

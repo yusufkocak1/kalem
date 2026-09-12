@@ -1,0 +1,59 @@
+---
+/**
+ * Giriş sayfasının canlı editörü  (İş listesi: F6-05)
+ *
+ * Maddenin kabul kriteri "ilk 5 saniyede bu ne anlaşılıyor". Bir ekran
+ * görüntüsü ya da GIF bunu anlatabilir; **çalışan bir editör** ise
+ * gösteriyor. Ziyaretçi okumadan önce yazmaya başlayabiliyor.
+ *
+ * Markdown çıktısı yanında ve açık: ürünün ayırt edici iddiası
+ * ("çıktı Markdown, JSON değil") ancak görünürken iddia olmaktan çıkıyor.
+ */
+import "./hero.css";
+---
+
+<div class="hero-deneme">
+	<div class="hero-yazi-sar">
+		<p class="hero-ipucu">
+			<span class="nokta"></span>
+			Bu gerçek bir editör — yazmayı deneyin
+		</p>
+		<div class="hero-yazi kalem-theme" data-hero-editor lang="tr"></div>
+	</div>
+	<div class="hero-cikti-sar">
+		<p class="hero-etiket">Markdown çıktısı <small>canlı</small></p>
+		<pre class="hero-cikti" data-hero-cikti></pre>
+	</div>
+</div>
+
+<script>
+	import { Editor } from "@kalem/editor";
+	import { mountUi } from "@kalem/ui";
+
+	const BELGE = `# Işık ve Gölge
+
+Word kadar kolay, **Markdown** kadar taşınabilir. Bir kelime seçin —
+biçimlendirme balonu belirir. Boş satırda \`/\` yazın — blok menüsü açılır.
+
+* yıldız işareti korunuyor
+* çünkü yazım tercihi modelde duruyor
+
+1) parantez ayracı da öyle
+`;
+
+	const kap = document.querySelector<HTMLElement>("[data-hero-editor]");
+	const cikti = document.querySelector<HTMLElement>("[data-hero-cikti]");
+
+	if (kap !== null && cikti !== null) {
+		const editor = new Editor(kap, {
+			value: BELGE,
+			lang: "tr",
+			label: "Deneme belgesi",
+			onChange: (markdown) => {
+				cikti.textContent = markdown;
+			},
+		});
+		mountUi(editor, { toolbar: "both" });
+		cikti.textContent = editor.getValue();
+	}
+</script>
