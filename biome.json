@@ -16,7 +16,9 @@
       "!examples/*/next-env.d.ts",
       "!**/.astro",
       "!apps/demo/index.html",
-      "!pnpm-lock.yaml"
+      "!pnpm-lock.yaml",
+      "!**/.angular",
+      "!**/out-tsc"
     ]
   },
   "formatter": {
@@ -108,7 +110,7 @@
       }
     },
     {
-      "includes": ["**/*.vue"],
+      "includes": ["**/*.vue", "**/*.svelte"],
       "linter": {
         "rules": {
           "correctness": {

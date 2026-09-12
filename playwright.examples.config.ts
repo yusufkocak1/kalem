@@ -67,5 +67,23 @@ export default defineConfig({
 			timeout: 300_000,
 			stdout: "pipe",
 		},
+		{
+			command:
+				"pnpm --filter example-svelte build && pnpm --filter example-svelte preview --port 4175 --strictPort",
+			url: "http://localhost:4175",
+			reuseExistingServer: false,
+			timeout: 180_000,
+			stdout: "pipe",
+		},
+		{
+			// Angular'ın kendi önizleme sunucusu yok; üretim çıktısı
+			// depodaki sıfır bağımlılıklı statik sunucuyla yayınlanıyor.
+			command:
+				"pnpm --filter example-angular build && node scripts/serve-static.mjs examples/angular/dist/browser 4176",
+			url: "http://localhost:4176",
+			reuseExistingServer: false,
+			timeout: 300_000,
+			stdout: "pipe",
+		},
 	],
 });

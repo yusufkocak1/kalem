@@ -22,6 +22,10 @@ next-env.d.ts
 .nuxt/
 .output/
 
+# angular (examples/angular)
+.angular/
+out-tsc/
+
 # editör / işletim sistemi
 .DS_Store
 Thumbs.db

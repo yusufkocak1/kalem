@@ -6,9 +6,10 @@ Framework-bağımsız, küçük ve modüler bir **WYSIWYG Markdown editör küt�
 Yazılım bilmeyen kullanıcıların Word rahatlığında doküman yazabilmesi, geliştiricilerin
 ise projelerine 0 bağımlılıkla gömebilmesi için tasarlanıyor.
 
-**Durum: 32 / 72 görev (%44).** `@kalem/core`, `@kalem/viewer` ve
-`@kalem/editor` tamam — **UI olmadan, sadece klavyeyle tam işlevli bir
-Markdown editörü** çalışıyor. Sırada `@kalem/ui` (Word deneyimi).
+**Durum: 53 / 72 görev (%74).** Çekirdek, görüntüleyici, editör, arayüz ve
+yedi eklenti tamam. Sarmalayıcılardan `@kalem/react`, `@kalem/vue` ve
+`@kalem/wc` (`<kalem-editor>` özel elemanı) çalışıyor; altı örnek uygulama
+CI'da derlenip sınanıyor. Sırada kalan örnekler ve dogfooding.
 Henüz npm'de değil; ilk yayın v1.0 olacak.
 
 ---
@@ -86,6 +87,7 @@ pnpm build && pnpm demo     # http://localhost:5173
 | `/editor.html` | **`@kalem/editor`** — blok motoru: her blok kendi `contenteditable` elemanı, yazdıkça sağda gerçek Markdown çıktısı. |
 | `/viewer.html` | **`@kalem/viewer`** — aynı AST'nin `renderToDOM` ve `renderToString` çıktıları yan yana, byte-birebir eşitlik ölçümüyle. Ham HTML politikası canlı değiştirilebilir. |
 | `/core.html` | **`@kalem/core`** — Markdown → AST → Markdown, canlı gidiş-dönüş ve idempotans ölçümü. |
+| `/wc.html` | **`@kalem/wc`** — `<kalem-editor>` özel elemanı: ışık DOM, gölge DOM ve `ElementInternals` ile form entegrasyonu yan yana. |
 | `/` | Mimari doğrulama prototipi (`execCommand` ile; kütüphaneyi kullanmıyor) |
 
 İlk ikisi gerçek derlenmiş bundle'ı yükler — npm'e gidecek kodun aynısı.

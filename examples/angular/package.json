@@ -1,0 +1,27 @@
+{
+  "name": "example-angular",
+  "private": true,
+  "version": "0.0.0",
+  "description": "@kalem/wc — Angular örneği",
+  "scripts": {
+    "build": "ng build",
+    "dev": "ng serve",
+    "preview": "ng build"
+  },
+  "dependencies": {
+    "@angular/common": "catalog:",
+    "@angular/compiler": "catalog:",
+    "@angular/core": "catalog:",
+    "@angular/platform-browser": "catalog:",
+    "@kalem/themes": "workspace:^",
+    "@kalem/wc": "workspace:^",
+    "rxjs": "catalog:",
+    "tslib": "catalog:"
+  },
+  "devDependencies": {
+    "@angular/build": "catalog:",
+    "@angular/cli": "catalog:",
+    "@angular/compiler-cli": "catalog:",
+    "typescript": "catalog:ng"
+  }
+}

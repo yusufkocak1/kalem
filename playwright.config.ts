@@ -2,6 +2,15 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
 	testDir: "./e2e",
+	/*
+	 * Örnek uygulama testleri bu paketin **dışında**.
+	 *
+	 * Kendi yapılandırmaları var (`playwright.examples.config.ts`): altı
+	 * uygulamayı derleyip ayağa kaldırıyorlar ve bu, her `pnpm e2e`
+	 * koşusuna dakikalar ekler. Burada dışlanmasalardı sunucusuz koşup
+	 * bağlantı hatasıyla düşerlerdi.
+	 */
+	testIgnore: "examples/**",
 	fullyParallel: true,
 	forbidOnly: !!process.env.CI,
 	retries: process.env.CI ? 2 : 0,

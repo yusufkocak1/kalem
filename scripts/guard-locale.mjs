@@ -26,6 +26,8 @@ const ATLA = new Set([
 	".next",
 	".nuxt",
 	".output",
+	".angular",
+	"out-tsc",
 	".tsbuild",
 	"coverage",
 	".astro",

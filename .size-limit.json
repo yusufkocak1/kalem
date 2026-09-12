@@ -197,5 +197,13 @@
     "gzip": true,
     "import": "*",
     "ignore": ["vue", "@kalem/core", "@kalem/editor", "@kalem/viewer"]
+  },
+  {
+    "name": "@kalem/wc (editör hariç)",
+    "path": "packages/wc/dist/index.js",
+    "limit": "2.5 kB",
+    "gzip": true,
+    "import": "*",
+    "ignore": ["@kalem/core", "@kalem/editor"]
   }
 ]

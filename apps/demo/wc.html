@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="tr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kalem — &lt;kalem-editor&gt; Custom Element</title>
+<link rel="stylesheet" href="/@kalem/themes/tokens.css">
+<link rel="stylesheet" href="/@kalem/themes/viewer.css">
+<link rel="stylesheet" href="/@kalem/themes/editor.css">
+<style>
+	:root {
+		color-scheme: light;
+		--zemin: #fbfaf8;
+		--kart: #ffffff;
+		--kenar: #e3e0da;
+		--metin: #22201d;
+		--soluk: #6f6a62;
+		--vurgu: #0f4e4a;
+		--kotu: #b3402a;
+	}
+	@media (prefers-color-scheme: dark) {
+		:root:not([data-theme="light"]) {
+			--zemin: #16151a;
+			--kart: #1e1d23;
+			--kenar: #34323b;
+			--metin: #e8e6e1;
+			--soluk: #9d978d;
+			--vurgu: #6fd3c6;
+			--kotu: #ff9b82;
+		}
+	}
+	* { box-sizing: border-box; }
+	body {
+		margin: 0;
+		background: var(--zemin);
+		color: var(--metin);
+		font: 14px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+	}
+	header {
+		padding: 18px 22px 14px;
+		border-bottom: 1px solid var(--kenar);
+	}
+	h1 { margin: 0 0 6px; font-size: 17px; letter-spacing: -0.01em; }
+	h1 span { color: var(--soluk); font-weight: 400; }
+	header p { margin: 0; color: var(--soluk); font-size: 13px; max-width: 62ch; }
+	main {
+		display: grid;
+		gap: 20px;
+		grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+		padding: 20px 22px 60px;
+		align-items: start;
+	}
+	section {
+		background: var(--kart);
+		border: 1px solid var(--kenar);
+		border-radius: 8px;
+		padding: 14px 16px 16px;
+	}
+	h2 { margin: 0 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--soluk); }
+	section > p { margin: 0 0 12px; font-size: 12.5px; color: var(--soluk); }
+	kalem-editor {
+		padding: 10px 12px;
+		background: var(--zemin);
+		border: 1px solid var(--kenar);
+		border-radius: 6px;
+	}
+	.satir { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; font-size: 13px; }
+	button {
+		font: inherit;
+		font-size: 12.5px;
+		padding: 5px 11px;
+		border: 1px solid var(--kenar);
+		border-radius: 6px;
+		background: var(--kart);
+		color: var(--metin);
+		cursor: pointer;
+	}
+	button:hover { border-color: var(--vurgu); }
+	pre {
+		margin: 12px 0 0;
+		padding: 10px 12px;
+		background: var(--zemin);
+		border: 1px solid var(--kenar);
+		border-radius: 6px;
+		font-size: 12px;
+		white-space: pre-wrap;
+		max-height: 12rem;
+		overflow: auto;
+	}
+	dl { margin: 12px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 12.5px; }
+	dt { color: var(--soluk); }
+	dd { margin: 0; font-variant-numeric: tabular-nums; }
+	.kotu { color: var(--kotu); }
+</style>
+
+<header>
+	<h1>&lt;kalem-editor&gt; <span>— Custom Element (F5-03)</span></h1>
+	<p>
+		Bu sayfada çerçeve yok. Editör tarayıcının kendi bileşen modeliyle
+		kuruluyor: bir etiket, bir <code>define</code> çağrısı.
+	</p>
+</header>
+
+<main>
+	<section>
+		<h2>Işık DOM — varsayılan</h2>
+		<p>Başlangıç metni elemanın <b>içinden</b> okunuyor; HTML girintisi söküldüğü için kod bloğuna dönüşmüyor.</p>
+		<kalem-editor id="isik" label="Belge">
+			# Işık ve Gölge
+
+			Bu editör bir **özel eleman**. Yazdıkça olaylar aşağıda birikiyor.
+
+			* yıldız işareti korunuyor
+			* çünkü yazım tercihi modelde duruyor
+		</kalem-editor>
+		<div class="satir">
+			<label><input type="checkbox" id="saltOkunur"> salt okunur</label>
+			<button type="button" id="tasi">Elemanı taşı</button>
+			<button type="button" id="odak">Odağı ver</button>
+		</div>
+		<div id="liman"></div>
+		<dl>
+			<dt>input olayı</dt><dd id="sayacInput">0</dd>
+			<dt>change olayı</dt><dd id="sayacChange">0</dd>
+			<dt>kalem-ready</dt><dd id="sayacReady">0</dd>
+			<dt>event.target.value</dt><dd id="hedefDeger">—</dd>
+		</dl>
+		<pre id="cikti"></pre>
+	</section>
+
+	<section>
+		<h2>Gölge DOM — <code>shadow</code> özniteliği</h2>
+		<p>Sayfa CSS'i içeri girmiyor; stiller <code>styles</code> özelliğiyle veriliyor. Yabancı bir sayfaya gömülen widget için.</p>
+		<kalem-editor id="golge" shadow label="Gölgeli belge">
+			## Gölge kök
+
+			Sayfanın kuralları buraya **ulaşmıyor**.
+		</kalem-editor>
+		<div class="satir">
+			<button type="button" id="sayfaKurali">Sayfaya <code>p{color:red}</code> ekle</button>
+		</div>
+		<dl>
+			<dt>gölge kök</dt><dd id="golgeDurum">—</dd>
+		</dl>
+	</section>
+
+	<section>
+		<h2>Form entegrasyonu — <code>ElementInternals</code></h2>
+		<p><code>required</code>, <code>name</code>, sıfırlama ve gönderim; hepsi platformun kendi form akışı.</p>
+		<form id="form">
+			<kalem-editor id="alan" name="icerik" required label="Zorunlu belge"></kalem-editor>
+			<div class="satir">
+				<button type="submit">Gönder</button>
+				<button type="reset" id="sifirla">Sıfırla</button>
+				<button type="button" id="dogrula">Geçerli mi?</button>
+			</div>
+		</form>
+		<dl>
+			<dt>gönderilen</dt><dd id="gonderilen">—</dd>
+			<dt>geçerlilik</dt><dd id="gecerlilik">—</dd>
+			<dt>form</dt><dd id="formAdi">—</dd>
+		</dl>
+	</section>
+</main>
+
+<script type="importmap">
+	{
+		"imports": {
+			"@kalem/core": "/@kalem/core/index.js",
+			"@kalem/core/commands": "/@kalem/core/commands.js",
+			"@kalem/core/html": "/@kalem/core/html.js",
+			"@kalem/editor": "/@kalem/editor/index.js",
+			"@kalem/viewer": "/@kalem/viewer/index.js",
+			"@kalem/wc": "/@kalem/wc/index.js"
+		}
+	}
+</script>
+<script type="module">
+	import { defineKalemEditor } from "@kalem/wc";
+
+	// Kayıt açık ve tekrarlanabilir; ikinci çağrı `false` dönüyor.
+	const ilk = defineKalemEditor();
+	const ikinci = defineKalemEditor();
+	window.kalemKayit = { ilk, ikinci };
+
+	const $ = (id) => document.getElementById(id);
+	const isik = $("isik");
+
+	// --- Işık DOM ---------------------------------------------------------
+	let input = 0;
+	let change = 0;
+	let ready = 0;
+
+	isik.addEventListener("kalem-ready", () => {
+		ready += 1;
+		$("sayacReady").textContent = String(ready);
+	});
+	isik.addEventListener("input", (olay) => {
+		input += 1;
+		$("sayacInput").textContent = String(input);
+		// Olay elemanın kendisinden geliyor: `event.target.value` okunabiliyor.
+		$("hedefDeger").textContent = `${olay.target.value.length} karakter`;
+		$("cikti").textContent = olay.detail.value;
+	});
+	isik.addEventListener("change", () => {
+		change += 1;
+		$("sayacChange").textContent = String(change);
+	});
+	$("cikti").textContent = isik.value;
+
+	$("saltOkunur").addEventListener("change", (olay) => {
+		isik.readOnly = olay.target.checked;
+	});
+	$("odak").addEventListener("click", () => isik.focus());
+	// Taşıma: söküm bir mikrogörev geciktiği için içerik ve editör korunuyor.
+	$("tasi").addEventListener("click", () => $("liman").append(isik));
+
+	// --- Gölge DOM --------------------------------------------------------
+	const golge = $("golge");
+	golge.styles = `
+		:host { padding: 10px 12px; border: 1px dashed currentColor; border-radius: 6px; }
+		p { margin: 0 0 0.6em; }
+		h2 { margin: 0 0 0.4em; font-size: 15px; }
+	`;
+	$("golgeDurum").textContent = golge.shadowRoot === null ? "yok" : "açık";
+	$("sayfaKurali").addEventListener("click", () => {
+		const stil = document.createElement("style");
+		stil.textContent = "p { color: red !important; }";
+		document.head.append(stil);
+	});
+
+	// --- Form -------------------------------------------------------------
+	const alan = $("alan");
+	const form = $("form");
+	$("formAdi").textContent = alan.form === form ? "bağlı" : "bağsız";
+
+	function gecerlilikYaz() {
+		const gecerli = alan.checkValidity();
+		const dd = $("gecerlilik");
+		dd.textContent = gecerli ? "geçerli" : alan.validationMessage;
+		dd.className = gecerli ? "" : "kotu";
+	}
+	gecerlilikYaz();
+	alan.addEventListener("input", gecerlilikYaz);
+	$("dogrula").addEventListener("click", gecerlilikYaz);
+
+	form.addEventListener("submit", (olay) => {
+		olay.preventDefault();
+		const veri = new FormData(form);
+		$("gonderilen").textContent = JSON.stringify(veri.get("icerik"));
+	});
+	form.addEventListener("reset", () => {
+		// Sıfırlama tarayıcıdan geliyor; `formResetCallback` bir sonraki
+		// göreve kadar çalışmamış olabiliyor.
+		setTimeout(() => {
+			$("gonderilen").textContent = "—";
+			gecerlilikYaz();
+		}, 0);
+	});
+</script>
+</html>

@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-11 · `master` · `pnpm verify` yeşil · 1252 birim + 1047 tarayıcı + 22 örnek testi
+> Son güncelleme: 2026-09-12 · `master` · `pnpm verify` yeşil · 1260 birim + 1098 tarayıcı + 40 örnek testi
 
 | Faz | Görev | Durum |
 |---|---|---|
@@ -33,9 +33,9 @@
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
 | **Faz 4** — Eklentiler | 7 / 7 | ✅ **Tamamlandı** |
-| **Faz 5** — Sarmalayıcılar | 2 / 5 | 🔵 Sürüyor |
+| **Faz 5** — Sarmalayıcılar | 3 / 5 | 🔵 Sürüyor |
 | **Faz 6** — Cila ve yayın | 0 / 14 | ⬜ Başlanmadı |
-| | **52 / 72** | **%72** |
+| | **53 / 72** | **%74** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,9 +43,9 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02`
+referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03`
 
-**Sıradaki:** `F5-03` `@kalem/wc`.
+**Sıradaki:** `F5-04` örnek uygulamalar (`cdn-vanilla` ve CI kapsaması; diğer altı örnek F5-01…F5-03 ile birlikte yazıldı).
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10) ve Linux görsel
 referansları (F3-11) — ikisi de bir insanın masasında yapılmak zorunda.
@@ -1674,9 +1674,135 @@ Boyut: 662 B (gzip; Vue, editör ve görüntüleyici hariç).
 > kullanılan her import'u "kullanılmamış" sayıyor ve `--unsafe` bir
 > düzeltmede onları silerdi.
 
-### F5-03 · `@kalem/wc` `[M]` ⬜
-`<kalem-editor>` Custom Element; Shadow DOM **opsiyonel, varsayılan kapalı**; attribute/property/event köprüsü; `ElementInternals` ile form entegrasyonu
-- **Kabul:** `examples/svelte` ve `examples/angular` çalışıyor
+### F5-03 · `@kalem/wc` `[M]` ✅
+- [x] `<kalem-editor>` Custom Element; sınıf tembel kuruluyor, paket sunucuda import edilebiliyor
+- [x] Shadow DOM **opsiyonel, varsayılan kapalı** — `shadow` özniteliği
+- [x] Öznitelik / özellik / olay köprüsü; `input`, `change`, `kalem-ready`
+- [x] `ElementInternals` ile form entegrasyonu: `name`, `required`, sıfırlama, `disabled`, durum geri yükleme
+- [x] **Kabul:** `examples/svelte` ve `examples/angular` çalışıyor (20 tarayıcı testi)
+
+**Çerçeve başına bir paket yazmanın sonu yok.** React ve Vue sarmalayıcıları
+hâlâ değerli — kancalar, `v-model`, SSR — ama Svelte, Angular, Astro,
+Rails ve düz HTML için aynı şeyi tekrar etmek yerine tarayıcının kendi
+bileşen modeli kullanılıyor. Bu maddenin kabul kriteri de onu ölçüyor:
+iki farklı çerçevede **sarmalayıcı olmadan** çalışması.
+
+**Sınıf bir fonksiyonun içinde kuruluyor.** `class X extends HTMLElement`
+değerlendirildiği anda `HTMLElement` globalini okuyor; modül gövdesinde
+dursaydı `import "@kalem/wc"` yazan bir Next.js/Nuxt sunucusu daha ilk
+satırda düşerdi — eleman o sayfada hiç kullanılmasa bile. Sınıf
+`kalemEditorElement()` ilk çağrıldığında üretiliyor ve saklanıyor; DOM'a
+dokunan tek şey `defineKalemEditor()`.
+
+**Kayıt otomatik değil.** `customElements.define` global bir isim alanına
+yazıyor ve aynı adı iki kez kaydetmek **hata atıyor**: import edilir
+edilmez kaydeden bir kütüphane, aynı sayfada iki sürümü bulunan bir
+uygulamayı (mikro-ön uç, iki bağımlılığın farklı sürümleri) açılışta
+patlatırdı. Çağrı açık ve tekrarlanabilir — ad zaten kayıtlıysa `false`
+dönüyor. Tek satır isteyenler için `import "@kalem/wc/define"`; ayrı giriş
+olmasının sebebi `sideEffects` beyanı, yoksa paketleyici kaydı atardı.
+
+> **Olay başına iki `input` sorunu.** `contenteditable`ın kendi `input`
+> olayı zaten elemanın dışına kabarıyor, yani hiçbir şey yapmasan da
+> dinleyiciye ulaşıyor — ama `event.target` içerideki blok elemanı oluyor
+> ve `event.target.value` diye okuyan herkes `undefined` alıyor. Kendi
+> olayımızı da yaysaydık her tuşta **iki** olay görülürdü. Yerli olay
+> kapsayıcıda kesiliyor, yerine metni taşıyan bir `CustomEvent`
+> yayılıyor. Bir test tuş başına tam bir olay sayıyor.
+
+**`kalem-ready` bir mikrogörev geciktiriliyor.** `customElements.define`
+sayfada duran elemanları **o anda** yükseltiyor: `connectedCallback`
+define çağrısının içinde, senkron çalışıyor. Olay hemen yayılsaydı, hemen
+ardından `el.addEventListener("kalem-ready", …)` yazan sayfa onu
+kaçırırdı — yani en doğal kullanım hiç çalışmazdı. İmperatif erişimin
+senkron yolu duruyor: `el.editor` define döndüğünde dolu.
+
+**Söküm de bir mikrogörev geciktiriliyor.** `parent.append(el)` bir elemanı
+taşırken önce söküyor sonra takıyor, ikisi de aynı görevde. Hemen
+yıkılsaydı DOM'da yer değiştirmek geçmişi ve imleci silerdi. Bir test
+elemanı taşıyıp yazmaya devam ediyor ve `kalem-ready` sayacının 1'de
+kaldığını doğruluyor.
+
+> **Erken atanmış özellikler kurtarılıyor.** Klasik özel eleman tuzağı:
+> çerçeve `el.value = "…"` diyor, sınıf henüz tanımlı değil, atama
+> elemanın **kendi** özelliği olarak yapışıyor ve sonradan gelen prototip
+> erişimcisini gölgeliyor. Setter hiç çalışmıyor ve hata da yok. Angular
+> ve Svelte'nin özellik bağlamaları tam olarak bu sırayla işliyor;
+> `connectedCallback` her birini silip yeniden atıyor.
+
+**Başlangıç metni elemanın içinden okunabiliyor.** Çok satırlı Markdown'ı
+bir özniteliğe sıkıştırmak zorunda değilsiniz:
+
+    <kalem-editor>
+        # Başlık
+    </kalem-editor>
+
+Buradaki girinti sayfanın, yazarın değil — ama Markdown onu **kod bloğu**
+sayar. Ortak önek sökülüyor (göreli girintiler duruyor), yoksa sayfasını
+düzgün biçimlendiren herkesin belgesi sessizce koda dönerdi.
+`<script type="text/markdown">` çocuğu da aynı yoldan okunuyor: tarayıcı
+bilmediği tipi çalıştırmıyor ama metni `textContent`e katıyor, yani
+yükselmeden önce ham Markdown ekranda görünmüyor.
+
+**`value` özniteliği `<input>`ten bilerek ayrılıyor.** Platformda o
+öznitelik yalnızca başlangıç değeri; kullanıcı yazdıktan sonra
+değiştirmek hiçbir şey yapmıyor. Burada yapıyor, çünkü çerçevelerin özel
+elemanlara bağlanma yolu çoğu zaman öznitelik ve bağlamanın sessizce
+çalışmaması en kötü sonuç. Form sıfırlamasının ihtiyaç duyduğu ilk değer
+ayrı tutuluyor: `defaultValue`.
+
+**Shadow DOM neden varsayılan kapalı.** Gölge kök stilleri dışarıda
+bırakıyor: `@kalem/themes` sayfanın genelinde tanımlı ve gölgeye
+girmiyor. Varsayılan açık olsaydı editör her kurulumda stilsiz açılır,
+herkes bir geçici çözüm arardı. Açık olması gereken durum da gerçek —
+yabancı bir sayfaya gömülen widget'ta sayfanın `p { margin: 0 }` kuralı
+belgeyi bozuyor. Bir test tam olarak bunu ölçüyor: sayfaya
+`p { color: red }` ekleniyor, gölgedeki belge etkilenmiyor, ışık DOM'daki
+belge kırmızıya dönüyor.
+
+> **Gölge kipinde editör kullanıcının yazdığını görmüyordu.** `@kalem/editor`
+> değişen bloğu `document.activeElement` üzerinden buluyordu; gölge kökün
+> içinde bu, düzenlenen bloğu değil gölgeyi taşıyan ana makineyi veriyor.
+> Sonuç sessiz ve tam: DOM'da harfler beliriyor, model hiç güncellenmiyor,
+> `getValue()` eski metni dönüyor. `getRootNode()` belgede belgeyi,
+> gölgede gölge kökü veriyor. Editör paketinde düzeltildi — F5-03'ün
+> ortaya çıkardığı bir çekirdek hatası.
+
+**Form entegrasyonu platformun kendi akışı.** `ElementInternals` ile
+`setFormValue`, `formResetCallback`, `formDisabledCallback` ve
+`formStateRestoreCallback`; `required` boş belgede `valueMissing`
+kuruyor. Doğrulama mesajı tek kullanıcı metni ve eklentilerdeki kalıbı
+izliyor: belge diline göre seçiliyor, `required-message` ile eziliyor.
+`disabled` ayrı bir kip getirmiyor — salt okunur yeterli ve doğrusu da o,
+içerik görünür kalıyor.
+
+**Öznitelik listesinde `lang` yok** ve bu bir eksiklik değil: düzenlenebilir
+alan elemanın çocuğu, `lang` DOM'da kalıtımla iniyor ve tarayıcının yazım
+denetimi sözlüğünü zaten o seçiyor. Kopyalamak aynı gerçeğin iki kaynağı
+olurdu.
+
+**Örnekler.** `examples/svelte` (Vite + Svelte 5) ve `examples/angular`
+(Angular 21, zonesiz) — ikisinde de bağlama deyimsel. Svelte özel
+elemanlarda özellik varsa özelliği yazıyor (`value`, `readOnly`), Angular
+`CUSTOM_ELEMENTS_SCHEMA` ile aynısını yapıyor. Sonsuz döngü hiçbirinde
+elle kırılmıyor: elemanın `value` setter'ı gelen metin güncel metinle
+aynıysa duruyor.
+
+> **Angular kendi TypeScript'ini çekiyor.** Angular derleyicisi sürüme
+> kilitli (`>=5.9 <6.0`) ve deponun geri kalanı TypeScript 7 kullanıyor.
+> Örnek `catalogs.ng` üzerinden `~5.9` alıyor; başka hiçbir paket o
+> girdiye dokunmuyor. Angular 22 de denendi ama geliştirme makinesindeki
+> Node'dan yenisini istiyor (`^22.22.3`); 21 hem CI'da hem masada
+> çalışıyor.
+
+> **Yan düzeltme — `pnpm e2e` örnek testlerini de koşturuyordu.**
+> Ana yapılandırmanın `testDir`i `./e2e` ve örnek testleri onun alt
+> klasöründe; sunucuları ayrı yapılandırmada ayağa kalktığı için her
+> koşuda bağlantı hatasıyla düşüyorlardı. `testIgnore: "examples/**"`
+> eklendi.
+
+Boyut: 1.98 kB (gzip; editör hariç). 8 birim + 48 tarayıcı testi
+(3 motor) + 20 örnek testi.
 
 ### F5-04 · Örnek uygulamalar `[M]` ⬜
 `examples/`: `react-vite`, `vue-vite`, `nextjs`, `nuxt`, `svelte`, `angular`, `cdn-vanilla`

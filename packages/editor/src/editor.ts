@@ -689,7 +689,17 @@ export class Editor {
 	 */
 	#onInput = (): void => {
 		if (this.#readOnly) return;
-		const active = this.#element.ownerDocument.activeElement;
+		/*
+		 * Odaklı eleman **editörün kendi kökünden** soruluyor.
+		 *
+		 * Editör bir gölge kökün içindeyse (`@kalem/wc`nin `shadow` kipi,
+		 * F5-03) `document.activeElement` düzenlenen bloğu değil, gölgeyi
+		 * taşıyan ana makineyi veriyor — `closest` boş dönüyor ve model
+		 * kullanıcının yazdığını hiç görmüyor. `getRootNode()` belgede
+		 * belgeyi, gölgede gölge kökü veriyor; ikisinde de doğru cevap.
+		 */
+		const kok = this.#element.getRootNode() as Document | ShadowRoot;
+		const active = kok.activeElement;
 		const blockElement = active?.closest?.(`[${ID_ATTR}]`);
 		if (!(blockElement instanceof HTMLElement)) return;
 		this.#syncFromDom(blockElement);

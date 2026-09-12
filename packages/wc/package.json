@@ -1,0 +1,61 @@
+{
+  "name": "@kalem/wc",
+  "version": "0.0.0",
+  "description": "Kalem için Custom Element — <kalem-editor>, çerçevesiz",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "type": "module",
+  "sideEffects": [
+    "./dist/define-side-effect.js",
+    "./dist/define-side-effect.cjs"
+  ],
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "kalem-source": "./src/index.ts",
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./define": {
+      "kalem-source": "./src/define-side-effect.ts",
+      "import": {
+        "types": "./dist/define-side-effect.d.ts",
+        "default": "./dist/define-side-effect.js"
+      },
+      "require": {
+        "types": "./dist/define-side-effect.d.cts",
+        "default": "./dist/define-side-effect.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch"
+  },
+  "dependencies": {
+    "@kalem/editor": "workspace:^"
+  },
+  "devDependencies": {
+    "@kalem/core": "workspace:^",
+    "tsdown": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

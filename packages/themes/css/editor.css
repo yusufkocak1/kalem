@@ -107,3 +107,19 @@
 .kalem-editor .kalem-selected:focus {
 	outline: none;
 }
+
+/*
+ * `<kalem-editor>` özel elemanı  (F5-03)
+ *
+ * Özel elemanlar varsayılan olarak `display: inline`: kutu davranışı
+ * olmadan `min-height`, dolgu ve kenarlık hiç görünmez. Tek satır burada
+ * duruyor çünkü elemanın kendisi bunu **inline stille** yazsaydı sayfanın
+ * `display: flex` ya da `display: grid` demesini imkânsız kılardı.
+ *
+ * `:where()` özgüllüğü sıfırlıyor; tek bir `kalem-editor { … }` kuralı
+ * bunu ezebiliyor. Gölge kök açıkken karşılığı elemanın içinde
+ * (`:host{display:block}`), çünkü sayfa CSS'i oraya girmiyor.
+ */
+:where(kalem-editor) {
+	display: block;
+}

@@ -97,6 +97,10 @@ const PAKETLER = [
 		onEk: "/@kalem/plugin-autosave/",
 		kok: fileURLToPath(new URL("../packages/plugin-autosave/dist/", import.meta.url)),
 	},
+	{
+		onEk: "/@kalem/wc/",
+		kok: fileURLToPath(new URL("../packages/wc/dist/", import.meta.url)),
+	},
 	// Temalar saf CSS; derleme adımı yok, kaynak doğrudan servis ediliyor.
 	{
 		onEk: "/@kalem/themes/",
