@@ -11,6 +11,20 @@ import { expect, test } from "@playwright/test";
 
 const KOK = "http://localhost:4178/";
 
+/**
+ * Yeni not açar ve **editör odağa gelene kadar bekler**.
+ *
+ * Odak, editörün kurulumunu bildiren geri çağırmada veriliyor ve o çağrı
+ * bir mikrogörev gecikiyor. Tıklamadan hemen sonra yazmaya başlayan bir
+ * test, yük altında (tam paket, tek işçi) harfleri boşluğa gönderiyordu.
+ */
+async function yeniNotAc(page: import("@playwright/test").Page): Promise<void> {
+	await page.getByRole("button", { name: "Yeni not" }).click();
+	await expect
+		.poll(() => page.evaluate(() => document.activeElement?.isContentEditable === true))
+		.toBe(true);
+}
+
 test.beforeEach(async ({ page }) => {
 	// Her test temiz bir defterle başlıyor; notlar `localStorage`da
 	// yaşadığı için önceki testin kalıntısı sonrakini etkilerdi.
@@ -57,14 +71,14 @@ test("yeni not açınca odak editöre geçiyor", async ({ page }) => {
 	 * çağırmada veriliyor. Verilmeseydi kullanıcı fazladan bir tıklama
 	 * yapmak zorunda kalırdı — uygulama yazılırken bulunan tek hata buydu.
 	 */
-	await page.getByRole("button", { name: "Yeni not" }).click();
+	await yeniNotAc(page);
 	await page.keyboard.type("Toplantı notları");
 	await expect(page.locator(".satir .ad").first()).toHaveText("Toplantı notları");
 	await expect(page.locator(".liste li")).toHaveCount(2);
 });
 
 test("not değiştirmek belgeyi değiştiriyor", async ({ page }) => {
-	await page.getByRole("button", { name: "Yeni not" }).click();
+	await yeniNotAc(page);
 	await page.keyboard.type("İkinci not");
 	await expect(page.locator(".satir.secili .ad")).toHaveText("İkinci not");
 
@@ -77,7 +91,7 @@ test("not değiştirmek belgeyi değiştiriyor", async ({ page }) => {
 });
 
 test("arama Türkçe kasa ve aksan farkını yok sayıyor", async ({ page }) => {
-	await page.getByRole("button", { name: "Yeni not" }).click();
+	await yeniNotAc(page);
 	await page.keyboard.type("Gölgeli Köşe");
 	await expect(page.locator(".liste li")).toHaveCount(2);
 

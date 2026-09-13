@@ -5,41 +5,63 @@ template: splash
 hero:
   tagline: Word kadar kolay, Markdown kadar taşınabilir. Herhangi bir framework ile — ya da framework olmadan.
   actions:
-    - text: Canlı deneyin
-      link: /canli/
-      icon: rocket
-      variant: primary
     - text: Başlangıç
       link: /baslangic/
       icon: right-arrow
+      variant: primary
+    - text: GitHub
+      link: https://github.com/yusufkocak1/kalem
+      icon: external
       variant: minimal
 ---
 
 import { Card, CardGrid, Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+import HeroDeneme from '../../components/HeroDeneme.astro';
 
-<Aside type="caution" title="Henüz npm'de değil">
-Kütüphane yazıldı ve çalışıyor; ilk yayın **v1.0** olacak. Buradaki API
-depodaki koddan alınmıştır. Durum için [iş listesine](https://github.com/yusufkocak1/kalem/blob/main/docs/01-is-listesi.md) bakın.
-</Aside>
+<HeroDeneme />
+
+<div class="kurulum">
+  <code>npm i @kalem/editor @kalem/ui @kalem/themes</code>
+  <div class="rozetler">
+    <span class="rozet"><b>editör + arayüz</b><span>34,6 kB</span></span>
+    <span class="rozet"><b>çekirdek</b><span>11,5 kB</span></span>
+    <span class="rozet"><b>görüntüleyici</b><span>2,7 kB</span></span>
+    <span class="rozet"><b>bağımlılık</b><span>0</span></span>
+  </div>
+</div>
+
+Yukarıdaki editör **gerçek**: bu sayfada çalışıyor ve yazdığınız her şey
+sağda Markdown olarak duruyor. Bir kelime seçin, `/` yazın, `Ctrl+B`'ye
+basın — Word'de ne yapıyorsanız.
+
+## Neden Kalem?
+
+Yapay zekâ araçlarının çıktı formatı fiilen Markdown oldu. Ama yazılım
+bilmeyen kullanıcıların Word rahatlığında kullanabileceği bir Markdown
+editörü yok: ya ham metin yazdırılıyor ya da JSON tutup Markdown'a
+"dönüştüren" bir editör veriliyor — ve o dönüşüm kayıplı.
 
 <CardGrid stagger>
   <Card title="Markdown-native" icon="pencil">
-    Doğru kaynak her zaman Markdown metnidir, JSON değil. `serialize(parse(md)) === md`
-    garantisi sayesinde kullanıcının dokunmadığı satır byte düzeyinde değişmez —
-    `*` ile yazdığınız liste `-` olarak geri gelmez.
+    Doğru kaynak her zaman Markdown metnidir, JSON değil.
+    `serialize(parse(md)) === md` garantisi sayesinde kullanıcının
+    dokunmadığı satır byte düzeyinde değişmez — `*` ile yazdığınız liste
+    `-` olarak geri gelmez.
   </Card>
   <Card title="Framework-bağımsız" icon="puzzle">
-    Çekirdek saf TypeScript. `@kalem/react` ve `@kalem/vue` ayrı paketler ve
-    çerçeveyi `peerDependency` olarak alıyor. Svelte, Angular ve düz HTML için
-    sarmalayıcı bile gerekmiyor: `<kalem-editor>` tarayıcının kendi bileşen modeli.
+    Çekirdek saf TypeScript. `@kalem/react` ve `@kalem/vue` ayrı paketler
+    ve çerçeveyi `peerDependency` olarak alıyor. Svelte, Angular ve düz
+    HTML için sarmalayıcı bile gerekmiyor: `<kalem-editor>` tarayıcının
+    kendi bileşen modeli.
   </Card>
   <Card title="Küçük" icon="rocket">
-    Ölçülen değerler (min+gzip): çekirdek **11,5 kB**, görüntüleyici **2,7 kB**,
-    Word deneyiminin tamamı **34,6 kB**. Bütçeler CI'da zorlanıyor; aşım = build kırmızı.
+    Yukarıdaki rozetler ölçülen değerler (min+gzip), hedef değil.
+    Bütçeler CI'da zorlanıyor; aşım = build kırmızı.
   </Card>
   <Card title="Modüler" icon="setting">
-    Sadece göstermek için `@kalem/viewer`; düzenlemek için `@kalem/editor`;
-    Word benzeri arayüz için `@kalem/ui`. Ödemediğiniz şeyi indirmezsiniz.
+    Sadece göstermek için `@kalem/viewer`; düzenlemek için
+    `@kalem/editor`; Word benzeri arayüz için `@kalem/ui`. Ödemediğiniz
+    şeyi indirmezsiniz.
   </Card>
 </CardGrid>
 
@@ -53,8 +75,9 @@ import { Editor } from '@kalem/editor';
 import { mountUi } from '@kalem/ui';
 
 const editor = new Editor(document.getElementById('app')!, {
-  value: '# Merhaba\n\nYazmaya başlayın veya `/` ile komut çalıştırın.',
+  value: '# Merhaba',
   lang: 'tr',
+  label: 'Belge',
   onChange: (markdown) => console.log(markdown),
 });
 mountUi(editor);
@@ -105,18 +128,12 @@ const metin = ref('# Merhaba');
   </TabItem>
 </Tabs>
 
-Dört sekme de aynı editörü kuruyor. Sonuncusunda derleme adımı, paketleyici
-ve yazılmış JavaScript yok.
+Dört sekme de aynı editörü kuruyor. Sonuncusunda derleme adımı,
+paketleyici ve yazılmış JavaScript yok.
 
-Üçünü **çalışır hâlde** görmek için: [Canlı deneyin](/canli/) — vanilla,
-React ve Vue örnekleri aynı sayfada, aynı anda.
+[Üçünü aynı sayfada çalışır hâlde görün →](/canli/)
 
-## Neden Kalem?
-
-Yapay zekâ araçlarının çıktı formatı fiilen Markdown oldu. Ancak yazılım
-bilmeyen kullanıcıların Word rahatlığında kullanabileceği bir Markdown
-editörü yok: ya ham metin yazdırıyorlar ya da JSON tutup Markdown'a
-"dönüştüren" bir editör veriyorlar — ve o dönüşüm kayıplı.
+## Karşılaştırma
 
 | | Kalem | Tiptap | BlockNote | Editor.js |
 |---|---|---|---|---|
@@ -133,10 +150,16 @@ doğrulanıyor. Rakip değerleri yaklaşıktır (min+gzip) ve bağımsız
 ölçülmemiştir.
 </Aside>
 
+<Aside type="caution" title="Henüz npm'de değil">
+Kütüphane yazıldı ve çalışıyor — bu sayfadaki editör onun kendisi. İlk
+yayın **v1.0** olacak; buradaki API depodaki koddan alınmıştır. Durum ve
+açık işler için [iş listesine](https://github.com/yusufkocak1/kalem/blob/main/docs/01-is-listesi.md)
+bakın.
+</Aside>
+
 ## Sonraki adım
 
-- [Canlı deneyin](/canli/) — üç çerçeve, aynı sayfada, gerçekten çalışıyor
 - [Başlangıç](/baslangic/) — kurulum ve ilk editör
-- [Viewer rehberi](/rehber/viewer/) — sadece göstermek istiyorsanız
+- [Canlı deneyin](/canli/) — vanilla, React ve Vue aynı sayfada
 - [Editör rehberi](/rehber/editor/) — seçenekler, API, kısayollar
 - [Tarifler](/tarifler/otomatik-kaydet/) — otomatik kaydetme, görsel yükleme, sunucuda Markdown

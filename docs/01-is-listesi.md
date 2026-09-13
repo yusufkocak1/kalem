@@ -23,7 +23,9 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-12 · `master` · `pnpm verify` yeşil · 1284 birim + 1104 tarayıcı + 67 örnek/uygulama testi
+> Son güncelleme: 2026-09-13 · `main` · `pnpm verify` yeşil · 1284 birim + 1104 tarayıcı + 73 örnek/uygulama testi
+>
+> Uzak depo: [yusufkocak1/kalem](https://github.com/yusufkocak1/kalem) (private)
 
 | Faz | Görev | Durum |
 |---|---|---|
@@ -34,8 +36,8 @@
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
 | **Faz 4** — Eklentiler | 7 / 7 | ✅ **Tamamlandı** |
 | **Faz 5** — Sarmalayıcılar | 5 / 5 | 🟡 Bitti (2 haftalık kullanım sürüyor) |
-| **Faz 6** — Cila ve yayın | 4 / 14 | 🔵 Sürüyor |
-| | **59 / 72** | **%82** |
+| **Faz 6** — Cila ve yayın | 5 / 14 | 🔵 Sürüyor |
+| | **60 / 72** | **%83** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -43,14 +45,16 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03` · `F6-04`
+referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03` · `F6-04` · `F6-05`
 
-**Sıradaki:** `F6-05` landing sayfası — canlı editör, boyut rozeti, 30 saniyelik anlatım.
+**Sıradaki:** `F6-06` `apps/demo` — Vite vanilla playground.
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10), Linux görsel
 referansları (F3-11) ve `apps/notlar`ın iki haftalık günlük kullanımı
 (F5-05) — üçü de bir insanın masasında yapılmak zorunda.
-Ayrıca atomik düğümlere ofset uzunluğu 1 verilmesi (F4-01'de bulundu) ve
+Ayrıca 30 saniyelik tanıtım GIF'i (F6-05'te yapılamadı: ffmpeg/gifski
+kurulu değil — F6-11'e taşındı), atomik düğümlere ofset uzunluğu 1
+verilmesi (F4-01'de bulundu) ve
 tablo hücrelerinin düzenlenebilir çizilmesi (F4-03'te bulundu: yazılan
 metin çıktıya hiç girmiyor).
 
@@ -2175,9 +2179,56 @@ atlanıyor ve rapor bunu açıkça yazıyor.
 Çıktı `.gitignore`da: her derlemede yeniden üretilen bir şeyi depoda
 tutmak, kaynakla arasına fark girmesine davetiye.
 
-### F6-05 · Landing sayfası `[M]` ⬜
-Canlı editör (hemen dene), boyut rozeti, rakip karşılaştırma tablosu, 30 saniyelik GIF, kurulum tek satırı
-- **Kabul:** ilk 5 saniyede "bu ne" anlaşılıyor
+### F6-05 · Landing sayfası `[M]` ✅
+- [x] Canlı editör sayfanın **ilk ekranında** — okumadan önce yazılabiliyor
+- [x] Kurulum tek satırda; boyut rozetleri ölçülen değerler
+- [x] Rakip karşılaştırma tablosu
+- [x] **Kabul:** ilk 5 saniyede "bu ne" anlaşılıyor (6 tarayıcı testi)
+- [ ] 30 saniyelik GIF — araç eksiği yüzünden F6-11'e bırakıldı (aşağıya bakın)
+
+**GIF yerine çalışan editör.** Maddenin istediği şey bir tanıtım; ama bir
+GIF "bu ne" sorusunu *anlatıyor*, çalışan bir editör **gösteriyor**.
+Ziyaretçi sayfayı okumadan önce yazmaya başlayabiliyor ve yazdığı her şey
+sağ tarafta Markdown olarak beliriyor — ürünün ayırt edici iddiası
+("çıktı Markdown, JSON değil") böylece iddia olmaktan çıkıyor.
+
+Balon araç çubuğu, slash menüsü ve blok tutamağı da orada; "Word gibi mi"
+sorusunun cevabı üç saniyede alınıyor.
+
+> **Editör katlamanın altında kalıyordu.** Starlight'ın splash hero'su bir
+> hero **resmi** için yer ayırıyor; bizde resim yok ama boşluk duruyordu.
+> Ölçüldüğünde editör 1280×800'lük bir ekranda **555 piksel** aşağıdan
+> başlıyordu — yani ziyaretçi ürünü hiç görmeden karar veriyordu. Hero'nun
+> dikey boşluğu ve başlık ölçeği kısıldı; şimdi 379 piksel, yani editörün
+> 414 pikseli ilk ekranda. Bir test bunu 450 piksel sınırıyla sabitliyor,
+> çünkü "ilk 5 saniye" kriteri tam olarak buna bağlı.
+
+**Rozetler tahmin değil.** `editör + arayüz 34,6 kB`, `çekirdek 11,5 kB`,
+`görüntüleyici 2,7 kB`, `bağımlılık 0` — hepsi `size-limit` çıktısından.
+Bir test ilk rozetin gerçekten "34,6 kB" yazdığını doğruluyor; sayı
+değiştiğinde sayfanın sessizce eskimemesi için.
+
+**Kurulum tek satır:** `npm i @kalem/editor @kalem/ui @kalem/themes`.
+
+**Üst uyarı aşağı taşındı.** "Henüz npm'de değil" notu sayfanın en
+üstündeydi ve ilk okunan şey oydu — bir ürün sayfasının ilk cümlesi
+"bunu kullanamazsınız" olmamalı. Not hâlâ duruyor ve dürüst, ama
+karşılaştırma tablosundan sonra.
+
+> **30 saniyelik GIF yapılamadı.** Makinede ffmpeg, ImageMagick ve gifski
+> yok; Playwright'ın `.webm` kaydı da imleci çizmiyor, yani sürükle-bırak
+> gibi işaretçiyle yapılan şeyler anlaşılmaz görünüyor. GIF'in asıl yeri
+> zaten README ve sosyal önizleme (F6-11) — JavaScript'in çalışmadığı
+> yerler. Landing sayfasında canlı editör ondan güçlü olduğu için bu madde
+> onsuz kapandı; F6-11 açık iş olarak taşıyor.
+
+> **Yan düzeltme — `notlar` testlerinde yarış.** "Yeni not" düğmesine
+> basıp hemen yazmaya başlayan üç test, tam paket tek işçiyle koşarken
+> harfleri boşluğa gönderiyordu: odak, editörün kurulumunu bildiren geri
+> çağırmada veriliyor ve o çağrı bir mikrogörev gecikiyor. Testler artık
+> odağın düzenlenebilir bir bloğa gelmesini bekliyor.
+
+Site 87 rota üretiyor; 73 örnek/uygulama testi yeşil.
 
 ## 6B · Demo / Playground
 
