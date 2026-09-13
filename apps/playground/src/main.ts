@@ -41,6 +41,7 @@ import "@kalem/themes/plugin-source.css";
 import "@kalem/themes/plugin-autosave.css";
 import "./stil.css";
 
+import { baglantiUret, coz, GUVENLI_UZUNLUK } from "./baglanti.js";
 import { ORNEKLER } from "./ornekler.js";
 import { temaUygula } from "./tema.js";
 import { wordYapistir } from "./word-ornegi.js";
@@ -56,6 +57,7 @@ const cikti = $<HTMLPreElement>("cikti");
 const gidisDonus = $("gidisDonus");
 const bilgi = $("bilgi");
 const ipucu = $("ipucu");
+const paylasim = $("paylasim");
 
 // ---------------------------------------------------------------------------
 // Editör
@@ -248,12 +250,67 @@ $<HTMLInputElement>("anahat").addEventListener("change", (olay) => {
 $("kaynak").addEventListener("click", () => kurulum?.kaynak.toggle());
 
 // ---------------------------------------------------------------------------
+// Paylaşılabilir bağlantı  (F6-07)
+// ---------------------------------------------------------------------------
+
+function paylasimYaz(metin: string, durum: "iyi" | "uyari" = "iyi"): void {
+	paylasim.textContent = metin;
+	paylasim.dataset["durum"] = durum;
+	paylasim.hidden = false;
+}
+
+$("paylas").addEventListener("click", () => {
+	const editor = kurulum?.editor;
+	if (editor === undefined) return;
+
+	void (async () => {
+		const adres = await baglantiUret(editor.getValue(), window.location.href);
+
+		/*
+		 * Karma her hâlükârda güncelleniyor: adres çubuğunun kendisi
+		 * bağlantı oluyor. Pano yazması başarısız olsa bile (güvensiz
+		 * köken, izin reddi) kullanıcının elinde çalışan bir şey kalıyor.
+		 *
+		 * `replaceState`, `location.hash = …` değil — ikincisi geçmişe
+		 * kayıt ekliyor ve geri tuşu kullanıcıyı belgesinden çıkarıyordu.
+		 */
+		window.history.replaceState(null, "", adres);
+
+		const uzun = adres.length > GUVENLI_UZUNLUK;
+		try {
+			await navigator.clipboard.writeText(adres);
+			paylasimYaz(
+				uzun
+					? `Bağlantı kopyalandı ama uzun (${adres.length} karakter); bazı uygulamalar kesebilir.`
+					: `Bağlantı kopyalandı (${adres.length} karakter). Belge adreste, sunucuda değil.`,
+				uzun ? "uyari" : "iyi",
+			);
+		} catch {
+			paylasimYaz(
+				`Panoya yazılamadı; bağlantı adres çubuğunda (${adres.length} karakter).`,
+				"uyari",
+			);
+		}
+	})();
+});
+
+// ---------------------------------------------------------------------------
 // Açılış
 // ---------------------------------------------------------------------------
 
 temaUygula("acik");
 ipucuYaz();
-yenidenKur(ORNEKLER[0]?.metin() ?? "");
+
+void (async () => {
+	// Bağlantıyla gelen belge örnek seçiminin önüne geçiyor.
+	const paylasilan = await coz(window.location.hash);
+	if (paylasilan === null) {
+		yenidenKur(ORNEKLER[0]?.metin() ?? "");
+		return;
+	}
+	yenidenKur(paylasilan);
+	ipucu.textContent = "Bu belge paylaşılan bir bağlantıdan geldi.";
+})();
 
 // Konsoldan ve testlerden erişim; kütüphane global'e bir şey yazmıyor.
 declare global {

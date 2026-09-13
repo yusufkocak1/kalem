@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-13 · `main` · `pnpm verify` yeşil · 1284 birim + 1104 tarayıcı + 84 örnek/uygulama testi
+> Son güncelleme: 2026-09-13 · `main` · `pnpm verify` yeşil · 1296 birim + 1104 tarayıcı + 88 örnek/uygulama testi
 >
 > Uzak depo: [yusufkocak1/kalem](https://github.com/yusufkocak1/kalem) (private)
 
@@ -36,8 +36,8 @@
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
 | **Faz 4** — Eklentiler | 7 / 7 | ✅ **Tamamlandı** |
 | **Faz 5** — Sarmalayıcılar | 5 / 5 | 🟡 Bitti (2 haftalık kullanım sürüyor) |
-| **Faz 6** — Cila ve yayın | 6 / 14 | 🔵 Sürüyor |
-| | **61 / 72** | **%85** |
+| **Faz 6** — Cila ve yayın | 7 / 14 | 🔵 Sürüyor |
+| | **62 / 72** | **%86** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -45,9 +45,9 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03` · `F6-04` · `F6-05` · `F6-06`
+referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03` · `F6-04` · `F6-05` · `F6-06` · `F6-07`
 
-**Sıradaki:** `F6-07` paylaşılabilir playground — durum URL'de kodlanıyor.
+**Sıradaki:** `F6-08` performans geçişi — 5.000+ bloklu belgede ölçüm.
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10), Linux görsel
 referansları (F3-11) ve `apps/notlar`ın iki haftalık günlük kullanımı
@@ -2293,9 +2293,62 @@ bir test ikisini de sabitliyor.
 Boyut: 165 kB ham / 51 kB gzip (editör, arayüz ve altı eklenti dâhil;
 sekiz dil paketi ayrı parçalarda). 11 tarayıcı testi.
 
-### F6-07 · Paylaşılabilir playground `[M]` ⬜
-Durum URL'de kodlanır (LZ sıkıştırma), "bağlantıyı kopyala"
-- **Kabul:** paylaşılan bağlantı aynı içeriği açıyor
+### F6-07 · Paylaşılabilir playground `[M]` ✅
+- [x] Durum URL'de kodlanıyor — karma parçasında, `deflate-raw` + base64url
+- [x] "Bağlantıyı kopyala" düğmesi
+- [x] **Kabul:** paylaşılan bağlantı aynı içeriği açıyor (tarayıcı testi)
+
+> **`lz-string` yazılmadı.** Madde "LZ sıkıştırma" diyor ve akla ilk gelen
+> paket `lz-string`. Ama tarayıcı bunu zaten yapıyor:
+> `CompressionStream("deflate-raw")` — LZ77 + Huffman, daha iyi oran ve
+> uygulamaya **tek bayt eklemiyor**. Desteklemeyen tarayıcıda sıkıştırma
+> atlanıyor ve bağlantı yine çalışıyor, sadece uzun oluyor; ön ek
+> (`1` / `0`) hangi biçim olduğunu söylüyor, yani biçim değişirse eski
+> bağlantılar açılmaya devam ediyor.
+
+**Belge karma parçasında, sorgu dizesinde değil.** Karma sunucuya **hiç
+gönderilmiyor**: paylaşılan bir belgenin metni, bağlantıyı barındıran
+sunucunun günlüklerine düşmüyor ve bir ara vekil onu göremiyor. Bir yazma
+aracında bu, gizlilik açısından en ucuz doğru karar — ve tarayıcı testi
+düğmeye basıldıktan sonra giden isteklerin hiçbirinde karma olmadığını
+sabitliyor. Yan fayda: sunucuların sorgu dizesine uyguladığı uzunluk
+sınırları (çoğu 8 kB) karmayı bağlamıyor.
+
+**Ölçüm iki ucu da gösteriyor** ve küçük belgede beklediğim gibi çıkmadı:
+
+| Belge | Ham | Bağlantıda |
+| --- | --- | --- |
+| Tanıtım (890 karakter) | 890 | 857 (%96) |
+| 200 blok | 20.122 | 1.096 (%5) |
+| 1.000 blok | 100.825 | 4.600 (%5) |
+
+Küçük belgede kazanç neredeyse yok: base64 taşımayı %33 şişiriyor ve
+deflate'in kazandırdığını geri alıyor. Sıkıştırma **kısa belge için değil,
+uzun belge için** var — onsuz bin bloklu belge 134 bin karakterlik bir
+bağlantı üretirdi ve hiçbir sohbet uygulaması onu taşımazdı. Birim testi
+oranı değil, kazancın var olduğunu sabitliyor (`< belge.length / 4`).
+
+**Yalnızca belge paylaşılıyor.** Tema, araç çubuğu kipi ve özellik
+anahtarları **okuyucunun tercihi**, yazarın içeriği değil; bir bağlantının
+karşı tarafın temasını değiştirmesi beklenmedik olurdu. Kabul kriteri de
+"aynı **içeriği** açıyor" diyor.
+
+> **Geri tuşu kullanıcıyı belgesinden çıkarıyordu.** İlk sürüm adres
+> çubuğunu `location.hash = …` ile güncelliyordu ve bu geçmişe bir kayıt
+> ekliyor: paylaşan kişi geri tuşuna basınca karma kalkıyor, uygulama
+> baştan kuruluyor ve yazdığı belge yerine örnek belge açılıyordu.
+> `history.replaceState` bunu önlüyor; bir test de geri tuşunun karmayı
+> geri getirmediğini sabitliyor.
+
+Bozuk bağlantı **atmıyor**: kullanıcının eline kırpılmış bir bağlantı
+geçmiş olabilir ve uygulamanın hiç açılmaması bundan kötü — çözücü `null`
+dönüyor, playground örnek belgeyle açılıyor. Pano yazması başarısız olsa da
+(güvensiz köken, izin reddi) bağlantı adres çubuğunda duruyor. 12.000
+karakteri aşan adreste bağlantı yine üretiliyor, kullanıcı yalnızca
+uyarılıyor: tarayıcılar çok daha uzununu taşıyor ama araya giren araçlar
+(sohbet, e-posta, kısaltıcılar) taşımıyor.
+
+12 birim + 4 tarayıcı testi.
 
 ## 6C · Yayın Hazırlığı
 

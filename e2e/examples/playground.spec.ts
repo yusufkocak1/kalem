@@ -140,3 +140,63 @@ test("konsola hata düşmüyor", async ({ page }) => {
 	await expect(page.locator("#cikti")).toContainText("# Çeyrek Raporu");
 	expect(hatalar).toEqual([]);
 });
+
+test.describe("paylaşılabilir bağlantı", () => {
+	test.use({ permissions: ["clipboard-read", "clipboard-write"] });
+
+	test("paylaşılan bağlantı aynı içeriği açıyor", async ({ page, context }) => {
+		// Kabul kriteri bu: bağlantı başka bir sekmede aynı belgeyi açmalı.
+		await page.locator(".yazi p").first().click();
+		await page.keyboard.press("End");
+		await page.keyboard.type(" — PAYLAŞILAN İÇERİK");
+
+		await page.getByRole("button", { name: "Bağlantıyı kopyala" }).click();
+		await expect(page.locator("#paylasim")).toContainText("Bağlantı kopyalandı");
+
+		const adres = await page.evaluate(() => navigator.clipboard.readText());
+		expect(adres).toContain("#1");
+
+		const yeni = await context.newPage();
+		await yeni.goto(adres);
+		await expect(yeni.locator(".yazi p").first()).toContainText("PAYLAŞILAN İÇERİK");
+		await expect(yeni.locator("#ipucu")).toContainText("paylaşılan bir bağlantıdan");
+		await yeni.close();
+	});
+
+	test("belge sunucuya gitmiyor — karma parçasında", async ({ page }) => {
+		/*
+		 * Karma parçası istekte yok: paylaşılan bir belgenin metni, sayfayı
+		 * barındıran sunucunun günlüklerine düşmüyor.
+		 */
+		const istekler: string[] = [];
+		page.on("request", (r) => istekler.push(r.url()));
+
+		await page.getByRole("button", { name: "Bağlantıyı kopyala" }).click();
+		await expect(page.locator("#paylasim")).toBeVisible();
+
+		expect(page.url()).toContain("#");
+		expect(istekler.some((u) => u.includes("#"))).toBe(false);
+	});
+
+	test("bozuk bağlantı uygulamayı açmaya engel olmuyor", async ({ page }) => {
+		// Kullanıcının eline kırpılmış bir bağlantı geçmiş olabilir.
+		await page.goto(`${KOK}#1bozuk___veri`);
+		await expect(page.locator("[role='textbox']")).toHaveCount(1);
+		await expect(page.locator(".yazi h1")).toHaveText("Işık ve Gölge");
+	});
+
+	test("bağlantı geçmişe kayıt eklemiyor", async ({ page }) => {
+		/*
+		 * `location.hash = …` geçmişe kayıt ekliyor ve geri tuşu kullanıcıyı
+		 * belgesinden çıkarıyordu; `replaceState` bunu önlüyor.
+		 */
+		const oncekiAdres = page.url();
+		await page.getByRole("button", { name: "Bağlantıyı kopyala" }).click();
+		await expect(page.locator("#paylasim")).toBeVisible();
+		expect(page.url()).not.toBe(oncekiAdres);
+
+		await page.goBack();
+		// Geri gitmek playground'dan çıkarmalı, karmayı geri almamalı.
+		expect(page.url()).not.toContain("#1");
+	});
+});

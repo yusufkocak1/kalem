@@ -21,6 +21,9 @@ pnpm --filter kalem-playground dev  # http://localhost:5173
 5. **Büyük belge** — bin bloklu örnek. "Akıcı mı" sorusu okunarak değil
    yazarak cevaplanıyor.
 
+Ayrıca **"Bağlantıyı kopyala"**: yazdığınız belge adresin içine giriyor,
+bağlantıyı açan aynı belgeyi görüyor.
+
 Ayrıca: tema seçici (açık / koyu / yalın), araç çubuğu kipi, giriş
 kuralları anahtarı, salt okunur, içindekiler paneli, ham Markdown kaynağı,
 kelime sayacı ve otomatik kaydetme göstergesi.
@@ -50,6 +53,52 @@ editörün gördüğü şey gerçek bir yapıştırmadakinin aynısı, `text/htm
 uzun ve daha zorlu sürümü tarayıcı testlerinde
 (`e2e/fixtures/word-clipboard.ts`).
 
+## Paylaşılabilir bağlantı
+
+Belge, adresin **karma (hash) parçasında** sıkıştırılmış olarak taşınıyor
+(`src/baglanti.ts`). Üç karar var.
+
+**Karma, sorgu değil.** Karma parçası sunucuya hiç gönderilmiyor: paylaşılan
+bir belgenin metni, bağlantıyı barındıran sunucunun günlüklerine düşmüyor ve
+bir ara vekil onu göremiyor. Bir yazma aracında bu, gizlilik açısından en
+ucuz doğru karar. Yan fayda: sunucuların sorgu dizesine uyguladığı uzunluk
+sınırları (çoğu 8 kB) karmayı bağlamıyor. Bir tarayıcı testi bunu
+sabitliyor — düğmeye basıldıktan sonra giden isteklerin hiçbirinde karma yok.
+
+**`lz-string` değil, tarayıcının kendisi.** İş listesi "LZ sıkıştırma" diyor
+ve akla ilk gelen paket `lz-string`. Ama tarayıcı bunu zaten yapıyor:
+`CompressionStream("deflate-raw")` — daha iyi sıkıştırıyor (LZ77 + Huffman)
+ve uygulamaya tek bayt eklemiyor. Desteklemeyen tarayıcıda sıkıştırma
+atlanıyor, bağlantı yine çalışıyor; ön ek (`1` / `0`) hangi biçim olduğunu
+söylüyor.
+
+Ölçüm iki ucu da gösteriyor:
+
+| Belge | Ham | Bağlantıda |
+| --- | --- | --- |
+| Tanıtım (890 karakter) | 890 | 857 (%96) |
+| 200 blok | 20.122 | 1.096 (%5) |
+| 1.000 blok | 100.825 | 4.600 (%5) |
+
+Küçük belgede kazanç neredeyse yok: base64 taşımayı %33 şişiriyor ve
+deflate'in kazandırdığı kadarını geri alıyor. Asıl fayda uzun belgede ve
+paylaşımın çöktüğü yer de orası — sıkıştırma olmasaydı bin bloklu belge
+134 bin karakterlik bir bağlantı üretirdi ve hiçbir sohbet uygulaması onu
+taşımazdı.
+
+**Yalnızca belge.** Tema, araç çubuğu kipi ve özellik anahtarları
+**okuyucunun tercihi**, yazarın içeriği değil; bir bağlantının karşı tarafın
+temasını değiştirmesi beklenmedik olurdu.
+
+Adres 12.000 karakteri aşarsa bağlantı yine üretiliyor ama kullanıcı
+uyarılıyor: tarayıcılar çok daha uzununu taşıyor, araya giren araçlar
+taşımıyor.
+
+Adres çubuğu `history.replaceState` ile güncelleniyor, `location.hash = …`
+ile değil — ikincisi geçmişe kayıt ekliyor ve geri tuşu kullanıcıyı kendi
+belgesinden çıkarıyordu. Pano yazması başarısız olsa da (güvensiz köken,
+izin reddi) bağlantı adres çubuğunda duruyor.
+
 ## Görsel yükleme
 
 Sunucu yok: yüklenen görsel `FileReader` ile `data:` adresine çevriliyor.
@@ -63,4 +112,14 @@ Uçtan uca çalışıyor ve çevrimdışı kalıyor. Beyaz liste `data:image/png
 pnpm e2e:examples playground
 ```
 
-On bir tarayıcı testi yukarıdaki beş iddiayı ve denetimleri sınıyor.
+On beş tarayıcı testi yukarıdaki iddiaları ve denetimleri sınıyor; dördü
+paylaşımı (aynı içerik açılıyor, karma sunucuya gitmiyor, bozuk bağlantı
+uygulamayı açmaya engel olmuyor, geçmişe kayıt eklenmiyor).
+
+```bash
+pnpm vitest run apps/playground
+```
+
+On iki birim testi bağlantı kodlamasını sınıyor: gidiş-dönüş, Türkçe
+karakterler, sıkıştırmanın gerçekten kazandırması, adres-güvenli karakter
+kümesi ve bozuk girdide `null`.

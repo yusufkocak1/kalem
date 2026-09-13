@@ -151,6 +151,19 @@ button.birincil {
 	background: color-mix(in srgb, var(--p-vurgu) 5%, var(--p-zemin));
 }
 
+.paylasim {
+	margin: 0;
+	padding: 6px 16px;
+	border-bottom: 1px solid var(--p-kenar);
+	font-size: 12.5px;
+	background: color-mix(in srgb, var(--p-iyi) 10%, var(--p-zemin));
+	color: var(--p-metin);
+}
+
+.paylasim[data-durum="uyari"] {
+	background: color-mix(in srgb, var(--p-kotu) 10%, var(--p-zemin));
+}
+
 /* --- Gövde --------------------------------------------------------------- */
 
 .govde {
