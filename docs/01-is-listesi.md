@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-13 · `main` · `pnpm verify` yeşil · 1305 birim + 1176 tarayıcı + 88 örnek/uygulama testi
+> Son güncelleme: 2026-09-13 · `main` · `pnpm verify` yeşil · 1369 birim + 1218 tarayıcı + 88 örnek/uygulama testi
 >
 > Uzak depo: [yusufkocak1/kalem](https://github.com/yusufkocak1/kalem) (private)
 
@@ -36,8 +36,8 @@
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
 | **Faz 4** — Eklentiler | 7 / 7 | ✅ **Tamamlandı** |
 | **Faz 5** — Sarmalayıcılar | 5 / 5 | 🟡 Bitti (2 haftalık kullanım sürüyor) |
-| **Faz 6** — Cila ve yayın | 9 / 14 | 🔵 Sürüyor |
-| | **64 / 72** | **%89** |
+| **Faz 6** — Cila ve yayın | 10 / 14 | 🔵 Sürüyor |
+| | **65 / 72** | **%90** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -45,9 +45,9 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03` · `F6-04` · `F6-05` · `F6-06` · `F6-07` · `F6-08` · `F6-09`
+referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03` · `F6-04` · `F6-05` · `F6-06` · `F6-07` · `F6-08` · `F6-09` · `F6-10`
 
-**Sıradaki:** `F6-10` i18n ve locale.
+**Sıradaki:** `F6-11` README ve duyuru varlıkları.
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10), Linux görsel
 referansları (F3-11) ve `apps/notlar`ın iki haftalık günlük kullanımı
@@ -2541,23 +2541,145 @@ değil.
 > çöp toplama gürültüsüydü. Tek bir soğuk ölçüme bakıp "performans hatası
 > buldum" demek buydu.
 
-### F6-10 · i18n ve locale `[M]` ⬜
-İki ayrı iş; ikincisi genelde unutulur ve sessiz hatalara yol açar.
+### F6-10 · i18n ve locale `[M]` ✅
 
 **a) Çeviri**
-- Tüm UI metinleri sözlükten (araç çubuğu ipuçları, slash menü etiketleri, menüler, ekran okuyucu duyuruları, hata mesajları)
-- TR + EN; `dir="rtl"` temel desteği
-- Sözlük eklentiler tarafından genişletilebilir
+- [x] Tüm UI metinleri sözlükten — F3-03'ten beri; F6-10'da **tarandı ve doğrulandı**
+- [x] TR + EN; `dir="rtl"` temel desteği
+- [x] Sözlük eklentiler tarafından genişletilebilir — `PluginContext.getLang()` + belgelendi
 
 **b) Locale duyarlı davranış ⭐**
-- Editörün `lang`'i tek kaynak; tüm karşılaştırma ve sıralama onu kullanır
-- Harf dönüşümü: `toLocaleLowerCase(lang)` / `toLocaleUpperCase(lang)` — F0-04 lint kuralı bunu zaten zorluyor
-- Sıralama: `Intl.Collator(lang)` — TOC ve otomatik tamamlama listelerinde
-- Tarih/sayı biçimi kullanılıyorsa `Intl.DateTimeFormat` / `Intl.NumberFormat`
-- `lang` verilmezse `document.documentElement.lang`, o da yoksa `navigator.language`
+- [x] Editörün `lang`'i tek kaynak — `resolveLang` / `editor.getLang()`
+- [x] Harf dönüşümü — F0-04 kapısı zaten zorluyordu
+- [x] Sıralama — **sıralanan bir şey yok**, gerekçesi aşağıda
+- [x] Sayı biçimi — `Intl.NumberFormat`, kapıya da eklendi
+- [x] `lang` → `<html lang>` → `navigator.language` zinciri
 
-- **Kabul:** dil değişimi çalışıyor; sözlükte eksik anahtar kalmamış
-- **Kabul (locale):** Türkçe `i/İ` ve `ı/I` çiftleri için birim test seti geçiyor — slash menü araması, bul-değiştir ve TOC sıralaması dahil
+- [x] **Kabul:** dil değişimi çalışıyor (tarayıcı testi, üç motor)
+- [x] **Kabul:** sözlükte eksik anahtar kalmamış (sekiz sözlük, test)
+- [x] **Kabul (locale):** Türkçe `i/İ` ve `ı/I` test seti — slash araması,
+      bul-değiştir ve içindekiler dâhil
+
+#### Dil yedi yerde ayrı ayrı çözülüyordu
+
+Arayüz, özel eleman ve beş eklenti aynı satırı kopyalamıştı:
+
+```ts
+element.closest("[lang]")?.getAttribute("lang") ?? "en"
+```
+
+Kopyalar aynı cevabı verdiği sürece zararsız görünüyor. Ama maddenin
+istediği zincirin son halkası — tarayıcının dili — **hiçbirinde yoktu**:
+dil beyan etmeyen bir sayfada Türk kullanıcı İngilizce arayüz görüyordu.
+Eklemek yedi dosyaya dokunmak demekti ve bir sonraki değişiklikte
+kopyalardan birinin geride kalması an meselesiydi — o gün arayüz Türkçe
+konuşurken bul-değiştir İngilizce kasa kuralıyla arardı.
+
+Artık tek fonksiyon (`@kalem/editor` → `resolveLang`), editörde
+`getLang()`, eklenti bağlamında `context.getLang()`. Yedi kopyanın yedisi
+de ona bağlandı.
+
+> **Boş `lang` sessizce yanlış cevap veriyordu.** HTML'de `lang=""` "dil
+> bilinmiyor" demek. `closest("[lang]")` onu da buluyor ve zincir boş
+> dizeyle bitiyordu; `labelsFor("")` İngilizce'ye düşüyordu, oysa
+> `<html lang="tr">` oradaydı. Seçici artık `[lang]:not([lang=""])`.
+
+#### Kelime sayacı sayıları biçimlemiyordu
+
+440 bin karakterlik belgede "439689 karakter" yazıyordu. Binlik ayırıcı
+Türkçe'de nokta, İngilizce'de virgül — ve **ters** olanı başka bir sayı
+gibi okunuyor: İngiliz okur "12.345"i on iki virgül üç dört beş sanar.
+
+Biçimleyici her sözlüğün **kendi dilinde** sabit. Sözlüğe dışarıdan
+locale geçirmek hem imzayı değiştirirdi (kendi sözlüğünü yazan kullanıcıyı
+kırardı) hem de "Türkçe metin, İngilizce sayı" gibi kendi içinde tutarsız
+bir sonuca kapı açardı.
+
+**Aynı hata sınıfı kapıya eklendi.** `guard:locale` locale'siz
+`Intl.Collator`ı yakalıyordu ama `Intl.NumberFormat()`,
+`Intl.DateTimeFormat(undefined, …)` ve argümansız `toLocaleString()`i
+yakalamıyordu — üçü de belgenin değil **çalışma ortamının** dilini
+kullanıyor ve İngilizce bir CI makinesinde testten geçiyor. Dört yeni
+öz-test kuralın hem temiz kodu geçirdiğini hem kirliyi yakaladığını
+kanıtlıyor.
+
+#### Maddenin "TOC için Collator" önerisi yanlış araç
+
+İçindekiler **belge sırasında** olmalı, alfabetik değil: okur "Giriş"ten
+sonra belgedeki bir sonraki başlığı görmek istiyor. İçindekilerde
+harmanlanan hiçbir şey yok; slash menüsü de sabit, özenle dizilmiş bir
+sırada. Kodda sıralama yapılan tek yer yok, yani `Intl.Collator`ın
+girebileceği yer yok.
+
+Test bu yüzden Collator'u değil **Collator'un yokluğunu** sabitliyor:
+`ılık`, `İstanbul`, `Işık`, `istasyon` — Türkçe harmanlamayla da kod
+noktası sırasıyla da yer değiştiren dört başlık belge sırasında kalıyor.
+İkinci bir test o dört sözcüğün sıralanınca gerçekten yer değiştirdiğini
+kanıtlıyor; yoksa ilk test boşa geçerdi.
+
+#### Slash araması ile bul-değiştir kasıtlı olarak farklı
+
+| | Slash araması | Bul-değiştir |
+| --- | --- | --- |
+| `IŞIK` ↔ `ışık` | eşleşiyor | eşleşiyor |
+| `ılık` ↔ `ilik` | **eşleşiyor** | **eşleşmiyor** |
+| `bas` ↔ `Başlık` | eşleşiyor | eşleşmiyor |
+
+Slash menüsü bir **komut** arıyor ve klavyesinde `ı` olmayan kullanıcı
+`/bas` yazıp "Başlık"ı bulmalı. Bul-değiştir **metin değiştiriyor**:
+"ılık"ı değiştiren kullanıcının belgesindeki "ilik" de değişirse bu veri
+kaybı. İkisini "tutarlı olsun" diye birleştirmek birini bozar — iki
+pakette de karşı dosyayı adıyla anan bir test bunu tutuyor. Tablonun her
+hücresi test edilmiş; kullanıcı rehberindeki aynı tablo buna dayanıyor.
+
+#### Sağdan sola
+
+Tarama CSS'te 24 fiziksel yön özelliği buldu. **On dokuzu mantıksal
+özelliğe** geçti (`padding-inline-start`, `border-inline-start`,
+`text-align: start`): alıntı çizgisi, liste girintisi, içindekiler
+girintisi, tablo hücresi hizası, tutamaç boşluğu. Taramanın deseni
+yakalamayan bir köşe yuvarlatması da (`border-radius: 0 6px 6px 0`)
+mantıksal köşelere çevrildi — o olmasa RTL'de içindekiler öğesinin çizgisi
+bir tarafta, yuvarlatması aynı tarafta kalırdı. Soldan sağa yazıda
+mantıksal özellik fizikselle aynı değeri veriyor — 18 görsel regresyon
+testi referanslara karşı birebir geçti.
+
+**Beşi kasıtlı olarak fiziksel kaldı:** JS'in `getBoundingClientRect`
+pikselini yazdığı sabit katmanların üç `left: 0` orijini, ve yazarın
+Markdown'da `:---` / `---:` ile **açıkça** sol ve sağ dediği iki tablo
+sütun hizası.
+
+Tutamaç yönü `dir` özniteliğinden değil **hesaplanmış stilden** okuyor —
+ataya konmuş `dir` ve CSS `direction` da çalışıyor. RTL ve LTR testleri
+tutamaç için zıt konum iddia ediyor ve ikisi de geçiyor; yani konum
+gerçekten yöne bağlı, test boşa geçmiyor.
+
+#### Taranan ama değişmeyen
+
+**Son kullanıcıya görünen her metin zaten sözlükteydi.** Tarama sözlük
+dışında 60'tan fazla Türkçe dize buldu; hepsi geliştiriciye dönük —
+ayrıştırıcının iç tutarlılık etiketleri ve API yanlış kullanımında
+fırlatılan hatalar (`replaceAt: 3. çocuk yok`, `Eklenti adı zaten
+kayıtlı`).
+
+> **Karar bekliyor:** bu hatalar uluslararası yayımlanacak bir
+> kütüphanede İngilizce konuşan geliştiricinin konsoluna Türkçe düşecek.
+> Projenin kuralı "kod ve yorumlar Türkçe, kullanıcıya görünmüyor" — ama
+> fırlatılan hata geliştiriciye görünüyor. Sözlükten geçirmek yanlış
+> (bunlar arayüz metni değil); seçenekler İngilizce'ye çevirmek ya da
+> olduğu gibi bırakmak. v1.0'dan (F6-13) önce verilmesi gereken bir karar.
+
+> **Kendi yanlış alarmım.** Sözlüklerin dışa aktarımına bakarken dar bir
+> aramayla "`plugin-outline` sözlüklerini dışa aktarmıyor" sonucuna
+> vardım. Sekiz paketi tek tek kontrol eden bir betik hepsinin tam
+> olduğunu gösterdi; aramam yalnızca birkaç adı içeriyordu. Hiçbir şey
+> değiştirilmedi.
+
+Kullanıcı rehberi: [`/rehber/dil-ve-yon/`](../apps/docs/src/content/docs/rehber/dil-ve-yon.md).
+Başka bir dil eklemek, eklenti metinleri, sayılar, kasa kuralları ve RTL.
+
+64 birim testi (dil zinciri, sekiz sözlük, sayı biçimi, içindekiler sırası,
+kasıtlı fark) + 14 tarayıcı testi × 3 motor + 4 kapı öz-testi.
 
 ### F6-11 · README ve duyuru varlıkları `[M]` ⬜
 İngilizce README (GIF, rozet, kurulum, karşılaştırma tablosu), sosyal önizleme görseli, 30 sn demo videosu, "Show HN" ve dev.to yazı taslakları

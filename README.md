@@ -35,7 +35,7 @@ Sırada Faz 6 — cila ve yayın. Henüz npm'de değil; ilk yayın v1.0 olacak.
 | [apps/docs/](apps/docs/) | Astro Starlight dokümantasyon sitesi — anlattığı her API'nin gerçekten var olduğunu `guard:docs` sınıyor |
 | [docs/02-faz0-sonuc.md](docs/02-faz0-sonuc.md) | Faz 0 sonuç raporu — ne kuruldu, ne doğrulandı, ne kapsanmadı |
 
-**1305 birim testi** + **1176 tarayıcı testi** (Chromium · Firefox · WebKit
+**1369 birim testi** + **1218 tarayıcı testi** (Chromium · Firefox · WebKit
 · Edge · iPhone ve Pixel benzetimi) + **88 örnek/uygulama testi**. `serialize(parse(md)) === md` gidiş-dönüş
 17/17 byte-birebir; `renderToDOM` ile `renderToString` çıktıları üç motorda
 byte-birebir aynı.

@@ -32,7 +32,7 @@ değil.
 | `onChange` | `(value: string, doc: Root) => void` | — | İçerik her değiştiğinde |
 | `onSelectionChange` | `(selection: EditorSelection) => void` | — | Seçim değiştiğinde (bloklar arası dâhil) |
 | `readOnly` | `boolean` | `false` | İçerik görünür, düzenlenemez |
-| `lang` | `string` | kapsayıcıdan miras | Belge dili — yazım denetimi ve locale davranışı |
+| `lang` | `string` | atadan, sonra `<html lang>`, sonra tarayıcı | Belge dili — arayüz metinleri, kasa katlaması, sayı biçimi. Bkz. [Dil ve yön](/rehber/dil-ve-yon/) |
 | `label` | `string` | — | Erişilebilir ad (`aria-label`) |
 | `classPrefix` | `string` | `"kalem-"` | CSS sınıf öneki |
 | `inputRules` | `boolean` | `true` | `# ` yazınca başlık, `- ` yazınca liste |
@@ -63,6 +63,7 @@ yazmak, ya da `mountUi` kullanmak (sözlüğünden bir ad koyuyor).
 editor.getValue();              // string — güncel Markdown
 editor.getDocument();           // Root — değişmez AST
 editor.setValue(markdown);      // belgeyi baştan yükler (geçmişi sıfırlar)
+editor.getLang();               // string — çözülmüş belge dili
 ```
 
 `setValue` "başka bir belge aç" demek: kimlikler yeniden dağıtılıyor, tüm

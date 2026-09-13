@@ -82,3 +82,28 @@ describe("sıralama puanı", () => {
 		expect(score("Başlık", "", "tr")).toBe(score("Kod", "", "tr"));
 	});
 });
+
+describe("bul-değiştirden kasıtlı fark  (F6-10)", () => {
+	/*
+	 * Slash menü araması `ı` ile `i`yi **eşleştiriyor**; bul-değiştir
+	 * eşleştirmiyor (`plugin-find-replace/src/fold.test.ts`). İkisi de
+	 * doğru, çünkü işleri farklı:
+	 *
+	 * - Burada kullanıcı bir **komut** arıyor ve klavyesinde `ı` olmayabilir.
+	 *   `/ilik` yazan "Ilık"ı bulamazsa menü işe yaramaz görünür.
+	 * - Bul-değiştir **metin** değiştiriyor. "ılık"ı "sıcak" yapan
+	 *   kullanıcının belgesindeki "ilik" kelimesi de değişirse bu veri kaybı.
+	 *
+	 * İki davranışı "tutarlı olsun" diye birleştirmek ikisinden birini
+	 * bozar. Bu test ve karşı dosyadaki eşi bunun için var.
+	 */
+	it("komut aramasında noktasız ı noktalı i ile eşleşiyor", () => {
+		expect(matches("Ilık su", "ilik", "tr")).toBe(true);
+		expect(matches("İstatistik", "ıst", "tr")).toBe(true);
+	});
+
+	it("komut aramasında aksan da katlanıyor", () => {
+		// `dil-ve-yon.md` tablosunun son satırı.
+		expect(matches("Başlık 1", "bas", "tr")).toBe(true);
+	});
+});

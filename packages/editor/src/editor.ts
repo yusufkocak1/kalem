@@ -49,6 +49,7 @@ import {
 	sliceInline,
 	spliceInline,
 } from "./inline-edit.js";
+import { resolveLang } from "./lang.js";
 import { contentLength, offsetOf, selectRange } from "./offsets.js";
 import type { PasteInput } from "./paste.js";
 import { insertFragment, pasteFragment } from "./paste.js";
@@ -250,6 +251,7 @@ export class Editor {
 			getCaret: () => this.#caret(),
 			applyEdit: (sonuc) => this.applyEdit(sonuc),
 			isReadOnly: () => this.#readOnly,
+			getLang: () => this.getLang(),
 			on: (event: never, handler: never) => this.on(event, handler),
 		};
 	}
@@ -289,6 +291,18 @@ export class Editor {
 	// -----------------------------------------------------------------------
 	// Genel API
 	// -----------------------------------------------------------------------
+
+	/**
+	 * Belge dili  (F6-10)
+	 *
+	 * Arayüz metinleri, kasa katlaması, sayı biçimi — dile bağlı her karar
+	 * buradan okunuyor. `lang` seçeneği elemana yazıldığı için o da bu
+	 * zincirin ilk halkası. Sıra: eleman ya da atası → `<html lang>` →
+	 * `navigator.language` → `"en"`.
+	 */
+	getLang(): string {
+		return resolveLang(this.#element);
+	}
 
 	/** Belgenin Markdown karşılığı. */
 	getValue(): string {

@@ -141,8 +141,10 @@ ui.destroy();
 
 ### Arayüz metinleri
 
-Sözlük belgenin `lang`ine göre seçiliyor (`tr` → Türkçe, aksi hâlde
-İngilizce). Kendi sözlüğünüzü verebilirsiniz:
+Sözlük belgenin diline göre seçiliyor (`tr` → Türkçe, aksi hâlde
+İngilizce); dilin nereden geldiği ve başka bir dil eklemek
+[Dil ve yön](/rehber/dil-ve-yon/) sayfasında. Kendi sözlüğünüzü
+verebilirsiniz:
 
 ```ts
 import { mountUi, trLabels } from '@kalem/ui';

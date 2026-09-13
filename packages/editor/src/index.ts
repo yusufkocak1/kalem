@@ -47,6 +47,8 @@ export {
 	spliceInline,
 } from "./inline-edit.js";
 export { applyBlockRule, applyInlineRule, plainInline } from "./input-rules.js";
+export type { LangSource } from "./lang.js";
+export { resolveLang } from "./lang.js";
 export { blockElementOf, holderFor, holderIn } from "./locate.js";
 export type { DomPoint } from "./offsets.js";
 export { contentLength, offsetOf, pointAt, selectRange } from "./offsets.js";

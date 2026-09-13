@@ -32,7 +32,7 @@
 	display: inline-block;
 	width: 1px;
 	height: 0.9em;
-	margin-right: 14px;
+	margin-inline-end: 14px;
 	vertical-align: -0.1em;
 	background: var(--kalem-border);
 }

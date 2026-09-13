@@ -22,6 +22,7 @@ function baglam(): PluginContext {
 		getCaret: () => null,
 		applyEdit: () => true,
 		isReadOnly: () => false,
+		getLang: () => "tr",
 	};
 }
 

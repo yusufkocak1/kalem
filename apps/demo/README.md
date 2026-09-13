@@ -27,7 +27,7 @@ Kütüphaneyi gerçek derlenmiş bundle'dan yüklerler, o yüzden `pnpm demo`
 | `wc.html` | `@kalem/wc` — özel eleman, gölge DOM ve form bütünleşmesi |
 | `olcum.html` | **Performans ölçüm tezgâhı** (F6-08) |
 
-Bu sayfalardaki eleman kimlikleri 1.176 testin bağlı olduğu bir
+Bu sayfalardaki eleman kimlikleri 1.218 testin bağlı olduğu bir
 sözleşme — değiştirmeden önce `e2e/` altını arayın.
 
 ### `olcum.html` — ölçüm tezgâhı

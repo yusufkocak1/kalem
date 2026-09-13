@@ -134,7 +134,7 @@ export function sourceModePlugin(options: SourceModeOptions = {}): SourceModePlu
 
 		setup(context: PluginContext) {
 			ctx = context;
-			const belgeDili = context.element.closest("[lang]")?.getAttribute("lang") ?? "en";
+			const belgeDili = context.getLang();
 			const labels = options.labels ?? labelsFor(belgeDili);
 
 			view = createSourceView(context.element, {

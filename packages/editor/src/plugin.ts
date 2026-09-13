@@ -53,6 +53,11 @@ export interface PluginContext {
 	/** Salt okunur mod. */
 	isReadOnly(): boolean;
 	/**
+	 * Belge dili — metin seçimi, kasa katlaması ve sayı biçimi için tek
+	 * kaynak (F6-10). Her çağrıda yeniden çözülüyor; bkz. `resolveLang`.
+	 */
+	getLang(): string;
+	/**
 	 * Olay aboneliği; aboneliği bitiren fonksiyonu döndürüyor.
 	 *
 	 * `Editor.on` ile aynı. Eklentinin editörün durumuna **tepki

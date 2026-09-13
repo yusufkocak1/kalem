@@ -76,6 +76,24 @@ const KURALLAR = [
 		re: /new\s+Intl\.Collator\s*\(\s*undefined\b/g,
 		duzelt: "new Intl.Collator(locale)",
 	},
+	/*
+	 * Biçimleyiciler  (İş listesi: F6-10)
+	 *
+	 * Sıralamayla aynı sınıftan hata: locale verilmezse **çalışma ortamının**
+	 * dili kullanılıyor, belgenin değil. İngilizce bir CI makinesinde
+	 * "12,345 kelime" üretip testten geçer; Türkçe belgede doğrusu
+	 * "12.345". Patlamıyor, sadece yanlış görünüyor.
+	 */
+	{
+		ad: "Intl biçimleyici (locale'siz)",
+		re: /new\s+Intl\.(NumberFormat|DateTimeFormat|PluralRules|RelativeTimeFormat|ListFormat)\s*\(\s*(\)|undefined\b)/g,
+		duzelt: "new Intl.NumberFormat(locale) — belgenin dili, ortamın değil",
+	},
+	{
+		ad: "toLocaleString (locale'siz)",
+		re: /\.toLocale(Date|Time)?String\s*\(\s*\)/g,
+		duzelt: "toLocaleString(locale)",
+	},
 ];
 
 /**

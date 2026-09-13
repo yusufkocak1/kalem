@@ -1,7 +1,7 @@
 /**
  * @kalem/ui — Blok tutamacı ve sürükle-bırak  (İş listesi: F3-04)
  *
- * Kullanıcının açıkça istediği özellik. Bloğun soluna gelen tutamaç (⠿)
+ * Kullanıcının açıkça istediği özellik. Satırın başına gelen tutamaç (⠿)
  * ve altına blok ekleyen artı düğmesi.
  *
  * ## Pointer olayları, HTML5 sürükleme değil
@@ -126,12 +126,30 @@ export function createBlockHandle(editor: Editor, options: BlockHandleOptions): 
 		kok.style.visibility = "hidden";
 		kok.hidden = false;
 		const genislik = kok.getBoundingClientRect().width;
-		const sol = kutu.left - genislik - ARALIK;
 
-		// Sol boşluk yetmiyorsa tutamaç hiç çıkmıyor. Metnin üstüne binmek
+		/*
+		 * Tutamaç satırın **başında** duruyor: soldan sağa yazıda solda,
+		 * sağdan sola yazıda sağda  (İş listesi: F6-10)
+		 *
+		 * Yön `getComputedStyle`dan okunuyor, `dir` özniteliğinden değil:
+		 * `dir` ataya da konabilir, CSS `direction` ile de verilebilir ve
+		 * ikisini de doğru çözen tek kaynak hesaplanmış stil. Boşluğu
+		 * ayıran `.kalem-ui { padding-inline-start }` de aynı kurala uyuyor,
+		 * yani tutamaç her iki yönde de o boşluğa düşüyor.
+		 *
+		 * Koordinatlar yine fiziksel (`style.left`): `getBoundingClientRect`
+		 * görünüm alanı pikseli veriyor ve onun mantıksal karşılığı yok.
+		 */
+		const sagdanSola = doc.defaultView?.getComputedStyle(blok).direction === "rtl";
+		const sol = sagdanSola ? kutu.right + ARALIK : kutu.left - genislik - ARALIK;
+		const sigmiyor = sagdanSola
+			? sol + genislik > (doc.documentElement.clientWidth || Number.POSITIVE_INFINITY)
+			: sol < 0;
+
+		// Başta boşluk yetmiyorsa tutamaç hiç çıkmıyor. Metnin üstüne binmek
 		// tıklamaları ve sürükleyerek seçimi yutuyor; görünmemek yeğ.
 		// Boşluğu `.kalem-ui` ayırıyor, ama gömen sayfa onu ezebilir.
-		if (sol < 0) {
+		if (sigmiyor) {
 			kok.hidden = true;
 			hoverId = null;
 			return;
@@ -139,7 +157,7 @@ export function createBlockHandle(editor: Editor, options: BlockHandleOptions): 
 
 		hoverId = blok.getAttribute("data-kalem-id");
 		kok.style.visibility = "";
-		// Bloğun soluna, ilk satırıyla hizalı.
+		// Satırın başında (yöne göre solda ya da sağda), ilk satırla hizalı.
 		kok.style.left = `${sol}px`;
 		kok.style.top = `${kutu.top}px`;
 	}

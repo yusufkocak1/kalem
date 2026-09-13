@@ -218,7 +218,7 @@ export function outlinePlugin(options: OutlineOptions = {}): OutlinePlugin {
 
 		setup(context: PluginContext) {
 			ctx = context;
-			const belgeDili = context.element.closest("[lang]")?.getAttribute("lang") ?? "en";
+			const belgeDili = context.getLang();
 			const labels = options.labels ?? labelsFor(belgeDili);
 
 			if (options.container != null) {

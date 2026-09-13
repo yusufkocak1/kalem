@@ -31,13 +31,15 @@
 	width: 100%;
 	box-sizing: border-box;
 	font: inherit;
-	text-align: left;
+	text-align: start;
 	padding: 4px 8px;
 	color: inherit;
 	background: none;
 	border: 0;
-	border-left: 2px solid transparent;
-	border-radius: 0 6px 6px 0;
+	border-inline-start: 2px solid transparent;
+	/* Yuvarlatma kenar çizgisinin **karşı** tarafında; RTL'de o da aynalanıyor. */
+	border-start-end-radius: 6px;
+	border-end-end-radius: 6px;
 	cursor: pointer;
 	/*
 	 * Uzun başlık kesiliyor, sarmalanmıyor.
@@ -65,23 +67,23 @@
  * da aynı sonucu veriyor.
  */
 .kalem-outline-item[data-level="2"] {
-	padding-left: 20px;
+	padding-inline-start: 20px;
 }
 
 .kalem-outline-item[data-level="3"] {
-	padding-left: 32px;
+	padding-inline-start: 32px;
 }
 
 .kalem-outline-item[data-level="4"] {
-	padding-left: 44px;
+	padding-inline-start: 44px;
 }
 
 .kalem-outline-item[data-level="5"] {
-	padding-left: 56px;
+	padding-inline-start: 56px;
 }
 
 .kalem-outline-item[data-level="6"] {
-	padding-left: 68px;
+	padding-inline-start: 68px;
 }
 
 /* Birinci seviye belgenin iskeleti; biraz daha baskın. */
@@ -106,13 +108,13 @@
  */
 .kalem-outline-item[aria-current] {
 	color: var(--kalem-accent);
-	border-left-color: var(--kalem-accent);
+	border-inline-start-color: var(--kalem-accent);
 	background: var(--kalem-bg-subtle);
 }
 
 @media (forced-colors: active) {
 	.kalem-outline-item[aria-current] {
-		border-left-color: Highlight;
+		border-inline-start-color: Highlight;
 		color: Highlight;
 	}
 }

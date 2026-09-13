@@ -295,9 +295,7 @@ export function imageUploadPlugin(options: ImageUploadOptions): ImageUploadPlugi
 
 		setup(context) {
 			ctx = context;
-			labels =
-				options.labels ??
-				labelsFor(context.element.closest("[lang]")?.getAttribute("lang") ?? null);
+			labels = options.labels ?? labelsFor(context.getLang());
 
 			const surukleUstunde = (event: DragEvent): void => {
 				if (dosyalar(event.dataTransfer).length === 0) return;

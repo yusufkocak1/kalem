@@ -207,7 +207,7 @@ export function findReplacePlugin(options: FindReplaceOptions = {}): FindReplace
 
 		setup(context: PluginContext) {
 			ctx = context;
-			const belgeDili = context.element.closest("[lang]")?.getAttribute("lang") ?? "en";
+			const belgeDili = context.getLang();
 			locale = options.locale ?? belgeDili;
 			const labels = options.labels ?? labelsFor(belgeDili);
 

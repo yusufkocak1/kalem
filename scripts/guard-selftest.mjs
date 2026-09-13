@@ -152,6 +152,41 @@ const yaz = (ad, icerik) => {
 	const r = calistir(LOCALE, [y]);
 	bekle("tek argümanlı localeCompare KIRILIYOR", r.kod === 1, r.cikti);
 }
+// F6-10: biçimleyiciler. Locale verilmezse ortamın dili kullanılıyor.
+{
+	const y = yaz(
+		"sayi-temiz.ts",
+		"const f = new Intl.NumberFormat(lang);\nconst s = n.toLocaleString(lang);\n",
+	);
+	const r = calistir(LOCALE, [y]);
+	bekle("locale'li biçimleyici geçiyor", r.kod === 0, r.cikti);
+}
+{
+	const y = yaz("sayi-kirli.ts", "const f = new Intl.NumberFormat();\n");
+	const r = calistir(LOCALE, [y]);
+	bekle(
+		"locale'siz Intl.NumberFormat KIRILIYOR",
+		r.kod === 1 && /biçimleyici/.test(r.cikti),
+		r.cikti,
+	);
+}
+{
+	const y = yaz(
+		"tarih-kirli.ts",
+		"const f = new Intl.DateTimeFormat(undefined, { dateStyle: 'long' });\n",
+	);
+	const r = calistir(LOCALE, [y]);
+	bekle("undefined locale'li DateTimeFormat KIRILIYOR", r.kod === 1, r.cikti);
+}
+{
+	const y = yaz("tostring-kirli.ts", "const s = toplam.toLocaleString();\n");
+	const r = calistir(LOCALE, [y]);
+	bekle(
+		"argümansız toLocaleString KIRILIYOR",
+		r.kod === 1 && /toLocaleString/.test(r.cikti),
+		r.cikti,
+	);
+}
 {
 	const y = yaz(
 		"izinli.ts",

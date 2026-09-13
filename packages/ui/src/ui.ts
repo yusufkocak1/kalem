@@ -121,7 +121,7 @@ export interface Ui {
 export function mountUi(editor: Editor, options: UiOptions = {}): Ui {
 	const element = editor.getElement();
 	const prefix = options.classPrefix ?? "kalem-";
-	const belgeDili = element.closest("[lang]")?.getAttribute("lang") ?? "en";
+	const belgeDili = editor.getLang();
 	const labels = options.labels ?? labelsFor(belgeDili);
 	const locale = options.locale ?? belgeDili;
 	const sokucular: (() => void)[] = [];

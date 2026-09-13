@@ -38,7 +38,7 @@
  * yalnızca kullanıcının yazdığı yayıyor.
  */
 import type { Plugin } from "@kalem/editor";
-import { Editor } from "@kalem/editor";
+import { Editor, resolveLang } from "@kalem/editor";
 import { labelsFor } from "./labels.js";
 import { dedent } from "./metin.js";
 
@@ -513,8 +513,9 @@ export function kalemEditorElement(): KalemEditorConstructor {
 			if (ic === null) return;
 			if (this.required && (this.#deger ?? "").trim() === "") {
 				// `lang` DOM özelliği yalnızca elemanın **kendi** özniteliğini
-				// veriyor; kalıtımı okumak için atalara bakmak gerekiyor.
-				const sozluk = labelsFor(this.closest("[lang]")?.getAttribute("lang"));
+				// veriyor; kalıtım ve tarayıcı dili `resolveLang`de. Editör
+				// burada henüz kurulmamış olabilir, o yüzden eleman kendisi.
+				const sozluk = labelsFor(resolveLang(this));
 				ic.setValidity(
 					{ valueMissing: true },
 					this.getAttribute("required-message") ?? sozluk.valueMissing,

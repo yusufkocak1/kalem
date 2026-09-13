@@ -157,10 +157,9 @@
 /* --------------------------------------------------------------------- */
 
 .kalem-doc blockquote {
-	margin-left: 0;
-	margin-right: 0;
-	padding-left: 1em;
-	border-left: 3px solid var(--kalem-border);
+	margin-inline: 0;
+	padding-inline-start: 1em;
+	border-inline-start: 3px solid var(--kalem-border);
 	color: var(--kalem-fg-muted);
 }
 
@@ -176,7 +175,7 @@
 
 .kalem-doc ul,
 .kalem-doc ol {
-	padding-left: 1.5em;
+	padding-inline-start: 1.5em;
 }
 
 .kalem-doc li {
@@ -197,7 +196,7 @@
  */
 .kalem-doc .kalem-task {
 	list-style: none;
-	padding-left: 0;
+	padding-inline-start: 0;
 	text-indent: -1.5em;
 }
 
@@ -234,7 +233,7 @@
 .kalem-doc td {
 	border: 1px solid var(--kalem-border);
 	padding: 0.4em 0.7em;
-	text-align: left;
+	text-align: start;
 }
 
 .kalem-doc th {

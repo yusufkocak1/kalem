@@ -111,7 +111,7 @@
 
 .kalem-bubble-select {
 	height: 28px;
-	margin-left: 4px;
+	margin-inline-start: 4px;
 	padding: 0 4px;
 	border: 1px solid var(--kalem-border);
 	border-radius: 6px;
@@ -337,7 +337,7 @@
  * ödemiyor.
  */
 .kalem-ui {
-	padding-left: 2.75rem;
+	padding-inline-start: 2.75rem;
 }
 
 /*

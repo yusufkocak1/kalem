@@ -110,3 +110,21 @@ describe("kelime sınırı", () => {
 		expect(atWordBoundary("şeker", 1, 5)).toBe(false);
 	});
 });
+
+describe("slash aramasından kasıtlı fark  (F6-10)", () => {
+	/*
+	 * Slash menü araması `ı` ile `i`yi eşleştiriyor
+	 * (`ui/src/search.test.ts`); burada eşleşmiyor. Bul-değiştir **metin
+	 * değiştiriyor**: "ılık"ı değiştiren kullanıcının belgesindeki "ilik"
+	 * de değişirse bu veri kaybı. Komut aramasının gevşekliği burada hata.
+	 */
+	it("metin aramasında noktasız ı ile noktalı i ayrı harf", () => {
+		expect(esit("ılık", "ilik", "tr")).toBe(false);
+		expect(esit("Işık", "işik", "tr")).toBe(false);
+	});
+
+	it("metin aramasında aksan katlanmıyor", () => {
+		// `dil-ve-yon.md` tablosunun son satırı: "bas" "baş" değil.
+		expect(esit("bas", "baş", "tr")).toBe(false);
+	});
+});

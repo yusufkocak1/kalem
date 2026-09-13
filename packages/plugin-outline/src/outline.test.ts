@@ -103,3 +103,41 @@ describe("sameOutline", () => {
 		expect(sameOutline(a, a.slice(1))).toBe(false);
 	});
 });
+
+describe("Türkçe i/İ ve ı/I  (F6-10)", () => {
+	/*
+	 * İş listesi bu maddede "TOC sıralaması için `Intl.Collator`" diyor.
+	 * **Yanlış araç**: içindekiler belge sırasında olmalı, alfabetik değil.
+	 * Okur "Giriş"ten sonra "Sonuç"u değil, belgedeki bir sonraki başlığı
+	 * görmek istiyor. Burada harmanlanan hiçbir şey yok.
+	 *
+	 * Bu yüzden test Collator'u değil, **Collator'un yokluğunu** sabitliyor:
+	 * alfabetik sıraya göre dizilince yer değiştirecek dört başlık, belge
+	 * sırasında kalıyor. Birisi içindekileri "düzenli görünsün" diye
+	 * sıralarsa burası kırılır.
+	 *
+	 * Seçilen dört sözcük Türkçe harmanlamada **ve** kod noktası sırasında
+	 * farklı diziliyor; ikisinden hangisiyle sıralanırsa sıralansın sıra
+	 * bozuluyor.
+	 */
+	const BELGE = "# ılık\n\n# İstanbul\n\n# Işık\n\n# istasyon\n";
+
+	it("başlıklar belge sırasında, harmanlanmadan", () => {
+		expect(ozet(BELGE).map((s) => s.slice(5))).toEqual(["ılık", "İstanbul", "Işık", "istasyon"]);
+	});
+
+	it("dört başlığın sırası harmanlamayla gerçekten değişirdi", () => {
+		// Testin boşa geçmediğinin kanıtı: sıralı hâli belge sırası değil.
+		const metin = ["ılık", "İstanbul", "Işık", "istasyon"];
+		const turkce = [...metin].sort(new Intl.Collator("tr").compare);
+		const kodNoktasi = [...metin].sort();
+		expect(turkce).not.toEqual(metin);
+		expect(kodNoktasi).not.toEqual(metin);
+	});
+
+	it("noktalı ve noktasız harfler olduğu gibi korunuyor", () => {
+		// Başlık metnine hiçbir kasa dönüşümü uygulanmıyor: `I` `ı`'ya,
+		// `İ` `i`'ye inmiyor.
+		expect(ozet("# IŞIK\n\n# İŞİK\n")).toEqual(["1/1: IŞIK", "1/1: İŞİK"]);
+	});
+});
