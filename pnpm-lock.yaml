@@ -282,6 +282,49 @@ importers:
         specifier: 'catalog:'
         version: 5.0.0(@types/node@24.13.3)(@vitest/coverage-v8@5.0.0)(vite@6.4.3(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.33.0)(sass@1.101.0)(terser@5.51.2)(yaml@2.9.0))
 
+  apps/playground:
+    dependencies:
+      '@kalem/core':
+        specifier: workspace:^
+        version: link:../../packages/core
+      '@kalem/editor':
+        specifier: workspace:^
+        version: link:../../packages/editor
+      '@kalem/plugin-autosave':
+        specifier: workspace:^
+        version: link:../../packages/plugin-autosave
+      '@kalem/plugin-code-highlight':
+        specifier: workspace:^
+        version: link:../../packages/plugin-code-highlight
+      '@kalem/plugin-find-replace':
+        specifier: workspace:^
+        version: link:../../packages/plugin-find-replace
+      '@kalem/plugin-image-upload':
+        specifier: workspace:^
+        version: link:../../packages/plugin-image-upload
+      '@kalem/plugin-outline':
+        specifier: workspace:^
+        version: link:../../packages/plugin-outline
+      '@kalem/plugin-source-mode':
+        specifier: workspace:^
+        version: link:../../packages/plugin-source-mode
+      '@kalem/plugin-word-count':
+        specifier: workspace:^
+        version: link:../../packages/plugin-word-count
+      '@kalem/themes':
+        specifier: workspace:^
+        version: link:../../packages/themes
+      '@kalem/ui':
+        specifier: workspace:^
+        version: link:../../packages/ui
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vite:
+        specifier: 'catalog:'
+        version: 6.4.3(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.33.0)(sass@1.101.0)(terser@5.51.2)(yaml@2.9.0)
+
   examples/angular:
     dependencies:
       '@angular/common':
@@ -10794,7 +10837,7 @@ snapshots:
       obug: 2.1.4
       std-env: 4.2.0
       tinyrainbow: 3.1.1
-      vitest: 5.0.0(@types/node@24.13.3)(@vitest/coverage-v8@5.0.0)(vite@8.3.0(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.51.2)(yaml@2.9.0))
+      vitest: 5.0.0(@types/node@24.13.3)(@vitest/coverage-v8@5.0.0)(vite@6.4.3(@types/node@24.13.3)(jiti@2.7.0)(lightningcss@1.33.0)(sass@1.101.0)(terser@5.51.2)(yaml@2.9.0))
 
   '@vitest/istanbul-lib-coverage@1.0.1': {}
 

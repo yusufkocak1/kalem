@@ -1,0 +1,30 @@
+{
+  "name": "kalem-playground",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Kalem playground — kütüphanenin gücünü 30 saniyede gösteren Vite uygulaması",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@kalem/core": "workspace:^",
+    "@kalem/editor": "workspace:^",
+    "@kalem/plugin-autosave": "workspace:^",
+    "@kalem/plugin-code-highlight": "workspace:^",
+    "@kalem/plugin-find-replace": "workspace:^",
+    "@kalem/plugin-image-upload": "workspace:^",
+    "@kalem/plugin-outline": "workspace:^",
+    "@kalem/plugin-source-mode": "workspace:^",
+    "@kalem/plugin-word-count": "workspace:^",
+    "@kalem/themes": "workspace:^",
+    "@kalem/ui": "workspace:^"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

@@ -117,5 +117,14 @@ export default defineConfig({
 			timeout: 60_000,
 			stdout: "pipe",
 		},
+		{
+			// Playground (F6-06): ürünün vitrini. `apps/demo` test zemini
+			// olduğu için ayrı bir uygulama.
+			command: "node scripts/serve-static.mjs apps/playground/dist 4180",
+			url: "http://localhost:4180",
+			reuseExistingServer: false,
+			timeout: 60_000,
+			stdout: "pipe",
+		},
 	],
 });

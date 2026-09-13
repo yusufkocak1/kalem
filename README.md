@@ -30,6 +30,7 @@ Sırada Faz 6 — cila ve yayın. Henüz npm'de değil; ilk yayın v1.0 olacak.
 | [packages/themes/](packages/themes/) | Saf CSS: görüntüleyici tipografisi ve editör katmanı |
 | [examples/](examples/) | Yedi çalışan uygulama: React, Next.js, Vue, Nuxt, Svelte, Angular, düz HTML — hepsi CI'da derleniyor |
 | [apps/notlar/](apps/notlar/) | **Kalem Notlar** — kütüphanenin kendi kullanım denemesi (dogfooding): yerel not defteri, altı eklenti bir arada |
+| [apps/playground/](apps/playground/) | **Playground** — ürünün vitrini: Word deneyimi, canlı Markdown çıktısı, Word'den yapıştırma, bin bloklu belge |
 | [apps/demo/](apps/demo/) | Dört canlı sayfa (aşağıda) + Faz 0 mimari prototipi |
 | [apps/docs/](apps/docs/) | Astro Starlight dokümantasyon sitesi (planlanan API'yi dokümante eder) |
 | [docs/02-faz0-sonuc.md](docs/02-faz0-sonuc.md) | Faz 0 sonuç raporu — ne kuruldu, ne doğrulandı, ne kapsanmadı |

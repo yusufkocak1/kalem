@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-13 · `main` · `pnpm verify` yeşil · 1284 birim + 1104 tarayıcı + 73 örnek/uygulama testi
+> Son güncelleme: 2026-09-13 · `main` · `pnpm verify` yeşil · 1284 birim + 1104 tarayıcı + 84 örnek/uygulama testi
 >
 > Uzak depo: [yusufkocak1/kalem](https://github.com/yusufkocak1/kalem) (private)
 
@@ -36,8 +36,8 @@
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
 | **Faz 4** — Eklentiler | 7 / 7 | ✅ **Tamamlandı** |
 | **Faz 5** — Sarmalayıcılar | 5 / 5 | 🟡 Bitti (2 haftalık kullanım sürüyor) |
-| **Faz 6** — Cila ve yayın | 5 / 14 | 🔵 Sürüyor |
-| | **60 / 72** | **%83** |
+| **Faz 6** — Cila ve yayın | 6 / 14 | 🔵 Sürüyor |
+| | **61 / 72** | **%85** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -45,9 +45,9 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03` · `F6-04` · `F6-05`
+referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03` · `F6-04` · `F6-05` · `F6-06`
 
-**Sıradaki:** `F6-06` `apps/demo` — Vite vanilla playground.
+**Sıradaki:** `F6-07` paylaşılabilir playground — durum URL'de kodlanıyor.
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10), Linux görsel
 referansları (F3-11) ve `apps/notlar`ın iki haftalık günlük kullanımı
@@ -2232,9 +2232,66 @@ Site 87 rota üretiyor; 73 örnek/uygulama testi yeşil.
 
 ## 6B · Demo / Playground
 
-### F6-06 · `apps/demo` `[M]` ⬜
-Vite vanilla TS: sol editör / sağ canlı Markdown çıktısı, özellik anahtarları, tema seçici, örnek doküman yükleyici, "Word'den yapıştır" senaryosu
-- **Kabul:** kütüphanenin gücü 30 saniyede anlaşılıyor
+### F6-06 · Playground `[M]` ✅
+- [x] Vite vanilla TS; sol editör / sağ canlı Markdown çıktısı
+- [x] Özellik anahtarları, tema seçici, örnek belge yükleyici
+- [x] "Word'den yapıştır" senaryosu — tek düğme, gerçek Word HTML'i
+- [x] **Kabul:** kütüphanenin gücü 30 saniyede anlaşılıyor (11 tarayıcı testi)
+
+> **`apps/demo` değil, `apps/playground`.** Madde bu uygulamayı
+> `apps/demo` diye adlandırıyor ama `apps/demo` bu arada başka bir işe
+> sahip oldu: **on yedi tarayıcı test dosyasının zemini**. `editor.html`,
+> `viewer.html` ve `wc.html` sayfalarındaki eleman kimlikleri 1100 testin
+> bağlı olduğu bir sözleşme ve üstlerindeki hata ayıklama göstergeleri
+> (blok sayısı, seçim durumu, geçmiş, etkin biçimler) geliştirici için.
+>
+> Orayı ürün demosuna çevirmek ikisini de bozardı: vitrinin içinde hata
+> ayıklama tabloları, testlerin altında kayan bir zemin. Ayrı uygulama
+> hem daha ucuz hem daha dürüst — ve F6-07'nin (paylaşılabilir
+> playground) adıyla da örtüşüyor.
+
+**Sayfa bir özellik listesi değil, beş iddianın kanıtı:**
+
+1. **Word deneyimi** — `mountUi(editor)` tek satır; balon çubuk, sabit
+   çubuk, slash menüsü, blok tutamağı, bağlantı balonu.
+2. **Çıktı Markdown** — sağ panel her tuşta güncelleniyor, JSON yok.
+3. **Kayıpsız gidiş-dönüş** — rozet `serialize(parse(v)) === v` ölçümünü
+   gösteriyor. Bir kütüphane bunu söyleyebilir; burada okuyucu kendi
+   yazdığı metinde görüyor ve bozulunca rozet kırmızıya dönüyor.
+4. **Word'den yapıştırma** — tek düğme. `mso-list` ile sahte liste yapan,
+   iç içe boş `<span>` döşeyen Word HTML'i başlığa, listeye, bağlantıya
+   ve kalın metne dönüşüyor.
+5. **Büyük belge** — bin bloklu örnek. "Akıcı mı" sorusu okunarak değil
+   yazarak cevaplanıyor.
+
+Ayrıca tema seçici (açık / koyu / yalın), araç çubuğu kipi, giriş
+kuralları anahtarı, salt okunur, içindekiler, ham Markdown kaynağı,
+kelime sayacı ve otomatik kaydetme göstergesi.
+
+**Word yapıştırması panoya dokunmuyor.** Tarayıcı, kullanıcının izni
+olmadan panoya yazdırmıyor — ve izin istese bile kullanıcının kendi
+panosunu ezmek kaba olurdu. Düğme, Word'ün panoya koyduğu veriyi
+doğrudan bir `paste` olayı olarak editöre gönderiyor: editörün gördüğü
+şey gerçek bir yapıştırmadakinin aynısı.
+
+> **Word örneği ilk denemede yanlış biçimdeydi.** Başlıkları
+> `mso-outline-level` ile yazmıştım ve editör onları kalın paragraf
+> yapıyordu — **doğru davranış, yanlış örnek**: o biçimi Word, elle anahat
+> seviyesi verilmiş gövde metni için üretiyor. Başlık **stili** uygulanmış
+> paragrafları ise gerçek `<h1>`/`<h2>` olarak yazıyor. Örnek düzeltildi;
+> artık `# Çeyrek Raporu` ve `## Sonraki adımlar` çıkıyor.
+
+**Görsel yükleme sunucusuz çalışıyor.** Yüklenen dosya `FileReader` ile
+`data:` adresine çevriliyor — uçtan uca gerçek ve çevrimdışı. Beyaz liste
+`png`, `jpeg`, `gif`, `webp`, `avif`e izin veriyor; SVG kasten dışarıda.
+
+**Tema seçicisi iki farklı mekanizmayı gösteriyor:** açık/koyu
+`<html data-theme>` ile (fazladan dosya gerekmiyor), yalın ise
+`minimal.css` yüklenerek. Ayrım kütüphanenin kendi kararından geliyor ve
+bir test ikisini de sabitliyor.
+
+Boyut: 165 kB ham / 51 kB gzip (editör, arayüz ve altı eklenti dâhil;
+sekiz dil paketi ayrı parçalarda). 11 tarayıcı testi.
 
 ### F6-07 · Paylaşılabilir playground `[M]` ⬜
 Durum URL'de kodlanır (LZ sıkıştırma), "bağlantıyı kopyala"

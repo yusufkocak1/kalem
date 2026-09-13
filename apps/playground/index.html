@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="tr" data-theme="light">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Kalem — Playground</title>
+		<meta
+			name="description"
+			content="Kalem'i deneyin: Word deneyimi, canlı Markdown çıktısı ve Word'den yapıştırma."
+		/>
+	</head>
+	<body>
+		<div class="uygulama">
+			<header class="ust">
+				<p class="marka"><b>Kalem</b> <span>playground</span></p>
+
+				<div class="araclar">
+					<label class="alan">
+						Örnek
+						<select id="ornek"></select>
+					</label>
+
+					<button type="button" id="word" class="birincil">Word'den yapıştır</button>
+
+					<label class="alan">
+						Tema
+						<select id="tema">
+							<option value="acik">Açık</option>
+							<option value="koyu">Koyu</option>
+							<option value="yalin">Yalın</option>
+						</select>
+					</label>
+
+					<label class="alan">
+						Araç çubuğu
+						<select id="cubuk">
+							<option value="both">İkisi</option>
+							<option value="fixed">Sabit</option>
+							<option value="bubble">Balon</option>
+							<option value="false">Yok</option>
+						</select>
+					</label>
+
+					<label class="onay"><input type="checkbox" id="kurallar" checked /> giriş kuralları</label>
+					<label class="onay"><input type="checkbox" id="saltOkunur" /> salt okunur</label>
+					<label class="onay"><input type="checkbox" id="anahat" /> içindekiler</label>
+
+					<button type="button" id="kaynak" aria-pressed="false">Markdown kaynağı</button>
+				</div>
+			</header>
+
+			<p class="ipucu" id="ipucu"></p>
+
+			<main class="govde">
+				<section class="sol">
+					<div id="editor" class="yazi kalem-theme" lang="tr"></div>
+				</section>
+
+				<aside class="anahat" id="icindekiler" hidden></aside>
+
+				<aside class="sag">
+					<div class="sag-ust">
+						<h2>Markdown çıktısı</h2>
+						<p class="gidis" id="gidisDonus"></p>
+					</div>
+					<pre id="cikti"></pre>
+				</aside>
+			</main>
+
+			<footer class="durum">
+				<div id="sayac" class="sayac"></div>
+				<div id="kayit" class="kayit"></div>
+				<p class="bilgi" id="bilgi"></p>
+			</footer>
+		</div>
+
+		<script type="module" src="/src/main.ts"></script>
+	</body>
+</html>
