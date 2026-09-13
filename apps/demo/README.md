@@ -13,6 +13,45 @@ start index.html          # Windows
 
 Yayımlanmış hâli: https://claude.ai/code/artifact/12236fdb-f13a-4c35-aafa-c073672dce8e
 
+## Klasördeki diğer sayfalar
+
+`index.html` prototip; yanındaki sayfalar **tarayıcı testlerinin zemini**.
+Kütüphaneyi gerçek derlenmiş bundle'dan yüklerler, o yüzden `pnpm demo`
+(ya da Playwright'ın kendi sunucusu) açılışta paketleri derliyor.
+
+| Sayfa | Ne için |
+| --- | --- |
+| `core.html` | Ayrıştırıcı ve serileştirici — gidiş-dönüş gösterimi |
+| `viewer.html` | `@kalem/viewer` — salt okunur çıktı |
+| `editor.html` | Blok motoru, arayüz ve yedi eklenti; 17 test dosyasının zemini |
+| `wc.html` | `@kalem/wc` — özel eleman, gölge DOM ve form bütünleşmesi |
+| `olcum.html` | **Performans ölçüm tezgâhı** (F6-08) |
+
+Bu sayfalardaki eleman kimlikleri 1.130 testin bağlı olduğu bir
+sözleşme — değiştirmeden önce `e2e/` altını arayın.
+
+### `olcum.html` — ölçüm tezgâhı
+
+Ayrı bir sayfa çünkü `editor.html` her `onChange`de dokuz hata ayıklama
+göstergesi güncelliyor; orada ölçülen şey kütüphanenin değil, demo
+sayfasının hızı olurdu. Tezgâh ölçüm sırasında **hiçbir şey çizmiyor**:
+değerler belleğe toplanıyor, ekrana ancak koşu bitince yazılıyor.
+
+Sayfa `window.olcum` üstünden sürülüyor (`kur`, `sok`, `sonuc`,
+`donguBaslat`, `gidisDonus`) ve iki yerden kullanılıyor:
+
+```bash
+pnpm olcum                      # rapor: boyut boyut tablo + büyüme oranı
+pnpm olcum 100 1000 5000        # kendi boyutların
+pnpm e2e performans             # kapıdaki testler
+```
+
+`pnpm olcum` **`pnpm verify`in parçası değil**: mutlak süreler makineye ve
+o anki yüke bağlı (aynı ölçüm tek başına 7,3 ms, sekiz işçi koşarken
+17,8 ms). Kapıdaki testler bu yüzden mutlak süre değil **büyüme oranı**
+ölçüyor; oran çekişmeye dayanıklı çünkü iki ölçüm de aynı koşullarda
+alınıyor.
+
 ## Neyi kanıtlıyor
 
 Analiz dokümanı §5.1'deki **Seçenek C** (blok-tabanlı hibrit motor) mimarisinin

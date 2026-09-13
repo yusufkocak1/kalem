@@ -1,0 +1,287 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Kalem — Ölçüm Tezgâhı</title>
+<!--
+	Performans ölçüm tezgâhı  (İş listesi: F6-08)
+
+	Bu sayfa vitrin değil, **alet**. `editor.html` hata ayıklama
+	göstergeleriyle dolu (blok sayısı, seçim durumu, geçmiş, etkin biçimler)
+	ve her `onChange`de dokuz DOM düğümü güncelliyor — orada ölçülen şey
+	kütüphanenin değil, demo sayfasının hızı olurdu.
+
+	Burada sayfanın kendisi ölçüm sırasında **hiçbir şey yapmıyor**: değerler
+	belleğe toplanıyor, ekrana ancak koşu bitince yazılıyor.
+-->
+<style>
+	:root {
+		color-scheme: light dark;
+		--zemin: #fbfaf8;
+		--kart: #ffffff;
+		--kenar: #e3e0da;
+		--metin: #22201d;
+		--soluk: #6f6a62;
+		--vurgu: #0f4e4a;
+		--kod: "SFMono-Regular", ui-monospace, "Cascadia Mono", Consolas, monospace;
+	}
+	@media (prefers-color-scheme: dark) {
+		:root:not([data-theme="light"]) {
+			--zemin: #16151a;
+			--kart: #1e1d23;
+			--kenar: #34323b;
+			--metin: #e8e6e1;
+			--soluk: #9d978d;
+			--vurgu: #6fd3c6;
+		}
+	}
+	* { box-sizing: border-box; }
+	body {
+		margin: 0;
+		background: var(--zemin);
+		color: var(--metin);
+		font: 14px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+	}
+	header { padding: 16px 20px; border-bottom: 1px solid var(--kenar); }
+	h1 { margin: 0 0 4px; font-size: 16px; }
+	header p { margin: 0; color: var(--soluk); font-size: 12.5px; }
+	main { display: grid; grid-template-columns: 1fr 340px; min-height: calc(100vh - 74px); }
+	#tuval { overflow: auto; padding: 18px 22px; border-right: 1px solid var(--kenar); }
+	aside { padding: 14px 16px; overflow: auto; }
+	pre#rapor {
+		margin: 0;
+		font-family: var(--kod);
+		font-size: 12px;
+		line-height: 1.65;
+		white-space: pre-wrap;
+		word-break: break-word;
+		color: var(--metin);
+	}
+	#hazir { color: var(--vurgu); font-weight: 600; font-size: 12.5px; }
+</style>
+<link rel="stylesheet" href="/@kalem/themes/tokens.css">
+<link rel="stylesheet" href="/@kalem/themes/viewer.css">
+<link rel="stylesheet" href="/@kalem/themes/editor.css">
+<link rel="stylesheet" href="/@kalem/themes/ui.css">
+
+<header>
+	<h1>Kalem — ölçüm tezgâhı</h1>
+	<p>
+		F6-08. Sayfa <code>window.olcum</code> üstünden sürülüyor;
+		<code>scripts/olcum.mjs</code> ve <code>e2e/performans.spec.ts</code>
+		buraya bağlı.
+	</p>
+</header>
+
+<main>
+	<div id="tuval"><div id="editor" lang="tr"></div></div>
+	<aside>
+		<p id="hazir">yükleniyor…</p>
+		<pre id="rapor"></pre>
+	</aside>
+</main>
+
+<script type="importmap">
+	{
+		"imports": {
+			"@kalem/core": "/@kalem/core/index.js",
+			"@kalem/core/commands": "/@kalem/core/commands.js",
+			"@kalem/core/html": "/@kalem/core/html.js",
+			"@kalem/editor": "/@kalem/editor/index.js",
+			"@kalem/viewer": "/@kalem/viewer/index.js",
+			"@kalem/ui": "/@kalem/ui/index.js"
+		}
+	}
+</script>
+<script type="module">
+	import { parse, serialize } from "@kalem/core";
+	import { Editor } from "@kalem/editor";
+	import { mountUi } from "@kalem/ui";
+
+	const tuval = document.getElementById("editor");
+
+	/**
+	 * Ölçülebilir bir belge üretir.
+	 *
+	 * Bin tane aynı paragraf gerçekçi değil: gerçek bir belgede başlık,
+	 * liste, alıntı, kod ve satır içi biçim var ve bunların oluşturma
+	 * maliyetleri farklı. Desen yedi blokta bir tekrar ediyor, yani blok
+	 * sayısı ne olursa olsun karışım sabit kalıyor.
+	 */
+	function belge(blok) {
+		const parcalar = [];
+		for (let i = 0; i < blok; i++) {
+			switch (i % 7) {
+				case 0:
+					parcalar.push(`## Bölüm ${i}`);
+					break;
+				case 1:
+					parcalar.push(
+						`Paragraf ${i}: **kalın**, *eğik*, \`kod\` ve [bağlantı](https://ornek.com/${i}).`,
+					);
+					break;
+				case 2:
+					parcalar.push(`* madde ${i}a\n* madde ${i}b\n* madde ${i}c`);
+					break;
+				case 3:
+					parcalar.push(`> Alıntı ${i} — ışıkla İŞIK arasındaki fark.`);
+					break;
+				case 4:
+					parcalar.push(`1) sıralı ${i}a\n2) sıralı ${i}b`);
+					break;
+				case 5:
+					parcalar.push(`\`\`\`ts\nconst x = ${i};\n\`\`\``);
+					break;
+				default:
+					parcalar.push(`Düz paragraf ${i}, ölçüm için yeterince uzun bir cümle taşıyor.`);
+			}
+		}
+		return `${parcalar.join("\n\n")}\n`;
+	}
+
+	let editor = null;
+	let ui = null;
+	/** Tuş başına ölçümler; koşu bitene kadar ekrana yazılmıyor. */
+	let gecikmeler = [];
+	let baslangic = 0;
+	let uzunGorevler = 0;
+
+	/*
+	 * Uzun görev gözlemcisi.
+	 *
+	 * 16 ms'lik bütçe ortalamayla değil **takılmayla** ilgili: p50 iyi olup
+	 * arada 200 ms'lik bir görev varsa kullanıcı onu hisseder. `longtask`
+	 * girdileri (50 ms üstü) bunu yakalıyor. Firefox ve Safari bu API'yi
+	 * desteklemiyor; orada sayaç 0 kalıyor ve rapor bunu söylüyor.
+	 */
+	const uzunGorevDestegi =
+		typeof PerformanceObserver === "function" &&
+		(PerformanceObserver.supportedEntryTypes ?? []).includes("longtask");
+	if (uzunGorevDestegi) {
+		new PerformanceObserver((liste) => {
+			uzunGorevler += liste.getEntries().length;
+		}).observe({ type: "longtask", buffered: false });
+	}
+
+	/*
+	 * Gecikme `beforeinput`ten başlıyor, `keydown`dan değil.
+	 *
+	 * Ölçülmek istenen kütüphanenin yaptığı iş: `beforeinput` tarayıcının
+	 * değişikliği uygulamak üzere olduğu an, `onChange` de kütüphanenin
+	 * işini bitirdiği an. Aradaki fark editörün tuş başına maliyeti;
+	 * tarayıcının kendi metin yerleştirmesi de içinde.
+	 */
+	/*
+	 * Tek sefer bağlanıyor, her kurulumda değil.
+	 *
+	 * `tuval` kalıcı (yalnızca çocukları değişiyor), yani bir dinleyici
+	 * yetiyor. Ayrıca sızıntı testi eklenen/kaldırılan dinleyicileri
+	 * sayıyor: tezgâhın kendi dinleyicisi her kurulumda eklenseydi ölçümün
+	 * içine tezgâhın kendisi karışırdı.
+	 */
+	tuval.addEventListener("beforeinput", () => {
+		baslangic = performance.now();
+	});
+
+	function kur(blok, { arayuz = false, deger = null } = {}) {
+		sok();
+		const metin = deger ?? belge(blok);
+		const t0 = performance.now();
+		editor = new Editor(tuval, {
+			value: metin,
+			lang: "tr",
+			onChange: () => {
+				if (baslangic !== 0) {
+					gecikmeler.push(performance.now() - baslangic);
+					baslangic = 0;
+				}
+			},
+		});
+		const kurulus = performance.now() - t0;
+		if (arayuz) ui = mountUi(editor);
+		return {
+			kurulus,
+			karakter: metin.length,
+			blok: editor.getDocument().children.length,
+			// Blok sayısı üst seviye; `dugum` gerçekte oluşturulan eleman
+			// sayısı — liste maddeleri ve satır içi biçimler de içinde.
+			dugum: tuval.querySelectorAll("*").length,
+		};
+	}
+
+	function sok() {
+		ui?.destroy();
+		editor?.destroy();
+		ui = null;
+		editor = null;
+		tuval.replaceChildren();
+		gecikmeler = [];
+		baslangic = 0;
+		uzunGorevler = 0;
+	}
+
+	function yuzdelik(dizi, p) {
+		if (dizi.length === 0) return 0;
+		const sirali = [...dizi].sort((a, b) => a - b);
+		const i = Math.min(sirali.length - 1, Math.floor((p / 100) * sirali.length));
+		return sirali[i];
+	}
+
+	function sonuc() {
+		return {
+			orneklem: gecikmeler.length,
+			p50: yuzdelik(gecikmeler, 50),
+			p95: yuzdelik(gecikmeler, 95),
+			enKotu: gecikmeler.length === 0 ? 0 : Math.max(...gecikmeler),
+			uzunGorevler,
+			uzunGorevDestegi,
+		};
+	}
+
+	/**
+	 * Kurma/sökme döngüsü — sızıntı ölçümü.
+	 *
+	 * İki şey birden ölçülüyor. `WeakRef` **ikili** cevap veriyor: sökülen
+	 * editör nesnesi toplanabiliyor mu, evet ya da hayır. Yığın farkı ise
+	 * eğilim gösteriyor. İkincisi tek başına yanıltıcı — çöp toplayıcı
+	 * istediği an çalışır — ama ilki geçip ikincisi patlarsa sızan şey
+	 * editör nesnesi değil, ona takılan bir şeydir.
+	 */
+	async function dongu(kez, blok) {
+		sok();
+		const metin = belge(blok);
+		const zayif = [];
+		for (let i = 0; i < kez; i++) {
+			const e = new Editor(tuval, { value: metin, lang: "tr" });
+			const u = mountUi(e);
+			u.destroy();
+			e.destroy();
+			tuval.replaceChildren();
+			zayif.push(new WeakRef(e));
+		}
+		// Çöp toplayıcının çalışması için mikro görev sırasını boşaltmak
+		// yetmiyor; testte `HeapProfiler.collectGarbage` çağrılıyor.
+		return { zayif: zayif.length, canli: () => zayif.filter((z) => z.deref() !== undefined).length };
+	}
+
+	let zayifSaklanan = null;
+
+	window.olcum = {
+		belge,
+		kur,
+		sok,
+		sonuc,
+		async donguBaslat(kez, blok) {
+			const d = await dongu(kez, blok);
+			zayifSaklanan = d.canli;
+			return d.zayif;
+		},
+		canliEditor: () => (zayifSaklanan === null ? -1 : zayifSaklanan()),
+		/** Gidiş-dönüş doğruluğu: hız uğruna doğruluk kaybedilmediğinin kanıtı. */
+		gidisDonus: (metin) => serialize(parse(metin)) === metin,
+		editor: () => editor,
+		rapor(metin) {
+			document.getElementById("rapor").textContent = metin;
+		},
+	};
+
+	document.getElementById("hazir").textContent = "hazır";
+</script>

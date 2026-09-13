@@ -112,8 +112,8 @@ export {
 } from "./security.js";
 
 // --- Serileştirici (F1-07) ---
-export type { SerializeOptions } from "./serialize.js";
-export { serialize } from "./serialize.js";
+export type { SerializeCache, SerializeOptions } from "./serialize.js";
+export { createSerializeCache, serialize } from "./serialize.js";
 // --- Künye kaydı (F1-01) ---
 export { isParentContent, NODE_TYPES, SPECS, specOf } from "./spec.js";
 // --- Gezinme (F1-02) ---

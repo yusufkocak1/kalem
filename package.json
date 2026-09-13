@@ -32,7 +32,8 @@
     "prepare": "simple-git-hooks",
     "build:notlar": "pnpm --filter kalem-notlar build",
     "guard:docs": "node scripts/guard-docs.mjs",
-    "build:playground": "pnpm --filter kalem-playground build"
+    "build:playground": "pnpm --filter kalem-playground build",
+    "olcum": "node scripts/olcum.mjs"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "catalog:",

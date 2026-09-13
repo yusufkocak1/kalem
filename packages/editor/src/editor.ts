@@ -22,7 +22,7 @@
  * blokların referansı **aynı kalıyor** ve karşılaştırma tek bir `!==`.
  */
 import type { Definition, Inline, NodeId, Root } from "@kalem/core";
-import { parse, removeAt, replaceAt, serialize } from "@kalem/core";
+import { createSerializeCache, parse, removeAt, replaceAt, serialize } from "@kalem/core";
 import type { BlockType, MarkType } from "@kalem/core/commands";
 import { emptyParagraph, setBlockType } from "@kalem/core/commands";
 import type { Caret, EditResult } from "./block-edit.js";
@@ -159,6 +159,13 @@ export class Editor {
 	readonly #rendered = new Map<string, TopNode>();
 	#doc: Root;
 	#defs: ReadonlyMap<string, Definition>;
+	/**
+	 * Blok başına serileştirme önbelleği (F6-08).
+	 *
+	 * `WeakMap` üstünde: sökülen bloklar kendiliğinden düşüyor, yani
+	 * geçmişte kalan on bin blok bellekte tutulmuyor.
+	 */
+	readonly #serializeCache = createSerializeCache();
 	#readOnly: boolean;
 	#destroyed = false;
 	#selection: EditorSelection = null;
@@ -570,6 +577,7 @@ export class Editor {
 		this.#element.removeEventListener("compositionend", this.#onCompositionEnd);
 		this.#element.removeEventListener("copy", this.#onCopy);
 		this.#element.removeEventListener("cut", this.#onCut);
+		this.#element.removeEventListener("paste", this.#onPaste);
 		this.#element.removeEventListener("pointerdown", this.#onPointerDown);
 		this.#element.removeEventListener("pointermove", this.#onPointerMove);
 		this.#element.ownerDocument.removeEventListener("pointerup", this.#onPointerUp);
@@ -674,7 +682,21 @@ export class Editor {
 		const aboneler = this.#listeners.get("change");
 		// Serileştirme yalnızca dinleyen varsa çalışıyor.
 		if (onChange === undefined && (aboneler === undefined || aboneler.size === 0)) return;
-		const value = serialize(this.#doc);
+		/*
+		 * Önbellek açık: editör kendi belgesinin sahibi.
+		 *
+		 * Ölçüm (F6-08) tuş başına maliyetin tamamının burada olduğunu
+		 * gösterdi — 5.000 bloklu belgede tek bir tuş 18,9 ms serileştirme
+		 * demekti, yani bir kareden fazla. Oysa tuş **tek bir bloğu**
+		 * değiştiriyor ve model kalıcı: geri kalan bloklar aynı nesne
+		 * olarak kalıyor, o yüzden yeniden yazılmaları gerekmiyor.
+		 *
+		 * Önbellek `@kalem/core`'da varsayılan olarak kapalı çünkü AST
+		 * herkese açık ve yerinde değiştirilirse bayat çıktı verir. Burada
+		 * açılabiliyor: bu belgeyi üreten de, değiştiren de editörün
+		 * kendisi.
+		 */
+		const value = serialize(this.#doc, { cache: this.#serializeCache });
 		onChange?.(value, this.#doc);
 		this.#dispatch("change", value, this.#doc);
 	}

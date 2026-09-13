@@ -185,6 +185,11 @@ export default defineConfig({
 						bag("Markdown uyumu", "Markdown compatibility", "/rehber/markdown-uyumu/"),
 						bag("Güvenlik", "Security", "/rehber/guvenlik/"),
 						bag("Erişilebilirlik", "Accessibility", "/rehber/erisilebilirlik/"),
+						bag(
+							"Büyük belgeler ve performans",
+							"Large documents and performance",
+							"/rehber/performans/",
+						),
 					],
 				},
 				{

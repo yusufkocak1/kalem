@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-13 · `main` · `pnpm verify` yeşil · 1296 birim + 1104 tarayıcı + 88 örnek/uygulama testi
+> Son güncelleme: 2026-09-13 · `main` · `pnpm verify` yeşil · 1304 birim + 1130 tarayıcı + 88 örnek/uygulama testi
 >
 > Uzak depo: [yusufkocak1/kalem](https://github.com/yusufkocak1/kalem) (private)
 
@@ -36,8 +36,8 @@
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
 | **Faz 4** — Eklentiler | 7 / 7 | ✅ **Tamamlandı** |
 | **Faz 5** — Sarmalayıcılar | 5 / 5 | 🟡 Bitti (2 haftalık kullanım sürüyor) |
-| **Faz 6** — Cila ve yayın | 7 / 14 | 🔵 Sürüyor |
-| | **62 / 72** | **%86** |
+| **Faz 6** — Cila ve yayın | 8 / 14 | 🔵 Sürüyor |
+| | **63 / 72** | **%88** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -45,9 +45,9 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03` · `F6-04` · `F6-05` · `F6-06` · `F6-07`
+referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03` · `F6-04` · `F6-05` · `F6-06` · `F6-07` · `F6-08`
 
-**Sıradaki:** `F6-08` performans geçişi — 5.000+ bloklu belgede ölçüm.
+**Sıradaki:** `F6-09` tarayıcı ve mobil geçişi.
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10), Linux görsel
 referansları (F3-11) ve `apps/notlar`ın iki haftalık günlük kullanımı
@@ -2352,9 +2352,107 @@ uyarılıyor: tarayıcılar çok daha uzununu taşıyor ama araya giren araçlar
 
 ## 6C · Yayın Hazırlığı
 
-### F6-08 · Performans geçişi `[M]` ⬜
-Büyük doküman testi (5.000+ blok): sanal kaydırma gerekli mi ölç; giriş gecikmesi < 16 ms; bellek sızıntısı kontrolü (editör `destroy()` sonrası)
-- **Kabul:** 1.000 bloklu dokümanda yazmak akıcı
+### F6-08 · Performans geçişi `[M]` ✅
+- [x] Büyük doküman testi (5.000+ blok) — 10.000'e kadar ölçüldü
+- [x] Sanal kaydırma gerekli mi — **hayır**, gerekçesi aşağıda
+- [x] Giriş gecikmesi < 16 ms
+- [x] Bellek sızıntısı kontrolü (`destroy()` sonrası) — **bir sızıntı bulundu**
+- [x] **Kabul:** 1.000 bloklu dokümanda yazmak akıcı (p50 1,9 ms)
+
+**Ölçüm tezgâhı:** `apps/demo/olcum.html` + `scripts/olcum.mjs`
+(`pnpm olcum`). Tezgâh ayrı bir sayfa çünkü `editor.html` her `onChange`de
+dokuz DOM göstergesi güncelliyor — orada ölçülen şey kütüphanenin değil,
+demo sayfasının hızı olurdu.
+
+#### Sanal kaydırma gerekmiyor — ama maliyet gerçekten doğrusaldı
+
+İlk ölçüm maddenin şüphesini doğruladı: blok sayısı 100× büyürken tuş
+başına maliyet **37× büyüyordu**.
+
+| Blok | Eleman | Kuruluş | Tuş p50 | Tuş p95 | Uzun görev |
+| --- | --- | --- | --- | --- | --- |
+| 100 | 258 | 14,8 ms | 1,5 ms | 2,1 ms | 0 |
+| 1.000 | 2.573 | 59,9 ms | 4,9 ms | 8,2 ms | 0 |
+| 5.000 | 12.858 | 199,7 ms | **27,5 ms** | 41,8 ms | 1 |
+| 10.000 | 25.716 | 350,7 ms | **55,5 ms** | 69,4 ms | **60** |
+
+Ama darboğaz **DOM değildi**. Tuş başına yapılan işi tek tek ölçünce
+tamamı tek satırda çıktı: `#emit()` içindeki `serialize(this.#doc)`. Her
+tuş vuruşunda belgenin tamamı yeniden Markdown'a yazılıyordu — saf Node
+ölçümünde 1.000 blokta 4,6 ms, 5.000'de 18,9 ms, 10.000'de 39,7 ms.
+
+Sanal kaydırma ekrandaki DOM düğümünü azaltır. Bu maliyeti **hiç
+azaltmazdı** — ve karşılığında seçimin sanallaştırılmış sınırlar arasında
+taşınması, bul-değiştir, içindekiler ve yazdırma gibi her şeyi
+karmaşıklaştırırdı. Maddenin ima ettiği çözüm, ölçülen soruna çözüm
+değildi.
+
+#### Yapılan: blok başına serileştirme önbelleği
+
+Bir tuş vuruşu **tek bir bloğu** değiştiriyor ve model kalıcı: `replaceAt`
+yalnızca dokunulan bloğu yeni nesneyle değiştiriyor, geri kalan bloklar
+aynı nesne olarak kalıyor. Nesne kimliği bu yüzden kusursuz bir anahtar.
+`serialize` artık `WeakMap` üstünde blok başına çıktı saklayabiliyor
+(`createSerializeCache()`), editör de kendi belgesi için bunu açıyor.
+
+| Blok | Tuş p50 önce | Tuş p50 sonra | p95 sonra | Uzun görev |
+| --- | --- | --- | --- | --- |
+| 1.000 | 4,9 ms | **1,9 ms** | 3,0 ms | 0 |
+| 2.500 | 8,8 ms | **3,7 ms** | 5,9 ms | 0 |
+| 5.000 | 27,5 ms | **7,3 ms** | 9,0 ms | 0 → 0 |
+| 10.000 | 55,5 ms | **13,0 ms** | 15,7 ms | 60 → 1 |
+
+10.000 bloklu, 440 bin karakterlik bir belgede bile tuş başına maliyet
+artık bir karenin (16,7 ms) altında.
+
+> **Önbellek `@kalem/core`'da varsayılan olarak kapalı.** Düğümlerin
+> yerinde değiştirilmediği varsayımına dayanıyor; Kalem'in kendi kodu bu
+> sözü tutuyor ama AST herkese açık — `onChange` ikinci argümanda belgeyi
+> veriyor ve bir kullanıcı onu yerinde değiştirirse önbellek **sessizce**
+> bayat çıktı verir. Açma kararını, belgesinin değişmezliğinden emin olan
+> çağıran veriyor. Editör kendi belgesini kendi ürettiği için açıyor.
+
+Kalan doğrusal maliyet 440 kB'lık çıktı dizesini kurmanın kendisi ve o
+`onChange(value: string)` sözleşmesinin doğal sonucu — kaldırılabilmesi
+için API'nin değişmesi gerekirdi.
+
+#### `destroy()` bir dinleyici bırakıyordu
+
+Sızıntı testini yazmadan önce bulundu: kurucu `paste` dinleyicisini
+ekliyor, `destroy()` onu kaldırmıyordu. Sekiz dinleyicinin yedisi
+listedeydi, biri unutulmuştu. Playground ve `apps/notlar` editörü **aynı
+elemanın üstünde** yeniden kuruyor (tema ya da araç çubuğu kipi
+değişince), yani her turda bir dinleyici daha birikiyordu.
+
+> **İlk yazdığım test yanlış şeyi ölçtü.** `addEventListener` ve
+> `removeEventListener` çağrılarını sayıp simetriye bakıyordu ve dokuz
+> "sızıntı" buldu — dokuzu da yanlış alarmdı: `mountUi` düğmelerine
+> dinleyici takıyor ve sökerken düğmeleri DOM'dan çıkarıyor. Ulaşılamayan
+> bir elemanın dinleyicisi elemanla birlikte toplanıyor; o sızıntı değil,
+> geçerli bir temizleme yöntemi. Doğru ölçüt tek: dinleyici sökme
+> bittikten sonra hâlâ **ulaşılabilir** bir hedefte mi — `document`,
+> `window` ya da belgeye bağlı bir eleman.
+
+Ayrıca `WeakRef` + CDP `HeapProfiler.collectGarbage` ile otuz kur/sök
+turunun ardından sökülen editörlerin toplandığı, ve aynı elemanın üstünde
+beş kez yeniden kurmanın DOM'u büyütmediği sabitlendi.
+
+> **Kontrol karakteri kapısı ikinci kez işe yaradı.** Önbellek imzası
+> alanları ayırmak için araya ham bir U+0001 koyuyordu ve `guard:purity`
+> bunu reddetti (F5-03'te konan kural). İmza artık `JSON.stringify` ile
+> üretiliyor: hem belirsizlik yok hem de yalnızca yazdırılabilir karakter.
+
+#### Mutlak süreler kapıda değil
+
+`e2e/performans.spec.ts` on iki test taşıyor ama büyük belgelerde **oran**
+ölçüyor, mutlak süre değil. Sebep ölçüldü: tek başına 7,3 ms çıkan 5.000
+bloklu ölçüm, tüm takım sekiz işçiyle koşarken 17,8 ms'ye çıkıyor — yanı
+başında yedi tarayıcı varken alınan süre kütüphaneyi değil makinenin o
+anki yükünü ölçüyor. Oran çekişmeye dayanıklı, çünkü iki ölçüm de aynı
+koşullarda alınıyor. Mutlak sayılar `pnpm olcum` raporunda.
+
+Boyut etkisi: `@kalem/core` 11,67 kB (sınır 12 kB), `@kalem/editor`
+26,21 kB (sınır 38 kB).
 
 ### F6-09 · Tarayıcı ve mobil geçişi `[M]` ⬜
 Chrome/Firefox/Safari/Edge son 2 sürüm + iOS Safari + Android Chrome

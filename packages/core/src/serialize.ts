@@ -55,6 +55,82 @@ export interface SerializeOptions {
 	thematicBreak?: string;
 	/** Satır sonu; kökün `syntax`'ı varsa o kazanır. */
 	lineEnding?: "\n" | "\r\n" | "\r";
+	/**
+	 * Blok başına önbellek — yalnızca **değişmeyen belgeler** için.
+	 *
+	 * `createSerializeCache()` ile üretilir ve çağıran tarafından saklanır;
+	 * bkz. o fonksiyonun açıklaması.
+	 */
+	cache?: SerializeCache;
+}
+
+/**
+ * Blok başına serileştirme önbelleği.
+ *
+ * ## Ne işe yarıyor
+ *
+ * Editör her tuş vuruşunda `serialize(doc)` çağırıyor ve maliyeti belge
+ * boyutuyla **doğrusal** büyüyor: ölçümde 1.000 blokta 4,6 ms, 5.000'de
+ * 18,9 ms, 10.000'de 39,7 ms (İş listesi F6-08). 5.000 blokta tek bir tuş
+ * bir kareyi (16,7 ms) aşıyor.
+ *
+ * Oysa bir tuş vuruşu **tek bir bloğu** değiştiriyor. Model kalıcı
+ * (persistent): `replaceAt` yalnızca dokunulan bloğu yeni bir nesneyle
+ * değiştiriyor, geri kalan bloklar **aynı nesne** olarak kalıyor. Nesne
+ * kimliği bu yüzden kusursuz bir anahtar.
+ *
+ * ## Neden varsayılan değil
+ *
+ * Önbellek, düğümlerin **yerinde değiştirilmediği** varsayımına dayanıyor.
+ * Kalem'in kendi kodu bu sözü tutuyor ama AST herkese açık: `onChange`
+ * ikinci argümanda belgeyi veriyor ve bir kullanıcı onu yerinde
+ * değiştirirse önbellek bayat çıktı verir — sessizce.
+ *
+ * Bu yüzden varsayılan davranış değişmedi. Önbelleği yalnızca belgesinin
+ * değişmezliğinden **emin olan** çağıran açıyor; editör kendi belgesini
+ * kendi ürettiği için açıyor.
+ */
+export interface SerializeCache {
+	/** @internal Anahtar düğüm nesnesi; değer imza + çıktı. */
+	readonly blocks: WeakMap<object, { readonly imza: string; readonly metin: string }>;
+}
+
+/** Yeni bir blok önbelleği üretir; `serialize(doc, { cache })` ile kullanılır. */
+export function createSerializeCache(): SerializeCache {
+	return { blocks: new WeakMap() };
+}
+
+/**
+ * Önbellek imzası: çıktıyı etkileyen tüm seçenekler.
+ *
+ * Aynı düğüm farklı yazım tercihleriyle farklı Markdown veriyor, yani
+ * anahtar tek başına düğüm olamaz. `lineEnding` de dâhil: blok çıktısı
+ * içeride hep LF kullansa da onu dışarıda bırakmak, ileride bir blok
+ * türü satır sonuna dokunduğunda sessiz bir hataya dönüşürdü.
+ *
+ * ## Neden `JSON.stringify`, neden düz birleştirme değil
+ *
+ * Alanları uç uca eklemek belirsiz: `thematicBreak` serbest metin, yani
+ * iki farklı seçenek kümesi aynı dizeyi üretebilir. İlk sürüm araya bir
+ * kontrol karakteri koyuyordu ve `guard:purity` onu haklı olarak
+ * reddetti — ham kontrol karakteri, paket bir HTML sayfasına
+ * gömüldüğünde tarayıcı tarafından U+FFFD'ye çevriliyor ve bundle
+ * sessizce bozuluyor (bkz. iş listesi F5-03). `JSON.stringify` hem
+ * belirsizliği kaldırıyor hem de yalnızca yazdırılabilir karakter
+ * üretiyor.
+ *
+ * Maliyeti yok sayılır: `serialize` çağrısı başına bir kez çalışıyor,
+ * blok başına değil.
+ */
+function imzala(o: Resolved): string {
+	return JSON.stringify([
+		o.bulletMarker,
+		o.emphasisMarker,
+		o.codeFence,
+		o.orderedDelimiter,
+		o.thematicBreak,
+		o.lineEnding,
+	]);
 }
 
 interface Resolved {
@@ -64,6 +140,7 @@ interface Resolved {
 	readonly orderedDelimiter: "." | ")";
 	readonly thematicBreak: string;
 	lineEnding: "\n" | "\r\n" | "\r";
+	readonly cache: SerializeCache | undefined;
 }
 
 function resolve(options: SerializeOptions): Resolved {
@@ -74,6 +151,7 @@ function resolve(options: SerializeOptions): Resolved {
 		orderedDelimiter: options.orderedDelimiter ?? ".",
 		thematicBreak: options.thematicBreak ?? "---",
 		lineEnding: options.lineEnding ?? "\n",
+		cache: options.cache,
 	};
 }
 
@@ -90,11 +168,38 @@ function serializeRoot(root: Root, o: Resolved): string {
 	// Belge düzeyi yazım bilgisi seçenekleri ezer: dosya CRLF ise CRLF kalır.
 	if (root.syntax !== undefined) o.lineEnding = root.syntax.lineEnding;
 
+	/*
+	 * Önbellek yalnızca **üst seviye bloklarda**.
+	 *
+	 * İç içe düğümleri de önbelleğe almak kazancı artırmazdı: bir bloğun
+	 * çıktısı zaten bir kez üretiliyor ve kaydediliyor. Buradaki döngü ise
+	 * belge boyunca dönen tek döngü, yani doğrusal maliyetin tamamı burada.
+	 */
+	const onbellek = o.cache?.blocks;
+	const imza = onbellek === undefined ? "" : imzala(o);
+
 	const parts: string[] = [];
 	for (const child of root.children) {
-		if (child.type === "yaml") parts.push(`---\n${child.value}\n---`);
-		else if (child.type === "toml") parts.push(`+++\n${child.value}\n+++`);
-		else parts.push(block(child, o));
+		if (child.type === "yaml") {
+			parts.push(`---\n${child.value}\n---`);
+			continue;
+		}
+		if (child.type === "toml") {
+			parts.push(`+++\n${child.value}\n+++`);
+			continue;
+		}
+		if (onbellek === undefined) {
+			parts.push(block(child, o));
+			continue;
+		}
+		const kayit = onbellek.get(child);
+		if (kayit !== undefined && kayit.imza === imza) {
+			parts.push(kayit.metin);
+			continue;
+		}
+		const metin = block(child, o);
+		onbellek.set(child, { imza, metin });
+		parts.push(metin);
 	}
 
 	let out = parts[0] ?? "";
