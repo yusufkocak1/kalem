@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-13 · `main` · `pnpm verify` yeşil · 1304 birim + 1130 tarayıcı + 88 örnek/uygulama testi
+> Son güncelleme: 2026-09-13 · `main` · `pnpm verify` yeşil · 1305 birim + 1176 tarayıcı + 88 örnek/uygulama testi
 >
 > Uzak depo: [yusufkocak1/kalem](https://github.com/yusufkocak1/kalem) (private)
 
@@ -36,8 +36,8 @@
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
 | **Faz 4** — Eklentiler | 7 / 7 | ✅ **Tamamlandı** |
 | **Faz 5** — Sarmalayıcılar | 5 / 5 | 🟡 Bitti (2 haftalık kullanım sürüyor) |
-| **Faz 6** — Cila ve yayın | 8 / 14 | 🔵 Sürüyor |
-| | **63 / 72** | **%88** |
+| **Faz 6** — Cila ve yayın | 9 / 14 | 🔵 Sürüyor |
+| | **64 / 72** | **%89** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -45,9 +45,9 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03` · `F6-04` · `F6-05` · `F6-06` · `F6-07` · `F6-08`
+referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03` · `F6-04` · `F6-05` · `F6-06` · `F6-07` · `F6-08` · `F6-09`
 
-**Sıradaki:** `F6-09` tarayıcı ve mobil geçişi.
+**Sıradaki:** `F6-10` i18n ve locale.
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10), Linux görsel
 referansları (F3-11) ve `apps/notlar`ın iki haftalık günlük kullanımı
@@ -2454,10 +2454,92 @@ koşullarda alınıyor. Mutlak sayılar `pnpm olcum` raporunda.
 Boyut etkisi: `@kalem/core` 11,67 kB (sınır 12 kB), `@kalem/editor`
 26,21 kB (sınır 38 kB).
 
-### F6-09 · Tarayıcı ve mobil geçişi `[M]` ⬜
-Chrome/Firefox/Safari/Edge son 2 sürüm + iOS Safari + Android Chrome
-- **Karar gereği:** mobil "çalışır ama optimize değil" — **çalıştığı doğrulanmalı**, bozuk olmamalı. Bilinen mobil kısıtları dokümante et.
-- **Kabul:** mobilde doküman yazılabiliyor; kısıtlar `docs/bilinen-kisitlar` sayfasında
+### F6-09 · Tarayıcı ve mobil geçişi `[M]` ✅
+- [x] Chrome / Firefox / Safari — üç motor zaten her koşuda
+- [x] **Edge** — gerçek kurulumda (`channel: "msedge"`, Edge 153)
+- [x] iOS Safari + Android Chrome — cihaz benzetimiyle
+- [x] Bilinen mobil kısıtlar dokümante edildi
+- [x] **Kabul:** mobilde doküman yazılabiliyor; kısıtlar
+      [`/bilinen-kisitlar/`](../apps/docs/src/content/docs/bilinen-kisitlar.md)
+      sayfasında
+
+İki yeni dosya: `e2e/tarayici.spec.ts` (dört motorda uçtan uca bir yazma
+oturumu) ve `e2e/mobil.spec.ts` (iPhone 15 + Pixel 7 benzetimi).
+
+> **Edge tüm testleri koşmuyor, koşmamalı da.** Edge Chrome'la **aynı
+> motoru** kullanıyor (Blink + V8): ayrıştırıcı, `contenteditable` ve
+> seçim davranışı `chromium` projesinde zaten ölçülüyor. 1.130 testi
+> ikinci kez koşturmak altı dakika ekleyip yeni bilgi vermezdi. Farklı
+> olan kabuk — sürüm takvimi, eklentileri, varsayılanları — ve geçiş
+> testi tam olarak onu yokluyor. Ayrıca `channel: "msedge"` kurulu Edge
+> yoksa tüm koşuyu düşürüyor, o yüzden proje yalnızca Windows'ta (ya da
+> `KALEM_EDGE=1` ile) ekleniyor.
+
+#### Demo sayfalarında `<meta name="viewport">` yokmuş
+
+Mobil testleri ilk koşuşta iPhone'da yedi kere düştü: dokunma hedefe
+ulaşmıyor, "`#cikti` işaretçi olaylarını yutuyor" diyordu. Sebep
+sayfanın kendisiydi — görünüm alanı **980×1643** ölçülüyordu. Mobil
+tarayıcılar `viewport` meta etiketi olmayan sayfayı masaüstü genişliğinde
+kurup uzaklaştırıyor; yani demo sayfaları hiçbir zaman telefon
+genişliğinde çizilmemişti. Beş sayfaya (`core`, `editor`, `index`,
+`olcum`, `viewer`) etiket eklendi; `wc.html`de zaten vardı.
+
+Bu, mobil geçişinin ilk gerçek bulgusu: kütüphane değil ama
+kütüphaneyi gösteren sayfalar mobilde bozuk duruyordu.
+
+#### `touch-action: none` eklendi
+
+Blok tutamacının sürüklemesi `setPointerCapture` ile yürüyor ama
+varsayılan `touch-action` altında tarayıcı parmağı **önce kaydırma jesti
+sayıp** yakalamayı `pointercancel` ile iptal ediyor: blok taşınmıyor,
+sayfa kayıyor. Tutamacın üstünde jest kapatıldı — metnin dışında durduğu
+için sayfanın geri kalanı etkilenmiyor.
+
+Dürüst olmak gerekirse bu düzeltme **gerçek cihazda doğrulanmadı**: cihaz
+benzetimi yerel dokunmatik sürükleme jestini üretemiyor. Kısıtlar sayfası
+bunu böyle söylüyor.
+
+> **"Mobilde blok tutamacı çıkmaz" diye test yazdım, ölçüm aksini
+> gösterdi.** 393 px'lik iPhone'da çıkmıyor ama 412 px'lik Pixel'de
+> **çıkıyor** — çünkü kural ekranın mobil olması değil, bloğun solunda
+> tutamaca yer kalıp kalmaması. Test artık kuralın kendisini tutuyor:
+> tutamaç ya metnin soluna sığıyor ya da hiç görünmüyor, üstüne asla
+> binmiyor.
+
+#### Mobilde ölçülenler
+
+Ölçüm, tahmin değil: sabit araç çubuğu dar ekranda satırlara sarıyor ve
+taşmıyor (349 px genişlik, 61 px yükseklik, yatay kaydırma yok), balon
+çubuk ve bul-değiştir paneli görünüm alanının içinde kalıyor, düğmeler
+WCAG 2.2'nin istediği 24×24 CSS pikselinin üstünde, 300 karakterlik kod
+bloğu ve bağlantı sayfayı yana kaydırmıyor.
+
+> **Proje düzeyindeki `testIgnore` üst düzeydekini eziyor, genişletmiyor.**
+> Masaüstü projelerine yalnızca `mobil.spec.ts`i dışla yazınca örnek
+> uygulama testleri üç motora birden sızdı ve sunucusuz koşup düştüler.
+> İki desen tek listede birleştirildi.
+
+#### Kırılgan bir birim testi de düzeltildi
+
+Birim testlerini e2e koşusuyla aynı anda çalıştırdığımda
+`plugin-find-replace`in "100 sayfalık belge" testi iki kez düştü — kodda
+hiçbir şey değişmeden. Sebep eşiğin payının olmamasıydı: `createIndex`
+500 paragrafta gerçekten **1.405 ms** sürüyor ve eşik 2.000 ms'ti, yani
+1,4×. Makinede ikinci bir koşu varken aşılıyordu.
+
+Eşiğin amacı zaten mutlak hız değil, **büyüme biçimi**: doğrusal olmayan
+bir tarama oraya saniyeler getirirdi. Test artık onu ölçüyor — 250 ve
+1.000 paragraf, oran 8×'in altında (karesel olsa 16× olurdu; ölçülen
+4,8×). F6-08'de öğrenilenin aynısı: oran çekişmeye dayanıklı, mutlak süre
+değil.
+
+> **Bu arada bir yanlış alarm da elendi.** Aynı ölçümde `findMatches`
+> doğrusalın çok üstünde görünüyordu (125 paragrafta 5,6 ms, 1.000'de
+> 161 ms). Isıtma turu ekleyip tekrarlı ölçünce gerçek tablo çıktı:
+> 250→2.000 paragrafta 1,4→5,6 ms, yani temiz doğrusal. İlk sayı JIT ve
+> çöp toplama gürültüsüydü. Tek bir soğuk ölçüme bakıp "performans hatası
+> buldum" demek buydu.
 
 ### F6-10 · i18n ve locale `[M]` ⬜
 İki ayrı iş; ikincisi genelde unutulur ve sessiz hatalara yol açar.

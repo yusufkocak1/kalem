@@ -362,6 +362,16 @@
 	/* Blokla aynı yükseklikte, ilk satırın hizasında. */
 	height: 1.6em;
 	font-size: 14px;
+	/*
+	 * Dokunmatikte tutamaç sayfayı kaydırmıyor  (İş listesi: F6-09)
+	 *
+	 * Sürükleme `setPointerCapture` ile yürüyor ama varsayılan
+	 * `touch-action` altında tarayıcı parmağı önce kaydırma jesti sayıyor
+	 * ve yakalamayı `pointercancel` ile iptal ediyor: blok taşınmıyor,
+	 * sayfa kayıyor. `none` bu jesti tutamacın üstünde kapatıyor — sayfanın
+	 * geri kalanı etkilenmiyor, çünkü tutamaç metnin dışında duruyor.
+	 */
+	touch-action: none;
 }
 
 .kalem-handle[hidden] {

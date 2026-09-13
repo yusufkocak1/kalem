@@ -219,6 +219,7 @@ export default defineConfig({
 					],
 				},
 				bag("Mimari", "Architecture", "/mimari/"),
+				bag("Bilinen kısıtlar", "Known limitations", "/bilinen-kisitlar/"),
 				typeDocSidebarGroup,
 			],
 		}),

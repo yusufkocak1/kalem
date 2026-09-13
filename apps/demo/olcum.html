@@ -1,5 +1,6 @@
 <!doctype html>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kalem — Ölçüm Tezgâhı</title>
 <!--
 	Performans ölçüm tezgâhı  (İş listesi: F6-08)
@@ -168,13 +169,10 @@
 	 * değişikliği uygulamak üzere olduğu an, `onChange` de kütüphanenin
 	 * işini bitirdiği an. Aradaki fark editörün tuş başına maliyeti;
 	 * tarayıcının kendi metin yerleştirmesi de içinde.
-	 */
-	/*
-	 * Tek sefer bağlanıyor, her kurulumda değil.
 	 *
-	 * `tuval` kalıcı (yalnızca çocukları değişiyor), yani bir dinleyici
-	 * yetiyor. Ayrıca sızıntı testi eklenen/kaldırılan dinleyicileri
-	 * sayıyor: tezgâhın kendi dinleyicisi her kurulumda eklenseydi ölçümün
+	 * Tek sefer bağlanıyor, her kurulumda değil: `tuval` kalıcı (yalnızca
+	 * çocukları değişiyor). Ayrıca sızıntı testi eklenen dinleyicileri
+	 * sayıyor — tezgâhın kendi dinleyicisi her kurulumda eklenseydi ölçümün
 	 * içine tezgâhın kendisi karışırdı.
 	 */
 	tuval.addEventListener("beforeinput", () => {

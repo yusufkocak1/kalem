@@ -255,20 +255,49 @@ describe("100 sayfalık belge", () => {
 	/**
 	 * Kabul kriteri: "100 sayfalık dokümanda takılmadan çalışıyor."
 	 *
-	 * Sayfa ~500 kelime sayılıyor; 100 sayfa ≈ 50 000 kelime. Süre sınırı
-	 * cömert tutuldu (CI makineleri yavaş ve paylaşımlı) ama büyüklük
-	 * sırasını sabitlemeye yetiyor: doğrusal olmayan bir tarama buraya
-	 * saniyeler getirirdi.
+	 * Sayfa ~500 kelime sayılıyor; 100 sayfa ≈ 50 000 kelime.
+	 *
+	 * ## Duvar saati eşiği nerede kaldı
+	 *
+	 * `createIndex` için "2.000 ms'den kısa" diye bir eşik vardı ve
+	 * **payı yoktu**: bu makinede gerçek süre 1.405 ms, yani yalnızca
+	 * 1,4×. Makinede paralel bir koşu varken (F6-09 sırasında iki kez
+	 * oldu) eşik aşılıyordu — kodda hiçbir şey değişmeden.
+	 *
+	 * Eşiğin amacı zaten mutlak hız değil **büyüme biçimi**: doğrusal
+	 * olmayan bir tarama buraya saniyeler getirirdi. Onu ölçmenin doğru
+	 * yolu oran — iki ölçüm de aynı koşullarda alındığı için makinenin
+	 * yükü ikisini birden büyütüyor ve oran sabit kalıyor.
+	 *
+	 * Aşağıdaki iki testin mutlak eşikleri duruyor, çünkü payları gerçek:
+	 * ölçülen süreler 8 ms ve 6 ms, eşikler 1.000 ms ve 3.000 ms.
 	 */
 	const paragraf = `${"kelime ".repeat(100)}kedi\n\n`;
 	const md = paragraf.repeat(500);
 	const doc = parse(md);
 
-	it("bölge çıkarma ve katlama bir kez yapılıyor", () => {
-		const bas = performance.now();
+	it("belge bölgelere ayrılıyor", () => {
 		const index = createIndex(doc, "tr");
 		expect(index.regions).toHaveLength(500);
-		expect(performance.now() - bas).toBeLessThan(2000);
+		expect(index.regions[0]?.text).toContain("kedi");
+	});
+
+	it("indeksleme doğrusal büyüyor", () => {
+		/*
+		 * Dört kat belge, dört kat süre beklenir. Eşik 8× — karesel bir
+		 * tarama 16× getirirdi, yani aradaki fark testin yakalayabileceği
+		 * kadar geniş. Ölçülen: 4,8×.
+		 */
+		const sure = (n: number): number => {
+			const d = parse(paragraf.repeat(n));
+			const bas = performance.now();
+			createIndex(d, "tr");
+			return performance.now() - bas;
+		};
+
+		const kucuk = Math.max(sure(250), 1);
+		const buyuk = sure(1000);
+		expect(buyuk / kucuk).toBeLessThan(8);
 	});
 
 	it("her tuş vuruşunda yeniden tarama hızlı", () => {

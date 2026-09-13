@@ -31,12 +31,12 @@ Sırada Faz 6 — cila ve yayın. Henüz npm'de değil; ilk yayın v1.0 olacak.
 | [examples/](examples/) | Yedi çalışan uygulama: React, Next.js, Vue, Nuxt, Svelte, Angular, düz HTML — hepsi CI'da derleniyor |
 | [apps/notlar/](apps/notlar/) | **Kalem Notlar** — kütüphanenin kendi kullanım denemesi (dogfooding): yerel not defteri, altı eklenti bir arada |
 | [apps/playground/](apps/playground/) | **Playground** — ürünün vitrini: Word deneyimi, canlı Markdown çıktısı, Word'den yapıştırma, bin bloklu belge |
-| [apps/demo/](apps/demo/) | Dört canlı sayfa (aşağıda) + Faz 0 mimari prototipi |
-| [apps/docs/](apps/docs/) | Astro Starlight dokümantasyon sitesi (planlanan API'yi dokümante eder) |
+| [apps/demo/](apps/demo/) | Beş canlı sayfa (aşağıda) + Faz 0 mimari prototipi |
+| [apps/docs/](apps/docs/) | Astro Starlight dokümantasyon sitesi — anlattığı her API'nin gerçekten var olduğunu `guard:docs` sınıyor |
 | [docs/02-faz0-sonuc.md](docs/02-faz0-sonuc.md) | Faz 0 sonuç raporu — ne kuruldu, ne doğrulandı, ne kapsanmadı |
 
-**1284 birim testi** + **1104 tarayıcı testi** (Chromium · Firefox · WebKit)
-+ **58 örnek/uygulama testi**. `serialize(parse(md)) === md` gidiş-dönüş
+**1305 birim testi** + **1176 tarayıcı testi** (Chromium · Firefox · WebKit
+· Edge · iPhone ve Pixel benzetimi) + **88 örnek/uygulama testi**. `serialize(parse(md)) === md` gidiş-dönüş
 17/17 byte-birebir; `renderToDOM` ile `renderToString` çıktıları üç motorda
 byte-birebir aynı.
 
@@ -96,6 +96,7 @@ pnpm build && pnpm demo     # http://localhost:5173
 | `/viewer.html` | **`@kalem/viewer`** — aynı AST'nin `renderToDOM` ve `renderToString` çıktıları yan yana, byte-birebir eşitlik ölçümüyle. Ham HTML politikası canlı değiştirilebilir. |
 | `/core.html` | **`@kalem/core`** — Markdown → AST → Markdown, canlı gidiş-dönüş ve idempotans ölçümü. |
 | `/wc.html` | **`@kalem/wc`** — `<kalem-editor>` özel elemanı: ışık DOM, gölge DOM ve `ElementInternals` ile form entegrasyonu yan yana. |
+| `/olcum.html` | **Performans ölçüm tezgâhı** — `pnpm olcum` buradan sürüyor: boyut boyut tuş gecikmesi, kuruluş süresi ve sızıntı döngüsü. |
 | `/` | Mimari doğrulama prototipi (`execCommand` ile; kütüphaneyi kullanmıyor) |
 
 İlk ikisi gerçek derlenmiş bundle'ı yükler — npm'e gidecek kodun aynısı.
