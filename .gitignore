@@ -40,3 +40,6 @@ Thumbs.db
 .env.*
 !.env.example
 .tsbuild/
+
+# Duyuru kaydının ara kareleri (scripts/duyuru/kaydet.mjs)
+docs/duyuru/.kareler/

@@ -1,0 +1,203 @@
+<!doctype html>
+<!--
+	Kayıt sahnesi  (İş listesi: F6-11)
+
+	README GIF'i ve demo videosu buradan çekiliyor (`kaydet.mjs`). Playground
+	değil, çünkü: playground'un arayüzü Türkçe, üstünde on bir denetim var ve
+	duyurunun okuyucusu İngilizce konuşuyor. Burada yalnızca editör ve
+	çıktısı var — GIF'in anlatacağı tek şey.
+
+	Paketler gerçek `dist/`ten yükleniyor; kayıtta görünen kod npm'e gidecek
+	kodun aynısı. Önce `pnpm build`.
+-->
+<html lang="en" data-theme="light">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kalem — recording stage</title>
+<link rel="stylesheet" href="/packages/themes/css/tokens.css">
+<link rel="stylesheet" href="/packages/themes/css/viewer.css">
+<link rel="stylesheet" href="/packages/themes/css/editor.css">
+<link rel="stylesheet" href="/packages/themes/css/ui.css">
+<script type="importmap">
+{
+	"imports": {
+		"@kalem/core": "/packages/core/dist/index.js",
+		"@kalem/core/commands": "/packages/core/dist/commands.js",
+		"@kalem/core/html": "/packages/core/dist/html.js",
+		"@kalem/viewer": "/packages/viewer/dist/index.js",
+		"@kalem/editor": "/packages/editor/dist/index.js",
+		"@kalem/ui": "/packages/ui/dist/index.js"
+	}
+}
+</script>
+<style>
+	:root {
+		color-scheme: light;
+		--zemin: #f4f2ee;
+		--kart: #ffffff;
+		--kenar: #e2ded6;
+		--metin: #22201d;
+		--soluk: #77716a;
+		--vurgu: #0f4e4a;
+		--kod-zemin: #1d1c21;
+		--kod-metin: #e9e6df;
+		--kod-isaret: #6fd3c6;
+	}
+	* { box-sizing: border-box; }
+	html, body { height: 100%; }
+	body {
+		margin: 0;
+		background: var(--zemin);
+		color: var(--metin);
+		font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+		display: flex;
+		flex-direction: column;
+		/* Kayıtta kaydırma çubuğu görünmesin. */
+		overflow: hidden;
+	}
+	header {
+		display: flex;
+		align-items: baseline;
+		gap: 14px;
+		padding: 18px 28px 0;
+	}
+	header b { font-size: 22px; letter-spacing: -0.02em; }
+	header span { color: var(--soluk); font-size: 16px; }
+	main {
+		flex: 1;
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 18px;
+		padding: 14px 28px 26px;
+		min-height: 0;
+	}
+	section {
+		display: flex;
+		flex-direction: column;
+		border: 1px solid var(--kenar);
+		border-radius: 12px;
+		background: var(--kart);
+		overflow: hidden;
+		min-height: 0;
+	}
+	section h2 {
+		margin: 0;
+		padding: 9px 16px;
+		font-size: 13px;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--soluk);
+		border-bottom: 1px solid var(--kenar);
+	}
+	#editor {
+		flex: 1;
+		/* Sol boşluk blok tutamağına yer bırakıyor. */
+		padding: 24px 32px 24px 48px;
+		/* GIF 900 piksele küçülüyor; bu boyutta metin orada ~14 piksel. */
+		font-size: 21px;
+		overflow: hidden;
+	}
+	section.cikti { background: var(--kod-zemin); border-color: var(--kod-zemin); }
+	section.cikti h2 { color: #9d978d; border-color: #34323b; }
+	#cikti {
+		flex: 1;
+		margin: 0;
+		padding: 22px 24px;
+		color: var(--kod-metin);
+		font: 18px/1.6 "Cascadia Mono", "SFMono-Regular", ui-monospace, Consolas, monospace;
+		white-space: pre-wrap;
+		overflow: hidden;
+	}
+	#cikti .isaret { color: var(--kod-isaret); }
+
+	/*
+	 * Sahte imleç. Playwright'ın ekran yakalaması işletim sisteminin
+	 * imlecini çizmiyor; seçim ve sürükleme imleç olmadan anlaşılmıyor
+	 * (F6-05'te GIF'i düşüren sebep buydu).
+	 */
+	#imlec {
+		position: fixed;
+		left: 0;
+		top: 0;
+		width: 22px;
+		height: 22px;
+		pointer-events: none;
+		z-index: 2147483647;
+		transform: translate(-100px, -100px);
+		filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.35));
+	}
+	#imlec::after {
+		content: "";
+		position: absolute;
+		left: -9px;
+		top: -9px;
+		width: 18px;
+		height: 18px;
+		border-radius: 50%;
+		background: rgb(15 78 74 / 0.3);
+		transform: scale(0);
+		transition: transform 120ms ease-out;
+	}
+	#imlec.basili::after { transform: scale(1); }
+</style>
+
+<header>
+	<b>Kalem</b>
+	<span>A WYSIWYG editor whose source of truth is Markdown</span>
+</header>
+<main>
+	<section>
+		<h2>Editor</h2>
+		<div id="editor" class="kalem-theme" lang="en"></div>
+	</section>
+	<section class="cikti">
+		<h2>Markdown output</h2>
+		<pre id="cikti"></pre>
+	</section>
+</main>
+<svg id="imlec" viewBox="0 0 22 22" aria-hidden="true">
+	<path d="M3 2 L3 18 L7.5 14 L10.5 20.5 L13.2 19.3 L10.3 13 L16.5 13 Z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round" />
+</svg>
+
+<script type="module">
+	import { Editor } from "/packages/editor/dist/index.js";
+	import { mountUi } from "/packages/ui/dist/index.js";
+
+	const cikti = document.getElementById("cikti");
+
+	/** Markdown sözdizimini hafifçe renklendirir; okuyucunun gözü işaretlere gitsin. */
+	function goster(markdown) {
+		cikti.replaceChildren();
+		const desen = /(^#{1,6} |^> |^- |\*\*|^\d+\. )/gm;
+		let son = 0;
+		for (const m of markdown.matchAll(desen)) {
+			cikti.append(markdown.slice(son, m.index));
+			const isaret = document.createElement("span");
+			isaret.className = "isaret";
+			isaret.textContent = m[0];
+			cikti.append(isaret);
+			son = m.index + m[0].length;
+		}
+		cikti.append(markdown.slice(son));
+	}
+
+	const editor = new Editor(document.getElementById("editor"), {
+		value: "",
+		lang: "en",
+		label: "Document",
+		onChange: goster,
+	});
+	mountUi(editor);
+	goster(editor.getValue());
+
+	const imlec = document.getElementById("imlec");
+	addEventListener("mousemove", (e) => {
+		imlec.style.transform = `translate(${e.clientX - 3}px, ${e.clientY - 2}px)`;
+	}, { capture: true });
+	addEventListener("mousedown", () => imlec.classList.add("basili"), { capture: true });
+	addEventListener("mouseup", () => imlec.classList.remove("basili"), { capture: true });
+
+	window.kalemHazir = true;
+</script>
+</html>

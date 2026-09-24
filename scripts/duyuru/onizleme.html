@@ -1,0 +1,127 @@
+<!doctype html>
+<!--
+	Sosyal önizleme görseli, 1280×640  (İş listesi: F6-11)
+
+	GitHub'ın "Social preview" ayarı ve X / Bluesky / Slack bağlantı
+	kartları bu oranı kullanıyor. Kenarlardan 40 piksel güvenli alan
+	bırakıldı: bazı istemciler kartı ortadan kırpıyor.
+
+	Sol taraftaki belge gerçek `@kalem/viewer` çıktısı, sağdaki metin onun
+	kaynağı — görsel de iddiayı gösteriyor. `kaydet.mjs` ekran görüntüsünü
+	alıyor.
+-->
+<html lang="en">
+<meta charset="utf-8">
+<title>Kalem — social preview</title>
+<link rel="stylesheet" href="/packages/themes/css/tokens.css">
+<link rel="stylesheet" href="/packages/themes/css/viewer.css">
+<script type="importmap">
+{ "imports": { "@kalem/core": "/packages/core/dist/index.js" } }
+</script>
+<style>
+	* { box-sizing: border-box; }
+	body {
+		margin: 0;
+		width: 1280px;
+		height: 640px;
+		overflow: hidden;
+		background: #f4f2ee;
+		color: #22201d;
+		font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+		display: grid;
+		grid-template-columns: 500px 1fr;
+		gap: 44px;
+		padding: 64px 64px 56px 72px;
+	}
+	.sol { display: flex; flex-direction: column; }
+	.ad {
+		font-size: 92px;
+		font-weight: 750;
+		letter-spacing: -0.045em;
+		line-height: 1;
+		color: #0f4e4a;
+	}
+	.slogan {
+		margin: 26px 0 0;
+		font-size: 38px;
+		font-weight: 600;
+		line-height: 1.18;
+		letter-spacing: -0.02em;
+	}
+	.aciklama {
+		margin: 20px 0 0;
+		font-size: 21px;
+		line-height: 1.45;
+		color: #5f5a53;
+	}
+	.rozetler { margin-top: auto; display: flex; flex-wrap: wrap; gap: 10px; }
+	.rozetler span {
+		padding: 7px 14px;
+		border-radius: 999px;
+		background: #ffffff;
+		border: 1px solid #e2ded6;
+		font-size: 17px;
+		font-weight: 600;
+	}
+	.rozetler span b { color: #0f4e4a; }
+
+	.sag { display: grid; grid-template-rows: 1fr auto; gap: 16px; min-height: 0; }
+	.belge {
+		background: #fff;
+		border: 1px solid #e2ded6;
+		border-radius: 16px;
+		padding: 26px 34px;
+		overflow: hidden;
+		box-shadow: 0 18px 40px -24px rgb(0 0 0 / 0.25);
+	}
+	.belge .kalem-theme { font-size: 17px; }
+	.belge .kalem-theme h1 { margin-top: 0; font-size: 30px; }
+	.kaynak {
+		margin: 0;
+		background: #1d1c21;
+		color: #e9e6df;
+		border-radius: 16px;
+		padding: 20px 26px;
+		font: 16.5px/1.6 "Cascadia Mono", "SFMono-Regular", ui-monospace, Consolas, monospace;
+		white-space: pre-wrap;
+	}
+	.kaynak i { font-style: normal; color: #6fd3c6; }
+</style>
+
+<div class="sol">
+	<div class="ad">Kalem</div>
+	<p class="slogan">Easy as Word.<br>Portable as Markdown.</p>
+	<p class="aciklama">Your users write like it's Word. You get Markdown back — with clean diffs.</p>
+	<div class="rozetler">
+		<span><b>0</b> dependencies</span>
+		<span><b id="boyut">35.0 kB</b> editor + UI</span>
+		<span>React · Vue · Svelte · HTML</span>
+	</div>
+</div>
+<div class="sag">
+	<div class="belge"><div class="kalem-theme" id="belge"></div></div>
+	<pre class="kaynak"><i># </i>Meeting notes
+
+Kalem looks like Word, but it saves <i>**</i>plain Markdown<i>**</i>.
+
+<i>- </i>Zero runtime dependencies</pre>
+</div>
+
+<script type="module">
+	import { parse } from "/packages/core/dist/index.js";
+	import { renderToDOM } from "/packages/viewer/dist/index.js";
+
+	const md = [
+		"# Meeting notes",
+		"",
+		"Kalem looks like Word, but it saves **plain Markdown**.",
+		"",
+		"- Zero runtime dependencies",
+		"- React, Vue, or no framework",
+		"",
+		"> Your file stays yours.",
+		"",
+	].join("\n");
+	renderToDOM(parse(md), document.getElementById("belge"));
+</script>
+</html>

@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-13 · `main` · `pnpm verify` yeşil · 1369 birim + 1218 tarayıcı + 88 örnek/uygulama testi
+> Son güncelleme: 2026-09-24 · `main` · `pnpm verify` yeşil · 1369 birim + 1218 tarayıcı + 88 örnek/uygulama testi
 >
 > Uzak depo: [yusufkocak1/kalem](https://github.com/yusufkocak1/kalem) (private)
 
@@ -36,8 +36,8 @@
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
 | **Faz 4** — Eklentiler | 7 / 7 | ✅ **Tamamlandı** |
 | **Faz 5** — Sarmalayıcılar | 5 / 5 | 🟡 Bitti (2 haftalık kullanım sürüyor) |
-| **Faz 6** — Cila ve yayın | 10 / 14 | 🔵 Sürüyor |
-| | **65 / 72** | **%90** |
+| **Faz 6** — Cila ve yayın | 11 / 14 | 🔵 Sürüyor |
+| | **66 / 72** | **%92** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
@@ -45,15 +45,17 @@
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03` · `F6-04` · `F6-05` · `F6-06` · `F6-07` · `F6-08` · `F6-09` · `F6-10`
+referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03` · `F6-04` · `F6-05` · `F6-06` · `F6-07` · `F6-08` · `F6-09` · `F6-10` · `F6-11`
 
-**Sıradaki:** `F6-11` README ve duyuru varlıkları.
+**Sıradaki:** `F6-12` Yayın provası.
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10), Linux görsel
 referansları (F3-11) ve `apps/notlar`ın iki haftalık günlük kullanımı
 (F5-05) — üçü de bir insanın masasında yapılmak zorunda.
-Ayrıca 30 saniyelik tanıtım GIF'i (F6-05'te yapılamadı: ffmpeg/gifski
-kurulu değil — F6-11'e taşındı), atomik düğümlere ofset uzunluğu 1
+Ayrıca **gidiş-dönüş boşlukları** (F6-11'de bulundu, yedi kalıp — duyurunun
+ana iddiası, v1.0'dan önce), **İngilizce doküman sitesi** (içerik yalnızca
+Türkçe — İngilizce duyurudan önce karar gerekiyor), playground'un
+barındırılması ve `kalem.dev` alan adı (403 dönüyor), atomik düğümlere ofset uzunluğu 1
 verilmesi (F4-01'de bulundu) ve
 tablo hücrelerinin düzenlenebilir çizilmesi (F4-03'te bulundu: yazılan
 metin çıktıya hiç girmiyor).
@@ -2184,7 +2186,7 @@ tutmak, kaynakla arasına fark girmesine davetiye.
 - [x] Kurulum tek satırda; boyut rozetleri ölçülen değerler
 - [x] Rakip karşılaştırma tablosu
 - [x] **Kabul:** ilk 5 saniyede "bu ne" anlaşılıyor (6 tarayıcı testi)
-- [ ] 30 saniyelik GIF — araç eksiği yüzünden F6-11'e bırakıldı (aşağıya bakın)
+- [x] 30 saniyelik GIF — araç eksiği yüzünden F6-11'e bırakıldı, orada yapıldı
 
 **GIF yerine çalışan editör.** Maddenin istediği şey bir tanıtım; ama bir
 GIF "bu ne" sorusunu *anlatıyor*, çalışan bir editör **gösteriyor**.
@@ -2681,9 +2683,108 @@ Başka bir dil eklemek, eklenti metinleri, sayılar, kasa kuralları ve RTL.
 64 birim testi (dil zinciri, sekiz sözlük, sayı biçimi, içindekiler sırası,
 kasıtlı fark) + 14 tarayıcı testi × 3 motor + 4 kapı öz-testi.
 
-### F6-11 · README ve duyuru varlıkları `[M]` ⬜
-İngilizce README (GIF, rozet, kurulum, karşılaştırma tablosu), sosyal önizleme görseli, 30 sn demo videosu, "Show HN" ve dev.to yazı taslakları
-- **Kabul:** duyuru materyalleri hazır ve gözden geçirilmiş
+### F6-11 · README ve duyuru varlıkları `[M]` ✅
+- [x] İngilizce README — GIF, rozet, kurulum, karşılaştırma tablosu, kısıtlar
+- [x] Sosyal önizleme görseli — 1280×640, `docs/duyuru/onizleme.png`
+- [x] Demo videosu — 23 sn, 1280×720 H.264; GIF'i de aynı kayıttan
+- [x] "Show HN" ve dev.to taslakları — `docs/duyuru/`
+- [x] **Kabul:** materyaller hazır ve gözden geçirildi — gözden geçirme
+      iddiaları **ölçmek** demekti ve üç iddia ölçümü geçemedi (aşağıda)
+
+Varlıklar ve nasıl yeniden üretildikleri: [`docs/duyuru/`](duyuru/README.md).
+Türkçe README `README.tr.md`ye taşındı ve güncellendi (hâlâ "55/72, sırada
+Faz 3" diyordu).
+
+#### GIF bu sefer neden yapılabildi
+
+F6-05'te iki engel vardı: ffmpeg yok ve Playwright'ın video kaydı imleci
+çizmiyor. İmleç artık **sahnenin içinde** — `scripts/duyuru/sahne.html` fare
+olaylarını dinleyip bir SVG ok çiziyor, basılı tutarken halkası büyüyor.
+Kareler CDP'nin `Page.startScreencast`inden zaman damgalarıyla geliyor ve
+ffmpeg'e gerçek süreleriyle veriliyor. ffmpeg için makineye bir şey
+kurulmadı; betik `FFMPEG` ortam değişkenine bakıyor.
+
+Sahne playground değil: playground'un arayüzü Türkçe ve üstünde on bir
+denetim var. Sahnede yalnızca editör (`lang: "en"`) ve Markdown çıktısı.
+
+> **JPEG kareler beyazda bant yaptı.** İlk GIF'te editörün beyaz zemini
+> yatay şeritlere bölünmüştü; palet ayarlarıyla uğraşmak düzeltmedi, çünkü
+> bant kaynaktaydı — screencast'in JPEG sıkıştırması. PNG karelerle GIF hem
+> temiz hem küçük: 272 kB → 185 kB.
+
+#### Gözden geçirme: üç iddia ölçümü geçemedi
+
+**1. "Her belge için byte-birebir" doğru değil.** README'nin ve Show HN
+metninin ilk taslağı `serialize(parse(md)) === md`nin **her** belge için
+geçerli olduğunu söylüyordu. Gidiş-dönüş testleri 17 altın dosyada
+byte-birebir; özellik testleri ise yalnızca idempotansı sınıyor (bilerek —
+bkz. `property.test.ts`). Rastgele Markdown parçalarıyla 5000 denemenin
+3724'ü farklı döndü; çoğu bozuk sözdizimi, ama gerçekçi 28 örnekten 7'si de
+farklı:
+
+| Girdi | Çıktı |
+|---|---|
+| `1. bir` / `1. bir daha` | `2.` diye yeniden numaralanıyor |
+| dört boşlukla iç içe liste | iki boşluğa çekiliyor |
+| satır sonunda tek boşluk | siliniyor |
+| belge başında boş satırlar | siliniyor |
+| setext başlığın `---` çizgisi | başlık uzunluğuna getiriliyor |
+| alıntıda tembel devam satırı | başına `> ` ekleniyor |
+| kelime sonunda `_` (`under_score_`) | `\_` diye kaçırılıyor |
+
+İlk üçü gerçek belgelerde **çok yaygın** — `1.` `1.` `1.` listesi birçok
+yazarın alışkanlığı, dört boşluk girinti de öyle. Çıktı eşdeğer Markdown ama
+aynı baytlar değil; kullanıcı o satırlara dokunmasa da ilk kaydetmede
+değişiyorlar. Metinler şimdi bunu söylüyor: "test korpusunda byte-birebir,
+şu kalıplar hâlâ normalleşiyor, her biri bir hata". README'de yedisi de
+listeli.
+
+> **Karar bekliyor:** bu yedi kalıp v1.0'dan önce mi düzeltilmeli? Öneri
+> evet — ürünün ayırt edici iddiası bu ve Show HN okurunun ilk deneyeceği
+> şey kendi README'sini yapıştırmak. İlk üçü öncelikli. Düzeltilince
+> metinlerdeki "not yet universal" paragrafı kısalır.
+
+**2. Belgelerdeki boyutlar eskimişti — 16 yerde.** Giriş sayfası "editör +
+arayüz 34,6 kB" diyordu; ölçüm 35,0 kB. F6-05'te bunu sabitleyen test
+geçmeye devam ediyordu, çünkü sınadığı şey sayfanın **kendi metniydi**,
+ölçüm değil. Aynı anda on beş yerde daha eski sayı vardı (`core` 11,5 →
+11,7; `find-replace` 4,4 → 4,3; tek `<script>` derlemesi 26,7 → 27,0).
+
+Yeni kapı: **`pnpm guard:sizes`**. Her iddia bir dosya, bir desen ve bir
+`size-limit` girdisi; yazılan sayı ölçümle **yazarın seçtiği hassasiyette**
+karşılaştırılıyor ("26 kB" tam sayı, "35,0 kB" tek hane, "903 B" bayt) ve
+ondalık ayırıcı metinden okunuyor. Bir desen hiç eşleşmezse de kırmızı —
+iddia denetimden sessizce düşmesin. Bugün 47 sayı: README, iki duyuru
+metni, sosyal önizleme ve doküman sitesinin on sayfası. `verify`a ve CI'a
+eklendi. Giriş sayfası testi artık sayıyı değil biçimi sınıyor.
+
+**3. "Docs are in English" yazmıştım — değiller.** Show HN taslağının ilk
+hâli dokümanın İngilizce olduğunu söylüyordu. Starlight'ın `en` yerel ayarı
+F6-01'den beri kurulu ama **içeriği yok**; API referansı da Türkçe JSDoc'tan
+üretiliyor. Metinler şimdi bugünkü durumu söylüyor.
+
+> **Karar bekliyor:** İngilizce bir duyuruda doküman sitesinin Türkçe olması
+> büyük bir engel. Seçenekler: (a) F6-14'ten önce en azından başlangıç,
+> çerçeveler, editör rehberi ve bilinen kısıtlar sayfalarını çevirmek;
+> (b) Türkçe siteyle duyurmak ve İngilizce README'ye yaslanmak. Öneri (a).
+
+#### Bulunan ve düzeltilen: CI `main`de hiç koşmuyordu
+
+`.github/workflows/ci.yml` `push: branches: [master]` diyordu; depo dalı
+`main`. Yani CI yalnızca pull request'lerde koşuyordu, `main`e doğrudan
+gelen commit'lerde hiç. `main` yapıldı.
+
+#### Gönderimden önce açık kalanlar
+
+Taslakların başındaki yorum bloklarında listeli; özetle:
+
+- **Playground hiçbir yerde barındırılmıyor.** Taslaklarda `<PLAYGROUND_URL>`
+  yer tutucusu duruyor.
+- **`kalem.dev` 403 dönüyor.** `astro.config.mjs`in `site`ı bu alan adı;
+  bize ait olup olmadığı belli değil.
+- **Depo private.** README'deki CI rozeti ve göreli bağlantılar açıldığında
+  çalışır.
+- README'deki "Status: not on npm yet" notu F6-13'te kalkacak.
 
 ### F6-12 · Yayın provası `[M]` ⬜
 `npm publish --dry-run` tüm paketler; boş bir projeye tarball'dan kurup dene; `exports` haritası doğrulama; provenance imzası

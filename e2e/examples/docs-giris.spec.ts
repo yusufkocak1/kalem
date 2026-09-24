@@ -62,8 +62,13 @@ test("kurulum tek satırda ve boyutlar rozet olarak duruyor", async ({ page }) =
 		"npm i @kalem/editor @kalem/ui @kalem/themes",
 	);
 	await expect(page.locator(".rozet")).toHaveCount(4);
-	// Rozetteki sayı `size-limit` ölçümü; hedef değil.
-	await expect(page.locator(".rozet").first()).toContainText("34,6 kB");
+	/*
+	 * Rozetteki sayının **doğruluğu** burada değil, `guard:sizes`te
+	 * sınanıyor. Bu test önce sayıyı sabit yazıyordu ve ölçüm 34,6'dan
+	 * 35,0'a çıktığında geçmeye devam etti: sınadığı şey sayfanın kendi
+	 * metniydi. Burada yalnızca rozetin bir ölçü taşıdığına bakılıyor.
+	 */
+	await expect(page.locator(".rozet").first()).toContainText(/^editör \+ arayüz\s*\d+,\d kB$/);
 });
 
 test("konsola hata düşmüyor", async ({ page }) => {

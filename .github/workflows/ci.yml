@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
 
 concurrency:
@@ -66,6 +66,9 @@ jobs:
 
       - name: Boyut kapısı
         run: pnpm size
+
+      - name: Boyut iddiaları (belgelerdeki sayılar ölçümle aynı mı)
+        run: pnpm guard:sizes
 
       - name: publint
         run: pnpm publint

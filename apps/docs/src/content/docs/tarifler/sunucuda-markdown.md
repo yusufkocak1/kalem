@@ -15,7 +15,7 @@ export function markdownToHtml(md: string): string {
 }
 ```
 
-Toplam 14,2 kB (min+gzip) ve üçüncü parti bağımlılığı yok.
+Toplam 14,4 kB (min+gzip) ve üçüncü parti bağımlılığı yok.
 
 ## Bunu bir kapı koruyor
 
@@ -119,4 +119,4 @@ visit(parse(md), (node) => {
 });
 ```
 
-`@kalem/core` tek başına 11,5 kB ve `@kalem/viewer`e ihtiyaç duymuyor.
+`@kalem/core` tek başına 11,7 kB ve `@kalem/viewer`e ihtiyaç duymuyor.
