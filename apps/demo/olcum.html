@@ -275,6 +275,25 @@
 		canliEditor: () => (zayifSaklanan === null ? -1 : zayifSaklanan()),
 		/** Gidiş-dönüş doğruluğu: hız uğruna doğruluk kaybedilmediğinin kanıtı. */
 		gidisDonus: (metin) => serialize(parse(metin)) === metin,
+		/**
+		 * Kurulu belgeyi **önbelleksiz** bir kez serileştirmenin süresi
+		 * (yedi ölçümün medyanı).
+		 *
+		 * Performans testinin cetveli: tuş başına maliyet bununla
+		 * karşılaştırılıyor. İkisi de aynı sayfada, aynı anda ölçüldüğü için
+		 * makinenin yükü ikisini birden büyütüyor ve oran yükten bağımsız
+		 * kalıyor.
+		 */
+		tamSerilestirme() {
+			const doc = editor.getDocument();
+			const sureler = [];
+			for (let i = 0; i < 7; i++) {
+				const t0 = performance.now();
+				serialize(doc);
+				sureler.push(performance.now() - t0);
+			}
+			return yuzdelik(sureler, 50);
+		},
 		editor: () => editor,
 		rapor(metin) {
 			document.getElementById("rapor").textContent = metin;

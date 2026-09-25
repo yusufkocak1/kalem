@@ -39,6 +39,7 @@ declare global {
 			};
 			donguBaslat(kez: number, blok: number): Promise<number>;
 			canliEditor(): number;
+			tamSerilestirme(): number;
 			gidisDonus(metin: string): boolean;
 			rapor(metin: string): void;
 		};
@@ -123,56 +124,59 @@ test.describe("kabul: bin bloklu belgede yazmak akıcı", () => {
 
 test.describe("sanal kaydırma gerekli mi", () => {
 	/**
-	 * Büyük belgelerde **oran** ölçülüyor, mutlak süre değil.
+	 * Tuş başına maliyet, **aynı anda ölçülen** bir cetvele bölünüyor.
 	 *
-	 * Bu testler sekiz işçiyle paralel koşuyor: yanı başında yedi tarayıcı
-	 * aynı çekirdeği kullanırken alınan mutlak süre kütüphaneyi değil
-	 * makinenin o anki yükünü ölçüyor. Ölçüldü: tek başına 7,3 ms çıkan
-	 * 5.000 bloklu ölçüm, tüm takım koşarken 17,8 ms'ye çıkıyor.
+	 * Cetvel: kurulu belgeyi önbelleksiz bir kez serileştirmenin süresi. İkisi
+	 * aynı sayfada ardı ardına alındığı için makinenin yükü ikisini birden
+	 * büyütüyor; oran yükten bağımsız kalıyor.
 	 *
-	 * Oran ise çekişmeye dayanıklı — iki ölçüm de aynı koşullarda alınıyor,
-	 * yük ikisini birden büyütüyor. Ve asıl sorulan şey zaten oran: maliyet
-	 * belge boyutuyla **doğru orantılı** mı büyüyor. Mutlak sayılar
-	 * `pnpm olcum` raporunda, gürültüsüz bir koşuda.
+	 * ## Neden eski ölçüt değişti
+	 *
+	 * Önceki test büyük belgenin p50'sini **küçük belgenin** p50'sine
+	 * bölüyordu (`5.000/1.000 < 5`). İki kusuru vardı ve ikisi de ölçüldü:
+	 *
+	 * - Payda 1.000 bloğun ~1,5 ms'lik p50'si. 0,1 ms'lik oynama oranı bir
+	 *   tam kat kaydırıyor; tam takım koşarken test ara ara kırmızıydı, tek
+	 *   başına hep yeşil.
+	 * - Ayırdığı şey dardı: önbellek maliyeti sabite değil **yarı eğime**
+	 *   indiriyor, yani önbellekli ve önbelleksiz oranlar 4,3× ile 5,1×.
+	 *
+	 * Yeni ölçütle önbellekli tuş tam serileştirmenin 0,66–0,70'i,
+	 * önbelleksiz tuş 1,55–1,9'u (her boyutta, üçer ölçüm). 1,0 eşiği iki
+	 * tarafa da ~%40 pay bırakıyor ve asıl iddiayı söylüyor: **bir tuş
+	 * belgenin tamamını yeniden yazmaktan ucuz olmalı.** Önbellek kalkarsa
+	 * tuş en az bir tam serileştirme kadar sürmek zorunda.
 	 */
-	async function oran(
-		page: import("@playwright/test").Page,
-		kucukBlok: number,
-		buyukBlok: number,
-	): Promise<number> {
-		await page.evaluate((n) => window.olcum.kur(n), kucukBlok);
-		await yaz(page, 40);
-		const kucuk = await page.evaluate(() => window.olcum.sonuc());
-
-		await page.evaluate((n) => window.olcum.kur(n), buyukBlok);
-		await yaz(page, 40);
-		const buyuk = await page.evaluate(() => window.olcum.sonuc());
-
-		return buyuk.p50 / Math.max(kucuk.p50, 0.5);
+	async function tusMaliyeti(page: import("@playwright/test").Page, blok: number): Promise<number> {
+		const oranlar: number[] = [];
+		for (let i = 0; i < 3; i++) {
+			await page.evaluate((n) => window.olcum.kur(n), blok);
+			await yaz(page, 40);
+			const { p50 } = await page.evaluate(() => window.olcum.sonuc());
+			const cetvel = await page.evaluate(() => window.olcum.tamSerilestirme());
+			oranlar.push(p50 / Math.max(cetvel, 0.1));
+		}
+		return oranlar.sort((a, b) => a - b)[1] as number;
 	}
 
-	test("beş kat belge, beş kat maliyet getirmiyor", async ({ page }) => {
+	test("5.000 blokta bir tuş belgeyi yeniden yazmaktan ucuz", async ({ page }) => {
+		test.setTimeout(120_000);
 		/*
 		 * Asıl soru bu — ve cevabı "sanal kaydırma gerekmiyor".
 		 *
-		 * Tuş başına maliyet belge boyutuyla doğrusal büyüyordu ama darboğaz
-		 * DOM değil `serialize(doc)` idi: her tuşta belgenin tamamı yeniden
-		 * yazılıyordu. Sanal kaydırma DOM düğümü azaltır, bunu azaltmazdı.
-		 * Blok başına serileştirme önbelleği (F6-08) 5.000 blokta p50'yi
-		 * 27,5 ms'den 7,3 ms'ye indirdi.
-		 *
-		 * Eşik önbelleği koruyor: önbellek kalkarsa 5.000/1.000 oranı 5,6×
-		 * oluyor (ölçüldü), yani 5× sınırı onu geçirmez. Önbellekliyken
-		 * 3,8× — aradaki pay dar ama gürültüye değil koda duyarlı.
+		 * Darboğaz DOM değil `serialize(doc)` idi: her tuşta belgenin tamamı
+		 * yeniden yazılıyordu. Sanal kaydırma DOM düğümü azaltır, bunu
+		 * azaltmazdı. Blok başına serileştirme önbelleği (F6-08) bu testin
+		 * koruduğu şey.
 		 */
-		expect(await oran(page, 1000, 5000)).toBeLessThan(5);
+		expect(await tusMaliyeti(page, 5000)).toBeLessThan(1);
 	});
 
-	test("on kat belge, on kat maliyet getirmiyor", async ({ page }) => {
+	test("10.000 blokta da", async ({ page }) => {
+		test.setTimeout(120_000);
 		// İş listesi "5.000+" diyor; üstünü de ölçmek, sınırın nerede
-		// olduğunu tahmin etmek yerine bilmek demek. Gürültüsüz koşuda
-		// 10.000 blokta p50 13,0 ms — hâlâ bir karenin altında.
-		expect(await oran(page, 1000, 10_000)).toBeLessThan(10);
+		// olduğunu tahmin etmek yerine bilmek demek.
+		expect(await tusMaliyeti(page, 10_000)).toBeLessThan(1);
 	});
 
 	test("beş bin blok açılıyor ve yazılabiliyor", async ({ page }) => {

@@ -57,8 +57,7 @@ Türkçe — İngilizce duyurudan önce karar gerekiyor), playground'un
 barındırılması ve `kalem.dev` alan adı (403 dönüyor), atomik düğümlere ofset uzunluğu 1
 verilmesi (F4-01'de bulundu) ve
 tablo hücrelerinin düzenlenebilir çizilmesi (F4-03'te bulundu: yazılan
-metin çıktıya hiç girmiyor) ve performans oran testlerinin kırılganlığı
-(tam pakette ara ara kırmızı; F6-11 sonrası ölçüldü, kod değil test).
+metin çıktıya hiç girmiyor).
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -2813,9 +2812,17 @@ Yeni korpus dosyası: `packages/core/fixtures/08-yazim-aliskanliklari.md`.
 > Büyük belgede maliyet aynı; önbellek sağlam. Sorun testin kendisinde:
 > payda 1.000 bloğun 1,5 ms'lik p50'si ve 0,1 ms'lik oynama oranı bir tam
 > kat kaydırıyor — eski kod bile sessiz koşuda 5× eşiğine 4,7× ile
-> yaklaşıyor (F6-08'de 3,8× ölçülmüştü). **Açık iş:** oranı daha büyük
-> bir paydaya (ör. 2.000 blok) ya da çok ölçümün medyanına dayandırmak.
-> Eşik sessizce gevşetilmedi.
+> yaklaşıyor (F6-08'de 3,8× ölçülmüştü).
+>
+> **Düzeltildi — ölçüt değişti, eşik gevşetilmedi.** Tuş maliyeti artık
+> aynı sayfada aynı anda ölçülen bir cetvele bölünüyor: belgeyi önbelleksiz
+> bir kez serileştirmenin süresi. Yük ikisini birden büyütüyor, oran
+> sabit kalıyor. Önbellekli tuş cetvelin 0,66–0,70'i, önbelleksiz tuş
+> 1,55–1,9'u (1.000–10.000 blok, üçer ölçüm); eşik 1,0 — "bir tuş belgeyi
+> yeniden yazmaktan ucuz olmalı". Önbellek kaldırılınca iki test de
+> 1,6–1,7 ile kırmızı (denendi). Eski ölçüt önbelleği 4,3× / 5,1× gibi dar
+> bir payla ayırıyordu, çünkü önbellek maliyeti sabite değil yarı eğime
+> indiriyor.
 
 **2. Belgelerdeki boyutlar eskimişti — 16 yerde.** Giriş sayfası "editör +
 arayüz 34,6 kB" diyordu; ölçüm 35,0 kB. F6-05'te bunu sabitleyen test
