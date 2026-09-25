@@ -52,13 +52,13 @@ referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` �
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10), Linux görsel
 referansları (F3-11) ve `apps/notlar`ın iki haftalık günlük kullanımı
 (F5-05) — üçü de bir insanın masasında yapılmak zorunda.
-Ayrıca **gidiş-dönüş boşlukları** (F6-11'de bulundu, yedi kalıp — duyurunun
-ana iddiası, v1.0'dan önce), **İngilizce doküman sitesi** (içerik yalnızca
+Ayrıca **İngilizce doküman sitesi** (içerik yalnızca
 Türkçe — İngilizce duyurudan önce karar gerekiyor), playground'un
 barındırılması ve `kalem.dev` alan adı (403 dönüyor), atomik düğümlere ofset uzunluğu 1
 verilmesi (F4-01'de bulundu) ve
 tablo hücrelerinin düzenlenebilir çizilmesi (F4-03'te bulundu: yazılan
-metin çıktıya hiç girmiyor).
+metin çıktıya hiç girmiyor) ve performans oran testlerinin kırılganlığı
+(tam pakette ara ara kırmızı; F6-11 sonrası ölçüldü, kod değil test).
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -2739,10 +2739,83 @@ değişiyorlar. Metinler şimdi bunu söylüyor: "test korpusunda byte-birebir,
 şu kalıplar hâlâ normalleşiyor, her biri bir hata". README'de yedisi de
 listeli.
 
-> **Karar bekliyor:** bu yedi kalıp v1.0'dan önce mi düzeltilmeli? Öneri
-> evet — ürünün ayırt edici iddiası bu ve Show HN okurunun ilk deneyeceği
-> şey kendi README'sini yapıştırmak. İlk üçü öncelikli. Düzeltilince
-> metinlerdeki "not yet universal" paragrafı kısalır.
+#### Gidiş-dönüş boşlukları kapatıldı
+
+Karar: v1.0'dan önce düzelt. Yedisi de düzeldi; ölçerken beş yaygın kalıp
+daha çıktı, onlar da:
+
+| Kalıp | Neydi | Çözüm |
+|---|---|---|
+| `1.` `1.` `1.` | `numbering: "repeated"` alanı vardı ama ayrıştırıcı hiç yazmıyordu | iki+ madde hepsi aynı numaraysa `repeated` |
+| `    - iç` (4 boşluk) | işaret öncesi girinti kaydedilmiyordu | `ListSyntax.indent` |
+| `1.  metin` | işaret sonrası boşluk teke iniyordu | `ListSyntax.spacing` |
+| `satır \n` | yumuşak satır sonundan önceki boşluk atılıyordu | metinde kalıyor (HTML'de görünmez) |
+| paragraf sonunda boşluk | atılıyordu | paragrafta kalıyor, setext başlıkta atılıyor |
+| `   \n` (3+ boşluk) | iki boşluğa iniyordu | `BreakSyntax.width` |
+| baştaki / sondaki boş satırlar | kaybediliyordu | `RootSyntax.leadingBlankLines` / `trailingBlankLines` |
+| `Başlık\n---` | çizgi başlık boyuna uzatılıyordu | farklıysa `HeadingSyntax.underlineLength` |
+| tembel alıntı satırı | `> ` ekleniyordu | `BlockquoteSyntax.lazy` |
+| `>metin` | `> metin` oluyordu | `BlockquoteSyntax.compact` |
+| `under_score_` | `\_` kaçırılıyordu | kelime içi `_` eş sayılmıyor |
+| `C:\Users` | ters bölü ikiye katlanıyordu | yalnızca noktalama önünde kaçırılıyor |
+| `***kalın italik***` | `_**…**_` oluyordu | üç işaret italik(kalın) okunduğu için korunuyor |
+
+Ölçüm (gerçekçi 72 örnek; CommonMark'ın 652 örneği; 20.000 rastgele girdi):
+
+| | Önce | Sonra |
+|---|---|---|
+| Gerçekçi örnekte farklı dönen | 24 | 6 |
+| CommonMark byte-birebir | 391 | 420 |
+| CommonMark idempotan | 644 | 648 |
+| Rastgele girdide idempotans kaybı (dört tohum) | 25 · 28 · 27 · 21 | 10 · 12 · 11 · 6 |
+
+**Bayat alan kuralı.** Editör içerik değişince düğümü yeniden kuruyor ama
+`syntax`'ı taşıyabiliyor. Her yeni alan bu yüzden bayatladığında da geçerli
+Markdown üretecek şekilde tasarlandı: tembel kayıt yalnızca paragraf
+çocuğun ilk satırından sonrasına uygulanıyor, boşluksuz `>` girintili
+satırda boşluğa dönüyor, `spacing` girintili kodla başlayan maddede teke
+iniyor, ilk çocuk listenin `indent`'i işaret satırında yok sayılıyor.
+Testleri `serialize.test.ts` → "yazım alışkanlıkları korunuyor".
+
+> **İlk sürüm idempotansı geriletmişti.** Rastgele girdide kayıp 25'ten
+> 64'e çıktı; eski ve yeni kodun başarısız girdileri karşılaştırılınca
+> dört sebep çıktı: `>` sonrası sekme boşluksuz sayılıyordu, `> ` içindeki
+> boşluk işaret sanılıyordu, boş alıntı `>` yerine boş metin yazılıyordu ve
+> satır başındaki `*    ` kaçırılmıyordu (bu sonuncusu eski bir hataydı,
+> sondaki boşluk korununca görünür oldu). `__` dizilerinde yeni alt çizgi
+> kuralı eski temkinli kurala dönüyor. Son hâlde eski kodda geçip yeni
+> kodda bozulan girdi yok — dört tohumun birinde kalan tek örnek (`* *`,
+> iç içe boş madde) ilk turda zaten yapıyı kaybediyordu.
+
+**Bilerek bırakılanlar** (nadir; README'de listeli): paragraf içinde
+girintili devam satırı, `#  Başlık` (iki boşluk), yalnızca boşluktan oluşan
+ara satır, liste maddesinde tembel devam satırı, paragrafın ilk satırındaki
+1–3 boşluk, setext başlık metninin sonundaki boşluk.
+
+**Boyut:** `@kalem/core` 11,7 → 12,6 kB. Kullanıcının kararıyla bütçe
+12 → 13 kB (izin 15 kB'a kadardı; bütçe sıkı tutuldu ki sonraki büyüme
+görünsün). Belgelerdeki 25 sayı `guard:sizes`in raporuyla güncellendi —
+kapının ilk gerçek işi.
+
+Yeni korpus dosyası: `packages/core/fixtures/08-yazim-aliskanliklari.md`.
+
+> **Tarayıcı testlerinde iki kırmızı — bu değişiklikten değil.** Tam paket
+> iki kez koşuldu; `performans.spec.ts`teki oran testleri (`5.000/1.000 < 5`,
+> `10.000/1.000 < 10`) birinde bir, ötekinde iki kez düştü, tek başına her
+> seferinde geçti. Eski ve yeni kod aynı makinede, sessizken, üçer ölçümle
+> karşılaştırıldı (medyan p50):
+>
+> | | 1.000 | 5.000 | 10.000 | 5k/1k | 10k/1k |
+> |---|---|---|---|---|---|
+> | Eski | 1,5 ms | 7,0 ms | 13,0 ms | 4,7× | 8,7× |
+> | Yeni | 1,8 ms | 6,6 ms | 13,0 ms | 3,7× | 7,2× |
+>
+> Büyük belgede maliyet aynı; önbellek sağlam. Sorun testin kendisinde:
+> payda 1.000 bloğun 1,5 ms'lik p50'si ve 0,1 ms'lik oynama oranı bir tam
+> kat kaydırıyor — eski kod bile sessiz koşuda 5× eşiğine 4,7× ile
+> yaklaşıyor (F6-08'de 3,8× ölçülmüştü). **Açık iş:** oranı daha büyük
+> bir paydaya (ör. 2.000 blok) ya da çok ölçümün medyanına dayandırmak.
+> Eşik sessizce gevşetilmedi.
 
 **2. Belgelerdeki boyutlar eskimişti — 16 yerde.** Giriş sayfası "editör +
 arayüz 34,6 kB" diyordu; ölçüm 35,0 kB. F6-05'te bunu sabitleyen test

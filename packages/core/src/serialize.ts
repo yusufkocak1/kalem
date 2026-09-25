@@ -206,6 +206,10 @@ function serializeRoot(root: Root, o: Resolved): string {
 	for (let i = 1; i < parts.length; i++) {
 		out += gap(root.children[i - 1], root.children[i], "\n\n") + (parts[i] ?? "");
 	}
+	const bas = root.syntax?.leadingBlankLines ?? 0;
+	const son = root.syntax?.trailingBlankLines ?? 0;
+	if (bas > 0 && out !== "") out = "\n".repeat(bas) + out;
+	if (son > 0 && out !== "") out += "\n".repeat(son);
 	if (root.syntax?.finalNewline !== false && out !== "") out += "\n";
 	if (root.syntax?.bom === true) out = `﻿${out}`;
 	// Satır sonu normalleştirmesi en sonda, tek yerde yapılır.
@@ -281,7 +285,7 @@ function heading(node: Heading, o: Resolved): string {
 	// Setext yalnızca 1. ve 2. seviyede mümkün; derin başlık ATX'e düşer.
 	if (node.syntax?.style === "setext" && node.depth <= 2) {
 		const marker = node.syntax.underline ?? (node.depth === 1 ? "=" : "-");
-		const width = Math.max(content.length, 1);
+		const width = Math.max(node.syntax.underlineLength ?? content.length, 1);
 		return `${content}\n${marker.repeat(width)}`;
 	}
 
@@ -327,17 +331,45 @@ function longestFenceRun(value: string, marker: string): number {
 	return longest;
 }
 
+/**
+ * Alıntı.
+ *
+ * Çocuklar tek tek önekleniyor, çünkü tembel satırlar (`syntax.lazy`) bir
+ * **paragraf çocuğun** satırlarına ait: hangi çıktı satırının hangi
+ * paragrafın kaçıncı satırı olduğu ancak burada biliniyor.
+ *
+ * Tembel satır yalnızca paragrafın ilk satırından sonra `>`sız
+ * bırakılıyor. Paragraf metni serileştirilirken satır başı işaretleri
+ * zaten kaçırıldığı için (`#`, `-`, `>`…) böyle bir satır yeni blok
+ * açamaz; düzenlemeden sonra bayatlamış bir kayıt bile geçerli Markdown
+ * üretir.
+ */
 function blockquote(node: Blockquote, o: Resolved): string {
-	const inner = joinBlocks(node.children, o, "\n\n");
-	return prefixLines(inner, ">", "> ");
-}
-
-/** Her satıra önek koyar; boş satırlar kısa öneki alır (sondaki boşluk olmasın). */
-function prefixLines(text: string, blankPrefix: string, prefix: string): string {
-	return text
-		.split("\n")
-		.map((line) => (line === "" ? blankPrefix : prefix + line))
-		.join("\n");
+	// Çocuksuz alıntı da bir alıntı: tek başına `>`.
+	if (node.children.length === 0) return ">";
+	const tembel = new Set((node.syntax?.lazy ?? []).map(([cocuk, satir]) => `${cocuk}:${satir}`));
+	const compact = node.syntax?.compact === true;
+	const parts = node.children.map((child, i) =>
+		block(child, o)
+			.split("\n")
+			.map((line, k) => {
+				if (line === "") return ">";
+				const lazy = k > 0 && child.type === "paragraph" && tembel.has(`${i}:${k}`);
+				if (lazy) return line;
+				// Boşluksuz `>` yalnızca satır boşlukla başlamıyorsa: `>` sonrası
+				// ilk boşluk işaretin parçası sayılıyor, yani `>    kod` girintili
+				// kodu üç boşluklu paragrafa çevirirdi.
+				return compact && line[0] !== " " && line[0] !== "\t" ? `>${line}` : `> ${line}`;
+			})
+			.join("\n"),
+	);
+	let out = parts[0] ?? "";
+	for (let i = 1; i < parts.length; i++) {
+		// Çocuklar arasındaki boş satırlar da alıntının içinde: `>`.
+		const ara = gap(node.children[i - 1], node.children[i], "\n\n");
+		out += `\n${">\n".repeat(ara.length - 1)}${parts[i] ?? ""}`;
+	}
+	return out;
 }
 
 function list(node: List, o: Resolved): string {
@@ -355,18 +387,35 @@ function list(node: List, o: Resolved): string {
 
 /** Maddenin işaretini üretir: `- `, `1. `, `3) ` … */
 function itemMarker(node: List, index: number, o: Resolved): string {
-	if (!node.ordered) return `${node.syntax?.marker ?? o.bulletMarker} `;
+	// İşaretten önceki girinti işaretin parçası sayılıyor: devam satırları
+	// `listItem`de işaret uzunluğu kadar girintileniyor, yani içerik sütunu
+	// kendiliğinden doğru kalıyor.
+	const girinti = " ".repeat(node.syntax?.indent ?? 0);
+	const bosluk = " ".repeat(node.syntax?.spacing ?? 1);
+	if (!node.ordered) return `${girinti}${node.syntax?.marker ?? o.bulletMarker}${bosluk}`;
 
 	const delimiter = node.syntax?.delimiter ?? o.orderedDelimiter;
 	const start = node.start ?? 1;
 	// `1. 1. 1.` yazan kullanıcıya `1. 2. 3.` üretilmez.
 	const number = node.syntax?.numbering === "repeated" ? start : start + index;
-	return `${number}${delimiter} `;
+	return `${girinti}${number}${delimiter}${bosluk}`;
 }
 
-function listItem(node: ListItem, marker: string, o: Resolved): string {
+function listItem(node: ListItem, isaret: string, o: Resolved): string {
 	const task = node.checked === null ? "" : node.checked ? "[x] " : "[ ] ";
-	const inner = task + joinBlocks(node.children, o, node.spread ? "\n\n" : "\n");
+	// İlk çocuk bir listeyse işaretle **aynı satıra** yazılıyor; oradaki
+	// girinti satır başı girintisi değil, işaret sonrası boşluk olur ve
+	// anlamı değişir.
+	const [ilk, ...kalan] = node.children;
+	const cocuklar =
+		ilk?.type === "list" && ilk.syntax?.indent !== undefined
+			? [{ ...ilk, syntax: { ...ilk.syntax, indent: 0 } }, ...kalan]
+			: node.children;
+	const inner = task + joinBlocks(cocuklar, o, node.spread ? "\n\n" : "\n");
+	// İçerik boşlukla başlıyorsa (girintili kod) işaretten sonra tek boşluk
+	// olmak zorunda: CommonMark 5+ boşluğu içeriğin parçası sayıyor ve
+	// kaydedilmiş `spacing` kodun girintisine eklenirdi.
+	const marker = /^[ \t]/.test(inner) ? `${isaret.trimEnd()} ` : isaret;
 	const indent = " ".repeat(marker.length);
 
 	const lines = inner.split("\n");
@@ -487,6 +536,21 @@ function wrapEmphasis(inner: string, preferred: "*" | "_", length: 1 | 2): strin
 	const core = inner.trim();
 	const alternate = preferred === "*" ? "_" : "*";
 
+	/*
+	 * `***metin***`: italik içinde **aynı işaretle** kalın. Üç işaret
+	 * CommonMark'ta tam olarak italik(kalın(…)) okunuyor, yani burada öteki
+	 * işarete geçmek gerekmiyor — geçilince `_**metin**_` çıkıyordu.
+	 * Tersi (kalın içinde italik) aynı metne okunamaz; ona dokunulmuyor.
+	 */
+	const cift = preferred.repeat(2);
+	const ucluOkunur =
+		length === 1 &&
+		core.startsWith(cift) &&
+		core.endsWith(cift) &&
+		!core.startsWith(preferred.repeat(3)) &&
+		!core.endsWith(preferred.repeat(3));
+	if (ucluOkunur) return wrapMarked(inner, preferred, false);
+
 	const uygun =
 		core.startsWith(preferred) || core.endsWith(preferred)
 			? core.startsWith(alternate) || core.endsWith(alternate)
@@ -556,7 +620,7 @@ function inline(node: Inline, o: Resolved, startsLine = false, enclosing = ""): 
 			// için. İki boşluk görünmez: çoğu editör, linter ve `git` yapılandırması
 			// satır sonundaki boşluğu kırpar ve kırpınca satır sonu sessizce
 			// kaybolur. remark de aynı sebeple ters bölü yazar.
-			return node.syntax?.marker === "spaces" ? "  \n" : "\\\n";
+			return node.syntax?.marker === "spaces" ? `${" ".repeat(node.syntax.width ?? 2)}\n` : "\\\n";
 		case "html":
 			return node.value;
 	}
@@ -708,6 +772,9 @@ function escapeLine(line: string, atLineStart: boolean, enclosing: string): stri
 	return out;
 }
 
+/** CommonMark'ta ters bölüyle kaçırılabilen ASCII noktalama. */
+const KACIRILABILIR = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~";
+
 /** Geçerli bir ATX başlık öneki: 1–6 diyez, ardından boşluk ya da satır sonu. */
 const ATX_PREFIX = /^#{1,6}(?:[ \t]|$)/;
 
@@ -742,6 +809,36 @@ function hasPartner(line: string, i: number, ch: string): boolean {
 }
 
 /**
+ * Bu `_` gerçekten eşleşebilecek bir `_` ile birlikte mi.
+ *
+ * `hasPartner` satırdaki **herhangi** bir `_`'yi eş sayıyor. Alt çizgide
+ * bu fazla temkinli: kelime içindeki `_` (`under_score`) CommonMark'ta ne
+ * açabilir ne kapatabilir. `under_score_` yazan kullanıcı, sondaki `_` için
+ * `under_score\_` görüyordu.
+ *
+ * Burada açma/kapama yeteneği yaklaşık hesaplanıyor: açabilmek için sonraki
+ * karakter boşluk olmamalı ve önceki kelime harfi olmamalı; kapatmak için
+ * tersi. Noktalama inceliklerinde yaklaşım **daha fazla** eş buluyor, yani
+ * hata payı kaçış yönünde — fazladan bir `\` çirkin ama yanlış değil.
+ */
+function hasUnderscorePartner(line: string, i: number): boolean {
+	// `__` gibi diziler birlikte tek bir işaret: tek tek karakterin yeteneğine
+	// bakmak orada yanlış. Dizide eski temkinli kurala dönülüyor.
+	const dizide = (j: number) => line[j - 1] === "_" || line[j + 1] === "_";
+	if (dizide(i)) return hasPartner(line, i, "_");
+
+	const acabilir = (j: number) => !isSpaceOrEdge(line[j + 1]) && !isWordChar(line[j - 1]);
+	const kapatabilir = (j: number) => !isSpaceOrEdge(line[j - 1]) && !isWordChar(line[j + 1]);
+	for (let j = 0; j < line.length; j++) {
+		if (j === i || line[j] !== "_") continue;
+		if (dizide(j)) return true;
+		if (j > i && acabilir(i) && kapatabilir(j)) return true;
+		if (j < i && kapatabilir(i) && acabilir(j)) return true;
+	}
+	return false;
+}
+
+/**
  * Bu karakter kaçırılmalı mı.
  *
  * Kaçışlama bağlama duyarlı olmak zorunda: `5 * 3 * 2` yazan kullanıcıya
@@ -758,8 +855,12 @@ function needsEscape(line: string, i: number, atLineStart: boolean, enclosing: s
 	const prev = i === 0 ? undefined : line[i - 1];
 	const next = line[i + 1];
 
-	// Her yerde tehlikeli olanlar.
-	if (ch === "\\" || ch === "[" || ch === "]" || ch === "`") return true;
+	// Ters bölü yalnızca bir noktalama işaretinin ya da satır sonunun
+	// önündeyse anlam taşıyor; `C:\Users` içindeki ters bölü düz metin ve
+	// kaçırılırsa ikiye katlanıyordu. Satırın (ya da düğümün) sonunda sonraki
+	// karakter bilinmiyor — orada temkinli davranılıyor.
+	if (ch === "\\") return next === undefined || KACIRILABILIR.includes(next);
+	if (ch === "[" || ch === "]" || ch === "`") return true;
 
 	if (ch === "~") {
 		// Üstü çizili bir EŞ gerektirir. Tek başına duran `~` — "~1 hafta"
@@ -769,12 +870,15 @@ function needsEscape(line: string, i: number, atLineStart: boolean, enclosing: s
 		return hasPartner(line, i, ch);
 	}
 	if (ch === "*" || ch === "_") {
+		// Satır başında blok açıyorsa (liste ya da yatay çizgi) kaçırılmalı.
+		// "İki yanı boşluk" kuralından **önce**: `*    ` satırı iki yanı boş
+		// bir yıldız ama boş bir liste maddesi açıyor.
+		if (atLineStart && i === 0 && (LIST_PREFIX.test(line) || THEMATIC_LINE.test(line))) return true;
 		if (isSpaceOrEdge(prev) && isSpaceOrEdge(next)) return false;
 		// Kelime içindeki alt çizgi vurgu açmaz: `dosya_adi_uzun` bozulmamalı.
 		if (ch === "_" && isWordChar(prev) && isWordChar(next)) return false;
-		// Satır başında blok açıyorsa (liste ya da yatay çizgi) kaçırılmalı.
-		if (atLineStart && i === 0 && (LIST_PREFIX.test(line) || THEMATIC_LINE.test(line))) return true;
 		// Vurgu bir EŞ gerektirir; eşi olmayan işaret düz metindir.
+		if (ch === "_") return hasUnderscorePartner(line, i);
 		return hasPartner(line, i, ch);
 	}
 

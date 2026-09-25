@@ -50,7 +50,7 @@ düzenlenemiyor.
 
 ## Editörü hiç kurmamak
 
-Sayfada düzenleme **ihtimali yoksa** editörü yüklemeyin. 26 kB yerine
+Sayfada düzenleme **ihtimali yoksa** editörü yüklemeyin. 27 kB yerine
 2,7 kB:
 
 ```ts

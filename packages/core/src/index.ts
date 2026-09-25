@@ -19,6 +19,7 @@ export type {
 	AlignType,
 	Block,
 	Blockquote,
+	BlockquoteSyntax,
 	Break,
 	BreakSyntax,
 	Code,

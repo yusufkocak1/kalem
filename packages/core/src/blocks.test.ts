@@ -125,10 +125,21 @@ describe("setext başlık", () => {
 	});
 
 	it("yazım tercihini kaydediyor", () => {
-		expect((tek("Başlık\n---") as Heading).syntax).toEqual({
+		expect((tek("Başlık\n------") as Heading).syntax).toEqual({
 			style: "setext",
 			underline: "-",
 		});
+	});
+
+	/**
+	 * Metinden farklı uzunluktaki çizgi yazarın tercihi (F6-11'de bulundu:
+	 * `Başlık\n---` metin boyuna uzatılıyordu). Metin kadar olan çizgi
+	 * kaydedilmiyor — metin değişince çizgi de onunla uzamalı.
+	 */
+	it("metinden farklı çizgi uzunluğunu kaydediyor", () => {
+		expect((tek("Başlık\n---") as Heading).syntax?.underlineLength).toBe(3);
+		expect((tek("Başlık\n==========") as Heading).syntax?.underlineLength).toBe(10);
+		expect((tek("Başlık\n======") as Heading).syntax?.underlineLength).toBeUndefined();
 	});
 
 	/**

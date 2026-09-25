@@ -34,13 +34,13 @@ Kalem keeps Markdown as the source of truth. The document model records how each
 
     serialize(parse(markdown)) === markdown
 
-That holds byte-for-byte on the test corpus, but not yet for everything: a few patterns are still normalized (1. 1. 1. lists get renumbered, four-space nested lists become two, trailing whitespace is dropped). They're listed in the README and I treat each one as a bug.
+That holds byte-for-byte for the habits real authors have (1. 1. 1. numbering, four-space nested lists, trailing whitespace, lazy blockquote lines, Windows paths with backslashes). A few rare patterns are still normalized, like indented continuation lines inside a paragraph. They're listed in the README and I treat each one as a bug.
 
 Other things that may be interesting:
 
 - Block-based engine: each block is its own contenteditable, and the engine owns the model. Zero runtime dependencies.
 - Framework-agnostic: vanilla core, thin React and Vue wrappers, and a form-associated <kalem-editor> custom element for Svelte, Angular or plain HTML.
-- Size budgets enforced in CI: 11.7 kB for the parser/serializer, 35.0 kB for the editor plus the Word-like UI (min+gzip).
+- Size budgets enforced in CI: 12.6 kB for the parser/serializer, 35.9 kB for the editor plus the Word-like UI (min+gzip).
 - No innerHTML anywhere. Raw HTML inside Markdown is kept as text, and links go through a protocol allowlist.
 - Tests run in Chromium, Firefox and WebKit under a Turkish locale, because locale bugs that pass in English tend to fail in Turkish (the dotted/dotless i breaks naive case folding).
 

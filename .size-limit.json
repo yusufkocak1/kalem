@@ -3,7 +3,7 @@
     "name": "@kalem/core",
     "path": "packages/core/dist/index.js",
     "import": "*",
-    "limit": "12 kB",
+    "limit": "13 kB",
     "gzip": true
   },
   {

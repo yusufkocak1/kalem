@@ -201,10 +201,30 @@ export function parseBlocks(source: string, options: ParseBlocksOptions = {}): R
 	const children: Root["children"] = front === null ? [] : [front.node];
 	children.push(...parseLines(lines.slice(front?.next ?? 0), inline));
 
+	/*
+	 * İlk bloktan önceki boş satırlar. Bloklar arasındaki boşluk konumdan
+	 * okunuyor (bkz. `serialize.ts` → `gap`), ama ilk bloğun öncesinde
+	 * karşılaştırılacak bir blok yok. Frontmatter varsa o zaten ilk satırda.
+	 */
+	let leadingBlankLines = 0;
+	if (front === null && children.length > 0) {
+		while (isBlank(must(lines[leadingBlankLines], "baştaki satır").value)) leadingBlankLines++;
+	}
+	// Son bloğun bitişinden sonraki satırlar boş olmak zorunda — yoksa
+	// bir bloğa ait olurlardı.
+	const sonBlok = children[children.length - 1]?.position?.end.line;
+	const trailingBlankLines = sonBlok === undefined ? 0 : last.line - sonBlok;
+
 	return {
 		type: "root",
 		children,
-		syntax: { lineEnding, finalNewline, bom },
+		syntax: {
+			lineEnding,
+			finalNewline,
+			bom,
+			...(leadingBlankLines > 0 ? { leadingBlankLines } : {}),
+			...(trailingBlankLines > 0 ? { trailingBlankLines } : {}),
+		},
 		position: { start: point(first, 0), end: point(last, last.value.length) },
 	};
 }
@@ -490,8 +510,8 @@ function readParagraph(
 		// Setext alt çizgisi: paragrafı başlığa çevirir.
 		const setext = SETEXT.exec(line.value);
 		if (setext !== null && indentWidth(line.value) < INDENTED_CODE_COLUMNS) {
-			const marker = must(setext[1], "setext alt çizgisi").startsWith("=") ? "=" : "-";
-			blocks.push(makeSetextHeading(collected, line, marker, inline));
+			const cizgi = must(setext[1], "setext alt çizgisi");
+			blocks.push(makeSetextHeading(collected, line, cizgi, inline));
 			return i + 1;
 		}
 
@@ -530,14 +550,16 @@ function startsNewBlock(line: Line): boolean {
  *
  * CommonMark her satırın **baştaki** boşluğunu atar ama sondakini atmaz:
  * satır sonundaki iki boşluk sert satır sonu demektir ve satır içi
- * ayrıştırıcıya ulaşması gerekir. Yalnızca paragrafın tamamının sonundaki
- * boşluk atılır.
+ * ayrıştırıcıya ulaşması gerekir.
+ *
+ * CommonMark paragrafın **en sonundaki** boşluğu da atar. Paragrafta
+ * atılmıyor (`keepTrailing`): anlamı yok ama kullanıcının dosyasında
+ * duruyor, ve atılırsa dokunulmamış satır ilk kaydetmede değişir. HTML'de
+ * görünmez. Setext başlıkta atılıyor — metinle alt çizgi arasında anlamsız.
  */
-function paragraphContent(collected: readonly Line[]): string {
-	return collected
-		.map((l) => l.value.replace(/^[ \t]+/, ""))
-		.join("\n")
-		.replace(/[ \t]+$/, "");
+function paragraphContent(collected: readonly Line[], keepTrailing = false): string {
+	const joined = collected.map((l) => l.value.replace(/^[ \t]+/, "")).join("\n");
+	return keepTrailing ? joined : joined.replace(/[ \t]+$/, "");
 }
 
 function makeParagraph(collected: readonly Line[], inline: InlineParser): Paragraph {
@@ -546,7 +568,7 @@ function makeParagraph(collected: readonly Line[], inline: InlineParser): Paragr
 
 	return {
 		type: "paragraph",
-		children: inline(paragraphContent(collected)),
+		children: inline(paragraphContent(collected, true)),
 		position: span(first, last),
 	};
 }
@@ -554,16 +576,24 @@ function makeParagraph(collected: readonly Line[], inline: InlineParser): Paragr
 function makeSetextHeading(
 	collected: readonly Line[],
 	underline: Line,
-	marker: "=" | "-",
+	cizgi: string,
 	inline: InlineParser,
 ): Heading {
 	const first = must(collected[0], "setext ilk satırı");
+	const marker = cizgi.startsWith("=") ? "=" : "-";
+	const metin = paragraphContent(collected);
 
 	return {
 		type: "heading",
 		depth: marker === "=" ? 1 : 2,
-		children: inline(paragraphContent(collected)),
-		syntax: { style: "setext", underline: marker },
+		children: inline(metin),
+		syntax: {
+			style: "setext",
+			underline: marker,
+			// Metin kadar çekilmiş çizgi kaydedilmiyor: metin değişince o da
+			// uzamalı. Farklı uzunluktaki çizgi ise yazarın tercihi.
+			...(cizgi.length !== metin.length ? { underlineLength: cizgi.length } : {}),
+		},
 		position: span(first, underline),
 	};
 }
@@ -812,6 +842,8 @@ function readBlockquote(
 ): number {
 	const openLine = must(lines[start], "alıntı açılış satırı");
 	const inner: Line[] = [];
+	/** `>` olmadan gelen satırların kaynak satır numaraları. */
+	const tembel = new Set<number>();
 	let i = start;
 	let lastWasContent = false;
 
@@ -830,6 +862,7 @@ function readBlockquote(
 		// Ama yeni bir blok başlatan satır alıntıyı bitirir.
 		if (lastWasContent && !isBlank(line.value) && !startsNewBlock(line)) {
 			inner.push(line);
+			tembel.add(line.line);
 			i++;
 			continue;
 		}
@@ -837,12 +870,50 @@ function readBlockquote(
 	}
 
 	const endLine = must(lines[i - 1], "alıntı bitiş satırı");
+	const children = parseLines(inner, inline);
+	const lazy = tembelSatirlar(children, tembel);
+	// `>metin`: işaretten sonra boşluk yok ve satırda içerik var. Boş `>`
+	// satırı karar vermiyor — orada boşluk zaten hiç yazılmıyor.
+	const ilk = must(BLOCKQUOTE.exec(openLine.value)?.[0], "alıntı işareti");
+	// Desen `> ` içindeki boşluğu işarete katıyor; boşluksuz yazımda işaret
+	// `>` ile bitiyor ve ardından sekme de gelmiyor.
+	const sonraki = openLine.value[ilk.length];
+	const compact = ilk.endsWith(">") && sonraki !== undefined && sonraki !== "\t";
+	const syntax = {
+		...(lazy.length > 0 ? { lazy } : {}),
+		...(compact ? { compact: true } : {}),
+	};
 	blocks.push({
 		type: "blockquote",
-		children: parseLines(inner, inline),
+		children,
+		...(Object.keys(syntax).length > 0 ? { syntax } : {}),
 		position: span(openLine, endLine),
 	});
 	return i;
+}
+
+/**
+ * Tembel satırları `[çocuk sırası, çocuk içindeki satır]` çiftlerine çevirir.
+ *
+ * Yalnızca doğrudan paragraf çocuklar: tembel devam CommonMark'ta zaten
+ * yalnızca paragraf metnine uygulanıyor. İç içe bir kabın (alıntı içinde
+ * liste ya da alıntı) tembel satırı kaydedilmiyor ve serileştirici oraya
+ * `>` koyuyor — anlamı aynı, nadir bir durum.
+ */
+function tembelSatirlar(
+	children: readonly Block[],
+	tembel: ReadonlySet<number>,
+): [number, number][] {
+	const out: [number, number][] = [];
+	if (tembel.size === 0) return out;
+	for (const [i, child] of children.entries()) {
+		if (child.type !== "paragraph" || child.position === undefined) continue;
+		const bas = child.position.start.line;
+		for (let satir = bas + 1; satir <= child.position.end.line; satir++) {
+			if (tembel.has(satir)) out.push([i, satir - bas]);
+		}
+	}
+	return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -851,6 +922,10 @@ function readBlockquote(
 
 /** İşaretin satırdaki ölçüleri — sırasız ve sıralı maddede ortak. */
 interface MarkerGeometry {
+	/** İşaretten önceki boşluk sayısı (desen yalnızca boşluk yakalıyor). */
+	readonly indent: number;
+	/** İşaretle içerik arasındaki etkin boşluk (1–4); boş maddede 1. */
+	readonly spacing: number;
 	/** İçeriğin başladığı sütun — devam satırlarının uyması gereken girinti. */
 	readonly contentColumn: number;
 	/** İşaret ve ardındaki boşluğun karakter uzunluğu. */
@@ -887,7 +962,7 @@ function listItemStart(line: Line): ListItemStart | null {
 	const bullet = BULLET_ITEM.exec(line.value);
 	if (bullet !== null) {
 		const geo = geometry({
-			indent: must(bullet[1], "madde girintisi").length,
+			indent: must(bullet[1], "madde girintisi"),
 			markerWidth: 1,
 			spaces: must(bullet[3], "işaret sonrası boşluk"),
 			content: must(bullet[4], "madde içeriği"),
@@ -905,7 +980,7 @@ function listItemStart(line: Line): ListItemStart | null {
 	if (ordered !== null) {
 		const digits = must(ordered[2], "madde numarası");
 		const geo = geometry({
-			indent: must(ordered[1], "madde girintisi").length,
+			indent: must(ordered[1], "madde girintisi"),
 			markerWidth: digits.length + 1,
 			spaces: must(ordered[4], "işaret sonrası boşluk"),
 			content: must(ordered[5], "madde içeriği"),
@@ -924,11 +999,12 @@ function listItemStart(line: Line): ListItemStart | null {
 
 /** İşaret ölçülerini hesaplar; satır liste maddesi değilse `null`. */
 function geometry(p: {
-	indent: number;
+	indent: string;
 	markerWidth: number;
 	spaces: string;
 	content: string;
 }): MarkerGeometry | null {
+	const indent = p.indent.length;
 	// İşaretten sonra boşluk yoksa ve içerik varsa bu bir liste değildir:
 	// `-metin` paragraftır. `-` tek başına ise boş maddedir.
 	if (p.spaces === "" && p.content !== "") return null;
@@ -939,8 +1015,12 @@ function geometry(p: {
 	const effective = p.content === "" || spaceWidth > MAX_MARKER_SPACES ? 1 : spaceWidth;
 
 	return {
-		contentColumn: p.indent + p.markerWidth + effective,
-		markerChars: p.indent + p.markerWidth + (p.content === "" ? p.spaces.length : effective),
+		indent,
+		// Sekmeli boşluk korunmuyor: genişliği sütuna bağlı ve serileştirici
+		// boşluk yazıyor.
+		spacing: /^ *$/.test(p.spaces) ? effective : 1,
+		contentColumn: indent + p.markerWidth + effective,
+		markerChars: indent + p.markerWidth + (p.content === "" ? p.spaces.length : effective),
 		content: p.content,
 	};
 }
@@ -961,6 +1041,8 @@ function readList(
 	const items: ListItem[] = [];
 	let i = start;
 	let current: ListItemStart | null = first;
+	/** Maddelerin numaraları — `1. 1. 1.` yazımını tanımak için. */
+	const numaralar: number[] = [];
 	/** Maddeler arasında boş satır görüldü mü — gevşek listenin ölçütü. */
 	let looseBetween = false;
 	let looseInside = false;
@@ -969,6 +1051,7 @@ function readList(
 	while (current !== null && i < lines.length) {
 		const read = readListItem(lines, i, current, inline);
 		items.push(read.item);
+		if (current.number !== null) numaralar.push(current.number);
 		looseInside ||= read.spread;
 		lastConsumed = read.lastContent;
 		i = read.next;
@@ -989,6 +1072,19 @@ function readList(
 	}
 
 	const endLine = must(lines[lastConsumed], "liste bitiş satırı");
+	/*
+	 * `1. 1. 1.` — iki ya da daha çok madde ve hepsi ilkiyle aynı numara.
+	 * Tek maddeli listede ayırt edilemez; artan varsayılıyor, çünkü editörde
+	 * eklenen ikinci madde çoğu yazar için `2.` olmalı.
+	 */
+	const numbering =
+		numaralar.length > 1 && numaralar.every((n) => n === first.number)
+			? "repeated"
+			: "incrementing";
+	const indent = {
+		...(first.indent > 0 ? { indent: first.indent } : {}),
+		...(first.spacing > 1 ? { spacing: first.spacing } : {}),
+	};
 	blocks.push({
 		type: "list",
 		ordered: first.bullet === null,
@@ -997,8 +1093,8 @@ function readList(
 		children: items,
 		syntax:
 			first.bullet !== null
-				? { marker: first.bullet }
-				: { delimiter: first.delimiter, numbering: "incrementing" },
+				? { marker: first.bullet, ...indent }
+				: { delimiter: first.delimiter, numbering, ...indent },
 		position: span(openLine, endLine),
 	});
 	return i;

@@ -439,3 +439,129 @@ describe("daha az yürünen yollar", () => {
 		expect(p("_vurgu_")).toBe("\\_vurgu\\_");
 	});
 });
+
+/**
+ * Yazım alışkanlıkları  (İş listesi: F6-11 sonrası)
+ *
+ * README'nin "dokunmadığınız satır aynı kalır" iddiası ölçülünce gerçekçi
+ * 28 örnekten 7'si farklı döndü. Buradaki testler o kalıpları ve — daha
+ * önemlisi — yeni `syntax` alanlarının **düzenlemeden sonra** güvenli
+ * kaldığını sınıyor: editör içerik değişince düğümü yeniden kuruyor ama
+ * `syntax`'ı taşıyabiliyor, yani bayat bir alan geçersiz Markdown
+ * üretmemeli.
+ */
+describe("yazım alışkanlıkları korunuyor", () => {
+	const gd = (md: string) => serialize(parse(md));
+
+	it.each([
+		["tekrar eden numara", "1. bir\n1. iki\n1. üç\n"],
+		["dört boşluklu iç liste", "- a\n    - b\n"],
+		["işaretten sonra fazla boşluk", "1.  a\n2.  b\n"],
+		["yumuşak satır sonundan önce boşluk", "bir \niki\n"],
+		["paragraf sonunda boşluk", "son \n\nsonraki\n"],
+		["üç boşluklu sert satır sonu", "bir   \niki\n"],
+		["baştaki boş satırlar", "\n\nmetin\n"],
+		["sondaki boş satırlar", "metin\n\n\n"],
+		["kısa setext çizgisi", "Başlık\n---\n"],
+		["tembel alıntı satırı", "> bir\niki\n"],
+		["boşluksuz alıntı", ">metin\n"],
+		["kelime sonunda alt çizgi", "under_score_\n"],
+		["ters bölü düz metin", "C:\\Users\\ali\n"],
+		["kalın italik", "***ikisi***\n"],
+	])("%s", (_ad, md) => {
+		expect(gd(md)).toBe(md);
+	});
+
+	it("tek maddeli sıralı liste artan sayılıyor — ikinci madde 2 olmalı", () => {
+		const doc = parse("1. tek\n");
+		const liste = doc.children[0] as Extract<Block, { type: "list" }>;
+		expect(liste.syntax?.numbering).toBe("incrementing");
+	});
+
+	/**
+	 * Bayat tembel kayıt: düzenlemeden sonra kayıt ilk satıra ya da
+	 * paragraf olmayan bir çocuğa denk gelebilir. İkisinde de `>` yazılmalı.
+	 */
+	it("bayat tembel kayıt geçersiz Markdown üretmiyor", () => {
+		const alinti: Block = {
+			type: "blockquote",
+			children: [
+				{ type: "heading", depth: 2, children: [metin("başlık")] },
+				{ type: "paragraph", children: [metin("tek satır")] },
+			],
+			syntax: {
+				lazy: [
+					[0, 0],
+					[0, 1],
+					[1, 0],
+					[5, 1],
+				],
+			},
+		};
+		expect(blok(alinti)).toBe("> ## başlık\n>\n> tek satır");
+	});
+
+	it("çocuksuz alıntı tek başına işaret", () => {
+		expect(blok({ type: "blockquote", children: [] })).toBe(">");
+	});
+
+	it("boşluksuz alıntı girintili satırda boşluğa dönüyor", () => {
+		const alinti: Block = {
+			type: "blockquote",
+			children: [
+				{ type: "code", lang: null, meta: null, value: "kod", syntax: { style: "indented" } },
+			],
+			syntax: { compact: true },
+		};
+		// `>    kod` yazılsaydı `>` sonrası ilk boşluk işarete ait sayılır ve
+		// kod üç boşluklu bir paragrafa dönerdi.
+		expect(blok(alinti)).toBe(">     kod");
+	});
+
+	it("kısa setext çizgisi metin değişse de kısa kalıyor", () => {
+		const h: Block = {
+			type: "heading",
+			depth: 2,
+			children: [metin("çok daha uzun bir başlık")],
+			syntax: { style: "setext", underline: "-", underlineLength: 3 },
+		};
+		expect(blok(h)).toBe("çok daha uzun bir başlık\n---");
+	});
+
+	it("fazla boşluklu işaret girintili kodla başlayan maddede teke iniyor", () => {
+		const md = "1.  a\n2.      kod\n";
+		expect(gd(gd(md))).toBe(gd(md));
+	});
+
+	it("maddenin ilk çocuğu olan listenin girintisi işaret satırına taşınmıyor", () => {
+		const md = "- [ ]\n   - iç\n";
+		expect(gd(gd(md))).toBe(gd(md));
+	});
+
+	it("ters bölü noktalamadan önce hâlâ kaçırılıyor", () => {
+		const p = (v: string) => blok({ type: "paragraph", children: [metin(v)] });
+		expect(p("a*b c*")).toBe("a\\*b c\\*");
+		// Ters bölü `*`dan önce kaçırılıyor; eşi olmayan `*` kaçırılmıyor.
+		expect(p("a\\*b")).toBe("a\\\\*b");
+		expect(serialize(parse("a\\\\*b"))).toBe("a\\\\*b");
+		// Düğümün sonunda sonraki karakter bilinmiyor: temkinli.
+		expect(p("son\\")).toBe("son\\\\");
+	});
+
+	it("gerçekten eşleşebilen alt çizgi hâlâ kaçırılıyor", () => {
+		const p = (v: string) => blok({ type: "paragraph", children: [metin(v)] });
+		expect(p("a _b_ c")).toBe("a \\_b\\_ c");
+		expect(p("x__y__")).toBe("x\\_\\_y\\_\\_");
+	});
+
+	it("kalın içinde italik öteki işarete geçiyor — üç yıldız italik(kalın) okunurdu", () => {
+		const s: Inline = {
+			type: "strong",
+			children: [{ type: "emphasis", children: [metin("x")], syntax: { marker: "*" } }],
+			syntax: { marker: "*" },
+		};
+		const md = satirIci(s);
+		expect(md).not.toBe("***x***");
+		expect(serialize(parse(md))).toBe(md);
+	});
+});

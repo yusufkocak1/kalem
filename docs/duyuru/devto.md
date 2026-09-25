@@ -108,10 +108,10 @@ The form submits Markdown, like a `<textarea>` would. No build step.
 
 | Package | What it does | min+gzip |
 |---|---|---|
-| `@kalem/core` | Parse and serialize, no DOM | 11.7 kB |
+| `@kalem/core` | Parse and serialize, no DOM | 12.6 kB |
 | `@kalem/viewer` | Render to DOM or to a string (SSR) | 2.7 kB |
-| `@kalem/editor` | The block engine | 26.3 kB |
-| `@kalem/editor` + `@kalem/ui` | The Word-like experience | 35.0 kB |
+| `@kalem/editor` | The block engine | 27.2 kB |
+| `@kalem/editor` + `@kalem/ui` | The Word-like experience | 35.9 kB |
 
 Every package has a size budget in CI, and a build over budget fails. The
 numbers in the docs are checked against the measurement, so they can't
@@ -133,9 +133,9 @@ the codebase.
 
 I'd rather you read this here than find it on day one:
 
-- **Round-trip gaps.** A few patterns are still normalized: `1.` `1.` `1.`
-  lists get renumbered, four-space nested lists become two-space, trailing
-  whitespace is dropped. Each is tracked as a bug.
+- **Round-trip gaps.** A few rare patterns are still normalized: indented
+  continuation lines inside a paragraph, `#  Heading` with two spaces,
+  whitespace-only blank lines. Each is tracked as a bug.
 - **No table editing UI** in v1. Tables are preserved losslessly; editing
   them comes in v1.1.
 - **Mobile works but isn't polished.** Drag-to-reorder has no touch

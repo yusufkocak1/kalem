@@ -88,6 +88,15 @@ export interface HeadingSyntax {
 	closed?: boolean;
 	/** Setext'te alt çizgi karakteri: `=` (depth 1) veya `-` (depth 2). */
 	underline?: "=" | "-";
+	/**
+	 * Setext alt çizgisinin uzunluğu — **yalnızca başlık metninden farklıysa.**
+	 *
+	 * Çoğu yazar çizgiyi metin kadar çeker ve metin değişince çizgi de
+	 * uzamalı; o durumda alan boş kalır. `Başlık
+---` gibi sabit kısa
+	 * çizgi yazan için ise uzunluk bir tercih ve korunur.
+	 */
+	underlineLength?: number;
 }
 
 /** Çitli mi girintili mi; çit karakteri ve uzunluğu. */
@@ -116,6 +125,21 @@ export interface ListSyntax {
 	 * İkisi de geçerli Markdown'dır ve kullanıcının tercihi korunmalıdır.
 	 */
 	numbering?: "incrementing" | "repeated";
+	/**
+	 * İşaretten önceki boşluk sayısı (0–3), üst kabın içerik sütununa göre.
+	 *
+	 * İç içe listeyi dört boşlukla girintileyen yazar (`- a
+    - b`) iki
+	 * boşluğa çekilmemeli. Sıfırsa alan yazılmaz.
+	 */
+	indent?: number;
+	/**
+	 * İşaretten sonraki boşluk sayısı (2–4) — birden fazlaysa.
+	 *
+	 * `1.  metin` ya da `-   metin` gibi içeriği sütuna hizalayan yazım.
+	 * Devam satırlarının girintisi de buna göre.
+	 */
+	spacing?: number;
 }
 
 /** Vurgu işaretleyicisi. `**` ve `__` aynı anlama gelir, farklı yazılır. */
@@ -139,6 +163,28 @@ export interface InlineCodeSyntax {
 /** Sert satır sonunun yazılışı: iki boşluk mu ters bölü mü. */
 export interface BreakSyntax {
 	marker: "spaces" | "backslash";
+	/** `spaces` için boşluk sayısı — ikiden fazlaysa. */
+	width?: number;
+}
+
+/**
+ * Alıntının yazılışı.
+ *
+ * CommonMark alıntı içindeki paragrafın `>` olmadan sürmesine izin veriyor
+ * ("tembel devam"). Hangi satırların böyle yazıldığı kaydedilmezse
+ * serileştirici her satıra `> ` koyar.
+ */
+export interface BlockquoteSyntax {
+	/**
+	 * `>` olmadan yazılmış satırlar: `[çocuk sırası, çocuğun içindeki satır]`.
+	 *
+	 * Yalnızca **paragraf** çocukların ilk satırından sonrası tembel olabilir;
+	 * serileştirici başka bir yere denk gelen kaydı yok sayar. Böylece
+	 * düzenlemeden sonra bayatlamış bir kayıt bile geçersiz Markdown üretemez.
+	 */
+	lazy?: readonly (readonly [number, number])[];
+	/** `>metin` — işaretten sonra boşluk yok. İlk satır belirliyor. */
+	compact?: boolean;
 }
 
 /**
@@ -203,6 +249,16 @@ export interface RootSyntax {
 	finalNewline: boolean;
 	/** Dosya bayt sırası işaretiyle (BOM) başlıyor muydu. */
 	bom: boolean;
+	/** İlk bloktan önceki boş satır sayısı. Sıfırsa alan yazılmaz. */
+	leadingBlankLines?: number;
+	/**
+	 * Son bloktan sonraki boş satır sayısı. Sıfırsa alan yazılmaz.
+	 *
+	 * `finalNewline` yalnızca dosyanın satır sonuyla bitip bitmediğini
+	 * söylüyor; sonda iki boş satır bırakan yazarın dosyası tek satır sonuna
+	 * iniyordu.
+	 */
+	trailingBlankLines?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -231,6 +287,7 @@ export interface Heading extends NodeBase {
 export interface Blockquote extends NodeBase {
 	type: "blockquote";
 	children: Block[];
+	syntax?: BlockquoteSyntax;
 }
 
 export interface List extends NodeBase {

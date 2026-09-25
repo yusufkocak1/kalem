@@ -22,7 +22,7 @@ export const SPECS: NodeSpecs = {
 	// --- bloklar ---
 	paragraph: { type: "paragraph", groups: ["block"], content: "inlines", hasSyntax: false },
 	heading: { type: "heading", groups: ["block"], content: "inlines", hasSyntax: true },
-	blockquote: { type: "blockquote", groups: ["block"], content: "blocks", hasSyntax: false },
+	blockquote: { type: "blockquote", groups: ["block"], content: "blocks", hasSyntax: true },
 	list: { type: "list", groups: ["block"], content: "listItems", hasSyntax: true },
 	code: { type: "code", groups: ["block"], content: "value", hasSyntax: true },
 	thematicBreak: { type: "thematicBreak", groups: ["block"], content: "void", hasSyntax: true },

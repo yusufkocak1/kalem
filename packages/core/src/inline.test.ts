@@ -122,8 +122,23 @@ describe("satır sonları", () => {
 		expect(yapi("bir\\\niki")).toEqual(["text(bir)", "break()", "text(iki)"]);
 	});
 
+	/**
+	 * Tek boşluk yumuşak satır sonu — ve boşluk metinde **kalıyor.**
+	 *
+	 * CommonMark onu atar; HTML'de zaten görünmez. Atılırsa, satır sonunda
+	 * boşluk bırakmış bir yazarın dokunmadığı satır ilk kaydetmede değişir
+	 * (F6-11'de bulundu).
+	 */
 	it("tek boşluk yumuşak satır sonu", () => {
-		expect(yapi("bir \niki")).toEqual(["text(bir\niki)"]);
+		expect(yapi("bir \niki")).toEqual(["text(bir \niki)"]);
+	});
+
+	it("ikiden fazla boşluklu sert satır sonu genişliğini kaydediyor", () => {
+		const nodes = parseInline("bir   \niki");
+		expect((nodes[1] as { syntax?: { width?: number } }).syntax?.width).toBe(3);
+		expect(
+			(parseInline("bir  \niki")[1] as { syntax?: { width?: number } }).syntax?.width,
+		).toBeUndefined();
 	});
 
 	it("sert satır sonu işaretini kaydediyor", () => {

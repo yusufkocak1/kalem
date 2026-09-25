@@ -381,10 +381,21 @@ function tokenize(raw: string): TokenizeResult {
 			if (trailing !== null && trailing[0].length >= 2) {
 				buffer = buffer.slice(0, -trailing[0].length);
 				flush();
-				nodes.push({ type: "break", syntax: { marker: "spaces" } });
+				// İkiden fazla boşluk da sert satır sonu; sayı korunuyor.
+				const width = trailing[0].length;
+				nodes.push({
+					type: "break",
+					syntax:
+						/^ +$/.test(trailing[0]) && width > 2
+							? { marker: "spaces", width }
+							: { marker: "spaces" },
+				});
 			} else {
 				// Yumuşak satır sonu: metin içinde satır sonu olarak kalır.
-				buffer = buffer.replace(/[ \t]+$/, "");
+				//
+				// Önündeki tek boşluk **atılmıyor.** CommonMark onu atar ve
+				// HTML'de zaten görünmez; ama atılırsa, satır sonunda boşluk
+				// bırakmış bir yazarın dokunmadığı satır ilk kaydetmede değişir.
 				buffer += "\n";
 			}
 			i++;

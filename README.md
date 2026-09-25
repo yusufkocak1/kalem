@@ -37,8 +37,11 @@ serialize(parse(markdown)) === markdown
 
 This holds byte-for-byte on the test corpus, and a line the user didn't edit
 comes back as it went in. Git diffs show what the person actually changed.
-It is not universal yet: a few patterns are still normalized — they're
-listed [below](#what-it-doesnt-do-yet), and each one is treated as a bug.
+That includes the habits real authors have: `1.` `1.` `1.` numbering,
+four-space nested lists, `1.  ` with extra spaces after the marker, trailing
+whitespace, lazy blockquote lines, short setext underlines, Windows paths
+with backslashes. A few rare patterns are still normalized — they're listed
+[below](#what-it-doesnt-do-yet), and each one is treated as a bug.
 
 ## What you get
 
@@ -63,10 +66,10 @@ listed [below](#what-it-doesnt-do-yet), and each one is treated as a bug.
 | You want to… | Package | min+gzip |
 |---|---|---|
 | **Display** Markdown (read-only) | `@kalem/viewer` | 2.7 kB |
-| **Parse** Markdown (server, scripts) | `@kalem/core` | 11.7 kB |
-| **Edit**, with your own UI | `@kalem/editor` | 26.3 kB |
-| The full **Word-like** experience | `@kalem/editor` + `@kalem/ui` | 35.0 kB |
-| Drop it in with one `<script>` tag | `@kalem/wc` (IIFE build) | 27.0 kB |
+| **Parse** Markdown (server, scripts) | `@kalem/core` | 12.6 kB |
+| **Edit**, with your own UI | `@kalem/editor` | 27.2 kB |
+| The full **Word-like** experience | `@kalem/editor` + `@kalem/ui` | 35.9 kB |
+| Drop it in with one `<script>` tag | `@kalem/wc` (IIFE build) | 27.8 kB |
 
 Sizes are measured by [`size-limit`](.size-limit.json) and enforced in CI —
 a build that exceeds its budget fails. `@kalem/core` doesn't touch the DOM,
@@ -161,7 +164,7 @@ live in [`examples/`](examples/) and are built and tested in CI.
 | Stores Markdown natively | ✅ | ❌ HTML / JSON | ❌ JSON | ❌ JSON |
 | Framework-agnostic | ✅ | ✅ | ❌ React only | ✅ |
 | Runtime dependencies | **0** | ~10 packages | ~15 packages | a few |
-| Editor + UI (min+gzip) | **35.0 kB** | ~90–120 kB | ~150 kB+ | ~30 kB + plugins |
+| Editor + UI (min+gzip) | **35.9 kB** | ~90–120 kB | ~150 kB+ | ~30 kB + plugins |
 | Drag-and-drop blocks | ✅ | Extension | ✅ | ✅ |
 | Lossless Markdown round-trip | ✅ | Partial | ❌ | ❌ |
 
@@ -179,12 +182,11 @@ The [known limitations](apps/docs/src/content/docs/bilinen-kisitlar.md) page
 (in Turkish, for now) is the most useful one to read before choosing Kalem.
 In short:
 
-- **Some Markdown is still normalized on the way through.** Lists numbered
-  `1.` `1.` `1.` get renumbered; nested lists indented with four spaces are
-  re-indented to two; trailing whitespace and leading blank lines are
-  dropped; setext underlines are resized to the heading; lazy blockquote
-  continuation lines gain a `> `; a trailing `_` in a word gets escaped.
-  The output is equivalent Markdown, but not the same bytes.
+- **A few rare patterns are still normalized.** Indented continuation
+  lines inside a paragraph lose their indentation; `#  Heading` with two
+  spaces gets one; blank lines containing only spaces become empty; a lazy
+  (unindented) continuation line inside a list item gets indented. The
+  output is equivalent Markdown, but not the same bytes.
 - **Tables** are parsed and preserved byte-for-byte, but there is no table
   editing UI in v1 (planned for v1.1). Typing inside a table cell is
   currently a known bug: the text doesn't reach the output.
