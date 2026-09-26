@@ -84,7 +84,7 @@ function plainText(nodes: readonly Inline[]): string {
  */
 export function setBlockType<T extends Node>(tree: T, path: Path, target: BlockType): T {
 	const node = nodeAtPath(tree, path);
-	if (node === undefined) throw new Error(`setBlockType: [${path.join(", ")}] yolunda düğüm yok`);
+	if (node === undefined) throw new Error(`setBlockType: no node at path [${path.join(", ")}]`);
 
 	return replaceAt(tree, path, convertBlock(node as Block, target));
 }
@@ -130,7 +130,7 @@ function codeValueOf(node: Block): string {
 /** Yoldaki bloğu bir alıntı ya da liste içine alır. */
 export function wrapIn<T extends Node>(tree: T, path: Path, container: "blockquote" | "list"): T {
 	const node = nodeAtPath(tree, path);
-	if (node === undefined) throw new Error(`wrapIn: [${path.join(", ")}] yolunda düğüm yok`);
+	if (node === undefined) throw new Error(`wrapIn: no node at path [${path.join(", ")}]`);
 	const block = node as Block;
 
 	const wrapped: Block =
@@ -157,13 +157,13 @@ export function wrapIn<T extends Node>(tree: T, path: Path, container: "blockquo
  * ihtiyacı netleştiğinde F2'de eklenecek.)
  */
 export function lift<T extends Node>(tree: T, path: Path): T {
-	if (path.length < 2) throw new Error("lift: kök düzeyindeki düğüm çıkarılamaz");
+	if (path.length < 2) throw new Error("lift: a root-level node cannot be lifted");
 
 	const parent = parentAtPath(tree, path);
-	if (parent === undefined) throw new Error(`lift: [${path.join(", ")}] yolunun ebeveyni yok`);
+	if (parent === undefined) throw new Error(`lift: path [${path.join(", ")}] has no parent`);
 
 	const node = nodeAtPath(tree, path);
-	if (node === undefined) throw new Error(`lift: [${path.join(", ")}] yolunda düğüm yok`);
+	if (node === undefined) throw new Error(`lift: no node at path [${path.join(", ")}]`);
 
 	const index = path[path.length - 1] as number;
 	const parentPath = path.slice(0, -1);
@@ -175,7 +175,7 @@ export function lift<T extends Node>(tree: T, path: Path): T {
 	}
 	if (index !== 0 && index !== siblings.length - 1) {
 		throw new Error(
-			"lift: yalnızca kapsayıcının ilk ya da son çocuğu çıkarılabilir (ortadaki, kapsayıcıyı bölmeyi gerektirir)",
+			"lift: only the first or last child of a container can be lifted (lifting a middle child would require splitting the container)",
 		);
 	}
 
@@ -201,8 +201,9 @@ export function lift<T extends Node>(tree: T, path: Path): T {
  */
 export function splitBlock<T extends Node>(tree: T, path: Path, offset: number): T {
 	const node = nodeAtPath(tree, path);
-	if (node === undefined) throw new Error(`splitBlock: [${path.join(", ")}] yolunda düğüm yok`);
-	if (!isParent(node)) throw new Error(`splitBlock: "${node.type}" bölünemez, çocuğu yok`);
+	if (node === undefined) throw new Error(`splitBlock: no node at path [${path.join(", ")}]`);
+	if (!isParent(node))
+		throw new Error(`splitBlock: "${node.type}" cannot be split, it has no children`);
 
 	const children = node.children as readonly Node[];
 	const clamped = Math.max(0, Math.min(offset, children.length));
@@ -225,17 +226,17 @@ export function splitBlock<T extends Node>(tree: T, path: Path, offset: number):
  */
 export function joinBlocks<T extends Node>(tree: T, path: Path): T {
 	const index = path[path.length - 1] as number;
-	if (index === 0) throw new Error("joinBlocks: ilk bloğun birleşeceği bir önceki blok yok");
+	if (index === 0) throw new Error("joinBlocks: the first block has no previous block to join");
 
 	const previousPath = [...path.slice(0, -1), index - 1];
 	const previous = nodeAtPath(tree, previousPath);
 	const current = nodeAtPath(tree, path);
 
 	if (previous === undefined || current === undefined) {
-		throw new Error(`joinBlocks: [${path.join(", ")}] yolundaki bloklar bulunamadı`);
+		throw new Error(`joinBlocks: blocks at path [${path.join(", ")}] not found`);
 	}
 	if (!isParent(previous) || !isParent(current)) {
-		throw new Error("joinBlocks: yalnızca çocuklu bloklar birleşebilir");
+		throw new Error("joinBlocks: only blocks with children can be joined");
 	}
 
 	const merged = {

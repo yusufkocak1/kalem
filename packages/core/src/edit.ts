@@ -102,11 +102,11 @@ function rebuild(
 ): Node {
 	const index = path[depth];
 	if (index === undefined) {
-		throw new Error(`Geçersiz yol: ${depth}. seviyede indis yok (yol: [${path.join(", ")}])`);
+		throw new Error(`Invalid path: no index at depth ${depth} (path: [${path.join(", ")}])`);
 	}
 	if (!isParent(node)) {
 		throw new Error(
-			`Geçersiz yol: "${node.type}" düğümünün çocuğu yok (yol: [${path.join(", ")}], seviye: ${depth})`,
+			`Invalid path: "${node.type}" node has no children (path: [${path.join(", ")}], depth: ${depth})`,
 		);
 	}
 
@@ -119,7 +119,7 @@ function rebuild(
 	const child = children[index];
 	if (child === undefined) {
 		throw new Error(
-			`Geçersiz yol: [${path.join(", ")}] — ${depth}. seviyede ${index}. çocuk yok (${children.length} çocuk var)`,
+			`Invalid path: [${path.join(", ")}] — no child at index ${index} at depth ${depth} (${children.length} children)`,
 		);
 	}
 
@@ -132,7 +132,7 @@ function rebuild(
 function assertNotRoot(path: Path, operation: string): void {
 	if (path.length === 0) {
 		throw new Error(
-			`${operation}: boş yol kökü gösterir, kökün ebeveyni yoktur. Kökü değiştirmek için dönen ağacı doğrudan kullan.`,
+			`${operation}: an empty path points to the root, which has no parent. To replace the root, use the returned tree directly.`,
 		);
 	}
 }
@@ -146,7 +146,7 @@ export function insertAt<T extends Node>(tree: T, path: Path, node: Node): T {
 	assertNotRoot(path, "insertAt");
 	return rebuild(tree, path, 0, (children, index) => {
 		if (index < 0 || index > children.length) {
-			throw new Error(`insertAt: ${index}. konum aralık dışı (0–${children.length} bekleniyordu)`);
+			throw new Error(`insertAt: position ${index} out of range (expected 0–${children.length})`);
 		}
 		return [...children.slice(0, index), node, ...children.slice(index)];
 	}) as T;
@@ -157,7 +157,7 @@ export function replaceAt<T extends Node>(tree: T, path: Path, node: Node): T {
 	assertNotRoot(path, "replaceAt");
 	return rebuild(tree, path, 0, (children, index) => {
 		if (children[index] === undefined) {
-			throw new Error(`replaceAt: ${index}. çocuk yok (${children.length} çocuk var)`);
+			throw new Error(`replaceAt: no child at index ${index} (${children.length} children)`);
 		}
 		const next = [...children];
 		next[index] = node;
@@ -170,7 +170,7 @@ export function removeAt<T extends Node>(tree: T, path: Path): T {
 	assertNotRoot(path, "removeAt");
 	return rebuild(tree, path, 0, (children, index) => {
 		if (children[index] === undefined) {
-			throw new Error(`removeAt: ${index}. çocuk yok (${children.length} çocuk var)`);
+			throw new Error(`removeAt: no child at index ${index} (${children.length} children)`);
 		}
 		return [...children.slice(0, index), ...children.slice(index + 1)];
 	}) as T;
@@ -184,13 +184,13 @@ export function removeAt<T extends Node>(tree: T, path: Path): T {
  */
 export function replace<T extends Node>(tree: T, target: Node, replacement: Node): T {
 	const path = pathToNode(tree, target);
-	if (path === undefined) throw new Error(`replace: "${target.type}" düğümü ağaçta bulunamadı`);
+	if (path === undefined) throw new Error(`replace: "${target.type}" node not found in the tree`);
 	return replaceAt(tree, path, replacement);
 }
 
 /** Ağaçtaki bir düğümü referansıyla bulup siler. */
 export function remove<T extends Node>(tree: T, target: Node): T {
 	const path = pathToNode(tree, target);
-	if (path === undefined) throw new Error(`remove: "${target.type}" düğümü ağaçta bulunamadı`);
+	if (path === undefined) throw new Error(`remove: "${target.type}" node not found in the tree`);
 	return removeAt(tree, path);
 }

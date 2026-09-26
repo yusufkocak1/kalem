@@ -2701,6 +2701,11 @@ kayıtlı`).
 > fırlatılan hata geliştiriciye görünüyor. Sözlükten geçirmek yanlış
 > (bunlar arayüz metni değil); seçenekler İngilizce'ye çevirmek ya da
 > olduğu gibi bırakmak. v1.0'dan (F6-13) önce verilmesi gereken bir karar.
+>
+> **Karar verildi ve uygulandı: İngilizce.** 22 `throw` mesajı ve
+> `blocks.ts`teki 52 `must()` etiketi çevrildi; kod yorumları Türkçe kaldı.
+> Kural `CONTRIBUTING.md`de: "geliştiricinin konsoluna düşen her şey
+> İngilizce". 24 test beklentisi İngilizce desenlere güncellendi.
 
 > **Kendi yanlış alarmım.** Sözlüklerin dışa aktarımına bakarken dar bir
 > aramayla "`plugin-outline` sözlüklerini dışa aktarmıyor" sonucuna

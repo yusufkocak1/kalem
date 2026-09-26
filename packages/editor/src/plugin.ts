@@ -110,7 +110,7 @@ export class PluginRegistry {
 
 	add(plugin: Plugin): void {
 		if (this.#plugins.some((p) => p.name === plugin.name)) {
-			throw new Error(`Eklenti adı zaten kayıtlı: "${plugin.name}"`);
+			throw new Error(`A plugin named "${plugin.name}" is already registered`);
 		}
 		this.#plugins.push(plugin);
 		const cleanup = plugin.setup?.(this.#ctx);

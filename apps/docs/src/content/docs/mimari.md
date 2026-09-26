@@ -96,11 +96,11 @@ itibaren vardır ve kendi öz-testleri de var (`pnpm guard:selftest`).
 
 | Paket | min+gzip |
 |---|---|
-| `@kalem/core` | 13,0 kB |
+| `@kalem/core` | 12,8 kB |
 | `@kalem/viewer` | 2,7 kB |
-| `@kalem/editor` (çekirdek dâhil) | 27,6 kB |
-| `@kalem/editor` + `@kalem/ui` | 36,3 kB |
-| `@kalem/wc` — tek `<script>` derlemesi | 28,3 kB |
+| `@kalem/editor` (çekirdek dâhil) | 27,5 kB |
+| `@kalem/editor` + `@kalem/ui` | 36,2 kB |
+| `@kalem/wc` — tek `<script>` derlemesi | 28,1 kB |
 | Sarmalayıcılar (react / vue / wc) | 903 B / 682 B / 1,97 kB |
 
 Doğrulama: 1284 birim testi, 1104 tarayıcı testi (Chromium · Firefox ·

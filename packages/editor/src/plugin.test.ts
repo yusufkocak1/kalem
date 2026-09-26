@@ -40,7 +40,7 @@ describe("kayıt", () => {
 	it("aynı ad iki kez kaydedilemiyor", () => {
 		const kayit = new PluginRegistry(baglam());
 		kayit.add(bos("a"));
-		expect(() => kayit.add(bos("a"))).toThrow(/zaten kayıtlı/);
+		expect(() => kayit.add(bos("a"))).toThrow(/already registered/);
 	});
 
 	it("kaldırılabiliyor", () => {

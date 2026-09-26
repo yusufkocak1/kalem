@@ -130,12 +130,12 @@ describe("insertAt", () => {
 	});
 
 	it("aralık dışı konumda anlaşılır hata veriyor", () => {
-		expect(() => insertAt(ornekBelge(), [99], paragraf("x"))).toThrow(/aralık dışı/);
-		expect(() => insertAt(ornekBelge(), [-1], paragraf("x"))).toThrow(/aralık dışı/);
+		expect(() => insertAt(ornekBelge(), [99], paragraf("x"))).toThrow(/out of range/);
+		expect(() => insertAt(ornekBelge(), [-1], paragraf("x"))).toThrow(/out of range/);
 	});
 
 	it("boş yolda hata veriyor", () => {
-		expect(() => insertAt(ornekBelge(), [], paragraf("x"))).toThrow(/kökün ebeveyni yoktur/);
+		expect(() => insertAt(ornekBelge(), [], paragraf("x"))).toThrow(/root, which has no parent/);
 	});
 });
 
@@ -154,17 +154,17 @@ describe("replaceAt", () => {
 	});
 
 	it("olmayan çocukta anlaşılır hata veriyor", () => {
-		expect(() => replaceAt(ornekBelge(), [99], paragraf("x"))).toThrow(/çocuk yok/);
+		expect(() => replaceAt(ornekBelge(), [99], paragraf("x"))).toThrow(/no child at index/);
 	});
 
 	it("yaprak düğümün içine inmeye çalışınca anlaşılır hata veriyor", () => {
-		expect(() => replaceAt(ornekBelge(), [0, 0, 0], paragraf("x"))).toThrow(/çocuğu yok/);
+		expect(() => replaceAt(ornekBelge(), [0, 0, 0], paragraf("x"))).toThrow(/has no children/);
 	});
 
 	it("ara seviyede olmayan çocuğu anlaşılır bildiriyor", () => {
 		// [99, 0]: kökte 99. çocuk yok — hata hedefe inmeden, ara seviyede çıkmalı.
 		expect(() => replaceAt(ornekBelge(), [99, 0], paragraf("x"))).toThrow(
-			/0\. seviyede 99\. çocuk yok/,
+			/no child at index 99 at depth 0/,
 		);
 	});
 
@@ -174,7 +174,7 @@ describe("replaceAt", () => {
 	 */
 	it("delikli yolda anlaşılır hata veriyor", () => {
 		const delikli = [0, undefined, 0] as unknown as number[];
-		expect(() => replaceAt(ornekBelge(), delikli, paragraf("x"))).toThrow(/indis yok/);
+		expect(() => replaceAt(ornekBelge(), delikli, paragraf("x"))).toThrow(/no index at depth/);
 	});
 });
 
@@ -191,11 +191,11 @@ describe("removeAt", () => {
 	});
 
 	it("olmayan çocukta anlaşılır hata veriyor", () => {
-		expect(() => removeAt(ornekBelge(), [7])).toThrow(/çocuk yok/);
+		expect(() => removeAt(ornekBelge(), [7])).toThrow(/no child at index/);
 	});
 
 	it("boş yolda hata veriyor", () => {
-		expect(() => removeAt(ornekBelge(), [])).toThrow(/kökün ebeveyni yoktur/);
+		expect(() => removeAt(ornekBelge(), [])).toThrow(/root, which has no parent/);
 	});
 });
 
@@ -257,12 +257,12 @@ describe("replace / remove (referansla)", () => {
 	});
 
 	it("ağaçta olmayan düğümde anlaşılır hata veriyor", () => {
-		expect(() => replace(ornekBelge(), paragraf("yok"), paragraf("x"))).toThrow(/bulunamadı/);
-		expect(() => remove(ornekBelge(), paragraf("yok"))).toThrow(/bulunamadı/);
+		expect(() => replace(ornekBelge(), paragraf("yok"), paragraf("x"))).toThrow(/not found/);
+		expect(() => remove(ornekBelge(), paragraf("yok"))).toThrow(/not found/);
 	});
 
 	it("kökün kendisini silmeye çalışınca hata veriyor", () => {
 		const belge = ornekBelge();
-		expect(() => remove(belge, belge)).toThrow(/kökün ebeveyni yoktur/);
+		expect(() => remove(belge, belge)).toThrow(/root, which has no parent/);
 	});
 });

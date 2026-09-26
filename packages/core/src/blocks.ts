@@ -73,7 +73,7 @@ const rawText: InlineParser = (raw) => (raw === "" ? [] : [{ type: "text", value
  */
 export function must<T>(value: T | undefined, what: string): T {
 	if (value === undefined) {
-		throw new Error(`blocks: iç tutarlılık hatası — ${what} beklenirken bulunamadı`);
+		throw new Error(`blocks: internal consistency error — expected ${what}, found nothing`);
 	}
 	return value;
 }
@@ -193,8 +193,8 @@ export function parseBlocks(source: string, options: ParseBlocksOptions = {}): R
 	const inline = options.parseInline ?? rawText;
 
 	// `scan` her zaman en az bir satır döndürür — boş kaynakta bile.
-	const first = must(lines[0], "ilk satır");
-	const last = must(lines[lines.length - 1], "son satır");
+	const first = must(lines[0], "first line");
+	const last = must(lines[lines.length - 1], "last line");
 
 	// Frontmatter yalnızca dosyanın en başında olabilir.
 	const front = readFrontmatter(lines);
@@ -208,7 +208,7 @@ export function parseBlocks(source: string, options: ParseBlocksOptions = {}): R
 	 */
 	let leadingBlankLines = 0;
 	if (front === null && children.length > 0) {
-		while (isBlank(must(lines[leadingBlankLines], "baştaki satır").value)) leadingBlankLines++;
+		while (isBlank(must(lines[leadingBlankLines], "leading line").value)) leadingBlankLines++;
 	}
 	// Son bloğun bitişinden sonraki satırlar boş olmak zorunda — yoksa
 	// bir bloğa ait olurlardı.
@@ -239,13 +239,13 @@ export function parseBlocks(source: string, options: ParseBlocksOptions = {}): R
  */
 function readFrontmatter(lines: readonly Line[]): { node: Frontmatter; next: number } | null {
 	// `scan` boş kaynakta bile bir satır döndürür.
-	const openLine = must(lines[0], "frontmatter açılış satırı");
+	const openLine = must(lines[0], "frontmatter opening line");
 	const rule = FRONTMATTER_FENCES.find((f) => openLine.value === f.fence);
 	if (rule === undefined) return null;
 
 	const body: string[] = [];
 	for (let i = 1; i < lines.length; i++) {
-		const line = must(lines[i], "frontmatter satırı");
+		const line = must(lines[i], "frontmatter line");
 		if (line.value === rule.fence) {
 			return {
 				node: {
@@ -273,7 +273,7 @@ function parseLines(lines: readonly Line[], inline: InlineParser): Block[] {
 	let i = 0;
 
 	while (i < lines.length) {
-		const line = must(lines[i], "geçerli satır");
+		const line = must(lines[i], "current line");
 
 		// Boş satırlar blok üretmez; blokları ayırırlar.
 		if (isBlank(line.value)) {
@@ -359,7 +359,7 @@ function makeThematicBreak(line: Line): ThematicBreak {
 }
 
 function makeAtxHeading(line: Line, match: RegExpExecArray, inline: InlineParser): Heading {
-	const hashes = must(match[1], "diyez dizisi");
+	const hashes = must(match[1], "hash run");
 	// 2. grup gerçekten isteğe bağlı: `#` tek başına geçerli bir başlıktır.
 	const rest = match[2] ?? "";
 
@@ -384,8 +384,8 @@ function makeAtxHeading(line: Line, match: RegExpExecArray, inline: InlineParser
  * kod içeren normal metinler yanlışlıkla kod bloğu açardı.
  */
 function isValidFence(match: RegExpExecArray): boolean {
-	const fence = must(match[2], "çit");
-	const info = must(match[3], "bilgi dizisi");
+	const fence = must(match[2], "fence");
+	const info = must(match[3], "info string");
 	return !(fence.startsWith("`") && info.includes("`"));
 }
 
@@ -395,11 +395,11 @@ function readFencedCode(
 	match: RegExpExecArray,
 	blocks: Block[],
 ): number {
-	const openLine = must(lines[start], "çit açılış satırı");
-	const openIndent = must(match[1], "çit girintisi").length;
-	const fence = must(match[2], "çit");
+	const openLine = must(lines[start], "fence opening line");
+	const openIndent = must(match[1], "fence indent").length;
+	const fence = must(match[2], "fence");
 	const marker = fence.startsWith("~") ? "~" : "`";
-	const info = must(match[3], "bilgi dizisi").trim();
+	const info = must(match[3], "info string").trim();
 
 	const closeRe = new RegExp(`^ {0,3}\\${marker}{${fence.length},}[ \\t]*$`);
 
@@ -408,7 +408,7 @@ function readFencedCode(
 	let closingLine: Line | undefined;
 
 	while (i < lines.length) {
-		const line = must(lines[i], "çit gövde satırı");
+		const line = must(lines[i], "fence body line");
 		if (closeRe.test(line.value)) {
 			closingLine = line;
 			i++;
@@ -421,7 +421,7 @@ function readFencedCode(
 
 	const [lang, meta] = splitInfo(info);
 	// Kapanmamış çit dosya sonuna kadar sürer; o zaman son okunan satır biterdir.
-	const endLine = closingLine ?? must(lines[i - 1], "çit bitiş satırı");
+	const endLine = closingLine ?? must(lines[i - 1], "fence closing line");
 
 	blocks.push({
 		type: "code",
@@ -449,7 +449,7 @@ function splitInfo(raw: string): [string | null, string | null] {
 }
 
 function readIndentedCode(lines: readonly Line[], start: number, blocks: Block[]): number {
-	const openLine = must(lines[start], "girintili kod açılış satırı");
+	const openLine = must(lines[start], "indented code opening line");
 
 	const body: string[] = [];
 	/** Sondaki boş satırlar kod bloğuna dahil değildir. */
@@ -457,7 +457,7 @@ function readIndentedCode(lines: readonly Line[], start: number, blocks: Block[]
 	let i = start;
 
 	while (i < lines.length) {
-		const line = must(lines[i], "girintili kod satırı");
+		const line = must(lines[i], "indented code line");
 
 		if (isBlank(line.value)) {
 			// Boş satır kod bloğunu bitirmez — ama devamı gelmezse dahil edilmez.
@@ -473,7 +473,7 @@ function readIndentedCode(lines: readonly Line[], start: number, blocks: Block[]
 	}
 
 	const kept = body.slice(0, lastContent - start + 1);
-	const endLine = must(lines[lastContent], "girintili kod bitiş satırı");
+	const endLine = must(lines[lastContent], "indented code closing line");
 
 	blocks.push({
 		type: "code",
@@ -500,17 +500,17 @@ function readParagraph(
 	blocks: Block[],
 	inline: InlineParser,
 ): number {
-	const collected: Line[] = [must(lines[start], "paragraf açılış satırı")];
+	const collected: Line[] = [must(lines[start], "paragraph opening line")];
 	let i = start + 1;
 
 	while (i < lines.length) {
-		const line = must(lines[i], "paragraf devam satırı");
+		const line = must(lines[i], "paragraph continuation line");
 		if (isBlank(line.value)) break;
 
 		// Setext alt çizgisi: paragrafı başlığa çevirir.
 		const setext = SETEXT.exec(line.value);
 		if (setext !== null && indentWidth(line.value) < INDENTED_CODE_COLUMNS) {
-			const cizgi = must(setext[1], "setext alt çizgisi");
+			const cizgi = must(setext[1], "setext underline");
 			blocks.push(makeSetextHeading(collected, line, cizgi, inline));
 			return i + 1;
 		}
@@ -563,8 +563,8 @@ function paragraphContent(collected: readonly Line[], keepTrailing = false): str
 }
 
 function makeParagraph(collected: readonly Line[], inline: InlineParser): Paragraph {
-	const first = must(collected[0], "paragraf ilk satırı");
-	const last = must(collected[collected.length - 1], "paragraf son satırı");
+	const first = must(collected[0], "paragraph first line");
+	const last = must(collected[collected.length - 1], "paragraph last line");
 
 	return {
 		type: "paragraph",
@@ -579,7 +579,7 @@ function makeSetextHeading(
 	cizgi: string,
 	inline: InlineParser,
 ): Heading {
-	const first = must(collected[0], "setext ilk satırı");
+	const first = must(collected[0], "setext first line");
 	const marker = cizgi.startsWith("=") ? "=" : "-";
 	const metin = paragraphContent(collected);
 
@@ -623,13 +623,13 @@ function readHtmlBlock(
 	rule: HtmlRule,
 	blocks: Block[],
 ): number {
-	const openLine = must(lines[start], "HTML açılış satırı");
+	const openLine = must(lines[start], "HTML opening line");
 	const body: string[] = [];
 	let i = start;
 	let endLine = openLine;
 
 	while (i < lines.length) {
-		const line = must(lines[i], "HTML satırı");
+		const line = must(lines[i], "HTML line");
 
 		// Kapanış deseni olmayan türlerde bloğu ilk boş satır bitirir; boş satır
 		// bloğa dahil edilmez.
@@ -723,8 +723,8 @@ function readTable(
 	blocks: Block[],
 	inline: InlineParser,
 ): number {
-	const headerLine = must(lines[start], "tablo başlık satırı");
-	const delimiterLine = must(lines[start + 1], "tablo ayraç satırı");
+	const headerLine = must(lines[start], "table header row");
+	const delimiterLine = must(lines[start + 1], "table delimiter row");
 	const align = readAlignments(delimiterLine.value);
 	const columns = align.length;
 
@@ -734,7 +734,7 @@ function readTable(
 	let i = start + 2;
 
 	while (i < lines.length) {
-		const line = must(lines[i], "tablo gövde satırı");
+		const line = must(lines[i], "table body row");
 		// Tablo, boş satırda ya da boru içermeyen satırda biter.
 		if (isBlank(line.value) || !line.value.includes("|")) break;
 		rows.push(makeRow(line, columns, inline));
@@ -782,8 +782,8 @@ function normalizeLabel(label: string): string {
 }
 
 function makeDefinition(line: Line, match: RegExpExecArray): Block {
-	const label = must(match[1], "tanım etiketi");
-	const rawUrl = must(match[2], "tanım hedefi");
+	const label = must(match[1], "definition label");
+	const rawUrl = must(match[2], "definition destination");
 	// `<...>` sarmalı hedefin parçası değil.
 	const url = rawUrl.startsWith("<") && rawUrl.endsWith(">") ? rawUrl.slice(1, -1) : rawUrl;
 	const title = match[3] ?? match[4] ?? match[5] ?? null;
@@ -843,7 +843,7 @@ function readBlockquote(
 	blocks: Block[],
 	inline: InlineParser,
 ): number {
-	const openLine = must(lines[start], "alıntı açılış satırı");
+	const openLine = must(lines[start], "blockquote opening line");
 	const inner: Line[] = [];
 	/** `>` olmadan gelen satırların kaynak satır numaraları. */
 	const tembel = new Set<number>();
@@ -851,7 +851,7 @@ function readBlockquote(
 	let lastWasContent = false;
 
 	while (i < lines.length) {
-		const line = must(lines[i], "alıntı satırı");
+		const line = must(lines[i], "blockquote line");
 		const marker = BLOCKQUOTE.exec(line.value);
 
 		if (marker !== null) {
@@ -872,12 +872,12 @@ function readBlockquote(
 		break;
 	}
 
-	const endLine = must(lines[i - 1], "alıntı bitiş satırı");
+	const endLine = must(lines[i - 1], "blockquote closing line");
 	const children = parseLines(inner, inline);
 	const lazy = tembelSatirlar(children, tembel);
 	// `>metin`: işaretten sonra boşluk yok ve satırda içerik var. Boş `>`
 	// satırı karar vermiyor — orada boşluk zaten hiç yazılmıyor.
-	const ilk = must(BLOCKQUOTE.exec(openLine.value)?.[0], "alıntı işareti");
+	const ilk = must(BLOCKQUOTE.exec(openLine.value)?.[0], "blockquote marker");
 	// Desen `> ` içindeki boşluğu işarete katıyor; boşluksuz yazımda işaret
 	// `>` ile bitiyor ve ardından sekme de gelmiyor.
 	const sonraki = openLine.value[ilk.length];
@@ -965,15 +965,15 @@ function listItemStart(line: Line): ListItemStart | null {
 	const bullet = BULLET_ITEM.exec(line.value);
 	if (bullet !== null) {
 		const geo = geometry({
-			indent: must(bullet[1], "madde girintisi"),
+			indent: must(bullet[1], "list item indent"),
 			markerWidth: 1,
-			spaces: must(bullet[3], "işaret sonrası boşluk"),
-			content: must(bullet[4], "madde içeriği"),
+			spaces: must(bullet[3], "space after marker"),
+			content: must(bullet[4], "list item content"),
 		});
 		if (geo === null) return null;
 		return {
 			...geo,
-			bullet: must(bullet[2], "madde işareti") as "-" | "*" | "+",
+			bullet: must(bullet[2], "bullet marker") as "-" | "*" | "+",
 			delimiter: null,
 			number: null,
 		};
@@ -981,18 +981,18 @@ function listItemStart(line: Line): ListItemStart | null {
 
 	const ordered = ORDERED_ITEM.exec(line.value);
 	if (ordered !== null) {
-		const digits = must(ordered[2], "madde numarası");
+		const digits = must(ordered[2], "list item number");
 		const geo = geometry({
-			indent: must(ordered[1], "madde girintisi"),
+			indent: must(ordered[1], "list item indent"),
 			markerWidth: digits.length + 1,
-			spaces: must(ordered[4], "işaret sonrası boşluk"),
-			content: must(ordered[5], "madde içeriği"),
+			spaces: must(ordered[4], "space after marker"),
+			content: must(ordered[5], "list item content"),
 		});
 		if (geo === null) return null;
 		return {
 			...geo,
 			bullet: null,
-			delimiter: must(ordered[3], "madde ayracı") as "." | ")",
+			delimiter: must(ordered[3], "ordered list delimiter") as "." | ")",
 			number: Number(digits),
 		};
 	}
@@ -1040,7 +1040,7 @@ function readList(
 	blocks: Block[],
 	inline: InlineParser,
 ): number {
-	const openLine = must(lines[start], "liste açılış satırı");
+	const openLine = must(lines[start], "list opening line");
 	const items: ListItem[] = [];
 	let i = start;
 	let current: ListItemStart | null = first;
@@ -1061,20 +1061,20 @@ function readList(
 
 		// Sonraki maddeye kadar boş satırları atla.
 		let blanks = 0;
-		while (i < lines.length && isBlank(must(lines[i], "liste boş satırı").value)) {
+		while (i < lines.length && isBlank(must(lines[i], "list blank line").value)) {
 			blanks++;
 			i++;
 		}
 		if (i >= lines.length) break;
 
-		const next = listItemStart(must(lines[i], "sonraki madde satırı"));
+		const next = listItemStart(must(lines[i], "next list item line"));
 		if (next === null || !sameList(current, next)) break;
 
 		if (blanks > 0) looseBetween = true;
 		current = next;
 	}
 
-	const endLine = must(lines[lastConsumed], "liste bitiş satırı");
+	const endLine = must(lines[lastConsumed], "list closing line");
 	/*
 	 * `1. 1. 1.` — iki ya da daha çok madde ve hepsi ilkiyle aynı numara.
 	 * Tek maddeli listede ayırt edilemez; artan varsayılıyor, çünkü editörde
@@ -1116,7 +1116,7 @@ function readListItem(
 	info: ListItemStart,
 	inline: InlineParser,
 ): ReadItem {
-	const openLine = must(lines[start], "madde açılış satırı");
+	const openLine = must(lines[start], "list item opening line");
 	const firstInner = sliceLine(openLine, info.markerChars);
 
 	// GFM görev listesi: içerik `[ ]` ya da `[x]` ile başlıyorsa madde bir
@@ -1125,7 +1125,7 @@ function readListItem(
 	// Desen zaten yalnızca " ", "x" ya da "X" yakalıyor; boşluk olmayan her
 	// şey işaretli demek. Büyük/küçük harf katlaması gerekmiyor — gereksiz
 	// bir locale bağımlılığı yaratmamak için de tercih edilmedi.
-	const checked = task === null ? null : must(task[1], "görev işareti") !== " ";
+	const checked = task === null ? null : must(task[1], "task marker") !== " ";
 	const inner: Line[] = [task === null ? firstInner : sliceLine(firstInner, task[0].length)];
 
 	let i = start + 1;
@@ -1135,7 +1135,7 @@ function readListItem(
 	let spread = false;
 
 	while (i < lines.length) {
-		const line = must(lines[i], "madde devam satırı");
+		const line = must(lines[i], "list item continuation line");
 
 		if (isBlank(line.value)) {
 			inner.push(sliceLine(line, 0));
@@ -1173,7 +1173,7 @@ function readListItem(
 			checked,
 			spread,
 			children: parseLines(kept, inline),
-			position: span(openLine, must(lines[lastContent], "madde bitiş satırı")),
+			position: span(openLine, must(lines[lastContent], "list item closing line")),
 		},
 		next: lastContent + 1,
 		lastContent,

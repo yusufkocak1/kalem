@@ -16,9 +16,9 @@ indirmezsiniz.
 | Ne yapmak istiyorsunuz | Paket | Boyut (min+gzip) |
 |---|---|---|
 | Markdown'ı **göstermek** (salt okunur) | `@kalem/viewer` | 2,7 kB |
-| Markdown'ı **ayrıştırmak** (sunucuda, betikte) | `@kalem/core` | 13,0 kB |
-| **Düzenlemek**, kendi arayüzünüzle | `@kalem/editor` | 27,6 kB |
-| **Word benzeri** tam deneyim | `@kalem/editor` + `@kalem/ui` | 36,3 kB |
+| Markdown'ı **ayrıştırmak** (sunucuda, betikte) | `@kalem/core` | 12,8 kB |
+| **Düzenlemek**, kendi arayüzünüzle | `@kalem/editor` | 27,5 kB |
+| **Word benzeri** tam deneyim | `@kalem/editor` + `@kalem/ui` | 36,2 kB |
 
 Çerçeve sarmalayıcıları bunların üstüne birkaç yüz bayt ekliyor:
 `@kalem/react` 903 B, `@kalem/vue` 682 B, `@kalem/wc` 1,97 kB.

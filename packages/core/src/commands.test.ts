@@ -115,7 +115,7 @@ describe("setBlockType", () => {
 	});
 
 	it("olmayan yolda anlaşılır hata", () => {
-		expect(() => setBlockType(belge(), [9], { type: "paragraph" })).toThrow(/yolunda düğüm yok/);
+		expect(() => setBlockType(belge(), [9], { type: "paragraph" })).toThrow(/no node at path/);
 	});
 });
 
@@ -168,7 +168,7 @@ describe("wrapIn ve lift", () => {
 	});
 
 	it("kök düzeyindeki düğümde hata veriyor", () => {
-		expect(() => lift(belge(), [0])).toThrow(/kök düzeyindeki/);
+		expect(() => lift(belge(), [0])).toThrow(/root-level node/);
 	});
 
 	/** Ortadaki çocuğu çıkarmak kapsayıcıyı bölmeyi gerektirir — v1 dışı. */
@@ -186,7 +186,7 @@ describe("wrapIn ve lift", () => {
 				},
 			],
 		};
-		expect(() => lift(kok, [0, 1])).toThrow(/ilk ya da son/);
+		expect(() => lift(kok, [0, 1])).toThrow(/first or last child/);
 	});
 });
 
@@ -251,7 +251,7 @@ describe("splitBlock", () => {
 			type: "root",
 			children: [{ type: "code", lang: null, meta: null, value: "x\n" }],
 		};
-		expect(() => splitBlock(c, [0], 0)).toThrow(/bölünemez/);
+		expect(() => splitBlock(c, [0], 0)).toThrow(/cannot be split/);
 	});
 });
 
@@ -269,7 +269,7 @@ describe("joinBlocks", () => {
 	});
 
 	it("ilk blokta anlaşılır hata", () => {
-		expect(() => joinBlocks(belge(), [0])).toThrow(/ilk bloğun/);
+		expect(() => joinBlocks(belge(), [0])).toThrow(/first block has no previous/);
 	});
 
 	it("yaprak blokta anlaşılır hata", () => {
@@ -280,7 +280,7 @@ describe("joinBlocks", () => {
 				{ type: "code", lang: null, meta: null, value: "x\n" },
 			],
 		};
-		expect(() => joinBlocks(kok, [1])).toThrow(/çocuklu bloklar/);
+		expect(() => joinBlocks(kok, [1])).toThrow(/only blocks with children/);
 	});
 });
 
@@ -358,19 +358,19 @@ describe("daha az yürünen yollar", () => {
 	});
 
 	it("olmayan yolda birleştirme anlaşılır hata veriyor", () => {
-		expect(() => joinBlocks(belge(), [9])).toThrow(/bulunamadı/);
+		expect(() => joinBlocks(belge(), [9])).toThrow(/not found/);
 	});
 
 	it("wrapIn olmayan yolda anlaşılır hata veriyor", () => {
-		expect(() => wrapIn(belge(), [9], "blockquote")).toThrow(/yolunda düğüm yok/);
+		expect(() => wrapIn(belge(), [9], "blockquote")).toThrow(/no node at path/);
 	});
 
 	it("lift olmayan yolda anlaşılır hata veriyor", () => {
 		const sarili = wrapIn(belge(), [0], "blockquote");
-		expect(() => lift(sarili, [0, 9])).toThrow(/yolunda düğüm yok/);
+		expect(() => lift(sarili, [0, 9])).toThrow(/no node at path/);
 	});
 
 	it("splitBlock olmayan yolda anlaşılır hata veriyor", () => {
-		expect(() => splitBlock(belge(), [9], 0)).toThrow(/yolunda düğüm yok/);
+		expect(() => splitBlock(belge(), [9], 0)).toThrow(/no node at path/);
 	});
 });

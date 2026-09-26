@@ -78,13 +78,28 @@ const proto = url.toLowerCase(); // kalem-locale-ok: URL şeması ASCII
 
 | Paket | Bütçe (min+gzip) |
 |---|---|
-| `@kalem/core` | 12 kB |
+| `@kalem/core` | 14 kB |
 | `@kalem/viewer` | 14 kB |
 | `@kalem/editor` (core dahil) | 38 kB |
 | `@kalem/editor` + `@kalem/ui` | 58 kB |
 
 `pnpm size` bunu denetler. Bütçe aşımı build'i kırar — bütçeyi yükseltmek
 bir karardır, PR'da gerekçelendirilmelidir.
+
+Belgelerde yazan boyutlar (README, doküman sitesi, duyuru metinleri)
+`pnpm guard:sizes` ile ölçüme karşı denetlenir. Paket büyüdüyse
+`node scripts/guard-sizes.mjs --fix` sayıları biçimini koruyarak günceller.
+
+### 6. Dil: kod Türkçe, geliştiriciye görünen İngilizce
+
+Kaynak kodun yorumları, değişken adları, commit mesajları ve `docs/` Türkçe.
+Ama **geliştiricinin konsoluna düşen her şey İngilizce**: fırlatılan hata
+mesajları (`throw new Error(...)`), `must()` etiketleri ve konsol uyarıları.
+Kütüphane uluslararası yayımlanıyor; Türkçe bilmeyen geliştirici hatayı
+okuyabilmeli.
+
+Kullanıcıya görünen arayüz metni ise bunların hiçbiri değil: o her zaman
+sözlükten gelir (`labels.ts`), belgenin diline göre.
 
 ## Koruyucu kapılar bozulursa
 
