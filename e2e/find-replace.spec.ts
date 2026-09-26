@@ -215,3 +215,31 @@ test("kod bloğunun içinde de buluyor", async ({ page }) => {
 	await bulKutusu(page).fill("kedi");
 	await expect(sayac(page)).toHaveText("1 / 1");
 });
+
+/**
+ * Tablo hücreleri aranıyor ve değiştiriliyor. F4-03'te tablolar taranmıyordu:
+ * hücre değişikliği çıktıya girmediği için bulup değiştirememek kullanıcıya
+ * yalan olurdu. Serileştirici artık yalnızca değişen satırı yazıyor.
+ */
+test("tablo hücrelerinde boyuyor ve değiştiriyor, hizayı koruyor", async ({ page }) => {
+	await yaz(
+		page,
+		"| Hayvan | Ses   |\n| ------ | ----- |\n| kedi   | miyav |\n| inek   | mö    |\n",
+	);
+	await page.keyboard.press("Control+h");
+	await bulKutusu(page).fill("kedi");
+	await expect(sayac(page)).toHaveText("1 / 1");
+	const boyanan = await page.evaluate(
+		() =>
+			(CSS as unknown as { highlights: Map<string, { size: number }> }).highlights.get(
+				"kalem-find-current",
+			)?.size ?? 0,
+	);
+	expect(boyanan).toBe(1);
+
+	await degistirKutusu(page).fill("fare");
+	await panel(page).getByRole("button", { name: "Tümünü değiştir" }).click();
+	expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe(
+		"| Hayvan | Ses   |\n| ------ | ----- |\n| fare   | miyav |\n| inek   | mö    |\n",
+	);
+});

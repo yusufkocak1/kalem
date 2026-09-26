@@ -26,19 +26,14 @@
  * ikinci bir Markdown ayrıştırıcısı. Aranıyor ama **değiştirilemiyor**
  * demek de kullanıcıya yalan söylemek olurdu; bu yüzden hiç taranmıyor.
  *
- * ## Tablolar neden dışarıda
+ * ## Tablolar
  *
- * Aynı gerekçenin daha sert hâli. Tablo modelde hücre hücre duruyor ama
- * serileştirici onu **ham metinden** geri yazıyor (`TableSyntax.raw`):
- * v1'de tablo düzenleme arayüzü yok (Karar #5) ve ayrıştırıcı, hücre
- * dolgusunu ve boru hizasını bozmamak için kaynağı saklıyor. Yani bir
- * hücrenin içeriğini değiştirmek modelde görünüyor, çıktıda görünmüyor.
- *
- * Üç seçenek vardı: (1) tabloda arayıp değiştirememek — kullanıcıya
- * yalan; (2) ham metni düşürüp tabloyu yeniden üretmek — kullanıcının
- * hizalamasını, bir kelime değiştirdiği için bozmak; (3) taramamak.
- * Üçüncüsü seçildi ve `@kalem/plugin-table` (v1.1) geldiğinde ilk
- * kaldırılacak sınır bu.
+ * Her hücre ayrı bir satır içi bölge (`path` = `[satır, hücre]`, editörün
+ * hücre yoluyla aynı). F4-03'te tablolar taranmıyordu: serileştirici
+ * tabloyu ham metinden koşulsuz geri yazdığı için hücrede yapılan
+ * değişiklik çıktıya girmiyordu ve bulunup değiştirilemeyen metin
+ * kullanıcıya yalan olurdu. Serileştirici artık yalnızca değişen satırı
+ * yeniden üretiyor; o gerekçe ortadan kalktı.
  */
 import type { Block, Inline, Root } from "@kalem/core";
 import { nodeAtPath, replaceAt } from "@kalem/core";
@@ -109,9 +104,15 @@ function topla(node: Block, blockIndex: number, path: readonly number[], out: Re
 		return;
 	}
 
-	// Tablo taranmıyor (dosya başındaki gerekçe): değiştirilemediği için
-	// bulunması da kullanıcıyı yanıltırdı.
-	if (node.type === "table") return;
+	if (node.type === "table") {
+		for (const [r, row] of node.children.entries()) {
+			for (const [c, cell] of row.children.entries()) {
+				const { text, atomics } = duzMetin(cell.children);
+				out.push({ blockIndex, path: [...path, r, c], kind: "inline", text, atomics });
+			}
+		}
+		return;
+	}
 
 	// Blockquote ve liste: çocuklar da blok, yol uzuyor.
 	const children = (node as { children?: readonly unknown[] }).children;

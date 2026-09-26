@@ -1262,6 +1262,11 @@ kriteri ("API kendi kullanımıyla doğrulanmış") tam olarak bunu istiyordu:
 > yapmıyordu. Buna bakan tarayıcı testi eski kodda kırmızı, yenide üç
 > motorda yeşil; ilk yazdığım iki test ise eski kodda da geçiyordu ve
 > düzeltmeyi kanıtlamıyordu.
+>
+> **Yan kazanç: bul-değiştir tabloları da tarıyor.** F4-03'te tablolar
+> "değişiklik çıktıya girmiyor" gerekçesiyle dışarıdaydı; tablo düzeltmesi
+> o gerekçeyi kaldırdı. Her hücre ayrı bir bölge (`path` = `[satır,
+> hücre]`); boyama ve değiştirme üç motorda sınandı.
 
 Boyut: eklenti tek başına 2.92 kB (çekirdek ve editör hariç),
 `plugin-image.css` 342 B.

@@ -45,10 +45,17 @@ describe("regionsOf", () => {
 		expect(regionsOf(parse("- bir\n- iki\n")).map((r) => r.text)).toEqual(["bir", "iki"]);
 	});
 
-	it("tablo taranmıyor", () => {
-		// Serileştirici tabloyu ham metinden geri yazıyor (Karar #5), yani
-		// burada bulunan bir eşleşme değiştirilemezdi.
-		expect(regionsOf(parse("| a | b |\n|---|---|\n| c | d |\n"))).toHaveLength(0);
+	it("tablo hücre hücre taranıyor", () => {
+		// Serileştirici artık yalnızca değişen satırı yeniden yazıyor; hücrede
+		// bulunan eşleşme değiştirilebiliyor.
+		const bolgeler = regionsOf(parse("| a | b |\n|---|---|\n| c | d |\n"));
+		expect(bolgeler.map((r) => r.text)).toEqual(["a", "b", "c", "d"]);
+		expect(bolgeler.map((r) => r.path)).toEqual([
+			[0, 0],
+			[0, 1],
+			[1, 0],
+			[1, 1],
+		]);
 	});
 
 	it("kod bloğu kaynak metin bölgesi", () => {
@@ -203,9 +210,11 @@ describe("değiştirme", () => {
 		expect(degistir("# kedi\n\n- kedi\n", "kedi", "köpek")).toBe("# köpek\n\n- köpek\n");
 	});
 
-	it("tablo değişmeden kalıyor", () => {
-		const md = "| kedi | b |\n| --- | --- |\n| c | kedi |\n";
-		expect(degistir(md, "kedi", "köpek")).toBe(md);
+	it("tabloda değiştiriyor, hizayı ve öteki satırları koruyor", () => {
+		const md = "| Hayvan | Ses |\n| ------ | --- |\n| kedi   | miyav |\n| inek   | mö |\n";
+		expect(degistir(md, "kedi", "fare")).toBe(
+			"| Hayvan | Ses |\n| ------ | --- |\n| fare   | miyav |\n| inek   | mö |\n",
+		);
 	});
 
 	it("kod bloğunda çalışıyor", () => {

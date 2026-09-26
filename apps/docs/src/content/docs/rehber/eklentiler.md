@@ -92,10 +92,10 @@ Kasa katlaması **belgenin diline** göre: `lang="tr"` bir belgede `ışık`
 araması `IŞIK`ı buluyor, `İŞİK`i bulmuyor. Aksanlar katlanmıyor — `şık`
 araması `sik` yazmıyor.
 
-:::caution[Tablolar aranmıyor]
-Tablolar Markdown'a ham metin olarak geri yazıldığı için değiştirme
-güvenli değil; arama bölgelerinden çıkarıldılar.
-:::
+Tablo hücreleri de aranıyor ve değiştiriliyor; değişen satır dışındaki
+satırlar ve sütun hizası olduğu gibi kalıyor. Satır içi görseller aramada
+tek bir yer tutucu karakter sayılıyor: `a![](x.png)b` içinde `ab` bulunmuyor,
+çünkü ekranda aralarında bir görsel var.
 
 ### Görsel yükleme
 
