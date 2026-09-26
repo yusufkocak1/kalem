@@ -8,8 +8,8 @@ Gönderimden önce:
 - Depo herkese açık mı? (bugün private; README'deki CI rozeti ve bağlantılar
   ancak açıldığında çalışır)
 - npm'de `@kalem/editor` var mı? (F6-13)
-- Dil paragrafı bugünkü durumu söylüyor: doküman sitesi yalnızca Türkçe.
-  İngilizce çeviri gönderimden önce biterse paragraf değişmeli.
+- Dil paragrafı bugünkü durumu söylüyor: doküman sitesi İngilizce, yalnızca
+  üretilen API referansı Türkçe (kaynak yorumlarından geliyor).
 - Sayılar `pnpm size` ile aynı mı? (`pnpm guard:sizes` bu dosyayı da denetliyor)
 - HN metin kutusu Markdown işlemiyor: yalnızca paragraf ve iki boşlukla
   girintili kod. Aşağıdaki metin buna göre yazıldı — biçim ekleme.
@@ -46,7 +46,7 @@ Other things that may be interesting:
 
 What it doesn't do: tables are only partly editable (cell text yes; adding rows and columns is v1.1), mobile works but isn't polished, and there's no real-time collaboration.
 
-A note on language: I'm in Turkey. The API, types, UI strings and README are in English; the source comments, design docs and (for now) the docs site are in Turkish.
+A note on language: I'm in Turkey. The API, error messages, UI strings, README and docs are in English; the source comments and design docs are in Turkish, and so is the generated API reference.
 
 Playground: <PLAYGROUND_URL> (your document is compressed into the URL hash, so shared links never reach a server)
 

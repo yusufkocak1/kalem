@@ -11,7 +11,7 @@ Rails, Django ve düz HTML — hepsinde aynı etiket.**
 npm i @kalem/wc @kalem/themes
 ```
 
-Kendi boyutu 1,98 kB (editör hariç).
+Kendi boyutu 1,97 kB (editör hariç).
 
 ```ts
 import { defineKalemEditor } from '@kalem/wc';

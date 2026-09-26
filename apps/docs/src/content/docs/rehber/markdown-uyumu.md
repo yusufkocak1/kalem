@@ -9,11 +9,13 @@ test edilen bir garanti:
 ```ts
 import { parse, serialize } from '@kalem/core';
 
-serialize(parse(md)) === md; // dokunulmamış belgede her zaman
+serialize(parse(md)) === md; // test korpusunda byte-birebir
 ```
 
-Gidiş-dönüş 17 gerçek belgede byte-birebir doğrulanıyor ve her CI
-koşusunda yeniden ölçülüyor.
+Gidiş-dönüş 18 gerçek belgelik bir korpusta byte-birebir doğrulanıyor,
+652 CommonMark örneğinde ve on binlerce rastgele girdide idempotans için
+sınanıyor ve her CI koşusunda yeniden ölçülüyor. Birkaç nadir kalıp hâlâ
+normalleşiyor; [Bilinen kısıtlar](/bilinen-kisitlar/) sayfasında listeli.
 
 ## Yazım tercihiniz korunuyor
 
@@ -26,12 +28,17 @@ Kalem bunu yapmıyor — tercih AST'de saklanıyor.
 | `- ` · `* ` · `+ ` | Liste işareti |
 | `1.` · `1)` | Sıralı liste ayracı |
 | `1. 2. 3.` · `1. 1. 1.` | Numaralandırma biçimi |
+| `1.  metin` · `-   metin` | İşaretten sonraki boşluk |
+| dört ya da iki boşluklu iç liste | İşaretten önceki girinti |
 | `**kalın**` · `__kalın__` | Vurgu işaretleyicisi |
 | `# Başlık` · alt çizgiyle yazılan başlık | ATX mi setext mi |
+| uzun başlığın altında kısa `---` | Setext çizgisinin uzunluğu |
 | `## Başlık ##` | Kapanış diyezleri |
 | ` ``` ` · `~~~` · girintili | Kod bloğu biçimi ve çit uzunluğu |
 | `[m](u)` · `<url>` · çıplak URL | Bağlantı biçimi |
 | `---` · `***` · `___` | Yatay çizginin ham hâli |
+| `> alıntı` ardından `>`sız satır | Alıntıda tembel devam |
+| satır sonu boşluğu, baştaki ve sondaki boş satırlar | Boşluk |
 
 Sonuç pratikte şu: bir ekip Markdown dosyalarını git'te tutuyorsa,
 Kalem'le açılan bir belgenin diff'i **yalnızca gerçekten değişen

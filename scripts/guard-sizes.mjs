@@ -45,6 +45,7 @@ const KOK = fileURLToPath(new URL("../", import.meta.url));
 const SESSIZ = process.argv.includes("--quiet");
 const DUZELT = process.argv.includes("--fix");
 const DOCS = "apps/docs/src/content/docs";
+const EN = `${DOCS}/en`;
 
 // size-limit girdilerinin adları (.size-limit.json)
 const CORE = "@kalem/core";
@@ -158,11 +159,78 @@ const IDDIALAR = [
 		["plugin-word-count", "@kalem/plugin-word-count"],
 		["plugin-source-mode", "@kalem/plugin-source-mode"],
 		["plugin-autosave", "@kalem/plugin-autosave"],
-	].map(([paket, olcum]) => ({
-		dosya: `${DOCS}/rehber/eklentiler.md`,
-		desen: sonra(`| \`@kalem/${paket}\` |`),
-		olcum,
-	})),
+	].flatMap(([paket, olcum]) =>
+		[`${DOCS}/rehber/eklentiler.md`, `${EN}/rehber/eklentiler.md`].map((dosya) => ({
+			dosya,
+			desen: sonra(`| \`@kalem/${paket}\` |`),
+			olcum,
+		})),
+	),
+	{ dosya: `${DOCS}/rehber/viewer.md`, desen: desen("editörün SAYI'ını"), olcum: EDITOR },
+	{
+		dosya: `${DOCS}/frameworkler/web-components.md`,
+		desen: desen("Kendi boyutu SAYI \\(editör hariç\\)"),
+		olcum: WC,
+	},
+	{ dosya: `${DOCS}/frameworkler/react.md`, desen: desen("Kendi boyutu SAYI"), olcum: REACT },
+	{ dosya: `${DOCS}/frameworkler/vue.md`, desen: desen("Kendi boyutu SAYI"), olcum: VUE },
+
+	// Doküman sitesi — İngilizce (`/en/`). Ondalık ayırıcı nokta; `bicimle`
+	// ayırıcıyı metinden okuduğu için aynı iddialar yeniden kullanılıyor.
+	{ dosya: `${EN}/index.mdx`, desen: sonra("<b>editor + UI</b>"), olcum: WORD },
+	{ dosya: `${EN}/index.mdx`, desen: sonra("<b>core</b>"), olcum: CORE },
+	{ dosya: `${EN}/index.mdx`, desen: sonra("<b>viewer</b>"), olcum: VIEWER },
+	{ dosya: `${EN}/index.mdx`, desen: sonra("Editor + UI (min+gzip) |"), olcum: WORD },
+	{ dosya: `${EN}/baslangic.md`, desen: sonra("`@kalem/viewer` |"), olcum: VIEWER },
+	{ dosya: `${EN}/baslangic.md`, desen: sonra("`@kalem/core` |"), olcum: CORE },
+	{ dosya: `${EN}/baslangic.md`, desen: sonra("| `@kalem/editor` |"), olcum: EDITOR },
+	{ dosya: `${EN}/baslangic.md`, desen: sonra("`@kalem/editor` + `@kalem/ui` |"), olcum: WORD },
+	{
+		dosya: `${EN}/baslangic.md`,
+		desen: desen("`@kalem/react` SAYI, `@kalem/vue` SAYI, `@kalem/wc` SAYI"),
+		olcum: [REACT, VUE, WC],
+	},
+	{ dosya: `${EN}/mimari.md`, desen: sonra("| `@kalem/core` |"), olcum: CORE },
+	{ dosya: `${EN}/mimari.md`, desen: sonra("| `@kalem/viewer` |"), olcum: VIEWER },
+	{ dosya: `${EN}/mimari.md`, desen: sonra("`@kalem/editor` (core included) |"), olcum: EDITOR },
+	{ dosya: `${EN}/mimari.md`, desen: sonra("`@kalem/editor` + `@kalem/ui` |"), olcum: WORD },
+	{ dosya: `${EN}/mimari.md`, desen: sonra("the single `<script>` build |"), olcum: IIFE },
+	{
+		dosya: `${EN}/mimari.md`,
+		desen: desen("\\| Wrappers \\(react / vue / wc\\) \\| SAYI / SAYI / SAYI"),
+		olcum: [REACT, VUE, WC],
+	},
+	{
+		dosya: `${EN}/frameworkler/cdn.md`,
+		desen: desen("includes everything: \\*\\*SAYI"),
+		olcum: IIFE,
+	},
+	{ dosya: `${EN}/frameworkler/vanilla.md`, desen: desen("SAYI, no editing code"), olcum: VIEWER },
+	{
+		dosya: `${EN}/frameworkler/web-components.md`,
+		desen: desen("Its own size is SAYI \\(editor not included\\)"),
+		olcum: WC,
+	},
+	{ dosya: `${EN}/frameworkler/react.md`, desen: desen("Its own size is SAYI"), olcum: REACT },
+	{ dosya: `${EN}/frameworkler/vue.md`, desen: desen("Its own size is SAYI"), olcum: VUE },
+	{ dosya: `${EN}/rehber/viewer.md`, desen: desen("doesn't edit it\\. SAYI"), olcum: VIEWER },
+	{ dosya: `${EN}/rehber/viewer.md`, desen: desen("the editor's SAYI"), olcum: EDITOR },
+	{
+		dosya: `${EN}/tarifler/salt-okunur.md`,
+		desen: desen("SAYI instead of SAYI:"),
+		olcum: [VIEWER, EDITOR],
+	},
+	{
+		dosya: `${EN}/tarifler/sunucuda-markdown.md`,
+		desen: desen("SAYI in total"),
+		olcum: [[CORE, VIEWER]],
+	},
+	{
+		dosya: `${EN}/tarifler/sunucuda-markdown.md`,
+		desen: desen("`@kalem/core` on its own is SAYI"),
+		olcum: CORE,
+	},
+	{ dosya: `${EN}/rehber/temalar.md`, desen: sonra("| `ui.css` |"), olcum: "@kalem/themes/ui.css" },
 ];
 
 // ---------------------------------------------------------------------------

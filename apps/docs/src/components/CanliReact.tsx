@@ -13,14 +13,14 @@ import type { Editor } from "@kalem/editor";
 import { KalemEditor, useKalemValue } from "@kalem/react";
 import { mountUi, type Ui } from "@kalem/ui";
 import { useCallback, useEffect, useRef } from "react";
-import { ORNEK_BELGE } from "./ornek-belge.js";
+import { canliEtiket, type Dil, ornekBelge } from "./ornek-belge.js";
 
-function Cikti() {
-	const metin = useKalemValue(ORNEK_BELGE);
+function Cikti({ dil }: { dil: Dil }) {
+	const metin = useKalemValue(ornekBelge(dil));
 	return <pre className="canli-cikti">{metin}</pre>;
 }
 
-export function CanliReact() {
+export function CanliReact({ dil = "tr" }: { dil?: Dil }) {
 	const uiRef = useRef<Ui | null>(null);
 
 	const hazir = useCallback((editor: Editor) => {
@@ -43,12 +43,12 @@ export function CanliReact() {
 			</p>
 			<KalemEditor
 				className="canli-yazi kalem-theme"
-				defaultValue={ORNEK_BELGE}
-				lang="tr"
-				label="Canlı örnek — React"
+				defaultValue={ornekBelge(dil)}
+				lang={dil}
+				label={canliEtiket(dil, "React")}
 				onReady={hazir}
 			>
-				<Cikti />
+				<Cikti dil={dil} />
 			</KalemEditor>
 		</div>
 	);

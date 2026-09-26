@@ -8,20 +8,34 @@
  *
  * Markdown çıktısı yanında ve açık: ürünün ayırt edici iddiası
  * ("çıktı Markdown, JSON değil") ancak görünürken iddia olmaktan çıkıyor.
+ *
+ * `dil` Türkçe (kök) ve İngilizce (`/en/`) giriş sayfaları için; editörün
+ * arayüz metinleri de `lang`'e göre değişiyor.
  */
 import "./hero.css";
+import type { Dil } from "./ornek-belge";
+
+interface Props {
+	dil?: Dil;
+}
+
+const { dil = "tr" } = Astro.props;
+const METIN = {
+	tr: { ipucu: "Bu gerçek bir editör — yazmayı deneyin", etiket: "Markdown çıktısı", canli: "canlı" },
+	en: { ipucu: "This is a real editor — try typing", etiket: "Markdown output", canli: "live" },
+}[dil];
 ---
 
 <div class="hero-deneme">
 	<div class="hero-yazi-sar">
 		<p class="hero-ipucu">
 			<span class="nokta"></span>
-			Bu gerçek bir editör — yazmayı deneyin
+			{METIN.ipucu}
 		</p>
-		<div class="hero-yazi kalem-theme" data-hero-editor lang="tr"></div>
+		<div class="hero-yazi kalem-theme" data-hero-editor lang={dil}></div>
 	</div>
 	<div class="hero-cikti-sar">
-		<p class="hero-etiket">Markdown çıktısı <small>canlı</small></p>
+		<p class="hero-etiket">{METIN.etiket} <small>{METIN.canli}</small></p>
 		<pre class="hero-cikti" data-hero-cikti></pre>
 	</div>
 </div>
@@ -29,26 +43,17 @@ import "./hero.css";
 <script>
 	import { Editor } from "@kalem/editor";
 	import { mountUi } from "@kalem/ui";
-
-	const BELGE = `# Işık ve Gölge
-
-Word kadar kolay, **Markdown** kadar taşınabilir. Bir kelime seçin —
-biçimlendirme balonu belirir. Boş satırda \`/\` yazın — blok menüsü açılır.
-
-* yıldız işareti korunuyor
-* çünkü yazım tercihi modelde duruyor
-
-1) parantez ayracı da öyle
-`;
+	import { type Dil, GIRIS_BELGESI } from "./ornek-belge";
 
 	const kap = document.querySelector<HTMLElement>("[data-hero-editor]");
 	const cikti = document.querySelector<HTMLElement>("[data-hero-cikti]");
 
 	if (kap !== null && cikti !== null) {
+		const dil: Dil = kap.lang === "en" ? "en" : "tr";
 		const editor = new Editor(kap, {
-			value: BELGE,
-			lang: "tr",
-			label: "Deneme belgesi",
+			value: GIRIS_BELGESI[dil],
+			lang: dil,
+			label: dil === "en" ? "Try-it document" : "Deneme belgesi",
 			onChange: (markdown) => {
 				cikti.textContent = markdown;
 			},

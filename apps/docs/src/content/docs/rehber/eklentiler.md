@@ -230,6 +230,7 @@ export function benimEklentim(): Plugin {
 | `element` | Editörün kök elemanı |
 | `isReadOnly()` | Salt okunur mod |
 | `on(event, handler)` | `Editor.on` ile aynı; abonelikten çıkma döndürüyor |
+| `getLang()` | Çözülmüş belge dili — eklentinin kendi metinleri için |
 
 ### Çakışma kuralı: kayıt sırası
 

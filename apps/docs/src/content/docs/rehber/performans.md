@@ -92,9 +92,12 @@ pnpm olcum 100 1000 5000     # kendi boyutlarınız
 ```
 
 Makineye ve o anki yüke bağlı olduğu için bu sayılar `pnpm verify`
-kapısında değil. Kapıdaki testler (`e2e/performans.spec.ts`) mutlak süre
-değil **büyüme oranı** ölçüyor: maliyetin belge boyutuyla doğru orantılı
-büyümeye dönmesi bir gerileme sayılıyor.
+kapısında değil. Kapıdaki testler (`e2e/performans.spec.ts`) bir tuşu,
+**aynı sayfada aynı anda** alınan bir cetvelle karşılaştırıyor: belgenin
+tamamını önbelleksiz bir kez serileştirmenin süresi. Yük ikisini birden
+büyüttüğü için oran sabit kalıyor. Önbellekle bir tuş o cetvelin yaklaşık
+0,7'si, önbelleksiz en az 1,5'i — kapının eşiği 1,0: *bir tuş belgeyi
+yeniden yazmaktan ucuz olmalı.*
 
 ## Bellek
 

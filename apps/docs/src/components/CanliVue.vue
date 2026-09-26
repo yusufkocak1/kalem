@@ -14,9 +14,10 @@ import type { Editor } from "@kalem/editor";
 import { mountUi, type Ui } from "@kalem/ui";
 import { KalemEditor } from "@kalem/vue";
 import { onBeforeUnmount, ref } from "vue";
-import { ORNEK_BELGE } from "./ornek-belge.js";
+import { canliEtiket, type Dil, ornekBelge } from "./ornek-belge.js";
 
-const metin = ref(ORNEK_BELGE);
+const props = withDefaults(defineProps<{ dil?: Dil }>(), { dil: "tr" });
+const metin = ref(ornekBelge(props.dil));
 let ui: Ui | null = null;
 
 function hazir(editor: Editor) {
@@ -38,8 +39,8 @@ onBeforeUnmount(() => {
 		<KalemEditor
 			v-model="metin"
 			class="canli-yazi kalem-theme"
-			lang="tr"
-			label="Canlı örnek — Vue"
+			:lang="props.dil"
+			:label="canliEtiket(props.dil, 'Vue')"
 			@ready="hazir"
 		/>
 		<pre class="canli-cikti">{{ metin }}</pre>

@@ -1,0 +1,131 @@
+---
+title: Try it live
+description: Vanilla, React and Vue on the same page — all three real, all three running at once.
+---
+
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+import CanliVanilla from '../../../components/CanliVanilla.astro';
+import { CanliReact } from '../../../components/CanliReact.tsx';
+import CanliVue from '../../../components/CanliVue.vue';
+
+The three editors below **really work**, and all three live on the same page
+at the same time. The only difference is the mounting code: the engine, the
+UI and the output are the same.
+
+Try typing. The Markdown on the right updates on every keystroke — and the
+asterisk list doesn't turn into `-`, and the `1)` delimiter doesn't become `1.`.
+
+<Tabs syncKey="cerceve">
+  <TabItem label="Vanilla">
+
+<CanliVanilla dil="en" />
+
+```ts
+import { Editor } from '@kalem/editor';
+import { mountUi } from '@kalem/ui';
+
+const editor = new Editor(container, {
+  value: SAMPLE_DOCUMENT,
+  lang: 'en',
+  label: 'Live example — vanilla',
+  onChange: (markdown) => { output.textContent = markdown; },
+});
+
+mountUi(editor, { toolbar: 'both' });
+```
+
+  </TabItem>
+  <TabItem label="React">
+
+<CanliReact client:load dil="en" />
+
+```tsx
+import { KalemEditor, useKalemValue } from '@kalem/react';
+import { mountUi } from '@kalem/ui';
+
+function Output() {
+  const text = useKalemValue(SAMPLE_DOCUMENT);
+  return <pre>{text}</pre>;
+}
+
+<KalemEditor
+  defaultValue={SAMPLE_DOCUMENT}
+  lang="en"
+  label="Live example — React"
+  onReady={(editor) => mountUi(editor, { toolbar: 'both' })}
+>
+  <Output />
+</KalemEditor>
+```
+
+  </TabItem>
+  <TabItem label="Vue">
+
+<CanliVue client:load dil="en" />
+
+```vue
+<script setup lang="ts">
+import { KalemEditor } from '@kalem/vue';
+import { mountUi } from '@kalem/ui';
+import { ref } from 'vue';
+
+const text = ref(SAMPLE_DOCUMENT);
+</script>
+
+<template>
+  <KalemEditor
+    v-model="text"
+    lang="en"
+    label="Live example — Vue"
+    @ready="(editor) => mountUi(editor, { toolbar: 'both' })"
+  />
+  <pre>{{ text }}</pre>
+</template>
+```
+
+  </TabItem>
+</Tabs>
+
+## This page is the proof of a claim
+
+Kalem's main claim is framework independence. A library can say that;
+proving it is another matter.
+
+This site is built with [Astro Starlight](https://starlight.astro.build) and
+runs **both React and Vue islands** at the same time. The three editors above
+live on one page, on one `@kalem/editor` engine.
+
+This page couldn't have been written with Vue-based VitePress or React-based
+Docusaurus — the choice of documentation tool is part of the message.
+
+<Aside type="tip" title="Things to try">
+- **Select** a word — the formatting bubble appears
+- Type `/` on an empty line — the block menu opens
+- Type `# ` or `- ` — the line turns into a heading or a list on its own
+- `Ctrl+B`, `Ctrl+I`, `Ctrl+K` — the keys you know from Word
+- Drag the block handle, or move a block with `Ctrl+Shift+↑/↓`
+</Aside>
+
+## The Vue example is rendered on the server
+
+The React and Vue islands are set up with `client:load`, which means they're
+**rendered on the server first**. The Vue tab shows a visible result of this:
+look at the page source and the document's `<h1>` and list are there — before
+any JavaScript loads.
+
+The "you don't need `<ClientOnly>`" claim on the [Nuxt page](/en/frameworkler/nuxt/)
+is right there in this page's own HTML.
+
+## All three open with the same document
+
+The starting text lives in a single module and all three import it. That way
+the only difference is the mounting code: same input, same output, three
+different frameworks.
+
+## Next
+
+- [Getting started](/en/baslangic/) — adding it to your own project
+- [Editor guide](/en/rehber/editor/) — options, the API and shortcuts
+- Your framework: [React](/en/frameworkler/react/) · [Vue](/en/frameworkler/vue/) ·
+  [Svelte](/en/frameworkler/svelte/) · [Angular](/en/frameworkler/angular/) ·
+  [CDN](/en/frameworkler/cdn/)

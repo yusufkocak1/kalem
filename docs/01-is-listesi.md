@@ -51,8 +51,7 @@
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10) ve `apps/notlar`ın
 iki haftalık günlük kullanımı (F5-05) — ikisi de bir insanın masasında
 yapılmak zorunda.
-Ayrıca **İngilizce doküman sitesi** (içerik yalnızca
-Türkçe — İngilizce duyurudan önce karar gerekiyor), playground'un
+Ayrıca playground'un
 barındırılması ve `kalem.dev` alan adı (403 dönüyor).
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
@@ -2896,6 +2895,25 @@ F6-01'den beri kurulu ama **içeriği yok**; API referansı da Türkçe JSDoc'ta
 > büyük bir engel. Seçenekler: (a) F6-14'ten önce en azından başlangıç,
 > çerçeveler, editör rehberi ve bilinen kısıtlar sayfalarını çevirmek;
 > (b) Türkçe siteyle duyurmak ve İngilizce README'ye yaslanmak. Öneri (a).
+>
+> **Karar: sitenin tamamı. Uygulandı.** 28 sayfanın 28'i `en/` altında
+> (giriş, başlangıç, canlı örnekler, mimari, bilinen kısıtlar, 9 rehber,
+> 9 çerçeve, 5 tarif). Üretilen API referansı Türkçe kaldı — kaynak
+> yorumlarından geliyor. Canlı bileşenler (`HeroDeneme`, `CanliVanilla`,
+> `CanliReact`, `CanliVue`) `dil` alıyor; İngilizce sayfalardaki editörler
+> İngilizce belgeyle ve İngilizce arayüzle (`lang: "en"`) açılıyor.
+>
+> Çeviri sırasında Türkçe sayfalarda eskimiş şeyler de düzeltildi: test
+> sayıları (1284 → "1.400'ün üstünde"), `markdown-uyumu`nun "dokunulmamış
+> belgede her zaman" iddiası, performans testinin anlatımı, eklenti
+> bağlamında eksik `getLang()`, boyut kapısının kapsamadığı üç sayı
+> ("editörün 26 kB'ı", `wc` 1,98 kB). Boyut kapısı artık iki dilde 89
+> sayıyı denetliyor — çeviride tahminle yazdığım "28 kB"leri de yakaladı
+> (ölçüm 27). Doküman kapısı 56 sayfada 180 import adını doğruluyor.
+>
+> Yeni tarayıcı testi `e2e/examples/docs-en.spec.ts`: sayfa `lang="en"`,
+> canlı editör İngilizce belgeyle ve İngilizce arayüzle açılıyor, iç
+> bağlantılar `/en/` dışına çıkmıyor, konsol temiz.
 
 #### Bulunan ve düzeltilen: CI `main`de hiç koşmuyordu
 

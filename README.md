@@ -178,8 +178,8 @@ Markdown that a human would have written.
 
 ## What it doesn't do (yet)
 
-The [known limitations](apps/docs/src/content/docs/bilinen-kisitlar.md) page
-(in Turkish, for now) is the most useful one to read before choosing Kalem.
+The [known limitations](apps/docs/src/content/docs/en/bilinen-kisitlar.md)
+page is the most useful one to read before choosing Kalem.
 In short:
 
 - **A few rare patterns are still normalized.** Indented continuation
@@ -224,9 +224,11 @@ Node ≥ 20, pnpm 10. Browser tests run under a Turkish locale on purpose:
 locale-sensitive bugs that pass in English tend to fail in Turkish.
 
 **A note on language:** Kalem was built in Turkey. The public API, types, UI
-strings and this README are in English; the source comments, commit
-messages, design documents ([`docs/`](docs/)) and — for now — the
-documentation site are in Turkish. Issues and pull
+strings, error messages, this README and the documentation site are in
+English (the site is also available in Turkish); the source comments,
+commit messages and design documents ([`docs/`](docs/)) are in Turkish, and
+so is the generated API reference, which comes from the source comments.
+Issues and pull
 requests in English are very welcome. See [CONTRIBUTING.md](CONTRIBUTING.md)
 and the [Turkish README](README.tr.md).
 

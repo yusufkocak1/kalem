@@ -1,0 +1,167 @@
+---
+title: Kalem
+description: A small, modular, framework-agnostic WYSIWYG Markdown editor library.
+template: splash
+hero:
+  tagline: Easy as Word, portable as Markdown. With any framework — or none at all.
+  actions:
+    - text: Getting started
+      link: /en/baslangic/
+      icon: right-arrow
+      variant: primary
+    - text: GitHub
+      link: https://github.com/yusufkocak1/kalem
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+import HeroDeneme from '../../../components/HeroDeneme.astro';
+
+<HeroDeneme dil="en" />
+
+<div class="kurulum">
+  <code>npm i @kalem/editor @kalem/ui @kalem/themes</code>
+  <div class="rozetler">
+    <span class="rozet"><b>editor + UI</b><span>36.2 kB</span></span>
+    <span class="rozet"><b>core</b><span>12.8 kB</span></span>
+    <span class="rozet"><b>viewer</b><span>2.7 kB</span></span>
+    <span class="rozet"><b>dependencies</b><span>0</span></span>
+  </div>
+</div>
+
+The editor above is **real**: it runs on this page, and everything you type
+shows up as Markdown on the right. Select a word, type `/`, press `Ctrl+B` —
+whatever you'd do in Word.
+
+## Why Kalem?
+
+Markdown has become the de facto output format of AI tools. But there is no
+Markdown editor that people who don't write code can use as comfortably as
+Word: either they're handed raw text, or an editor that stores JSON and
+"converts" it to Markdown — and that conversion is lossy.
+
+<CardGrid stagger>
+  <Card title="Markdown-native" icon="pencil">
+    The source of truth is always Markdown text, not JSON. A line the user
+    didn't touch comes back byte-for-byte — a list you wrote with `*` doesn't
+    come back as `-`.
+  </Card>
+  <Card title="Framework-agnostic" icon="puzzle">
+    The core is plain TypeScript. `@kalem/react` and `@kalem/vue` are
+    separate packages that take the framework as a `peerDependency`. Svelte,
+    Angular and plain HTML don't even need a wrapper: `<kalem-editor>` is the
+    browser's own component model.
+  </Card>
+  <Card title="Small" icon="rocket">
+    The badges above are measured values (min+gzip), not targets. Budgets
+    are enforced in CI; going over means a red build.
+  </Card>
+  <Card title="Modular" icon="setting">
+    `@kalem/viewer` just to display; `@kalem/editor` to edit; `@kalem/ui`
+    for the Word-like interface. You don't download what you don't use.
+  </Card>
+</CardGrid>
+
+## In five lines
+
+<Tabs syncKey="cerceve">
+  <TabItem label="Vanilla">
+
+```ts
+import { Editor } from '@kalem/editor';
+import { mountUi } from '@kalem/ui';
+
+const editor = new Editor(document.getElementById('app')!, {
+  value: '# Hello',
+  lang: 'en',
+  label: 'Document',
+  onChange: (markdown) => console.log(markdown),
+});
+mountUi(editor);
+```
+
+  </TabItem>
+  <TabItem label="React">
+
+```tsx
+import { KalemEditor } from '@kalem/react';
+import { mountUi } from '@kalem/ui';
+
+<KalemEditor
+  defaultValue="# Hello"
+  lang="en"
+  label="Document"
+  onChange={(markdown) => console.log(markdown)}
+  onReady={(editor) => mountUi(editor)}
+/>
+```
+
+  </TabItem>
+  <TabItem label="Vue">
+
+```vue
+<script setup lang="ts">
+import { KalemEditor } from '@kalem/vue';
+import { mountUi } from '@kalem/ui';
+import { ref } from 'vue';
+const text = ref('# Hello');
+</script>
+
+<template>
+  <KalemEditor v-model="text" lang="en" label="Document" @ready="mountUi" />
+</template>
+```
+
+  </TabItem>
+  <TabItem label="HTML">
+
+```html
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/tokens.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/viewer.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/editor.css">
+
+<kalem-editor label="Document"># Hello</kalem-editor>
+
+<script src="https://cdn.jsdelivr.net/npm/@kalem/wc/dist/kalem-editor.iife.js"></script>
+```
+
+  </TabItem>
+</Tabs>
+
+All four tabs set up the same editor. The last one has no build step, no
+bundler and no JavaScript written by you.
+
+[See all three running on the same page →](/en/canli/)
+
+## Comparison
+
+| | Kalem | Tiptap | BlockNote | Editor.js |
+|---|---|---|---|---|
+| Markdown first-class | ✅ | ❌ HTML-focused | ❌ JSON | ❌ JSON |
+| Framework-agnostic | ✅ | ✅ | ❌ React required | ✅ |
+| Runtime dependencies | **0** | ~10 packages | ~15 packages | a few |
+| Editor + UI (min+gzip) | **36.2 kB** | ~90–120 kB | ~150 kB+ | ~30 kB + plugins |
+| Drag-and-drop blocks | ✅ | Extension | ✅ | ✅ |
+| Lossless round-trip | ✅ | Partial | ❌ | ❌ |
+
+<Aside>
+Kalem's number is measured by `size-limit` and re-checked on every CI run.
+The competitors' values are approximate (min+gzip) and were not measured
+independently.
+</Aside>
+
+<Aside type="caution" title="Not on npm yet">
+The library is written and works — the editor on this page is the library
+itself. The first release will be **v1.0**; the API here is taken from the
+code in the repository. For status and open work, see the
+[task list](https://github.com/yusufkocak1/kalem/blob/main/docs/01-is-listesi.md)
+(in Turkish).
+</Aside>
+
+## Next
+
+- [Getting started](/en/baslangic/) — installation and your first editor
+- [Try it live](/en/canli/) — vanilla, React and Vue on the same page
+- [Editor guide](/en/rehber/editor/) — options, API, shortcuts
+- [Recipes](/en/tarifler/otomatik-kaydet/) — autosave, image upload, Markdown on the server

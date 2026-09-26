@@ -7,29 +7,37 @@
  * çalışıyor; sunucuda hiçbir şey yapmıyor.
  */
 import "./canli.css";
+import type { Dil } from "./ornek-belge";
+
+interface Props {
+	dil?: Dil;
+}
+
+const { dil = "tr" } = Astro.props;
 ---
 
 <div class="canli">
 	<p class="canli-rozet">
 		<b>vanilla</b> · <code>new Editor(el)</code> + <code>mountUi(editor)</code>
 	</p>
-	<div class="canli-yazi kalem-theme" data-canli-vanilla lang="tr"></div>
+	<div class="canli-yazi kalem-theme" data-canli-vanilla lang={dil}></div>
 	<pre class="canli-cikti" data-canli-vanilla-cikti></pre>
 </div>
 
 <script>
 	import { Editor } from "@kalem/editor";
 	import { mountUi } from "@kalem/ui";
-	import { ORNEK_BELGE } from "./ornek-belge";
+	import { canliEtiket, type Dil, ornekBelge } from "./ornek-belge";
 
 	const kap = document.querySelector<HTMLElement>("[data-canli-vanilla]");
 	const cikti = document.querySelector<HTMLElement>("[data-canli-vanilla-cikti]");
 
 	if (kap !== null && cikti !== null) {
+		const dil: Dil = kap.lang === "en" ? "en" : "tr";
 		const editor = new Editor(kap, {
-			value: ORNEK_BELGE,
-			lang: "tr",
-			label: "Canlı örnek — vanilla",
+			value: ornekBelge(dil),
+			lang: dil,
+			label: canliEtiket(dil, "vanilla"),
 			onChange: (markdown) => {
 				cikti.textContent = markdown;
 			},

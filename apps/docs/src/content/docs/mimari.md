@@ -56,7 +56,7 @@ AST yalnızca Markdown'ın bellek içi temsilidir.
 
 Ayrıştırıcı, her düğümde konum bilgisinin yanı sıra **sözdizimi tercihini** de
 saklar: madde işareti `-` miydi `*` mıydı, başlık ATX miydi setext miydi, kod
-bloğu ``` ile mi açılmıştı. Serileştirici bu tercihleri kullanır.
+bloğu ``` ile mi açılmıştı, iç liste nasıl girintilenmişti. Serileştirici bu tercihleri kullanır.
 
 Bu yüzden hazır bir ayrıştırıcı (marked, markdown-it) kullanılamadı — hiçbiri bu
 bilgiyi vermez.
@@ -79,15 +79,19 @@ da "yüksek öncelikli eklenti" kavramı yoktur.
 
 ## Ölçülen vaatler
 
-Üç vaat CI'da otomatik olarak korunur; üçü de birer testtir, niyet değil:
+Bu vaatler CI'da otomatik olarak korunur; her biri bir testtir, niyet değil:
 
 - **Boyut kapısı** — `size-limit` bütçeyi aşan build'i kırar.
+- **Boyut iddiaları kapısı** — belgelerde ve README'de yazan her boyut
+  ölçümle karşılaştırılır.
 - **Saflık kapısı** — çekirdek paketlerin `dependencies` alanı boş mu, üretim
   bundle'ında `react`/`vue` izi var mı, `core` bundle'ı `document`/`window`'a
   dokunuyor mu (SSR güvenliği).
 - **Locale kapısı** — bölgesiz `toLowerCase()` / `toUpperCase()` çağrısı
   build'i kırar. Türkçe'de `I` ve `ı` sessizce yanlış katlanır; hata
   patlamaz, yalnızca yanlış cevap verir.
+- **Doküman kapısı** — doküman örneklerinde import edilen her ad, o
+  paketin gerçekten dışa aktardığı bir ad mı.
 
 Bir vaat ölçülmüyorsa zamanla erir. Bu kapılar projenin ilk gününden
 itibaren vardır ve kendi öz-testleri de var (`pnpm guard:selftest`).
@@ -103,8 +107,9 @@ itibaren vardır ve kendi öz-testleri de var (`pnpm guard:selftest`).
 | `@kalem/wc` — tek `<script>` derlemesi | 28,1 kB |
 | Sarmalayıcılar (react / vue / wc) | 903 B / 682 B / 1,97 kB |
 
-Doğrulama: 1284 birim testi, 1104 tarayıcı testi (Chromium · Firefox ·
-WebKit) ve 58 örnek/uygulama testi.
+Doğrulama: 1.400'ün üstünde birim testi, 1.200'ün üstünde tarayıcı testi
+(Chromium · Firefox · WebKit, ayrıca iPhone ve Pixel benzetimi) ve CI'da
+derlenip sınanan örnek uygulamalar.
 
 ## Bilinçli kapsam dışı
 

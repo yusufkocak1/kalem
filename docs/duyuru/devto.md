@@ -141,8 +141,9 @@ I'd rather you read this here than find it on day one:
 - **Mobile works but isn't polished.** Drag-to-reorder has no touch
   equivalent yet.
 - **No real-time collaboration.**
-- **The documentation site is in Turkish** for now. The API, types, UI
-  strings and README are in English.
+- **The API reference is in Turkish.** It's generated from the source
+  comments, which are Turkish; the guides, recipes and everything else on
+  the docs site are in English.
 
 ## Try it
 
