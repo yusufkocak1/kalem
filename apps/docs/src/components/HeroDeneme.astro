@@ -21,7 +21,11 @@ interface Props {
 
 const { dil = "tr" } = Astro.props;
 const METIN = {
-	tr: { ipucu: "Bu gerçek bir editör — yazmayı deneyin", etiket: "Markdown çıktısı", canli: "canlı" },
+	tr: {
+		ipucu: "Bu gerçek bir editör — yazmayı deneyin",
+		etiket: "Markdown çıktısı",
+		canli: "canlı",
+	},
 	en: { ipucu: "This is a real editor — try typing", etiket: "Markdown output", canli: "live" },
 }[dil];
 ---
