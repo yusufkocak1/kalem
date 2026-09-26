@@ -55,9 +55,7 @@ referansları (F3-11) ve `apps/notlar`ın iki haftalık günlük kullanımı
 Ayrıca **İngilizce doküman sitesi** (içerik yalnızca
 Türkçe — İngilizce duyurudan önce karar gerekiyor), playground'un
 barındırılması ve `kalem.dev` alan adı (403 dönüyor), atomik düğümlere ofset uzunluğu 1
-verilmesi (F4-01'de bulundu) ve
-tablo hücrelerinin düzenlenebilir çizilmesi (F4-03'te bulundu: yazılan
-metin çıktıya hiç girmiyor).
+verilmesi (F4-01'de bulundu).
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -1381,6 +1379,22 @@ kullanıcının hizalamasını bozmak olurdu.
 > etmemek. Gerçek çözüm `@kalem/plugin-table` (v1.1) ile tablo üreticisi.
 > F4-03'ün ortasında yapılacak bir değişiklik değildi, ayrı bir iş
 > olarak duruyor.
+>
+> **Kapandı (Faz 6 sonu).** Hücreleri salt okunur yapmak yerine düzenleme
+> çalışır hâle getirildi: serileştirici ham tabloyu **satır satır**
+> kullanıyor. Her ham satır yeniden ayrıştırılıp modeldeki satırla anlamca
+> (ağaç olarak, `position`/`id`/`syntax` hariç) karşılaştırılıyor; aynıysa
+> ham satır yazılıyor, değilse yalnızca o satır üretiliyor — kenar boruları
+> ve hücre genişlikleri eski satırdan alınarak. Tek kelime için bütün
+> tabloyu yeniden hizalamak dokunulmamış satırları değiştirmek olurdu.
+> Satır sayısı ham metinle tutmazsa tablo baştan üretiliyor (v1'de satır
+> ekleme arayüzü yok). Ek hata: tam üretim yolu hücredeki `|`'yi
+> kaçırmıyordu; artık kaçırıyor, ayrıştırıcının kuralıyla (önünde tek ters
+> bölü) aynı. 7 birim testi + 1 tarayıcı testi (üç motor).
+>
+> Çekirdek 12,6 → 13,0 kB; bütçe 13 → 14 kB (izin 15 kB'a kadar).
+> `guard:sizes` artık `--fix` alıyor: eski sayıları biçimini koruyarak
+> yerinde güncelliyor — bu seferki 25 sayı böyle güncellendi.
 
 Boyut: eklenti 4.46 kB, `plugin-find.css` 649 B (gzip, çekirdek ve
 editör hariç). 59 birim + 51 tarayıcı testi.

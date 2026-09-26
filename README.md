@@ -66,10 +66,10 @@ with backslashes. A few rare patterns are still normalized — they're listed
 | You want to… | Package | min+gzip |
 |---|---|---|
 | **Display** Markdown (read-only) | `@kalem/viewer` | 2.7 kB |
-| **Parse** Markdown (server, scripts) | `@kalem/core` | 12.6 kB |
-| **Edit**, with your own UI | `@kalem/editor` | 27.2 kB |
-| The full **Word-like** experience | `@kalem/editor` + `@kalem/ui` | 35.9 kB |
-| Drop it in with one `<script>` tag | `@kalem/wc` (IIFE build) | 27.8 kB |
+| **Parse** Markdown (server, scripts) | `@kalem/core` | 13.0 kB |
+| **Edit**, with your own UI | `@kalem/editor` | 27.6 kB |
+| The full **Word-like** experience | `@kalem/editor` + `@kalem/ui` | 36.3 kB |
+| Drop it in with one `<script>` tag | `@kalem/wc` (IIFE build) | 28.3 kB |
 
 Sizes are measured by [`size-limit`](.size-limit.json) and enforced in CI —
 a build that exceeds its budget fails. `@kalem/core` doesn't touch the DOM,
@@ -164,7 +164,7 @@ live in [`examples/`](examples/) and are built and tested in CI.
 | Stores Markdown natively | ✅ | ❌ HTML / JSON | ❌ JSON | ❌ JSON |
 | Framework-agnostic | ✅ | ✅ | ❌ React only | ✅ |
 | Runtime dependencies | **0** | ~10 packages | ~15 packages | a few |
-| Editor + UI (min+gzip) | **35.9 kB** | ~90–120 kB | ~150 kB+ | ~30 kB + plugins |
+| Editor + UI (min+gzip) | **36.3 kB** | ~90–120 kB | ~150 kB+ | ~30 kB + plugins |
 | Drag-and-drop blocks | ✅ | Extension | ✅ | ✅ |
 | Lossless Markdown round-trip | ✅ | Partial | ❌ | ❌ |
 
@@ -187,9 +187,9 @@ In short:
   spaces gets one; blank lines containing only spaces become empty; a lazy
   (unindented) continuation line inside a list item gets indented. The
   output is equivalent Markdown, but not the same bytes.
-- **Tables** are parsed and preserved byte-for-byte, but there is no table
-  editing UI in v1 (planned for v1.1). Typing inside a table cell is
-  currently a known bug: the text doesn't reach the output.
+- **Tables:** you can edit the text in any cell — only the edited row is
+  rewritten, and column alignment is kept. Adding or removing rows and
+  columns, and changing alignment, comes in v1.1.
 - **Mobile works but isn't optimized.** Typing, input rules and the slash
   menu work; drag-to-reorder has no touch equivalent yet, and on-screen
   keyboard autocorrect hasn't been measured.

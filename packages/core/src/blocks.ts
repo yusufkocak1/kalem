@@ -676,8 +676,11 @@ function isTableStart(lines: readonly Line[], index: number): boolean {
  *
  * Kenardaki borular isteğe bağlıdır; `\|` kaçırılmış boru hücre ayracı
  * değildir, hücre içeriğidir.
+ *
+ * Serileştirici de kullanıyor (değişen tablo satırını bulmak için); genel
+ * API'nin parçası değil, `index.ts`ten dışa aktarılmıyor.
  */
-function splitRow(value: string): string[] {
+export function splitRow(value: string): string[] {
 	const trimmed = value
 		.trim()
 		.replace(/^\|/, "")

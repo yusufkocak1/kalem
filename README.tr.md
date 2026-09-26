@@ -49,7 +49,7 @@ hepsi CI'da ve Türkçe yerel ayar altında koşuyor.
 | Editör motoru | Kendi **blok-tabanlı** motorumuz — her blok ayrı `contenteditable`. 0 runtime bağımlılığı. |
 | Doğru kaynak | **Markdown metni**, JSON değil. `serialize(parse(md)) === md` |
 | Framework | Vanilla çekirdek + ayrı sarmalayıcı paketler (`peerDependency`). Vue projesine React sızmaz. |
-| Boyut bütçesi | `core` 13 kB · `viewer` 14 kB · `editor+ui` 58 kB (min+gzip), CI'da zorlanır. Bugünkü ölçüler [doküman sitesinde](apps/docs/src/content/docs/mimari.md). |
+| Boyut bütçesi | `core` 14 kB · `viewer` 14 kB · `editor+ui` 58 kB (min+gzip), CI'da zorlanır. Bugünkü ölçüler [doküman sitesinde](apps/docs/src/content/docs/mimari.md). |
 | Tablo | v1 dışı — parser korur, düzenleme UI'ı v1.1 |
 | Mobil | v1'de "çalışır ama optimize değil" |
 | Yayın | Sessiz geliştirme, tek duyuru ile v1.0 |

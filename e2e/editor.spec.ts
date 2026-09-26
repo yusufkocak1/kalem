@@ -152,6 +152,31 @@ test.describe("yazma", () => {
 		await page.locator("#editor .kalem-task input[type=checkbox]").nth(1).click();
 		await expect(page.locator("#cikti")).toContainText("- [x] Enter ile blok bölme");
 	});
+
+	/**
+	 * Tablo hücresine yazılan çıktıya giriyor — ve **yalnızca o satır**
+	 * değişiyor.
+	 *
+	 * F4-03'te bulunan sessiz veri kaybı: hücreler düzenlenebilir çiziliyor,
+	 * model güncelleniyordu ama serileştirici tabloyu ham metinden koşulsuz
+	 * geri yazdığı için yazılan hiçbir şey çıktıya girmiyordu. Artık değişen
+	 * satır yeniden üretiliyor, dokunulmayan satırlar ve sütun hizası
+	 * olduğu gibi kalıyor.
+	 */
+	test("tablo hücresine yazmak çıktıya giriyor, öteki satırlar değişmiyor", async ({ page }) => {
+		const md = "| Ad    | Yaş |\n|:------|----:|\n| Ali   |  30 |\n| Ayşe  |  25 |\n";
+		await page.evaluate((m) => window.kalem.editor.setValue(m), md);
+
+		// Satırlar doğrudan `<table>` altında (`render.ts`); ilki başlık.
+		const hucre = page.locator("#editor table tr").nth(1).locator("td").first();
+		await hucre.click();
+		await page.keyboard.press("End");
+		await page.keyboard.type("can");
+
+		await expect(page.locator("#cikti")).toContainText("| Alican |  30 |");
+		const value = await page.evaluate(() => window.kalem.editor.getValue());
+		expect(value).toBe("| Ad    | Yaş |\n|:------|----:|\n| Alican |  30 |\n| Ayşe  |  25 |\n");
+	});
 });
 
 test.describe("yaşam döngüsü", () => {

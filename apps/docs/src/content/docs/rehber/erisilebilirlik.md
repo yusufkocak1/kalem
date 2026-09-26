@@ -116,9 +116,6 @@ Tema paleti WCAG AA kontrast oranlarını karşılıyor ve axe her temada bunu
 - **Ekran okuyucularla elle test tamamlanmadı.** Otomatik denetim (axe)
   yapısal hataları yakalıyor ama NVDA ve VoiceOver ile gerçek bir okuma
   denemesinin yerini tutmuyor. v1.0 öncesinde yapılacak.
-- **Tablo hücreleri** düzenlenebilir görünüyor ama yazılan metin çıktıya
-  girmiyor; bu hem erişilebilirlik hem doğruluk sorunu ve v1.0 öncesinde
-  kapanacak.
 - **Mobil** "çalışır ama optimize değil": belge yazılabiliyor, dokunmatik
   seçim tutamaçları tarayıcının kendi davranışına bırakılmış durumda.
 :::

@@ -38,8 +38,11 @@ import type {
 	Paragraph,
 	Root,
 	Table,
+	TableRow,
 	ThematicBreak,
 } from "./ast.js";
+import { splitRow } from "./blocks.js";
+import { parseInline } from "./inline.js";
 
 /** Yeni düğümler için yazım varsayılanları. */
 export interface SerializeOptions {
@@ -436,20 +439,133 @@ function definition(node: Definition): string {
 /**
  * Tablo.
  *
- * v1'de düzenleme arayüzü olmadığı için ham metin varsa **olduğu gibi**
- * geri yazılır — hücre dolgusu ve boru hizası korunur. Düzenleme geldiğinde
- * (v1.1) buraya gerçek bir üretici gelecek.
+ * Ham metin (`syntax.raw`) **satır satır** kullanılıyor: modeldeki satır
+ * ham satırla anlamca aynıysa ham satır olduğu gibi yazılıyor — hücre
+ * dolgusu ve boru hizası korunuyor. Değişen satır yeniden üretiliyor.
+ *
+ * Önceki sürüm ham metni koşulsuz geri yazıyordu. Editör hücreleri
+ * düzenlenebilir çiziyor, yani kullanıcı bir hücreye yazabiliyor, model
+ * güncelleniyor ama **yazdığı hiçbir şey çıktıya girmiyordu** (F4-03'te
+ * bulunan sessiz veri kaybı). Tablonun tamamını yeniden üretmek ise tek
+ * kelime için bütün hizalamayı bozardı.
+ *
+ * Satır ekleme, silme ve hizalama arayüzü v1'de yok (Karar #5, v1.1'de
+ * `@kalem/plugin-table`); satır sayısı ham metinle tutmazsa tablo baştan
+ * üretiliyor.
  */
 function table(node: Table, o: Resolved): string {
-	if (node.syntax?.raw !== undefined) return node.syntax.raw;
+	const raw = node.syntax?.raw;
+	if (raw !== undefined) {
+		const satirlar = raw.split("\n");
+		// Başlık + ayraç + gövde. Satır sayısı tutmuyorsa yapı değişmiş
+		// demek; ham metin artık bu tabloyu anlatmıyor.
+		if (satirlar.length === node.children.length + 1) {
+			return satirlar
+				.map((satir, i) => {
+					if (i === 1) return satir;
+					const row = node.children[i === 0 ? 0 : i - 1] as TableRow;
+					return ayniSatir(satir, row) ? satir : tabloSatiri(row, o, satir);
+				})
+				.join("\n");
+		}
+	}
 
-	const rows = node.children.map(
-		(row) => `| ${row.children.map((cell) => inlines(cell.children, o)).join(" | ")} |`,
-	);
+	const rows = node.children.map((row) => tabloSatiri(row, o));
 	const delimiter = `| ${node.align
 		.map((a) => (a === "left" ? ":---" : a === "right" ? "---:" : a === "center" ? ":---:" : "---"))
 		.join(" | ")} |`;
 	return [rows[0] ?? "|  |", delimiter, ...rows.slice(1)].join("\n");
+}
+
+/**
+ * Ham satırdaki hücreler modeldeki hücrelerle anlamca aynı mı.
+ *
+ * Metin değil **ağaç** karşılaştırılıyor: ham hücre yeniden ayrıştırılıp
+ * modeldeki hücreyle kıyaslanıyor. Metin karşılaştırması kaçış farklarında
+ * (`\|`, `\*`) dokunulmamış satırı "değişmiş" sayar ve hizasını bozardı.
+ * `position`, `id` ve `syntax` dışarıda: editörün DOM'dan okuduğu hücre
+ * yazım tercihini taşımıyor ama içerik aynıysa aynı hücredir.
+ */
+function ayniSatir(satir: string, row: TableRow): boolean {
+	const hucreler = splitRow(satir);
+	return row.children.every(
+		(cell, c) => hucreAnahtari(parseInline(hucreler[c] ?? "")) === hucreAnahtari(cell.children),
+	);
+}
+
+/**
+ * Bu konumdaki boru ayraç mı: önünde ters bölü yoksa evet.
+ *
+ * Ayrıştırıcının kuralıyla (`splitRow`) birebir aynı olmak zorunda — ve o
+ * kural cmark-gfm'inki: boru hücreye bölme aşamasında, satır içi kaçışlar
+ * çözülmeden önce ayrılıyor, yani önündeki **tek** ters bölüye bakılıyor.
+ */
+function ayracMi(metin: string, i: number): boolean {
+	return metin[i - 1] !== "\\";
+}
+
+/** Hücre metninde ayraç sayılacak boruları kaçırır. */
+function boruKacir(metin: string): string {
+	let out = "";
+	for (let i = 0; i < metin.length; i++) {
+		out += metin[i] === "|" && ayracMi(metin, i) ? "\\|" : metin[i];
+	}
+	return out;
+}
+
+/** Ayraç borularından böler; parçaların boşlukları korunur (genişlik için). */
+function boruyaGoreBol(metin: string): string[] {
+	const parcalar: string[] = [];
+	let bas = 0;
+	for (let i = 0; i < metin.length; i++) {
+		if (metin[i] === "|" && ayracMi(metin, i)) {
+			parcalar.push(metin.slice(bas, i));
+			bas = i + 1;
+		}
+	}
+	parcalar.push(metin.slice(bas));
+	return parcalar;
+}
+
+const ATLANAN = new Set(["position", "id", "syntax"]);
+
+function hucreAnahtari(nodes: readonly Inline[]): string {
+	return JSON.stringify(nodes, (k, v: unknown) => (ATLANAN.has(k) ? undefined : v));
+}
+
+/**
+ * Bir tablo satırını yazar.
+ *
+ * `ornek` verilirse (değişen satırın ham hâli) onun biçimi korunuyor: kenar
+ * boruları var mıydı, her hücre kaç karakter genişliğindeydi. Yeni içerik
+ * eski genişliğe sığıyorsa boşlukla dolduruluyor — sütunların hizası tek
+ * hücre değişti diye kaymasın. Sığmıyorsa hücre uzuyor; tabloyu yeniden
+ * hizalamak dokunulmamış satırları değiştirmek olurdu.
+ */
+function tabloSatiri(row: TableRow, o: Resolved, ornek?: string): string {
+	// Hücre içindeki boru ayraç sanılmasın.
+	const icerik = row.children.map((cell) => boruKacir(inlines(cell.children, o)));
+	if (ornek === undefined) return `| ${icerik.join(" | ")} |`;
+
+	const govde = ornek.trim();
+	const bas = govde.startsWith("|");
+	const son = govde.length > 1 && govde.endsWith("|") && ayracMi(govde, govde.length - 1);
+	const girinti = ornek.slice(0, ornek.length - ornek.trimStart().length);
+	const ic = govde.slice(bas ? 1 : 0, son ? -1 : undefined);
+	const eskiler = boruyaGoreBol(ic);
+
+	const hucreler = icerik.map((metin, c) => {
+		const eski = eskiler[c];
+		if (eski === undefined) return ` ${metin} `;
+		const sol = eski.length - eski.trimStart().length;
+		const yeni = `${" ".repeat(sol)}${metin}`;
+		// Sağdaki dolgu: en az bir boşluk (varsa), genişlik korunarak.
+		const sagVardi = eski.length > eski.trimEnd().length;
+		return yeni.length + (sagVardi ? 1 : 0) <= eski.length
+			? yeni.padEnd(eski.length)
+			: `${yeni}${sagVardi ? " " : ""}`;
+	});
+	return `${girinti}${bas ? "|" : ""}${hucreler.join("|")}${son ? "|" : ""}`;
 }
 
 // ---------------------------------------------------------------------------

@@ -282,7 +282,7 @@ core  <-  viewer  <-  editor  <-  ui  <-  { react, vue, wc }
 
 | Paket | Bütçe (min+gzip) |
 |---|---|
-| `core` | 13 kB (F6-11 sonrası; önce 12 kB) |
+| `core` | 14 kB (F6-11 sonrası; önce 12 kB) |
 | `viewer` | 14 kB |
 | `editor` (core dahil) | 38 kB |
 | `editor + ui` | 58 kB |

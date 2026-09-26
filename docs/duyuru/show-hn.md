@@ -40,11 +40,11 @@ Other things that may be interesting:
 
 - Block-based engine: each block is its own contenteditable, and the engine owns the model. Zero runtime dependencies.
 - Framework-agnostic: vanilla core, thin React and Vue wrappers, and a form-associated <kalem-editor> custom element for Svelte, Angular or plain HTML.
-- Size budgets enforced in CI: 12.6 kB for the parser/serializer, 35.9 kB for the editor plus the Word-like UI (min+gzip).
+- Size budgets enforced in CI: 13.0 kB for the parser/serializer, 36.3 kB for the editor plus the Word-like UI (min+gzip).
 - No innerHTML anywhere. Raw HTML inside Markdown is kept as text, and links go through a protocol allowlist.
 - Tests run in Chromium, Firefox and WebKit under a Turkish locale, because locale bugs that pass in English tend to fail in Turkish (the dotted/dotless i breaks naive case folding).
 
-What it doesn't do: no table editing UI yet (tables round-trip losslessly, but editing is v1.1), mobile works but isn't polished, and there's no real-time collaboration.
+What it doesn't do: tables are only partly editable (cell text yes; adding rows and columns is v1.1), mobile works but isn't polished, and there's no real-time collaboration.
 
 A note on language: I'm in Turkey. The API, types, UI strings and README are in English; the source comments, design docs and (for now) the docs site are in Turkish.
 

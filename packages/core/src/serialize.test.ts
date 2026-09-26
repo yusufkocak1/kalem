@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Block, Inline, Root } from "./ast.js";
+import { replaceAt } from "./edit.js";
 import { parse } from "./parse.js";
 import { serialize } from "./serialize.js";
 
@@ -563,5 +564,63 @@ describe("yazım alışkanlıkları korunuyor", () => {
 		const md = satirIci(s);
 		expect(md).not.toBe("***x***");
 		expect(serialize(parse(md))).toBe(md);
+	});
+});
+
+/**
+ * Tablo hücresi düzenlemesi  (F4-03'te bulunan veri kaybı)
+ *
+ * Serileştirici tabloyu ham metinden koşulsuz geri yazıyordu: editörde bir
+ * hücreye yazılan hiçbir şey çıktıya girmiyordu. Artık ham metin satır
+ * satır kullanılıyor ve yalnızca değişen satır yeniden üretiliyor.
+ */
+describe("tablo hücresi düzenlemesi", () => {
+	const TABLO = "| Ad    | Yaş |\n|:------|----:|\n| Ali   |  30 |\n| Ayşe  |  25 |\n";
+	const hucre = (value: string) => ({
+		type: "tableCell" as const,
+		children: [{ type: "text" as const, value }],
+	});
+
+	it("dokunulmamış tablo byte-birebir", () => {
+		expect(serialize(parse(TABLO))).toBe(TABLO);
+	});
+
+	it("yalnızca değişen satır yeniden yazılıyor, hiza korunuyor", () => {
+		const doc = replaceAt(parse(TABLO), [0, 1, 0], hucre("Veli"));
+		expect(serialize(doc)).toBe(
+			"| Ad    | Yaş |\n|:------|----:|\n| Veli  |  30 |\n| Ayşe  |  25 |\n",
+		);
+	});
+
+	it("sığmayan içerik hücreyi uzatıyor, öteki satırlara dokunmuyor", () => {
+		const doc = replaceAt(parse(TABLO), [0, 2, 0], hucre("Ayşe Nur"));
+		expect(serialize(doc)).toBe(
+			"| Ad    | Yaş |\n|:------|----:|\n| Ali   |  30 |\n| Ayşe Nur |  25 |\n",
+		);
+	});
+
+	it("hücredeki boru kaçırılıyor ve gidiş-dönüş tutuyor", () => {
+		const doc = replaceAt(parse(TABLO), [0, 1, 0], hucre("a|b"));
+		const md = serialize(doc);
+		expect(md).toContain("| a\\|b  |");
+		expect(serialize(parse(md))).toBe(md);
+	});
+
+	it("kaçışlı boru içeren dokunulmamış satır değişmiyor", () => {
+		const md = "| a \\| b | c |\n|---|---|\n| x | y |\n";
+		expect(serialize(parse(md))).toBe(md);
+	});
+
+	it("kenar borusu olmayan satırın biçimi korunuyor", () => {
+		const md = "a | b\n--|--\nx | y\n";
+		const doc = replaceAt(parse(md), [0, 1, 1], hucre("z"));
+		expect(serialize(doc)).toBe("a | b\n--|--\nx | z\n");
+	});
+
+	it("satır sayısı ham metinle uyuşmazsa tablo baştan üretiliyor", () => {
+		const doc = parse(TABLO);
+		const tablo = doc.children[0] as Extract<Block, { type: "table" }>;
+		const kisalmis = replaceAt(doc, [0], { ...tablo, children: tablo.children.slice(0, 2) });
+		expect(serialize(kisalmis)).toBe("| Ad | Yaş |\n| :--- | ---: |\n| Ali | 30 |\n");
 	});
 });

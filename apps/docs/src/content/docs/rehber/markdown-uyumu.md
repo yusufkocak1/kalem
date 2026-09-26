@@ -61,16 +61,20 @@ Bunlar ham metin olarak korunuyor; yani bir belgede varsa
 
 ## Tablolar
 
-Tablolar ayrıştırılıyor ve gösteriliyor ama Markdown'a **ham hâlleriyle**
-geri yazılıyor (`TableSyntax.raw`). Sebep hizalama: bir hücrenin metnini
-değiştirmek bütün sütun genişliklerini yeniden hesaplamayı gerektiriyor ve
-sonuç, kullanıcının elle hizaladığı tabloyu bozuyor.
+Tablolar ayrıştırılıyor, gösteriliyor ve **hücre metni düzenlenebiliyor.**
+Markdown'a satır satır geri yazılıyor: dokunulmayan satır ham hâliyle
+(`TableSyntax.raw`) kalıyor, düzenlenen satır yeniden üretiliyor. Yeni
+satır eski satırın biçimini koruyor — kenar boruları ve hücre genişlikleri
+aynı; yeni metin eski genişliğe sığıyorsa boşlukla dolduruluyor, sığmıyorsa
+yalnızca o hücre uzuyor.
 
-:::caution[Bilinen kısıt]
-Tablo hücreleri şu an düzenlenebilir çiziliyor ama yazılan metin çıktıya
-**girmiyor**. Tablo düzenleme v1.0 öncesinde ya tamamlanacak ya da hücreler
-salt okunur hâle gelecek. Takip:
-[iş listesi, açık işler](https://github.com/yusufkocak1/kalem/blob/main/docs/01-is-listesi.md).
+Bütün tabloyu yeniden hizalamak bilinçli olarak yapılmıyor: tek kelime için
+elle hizalanmış bir tablonun her satırını değiştirmek, dokunulmamış
+satırları değiştirmek olurdu.
+
+:::note[v1.1]
+Satır ve sütun ekleme/silme ile hizalama değiştirme `@kalem/plugin-table`
+ile geliyor (Karar #5).
 :::
 
 ## Locale duyarlı davranış

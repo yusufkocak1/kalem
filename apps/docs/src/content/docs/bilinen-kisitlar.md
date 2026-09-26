@@ -123,8 +123,6 @@ sınanmadı:
 - **Linux'ta görsel referanslar.** Görsel regresyon anlık görüntüleri
   Windows'ta üretildi; Linux'ta font işleme farklı olduğu için o
   platformda referanslar henüz yok.
-- **Tablo hücresine yazmak.** Hücreler düzenlenebilir görünüyor ama
-  yazılan metin çıktıya ulaşmıyor; bilinen ve açık bir hata.
 
 ## Bir kısıtla karşılaştıysanız
 

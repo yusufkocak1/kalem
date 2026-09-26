@@ -29,15 +29,21 @@
  *
  * Önce `pnpm build` gerekiyor (`size-limit` derlenmiş çıktıyı ölçüyor).
  *
- * Kullanım: node scripts/guard-sizes.mjs [--quiet]
+ * `--fix` eski sayıları ölçümle **yerinde** değiştiriyor — biçim (birim,
+ * hane, ayırıcı) korunarak. Paket büyüdüğünde on beş dosyayı elle
+ * düzeltmek yerine bir komut; kayıp iddialar yine elle düzeltilmeli, çünkü
+ * orada metnin kendisi değişmiş.
+ *
+ * Kullanım: node scripts/guard-sizes.mjs [--quiet] [--fix]
  */
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const KOK = fileURLToPath(new URL("../", import.meta.url));
 const SESSIZ = process.argv.includes("--quiet");
+const DUZELT = process.argv.includes("--fix");
 const DOCS = "apps/docs/src/content/docs";
 
 // size-limit girdilerinin adları (.size-limit.json)
@@ -55,12 +61,12 @@ const SAYI = String.raw`(\d+(?:[.,]\d+)? k?B)`;
 /** Etiketten sonra, aynı satırdaki ilk boyut. Tablo satırları için. */
 function sonra(etiket) {
 	const kacis = etiket.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-	return new RegExp(`${kacis}[^\\n]*?${SAYI}`);
+	return new RegExp(`${kacis}[^\\n]*?${SAYI}`, "d");
 }
 
 /** Serbest desen: `SAYI` yer tutucusu boyutu yakalıyor. */
 function desen(kaynak) {
-	return new RegExp(kaynak.replaceAll("SAYI", SAYI));
+	return new RegExp(kaynak.replaceAll("SAYI", SAYI), "d");
 }
 
 /**
@@ -195,6 +201,9 @@ export function bicimle(bayt, ornek) {
 const olcumler = olc();
 const hatalar = [];
 let denetlenen = 0;
+let duzeltilen = 0;
+/** `--fix` için dosya başına bekleyen değişiklikler: [başlangıç, bitiş, yeni]. */
+const degisiklikler = new Map();
 
 const toplam = (ad) => {
 	const adlar = Array.isArray(ad) ? ad : [ad];
@@ -220,11 +229,30 @@ for (const { dosya, desen: re, olcum } of IDDIALAR) {
 		const beklenen = bicimle(toplam(hedefler[i]), yazilan);
 		denetlenen++;
 		if (yazilan !== beklenen) {
+			if (DUZELT) {
+				const [bas, bit] = m.indices[i + 1];
+				if (!degisiklikler.has(dosya)) degisiklikler.set(dosya, []);
+				degisiklikler.get(dosya).push([bas, bit, beklenen]);
+				continue;
+			}
 			const satir = metin.slice(0, m.index).split("\n").length;
 			hatalar.push(`${dosya}:${satir}  "${yazilan}" yazıyor, ölçüm ${beklenen}`);
 		}
 	}
 }
+
+// Sondan başa uygulanıyor: öndeki bir değişiklik arkadakilerin konumunu
+// kaydırmasın.
+for (const [dosya, liste] of degisiklikler) {
+	const yol = join(KOK, dosya);
+	let metin = readFileSync(yol, "utf8");
+	for (const [bas, bit, yeni] of liste.sort((a, b) => b[0] - a[0])) {
+		metin = metin.slice(0, bas) + yeni + metin.slice(bit);
+		duzeltilen++;
+	}
+	writeFileSync(yol, metin);
+}
+if (duzeltilen > 0) console.log(`Boyut kapısı: ${duzeltilen} sayı ölçümle güncellendi.`);
 
 if (hatalar.length > 0) {
 	console.error(`Boyut kapısı: ${hatalar.length} eski ya da kayıp iddia\n`);
