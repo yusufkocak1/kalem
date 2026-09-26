@@ -44,14 +44,13 @@
 ### 👉 Şu an buradayız
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
-**`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi ve F3-11'in Linux
-referansları hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03` · `F6-04` · `F6-05` · `F6-06` · `F6-07` · `F6-08` · `F6-09` · `F6-10` · `F6-11`
+**`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03` · `F6-04` · `F6-05` · `F6-06` · `F6-07` · `F6-08` · `F6-09` · `F6-10` · `F6-11`
 
 **Sıradaki:** `F6-12` Yayın provası.
 
-**Açık işler:** NVDA/VoiceOver ile elle test (F3-10), Linux görsel
-referansları (F3-11) ve `apps/notlar`ın iki haftalık günlük kullanımı
-(F5-05) — üçü de bir insanın masasında yapılmak zorunda.
+**Açık işler:** NVDA/VoiceOver ile elle test (F3-10) ve `apps/notlar`ın
+iki haftalık günlük kullanımı (F5-05) — ikisi de bir insanın masasında
+yapılmak zorunda.
 Ayrıca **İngilizce doküman sitesi** (içerik yalnızca
 Türkçe — İngilizce duyurudan önce karar gerekiyor), playground'un
 barındırılması ve `kalem.dev` alan adı (403 dönüyor).
@@ -1185,6 +1184,19 @@ eksik olan karşılaştırma ölçütü. Depoda şu an yalnızca
 > için o iş bir kez `pnpm e2e --update-snapshots` ile koşturulup
 > `*-chromium-linux.png` dosyaları commit'lenmeli; gerekçe ve adımlar
 > `ci.yml` içinde yazılı. Windows'ta üretilenler oraya taşınamaz.
+
+>
+> **Kapandı (Faz 6 sonu).** 18 Linux referansı Playwright'ın resmi
+> imajında (`mcr.microsoft.com/playwright:v1.63.0-noble`) üretildi ve CI'daki
+> tarayıcı işi de artık **aynı imajda** koşuyor — `ubuntu-latest`in kendi
+> yazı tipleri pikseli değiştirebilirdi.
+>
+> **İlk deneme yanlıştı ve yakalandı.** Referansları `LANG` vermeden
+> üretip Türkçe yerel ayarla (CI'ın ayarı) karşılaştırınca 18 testin
+> hepsi kırmızıydı: 250–370 piksel fark, bazı öğeler 1 piksel dar.
+> fontconfig yazı tipini `LANG`'a göre seçiyor. Referanslar CI'ın yerel
+> ayarıyla yeniden üretildi ve aynı konteynerde iki ayrı karşılaştırma
+> koşusunda 18/18 geçti.
 
 **Testlerin gerçekten yakaladığı doğrulandı:** balon çubuğunun `gap`
 değeri 2px → 9px yapılınca üç temada da kırmızıya döndüler. Ardışık iki

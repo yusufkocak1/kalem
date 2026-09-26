@@ -111,6 +111,11 @@ düşürülüyor. Görsellerde ayrıca `data:image/png|jpeg|gif|webp|avif`
 kabul ediliyor; `data:image/svg+xml` **kasten dışarıda**, çünkü SVG
 içinde script çalışıyor.
 
+**Tablolar kısmen düzenlenebilir.** Hücre metni düzenlenebiliyor; yalnızca
+düzenlenen satır yeniden yazılıyor ve sütun hizası korunuyor. Satır ve
+sütun ekleme/silme ile hizalama değiştirme v1.1'de `@kalem/plugin-table`
+ile geliyor.
+
 ## Henüz ölçülmemiş
 
 Dürüst olmak gerekirse bu maddeler "çalışıyor" demeye yetecek kadar
@@ -120,9 +125,16 @@ sınanmadı:
   otomatik olarak `axe` ile her koşuda denetleniyor ve klavye gezinmesi
   testlerle sabitleniyor, ama bir ekran okuyucunun deneyimi elle
   dinlenmedi.
-- **Linux'ta görsel referanslar.** Görsel regresyon anlık görüntüleri
-  Windows'ta üretildi; Linux'ta font işleme farklı olduğu için o
-  platformda referanslar henüz yok.
+
+## Birkaç nadir Markdown kalıbı normalleşiyor
+
+Dokunmadığınız satır, yazarların gerçekten sahip olduğu alışkanlıklarda
+byte-birebir geri geliyor — `1.` `1.` `1.` numaralandırma, dört boşluklu
+iç liste, işaretten sonra fazla boşluk, satır sonu boşluğu, tembel alıntı
+satırı. Birkaç nadir kalıp hâlâ normalleşiyor: paragraf içinde girintili
+devam satırı, `#  Başlık` (iki boşluk), yalnızca boşluktan oluşan ara
+satır ve liste maddesinde girintisiz (tembel) devam satırı. Çıktı eşdeğer
+Markdown, ama aynı baytlar değil.
 
 ## Bir kısıtla karşılaştıysanız
 

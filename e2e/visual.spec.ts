@@ -31,8 +31,9 @@ import { expect, test } from "@playwright/test";
  * `pnpm e2e --update-snapshots` çalıştırıp referansı üretiyor ve commit'e
  * ekliyor.
  *
- * CI (`ubuntu-latest`) için referanslar Linux'ta üretilmeli; Windows'ta
- * üretilenler oraya taşınamaz.
+ * CI için Linux referansları (`*-chromium-linux.png`) Playwright'ın resmi
+ * imajında, CI ile aynı yerel ayarla üretildi; CI'daki tarayıcı işi de aynı
+ * imajda koşuyor. Yeniden üretme komutu `ci.yml` içinde.
  */
 
 declare global {

@@ -79,6 +79,25 @@ jobs:
   tarayici:
     name: tarayıcı testleri
     runs-on: ubuntu-latest
+    # Görsel regresyon (F3-11) referansları yazı tipi çizimine bağlı. İş
+    # Playwright'ın resmi imajında koşuyor, çünkü Linux referansları
+    # **aynı imajda** üretildi: `ubuntu-latest`in kendi yazı tipleri
+    # (`playwright install --with-deps` ile gelenler dâhil) pikseli
+    # değiştirebiliyor. Etiket `@playwright/test` sürümüyle aynı olmalı —
+    # biri güncellenince öteki de.
+    #
+    # Referansları yeniden üretmek (CSS bilerek değiştiğinde):
+    #   docker run --rm --ipc=host -v "$PWD:/src" -w /src \
+    #     mcr.microsoft.com/playwright:v1.63.0-noble \
+    #     bash -c "npm i -g pnpm@10.18.2 && pnpm install && \
+    #       pnpm exec playwright test e2e/visual.spec.ts --project=chromium --update-snapshots"
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    env:
+      # Firefox imajda root olarak koşarken HOME'u kendi dizini sanmazsa
+      # açılmıyor (Playwright belgelerindeki kurulum).
+      HOME: /root
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -87,15 +106,6 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium firefox webkit
-      # Görsel regresyon (F3-11) referansları platforma bağlı: yazı tipi
-      # çizimi Windows ile Linux arasında birebir aynı değil. Bu iş
-      # `ubuntu-latest`te koşuyor; Linux referansları depoda yoksa o
-      # testler **atlanıyor** ve sebebi raporda yazıyor.
-      #
-      # Linux referanslarını üretmek için bu iş bir kez
-      # `pnpm e2e --update-snapshots` ile koşturulup üretilen
-      # `e2e/visual.spec.ts-snapshots/*-linux.png` dosyaları commit'lenmeli.
       - run: pnpm e2e
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
