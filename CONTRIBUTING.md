@@ -1,123 +1,143 @@
-# Katkı Rehberi
+# Contributing
 
-> **Not:** Kalem şu anda **sessiz geliştirme** aşamasında (bkz. [iş listesi](docs/01-is-listesi.md), Karar #3).
-> v1.0 öncesi dış katkı beklentisi düşük; yine de bir hata bulursan issue aç.
+*English · [Türkçe](CONTRIBUTING.tr.md)*
 
-## Kurulum
+Thanks for looking. Bug reports are the most valuable contribution right
+now — especially **a Markdown document that doesn't survive the round trip**
+(opening it in Kalem and saving it without edits changes it). There's an
+issue template for exactly that.
+
+## Setup
 
 ```bash
 pnpm install
-pnpm verify     # lint + tip + test + build + kapılar + boyut + publint
+pnpm verify     # lint + types + tests + build + gates + size + publint
+pnpm e2e        # browser tests: Chromium, Firefox, WebKit
 ```
 
-Node ≥ 20 (geliştirme için 22 önerilir, `.nvmrc`), pnpm 10.
+Node ≥ 20 (22 recommended for development, `.nvmrc`), pnpm 10.
 
-## Depo yapısı
+## Repository layout
 
-| Yol | Ne | Yayımlanır mı |
+| Path | What | Published |
 |---|---|---|
-| `packages/*` | Kütüphanenin kendisi | **Evet** — npm'e |
-| `apps/demo` | Mimari doğrulama prototipi | Hayır |
-| `apps/docs` | Astro Starlight doküman sitesi | Hayır |
-| `docs/` | Analiz ve yol haritası | Hayır |
-| `scripts/` | Koruyucu kapılar ve yardımcılar | Hayır |
+| `packages/*` | The library itself | **Yes** — to npm |
+| `apps/docs` | Astro Starlight documentation site (English and Turkish) | No |
+| `apps/playground` | The playground | No |
+| `apps/notlar` | A notes app built on the library (dogfooding) | No |
+| `apps/demo` | Test fixtures for the browser tests | No |
+| `examples/*` | React, Next.js, Vue, Nuxt, Svelte, Angular and plain HTML apps | No |
+| `docs/` | Analysis and roadmap (Turkish) | No |
+| `scripts/` | Guard gates and tools | No |
 
-`apps/*` altındaki her şey `private: true`. Astro, sharp gibi ağır araçlar
-yalnızca burada yaşar; **kullanıcının `node_modules`'ına asla girmezler.**
+Everything under `apps/*` and `examples/*` is `private: true`. Heavy tools
+like Astro and sharp live only there; **they never reach a user's
+`node_modules`.**
 
-## Pazarlıksız kurallar
+## A note on language
 
-Bunlar projenin var oluş sebebi. CI bunları otomatik zorlar, tartışmaya açık değildir.
+Kalem was built in Turkey. Source comments, commit messages and the design
+documents in `docs/` are in Turkish. **You don't need to write Turkish:**
+issues, pull requests and code comments in English are welcome.
 
-### 1. Çekirdek paketlerde 3rd-party bağımlılık yok
+Anything a developer sees at runtime is in English: thrown error messages
+and console output. UI strings come from dictionaries (`labels.ts`) and
+follow the document's language.
 
-`packages/{core,viewer,editor,ui}` yalnızca birbirlerine bağımlı olabilir.
-Bir yardımcı kütüphaneye ihtiyacın varsa: kodu içeri al, ya da opsiyonel bir
-eklenti paketine taşı.
+## Non-negotiable rules
 
-`pnpm guard:purity` bunu denetler.
+These are the reason the project exists. CI enforces them automatically.
 
-### 2. Framework sızıntısı yok
+### 1. No third-party dependencies in the core packages
 
-Üretim bundle'ında `react` / `vue` / `preact` / `svelte` izi olamaz.
-Kullanıcının Vue projesine React girmemesi bu kütüphanenin temel vaadi.
+`packages/{core,viewer,editor,ui}` may depend only on each other. If you
+need a helper library: bring the code in, or move the feature into an
+optional plugin package.
 
-Framework bağı yalnızca `@kalem/react`, `@kalem/vue` sarmalayıcılarında,
-`peerDependencies` olarak bulunur.
+`pnpm guard:purity` checks this.
 
-### 3. `@kalem/core` DOM'a dokunmaz
+### 2. No framework leakage
 
-Core sunucuda (SSR, Node, worker) çalışabilmeli. `document`, `window`,
-`navigator`, `localStorage` core'da yasak — tip düzeyinde de engelli
-(`packages/core/tsconfig.json` içinde `lib`, DOM içermez).
+No trace of `react` / `vue` / `preact` / `svelte` may appear in a production
+bundle. React never getting into a user's Vue project is a core promise of
+this library.
 
-### 4. Locale duyarlılığı ⭐
+Framework bindings live only in the `@kalem/react` and `@kalem/vue` wrappers,
+as `peerDependencies`.
 
-Çıplak `toLowerCase()`, `toUpperCase()`, tek argümanlı `localeCompare()` **yasak.**
+### 3. `@kalem/core` doesn't touch the DOM
+
+The core must run on the server (SSR, Node, workers). `document`, `window`,
+`navigator` and `localStorage` are forbidden in core — blocked at the type
+level too (`lib` in `packages/core/tsconfig.json` has no DOM).
+
+### 4. Locale sensitivity ⭐
+
+A bare `toLowerCase()`, `toUpperCase()` or single-argument
+`localeCompare()` is **forbidden.**
 
 ```js
-"Işık".toLowerCase()              // → "işık"  ✗  Türkçe'de yanlış
+"Işık".toLowerCase()              // → "işık"  ✗  wrong in Turkish
 "Işık".toLocaleLowerCase("tr")    // → "ışık"  ✓
 "iyi".toUpperCase()               // → "IYI"   ✗
 "iyi".toLocaleUpperCase("tr")     // → "İYİ"   ✓
 ```
 
-Bu çağrılar **patlamaz, sessizce yanlış sonuç verir** — İngilizce yazılmış
-testler asla yakalamaz. Bu yüzden derleme zamanında engellenirler.
+These calls **don't crash, they silently return the wrong result** — tests
+written in English never catch them. That's why they're blocked at build
+time.
 
-Gerçekten locale'den bağımsız bir karşılaştırma gerekiyorsa (protokol adı,
-HTML etiketi, dosya uzantısı) satıra gerekçesini yaz:
+If you genuinely need a locale-independent comparison (a protocol name, an
+HTML tag, a file extension), write the reason on the line:
 
 ```js
-const proto = url.toLowerCase(); // kalem-locale-ok: URL şeması ASCII
+const proto = url.toLowerCase(); // kalem-locale-ok: URL scheme is ASCII
 ```
 
-`pnpm guard:locale` bunu denetler.
+`pnpm guard:locale` checks this.
 
-### 5. Boyut bütçesi
+### 5. Size budgets
 
-| Paket | Bütçe (min+gzip) |
+| Package | Budget (min+gzip) |
 |---|---|
 | `@kalem/core` | 14 kB |
 | `@kalem/viewer` | 14 kB |
-| `@kalem/editor` (core dahil) | 38 kB |
+| `@kalem/editor` (core included) | 38 kB |
 | `@kalem/editor` + `@kalem/ui` | 58 kB |
 
-`pnpm size` bunu denetler. Bütçe aşımı build'i kırar — bütçeyi yükseltmek
-bir karardır, PR'da gerekçelendirilmelidir.
+`pnpm size` checks this. Going over budget fails the build — raising a
+budget is a decision, and it needs a justification in the PR.
 
-Belgelerde yazan boyutlar (README, doküman sitesi, duyuru metinleri)
-`pnpm guard:sizes` ile ölçüme karşı denetlenir. Paket büyüdüyse
-`node scripts/guard-sizes.mjs --fix` sayıları biçimini koruyarak günceller.
+Sizes written in the docs (README, documentation site, announcement drafts)
+are checked against the measurement by `pnpm guard:sizes`. If a package
+grew, `node scripts/guard-sizes.mjs --fix` updates the numbers while keeping
+their format.
 
-### 6. Dil: kod Türkçe, geliştiriciye görünen İngilizce
+### 6. Round-trip fidelity
 
-Kaynak kodun yorumları, değişken adları, commit mesajları ve `docs/` Türkçe.
-Ama **geliştiricinin konsoluna düşen her şey İngilizce**: fırlatılan hata
-mesajları (`throw new Error(...)`), `must()` etiketleri ve konsol uyarıları.
-Kütüphane uluslararası yayımlanıyor; Türkçe bilmeyen geliştirici hatayı
-okuyabilmeli.
+`serialize(parse(md)) === md` for the corpus in `packages/core/fixtures/`,
+and serialization must stay idempotent. If you fix a normalization, add the
+pattern to the corpus.
 
-Kullanıcıya görünen arayüz metni ise bunların hiçbiri değil: o her zaman
-sözlükten gelir (`labels.ts`), belgenin diline göre.
-
-## Koruyucu kapılar bozulursa
+## If the guard gates break
 
 ```bash
 pnpm guard:selftest
 ```
 
-Kapıların hâlâ ihlalleri yakaladığını doğrular. Bu test kırmızıysa kapılar
-artık hiçbir şeyi korumuyor demektir — önce onu düzelt.
+This verifies that the gates still catch violations. If it's red, the gates
+no longer protect anything — fix that first.
 
-## Changeset
+## Changesets
 
-Davranış değiştiren her PR bir changeset içermeli:
+Every PR that changes behavior should include a changeset:
 
 ```bash
 pnpm changeset
 ```
 
-## Kod stili
+All `@kalem/*` packages share one version number (`fixed` group).
 
-Biome. `pnpm format` her şeyi düzeltir. Tartışma yok, araç karar verir.
+## Code style
+
+Biome. `pnpm format` fixes everything. No debate; the tool decides.

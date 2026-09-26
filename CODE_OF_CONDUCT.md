@@ -1,33 +1,37 @@
-# Davranış Kuralları
+# Code of Conduct
 
-## Taahhüdümüz
+*English · [Türkçe](CODE_OF_CONDUCT.tr.md)*
 
-Bu projeye katılan herkes için tacizden uzak bir ortam sağlamayı taahhüt
-ediyoruz — yaş, beden, engellilik, etnik köken, cinsiyet kimliği ve ifadesi,
-deneyim seviyesi, eğitim, sosyoekonomik durum, milliyet, görünüş, ırk, din
-veya cinsel kimlik fark etmeksizin.
+## Our pledge
 
-## Beklenen davranış
+We pledge to make participation in this project a harassment-free experience
+for everyone — regardless of age, body size, disability, ethnicity, gender
+identity and expression, level of experience, education, socio-economic
+status, nationality, personal appearance, race, religion, or sexual
+identity and orientation.
 
-- Farklı görüş ve deneyimlere saygı göstermek
-- Yapıcı eleştiriyi nazikçe vermek ve kabul etmek
-- Topluluk için en iyisine odaklanmak
-- Hata yaptığında sorumluluğu üstlenmek
+## Expected behavior
 
-## Kabul edilmeyen davranış
+- Being respectful of differing opinions and experiences
+- Giving and gracefully accepting constructive feedback
+- Focusing on what is best for the community
+- Taking responsibility when you make a mistake
 
-- Cinselleştirilmiş dil, imge veya istenmeyen ilgi
-- Trolleme, aşağılayıcı yorumlar, kişisel veya politik saldırılar
-- Kamuya açık veya özel taciz
-- Başkalarının özel bilgilerini izinsiz paylaşmak
+## Unacceptable behavior
 
-## Uygulama
+- Sexualized language or imagery, and unwelcome attention
+- Trolling, insulting or derogatory comments, and personal or political attacks
+- Public or private harassment
+- Publishing others' private information without their explicit permission
 
-İhlalleri proje sahibine GitHub üzerinden bildirebilirsiniz. Tüm şikâyetler
-incelenir ve gizlilik korunur. Proje bakımcıları bu kurallara uymayan yorum,
-commit, kod, issue ve diğer katkıları kaldırma hakkını saklı tutar.
+## Enforcement
 
-## Kaynak
+You can report violations to the project owner through GitHub. All
+complaints will be reviewed, and privacy will be respected. Maintainers
+reserve the right to remove comments, commits, code, issues and other
+contributions that don't follow this code of conduct.
 
-Bu metin [Contributor Covenant](https://www.contributor-covenant.org)
-v2.1'den uyarlanmıştır.
+## Attribution
+
+This text is adapted from the [Contributor Covenant](https://www.contributor-covenant.org),
+version 2.1.

@@ -87,7 +87,7 @@ Node ≥ 20 (önerilen 22, `.nvmrc`), pnpm 10.
 | `pnpm guard:sizes` | Belgelerde yazan her boyut bugünkü ölçümle aynı mı |
 | `pnpm guard:selftest` | **Kapıların kendisi hâlâ ihlalleri yakalıyor mu** |
 
-Ayrıntı: [CONTRIBUTING.md](CONTRIBUTING.md)
+Ayrıntı: [CONTRIBUTING.tr.md](CONTRIBUTING.tr.md)
 
 ## Denemek
 

@@ -1,53 +1,64 @@
-# Güvenlik Politikası
+# Security Policy
 
-## Desteklenen sürümler
+*English · [Türkçe](SECURITY.tr.md)*
 
-Kalem henüz yayımlanmadı (v1.0 öncesi). İlk kararlı sürüm çıktığında bu bölüm
-desteklenen sürüm aralığıyla güncellenecek.
+## Supported versions
 
-## Açık bildirimi
-
-Güvenlik açıklarını **herkese açık issue olarak açma.**
-
-GitHub üzerinden özel bildirim kullan:
-**Security → Report a vulnerability** (private vulnerability reporting).
-
-Yanıt hedefi: 72 saat içinde ilk dönüş, 90 gün içinde düzeltme veya
-gerekçeli açıklama.
-
-## Tehdit modeli
-
-Kalem, **güvenilmeyen Markdown'ı** güvenilir bir sayfada render edebilmelidir.
-Aşağıdakiler açık kabul edilir:
-
-| Senaryo | Beklenen davranış |
+| Version | Supported |
 |---|---|
-| Markdown içinde `<script>` | Metin olarak kaçırılır, çalıştırılmaz |
-| `[t](javascript:alert(1))` | Bağlantı reddedilir veya etkisizleştirilir |
-| `<img onerror=...>` | Öznitelik render edilmez |
-| Word'den yapıştırma | Temizlenir; stil/script taşınmaz |
-| SSR (`renderToString`) | İstemci tarafıyla aynı kaçışlama garantisi |
+| 1.x | ✅ security fixes |
+| < 1.0 | ❌ never published |
 
-### Mimari savunma
+## Reporting a vulnerability
 
-Render **AST'den DOM API ile** yapılır (`createElement` + `textContent`),
-ham HTML string'den değil. `innerHTML` üretim yolunda kullanılmaz. Bu, XSS
-yüzeyinin büyük kısmını *yapısal olarak* ortadan kaldırır — DOMPurify gibi
-bir sanitizer bağımlılığı gerekmez.
+**Please don't open a public issue for a security vulnerability.**
 
-Geriye kalan yüzeyler ve savunmaları:
+Use GitHub's private reporting instead:
+**Security → Report a vulnerability** on this repository.
 
-- **URL protokolleri** — izin listesi (`http`, `https`, `mailto`, `tel`,
-  göreli yollar). `javascript:`, `data:`, `vbscript:` reddedilir.
-- **Ham HTML blokları** — varsayılan olarak kaçırılır. `allowDangerousHtml`
-  seçeneği açıkça açılmadıkça render edilmez; açıldığında sorumluluk
-  çağıranındır ve bu dokümante edilir.
-- **Yapıştırma** — gelen HTML kendi normalleştiricimizden geçer, izin verilen
-  yapı dışındaki her şey düşer.
+Response targets: a first reply within 72 hours, and a fix or a reasoned
+explanation within 90 days.
 
-## Kapsam dışı
+## Threat model
 
-- Bağımlılık zinciri açıkları — çekirdek paketlerin 3rd-party bağımlılığı yok
-  (`pnpm guard:purity` bunu zorlar), zincir de yok.
-- `allowDangerousHtml: true` ile bilinçli olarak açılan ham HTML render'ı.
-- `apps/demo` ve `apps/docs` — yayımlanmayan geliştirme araçları.
+Kalem must be able to render **untrusted Markdown** on a trusted page. The
+following are considered vulnerabilities:
+
+| Scenario | Expected behavior |
+|---|---|
+| `<script>` inside Markdown | Escaped as text, never executed |
+| `[t](javascript:alert(1))` | The link is neutralized (`#`) |
+| `<img onerror=...>` | Raw HTML is escaped by default; no attribute is rendered |
+| `![x](data:image/svg+xml,...)` | Rejected — scripts run inside SVG |
+| Pasting from Word or a web page | Converted to the AST; styles and scripts aren't carried over |
+| SSR (`renderToString`) | The same escaping guarantees as the client |
+
+### Architectural defense
+
+Rendering is done **from the AST with DOM APIs** (`createElement` +
+`createTextNode`), not from an HTML string. `innerHTML` isn't used on any
+production path. That removes most of the XSS surface *structurally* — no
+sanitizer dependency like DOMPurify is needed.
+
+The remaining surfaces and their defenses:
+
+- **URL protocols** — an allowlist: `http:`, `https:`, `mailto:`, `tel:`,
+  `ftp:` and relative paths. Everything else, `javascript:` and `vbscript:`
+  included, is neutralized. Images additionally accept
+  `data:image/png|jpeg|gif|webp|avif`; `data:image/svg+xml` is rejected.
+- **Raw HTML** — escaped by default (`html: "escape"`). With `html: "allow"`
+  the library still doesn't parse HTML: it hands the string to the caller's
+  `renderRawHtml` / `sanitizeHtml` hooks, and sanitizing becomes the
+  caller's responsibility (documented).
+- **Pasting** — incoming HTML goes through Kalem's own converter
+  (`@kalem/core/html`) into the AST; anything outside the allowed structure
+  is dropped.
+
+## Out of scope
+
+- Supply-chain vulnerabilities in dependencies — the core packages have no
+  third-party dependencies (`pnpm guard:purity` enforces this).
+- Raw HTML rendered after deliberately opting in with `html: "allow"`
+  without sanitizing it.
+- `apps/*` and `examples/*` — development tools and demos that aren't
+  published.

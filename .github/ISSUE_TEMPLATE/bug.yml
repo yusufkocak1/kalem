@@ -1,0 +1,36 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you expected, and what you saw instead.
+    validations: { required: true }
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+    validations: { required: true }
+  - type: textarea
+    id: markdown
+    attributes:
+      label: Related Markdown (if any)
+      description: The smallest piece of Markdown that triggers the problem.
+      render: markdown
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: "Chrome 140 / Windows 11 / @kalem/editor 1.0.0 / React 19"
+    validations: { required: true }
+  - type: input
+    id: lang
+    attributes:
+      label: Document language (lang)
+      description: Matters for locale-sensitive bugs — search, case folding, number format.
+      placeholder: "en"

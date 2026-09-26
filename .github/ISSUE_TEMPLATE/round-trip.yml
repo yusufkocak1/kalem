@@ -1,0 +1,36 @@
+name: Round-trip bug
+description: A Markdown document changes when opened and saved without edits
+labels: ["round-trip"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Kalem promises that a line you didn't touch comes back byte-for-byte.
+        If you have a document where that isn't true, this is the most useful
+        report you can send. The smallest input that reproduces it is best.
+
+        You can check without the editor:
+        ```js
+        import { parse, serialize } from '@kalem/core';
+        serialize(parse(input)) === input; // false?
+        ```
+  - type: textarea
+    id: input
+    attributes:
+      label: Input Markdown
+      description: Paste it exactly. Whitespace matters here — trailing spaces, tabs, blank lines.
+      render: markdown
+    validations: { required: true }
+  - type: textarea
+    id: output
+    attributes:
+      label: What came back
+      description: The output of `serialize(parse(input))`, or what the editor saved.
+      render: markdown
+    validations: { required: true }
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: "@kalem/core 1.0.0"
+    validations: { required: true }

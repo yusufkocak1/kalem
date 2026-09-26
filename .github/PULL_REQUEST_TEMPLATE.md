@@ -1,19 +1,15 @@
-## Ne değişti
+## What changed
 
-<!-- Bir iki cümle. Kod zaten "nasıl"ı anlatıyor; burada "neden"i yaz. -->
+<!-- A sentence or two. The code already says "how"; say "why" here. -->
 
-## İlgili görev
+## Checklist
 
-<!-- docs/01-is-listesi.md içindeki görev kodu, ör. F1-03 -->
+- [ ] `pnpm verify` passes locally
+- [ ] `pnpm changeset` was run if behavior changed
+- [ ] New code is locale-safe (no bare `toLowerCase` — see CONTRIBUTING.md §4)
+- [ ] No third-party dependency was added to a core package
+- [ ] The size budget holds (`pnpm size`)
 
-## Kontrol listesi
+## Size impact
 
-- [ ] `pnpm verify` yerelde temiz geçiyor
-- [ ] Davranış değiştiyse `pnpm changeset` çalıştırıldı
-- [ ] Yeni kod locale duyarlı (çıplak `toLowerCase` yok — bkz. CONTRIBUTING.md §4)
-- [ ] Çekirdeğe 3rd-party bağımlılık eklenmedi
-- [ ] Boyut bütçesi aşılmadı (`pnpm size`)
-
-## Boyut etkisi
-
-<!-- `pnpm size` çıktısını yapıştır. Bütçe yükseltiliyorsa gerekçesini yaz. -->
+<!-- Paste the `pnpm size` output. If a budget is raised, say why. -->

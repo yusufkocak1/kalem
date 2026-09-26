@@ -2715,7 +2715,7 @@ kayıtlı`).
 >
 > **Karar verildi ve uygulandı: İngilizce.** 22 `throw` mesajı ve
 > `blocks.ts`teki 52 `must()` etiketi çevrildi; kod yorumları Türkçe kaldı.
-> Kural `CONTRIBUTING.md`de: "geliştiricinin konsoluna düşen her şey
+> Kural `CONTRIBUTING.md`de (İngilizce ve Türkçe): "geliştiricinin konsoluna düşen her şey
 > İngilizce". 24 test beklentisi İngilizce desenlere güncellendi.
 
 > **Kendi yanlış alarmım.** Sözlüklerin dışa aktarımına bakarken dar bir
@@ -3012,7 +3012,20 @@ ve release — changesets'in paket başına 15 ayrı release'i yerine.
 5. **Actions → "Yayın" → Run workflow.**
 6. Yayından sonra: README'deki "Status: … not on npm yet" satırı ve
    sitedeki "Henüz npm'de değil / Not on npm yet" notları kaldırılmalı;
-   `SECURITY.md` desteklenen sürüm aralığı `1.x`.
+   `SECURITY.md` zaten `1.x` diyor (topluluk dosyaları İngilizceye çevrildi).
+
+**Topluluk dosyaları İngilizce** (duyurudan gelecek ilk ziyaretçinin
+göreceği sayfalar): `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`
+İngilizce; Türkçe asılları `.tr.md`. Issue şablonları İngilizce ve bir
+**round-trip** şablonu eklendi — duyuru metinleri okuyucudan tam olarak bu
+bildirimi istiyor. Eski şablonlar "v1.0 öncesi" ve "`@kalem/editor
+0.0.0`" diyordu; "Soru" bağlantısı depoya değil GitHub'ın genel
+`/discussions` sayfasına gidiyordu.
+
+`SECURITY.md` gerçek koddan sapmıştı: var olmayan bir `allowDangerousHtml`
+seçeneğini anlatıyor, `ftp:`'yi izin listesinde göstermiyor ve görsellerin
+izin verilen `data:image` türlerini "reddedilir" diye yazıyordu. İngilizce
+metin koda karşı doğrulandı (`sanitizeUrl` çıktıları).
 
 ### F6-14 · Duyuru `[S]` ⬜
 Show HN, r/webdev, X, dev.to, Bluesky. İlk 48 saat issue'lara aktif yanıt.
