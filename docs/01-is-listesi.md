@@ -23,7 +23,7 @@
 
 ## İlerleme Durumu
 
-> Son güncelleme: 2026-09-24 · `main` · `pnpm verify` yeşil · 1369 birim + 1218 tarayıcı + 88 örnek/uygulama testi
+> Son güncelleme: 2026-09-26 · `main` · `pnpm verify` yeşil · 1408 birim + 1233 tarayıcı + 93 örnek/uygulama testi · yayın provası geçti
 >
 > Uzak depo: [yusufkocak1/kalem](https://github.com/yusufkocak1/kalem) (private)
 
@@ -46,13 +46,19 @@
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
 **`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03` · `F6-04` · `F6-05` · `F6-06` · `F6-07` · `F6-08` · `F6-09` · `F6-10` · `F6-11` · `F6-12`
 
-**Sıradaki:** `F6-13` v1.0.0 yayını — hazırlık yapıldı, `npm publish` kullanıcının onayını bekliyor.
+**Hazır, kullanıcının onayını bekleyen:** `F6-13` v1.0.0 yayını (sürümler
+1.0.0, changelog ve yayın iş akışı hazır; `npm publish` geri alınamaz) ve
+`F6-14` duyuru (metinler hazır, gönderim kullanıcının hesaplarıyla). Adımlar
+F6-13 ve F6-14 bölümlerinde.
 
-**Açık işler:** NVDA/VoiceOver ile elle test (F3-10) ve `apps/notlar`ın
-iki haftalık günlük kullanımı (F5-05) — ikisi de bir insanın masasında
-yapılmak zorunda.
-Ayrıca playground'un
-barındırılması ve `kalem.dev` alan adı (403 dönüyor).
+**Açık işler — hepsi bir insanın ya da bir kararın işi:**
+
+- NVDA/VoiceOver ile elle ekran okuyucu testi (F3-10)
+- `apps/notlar`ın iki haftalık günlük kullanımı (F5-05)
+- `@kalem` kapsamının npm'de kime ait olduğu (F6-13, adım 1)
+- Doküman sitesi ve playground'un nerede barındırılacağı: `kalem.dev` 403
+  dönüyor. GitHub Pages seçilirse Astro `base` ayarı gerekiyor ve içerikteki
+  mutlak bağlantılar (`/en/…`) ona göre değişmeli.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.

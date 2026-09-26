@@ -1125,7 +1125,7 @@ test.describe("eklentiler", () => {
 				return String(e);
 			}
 		});
-		expect(hata).toContain("zaten kayıtlı");
+		expect(hata).toContain("already registered");
 	});
 
 	test("özel eklenti tuşu çekirdekten önce yakalıyor", async ({ page }) => {
