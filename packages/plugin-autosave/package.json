@@ -1,6 +1,6 @@
 {
   "name": "@kalem/plugin-autosave",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Kalem plugin: debounced autosave with status indicator and crash recovery",
   "keywords": [
     "markdown",

@@ -2972,9 +2972,47 @@ yazma → `<script>` etiketiyle IIFE. CI'da her push'ta koşuyor.
   paketin beyan ettiği depoyla eşleştiriyor.
 - **Changesets `baseBranch: "master"`** diyordu (CI'daki hatanın ikizi).
 
-### F6-13 · v1.0.0 yayını 🚀 `[S]` ⬜
-Changesets ile sürüm, GitHub Actions ile npm yayını, GitHub release + changelog, git tag
-- **Kabul:** `npm i @kalem/editor` çalışıyor
+### F6-13 · v1.0.0 yayını 🚀 `[S]` 🟡 — hazır, `npm publish` onayını bekliyor
+- [x] Changesets ile sürüm — 15 paket `1.0.0`, İngilizce CHANGELOG
+- [x] GitHub Actions ile npm yayını — `.github/workflows/release.yml`, provenance imzalı
+- [x] GitHub release + changelog + git tag — iş akışında tek `v1.0.0` release'i
+- [ ] **`npm publish`** — kullanıcının adımı (aşağıda); geri alınamaz
+- [ ] **Kabul:** `npm i @kalem/editor` çalışıyor
+
+**Karar kullanıcının: her şey hazırlandı, son adımda durdu.** npm'e yayın
+geri alınamıyor (72 saatten sonra silinemiyor, aynı sürüm numarası bir
+daha kullanılamıyor) ve kullanıcının hesabıyla yapılıyor.
+
+**Sürüm notu yeniden yazıldı.** Depodaki 14 changeset Faz 1'in iç
+notlarıydı — Türkçe ve yalnızca `@kalem/core` için `minor`. Olduğu gibi
+kalsalardı sürüm **0.1.0** olurdu ve changelog v1.0'ın yalnızca ayrıştırıcı
+kısmını anlatırdı. Yerine 15 paketi kapsayan tek bir İngilizce `major`
+changeset yazıldı; eskiler git geçmişinde.
+
+**İş akışı yalnızca elle tetikleniyor** (`workflow_dispatch`): önce
+`pnpm verify` ve yayın provası, biri kırmızıysa hiçbir şey yayımlanmıyor;
+sonra `changeset publish` (provenance ile), sonra tek bir `vX.Y.Z` etiketi
+ve release — changesets'in paket başına 15 ayrı release'i yerine.
+
+**Yayın için yapılacaklar (sırasıyla):**
+
+1. **`@kalem` kapsamı sende mi?** Paket adları npm'de boş (404), ama
+   kapsamın sahibi buradan doğrulanamadı (npm oturumu yok, npmjs.com
+   otomatik isteğe 403). `npm login`, sonra `npm org create kalem` ya da
+   npm'de "kalem" adlı bir kuruluş oluştur. Kapsam başkasınınsa bütün
+   paket adları değişmeli (ör. `@kalemjs/*`) — o durumda söyle, adlar tek
+   komutla değiştirilebilir ama belgelerde çok yerde geçiyor.
+2. **Depoyu herkese açık yap.** Provenance imzası özel depolarda çalışmıyor;
+   README'deki CI rozeti de ancak o zaman görünüyor.
+3. **`NPM_TOKEN` sırrı:** npm → Access Tokens → "Automation" (ya da
+   yalnızca `@kalem` kapsamına yazabilen granular token) → GitHub → depo →
+   Settings → Secrets and variables → Actions → `NPM_TOKEN`.
+4. **`main`i GitHub'a gönder** ve CI'ın yeşil olduğunu gör (yerel `main`,
+   `origin/main`in önünde; bu oturumdaki commit'ler henüz gönderilmedi).
+5. **Actions → "Yayın" → Run workflow.**
+6. Yayından sonra: README'deki "Status: … not on npm yet" satırı ve
+   sitedeki "Henüz npm'de değil / Not on npm yet" notları kaldırılmalı;
+   `SECURITY.md` desteklenen sürüm aralığı `1.x`.
 
 ### F6-14 · Duyuru `[S]` ⬜
 Show HN, r/webdev, X, dev.to, Bluesky. İlk 48 saat issue'lara aktif yanıt.

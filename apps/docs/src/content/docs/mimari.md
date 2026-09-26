@@ -105,7 +105,7 @@ itibaren vardır ve kendi öz-testleri de var (`pnpm guard:selftest`).
 | `@kalem/editor` (çekirdek dâhil) | 27,5 kB |
 | `@kalem/editor` + `@kalem/ui` | 36,2 kB |
 | `@kalem/wc` — tek `<script>` derlemesi | 28,1 kB |
-| Sarmalayıcılar (react / vue / wc) | 903 B / 682 B / 1,97 kB |
+| Sarmalayıcılar (react / vue / wc) | 903 B / 682 B / 1,99 kB |
 
 Doğrulama: 1.400'ün üstünde birim testi, 1.200'ün üstünde tarayıcı testi
 (Chromium · Firefox · WebKit, ayrıca iPhone ve Pixel benzetimi) ve CI'da

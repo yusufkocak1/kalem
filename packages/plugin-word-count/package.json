@@ -1,6 +1,6 @@
 {
   "name": "@kalem/plugin-word-count",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Kalem plugin: word count, character count and reading time",
   "keywords": [
     "markdown",

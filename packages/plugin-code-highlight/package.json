@@ -1,6 +1,6 @@
 {
   "name": "@kalem/plugin-code-highlight",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Kalem plugin: code block highlighting with lazily loaded language packs",
   "keywords": [
     "markdown",

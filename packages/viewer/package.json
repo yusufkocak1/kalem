@@ -1,6 +1,6 @@
 {
   "name": "@kalem/viewer",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Render a Markdown AST to the DOM or to an HTML string (SSR) — read-only viewer",
   "keywords": [
     "markdown",

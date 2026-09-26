@@ -1,6 +1,6 @@
 {
   "name": "@kalem/themes",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Typography and theme tokens for Kalem — plain CSS, no build step",
   "keywords": [
     "markdown",

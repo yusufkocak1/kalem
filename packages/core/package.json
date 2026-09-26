@@ -1,6 +1,6 @@
 {
   "name": "@kalem/core",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Markdown AST, parser and lossless serializer — no DOM, zero dependencies",
   "keywords": [
     "markdown",

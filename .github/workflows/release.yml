@@ -1,0 +1,85 @@
+name: Yayın
+
+# v1.0.0 ve sonrası  (İş listesi: F6-13)
+#
+# Yalnızca elle tetikleniyor: Actions → "Yayın" → Run workflow. Bir
+# push'un kazara npm'e yayın yapması geri alınamaz bir hata olurdu —
+# npm yayımlanmış bir sürümü 72 saat sonra silmeye izin vermiyor ve aynı
+# sürüm numarası bir daha asla kullanılamıyor.
+#
+# Akış:
+#   1. Doğrulama: `pnpm verify` ve yayın provası (paket dosyalarından temiz
+#      kurulum, F6-12). Biri kırmızıysa hiçbir şey yayımlanmıyor.
+#   2. `changeset publish`: sürümü npm'de olmayan her paketi yayımlıyor.
+#      Sürümler depoda zaten yükseltilmiş olmalı (`pnpm changeset version`
+#      yerelde çalıştırılıp commit'lenmiş); bu iş sürüm yükseltmiyor.
+#   3. Provenance: npm, paketin bu depodaki bu iş akışından derlendiğini
+#      imzalıyor (`id-token: write`). Depo herkese açık olmalı.
+#   4. Tek bir `vX.Y.Z` etiketi ve GitHub release'i. changesets'in paket
+#      başına release'i (15 ayrı release) yerine; sürümler `fixed` grubunda
+#      zaten tek numara.
+#
+# Gereken: depo ayarlarında `NPM_TOKEN` sırrı (npm → Access Tokens →
+# "Automation" türü, yalnızca @kalem kapsamına yayın yetkisiyle).
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: yayin
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  yayin:
+    name: npm'e yayın
+    runs-on: ubuntu-latest
+    # Yayın provası tarayıcı adımı için Chromium istiyor.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    env:
+      HOME: /root
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+
+      - name: Doğrulama
+        run: pnpm verify
+
+      - name: Yayın provası
+        run: pnpm yayin:prova
+
+      - name: npm'e yayın (provenance ile)
+        run: pnpm exec changeset publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"
+
+      - name: Etiket ve GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          SURUM=$(node -p "require('./packages/core/package.json').version")
+          # Sürüm notu çekirdeğin CHANGELOG'undaki o sürümün bölümü.
+          node -e "
+            const md = require('fs').readFileSync('packages/core/CHANGELOG.md', 'utf8');
+            const bas = md.indexOf('## ' + process.argv[1]);
+            const bit = md.indexOf('\n## ', bas + 1);
+            process.stdout.write(md.slice(bas, bit === -1 ? undefined : bit).split('\n').slice(1).join('\n').trim() + '\n');
+          " "$SURUM" > notlar.md
+          if gh release view "v$SURUM" > /dev/null 2>&1; then
+            echo "v$SURUM zaten var; atlanıyor."
+          else
+            gh release create "v$SURUM" --title "v$SURUM" --notes-file notlar.md
+          fi

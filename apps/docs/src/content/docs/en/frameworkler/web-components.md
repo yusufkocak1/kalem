@@ -11,7 +11,7 @@ Rails, Django and plain HTML — the same tag everywhere.**
 npm i @kalem/wc @kalem/themes
 ```
 
-Its own size is 1.97 kB (editor not included).
+Its own size is 1.99 kB (editor not included).
 
 ```ts
 import { defineKalemEditor } from '@kalem/wc';

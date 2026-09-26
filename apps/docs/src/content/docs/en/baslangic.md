@@ -21,7 +21,7 @@ download what you don't use.
 | The full **Word-like** experience | `@kalem/editor` + `@kalem/ui` | 36.2 kB |
 
 The framework wrappers add a few hundred bytes on top:
-`@kalem/react` 903 B, `@kalem/vue` 682 B, `@kalem/wc` 1.97 kB.
+`@kalem/react` 903 B, `@kalem/vue` 682 B, `@kalem/wc` 1.99 kB.
 
 ```bash
 # The full Word-like experience

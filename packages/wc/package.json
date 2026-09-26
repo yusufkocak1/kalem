@@ -1,6 +1,6 @@
 {
   "name": "@kalem/wc",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Kalem as a form-associated custom element — <kalem-editor>, no framework needed",
   "keywords": [
     "markdown",

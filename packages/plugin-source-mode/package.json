@@ -1,6 +1,6 @@
 {
   "name": "@kalem/plugin-source-mode",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Kalem plugin: toggle between WYSIWYG and raw Markdown source",
   "keywords": [
     "markdown",

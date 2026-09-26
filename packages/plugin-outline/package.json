@@ -1,6 +1,6 @@
 {
   "name": "@kalem/plugin-outline",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Kalem plugin: table of contents with active heading tracking",
   "keywords": [
     "markdown",

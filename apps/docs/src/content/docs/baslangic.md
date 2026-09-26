@@ -21,7 +21,7 @@ indirmezsiniz.
 | **Word benzeri** tam deneyim | `@kalem/editor` + `@kalem/ui` | 36,2 kB |
 
 Çerçeve sarmalayıcıları bunların üstüne birkaç yüz bayt ekliyor:
-`@kalem/react` 903 B, `@kalem/vue` 682 B, `@kalem/wc` 1,97 kB.
+`@kalem/react` 903 B, `@kalem/vue` 682 B, `@kalem/wc` 1,99 kB.
 
 ```bash
 # Word benzeri tam deneyim

@@ -1,6 +1,6 @@
 {
   "name": "@kalem/editor",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Headless block editor engine for Markdown — selection, history, commands",
   "keywords": [
     "markdown",
