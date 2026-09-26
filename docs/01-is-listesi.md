@@ -3027,8 +3027,20 @@ seçeneğini anlatıyor, `ftp:`'yi izin listesinde göstermiyor ve görsellerin
 izin verilen `data:image` türlerini "reddedilir" diye yazıyordu. İngilizce
 metin koda karşı doğrulandı (`sanitizeUrl` çıktıları).
 
-### F6-14 · Duyuru `[S]` ⬜
+### F6-14 · Duyuru `[S]` 🟡 — metinler hazır, gönderim kullanıcının
 Show HN, r/webdev, X, dev.to, Bluesky. İlk 48 saat issue'lara aktif yanıt.
+
+- [x] Show HN ve dev.to taslakları (F6-11) — bugünkü duruma güncellendi
+- [x] r/webdev, X ve Bluesky taslakları — `docs/duyuru/sosyal.md`
+      (X 227/280, Bluesky 256/300 karakter)
+- [x] Gönderim sırası ve zamanlaması — aynı dosyanın başında
+- [x] Gelen bildirimler için İngilizce issue şablonları, **round-trip** şablonu dâhil
+- [ ] Gönderimler — kullanıcının hesaplarıyla; F6-13'ten (npm) sonra
+- [ ] İlk 48 saat issue'lara yanıt — bir insanın işi
+
+> **r/webdev kuralı:** kişisel proje tanıtımı yalnızca **Showoff Saturday**
+> (Cumartesi) günü; başka gün atılan gönderi siliniyor. Taslağın başlığı
+> buna göre.
 
 > **FAZ 6 ÇIKIŞ KRİTERİ:** v1.0.0 npm'de, doküman sitesi canlı, duyuru yapılmış.
 

@@ -91,6 +91,7 @@ const IDDIALAR = [
 	{ dosya: "docs/duyuru/devto.md", desen: sonra("| `@kalem/editor` |"), olcum: EDITOR },
 	{ dosya: "docs/duyuru/devto.md", desen: sonra("`@kalem/editor` + `@kalem/ui` |"), olcum: WORD },
 	{ dosya: "scripts/duyuru/onizleme.html", desen: desen('id="boyut">SAYI'), olcum: WORD },
+	{ dosya: "docs/duyuru/sosyal.md", desen: desen("dependencies; SAYI min+gzip"), olcum: WORD },
 
 	// Doküman sitesi — giriş sayfası
 	{ dosya: `${DOCS}/index.mdx`, desen: sonra("<b>editör + arayüz</b>"), olcum: WORD },

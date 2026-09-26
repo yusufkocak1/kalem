@@ -7,6 +7,7 @@
 | `onizleme.png` | 1280×640 sosyal önizleme | GitHub → Settings → Social preview; bağlantı kartları |
 | `show-hn.md` | Show HN başlığı ve metni | F6-14 |
 | `devto.md` | dev.to yazısı (`published: false`) | F6-14 |
+| `sosyal.md` | r/webdev, X ve Bluesky gönderileri; gönderim sırası | F6-14 |
 
 Taslakların başındaki yorum bloğu **gönderimden önce** yapılacakları
 listeliyor — boş bırakılan adresler ve bugün doğru olmayan varsayımlar orada.
