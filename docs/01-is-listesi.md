@@ -54,8 +54,7 @@ referansları (F3-11) ve `apps/notlar`ın iki haftalık günlük kullanımı
 (F5-05) — üçü de bir insanın masasında yapılmak zorunda.
 Ayrıca **İngilizce doküman sitesi** (içerik yalnızca
 Türkçe — İngilizce duyurudan önce karar gerekiyor), playground'un
-barındırılması ve `kalem.dev` alan adı (403 dönüyor), atomik düğümlere ofset uzunluğu 1
-verilmesi (F4-01'de bulundu).
+barındırılması ve `kalem.dev` alan adı (403 dönüyor).
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
@@ -1249,6 +1248,20 @@ kriteri ("API kendi kullanımıyla doğrulanmış") tam olarak bunu istiyordu:
 > `offsets.ts`teki DOM↔model eşlemesini de değiştiriyor, üç tarayıcıda
 > imleç matematiği demek. F4-01'in ortasında yapılacak bir değişiklik
 > değildi, ayrı bir iş olarak duruyor.
+>
+> **Kapandı (Faz 6 sonu).** Görsel artık tek karakterlik atomik öğe: DOM
+> tarafında `<img>` = 1 (`offsets.ts`, `<br>` ile aynı yolda), modelde
+> `image`/`imageReference` = 1 (`inline-edit.ts`). Bul-değiştir görseli
+> arama metninde U+FFFC olarak tutuyor; düz arama artık görselin üstünden
+> geçip eşleşmiyor.
+>
+> **Notun bir kısmı yanlıştı.** Ölçülünce imleç koymak ve Backspace'in eski
+> kodda da çalıştığı görüldü — onları tarayıcı kendisi yapıyor. Kırık olan,
+> seçimi **modelden** okuyan işlemlerdi: yalnızca görseli seçmek modelde 0
+> uzunluklu bir aralıktı, Ctrl+B / bağlantı / kopyalama hiçbir şey
+> yapmıyordu. Buna bakan tarayıcı testi eski kodda kırmızı, yenide üç
+> motorda yeşil; ilk yazdığım iki test ise eski kodda da geçiyordu ve
+> düzeltmeyi kanıtlamıyordu.
 
 Boyut: eklenti tek başına 2.92 kB (çekirdek ve editör hariç),
 `plugin-image.css` 342 B.

@@ -11,8 +11,10 @@
  *
  * ## Ofsetler editörün kuralına uyuyor
  *
- * Metin karakteri 1, `break` 1, görsel 0 — `inline-edit.ts` ve
- * `offsets.ts` ile **aynı** kural. Uymak zorunda: bulunan aralık
+ * Metin karakteri 1, `break` 1, görsel 1 — `inline-edit.ts` ve
+ * `offsets.ts` ile **aynı** kural. Görsel arama metninde U+FFFC (nesne
+ * yer tutucu) olarak duruyor: ofsetler hizalı kalıyor ve düz bir arama
+ * görselin üstünden geçip onu eşleşmeye katamıyor. Uymak zorunda: bulunan aralık
  * doğrudan `spliceInline`a ve imleç konumuna gidiyor, bir karakter kayma
  * yanlış yeri değiştirmek demek.
  *
@@ -46,6 +48,9 @@ import { inlineLength, normalizeInline, sliceInline } from "@kalem/editor";
 /** `break` düğümünün arama metnindeki karşılığı (1 karakter, editörle aynı). */
 const SATIR_SONU = String.fromCharCode(10);
 
+/** Görselin arama metnindeki karşılığı: U+FFFC OBJECT REPLACEMENT CHARACTER. */
+const NESNE = String.fromCharCode(0xfffc);
+
 /**
  * Aranabilir bir metin parçası.
  *
@@ -60,11 +65,12 @@ export interface Region {
 	/** Ofset hizalı düz metin. */
 	readonly text: string;
 	/**
-	 * Uzunluğu sıfır olan atomik düğümlerin ofsetleri (görsel, referans).
+	 * Atomik düğümlerin ofsetleri (görsel, görsel referansı).
 	 *
-	 * Arama metninde hiç görünmüyorlar, yani bir eşleşme üstlerinden
-	 * geçebiliyor. Değiştirme bunları **koruyor** (`replaceInRegion`);
-	 * aksi hâlde "ab" araması, aradaki bir görseli sessizce silerdi.
+	 * Arama metninde U+FFFC olarak duruyorlar. Düz bir arama onları hiç
+	 * kapsamaz; yine de değiştirme bunları **koruyor** (`replaceInRegion`),
+	 * çünkü düzenli ifade gibi geniş bir eşleşme onları kapsayabilir ve
+	 * görselin sessizce silinmesi veri kaybı olurdu.
 	 */
 	readonly atomics: readonly number[];
 }
@@ -134,6 +140,7 @@ function duzMetin(nodes: readonly Inline[]): { text: string; atomics: number[] }
 				case "image":
 				case "imageReference":
 					atomics.push(text.length);
+					text += NESNE;
 					break;
 				default:
 					gez((node as { children: readonly Inline[] }).children);
@@ -274,10 +281,8 @@ function yerindeDegistir(
  * Aralığı değiştirirken sıfır uzunluklu düğümleri koruyor.
  *
  * `spliceInline` kullanılmıyor çünkü aralığın **içinde** kalan görseli
- * atardı: görselin ofset uzunluğu 0 ve o kural gereği `[from, to)`
- * aralığına düşüyor (bkz. `inline-edit.ts`). Arama metninde hiç
- * görünmediği için kullanıcı onu eşleşmenin parçası saymıyor; silinmesi
- * veri kaybı olurdu. Yeni metnin **önüne** alınıyor.
+ * atardı. Kullanıcı görseli bir metin eşleşmesinin parçası saymıyor;
+ * silinmesi veri kaybı olurdu. Yeni metnin **önüne** alınıyor.
  */
 function spliceKoruyarak(
 	children: readonly Inline[],
@@ -285,7 +290,9 @@ function spliceKoruyarak(
 	to: number,
 	value: string,
 ): Inline[] {
-	const korunan = sliceInline(children, from, to).filter((node) => inlineLength(node) === 0);
+	const korunan = sliceInline(children, from, to).filter(
+		(node) => node.type === "image" || node.type === "imageReference",
+	);
 	const ortadaki: Inline[] = [...korunan];
 	if (value !== "") ortadaki.push({ type: "text", value });
 	return normalizeInline([

@@ -16,8 +16,11 @@
  * ## Uzunluk kuralı
  *
  * `offsets.ts` ile **birebir aynı** olmak zorunda: metin karakteri 1,
- * `break` 1, görsel 0. Ayrışırlarsa seçim kayar ve hata, yanlış yeri
+ * `break` 1, görsel 1. Ayrışırlarsa seçim kayar ve hata, yanlış yeri
  * kalınlaştırmak olarak görünür — bulması zor bir hata.
+ *
+ * Görsel eskiden 0'dı; imleç görselin iki yanında aynı ofsete düştüğü için
+ * görsel seçilemiyor ve silinemiyordu (F4-01). Bkz. `offsets.ts`.
  */
 import type { Inline } from "@kalem/core";
 import type { MarkType } from "@kalem/core/commands";
@@ -35,7 +38,9 @@ export function inlineLength(node: Inline): number {
 			return 1;
 		case "image":
 		case "imageReference":
-			return 0;
+			// Tek karakterlik atomik öğe: yanına imleç konabiliyor, seçilip
+			// silinebiliyor.
+			return 1;
 		default:
 			return listLength(node.children);
 	}
@@ -55,16 +60,15 @@ export function listLength(nodes: readonly Inline[]): number {
  *
  * ## Sıfır uzunluklu düğümler
  *
- * Görselin ofset uzunluğu 0 (`inlineLength`). Sıfır uzunluklu bir düğüm
- * hiçbir aralıkla **çakışmıyor**, yani `bit <= from || bas >= to` kuralı
- * onu her iki taraftan da eliyor. Sonuç veri kaybıydı: imleci görselin
- * hemen yanına koyup bir şey yapıştırmak (ya da başka bir görsel bırakmak)
- * görseli sessizce siliyordu — F4-01 yazılırken çıktı, bağımsız bir
- * `spliceInline` testiyle doğrulandı.
+ * Sıfır uzunluklu bir düğüm hiçbir aralıkla **çakışmıyor**, yani
+ * `bit <= from || bas >= to` kuralı onu her iki taraftan da eler. Görsel
+ * eskiden 0 uzunluktaydı ve sonuç veri kaybıydı: imleci görselin yanına
+ * koyup bir şey yapıştırmak görseli sessizce siliyordu (F4-01).
  *
- * Kural: sıfır uzunluklu düğüm `from <= bas < to` ise aralığa ait.
- * Böylece her düğüm **tam olarak bir** dilime düşüyor; ne kayboluyor ne
- * ikileniyor.
+ * Görsel artık 1 uzunlukta, ama kural duruyor: içi boş bir biçim düğümü
+ * (`strong[]`) hâlâ 0 uzunlukta olabilir. Sıfır uzunluklu düğüm
+ * `from <= bas < to` ise aralığa ait; böylece her düğüm **tam olarak
+ * bir** dilime düşüyor.
  */
 export function sliceInline(nodes: readonly Inline[], from: number, to: number): Inline[] {
 	const out: Inline[] = [];

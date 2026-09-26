@@ -68,9 +68,10 @@ describe("regionsOf", () => {
 		expect(regionsOf(parse("bu **kalın** metin\n"))[0]?.text).toBe("bu kalın metin");
 	});
 
-	it("görsel sıfır uzunlukta ve atomik olarak işaretli", () => {
+	it("görsel tek karakter (U+FFFC) ve atomik olarak işaretli", () => {
+		// Editörün kuralı: görsel 1 karakter (`inline-edit.ts`, `offsets.ts`).
 		const bolge = regionsOf(parse("a![alt](x.png)b\n"))[0];
-		expect(bolge?.text).toBe("ab");
+		expect(bolge?.text).toBe(`a${String.fromCharCode(0xfffc)}b`);
 		expect(bolge?.atomics).toEqual([1]);
 	});
 
@@ -222,11 +223,13 @@ describe("değiştirme", () => {
 		expect(degistir("**ka**lın\n", "kalın", "ince")).toBe("ince\n");
 	});
 
-	it("görsel silinmiyor", () => {
-		// Görselin ofset uzunluğu 0, yani eşleşme üstünden geçebiliyor.
-		const sonuc = degistir("a![alt](x.png)b\n", "ab", "c");
-		expect(sonuc).toContain("![alt](x.png)");
-		expect(sonuc).toContain("c");
+	it("arama görselin üstünden geçmiyor, görsel silinmiyor", () => {
+		// Kullanıcı arada bir görsel görüyor; "ab" orada yazmıyor.
+		expect(degistir("a![alt](x.png)b\n", "ab", "c")).toBe("a![alt](x.png)b\n");
+	});
+
+	it("görselin yanındaki metin değiştiriliyor, görsel kalıyor", () => {
+		expect(degistir("kedi![alt](x.png)kedi\n", "kedi", "köpek")).toBe("köpek![alt](x.png)köpek\n");
 	});
 
 	it("eşleşme yoksa belge değişmiyor", () => {

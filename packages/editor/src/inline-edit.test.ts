@@ -39,8 +39,12 @@ describe("uzunluk", () => {
 		expect(listLength([metin("a"), { type: "break" }, metin("b")])).toBe(3);
 	});
 
-	it("görsel sıfır", () => {
-		expect(listLength([{ type: "image", url: "/r.png", alt: "kedi", title: null }])).toBe(0);
+	/**
+	 * Görsel tek karakterlik atomik öğe. Eskiden 0'dı ve imleç görselin iki
+	 * yanında aynı ofsete düştüğü için görsel seçilemiyor, silinemiyordu.
+	 */
+	it("görsel bir", () => {
+		expect(listLength([{ type: "image", url: "/r.png", alt: "kedi", title: null }])).toBe(1);
 	});
 
 	it("sarmalayıcı çocuklarının toplamı", () => {
@@ -226,8 +230,15 @@ describe("sıfır uzunluklu düğümler", () => {
 
 	/** Aralığın **içinde** kalan görsel silinmeli — kullanıcı onu seçmiş. */
 	it("seçili aralıktaki görsel siliniyor", () => {
+		// a=0 b=1 görsel=2 c=3 d=4
 		const nodes: Inline[] = [metin("ab"), gorsel(), metin("cd")];
-		expect(spliceInline(nodes, 1, 3, [])).toEqual([metin("ad")]);
+		expect(spliceInline(nodes, 1, 4, [])).toEqual([metin("ad")]);
+	});
+
+	/** Backspace görselin hemen arkasında: yalnızca görsel gidiyor. */
+	it("görselin kendi aralığı yalnızca onu siliyor", () => {
+		const nodes: Inline[] = [metin("ab"), gorsel(), metin("cd")];
+		expect(spliceInline(nodes, 2, 3, [])).toEqual([metin("abcd")]);
 	});
 
 	it("dilim görseli ikilemiyor", () => {

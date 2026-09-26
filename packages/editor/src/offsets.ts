@@ -15,9 +15,15 @@
  *
  * ## Ölçü birimi
  *
- * Metin karakteri = 1, `<br>` = 1 (modelde `break` düğümü), `<img>` ve
- * görev kutusu = 0. Model tarafındaki uzunluk hesabı (`inline-edit.ts`)
- * **aynı** kurala uymak zorunda; ayrışırlarsa seçim kayar.
+ * Metin karakteri = 1, `<br>` = 1 (modelde `break` düğümü), `<img>` = 1
+ * (modelde görsel), görev kutusu = 0. Model tarafındaki uzunluk hesabı
+ * (`inline-edit.ts`) **aynı** kurala uymak zorunda; ayrışırlarsa seçim
+ * kayar.
+ *
+ * Görsel eskiden 0'dı. Sonucu: imleç görselin iki yanında **aynı** ofsete
+ * düşüyordu, yani kullanıcı görselin yanına imleç koyamıyor, onu seçemiyor
+ * ve Backspace ile silemiyordu (F4-01'de bulundu). Tek karakterlik atomik
+ * bir öğe olarak sayılınca üçü de metin karakteri gibi çalışıyor.
  */
 
 const ELEMENT = 1;
@@ -26,11 +32,14 @@ const TEXT = 3;
 /** Ofset hesabında görünmez sayılan elemanlar. */
 const ATLANAN = new Set(["INPUT"]);
 
+/** Tek karakter sayılan, içine imleç girmeyen elemanlar. */
+const ATOMIK = new Set(["BR", "IMG"]);
+
 /** Bir DOM düğümünün ofset uzunluğu (alt ağacı dâhil). */
 function uzunluk(node: Node): number {
 	if (node.nodeType === TEXT) return (node.nodeValue ?? "").length;
 	if (node.nodeType !== ELEMENT) return 0;
-	if (node.nodeName === "BR") return 1;
+	if (ATOMIK.has(node.nodeName)) return 1;
 	if (ATLANAN.has(node.nodeName)) return 0;
 	let out = 0;
 	for (const child of Array.from(node.childNodes)) out += uzunluk(child);
@@ -97,7 +106,8 @@ function ara(node: Node, durum: { kalan: number }): DomPoint | null {
 	}
 	if (node.nodeType !== ELEMENT) return null;
 
-	if (node.nodeName === "BR") {
+	if (ATOMIK.has(node.nodeName)) {
+		// Hedef öğenin önündeyse konum ebeveynde, öğenin indisinde.
 		const parent = node.parentNode;
 		if (durum.kalan === 0 && parent !== null) {
 			return { node: parent, offset: Array.from(parent.childNodes).indexOf(node as ChildNode) };

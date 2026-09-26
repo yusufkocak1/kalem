@@ -492,6 +492,61 @@ test.describe("biçimlendirme", () => {
 });
 
 /**
+ * Görsel tek karakterlik atomik öğe  (F4-01'de bulunan kalan iş)
+ *
+ * Görselin ofset uzunluğu 0'dı: imleç görselin iki yanında aynı ofsete
+ * düşüyordu, yani kullanıcı görselin yanına imleç koyamıyor, onu
+ * seçemiyor ve Backspace ile silemiyordu.
+ */
+test.describe("satır içi görsel", () => {
+	// 1×1 saydam PNG; `data:image/png` beyaz listede.
+	const PNG =
+		"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
+	test.beforeEach(async ({ page }) => {
+		await page.evaluate((png) => window.kalem.editor.setValue(`ab![g](${png})cd\n`), PNG);
+		// Metnin sonuna, görselden iki karakter sonraya.
+		await page.locator("#editor > p").first().click();
+		await page.keyboard.press("End");
+	});
+
+	/**
+	 * Eski kodda kırmızı olan test bu. İmleç ve Backspace'i tarayıcı zaten
+	 * doğru yapıyordu; kırık olan, seçimi **modelden** okuyan işlemlerdi:
+	 * yalnızca görseli seçmek modelde 0 uzunluklu bir aralıktı ve Ctrl+B,
+	 * bağlantı, kopyalama hiçbir şey yapmıyordu.
+	 */
+	test("yalnızca görseli seçip biçimlendirmek çalışıyor", async ({ page }) => {
+		await page.keyboard.press("ArrowLeft");
+		await page.keyboard.press("ArrowLeft");
+		await page.keyboard.press("Shift+ArrowLeft");
+		await page.keyboard.press("ControlOrMeta+b");
+		await expect
+			.poll(() => page.evaluate(() => window.kalem.editor.getValue()))
+			.toMatch(/^ab\*\*!\[g\]\(data:image\/png;base64,[^)]+\)\*\*cd\n$/);
+	});
+
+	test("görselin arkasında Backspace yalnızca görseli siliyor", async ({ page }) => {
+		await page.keyboard.press("ArrowLeft");
+		await page.keyboard.press("ArrowLeft");
+		await page.keyboard.press("Backspace");
+		await expect.poll(() => page.evaluate(() => window.kalem.editor.getValue())).toBe("abcd\n");
+	});
+
+	test("görselin iki yanına yazılabiliyor", async ({ page }) => {
+		await page.keyboard.press("ArrowLeft");
+		await page.keyboard.press("ArrowLeft");
+		await page.keyboard.type("Y");
+		await page.keyboard.press("ArrowLeft");
+		await page.keyboard.press("ArrowLeft");
+		await page.keyboard.type("X");
+		await expect
+			.poll(() => page.evaluate(() => window.kalem.editor.getValue()))
+			.toMatch(/^abX!\[g\]\(data:image\/png;base64,[^)]+\)Ycd\n$/);
+	});
+});
+
+/**
  * Klavye ve gezinme  (İş listesi: F2-08)
  *
  * Kabul kriteri "klavye ile fare kullanmadan tam doküman yazılabiliyor".
