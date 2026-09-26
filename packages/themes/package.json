@@ -1,8 +1,24 @@
 {
   "name": "@kalem/themes",
   "version": "0.0.0",
-  "description": "Kalem için tipografi ve tema değişkenleri — saf CSS, derleme adımı yok",
+  "description": "Typography and theme tokens for Kalem — plain CSS, no build step",
+  "keywords": [
+    "markdown",
+    "editor",
+    "css",
+    "theme"
+  ],
   "license": "MIT",
+  "author": "Yusuf Koçak",
+  "homepage": "https://github.com/yusufkocak1/kalem/tree/main/packages/themes#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yusufkocak1/kalem.git",
+    "directory": "packages/themes"
+  },
+  "bugs": {
+    "url": "https://github.com/yusufkocak1/kalem/issues"
+  },
   "type": "module",
   "sideEffects": [
     "*.css"

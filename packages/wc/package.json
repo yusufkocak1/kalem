@@ -1,8 +1,25 @@
 {
   "name": "@kalem/wc",
   "version": "0.0.0",
-  "description": "Kalem için Custom Element — <kalem-editor>, çerçevesiz",
+  "description": "Kalem as a form-associated custom element — <kalem-editor>, no framework needed",
+  "keywords": [
+    "markdown",
+    "editor",
+    "wysiwyg",
+    "web-components",
+    "custom-element"
+  ],
   "license": "MIT",
+  "author": "Yusuf Koçak",
+  "homepage": "https://github.com/yusufkocak1/kalem/tree/main/packages/wc#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yusufkocak1/kalem.git",
+    "directory": "packages/wc"
+  },
+  "bugs": {
+    "url": "https://github.com/yusufkocak1/kalem/issues"
+  },
   "engines": {
     "node": ">=18"
   },

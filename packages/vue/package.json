@@ -1,8 +1,25 @@
 {
   "name": "@kalem/vue",
   "version": "0.0.0",
-  "description": "Kalem için Vue sarmalayıcısı — <KalemEditor v-model /> ve SSR",
+  "description": "Vue wrapper for Kalem — <KalemEditor v-model /> with SSR",
+  "keywords": [
+    "markdown",
+    "editor",
+    "wysiwyg",
+    "vue",
+    "nuxt"
+  ],
   "license": "MIT",
+  "author": "Yusuf Koçak",
+  "homepage": "https://github.com/yusufkocak1/kalem/tree/main/packages/vue#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yusufkocak1/kalem.git",
+    "directory": "packages/vue"
+  },
+  "bugs": {
+    "url": "https://github.com/yusufkocak1/kalem/issues"
+  },
   "engines": {
     "node": ">=18"
   },

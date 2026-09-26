@@ -1,8 +1,25 @@
 {
   "name": "@kalem/editor",
   "version": "0.0.0",
-  "description": "Başsız blok editör motoru — seçim, geçmiş, komutlar",
+  "description": "Headless block editor engine for Markdown — selection, history, commands",
+  "keywords": [
+    "markdown",
+    "editor",
+    "wysiwyg",
+    "contenteditable",
+    "headless"
+  ],
   "license": "MIT",
+  "author": "Yusuf Koçak",
+  "homepage": "https://github.com/yusufkocak1/kalem/tree/main/packages/editor#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yusufkocak1/kalem.git",
+    "directory": "packages/editor"
+  },
+  "bugs": {
+    "url": "https://github.com/yusufkocak1/kalem/issues"
+  },
   "engines": {
     "node": ">=18"
   },

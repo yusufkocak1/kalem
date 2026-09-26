@@ -1,8 +1,24 @@
 {
   "name": "@kalem/viewer",
   "version": "0.0.0",
-  "description": "AST'den DOM ve SSR string render — salt okunur görüntüleyici",
+  "description": "Render a Markdown AST to the DOM or to an HTML string (SSR) — read-only viewer",
+  "keywords": [
+    "markdown",
+    "renderer",
+    "ssr",
+    "html"
+  ],
   "license": "MIT",
+  "author": "Yusuf Koçak",
+  "homepage": "https://github.com/yusufkocak1/kalem/tree/main/packages/viewer#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yusufkocak1/kalem.git",
+    "directory": "packages/viewer"
+  },
+  "bugs": {
+    "url": "https://github.com/yusufkocak1/kalem/issues"
+  },
   "engines": {
     "node": ">=18"
   },

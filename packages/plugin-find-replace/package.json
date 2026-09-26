@@ -1,8 +1,25 @@
 {
   "name": "@kalem/plugin-find-replace",
   "version": "0.0.0",
-  "description": "Bul ve değiştir eklentisi — locale duyarlı arama, tümünü değiştir",
+  "description": "Kalem plugin: locale-aware find and replace",
+  "keywords": [
+    "markdown",
+    "editor",
+    "kalem-plugin",
+    "find-replace",
+    "search"
+  ],
   "license": "MIT",
+  "author": "Yusuf Koçak",
+  "homepage": "https://github.com/yusufkocak1/kalem/tree/main/packages/plugin-find-replace#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yusufkocak1/kalem.git",
+    "directory": "packages/plugin-find-replace"
+  },
+  "bugs": {
+    "url": "https://github.com/yusufkocak1/kalem/issues"
+  },
   "engines": {
     "node": ">=18"
   },

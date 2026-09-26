@@ -1,8 +1,27 @@
 {
   "name": "@kalem/core",
   "version": "0.0.0",
-  "description": "Markdown AST, ayrıştırıcı ve serileştirici — DOM'suz, 0 üçüncü parti bağımlılık",
+  "description": "Markdown AST, parser and lossless serializer — no DOM, zero dependencies",
+  "keywords": [
+    "markdown",
+    "parser",
+    "serializer",
+    "ast",
+    "mdast",
+    "commonmark",
+    "gfm"
+  ],
   "license": "MIT",
+  "author": "Yusuf Koçak",
+  "homepage": "https://github.com/yusufkocak1/kalem/tree/main/packages/core#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yusufkocak1/kalem.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/yusufkocak1/kalem/issues"
+  },
   "engines": {
     "node": ">=18"
   },

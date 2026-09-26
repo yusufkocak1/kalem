@@ -1,8 +1,24 @@
 {
   "name": "@kalem/plugin-code-highlight",
   "version": "0.0.0",
-  "description": "Kod bloğu vurgulama eklentisi — tembel yüklenen dil paketleri, sıfır bağımlılık",
+  "description": "Kalem plugin: code block highlighting with lazily loaded language packs",
+  "keywords": [
+    "markdown",
+    "editor",
+    "kalem-plugin",
+    "syntax-highlighting"
+  ],
   "license": "MIT",
+  "author": "Yusuf Koçak",
+  "homepage": "https://github.com/yusufkocak1/kalem/tree/main/packages/plugin-code-highlight#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yusufkocak1/kalem.git",
+    "directory": "packages/plugin-code-highlight"
+  },
+  "bugs": {
+    "url": "https://github.com/yusufkocak1/kalem/issues"
+  },
   "engines": {
     "node": ">=18"
   },

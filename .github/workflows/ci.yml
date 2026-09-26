@@ -114,6 +114,29 @@ jobs:
           path: playwright-report/
           retention-days: 7
 
+  yayin-provasi:
+    name: yayın provası (paket dosyalarından temiz kurulum)
+    runs-on: ubuntu-latest
+    # Tarayıcı adımı Chromium istiyor; imaj onu hazır getiriyor.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble
+      options: --ipc=host
+    env:
+      HOME: /root
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      # `pnpm pack` → içerik denetimi → `npm publish --dry-run` → depo
+      # dışında yalnızca arşivlerden kurulum → Node ESM/CJS → esbuild ile
+      # derlenmiş uygulama ve IIFE tarayıcıda (F6-12).
+      - run: pnpm yayin:prova
+
   ornekler:
     name: örnek uygulamalar
     runs-on: ubuntu-latest

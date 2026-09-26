@@ -1,8 +1,24 @@
 {
   "name": "@kalem/plugin-source-mode",
   "version": "0.0.0",
-  "description": "Ham Markdown kipi eklentisi — WYSIWYG ↔ kaynak geçişi",
+  "description": "Kalem plugin: toggle between WYSIWYG and raw Markdown source",
+  "keywords": [
+    "markdown",
+    "editor",
+    "kalem-plugin",
+    "source"
+  ],
   "license": "MIT",
+  "author": "Yusuf Koçak",
+  "homepage": "https://github.com/yusufkocak1/kalem/tree/main/packages/plugin-source-mode#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yusufkocak1/kalem.git",
+    "directory": "packages/plugin-source-mode"
+  },
+  "bugs": {
+    "url": "https://github.com/yusufkocak1/kalem/issues"
+  },
   "engines": {
     "node": ">=18"
   },

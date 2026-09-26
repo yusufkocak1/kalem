@@ -34,7 +34,8 @@
     "guard:docs": "node scripts/guard-docs.mjs",
     "guard:sizes": "node scripts/guard-sizes.mjs",
     "build:playground": "pnpm --filter kalem-playground build",
-    "olcum": "node scripts/olcum.mjs"
+    "olcum": "node scripts/olcum.mjs",
+    "yayin:prova": "node scripts/yayin-provasi.mjs"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "catalog:",

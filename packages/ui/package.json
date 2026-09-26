@@ -1,8 +1,25 @@
 {
   "name": "@kalem/ui",
   "version": "0.0.0",
-  "description": "Word benzeri arayüz katmanı — balon araç çubuğu, slash menü, sürükle-bırak",
+  "description": "Word-like UI for Kalem — bubble toolbar, slash menu, drag handles",
+  "keywords": [
+    "markdown",
+    "editor",
+    "wysiwyg",
+    "toolbar",
+    "slash-menu"
+  ],
   "license": "MIT",
+  "author": "Yusuf Koçak",
+  "homepage": "https://github.com/yusufkocak1/kalem/tree/main/packages/ui#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yusufkocak1/kalem.git",
+    "directory": "packages/ui"
+  },
+  "bugs": {
+    "url": "https://github.com/yusufkocak1/kalem/issues"
+  },
   "engines": {
     "node": ">=18"
   },

@@ -36,17 +36,17 @@
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
 | **Faz 4** — Eklentiler | 7 / 7 | ✅ **Tamamlandı** |
 | **Faz 5** — Sarmalayıcılar | 5 / 5 | 🟡 Bitti (2 haftalık kullanım sürüyor) |
-| **Faz 6** — Cila ve yayın | 11 / 14 | 🔵 Sürüyor |
-| | **66 / 72** | **%92** |
+| **Faz 6** — Cila ve yayın | 12 / 14 | 🔵 Sürüyor |
+| | **67 / 72** | **%93** |
 
 **İşaretler:** ✅ bitti · 🔵 devam ediyor · 🟡 kısmen · ⬜ başlanmadı · ⏭️ atlandı
 
 ### 👉 Şu an buradayız
 
 **Bitenler:** `F0-01` … `F0-08` · `F1-01` … `F1-11` · `F2-01` … `F2-13` ·
-**`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03` · `F6-04` · `F6-05` · `F6-06` · `F6-07` · `F6-08` · `F6-09` · `F6-10` · `F6-11`
+**`F3-01` … `F3-11` (Faz 3 tamam; F3-10'un elle SR testi hariç)** · `F4-01` · `F4-02` · `F4-03` · `F4-04` · `F4-05` · `F4-06` · `F4-07` **(Faz 4 tamam)** · `F5-01` · `F5-02` · `F5-03` · `F5-04` · `F5-05` **(Faz 5 tamam; dogfooding uygulaması yazıldı, 2 haftalık kullanım sürüyor)** · `F6-01` · `F6-02` · `F6-03` · `F6-04` · `F6-05` · `F6-06` · `F6-07` · `F6-08` · `F6-09` · `F6-10` · `F6-11` · `F6-12`
 
-**Sıradaki:** `F6-12` Yayın provası.
+**Sıradaki:** `F6-13` v1.0.0 yayını — hazırlık yapıldı, `npm publish` kullanıcının onayını bekliyor.
 
 **Açık işler:** NVDA/VoiceOver ile elle test (F3-10) ve `apps/notlar`ın
 iki haftalık günlük kullanımı (F5-05) — ikisi de bir insanın masasında
@@ -2933,9 +2933,44 @@ Taslakların başındaki yorum bloklarında listeli; özetle:
   çalışır.
 - README'deki "Status: not on npm yet" notu F6-13'te kalkacak.
 
-### F6-12 · Yayın provası `[M]` ⬜
-`npm publish --dry-run` tüm paketler; boş bir projeye tarball'dan kurup dene; `exports` haritası doğrulama; provenance imzası
-- **Kabul:** temiz makinede sıfırdan kurulum çalışıyor
+### F6-12 · Yayın provası `[M]` ✅
+- [x] `npm publish --dry-run` tüm paketler (15/15)
+- [x] Boş bir projeye tarball'dan kurup dene — depo dışında, yalnızca arşivlerden
+- [x] `exports` haritası doğrulama — her hedef arşivde var mı
+- [x] Provenance imzası — önkoşul (`repository` alanı) tamam; imzanın kendisi
+      GitHub Actions'ta OIDC ile F6-13'te
+- [x] **Kabul:** temiz makinede sıfırdan kurulum çalışıyor — yerelde ve CI'da
+      (Linux, Playwright imajı), `pnpm yayin:prova`
+
+**Prova, gidecek olanın kendisiyle.** Depodaki her test paketlere
+`workspace:` bağlantısıyla ulaşıyor; yayımlanan paket ise `files`
+listesinin süzdüğü, `workspace:` yerine sürüm yazılmış, `exports` haritası
+bir yabancının `node_modules`unda çözülen bir arşiv. `scripts/yayin-provasi.mjs`
+yedi adım: `pnpm pack` → arşiv içeriği (README, LICENSE, çıktı var; `src/`,
+test, `workspace:`, `catalog:` yok; `exports`un gösterdiği her dosya
+arşivde) → `npm publish --dry-run` → geçici bir dizinde yalnızca
+arşivlerden kurulum → Node'da 17 ESM ve 16 CJS girişi → kullanıcının
+paketleyicisiyle (npm'den `esbuild`) derlenen bir uygulamada tarayıcıda
+yazma → `<script>` etiketiyle IIFE. CI'da her push'ta koşuyor.
+
+**Bulunanlar — hepsi yayından önce kapandı:**
+
+- **`@kalem/wc/define` sunucuyu çökertiyordu.** Node'da içe aktarılınca
+  `customElements is not defined`. SvelteKit, Astro ve Nuxt bileşen
+  betiğini sunucuda da çalıştırıyor ve belgelerdeki Svelte örneği tam
+  olarak bu satırı kullanıyordu. `defineKalemEditor` artık
+  `customElements` yoksa `false` dönüyor; Node'da koşan bir birim testiyle
+  sabit. Depodaki hiçbir test bunu göremezdi: tarayıcı testleri
+  tarayıcıda, Svelte örneği yalnızca istemci derlemesiyle koşuyordu.
+- **npm sayfaları boş olacaktı.** Paketlerde README ve LICENSE yoktu
+  (npm kök dizindekileri pakete katmıyor); MIT, lisans metninin kopyayla
+  dağıtılmasını istiyor. 15 İngilizce README ve LICENSE kopyası eklendi.
+  README'lerin kod örnekleri doküman kapısına bağlandı — kapı artık kök
+  README'yi de tarıyor (73 sayfa, 205 import adı).
+- **Açıklamalar Türkçe'ydi**, `repository` / `homepage` / `bugs` /
+  `keywords` yoktu. `repository` provenance imzasının önkoşulu: npm, imzayı
+  paketin beyan ettiği depoyla eşleştiriyor.
+- **Changesets `baseBranch: "master"`** diyordu (CI'daki hatanın ikizi).
 
 ### F6-13 · v1.0.0 yayını 🚀 `[S]` ⬜
 Changesets ile sürüm, GitHub Actions ile npm yayını, GitHub release + changelog, git tag

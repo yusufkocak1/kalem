@@ -1,8 +1,24 @@
 {
   "name": "@kalem/plugin-word-count",
   "version": "0.0.0",
-  "description": "Kelime sayacı eklentisi — kelime, karakter ve okuma süresi",
+  "description": "Kalem plugin: word count, character count and reading time",
+  "keywords": [
+    "markdown",
+    "editor",
+    "kalem-plugin",
+    "word-count"
+  ],
   "license": "MIT",
+  "author": "Yusuf Koçak",
+  "homepage": "https://github.com/yusufkocak1/kalem/tree/main/packages/plugin-word-count#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yusufkocak1/kalem.git",
+    "directory": "packages/plugin-word-count"
+  },
+  "bugs": {
+    "url": "https://github.com/yusufkocak1/kalem/issues"
+  },
   "engines": {
     "node": ">=18"
   },

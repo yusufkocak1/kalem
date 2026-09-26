@@ -20,6 +20,16 @@ import { kalemEditorElement } from "./element.js";
  * @returns Kaydın bu çağrıyla yapılıp yapılmadığı.
  */
 export function defineKalemEditor(tag = "kalem-editor"): boolean {
+	/*
+	 * Sunucuda (SSR) kayıt yapılmıyor ve hata da atılmıyor.
+	 *
+	 * SvelteKit, Astro ve Nuxt bileşenin betiğini sunucuda da çalıştırıyor;
+	 * belgelerdeki `import '@kalem/wc/define'` satırı orada
+	 * `customElements is not defined` ile **sunucuyu** çökertiyordu.
+	 * Yayın provası (F6-12), paketi Node'da içe aktarırken buldu. Sınıfın
+	 * kendisi zaten tembel kuruluyor (`element.ts`); eksik olan buydu.
+	 */
+	if (typeof customElements === "undefined") return false;
 	if (customElements.get(tag) !== undefined) return false;
 	customElements.define(tag, kalemEditorElement());
 	return true;

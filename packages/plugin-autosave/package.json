@@ -1,8 +1,24 @@
 {
   "name": "@kalem/plugin-autosave",
   "version": "0.0.0",
-  "description": "Otomatik kaydetme eklentisi — gecikmeli kayıt, durum, kurtarma",
+  "description": "Kalem plugin: debounced autosave with status indicator and crash recovery",
+  "keywords": [
+    "markdown",
+    "editor",
+    "kalem-plugin",
+    "autosave"
+  ],
   "license": "MIT",
+  "author": "Yusuf Koçak",
+  "homepage": "https://github.com/yusufkocak1/kalem/tree/main/packages/plugin-autosave#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yusufkocak1/kalem.git",
+    "directory": "packages/plugin-autosave"
+  },
+  "bugs": {
+    "url": "https://github.com/yusufkocak1/kalem/issues"
+  },
   "engines": {
     "node": ">=18"
   },

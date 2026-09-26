@@ -1,8 +1,25 @@
 {
   "name": "@kalem/plugin-outline",
   "version": "0.0.0",
-  "description": "İçindekiler eklentisi — başlık ağacı, atlama, etkin başlık takibi",
+  "description": "Kalem plugin: table of contents with active heading tracking",
+  "keywords": [
+    "markdown",
+    "editor",
+    "kalem-plugin",
+    "outline",
+    "toc"
+  ],
   "license": "MIT",
+  "author": "Yusuf Koçak",
+  "homepage": "https://github.com/yusufkocak1/kalem/tree/main/packages/plugin-outline#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yusufkocak1/kalem.git",
+    "directory": "packages/plugin-outline"
+  },
+  "bugs": {
+    "url": "https://github.com/yusufkocak1/kalem/issues"
+  },
   "engines": {
     "node": ">=18"
   },

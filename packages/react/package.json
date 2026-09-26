@@ -1,8 +1,24 @@
 {
   "name": "@kalem/react",
   "version": "0.0.0",
-  "description": "Kalem için React sarmalayıcısı — <KalemEditor /> ve useKalem()",
+  "description": "React wrapper for Kalem — <KalemEditor /> and useKalem()",
+  "keywords": [
+    "markdown",
+    "editor",
+    "wysiwyg",
+    "react"
+  ],
   "license": "MIT",
+  "author": "Yusuf Koçak",
+  "homepage": "https://github.com/yusufkocak1/kalem/tree/main/packages/react#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yusufkocak1/kalem.git",
+    "directory": "packages/react"
+  },
+  "bugs": {
+    "url": "https://github.com/yusufkocak1/kalem/issues"
+  },
   "engines": {
     "node": ">=18"
   },

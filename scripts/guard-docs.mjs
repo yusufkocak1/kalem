@@ -117,7 +117,18 @@ function sayfalar(dizin) {
 }
 
 const harita = paketHaritasi();
-const sayfaListesi = existsSync(ICERIK) ? sayfalar(ICERIK) : [];
+/*
+ * Doküman sitesinin yanında README'ler de: kök README (GitHub) ve her
+ * paketin README'si (npm sayfası). Okuyucunun ilk kopyaladığı kod orada.
+ */
+const readmeler = [
+	join(KOK, "README.md"),
+	join(KOK, "README.tr.md"),
+	...readdirSync(PAKETLER)
+		.map((d) => join(PAKETLER, d, "README.md"))
+		.filter((y) => existsSync(y)),
+];
+const sayfaListesi = [...(existsSync(ICERIK) ? sayfalar(ICERIK) : []), ...readmeler];
 let denetlenen = 0;
 
 const API = join(ICERIK, "api");
@@ -127,7 +138,9 @@ for (const sayfa of sayfaListesi) {
 	// import adlarını ona sormak dairesel olurdu.
 	if (sayfa.startsWith(API)) continue;
 	const kod = readFileSync(sayfa, "utf8");
-	const kisaAd = sayfa.slice(ICERIK.length + 1).replaceAll("\\", "/");
+	const kisaAd = (
+		sayfa.startsWith(ICERIK) ? sayfa.slice(ICERIK.length + 1) : sayfa.slice(KOK.length)
+	).replaceAll("\\", "/");
 
 	for (const m of kod.matchAll(
 		/import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+['"](@kalem\/[^'"]+)['"]/g,

@@ -1,8 +1,24 @@
 {
   "name": "@kalem/plugin-image-upload",
   "version": "0.0.0",
-  "description": "Görsel yükleme eklentisi — sürükle-bırak, yapıştırma, yükleme kancası",
+  "description": "Kalem plugin: image upload by drag and drop or paste, with your own upload hook",
+  "keywords": [
+    "markdown",
+    "editor",
+    "kalem-plugin",
+    "image-upload"
+  ],
   "license": "MIT",
+  "author": "Yusuf Koçak",
+  "homepage": "https://github.com/yusufkocak1/kalem/tree/main/packages/plugin-image-upload#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yusufkocak1/kalem.git",
+    "directory": "packages/plugin-image-upload"
+  },
+  "bugs": {
+    "url": "https://github.com/yusufkocak1/kalem/issues"
+  },
   "engines": {
     "node": ">=18"
   },
