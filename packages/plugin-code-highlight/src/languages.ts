@@ -1,5 +1,5 @@
 /**
- * @kalem/plugin-code-highlight — Dil kayıt defteri  (İş listesi: F4-02)
+ * @kalem-editor/plugin-code-highlight — Dil kayıt defteri  (İş listesi: F4-02)
  *
  * ## Neden `import()`
  *

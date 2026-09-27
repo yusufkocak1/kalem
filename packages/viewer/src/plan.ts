@@ -1,5 +1,5 @@
 /**
- * @kalem/viewer — Render planı (AST → element tarifi)  (İş listesi: F2-01, F2-02)
+ * @kalem-editor/viewer — Render planı (AST → element tarifi)  (İş listesi: F2-01, F2-02)
  *
  * ## Neden araya bir katman giriyor
  *
@@ -20,8 +20,16 @@
  * string hedefi yapar, DOM hedefi ise `textContent` ile hiç yapmaz. Planın
  * içinde kaçışlanmış metin taşımak, iki hedefin çıktısını ayırırdı.
  */
-import type { Block, Definition, Frontmatter, HtmlPolicy, Inline, Node, Root } from "@kalem/core";
-import { sanitizeUrl } from "@kalem/core";
+import type {
+	Block,
+	Definition,
+	Frontmatter,
+	HtmlPolicy,
+	Inline,
+	Node,
+	Root,
+} from "@kalem-editor/core";
+import { sanitizeUrl } from "@kalem-editor/core";
 
 // ---------------------------------------------------------------------------
 // Plan düğümleri
@@ -140,7 +148,7 @@ function wrap(tag: string, children: readonly RenderNode[]): RenderElement {
 /**
  * Ağaçtaki tüm `definition` düğümlerini kimliklerine göre toplar.
  *
- * `walk` yerine elle iniyoruz: `@kalem/core`'un `walk`'ı ziyaretçi
+ * `walk` yerine elle iniyoruz: `@kalem-editor/core`'un `walk`'ı ziyaretçi
  * arayüzü kuruyor ve viewer'ın tek ihtiyacı düz bir tarama. 14 kB'lık
  * bütçede bu fark ölçülür.
  *
@@ -332,7 +340,7 @@ function tableRow(
 /**
  * Ham HTML düğümünü politikaya göre çevirir.
  *
- * `@kalem/core`'un `applyHtmlPolicy`'si burada **kasten** kullanılmıyor:
+ * `@kalem-editor/core`'un `applyHtmlPolicy`'si burada **kasten** kullanılmıyor:
  * o fonksiyon `escape` politikasında metni önceden kaçışlar. Plan
  * kaçışlanmış metin taşırsa DOM hedefi onu `textContent` ile basıp
  * `&lt;b&gt;` gösterir — iki hedef ayrışır. Politika kararı aynı, uygulama

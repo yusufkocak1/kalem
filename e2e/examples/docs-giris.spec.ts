@@ -59,7 +59,7 @@ test("araç çubuğu kurulu ve biçimlendirme çalışıyor", async ({ page }) =
 
 test("kurulum tek satırda ve boyutlar rozet olarak duruyor", async ({ page }) => {
 	await expect(page.locator(".kurulum code")).toHaveText(
-		"npm i @kalem/editor @kalem/ui @kalem/themes",
+		"npm i @kalem-editor/editor @kalem-editor/ui @kalem-editor/themes",
 	);
 	await expect(page.locator(".rozet")).toHaveCount(4);
 	/*

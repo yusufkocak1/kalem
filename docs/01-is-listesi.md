@@ -8,10 +8,10 @@
 | # | Karar | Sonuç |
 |---|---|---|
 | 1 | Editör motoru | **Kendi blok-tabanlı motorumuz** (Seçenek C). Sıfır 3rd-party runtime bağımlılığı. |
-| 2 | Marka / scope | **Kalem** · `@kalem/*` |
+| 2 | Marka / scope | **Kalem** · `@kalem-editor/*` |
 | 3 | Yayın stratejisi | **Sessiz geliştirme.** npm'e ilk yayın = v1.0. Tek ve güçlü duyuru. |
 | 4 | Dokümantasyon | **Astro Starlight** |
-| 5 | Tablo | **v1 kapsamı dışında.** v1.1'de `@kalem/plugin-table` olarak gelir. |
+| 5 | Tablo | **v1 kapsamı dışında.** v1.1'de `@kalem-editor/plugin-table` olarak gelir. |
 | 6 | Mobil | v1'de **"çalışır ama optimize değil".** Dokunmatik cila v1.1. |
 | 7 | Lisans | MIT *(varsayılan — F0-08'de nihai onay)* |
 
@@ -30,7 +30,7 @@
 | Faz | Görev | Durum |
 |---|---|---|
 | **Faz 0** — Temel altyapı | 8 / 8 | ✅ **Tamamlandı** |
-| **Faz 1** — `@kalem/core` | 11 / 11 | ✅ **Tamamlandı** |
+| **Faz 1** — `@kalem-editor/core` | 11 / 11 | ✅ **Tamamlandı** |
 | **Faz 1.5** — Doğrulama spike'ı | 0 / 3 | ⏭️ Atlandı (Faz 2'ye geçildi) |
 | **Faz 2** — Viewer + başsız editör | 13 / 13 | ✅ **Tamamlandı** |
 | **Faz 3** — Word deneyimi | 11 / 11 | 🟡 Bitti (elle SR testi hariç) |
@@ -55,7 +55,7 @@ F6-13 ve F6-14 bölümlerinde.
 
 - NVDA/VoiceOver ile elle ekran okuyucu testi (F3-10)
 - `apps/notlar`ın iki haftalık günlük kullanımı (F5-05)
-- `@kalem` kapsamının npm'de kime ait olduğu (F6-13, adım 1)
+- npm'de `kalem-editor` kuruluşunun açılması (F6-13, adım 1)
 - Doküman sitesi ve playground'un nerede barındırılacağı: `kalem.dev` 403
   dönüyor. GitHub Pages seçilirse Astro `base` ayarı gerekiyor ve içerikteki
   mutlak bağlantılar (`/en/…`) ona göre değişmeli.
@@ -75,15 +75,15 @@ F6-13 ve F6-14 bölümlerinde.
 >
 > | Giriş | Boyut | Bütçe |
 > |---|---|---|
-> | `@kalem/core` | 11.51 kB | 12 kB |
-> | `@kalem/core/commands` | 2.28 kB | 4 kB |
-> | `@kalem/core/html` | 2.21 kB | 6 kB |
-> | `@kalem/viewer` | 2.68 kB | 14 kB |
-> | `@kalem/themes/viewer.css` | 1.16 kB | 3 kB |
-> | `@kalem/themes/editor.css` | 340 B | 2 kB |
-> | `@kalem/themes/ui.css` | 1.35 kB | 3 kB |
-> | `@kalem/editor` (core + viewer dâhil) | 22.38 kB | 38 kB |
-> | `@kalem/editor` + `@kalem/ui` | 27.58 kB | 58 kB |
+> | `@kalem-editor/core` | 11.51 kB | 12 kB |
+> | `@kalem-editor/core/commands` | 2.28 kB | 4 kB |
+> | `@kalem-editor/core/html` | 2.21 kB | 6 kB |
+> | `@kalem-editor/viewer` | 2.68 kB | 14 kB |
+> | `@kalem-editor/themes/viewer.css` | 1.16 kB | 3 kB |
+> | `@kalem-editor/themes/editor.css` | 340 B | 2 kB |
+> | `@kalem-editor/themes/ui.css` | 1.35 kB | 3 kB |
+> | `@kalem-editor/editor` (core + viewer dâhil) | 22.38 kB | 38 kB |
+> | `@kalem-editor/editor` + `@kalem-editor/ui` | 27.58 kB | 58 kB |
 >
 > Gerekçe ikisinde de aynı: yalnızca Markdown işleyen kullanıcı (SSR,
 > derleme betiği) editör komutlarını ve yapıştırma dönüştürücüsünü
@@ -98,15 +98,15 @@ F6-13 ve F6-14 bölümlerinde.
 > ayrıştırıcı ve serileştirici **blok tipi başına birlikte** ilerletiliyor;
 > koşucu ikisi de var olur olmaz devreye girecek.
 
-**Yazılan kod:** `@kalem/core` — AST tipleri, künye kaydı, tip koruyucular,
+**Yazılan kod:** `@kalem-editor/core` — AST tipleri, künye kaydı, tip koruyucular,
 gezinme/konum/düzenleme yardımcıları, kaynak tarayıcı, blok ve satır içi
 ayrıştırıcı, serileştirici, güvenlik katmanı, komutlar, HTML dönüştürücü.
-`@kalem/viewer` — render planı, `renderToDOM`, `renderToString`.
-`@kalem/themes` — görüntüleyici ve editör stilleri (saf CSS).
-`@kalem/editor` — blok kapsayıcı, model↔DOM eşlemesi, satır içi geri okuma,
+`@kalem-editor/viewer` — render planı, `renderToDOM`, `renderToString`.
+`@kalem-editor/themes` — görüntüleyici ve editör stilleri (saf CSS).
+`@kalem-editor/editor` — blok kapsayıcı, model↔DOM eşlemesi, satır içi geri okuma,
 iki seviyeli seçim, satır içi biçimlendirme, klavye ve blok yapısı düzenleme,
 geri al/yinele, giriş kuralları, pano, eklenti sistemi. **Faz 2 kapandı.**
-`@kalem/ui` — balon araç çubuğu, bağlantı akışı, slash menü, yer tutucu.
+`@kalem-editor/ui` — balon araç çubuğu, bağlantı akışı, slash menü, yer tutucu.
 **924 birim testi** + **518 tarayıcı testi** (Chromium · Firefox · WebKit),
 axe ile WCAG 2.1 A/AA taraması ve CDP ile IME bileşimi dâhil.
 `parse(md)` ↔ `serialize(ast)` gidiş-dönüş 17/17 byte-birebir;
@@ -158,7 +158,7 @@ Her görevde: **Çıktı** (ne üretilir) ve **Kabul** (ne zaman bitti sayılır
 - **Kabul:** `tsc --noEmit` tüm workspace'te temiz
 
 ### F0-03 · Build hattı `[M]` ✅
-- `tsdown` (veya `tsup`) ile paket başına build: ESM + CJS + `.d.ts`; `@kalem/editor` için ayrıca IIFE (CDN)
+- `tsdown` (veya `tsup`) ile paket başına build: ESM + CJS + `.d.ts`; `@kalem-editor/editor` için ayrıca IIFE (CDN)
 - `package.json` `exports` haritası + `sideEffects: false` + `files` alanı
 - `publint` + `@arethetypeswrong/cli` ile paket sağlığı kontrolü
 - **Kabul:** boş bir paket build alıyor, `publint` sıfır uyarı veriyor
@@ -197,7 +197,7 @@ Bunlar projenin iki temel vaadini **otomatik** koruyan testlerdir. Bunlar olmada
 
 ---
 
-# FAZ 1 — `@kalem/core` 🔵 DEVAM EDİYOR (2 / 11)
+# FAZ 1 — `@kalem-editor/core` 🔵 DEVAM EDİYOR (2 / 11)
 **Amaç:** DOM'suz, saf, test edilebilir Markdown çekirdeği. **Süre: ~5–7 hafta**
 
 > Bu faz tamamen saf fonksiyonlardan oluşur — hızlı ve keyifli test edilir. Editörün en riskli kısmına girmeden önce sağlam bir zemin kurar.
@@ -317,7 +317,7 @@ Yapıştırma normalizasyonunun beyni. Word, Google Docs, Excel, Notion ve genel
 - **Kabul:** gerçek Word ve GDocs kopya çıktılarından oluşan fixture seti doğru AST üretiyor
 - **Not:** Bu görev sürekli iyileştirilir; v1 için "makul" hedeflenir, "mükemmel" değil
 
-> **Yapıldı.** `@kalem/core/html` — **ayrı giriş noktası**. Yalnızca Markdown
+> **Yapıldı.** `@kalem-editor/core/html` — **ayrı giriş noktası**. Yalnızca Markdown
 > işleyen kullanıcı bu kodu indirmez (2.21 kB, core bütçesinin dışında).
 >
 > DOM tipleri kullanılmıyor: dönüştürücü, gerçek bir `Element`'in yapısal
@@ -354,7 +354,7 @@ DOM'suz, AST üzerinde çalışan işlemler: `toggleMark`, `setBlockType`, `wrap
 > çocuğunu çıkarabiliyor; ortadaki, kapsayıcıyı ikiye bölmeyi gerektiriyor
 > ve editör ihtiyacı netleşmeden tasarlanmamalı (F2).
 
-> **FAZ 1 ÇIKIŞ KRİTERİ:** `@kalem/core` tek başına kullanılabilir, %90+ test kapsamlı, 0 bağımlılık, ≤ 12 kB. `pnpm size` yeşil.
+> **FAZ 1 ÇIKIŞ KRİTERİ:** `@kalem-editor/core` tek başına kullanılabilir, %90+ test kapsamlı, 0 bağımlılık, ≤ 12 kB. `pnpm size` yeşil.
 
 ---
 
@@ -403,7 +403,7 @@ Sonuçları değerlendir ve **açıkça karar ver**:
 # FAZ 2 — Viewer + Başsız Editör ✅ TAMAMLANDI (2026-09-09)
 **Amaç:** Görsel olmadan çalışan bir editör motoru. **Süre: ~7–9 hafta**
 
-## 2A · `@kalem/viewer` (~1 hafta) ✅ TAMAMLANDI
+## 2A · `@kalem-editor/viewer` (~1 hafta) ✅ TAMAMLANDI
 
 > **Mimari karar (uygulandı):** iki render hedefi ayrı ayrı yazılmadı.
 > Aralarına saf bir **render planı** kondu (`plan.ts`): AST → element
@@ -431,14 +431,14 @@ Saf, DOM'suz fonksiyon. Doğru HTML kaçışlaması.
 > kaçışlamak çıktıyı bozmaz ama **eşitliği** bozardı.
 
 ### F2-03 · Viewer stilleri `[S]` ✅
-`@kalem/themes` içindeki temel tipografi; `kalem-` sınıf öneki
+`@kalem-editor/themes` içindeki temel tipografi; `kalem-` sınıf öneki
 - **Kabul:** salt-okunur bir doküman düzgün görünüyor ✅
 
 > Sınıf öneki plandaki `mdx-` değil `kalem-`: `mdx-` marka kararından önce
 > yazılmıştı. Önek `classPrefix` seçeneğiyle değiştirilebilir.
 >
 > **Paket saf CSS** — derleme adımı, JS, bağımlılık yok. Tek dosya:
-> `@kalem/themes/viewer.css` (1.16 kB gzip, bütçe 3 kB).
+> `@kalem-editor/themes/viewer.css` (1.16 kB gzip, bütçe 3 kB).
 >
 > İki tasarım kararı:
 > - **Her kural `.kalem-doc` altında.** `:root` üzerine tek değişken bile
@@ -471,7 +471,7 @@ Render doğruluğu + XSS fixture'ları + a11y (axe)
 > Tek dev bağımlılık eklendi: `@axe-core/playwright`. Yayımlanan hiçbir
 > pakete girmiyor.
 
-## 2B · `@kalem/editor` — blok motoru (~6–8 hafta) ✅ TAMAMLANDI
+## 2B · `@kalem-editor/editor` — blok motoru (~6–8 hafta) ✅ TAMAMLANDI
 
 ### F2-05 · Blok kapsayıcı ve yaşam döngüsü `[L]` ✅
 - `Editor` sınıfı: `new Editor(el, { value, onChange, readOnly, plugins })` ✅ *(`plugins` F2-12'de)*
@@ -500,7 +500,7 @@ Render doğruluğu + XSS fixture'ları + a11y (axe)
 > `_italik_` yazan `*italik*` görmüyor.
 >
 > **Hedefli yama:** blok yalnızca **referansı** değiştiyse yeniden
-> kuruluyor. Bu, `@kalem/core`'un değişmez düzenleme kararının (F1-02)
+> kuruluyor. Bu, `@kalem-editor/core`'un değişmez düzenleme kararının (F1-02)
 > karşılığını aldığı yer: `replaceAt` yalnızca yoldaki ataları kopyaladığı
 > için dokunulmayan blokların referansı aynı kalıyor ve karşılaştırma tek
 > bir `!==`. Sanal DOM'a gerek kalmamasının sebebi bu.
@@ -510,7 +510,7 @@ Render doğruluğu + XSS fixture'ları + a11y (axe)
 > biçimlendirme komutları kaldı.
 >
 > Testler: 29 birim (sahte DOM'la normalleştirme mantığı) + 17 tarayıcı
-> testi × 3 motor. `@kalem/editor` 13.37 / 38 kB.
+> testi × 3 motor. `@kalem-editor/editor` 13.37 / 38 kB.
 
 ### F2-06 · Seçim modeli `[L]` ✅
 İki seviyeli seçim:
@@ -655,7 +655,7 @@ Blok içi `strong`/`emphasis`/`delete`/`inlineCode`/`link` uygulama ve kaldırma
 
 > **Ters işlem yerine anlık görüntü.** Plan "her komut tersine çevrilebilir
 > bir işlem üretir" diyordu; uygulama daha basit bir yoldan aynı sonucu
-> veriyor ve gerekçesi şu: `@kalem/core`'un düzenleme işlemleri değişmez ve
+> veriyor ve gerekçesi şu: `@kalem-editor/core`'un düzenleme işlemleri değişmez ve
 > **yapısal paylaşımlı** (F1-02), yani bir anlık görüntü tüm belgeyi
 > kopyalamıyor — yalnızca değişen yoldaki ataları. Bir geçmiş kaydı
 > pratikte tek bir kök referansı.
@@ -723,7 +723,7 @@ Yazarken otomatik dönüşüm: `# ` → başlık ✅, `- ` / `* ` → liste ✅,
 > **Tarayıcıya hiç bırakılmıyor**, blok içi seçimde bile: asıl kazanç
 > zaten orada, çünkü tarayıcının `text/plain`'i biçim işaretlerini atıyor.
 >
-> **Editör artık `@kalem/viewer`'a bağımlı.** `render.ts`'te "editör
+> **Editör artık `@kalem-editor/viewer`'a bağımlı.** `render.ts`'te "editör
 > viewer'ı kullanmaz" yazıyordu ve editör *render'ı* için hâlâ doğru
 > (farklı ihtiyaç). Ama pano için tam olarak viewer'ın ürettiği şey
 > gerekiyordu: sunum amaçlı, kimliksiz, düzenleme özniteliği taşımayan
@@ -752,7 +752,7 @@ Analiz §5.9'daki `Plugin` arayüzü; kayıt ✅, yaşam döngüsü ✅, çakı�
 > **Render'a kanca bilerek yok.** Düğüm başına bir kanca, blok motorunun
 > en sıcak yolunda her düğüm için bir dolaylı çağrı demek; ihtiyaç
 > ölçülmeden ödenecek bir bedel değil. Görsel genişletme Faz 3'ün
-> (`@kalem/ui`) işi. **Kod bloğu render'ının eklentiye çıkarılmaması bu
+> (`@kalem-editor/ui`) işi. **Kod bloğu render'ının eklentiye çıkarılmaması bu
 > yüzden** — çıkarmak, ölçülmemiş bir maliyeti tüm bloklara yaymak
 > olurdu. Görev listesinin **davranışı** (kutuya tıklayınca durum
 > değişmesi) eklentiye taşındı, **çizimi** çekirdekte kaldı.
@@ -792,9 +792,9 @@ Playwright ile: yazma ✅, seçim ✅, kısayollar ✅, giriş kuralları ✅, u
 > Kurallar artık `compositionend`'de bir kez çalışıyor.
 >
 > **Yapıştırma bu adımda değil:** kirli HTML normalleştirmesi F3-07'nin
-> boru hattı ve `@kalem/core/html` (F1-09) onu bekliyor.
+> boru hattı ve `@kalem-editor/core/html` (F1-09) onu bekliyor.
 
-> **FAZ 2 ÇIKIŞ KRİTERİ:** UI olmadan, sadece klavyeyle tam işlevli bir Markdown editörü ✅ · `@kalem/editor` ≤ 38 kB ✅ (21.85 kB)
+> **FAZ 2 ÇIKIŞ KRİTERİ:** UI olmadan, sadece klavyeyle tam işlevli bir Markdown editörü ✅ · `@kalem-editor/editor` ≤ 38 kB ✅ (21.85 kB)
 >
 > **Faz 1.5 atlandığı için matrise düşen üç riskin ikisi burada ölçüldü:**
 > bloklar arası sürükleyerek seçim (F2-06) ve IME bileşimi (F2-13). Üçüncüsü
@@ -803,7 +803,7 @@ Playwright ile: yazma ✅, seçim ✅, kısayollar ✅, giriş kuralları ✅, u
 
 ---
 
-# FAZ 3 — Word Deneyimi (`@kalem/ui`)
+# FAZ 3 — Word Deneyimi (`@kalem-editor/ui`)
 **Amaç:** Ürünün kalbi. Segment A'nın (yazılım bilmeyen kullanıcı) tüm değeri burada. **Süre: ~6–8 hafta**
 
 ### F3-01 · Balon araç çubuğu (bubble toolbar) `[L]` ✅
@@ -1074,7 +1074,7 @@ Boş dokümanda "Yazmaya başlayın veya `/` ile komut çalıştırın" ipucu �
 > Testler: 6 tarayıcı testi × 3 motor.
 
 ### F3-09 · Tema sistemi `[M]` ✅
-`@kalem/themes`: CSS değişkeni token seti ✅, `default` + `dark` + `minimal` ✅;
+`@kalem-editor/themes`: CSS değişkeni token seti ✅, `default` + `dark` + `minimal` ✅;
 `prefers-color-scheme` + `[data-theme]` ✅
 - [x] **Kabul:** tek CSS bloğuyla marka rengi değiştirilebiliyor
 
@@ -1091,7 +1091,7 @@ her kural bunu yeniyor; `!important` ya da uzun seçici zinciri gerekmiyor.
 **Yüzen parçalar tema sınıfını kendileri taşıyor.** Araç çubuğu, menüler
 ve tutamaç `<body>` altında duruyor (bir `overflow: hidden` kapsayıcı
 onları kırpardı) ve orada gömen sayfanın sarmalayıcısından miras
-alamıyorlar. `@kalem/ui` her birine `kalem-theme` ekliyor — testle
+alamıyorlar. `@kalem-editor/ui` her birine `kalem-theme` ekliyor — testle
 sabitlendi.
 
 **`:root` yine yok.** Bir Markdown kütüphanesinin gömüldüğü uygulamanın
@@ -1298,7 +1298,7 @@ Boyut: eklenti tek başına 2.92 kB (çekirdek ve editör hariç),
 
 **"0 byte" iki parçadan geliyor ve ikisi de makine tarafından ölçülüyor.**
 İlki paket ayrımı: eklentiyi kurmayan hiçbir şey indirmiyor ve
-`@kalem/editor` bütçesi (38 kB) değişmedi — hâlâ 25.92 kB. İkincisi dil
+`@kalem-editor/editor` bütçesi (38 kB) değişmedi — hâlâ 25.92 kB. İkincisi dil
 paketlerinin ayrı chunk olması: `.size-limit.json` tek bir dil paketini
 adıyla ölçüyor (599 B), yani chunk'lar birleşirse kapı kırmızıya döner.
 Çalışma zamanı tarafı e2e'de: sayfanın ağ istekleri izleniyor ve
@@ -1411,7 +1411,7 @@ kullanıcının hizalamasını bozmak olurdu.
 >
 > Karar #5 ile tutarlı çözüm, v1'de tablo hücrelerini düzenlenebilir
 > çizmemek (`render.ts`): kullanıcıyı kaybolacak bir metni yazmaya davet
-> etmemek. Gerçek çözüm `@kalem/plugin-table` (v1.1) ile tablo üreticisi.
+> etmemek. Gerçek çözüm `@kalem-editor/plugin-table` (v1.1) ile tablo üreticisi.
 > F4-03'ün ortasında yapılacak bir değişiklik değildi, ayrı bir iş
 > olarak duruyor.
 >
@@ -1466,7 +1466,7 @@ atlamayı işe yaramaz kılıyordu: atlamanın tetiklediği kaydırma olayı
 seçimi ilk başlığa geri alıyordu. Varsayım artık yalnızca **henüz bir
 seçim yokken** yapılıyor.
 
-**`@kalem/editor`e üç fonksiyon eklendi** (`blockElementOf`, `holderIn`,
+**`@kalem-editor/editor`e üç fonksiyon eklendi** (`blockElementOf`, `holderIn`,
 `holderFor`). Model konumundan DOM elemanına gitmek, F4-03'te de F4-04'te
 de gerekti ve eklentiler birbirine bağlanamıyor (her biri bağımsız
 paket). İki eklentinin aynı on satırı kopyalaması, `render.ts`in
@@ -1620,7 +1620,7 @@ testi.
 **Amaç:** "Framework bağımsız" vaadinin kanıtı. **Süre: ~2–3 hafta**
 **Not:** Faz 3 ile paralel yürütülebilir ve yürütülmeli — API'yi erken sınar.
 
-### F5-01 · `@kalem/react` `[M]` ✅
+### F5-01 · `@kalem-editor/react` `[M]` ✅
 - [x] `<KalemEditor value onChange />` — hem kontrollü hem kontrolsüz
 - [x] `useSyncExternalStore` ile abonelik (`useKalemValue`), `useKalem()` ile imperatif erişim
 - [x] `peerDependencies: { react: ">=17" }`, kendi boyutu **903 B** (sınır 1.5 kB)
@@ -1676,7 +1676,7 @@ geliştirme sunucusu, `exports` haritasındaki bir hatayı gizlerdi. Her iki
 > F5-01'den **önce** de kırmızıydı. `--profile node16` ile node10
 > bilerek yok sayılıyor — paketler zaten `node >= 18` istiyor.
 
-### F5-02 · `@kalem/vue` `[M]` ✅
+### F5-02 · `@kalem-editor/vue` `[M]` ✅
 - [x] `<KalemEditor v-model />`, `defineComponent`, `peerDependencies: { vue: "^3" }`
 - [x] Nuxt SSR uyumu — **`<ClientOnly>` gerekmiyor**, belge sunucuda çiziliyor
 - [x] `useKalem()` ile imperatif erişim (provide/inject)
@@ -1686,7 +1686,7 @@ geliştirme sunucusu, `exports` haritasındaki bir hatayı gizlerdi. Her iki
 yazmasının sebebi, Vue dünyasında editör sarmalayıcılarının neredeyse
 hepsinin `<ClientOnly>` istemesi; bedeli görünür — sunucu boş bir kutu
 gönderiyor, içerik sonradan beliriyor, arama motoru metni hiç görmüyor.
-Burada `@kalem/viewer.renderToString` ile üretilen HTML sunucudan geliyor;
+Burada `@kalem-editor/viewer.renderToString` ile üretilen HTML sunucudan geliyor;
 bir test, ham yanıtta `<h1>Işık ve Gölge</h1>` ve `<li>` olduğunu
 doğruluyor.
 
@@ -1729,7 +1729,7 @@ Boyut: 662 B (gzip; Vue, editör ve görüntüleyici hariç).
 > kullanılan her import'u "kullanılmamış" sayıyor ve `--unsafe` bir
 > düzeltmede onları silerdi.
 
-### F5-03 · `@kalem/wc` `[M]` ✅
+### F5-03 · `@kalem-editor/wc` `[M]` ✅
 - [x] `<kalem-editor>` Custom Element; sınıf tembel kuruluyor, paket sunucuda import edilebiliyor
 - [x] Shadow DOM **opsiyonel, varsayılan kapalı** — `shadow` özniteliği
 - [x] Öznitelik / özellik / olay köprüsü; `input`, `change`, `kalem-ready`
@@ -1744,7 +1744,7 @@ iki farklı çerçevede **sarmalayıcı olmadan** çalışması.
 
 **Sınıf bir fonksiyonun içinde kuruluyor.** `class X extends HTMLElement`
 değerlendirildiği anda `HTMLElement` globalini okuyor; modül gövdesinde
-dursaydı `import "@kalem/wc"` yazan bir Next.js/Nuxt sunucusu daha ilk
+dursaydı `import "@kalem-editor/wc"` yazan bir Next.js/Nuxt sunucusu daha ilk
 satırda düşerdi — eleman o sayfada hiç kullanılmasa bile. Sınıf
 `kalemEditorElement()` ilk çağrıldığında üretiliyor ve saklanıyor; DOM'a
 dokunan tek şey `defineKalemEditor()`.
@@ -1754,7 +1754,7 @@ yazıyor ve aynı adı iki kez kaydetmek **hata atıyor**: import edilir
 edilmez kaydeden bir kütüphane, aynı sayfada iki sürümü bulunan bir
 uygulamayı (mikro-ön uç, iki bağımlılığın farklı sürümleri) açılışta
 patlatırdı. Çağrı açık ve tekrarlanabilir — ad zaten kayıtlıysa `false`
-dönüyor. Tek satır isteyenler için `import "@kalem/wc/define"`; ayrı giriş
+dönüyor. Tek satır isteyenler için `import "@kalem-editor/wc/define"`; ayrı giriş
 olmasının sebebi `sideEffects` beyanı, yoksa paketleyici kaydı atardı.
 
 > **Olay başına iki `input` sorunu.** `contenteditable`ın kendi `input`
@@ -1807,7 +1807,7 @@ elemanlara bağlanma yolu çoğu zaman öznitelik ve bağlamanın sessizce
 ayrı tutuluyor: `defaultValue`.
 
 **Shadow DOM neden varsayılan kapalı.** Gölge kök stilleri dışarıda
-bırakıyor: `@kalem/themes` sayfanın genelinde tanımlı ve gölgeye
+bırakıyor: `@kalem-editor/themes` sayfanın genelinde tanımlı ve gölgeye
 girmiyor. Varsayılan açık olsaydı editör her kurulumda stilsiz açılır,
 herkes bir geçici çözüm arardı. Açık olması gereken durum da gerçek —
 yabancı bir sayfaya gömülen widget'ta sayfanın `p { margin: 0 }` kuralı
@@ -1815,7 +1815,7 @@ belgeyi bozuyor. Bir test tam olarak bunu ölçüyor: sayfaya
 `p { color: red }` ekleniyor, gölgedeki belge etkilenmiyor, ışık DOM'daki
 belge kırmızıya dönüyor.
 
-> **Gölge kipinde editör kullanıcının yazdığını görmüyordu.** `@kalem/editor`
+> **Gölge kipinde editör kullanıcının yazdığını görmüyordu.** `@kalem-editor/editor`
 > değişen bloğu `document.activeElement` üzerinden buluyordu; gölge kökün
 > içinde bu, düzenlenen bloğu değil gölgeyi taşıyan ana makineyi veriyor.
 > Sonuç sessiz ve tam: DOM'da harfler beliriyor, model hiç güncellenmiyor,
@@ -1876,12 +1876,12 @@ içinde duruyor, form alanının `name`'i var, Gönder'e basınca metin adres
 test sayfadaki script etiketlerini sayıyor ve listenin tam olarak tek
 elemanlı olduğunu doğruluyor.
 
-**IIFE derlemesi bir zorunluluktan doğdu.** ESM çıktısı `@kalem/core` ve
-`@kalem/editor`i **dışarıda** bırakıyor; paketleyici kullanan uygulamada
+**IIFE derlemesi bir zorunluluktan doğdu.** ESM çıktısı `@kalem-editor/core` ve
+`@kalem-editor/editor`i **dışarıda** bırakıyor; paketleyici kullanan uygulamada
 doğrusu bu, yoksa aynı kod iki kez paketlenirdi. Ama CDN kullanıcısının
-paketleyicisi yok ve çıplak `import "@kalem/editor"` satırı tarayıcıda
+paketleyicisi yok ve çıplak `import "@kalem-editor/editor"` satırı tarayıcıda
 çözülmez. `kalem-editor.iife.js` hepsini içine alıyor: **26,7 kB** gzip,
-tek istek, `type="module"` bile gerekmiyor. Bir test dosyada `@kalem/`
+tek istek, `type="module"` bile gerekmiyor. Bir test dosyada `@kalem-editor/`
 geçmediğini doğruluyor — dışarıda kalan tek bir import bu sözü sessizce
 bozardı.
 
@@ -1924,7 +1924,7 @@ Boyut: `kalem-editor.iife.js` 26,7 kB (gzip; çekirdek ve editör dâhil).
 
 ### F5-05 · Dogfooding ⭐ `[M]` 🟡
 - [x] Gerçek bir uygulama yazıldı: **`apps/notlar`** — yerel not defteri
-- [x] Kütüphanenin neredeyse tamamı kullanımda: `@kalem/react`, `@kalem/ui` ve altı eklenti
+- [x] Kütüphanenin neredeyse tamamı kullanımda: `@kalem-editor/react`, `@kalem-editor/ui` ve altı eklenti
 - [x] Kullanım sırasında bulunan üç sorun düzeltildi (aşağıda); ikisi kütüphanenin kendisindeydi
 - [x] 24 birim + 11 tarayıcı testi; CI'da derleniyor ve sınanıyor
 - [ ] **Kabul:** en az 2 hafta günlük kullanım — bu adım bir insanın masasında
@@ -1939,7 +1939,7 @@ Kullanımda olanlar: `<KalemEditor>` (kontrolsüz kip, `useKalem`),
 `mountUi` (sabit çubuk + balon, slash menü, bağlantı balonu), kod
 vurgulama, ara-değiştir, içindekiler, kelime sayacı, kaynak kipi,
 otomatik kaydetme. Not listesinin arama kutusu bile kütüphaneden:
-`@kalem/ui`nin `matches`/`score` yardımcıları slash menüsü için
+`@kalem-editor/ui`nin `matches`/`score` yardımcıları slash menüsü için
 yazılmıştı ama işi genel — Türkçe kasa ve aksan katlaması.
 
 > **Bulgu 1 — `[data-theme]` atadan gelince çalışmıyordu.** Kütüphanenin
@@ -2012,7 +2012,7 @@ dâhil; sekiz dil paketi ayrı parçalarda). 24 birim + 11 tarayıcı testi.
 
 ### F6-01 · Site kurulumu `[M]` ✅
 - [x] Astro 7 + Starlight 0.42, Pagefind araması (27 sayfa, iki dil indeksli)
-- [x] Marka teması — renkler `@kalem/themes/tokens.css` paletinin aynısı
+- [x] Marka teması — renkler `@kalem-editor/themes/tokens.css` paletinin aynısı
 - [x] TR + EN i18n iskeleti; kenar çubuğu iki dilde
 - [x] Site CI'da derleniyor (`dokuman` işi)
 - [x] **Kabul:** `pnpm docs:dev` ve `pnpm docs:build` çalışıyor
@@ -2022,7 +2022,7 @@ Starlight 0.30; güncel olanlar 7 ve 0.42). Yükseltme iki kırıcı değişikli
 getirdi: `social` artık nesne değil **dizi**, `tagline` kök seçenek
 olmaktan çıkıp giriş sayfasının hero'suna taşınmış. İkisi de düzeltildi.
 
-**Renkler uydurulmuyor.** `kalem.css`, `@kalem/themes/tokens.css`teki
+**Renkler uydurulmuyor.** `kalem.css`, `@kalem-editor/themes/tokens.css`teki
 paletin aynısını kullanıyor: açık temada `#22201d` metin / `#fbfaf8`
 zemin / `#0f4e4a` vurgu, koyu temada `#e8e6e1` / `#16151a` / `#6fd3c6`.
 Starlight'ın varsayılan gri merdiveni soğuk (maviye kaçık) olduğu için o
@@ -2065,7 +2065,7 @@ işi ve bu madde onu kapsamıyor.
 > kütüphaneyi bir daha denemezdi.
 
 **Bunun bir daha olmaması makineye bağlandı.** `pnpm guard:docs`
-(dördüncü koruyucu kapı) her `import { … } from "@kalem/…"` satırındaki
+(dördüncü koruyucu kapı) her `import { … } from "@kalem-editor/…"` satırındaki
 her adı, o paketin **kaynak dosyasındaki gerçek dışa aktarmalarıyla**
 karşılaştırıyor. Tip denetimi değil — örnekler kısaltılmış ve bağlamsız
 olduğu için derlenmeleri beklenmiyor — ama yazılan adların var olması
@@ -2117,7 +2117,7 @@ Bir bağlantı denetimi tüm iç bağlantıların hedefinin gerçekten
 **Site artık kütüphaneyi gerçekten gömüyor.** Astro'ya hem React hem Vue
 ada motoru kuruldu ve `/canli/` sayfasında üç editör aynı anda yaşıyor:
 biri `new Editor(el)` ile, biri `<KalemEditor />` ile, biri
-`<KalemEditor v-model />` ile. Üçü de aynı `@kalem/editor` motorunu
+`<KalemEditor v-model />` ile. Üçü de aynı `@kalem-editor/editor` motorunu
 kullanıyor ve aynı başlangıç belgesini tek bir modülden alıyor — fark
 yalnızca montaj kodunda olsun diye.
 
@@ -2136,7 +2136,7 @@ duruyor.
 > görünüyordu: Starlight'ın kendi element kuralları `h1`, `ul`, `blockquote`
 > için devreye giriyor ve editörü **tesadüfen** biçimlendiriyordu. Araç
 > çubuğu ise düz bir `<div>` yığınıydı; `display: flex` uygulanmadığı için
-> beş düğme grubu alt alta diziliyordu. `@kalem/themes` dosyaları
+> beş düğme grubu alt alta diziliyordu. `@kalem-editor/themes` dosyaları
 > `customCss`e eklendi.
 
 > **Araç çubuğu grid'e üçüncü hücre olarak giriyordu.** `mountUi` sabit
@@ -2179,7 +2179,7 @@ Kaynak okunuyor, `.d.ts` değil — derlenmiş bildirimlerde yorumların bir
 kısmı kayboluyor ve referansın değerli yanı tam olarak o yorumlar.
 TypeDoc'un okuduğu program ayrı bir `tsconfig.typedoc.json`da ve
 `customConditions: ["kalem-source"]` taşıyor, yani paketler arası
-`@kalem/*` import'ları da kaynağa çözülüyor.
+`@kalem-editor/*` import'ları da kaynağa çözülüyor.
 
 **Kabul kriteri ölçülebilir hâle getirildi.** Doküman kapısına ikinci bir
 denetim eklendi: her genel girişin dışa aktardığı her ad, üretilen
@@ -2193,24 +2193,24 @@ sessizce eksik kalırdı ve kimse fark etmezdi.
 
 > **396 sayfa yerine 17.** Varsayılan çıktı her dışa aktarma için ayrı bir
 > dosya üretiyor: 396 sayfa, iki dille 792 rota ve yirmi saniyelik bir
-> Pagefind indeksi. Okuyucunun sorusu ise "`@kalem/editor` neler veriyor" —
+> Pagefind indeksi. Okuyucunun sorusu ise "`@kalem-editor/editor` neler veriyor" —
 > ve onun cevabı tek sayfada, sayfa içi içindekilerle daha iyi duruyor.
 > `outputFileStrategy: "modules"` ile giriş başına tek sayfa; site 51
 > rotadan 87'ye çıktı, 843'e değil.
 
-> **`@kalem/wc` referansı 140 kB'tı — çekirdeğinkinden büyük.**
+> **`@kalem-editor/wc` referansı 140 kB'tı — çekirdeğinkinden büyük.**
 > `KalemEditorElement` `HTMLElement`i genişletiyor ve TypeDoc onun bütün
 > miras alınan DOM üyelerini sayfaya döküyordu. Okuyucunun aradığı şey
 > Kalem'in **eklediği** yüzey; `HTMLElement`i MDN anlatıyor.
 > `excludeExternals` ile kesildi.
 
 **Modül adları paket adlarıyla aynı.** Her genel giriş dosyasının baş
-yorumuna `@module @kalem/…` eklendi; yoksa TypeDoc modülleri dosya
+yorumuna `@module @kalem-editor/…` eklendi; yoksa TypeDoc modülleri dosya
 yoluna göre adlandırıyor ve kenar çubuğunda "src" yazıyordu. Artık
 başlık, kenar çubuğu ve adres `npm i` ile yazdığınız adla aynı.
 
-> **Tek pürüz: `@kalem/core/html` sayfası `html-1` adresinde.** TypeDoc'un
-> dosya kaydı büyük/küçük harfe duyarsız ve `@kalem/core` zaten `Html`
+> **Tek pürüz: `@kalem-editor/core/html` sayfası `html-1` adresinde.** TypeDoc'un
+> dosya kaydı büyük/küçük harfe duyarsız ve `@kalem-editor/core` zaten `Html`
 > adlı bir AST tipi dışa aktarıyor; çakışan ada son ek veriliyor. Başlık,
 > kenar çubuğu ve modül listesi doğru; yalnızca adres tuhaf. Elle
 > `/html/` yazan okuyucu için yönlendirme eklendi.
@@ -2258,7 +2258,7 @@ sorusunun cevabı üç saniyede alınıyor.
 Bir test ilk rozetin gerçekten "34,6 kB" yazdığını doğruluyor; sayı
 değiştiğinde sayfanın sessizce eskimemesi için.
 
-**Kurulum tek satır:** `npm i @kalem/editor @kalem/ui @kalem/themes`.
+**Kurulum tek satır:** `npm i @kalem-editor/editor @kalem-editor/ui @kalem-editor/themes`.
 
 **Üst uyarı aşağı taşındı.** "Henüz npm'de değil" notu sayfanın en
 üstündeydi ve ilk okunan şey oydu — bir ürün sayfasının ilk cümlesi
@@ -2455,7 +2455,7 @@ aynı nesne olarak kalıyor. Nesne kimliği bu yüzden kusursuz bir anahtar.
 10.000 bloklu, 440 bin karakterlik bir belgede bile tuş başına maliyet
 artık bir karenin (16,7 ms) altında.
 
-> **Önbellek `@kalem/core`'da varsayılan olarak kapalı.** Düğümlerin
+> **Önbellek `@kalem-editor/core`'da varsayılan olarak kapalı.** Düğümlerin
 > yerinde değiştirilmediği varsayımına dayanıyor; Kalem'in kendi kodu bu
 > sözü tutuyor ama AST herkese açık — `onChange` ikinci argümanda belgeyi
 > veriyor ve bir kullanıcı onu yerinde değiştirirse önbellek **sessizce**
@@ -2501,7 +2501,7 @@ başında yedi tarayıcı varken alınan süre kütüphaneyi değil makinenin o
 anki yükünü ölçüyor. Oran çekişmeye dayanıklı, çünkü iki ölçüm de aynı
 koşullarda alınıyor. Mutlak sayılar `pnpm olcum` raporunda.
 
-Boyut etkisi: `@kalem/core` 11,67 kB (sınır 12 kB), `@kalem/editor`
+Boyut etkisi: `@kalem-editor/core` 11,67 kB (sınır 12 kB), `@kalem-editor/editor`
 26,21 kB (sınır 38 kB).
 
 ### F6-09 · Tarayıcı ve mobil geçişi `[M]` ✅
@@ -2625,7 +2625,7 @@ Eklemek yedi dosyaya dokunmak demekti ve bir sonraki değişiklikte
 kopyalardan birinin geride kalması an meselesiydi — o gün arayüz Türkçe
 konuşurken bul-değiştir İngilizce kasa kuralıyla arardı.
 
-Artık tek fonksiyon (`@kalem/editor` → `resolveLang`), editörde
+Artık tek fonksiyon (`@kalem-editor/editor` → `resolveLang`), editörde
 `getLang()`, eklenti bağlamında `context.getLang()`. Yedi kopyanın yedisi
 de ona bağlandı.
 
@@ -2845,7 +2845,7 @@ girintili devam satırı, `#  Başlık` (iki boşluk), yalnızca boşluktan olu�
 ara satır, liste maddesinde tembel devam satırı, paragrafın ilk satırındaki
 1–3 boşluk, setext başlık metninin sonundaki boşluk.
 
-**Boyut:** `@kalem/core` 11,7 → 12,6 kB. Kullanıcının kararıyla bütçe
+**Boyut:** `@kalem-editor/core` 11,7 → 12,6 kB. Kullanıcının kararıyla bütçe
 12 → 13 kB (izin 15 kB'a kadardı; bütçe sıkı tutuldu ki sonraki büyüme
 görünsün). Belgelerdeki 25 sayı `guard:sizes`in raporuyla güncellendi —
 kapının ilk gerçek işi.
@@ -2961,7 +2961,7 @@ yazma → `<script>` etiketiyle IIFE. CI'da her push'ta koşuyor.
 
 **Bulunanlar — hepsi yayından önce kapandı:**
 
-- **`@kalem/wc/define` sunucuyu çökertiyordu.** Node'da içe aktarılınca
+- **`@kalem-editor/wc/define` sunucuyu çökertiyordu.** Node'da içe aktarılınca
   `customElements is not defined`. SvelteKit, Astro ve Nuxt bileşen
   betiğini sunucuda da çalıştırıyor ve belgelerdeki Svelte örneği tam
   olarak bu satırı kullanıyordu. `defineKalemEditor` artık
@@ -2983,14 +2983,14 @@ yazma → `<script>` etiketiyle IIFE. CI'da her push'ta koşuyor.
 - [x] GitHub Actions ile npm yayını — `.github/workflows/release.yml`, provenance imzalı
 - [x] GitHub release + changelog + git tag — iş akışında tek `v1.0.0` release'i
 - [ ] **`npm publish`** — kullanıcının adımı (aşağıda); geri alınamaz
-- [ ] **Kabul:** `npm i @kalem/editor` çalışıyor
+- [ ] **Kabul:** `npm i @kalem-editor/editor` çalışıyor
 
 **Karar kullanıcının: her şey hazırlandı, son adımda durdu.** npm'e yayın
 geri alınamıyor (72 saatten sonra silinemiyor, aynı sürüm numarası bir
 daha kullanılamıyor) ve kullanıcının hesabıyla yapılıyor.
 
 **Sürüm notu yeniden yazıldı.** Depodaki 14 changeset Faz 1'in iç
-notlarıydı — Türkçe ve yalnızca `@kalem/core` için `minor`. Olduğu gibi
+notlarıydı — Türkçe ve yalnızca `@kalem-editor/core` için `minor`. Olduğu gibi
 kalsalardı sürüm **0.1.0** olurdu ve changelog v1.0'ın yalnızca ayrıştırıcı
 kısmını anlatırdı. Yerine 15 paketi kapsayan tek bir İngilizce `major`
 changeset yazıldı; eskiler git geçmişinde.
@@ -3002,18 +3002,30 @@ ve release — changesets'in paket başına 15 ayrı release'i yerine.
 
 **Yayın için yapılacaklar (sırasıyla):**
 
-1. **`@kalem` kapsamı sende mi?** Paket adları npm'de boş (404), ama
-   kapsamın sahibi buradan doğrulanamadı (npm oturumu yok, npmjs.com
-   otomatik isteğe 403). `npm login`, sonra kuruluşu **web sitesinden**
-   aç: https://www.npmjs.com/org/create → ad `kalem` (npm CLI'da kuruluş
+1. **npm kuruluşu `kalem-editor`.** `@kalem` kapsamı başkasına aitti
+   (kullanıcı kuruluşu açmayı denedi: "alınmış"). Kararla bütün paketler
+   `@kalem-editor/*` oldu — 331 dosya, kilit dosyası yeniden üretildi;
+   gidiş-dönüş korpusu (`packages/core/fixtures`) bayt bayt korunduğu için
+   dokunulmadı.
+
+   > **Yeniden adlandırma iki şeyi sessizce bozmuştu, ikisi de yakalandı.**
+   > Düzenli ifade içindeki kaçırılmış biçim (`@kalem\/`) toplu
+   > değiştirmeden kaçtı: (1) `@kalem-editor/wc`'nin IIFE derlemesi çekirdeği
+   > ve editörü artık **içine almıyordu** (28 kB → 2 kB) — tek `<script>`
+   > etiketiyle kullanan herkeste çalışmazdı; boyut kapısı "2,0 kB" diyerek
+   > ve yayın provasının tarayıcı adımı yakaladı. (2) Doküman kapısının
+   > deseni eski adda kaldı ve kapı "0 import adı doğrulandı" diyerek
+   > **yeşil** geçti. Kapıya artık sıfır yakalama durumunda kırmızı veren
+   > bir koruma eklendi.
+
+   Kuruluş web sitesinden açılıyor:
+   https://www.npmjs.com/org/create → ad `kalem-editor` (npm CLI'da kuruluş
    oluşturan komut yok; `npm org` yalnızca üyeleri yönetiyor). Doğrulama:
-   `npm org ls kalem` seni `owner` olarak listelemeli. Kapsam başkasınınsa bütün
-   paket adları değişmeli (ör. `@kalemjs/*`) — o durumda söyle, adlar tek
-   komutla değiştirilebilir ama belgelerde çok yerde geçiyor.
+   `npm org ls kalem-editor` seni `owner` olarak listelemeli.
 2. **Depoyu herkese açık yap.** Provenance imzası özel depolarda çalışmıyor;
    README'deki CI rozeti de ancak o zaman görünüyor.
 3. **`NPM_TOKEN` sırrı:** npm → Access Tokens → "Automation" (ya da
-   yalnızca `@kalem` kapsamına yazabilen granular token) → GitHub → depo →
+   yalnızca `@kalem-editor` kapsamına yazabilen granular token) → GitHub → depo →
    Settings → Secrets and variables → Actions → `NPM_TOKEN`.
 4. **`main`i GitHub'a gönder** ve CI'ın yeşil olduğunu gör (yerel `main`,
    `origin/main`in önünde; bu oturumdaki commit'ler henüz gönderilmedi).
@@ -3026,7 +3038,7 @@ ve release — changesets'in paket başına 15 ayrı release'i yerine.
 göreceği sayfalar): `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`
 İngilizce; Türkçe asılları `.tr.md`. Issue şablonları İngilizce ve bir
 **round-trip** şablonu eklendi — duyuru metinleri okuyucudan tam olarak bu
-bildirimi istiyor. Eski şablonlar "v1.0 öncesi" ve "`@kalem/editor
+bildirimi istiyor. Eski şablonlar "v1.0 öncesi" ve "`@kalem-editor/editor
 0.0.0`" diyordu; "Soru" bağlantısı depoya değil GitHub'ın genel
 `/discussions` sayfasına gidiyordu.
 

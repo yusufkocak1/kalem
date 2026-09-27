@@ -1,213 +1,213 @@
 [
   {
-    "name": "@kalem/core",
+    "name": "@kalem-editor/core",
     "path": "packages/core/dist/index.js",
     "import": "*",
     "limit": "14 kB",
     "gzip": true
   },
   {
-    "name": "@kalem/core/commands — editör komutları",
+    "name": "@kalem-editor/core/commands — editör komutları",
     "path": "packages/core/dist/commands.js",
     "import": "*",
     "limit": "4 kB",
     "gzip": true
   },
   {
-    "name": "@kalem/core/html — yapıştırma dönüştürücü",
+    "name": "@kalem-editor/core/html — yapıştırma dönüştürücü",
     "path": "packages/core/dist/html.js",
     "import": "*",
     "limit": "6 kB",
     "gzip": true
   },
   {
-    "name": "@kalem/viewer",
+    "name": "@kalem-editor/viewer",
     "path": "packages/viewer/dist/index.js",
     "import": "*",
     "limit": "14 kB",
     "gzip": true
   },
   {
-    "name": "@kalem/themes/tokens.css",
+    "name": "@kalem-editor/themes/tokens.css",
     "path": "packages/themes/css/tokens.css",
     "limit": "1 kB",
     "gzip": true
   },
   {
-    "name": "@kalem/themes/viewer.css",
+    "name": "@kalem-editor/themes/viewer.css",
     "path": "packages/themes/css/viewer.css",
     "limit": "3 kB",
     "gzip": true
   },
   {
-    "name": "@kalem/themes/editor.css",
+    "name": "@kalem-editor/themes/editor.css",
     "path": "packages/themes/css/editor.css",
     "limit": "2 kB",
     "gzip": true
   },
   {
-    "name": "@kalem/themes/ui.css",
+    "name": "@kalem-editor/themes/ui.css",
     "path": "packages/themes/css/ui.css",
     "limit": "3 kB",
     "gzip": true
   },
   {
-    "name": "@kalem/themes/dark.css",
+    "name": "@kalem-editor/themes/dark.css",
     "path": "packages/themes/css/dark.css",
     "limit": "1 kB",
     "gzip": true
   },
   {
-    "name": "@kalem/themes/minimal.css",
+    "name": "@kalem-editor/themes/minimal.css",
     "path": "packages/themes/css/minimal.css",
     "limit": "1 kB",
     "gzip": true
   },
   {
-    "name": "@kalem/themes/plugin-image.css",
+    "name": "@kalem-editor/themes/plugin-image.css",
     "path": "packages/themes/css/plugin-image.css",
     "limit": "1 kB",
     "gzip": true
   },
   {
-    "name": "@kalem/editor (core dahil)",
+    "name": "@kalem-editor/editor (core dahil)",
     "path": "packages/editor/dist/index.js",
     "import": "*",
     "limit": "38 kB",
     "gzip": true
   },
   {
-    "name": "@kalem/editor + @kalem/ui — Word deneyimi",
+    "name": "@kalem-editor/editor + @kalem-editor/ui — Word deneyimi",
     "path": "scripts/size/word-deneyimi.js",
     "import": "*",
     "limit": "58 kB",
     "gzip": true
   },
   {
-    "name": "@kalem/themes/plugin-code.css",
+    "name": "@kalem-editor/themes/plugin-code.css",
     "path": "packages/themes/css/plugin-code.css",
     "limit": "2 kB",
     "gzip": true
   },
   {
-    "name": "@kalem/themes/plugin-find.css",
+    "name": "@kalem-editor/themes/plugin-find.css",
     "path": "packages/themes/css/plugin-find.css",
     "limit": "2 kB",
     "gzip": true
   },
   {
-    "name": "@kalem/themes/plugin-outline.css",
+    "name": "@kalem-editor/themes/plugin-outline.css",
     "path": "packages/themes/css/plugin-outline.css",
     "limit": "1 kB",
     "gzip": true
   },
   {
-    "name": "@kalem/themes/plugin-word-count.css",
+    "name": "@kalem-editor/themes/plugin-word-count.css",
     "path": "packages/themes/css/plugin-word-count.css",
     "limit": "1 kB",
     "gzip": true
   },
   {
-    "name": "@kalem/themes/plugin-source.css",
+    "name": "@kalem-editor/themes/plugin-source.css",
     "path": "packages/themes/css/plugin-source.css",
     "limit": "1 kB",
     "gzip": true
   },
   {
-    "name": "@kalem/themes/plugin-autosave.css",
+    "name": "@kalem-editor/themes/plugin-autosave.css",
     "path": "packages/themes/css/plugin-autosave.css",
     "limit": "1 kB",
     "gzip": true
   },
   {
-    "name": "@kalem/plugin-image-upload",
+    "name": "@kalem-editor/plugin-image-upload",
     "path": "packages/plugin-image-upload/dist/index.js",
     "limit": "4 kB",
     "gzip": true,
     "import": "{ imageUploadPlugin }",
-    "ignore": ["@kalem/core", "@kalem/editor"]
+    "ignore": ["@kalem-editor/core", "@kalem-editor/editor"]
   },
   {
-    "name": "@kalem/plugin-code-highlight (sekiz dil paketi dahil)",
+    "name": "@kalem-editor/plugin-code-highlight (sekiz dil paketi dahil)",
     "path": "packages/plugin-code-highlight/dist/index.js",
     "limit": "4 kB",
     "gzip": true,
     "import": "{ codeHighlightPlugin }",
-    "ignore": ["@kalem/core", "@kalem/editor"]
+    "ignore": ["@kalem-editor/core", "@kalem-editor/editor"]
   },
   {
-    "name": "@kalem/plugin-code-highlight — tek dil paketi (ayrı parça)",
+    "name": "@kalem-editor/plugin-code-highlight — tek dil paketi (ayrı parça)",
     "path": "packages/plugin-code-highlight/dist/langs/javascript.js",
     "limit": "2 kB",
     "gzip": true,
     "import": "*"
   },
   {
-    "name": "@kalem/plugin-find-replace",
+    "name": "@kalem-editor/plugin-find-replace",
     "path": "packages/plugin-find-replace/dist/index.js",
     "limit": "5 kB",
     "gzip": true,
     "import": "{ findReplacePlugin }",
-    "ignore": ["@kalem/core", "@kalem/editor"]
+    "ignore": ["@kalem-editor/core", "@kalem-editor/editor"]
   },
   {
-    "name": "@kalem/plugin-outline",
+    "name": "@kalem-editor/plugin-outline",
     "path": "packages/plugin-outline/dist/index.js",
     "limit": "3 kB",
     "gzip": true,
     "import": "{ outlinePlugin }",
-    "ignore": ["@kalem/core", "@kalem/editor"]
+    "ignore": ["@kalem-editor/core", "@kalem-editor/editor"]
   },
   {
-    "name": "@kalem/plugin-word-count",
+    "name": "@kalem-editor/plugin-word-count",
     "path": "packages/plugin-word-count/dist/index.js",
     "limit": "3 kB",
     "gzip": true,
     "import": "{ wordCountPlugin }",
-    "ignore": ["@kalem/core", "@kalem/editor"]
+    "ignore": ["@kalem-editor/core", "@kalem-editor/editor"]
   },
   {
-    "name": "@kalem/plugin-source-mode",
+    "name": "@kalem-editor/plugin-source-mode",
     "path": "packages/plugin-source-mode/dist/index.js",
     "limit": "3 kB",
     "gzip": true,
     "import": "{ sourceModePlugin }",
-    "ignore": ["@kalem/core", "@kalem/editor"]
+    "ignore": ["@kalem-editor/core", "@kalem-editor/editor"]
   },
   {
-    "name": "@kalem/plugin-autosave",
+    "name": "@kalem-editor/plugin-autosave",
     "path": "packages/plugin-autosave/dist/index.js",
     "limit": "3 kB",
     "gzip": true,
     "import": "{ autosavePlugin }",
-    "ignore": ["@kalem/core", "@kalem/editor"]
+    "ignore": ["@kalem-editor/core", "@kalem-editor/editor"]
   },
   {
-    "name": "@kalem/react (React ve editör hariç)",
+    "name": "@kalem-editor/react (React ve editör hariç)",
     "path": "packages/react/dist/index.js",
     "limit": "1.5 kB",
     "gzip": true,
     "import": "*",
-    "ignore": ["react", "react/jsx-runtime", "@kalem/core", "@kalem/editor"]
+    "ignore": ["react", "react/jsx-runtime", "@kalem-editor/core", "@kalem-editor/editor"]
   },
   {
-    "name": "@kalem/vue (Vue ve editör hariç)",
+    "name": "@kalem-editor/vue (Vue ve editör hariç)",
     "path": "packages/vue/dist/index.js",
     "limit": "2 kB",
     "gzip": true,
     "import": "*",
-    "ignore": ["vue", "@kalem/core", "@kalem/editor", "@kalem/viewer"]
+    "ignore": ["vue", "@kalem-editor/core", "@kalem-editor/editor", "@kalem-editor/viewer"]
   },
   {
-    "name": "@kalem/wc (editör hariç)",
+    "name": "@kalem-editor/wc (editör hariç)",
     "path": "packages/wc/dist/index.js",
     "limit": "2.5 kB",
     "gzip": true,
     "import": "*",
-    "ignore": ["@kalem/core", "@kalem/editor"]
+    "ignore": ["@kalem-editor/core", "@kalem-editor/editor"]
   },
   {
-    "name": "@kalem/wc — <script> ile düşen tam paket (çekirdek + editör dâhil)",
+    "name": "@kalem-editor/wc — <script> ile düşen tam paket (çekirdek + editör dâhil)",
     "path": "packages/wc/dist/kalem-editor.iife.js",
     "limit": "30 kB",
     "gzip": true

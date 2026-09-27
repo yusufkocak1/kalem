@@ -12,6 +12,6 @@ pnpm changeset
 ama changelog gün 1'den itibaren birikir. v1.0 duyurusunda "bu sürümde neler
 var" sorusunun cevabı bu dosyalardan otomatik üretilir.
 
-`fixed: [["@kalem/*"]]` ayarı tüm paketleri tek sürüm numarasında tutar:
-kullanıcı `@kalem/editor@1.2.0` ile `@kalem/ui@1.2.0`'ın uyumlu olduğunu
+`fixed: [["@kalem-editor/*"]]` ayarı tüm paketleri tek sürüm numarasında tutar:
+kullanıcı `@kalem-editor/editor@1.2.0` ile `@kalem-editor/ui@1.2.0`'ın uyumlu olduğunu
 sürüm numarasına bakarak bilir.

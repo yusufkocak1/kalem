@@ -1,5 +1,5 @@
 /**
- * @kalem/core — Güvenlik katmanı  (İş listesi: F1-10)
+ * @kalem-editor/core — Güvenlik katmanı  (İş listesi: F1-10)
  *
  * ## Neden burada, viewer'da değil
  *
@@ -51,7 +51,7 @@ export interface UrlPolicy {
  * URL'nin şemasını çıkarır.
  *
  * `URL` sınıfı kullanılmıyor: göreli yollar için taban gerektirir ve
- * `@kalem/core` tarayıcı API'lerine dayanmamalı. Şema ayrıştırma RFC 3986'da
+ * `@kalem-editor/core` tarayıcı API'lerine dayanmamalı. Şema ayrıştırma RFC 3986'da
  * basit bir dil bilgisi.
  */
 function schemeOf(url: string): string | null {

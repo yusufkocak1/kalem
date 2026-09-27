@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * `@kalem/plugin-image-upload`  (İş listesi: F4-01)
+ * `@kalem-editor/plugin-image-upload`  (İş listesi: F4-01)
  *
  * Kabul kriteri: *sahte bir S3 yükleyiciyle uçtan uca çalışıyor.* Demo
  * sayfası `window.kalemYukleme` ile ayarlanabilen bir yükleyici kuruyor;

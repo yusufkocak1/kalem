@@ -6,7 +6,7 @@
  * yeri. Tarayıcı testleri yalnızca tuşun buraya doğru bağlandığını
  * doğruluyor — davranışın kendisi burada sabitleniyor.
  */
-import { parse, serialize } from "@kalem/core";
+import { parse, serialize } from "@kalem-editor/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Caret, EditResult } from "./block-edit.js";
 import {

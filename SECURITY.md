@@ -51,7 +51,7 @@ The remaining surfaces and their defenses:
   `renderRawHtml` / `sanitizeHtml` hooks, and sanitizing becomes the
   caller's responsibility (documented).
 - **Pasting** — incoming HTML goes through Kalem's own converter
-  (`@kalem/core/html`) into the AST; anything outside the allowed structure
+  (`@kalem-editor/core/html`) into the AST; anything outside the allowed structure
   is dropped.
 
 ## Out of scope

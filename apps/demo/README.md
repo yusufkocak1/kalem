@@ -22,9 +22,9 @@ Kütüphaneyi gerçek derlenmiş bundle'dan yüklerler, o yüzden `pnpm demo`
 | Sayfa | Ne için |
 | --- | --- |
 | `core.html` | Ayrıştırıcı ve serileştirici — gidiş-dönüş gösterimi |
-| `viewer.html` | `@kalem/viewer` — salt okunur çıktı |
+| `viewer.html` | `@kalem-editor/viewer` — salt okunur çıktı |
 | `editor.html` | Blok motoru, arayüz ve yedi eklenti; 17 test dosyasının zemini |
-| `wc.html` | `@kalem/wc` — özel eleman, gölge DOM ve form bütünleşmesi |
+| `wc.html` | `@kalem-editor/wc` — özel eleman, gölge DOM ve form bütünleşmesi |
 | `olcum.html` | **Performans ölçüm tezgâhı** (F6-08) |
 
 Bu sayfalardaki eleman kimlikleri 1.218 testin bağlı olduğu bir

@@ -5,8 +5,8 @@
  * Node'da, shim olmadan çalışır. DOM tarafıyla eşitlik ayrı bir testte,
  * gerçek tarayıcıda ölçülüyor (`e2e/viewer.spec.ts`).
  */
-import type { Root } from "@kalem/core";
-import { parse } from "@kalem/core";
+import type { Root } from "@kalem-editor/core";
+import { parse } from "@kalem-editor/core";
 import { describe, expect, it } from "vitest";
 import type { ViewerOptions } from "./plan.js";
 import { renderToString } from "./string.js";

@@ -5,7 +5,7 @@
     "",
     "Sitenin kendi tsconfig'inden ayrı: TypeDoc paketlerin **kaynağını**",
     "okuyor, sitenin Astro/JSX kurulumunu değil. `customConditions` da o",
-    "yüzden burada — paketler arası `@kalem/*` import'ları dist'e değil",
+    "yüzden burada — paketler arası `@kalem-editor/*` import'ları dist'e değil",
     "src'ye çözülmeli, yoksa TypeDoc tip yerine `.d.ts` görürdü ve",
     "yorumların yarısı kaybolurdu.",
     "",

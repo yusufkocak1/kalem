@@ -1,5 +1,5 @@
 /**
- * @kalem/plugin-outline — Panel  (İş listesi: F4-04)
+ * @kalem-editor/plugin-outline — Panel  (İş listesi: F4-04)
  *
  * İçindekiler listesini, gömen uygulamanın verdiği kapsayıcıya çiziyor.
  *

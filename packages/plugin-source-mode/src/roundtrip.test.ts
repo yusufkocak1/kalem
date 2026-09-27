@@ -10,8 +10,8 @@
  * değişirse, kırılan testlerden biri burada olsun: kaynak kipi o
  * garantiyi kaybettiği anda kullanıcının belgesini bozmaya başlıyor.
  */
-import { parse, serialize } from "@kalem/core";
-import { assignIds } from "@kalem/editor";
+import { parse, serialize } from "@kalem-editor/core";
+import { assignIds } from "@kalem-editor/editor";
 import { describe, expect, it } from "vitest";
 
 /** Eklentinin yaptığı tam dönüş: belge → metin → belge → metin. */

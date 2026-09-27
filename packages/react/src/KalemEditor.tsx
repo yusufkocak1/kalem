@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * @kalem/react — `<KalemEditor />`  (İş listesi: F5-01)
+ * @kalem-editor/react — `<KalemEditor />`  (İş listesi: F5-01)
  *
  * Editörü React ağacına bağlayan ince katman. "İnce" burada gerçek
  * anlamıyla: bu dosya düzenleme hakkında hiçbir şey bilmiyor, yalnızca
@@ -53,9 +53,9 @@
  * kurulum o artığı temizliyor — `#sync` kendi ürettiği bloklardan sonra
  * kalan her düğümü siliyor. Bir tarayıcı testi bunu sabitliyor.
  */
-import type { Root } from "@kalem/core";
-import type { Plugin } from "@kalem/editor";
-import { Editor } from "@kalem/editor";
+import type { Root } from "@kalem-editor/core";
+import type { Plugin } from "@kalem-editor/editor";
+import { Editor } from "@kalem-editor/editor";
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { KalemContext } from "./context.js";

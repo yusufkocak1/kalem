@@ -3,11 +3,11 @@ import { defineConfig } from "tsdown";
 export default defineConfig([
 	{
 		/*
-		 * İki giriş: `@kalem/wc` (yan etkisiz) ve `@kalem/wc/define` (kaydeden).
+		 * İki giriş: `@kalem-editor/wc` (yan etkisiz) ve `@kalem-editor/wc/define` (kaydeden).
 		 *
 		 * Ayrımın sebebi `sideEffects` beyanı: paketleyici yan etkisiz bir
 		 * modülü, dışa aktardığı hiçbir şey kullanılmıyorsa atıyor. Tek giriş
-		 * olsaydı `import "@kalem/wc"` yazan bir uygulamada eleman **hiç
+		 * olsaydı `import "@kalem-editor/wc"` yazan bir uygulamada eleman **hiç
 		 * kaydolmazdı** ve hata sessiz olurdu.
 		 */
 		entry: ["src/index.ts", "src/define-side-effect.ts"],
@@ -21,9 +21,9 @@ export default defineConfig([
 		/*
 		 * CDN sürümü: `<script>` etiketiyle düşüyor.
 		 *
-		 * `noExternal` bilerek: yukarıdaki çıktı `@kalem/core` ve
-		 * `@kalem/editor`i dışarıda bırakıyor (paketleyici kullanan
-		 * uygulamada doğrusu bu), ama çıplak bir `import "@kalem/editor"`
+		 * `noExternal` bilerek: yukarıdaki çıktı `@kalem-editor/core` ve
+		 * `@kalem-editor/editor`i dışarıda bırakıyor (paketleyici kullanan
+		 * uygulamada doğrusu bu), ama çıplak bir `import "@kalem-editor/editor"`
 		 * satırı tarayıcıda çözülmez. Burada hepsi içeride.
 		 *
 		 * `clean` kapalı — ilk yapılandırmanın çıktısını silerdi.
@@ -33,7 +33,7 @@ export default defineConfig([
 		format: ["iife"],
 		globalName: "Kalem",
 		platform: "browser",
-		noExternal: [/^@kalem\//],
+		noExternal: [/^@kalem-editor\//],
 		minify: true,
 		dts: false,
 		clean: false,

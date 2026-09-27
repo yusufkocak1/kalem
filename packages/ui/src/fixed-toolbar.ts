@@ -1,5 +1,5 @@
 /**
- * @kalem/ui — Sabit üst araç çubuğu  (İş listesi: F3-06)
+ * @kalem-editor/ui — Sabit üst araç çubuğu  (İş listesi: F3-06)
  *
  * Word'e alışkın kullanıcı için. Balon çubuğu seçim yapılınca beliriyor;
  * bu her zaman orada.
@@ -25,7 +25,7 @@
  * ile kaydırmada üstte kalıyor. Gömen sayfanın düzenini bozmamak için
  * editörün *kardeşi* oluyor, sarmalayıcı eklenmiyor.
  */
-import type { Editor } from "@kalem/editor";
+import type { Editor } from "@kalem-editor/editor";
 import { button, el, themed } from "./dom.js";
 import type { UiLabels } from "./labels.js";
 import type { BlockSelect, ToolbarAction } from "./toolbar-actions.js";

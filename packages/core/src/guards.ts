@@ -1,5 +1,5 @@
 /**
- * @kalem/core — Tip koruyucular  (İş listesi: F1-01)
+ * @kalem-editor/core — Tip koruyucular  (İş listesi: F1-01)
  *
  * Hepsi künye kaydından (`spec.ts`) türer. Yeni bir düğüm tipi eklendiğinde
  * burada değişiklik gerekmez — künyesini yazmak yeterlidir.

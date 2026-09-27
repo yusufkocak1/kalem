@@ -1,9 +1,9 @@
 /**
- * @kalem/editor — Model → DOM  (İş listesi: F2-05)
+ * @kalem-editor/editor — Model → DOM  (İş listesi: F2-05)
  *
  * ## Neden viewer'ı kullanmıyor
  *
- * `@kalem/viewer` salt okunur çıktı üretir: tek yönlü, kimliksiz, yamasız.
+ * `@kalem-editor/viewer` salt okunur çıktı üretir: tek yönlü, kimliksiz, yamasız.
  * Editörün ihtiyacı farklı — her üst düzey blok kendi `contenteditable`
  * elemanı olmalı, her elemanın kimliği ve modeldeki karşılığına giden yolu
  * bilinmeli. Ortak bir soyutlama ikisini de bozardı; render mantığı ucuz,
@@ -27,8 +27,8 @@
  * Aynı gerekçe (analiz §5.6): metin hiçbir aşamada HTML olarak
  * ayrıştırılmıyor.
  */
-import type { Block, Definition, Frontmatter, Inline, Root } from "@kalem/core";
-import { sanitizeUrl } from "@kalem/core";
+import type { Block, Definition, Frontmatter, Inline, Root } from "@kalem-editor/core";
+import { sanitizeUrl } from "@kalem-editor/core";
 
 /**
  * Editörün "blok" saydığı şey: kökün doğrudan çocuğu.

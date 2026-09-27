@@ -1,5 +1,5 @@
 /**
- * `@kalem/plugin-autosave` — Otomatik kaydetme  (İş listesi: F4-07)
+ * `@kalem-editor/plugin-autosave` — Otomatik kaydetme  (İş listesi: F4-07)
  *
  * Yazma durunca kaydediyor, durumu bildiriyor ve kaydedilemeyeni yerel
  * depoda tutuyor.
@@ -30,8 +30,8 @@
  * gizleyebilir. Bunun yerine `recovered()` soruluyor ve ne yapılacağına
  * gömen uygulama karar veriyor.
  */
-import { serialize } from "@kalem/core";
-import type { Plugin, PluginContext } from "@kalem/editor";
+import { serialize } from "@kalem-editor/core";
+import type { Plugin, PluginContext } from "@kalem-editor/editor";
 
 /** Kaydetmenin görünen durumu. */
 export type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";

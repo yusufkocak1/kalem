@@ -1,12 +1,12 @@
-import type { Editor } from "@kalem/editor";
-import { autosavePlugin, createIndicator, trAutosaveLabels } from "@kalem/plugin-autosave";
-import { codeHighlightPlugin } from "@kalem/plugin-code-highlight";
-import { findReplacePlugin } from "@kalem/plugin-find-replace";
-import { outlinePlugin } from "@kalem/plugin-outline";
-import { type SourceModePlugin, sourceModePlugin } from "@kalem/plugin-source-mode";
-import { wordCountPlugin } from "@kalem/plugin-word-count";
-import { useKalem } from "@kalem/react";
-import { mountUi } from "@kalem/ui";
+import type { Editor } from "@kalem-editor/editor";
+import { autosavePlugin, createIndicator, trAutosaveLabels } from "@kalem-editor/plugin-autosave";
+import { codeHighlightPlugin } from "@kalem-editor/plugin-code-highlight";
+import { findReplacePlugin } from "@kalem-editor/plugin-find-replace";
+import { outlinePlugin } from "@kalem-editor/plugin-outline";
+import { type SourceModePlugin, sourceModePlugin } from "@kalem-editor/plugin-source-mode";
+import { wordCountPlugin } from "@kalem-editor/plugin-word-count";
+import { useKalem } from "@kalem-editor/react";
+import { mountUi } from "@kalem-editor/ui";
 import { type RefObject, useEffect, useRef } from "react";
 
 /**
@@ -33,7 +33,7 @@ import { type RefObject, useEffect, useRef } from "react";
  * Geri çağırmalar bağımlılık listesinde dursaydı, üst bileşendeki her
  * durum değişikliği bunu tetikleyebilirdi. Ref'ler her çizimde
  * tazeleniyor, bağımlılık listesi ise yalnızca editöre ve belgeye bakıyor.
- * (`@kalem/react` sarmalayıcısı kendi içinde aynı şeyi yapıyor.)
+ * (`@kalem-editor/react` sarmalayıcısı kendi içinde aynı şeyi yapıyor.)
  *
  * ## Paneller neden dışarıdan geliyor
  *

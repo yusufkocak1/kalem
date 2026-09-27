@@ -1,5 +1,5 @@
 /**
- * `@kalem/plugin-word-count` — Kelime sayacı  (İş listesi: F4-05)
+ * `@kalem-editor/plugin-word-count` — Kelime sayacı  (İş listesi: F4-05)
  *
  * Kelime, karakter ve okuma süresi; isteğe bağlı bir durum çubuğu.
  *
@@ -21,7 +21,7 @@
  * kendi yerleşimine koyuyor; kütüphane ekranın altını sahiplenmiyor
  * (F4-04'teki aynı karar).
  */
-import type { Plugin, PluginContext } from "@kalem/editor";
+import type { Plugin, PluginContext } from "@kalem-editor/editor";
 import type { CountOptions, Counts } from "./count.js";
 import { countText } from "./count.js";
 import type { WordCountLabels } from "./labels.js";

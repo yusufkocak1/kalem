@@ -4,13 +4,13 @@ description: SSR — no <ClientOnly> needed, the document is rendered on the ser
 ---
 
 ```bash
-npm i @kalem/vue @kalem/editor @kalem/themes
+npm i @kalem-editor/vue @kalem-editor/editor @kalem-editor/themes
 ```
 
 ```vue
 <!-- app/app.vue -->
 <script setup lang="ts">
-import { KalemEditor } from '@kalem/vue';
+import { KalemEditor } from '@kalem-editor/vue';
 import { ref } from 'vue';
 
 const text = ref('# Light and Shadow\n\nA document rendered on the server.');
@@ -25,10 +25,10 @@ const text = ref('# Light and Shadow\n\nA document rendered on the server.');
 // nuxt.config.ts
 export default defineNuxtConfig({
   css: [
-    '@kalem/themes/tokens.css',
-    '@kalem/themes/viewer.css',
-    '@kalem/themes/editor.css',
-    '@kalem/themes/ui.css',
+    '@kalem-editor/themes/tokens.css',
+    '@kalem-editor/themes/viewer.css',
+    '@kalem-editor/themes/editor.css',
+    '@kalem-editor/themes/ui.css',
   ],
 });
 ```
@@ -42,7 +42,7 @@ visible: the server sends an empty box, the content appears later, and
 search engines never see the text.
 
 With Kalem, the server **really renders** the document with
-`@kalem/viewer`. The raw HTTP response contains `<h1>` and `<li>`; a test
+`@kalem-editor/viewer`. The raw HTTP response contains `<h1>` and `<li>`; a test
 verifies this. A readable document shows up on first paint, and when the
 JavaScript loads, the editor takes over the same element.
 
@@ -73,8 +73,8 @@ In a Nitro endpoint, without loading the editor at all:
 
 ```ts
 // server/api/preview.post.ts
-import { parse } from '@kalem/core';
-import { renderToString } from '@kalem/viewer';
+import { parse } from '@kalem-editor/core';
+import { renderToString } from '@kalem-editor/viewer';
 
 export default defineEventHandler(async (event) => {
   const { markdown } = await readBody<{ markdown: string }>(event);
@@ -82,7 +82,7 @@ export default defineEventHandler(async (event) => {
 });
 ```
 
-`@kalem/core` and `@kalem/viewer` don't touch the DOM; a purity gate
+`@kalem-editor/core` and `@kalem-editor/viewer` don't touch the DOM; a purity gate
 verifies this in CI.
 
 ## Working example

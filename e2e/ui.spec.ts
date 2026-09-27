@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * `@kalem/ui` — balon araç çubuğu  (İş listesi: F3-01, F3-11)
+ * `@kalem-editor/ui` — balon araç çubuğu  (İş listesi: F3-01, F3-11)
  *
  * Araç çubuğunun tamamı seçim ve geometri davranışı; ikisi de gerçek
  * tarayıcı gerektiriyor. Konumlandırma hesabının saf kısmı birim

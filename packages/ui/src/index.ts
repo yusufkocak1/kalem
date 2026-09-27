@@ -1,12 +1,12 @@
 /**
- * @kalem/ui — Word benzeri arayüz katmanı
+ * @kalem-editor/ui — Word benzeri arayüz katmanı
  *
  * Editör başsız; görünen her şey burada. Bağlantı yönü tek: arayüz
  * editörü tanıyor, editör arayüzü tanımıyor.
  *
- * Stiller ayrı: `@kalem/themes/ui.css`.
+ * Stiller ayrı: `@kalem-editor/themes/ui.css`.
  *
- * @module @kalem/ui
+ * @module @kalem-editor/ui
  */
 export type { BlockHandle, BlockHandleOptions } from "./block-handle.js";
 export { createBlockHandle } from "./block-handle.js";

@@ -1,5 +1,5 @@
 /**
- * @kalem/react — Bağlam ve kancalar  (İş listesi: F5-01)
+ * @kalem-editor/react — Bağlam ve kancalar  (İş listesi: F5-01)
  *
  * ## `useSyncExternalStore` neden
  *
@@ -35,7 +35,7 @@
  * değil — React sürümü çalışma sırasında değişmediği için kanca sırası
  * sabit kalıyor.
  */
-import type { Editor } from "@kalem/editor";
+import type { Editor } from "@kalem-editor/editor";
 import * as React from "react";
 import { createContext, useCallback, useContext, useEffect, useReducer, useRef } from "react";
 

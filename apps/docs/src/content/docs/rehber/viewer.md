@@ -3,15 +3,15 @@ title: Viewer (salt okunur)
 description: Markdown'ı DOM'a veya HTML dizesine çizin — düzenleme kodu indirmeden.
 ---
 
-`@kalem/viewer` Markdown'ı **gösteriyor**, düzenlemiyor. 2,7 kB (min+gzip)
+`@kalem-editor/viewer` Markdown'ı **gösteriyor**, düzenlemiyor. 2,7 kB (min+gzip)
 ve düzenleme motorundan tamamen bağımsız: bir blog, bir yorum listesi ya da
 bir e-posta önizlemesi için editörün 27 kB'ını indirmenize gerek yok.
 
 İki çıkış var ve **aynı sonucu** veriyorlar:
 
 ```ts
-import { parse } from '@kalem/core';
-import { renderToDOM, renderToString } from '@kalem/viewer';
+import { parse } from '@kalem-editor/core';
+import { renderToDOM, renderToString } from '@kalem-editor/viewer';
 
 const ast = parse('# Başlık\n\nBir **paragraf**.');
 
@@ -76,12 +76,12 @@ yer kaplıyor ve sizin kendi CSS'inizle çakışıyor.
 
 ## Stil
 
-Tipografi `@kalem/themes/viewer.css` içinde ve `.kalem-doc` altına
+Tipografi `@kalem-editor/themes/viewer.css` içinde ve `.kalem-doc` altına
 kapatılı — sayfanın geri kalanına tek kural sızmıyor.
 
 ```ts
-import '@kalem/themes/tokens.css';
-import '@kalem/themes/viewer.css';
+import '@kalem-editor/themes/tokens.css';
+import '@kalem-editor/themes/viewer.css';
 ```
 
 `renderToString` kullanıyorsanız kapsayıcıyı kendiniz sarmalıyorsunuz:
@@ -97,15 +97,15 @@ import '@kalem/themes/viewer.css';
 
 ## Sunucuda
 
-`@kalem/core` ve `@kalem/viewer` DOM'a dokunmuyor — Node'da, worker'da ve
+`@kalem-editor/core` ve `@kalem-editor/viewer` DOM'a dokunmuyor — Node'da, worker'da ve
 edge çalışma zamanlarında aynı şekilde çalışıyorlar. Bir saflık kapısı
 (`pnpm guard:purity`) bunu CI'da doğruluyor: çekirdek bundle'ında
 `document`, `window` ya da `navigator` geçmesi build'i kırıyor.
 
 ```ts
 // Bir Astro / Next.js / Express sunucusunda
-import { parse } from '@kalem/core';
-import { renderToString } from '@kalem/viewer';
+import { parse } from '@kalem-editor/core';
+import { renderToString } from '@kalem-editor/viewer';
 
 export function markdownToHtml(md: string): string {
   return renderToString(parse(md));

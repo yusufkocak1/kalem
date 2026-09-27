@@ -30,7 +30,7 @@ varsayılanlar.
 
 ## Marka teması
 
-`src/styles/kalem.css` renkleri uydurmuyor: `@kalem/themes/tokens.css`
+`src/styles/kalem.css` renkleri uydurmuyor: `@kalem-editor/themes/tokens.css`
 paletinin aynısı. Sitenin ürünle aynı renkte olması süs değil — okuyucu,
 ekran görüntüsündeki editörle sayfanın kendisi arasında bir kopukluk
 görmemeli. Starlight'ın soğuk gri merdiveni de Kalem'in sıcak nötrleriyle
@@ -74,7 +74,7 @@ olmadı.
 
 `pnpm guard:docs` bunu bir daha olmaz hâle getiriyor. İki denetimi var:
 
-1. **Elle yazılan sayfalar** — her `import { … } from "@kalem/…"`
+1. **Elle yazılan sayfalar** — her `import { … } from "@kalem-editor/…"`
    satırındaki her adın paketin gerçek dışa aktarmaları arasında olup
    olmadığı. Tip denetimi değil (örnekler kısaltılmış, derlenmeleri
    beklenmiyor) ama yazılan adların var olması beklenebilir.

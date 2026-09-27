@@ -3,15 +3,15 @@ title: Editor
 description: Options, API, events and keyboard shortcuts.
 ---
 
-`@kalem/editor` is a **headless** block editor engine: the model, DOM
+`@kalem-editor/editor` is a **headless** block editor engine: the model, DOM
 mapping, selection, keyboard and history. It draws no UI — the toolbar, the
-bubble menu and the slash menu live in the [`@kalem/ui`](/en/rehber/temalar/)
+bubble menu and the slash menu live in the [`@kalem-editor/ui`](/en/rehber/temalar/)
 package.
 
 ## Setup
 
 ```ts
-import { Editor } from '@kalem/editor';
+import { Editor } from '@kalem-editor/editor';
 
 const editor = new Editor(document.getElementById('app')!, {
   value: '# Heading\n\nParagraph.',
@@ -156,7 +156,7 @@ Details: [Plugins](/en/rehber/eklentiler/).
 | `Ctrl/Cmd + I` | Italic |
 | `Ctrl/Cmd + E` | Inline code |
 | `Ctrl/Cmd + Shift + X` | Strikethrough |
-| `Ctrl/Cmd + K` | Link (with `@kalem/ui`) |
+| `Ctrl/Cmd + K` | Link (with `@kalem-editor/ui`) |
 
 `Ctrl+U` is **deliberately blocked and does nothing**: Markdown has no
 underline; if it weren't blocked, the browser would produce `<u>` and that
@@ -172,7 +172,7 @@ without a trace is worse than no reaction at all.
 | `Ctrl/Cmd + Shift + 8` | Bulleted list |
 | `Ctrl/Cmd + Shift + 7` | Numbered list |
 | `Tab` / `Shift + Tab` | Indent / outdent a list item |
-| `Ctrl/Cmd + Shift + ↑ / ↓` | Move the block (with `@kalem/ui`) |
+| `Ctrl/Cmd + Shift + ↑ / ↓` | Move the block (with `@kalem-editor/ui`) |
 
 The list shortcuts use the same keys as Word and GitHub.
 
@@ -228,4 +228,4 @@ editor.setReadOnly(true);
 
 The content stays visible, editability is removed and the `readonlychange`
 event fires — the UI layer disables its buttons accordingly. Being notified
-instead of polling means `@kalem/ui` never has to query the editor.
+instead of polling means `@kalem-editor/ui` never has to query the editor.

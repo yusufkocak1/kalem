@@ -1,5 +1,5 @@
 /**
- * @kalem/plugin-word-count — Belgenin metni  (İş listesi: F4-05)
+ * @kalem-editor/plugin-word-count — Belgenin metni  (İş listesi: F4-05)
  *
  * Sayılacak metni belgeden çıkarıyor.
  *
@@ -19,7 +19,7 @@
  * Bağlantı tanımları (`[etiket]: adres`) sayılmıyor: belgenin sonunda
  * duran, okunmayan üstveri.
  */
-import type { Block, Inline, Root } from "@kalem/core";
+import type { Block, Inline, Root } from "@kalem-editor/core";
 
 export interface TextOptions {
 	/** Kod ve ham HTML bloklarını da say (varsayılan: evet). */

@@ -1,5 +1,5 @@
 {
-  "name": "@kalem/vue",
+  "name": "@kalem-editor/vue",
   "version": "1.0.0",
   "description": "Vue wrapper for Kalem — <KalemEditor v-model /> with SSR",
   "keywords": [
@@ -50,9 +50,9 @@
     "dev": "tsdown --watch"
   },
   "dependencies": {
-    "@kalem/core": "workspace:^",
-    "@kalem/editor": "workspace:^",
-    "@kalem/viewer": "workspace:^"
+    "@kalem-editor/core": "workspace:^",
+    "@kalem-editor/editor": "workspace:^",
+    "@kalem-editor/viewer": "workspace:^"
   },
   "peerDependencies": {
     "vue": "^3"

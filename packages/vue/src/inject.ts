@@ -1,5 +1,5 @@
 /**
- * @kalem/vue — Bağlam  (İş listesi: F5-02)
+ * @kalem-editor/vue — Bağlam  (İş listesi: F5-02)
  *
  * React tarafındaki `useKalem()`in Vue karşılığı: `provide` / `inject`.
  *
@@ -8,7 +8,7 @@
  * çalıştığında henüz yok. Ref olunca alt bileşen ona **abone** kalıyor ve
  * editör hazır olduğunda kendiliğinden güncelleniyor.
  */
-import type { Editor } from "@kalem/editor";
+import type { Editor } from "@kalem-editor/editor";
 import type { InjectionKey, ShallowRef } from "vue";
 import { inject, shallowRef } from "vue";
 

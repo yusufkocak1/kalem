@@ -1,4 +1,4 @@
-# `@kalem/wc` — Angular
+# `@kalem-editor/wc` — Angular
 
 ```bash
 pnpm --filter example-angular dev

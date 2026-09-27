@@ -4,16 +4,16 @@ description: <KalemEditor v-model />, useKalem ve SSR.
 ---
 
 ```bash
-npm i @kalem/vue @kalem/editor @kalem/themes
+npm i @kalem-editor/vue @kalem-editor/editor @kalem-editor/themes
 ```
 
-`vue` bir **peer bağımlılık** (`^3`). Kendi boyutu 682 B.
+`vue` bir **peer bağımlılık** (`^3`). Kendi boyutu 686 B.
 
 ## `v-model`
 
 ```vue
 <script setup lang="ts">
-import { KalemEditor } from '@kalem/vue';
+import { KalemEditor } from '@kalem-editor/vue';
 import { ref } from 'vue';
 
 const metin = ref('# Merhaba');
@@ -47,7 +47,7 @@ verin, metin editörde yaşasın, `update:modelValue` olayı yine yayılsın.
 
 ```vue
 <script setup lang="ts">
-import { useKalem } from '@kalem/vue';
+import { useKalem } from '@kalem-editor/vue';
 const editor = useKalem();   // ShallowRef<Editor | null>
 </script>
 
@@ -67,7 +67,7 @@ Vue dünyasında editör sarmalayıcılarının neredeyse hepsi `<ClientOnly>`
 istiyor ve bedeli görünür: sunucu boş bir kutu gönderiyor, içerik
 sonradan beliriyor, arama motoru metni hiç görmüyor.
 
-Kalem'de sunucu belgeyi `@kalem/viewer` ile **gerçekten çiziyor**. İlk
+Kalem'de sunucu belgeyi `@kalem-editor/viewer` ile **gerçekten çiziyor**. İlk
 boyada okunabilir bir belge var; JavaScript yüklendiğinde editör aynı
 elemanı devralıyor.
 

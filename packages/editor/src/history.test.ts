@@ -5,8 +5,8 @@
  * saati dışarıdan alıyor — `Date.now()`'a bağlı bir yığın ya kırılgan ya
  * da yavaş test üretirdi.
  */
-import type { Root } from "@kalem/core";
-import { parse } from "@kalem/core";
+import type { Root } from "@kalem-editor/core";
+import { parse } from "@kalem-editor/core";
 import { describe, expect, it } from "vitest";
 import type { Caret } from "./block-edit.js";
 import { History } from "./history.js";

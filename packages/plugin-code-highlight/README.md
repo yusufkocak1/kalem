@@ -1,4 +1,4 @@
-# @kalem/plugin-code-highlight
+# @kalem-editor/plugin-code-highlight
 
 Kalem plugin: code block highlighting with lazily loaded language packs.
 
@@ -6,12 +6,12 @@ Part of [Kalem](https://github.com/yusufkocak1/kalem) — a WYSIWYG editor for p
 don't know Markdown, that saves Markdown.
 
 ```bash
-npm i @kalem/plugin-code-highlight
+npm i @kalem-editor/plugin-code-highlight
 ```
 
 ```ts
-import { codeHighlightPlugin } from '@kalem/plugin-code-highlight';
-import '@kalem/themes/plugin-code.css';
+import { codeHighlightPlugin } from '@kalem-editor/plugin-code-highlight';
+import '@kalem-editor/themes/plugin-code.css';
 
 editor.addPlugin(
   codeHighlightPlugin(),

@@ -3,17 +3,17 @@ title: Autosave
 description: Debounced saving, a status indicator and crash recovery.
 ---
 
-`@kalem/plugin-autosave` does three jobs at once: saving when typing stops,
+`@kalem-editor/plugin-autosave` does three jobs at once: saving when typing stops,
 reporting the status, and recovering the text locally when the server can't
 be reached.
 
 ```bash
-npm i @kalem/plugin-autosave
+npm i @kalem-editor/plugin-autosave
 ```
 
 ```ts
-import { autosavePlugin, createIndicator, enAutosaveLabels } from '@kalem/plugin-autosave';
-import '@kalem/themes/plugin-autosave.css';
+import { autosavePlugin, createIndicator, enAutosaveLabels } from '@kalem-editor/plugin-autosave';
+import '@kalem-editor/themes/plugin-autosave.css';
 
 const indicator = createIndicator(document.getElementById('status')!, {
   prefix: 'kalem-',

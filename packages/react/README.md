@@ -1,4 +1,4 @@
-# @kalem/react
+# @kalem-editor/react
 
 React wrapper for Kalem — <KalemEditor /> and useKalem().
 
@@ -6,12 +6,12 @@ Part of [Kalem](https://github.com/yusufkocak1/kalem) — a WYSIWYG editor for p
 don't know Markdown, that saves Markdown.
 
 ```bash
-npm i @kalem/react @kalem/editor @kalem/ui @kalem/themes
+npm i @kalem-editor/react @kalem-editor/editor @kalem-editor/ui @kalem-editor/themes
 ```
 
 ```ts
-import { KalemEditor } from '@kalem/react';
-import { mountUi } from '@kalem/ui';
+import { KalemEditor } from '@kalem-editor/react';
+import { mountUi } from '@kalem-editor/ui';
 
 <KalemEditor
   defaultValue="# Hello"

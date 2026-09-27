@@ -16,7 +16,7 @@ Kalem'de dile bağlı iki ayrı iş var ve ikincisi genelde unutulur:
 ## Belge dili nereden geliyor
 
 ```ts
-import { Editor } from '@kalem/editor';
+import { Editor } from '@kalem-editor/editor';
 
 const editor = new Editor(element, { lang: 'tr' });
 editor.getLang(); // "tr"
@@ -40,7 +40,7 @@ Arayüz ve eklentiler kurulurken dili bir kez okuyor. Dili değiştirdikten
 sonra arayüzü yeniden kurun — araç çubuğu kipiyle aynı model:
 
 ```ts
-import { mountUi } from '@kalem/ui';
+import { mountUi } from '@kalem-editor/ui';
 
 editor.getElement().lang = 'en';
 ui.destroy();
@@ -61,19 +61,19 @@ Her paketin kendi sözlüğü var ve hepsi aynı biçimde dışa aktarılıyor:
 
 | Paket | Tip | İngilizce | Türkçe |
 | --- | --- | --- | --- |
-| `@kalem/ui` | `UiLabels` | `enLabels` | `trLabels` |
-| `@kalem/wc` | `WcLabels` | `enWcLabels` | `trWcLabels` |
-| `@kalem/plugin-find-replace` | `FindLabels` | `enFindLabels` | `trFindLabels` |
-| `@kalem/plugin-outline` | `OutlineLabels` | `enOutlineLabels` | `trOutlineLabels` |
-| `@kalem/plugin-word-count` | `WordCountLabels` | `enWordCountLabels` | `trWordCountLabels` |
-| `@kalem/plugin-source-mode` | `SourceLabels` | `enSourceLabels` | `trSourceLabels` |
-| `@kalem/plugin-image-upload` | `ImageLabels` | `enImageLabels` | `trImageLabels` |
-| `@kalem/plugin-autosave` | `AutosaveLabels` | `enAutosaveLabels` | `trAutosaveLabels` |
+| `@kalem-editor/ui` | `UiLabels` | `enLabels` | `trLabels` |
+| `@kalem-editor/wc` | `WcLabels` | `enWcLabels` | `trWcLabels` |
+| `@kalem-editor/plugin-find-replace` | `FindLabels` | `enFindLabels` | `trFindLabels` |
+| `@kalem-editor/plugin-outline` | `OutlineLabels` | `enOutlineLabels` | `trOutlineLabels` |
+| `@kalem-editor/plugin-word-count` | `WordCountLabels` | `enWordCountLabels` | `trWordCountLabels` |
+| `@kalem-editor/plugin-source-mode` | `SourceLabels` | `enSourceLabels` | `trSourceLabels` |
+| `@kalem-editor/plugin-image-upload` | `ImageLabels` | `enImageLabels` | `trImageLabels` |
+| `@kalem-editor/plugin-autosave` | `AutosaveLabels` | `enAutosaveLabels` | `trAutosaveLabels` |
 
 ### Tek bir metni değiştirmek
 
 ```ts
-import { mountUi, trLabels } from '@kalem/ui';
+import { mountUi, trLabels } from '@kalem-editor/ui';
 
 mountUi(editor, {
   labels: { ...trLabels, editor: 'Ürün açıklaması' },
@@ -86,8 +86,8 @@ Sözlük düz bir nesne; tipi derleyicinin eksik anahtarı göstermesini
 sağlıyor. Almanca bir arayüz:
 
 ```ts
-import { mountUi, enLabels, type UiLabels } from '@kalem/ui';
-import { wordCountPlugin, type WordCountLabels } from '@kalem/plugin-word-count';
+import { mountUi, enLabels, type UiLabels } from '@kalem-editor/ui';
+import { wordCountPlugin, type WordCountLabels } from '@kalem-editor/plugin-word-count';
 
 const deLabels: UiLabels = {
   ...enLabels,          // çevrilmemiş anahtarlar İngilizce kalsın
@@ -120,7 +120,7 @@ hazır sözlük ve `labels` seçeneği. Dili kendiniz çözmeyin, bağlamdan
 alın — böylece arayüzle her zaman aynı dili konuşursunuz:
 
 ```ts
-import type { Plugin } from '@kalem/editor';
+import type { Plugin } from '@kalem-editor/editor';
 
 export function myPlugin(options: { labels?: MyLabels } = {}): Plugin {
   return {

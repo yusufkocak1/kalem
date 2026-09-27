@@ -11,7 +11,7 @@ body:
 
         You can check without the editor:
         ```js
-        import { parse, serialize } from '@kalem/core';
+        import { parse, serialize } from '@kalem-editor/core';
         serialize(parse(input)) === input; // false?
         ```
   - type: textarea
@@ -32,5 +32,5 @@ body:
     id: version
     attributes:
       label: Version
-      placeholder: "@kalem/core 1.0.0"
+      placeholder: "@kalem-editor/core 1.0.0"
     validations: { required: true }

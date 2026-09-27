@@ -1,7 +1,7 @@
 /*
- * @kalem/themes — Görsel yükleme eklentisi  (İş listesi: F4-01)
+ * @kalem-editor/themes — Görsel yükleme eklentisi  (İş listesi: F4-01)
  *
- * Yalnızca `@kalem/plugin-image-upload` kullanılıyorsa yükleniyor. Ayrı
+ * Yalnızca `@kalem-editor/plugin-image-upload` kullanılıyorsa yükleniyor. Ayrı
  * dosya olmasının sebebi eklentinin isteğe bağlı olması: görsel yüklemeyen
  * bir kullanıcı bu kuralları indirmemeli.
  *

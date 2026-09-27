@@ -1,5 +1,5 @@
 /**
- * @kalem/core — Ağaç gezinme  (İş listesi: F1-02)
+ * @kalem-editor/core — Ağaç gezinme  (İş listesi: F1-02)
  *
  * Gezinme, künye kaydına (`spec.ts`) dayanır: hangi düğümün çocuğu olduğu
  * `isParent` ile sorulur, her düğüm tipi için ayrı `switch` yazılmaz. Yeni

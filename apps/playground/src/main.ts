@@ -17,28 +17,28 @@
  * ayıklama göstergeleri geliştirici için. Orayı ürün demosuna çevirmek
  * ikisini de bozardı — biri test zemini, öteki vitrin.
  */
-import { parse, serialize } from "@kalem/core";
-import { Editor } from "@kalem/editor";
-import { autosavePlugin, createIndicator, trAutosaveLabels } from "@kalem/plugin-autosave";
-import { codeHighlightPlugin } from "@kalem/plugin-code-highlight";
-import { findReplacePlugin } from "@kalem/plugin-find-replace";
-import { imageUploadPlugin } from "@kalem/plugin-image-upload";
-import { outlinePlugin } from "@kalem/plugin-outline";
-import { type SourceModePlugin, sourceModePlugin } from "@kalem/plugin-source-mode";
-import { wordCountPlugin } from "@kalem/plugin-word-count";
-import { mountUi, type Ui } from "@kalem/ui";
+import { parse, serialize } from "@kalem-editor/core";
+import { Editor } from "@kalem-editor/editor";
+import { autosavePlugin, createIndicator, trAutosaveLabels } from "@kalem-editor/plugin-autosave";
+import { codeHighlightPlugin } from "@kalem-editor/plugin-code-highlight";
+import { findReplacePlugin } from "@kalem-editor/plugin-find-replace";
+import { imageUploadPlugin } from "@kalem-editor/plugin-image-upload";
+import { outlinePlugin } from "@kalem-editor/plugin-outline";
+import { type SourceModePlugin, sourceModePlugin } from "@kalem-editor/plugin-source-mode";
+import { wordCountPlugin } from "@kalem-editor/plugin-word-count";
+import { mountUi, type Ui } from "@kalem-editor/ui";
 
-import "@kalem/themes/tokens.css";
-import "@kalem/themes/viewer.css";
-import "@kalem/themes/editor.css";
-import "@kalem/themes/ui.css";
-import "@kalem/themes/plugin-code.css";
-import "@kalem/themes/plugin-find.css";
-import "@kalem/themes/plugin-image.css";
-import "@kalem/themes/plugin-outline.css";
-import "@kalem/themes/plugin-word-count.css";
-import "@kalem/themes/plugin-source.css";
-import "@kalem/themes/plugin-autosave.css";
+import "@kalem-editor/themes/tokens.css";
+import "@kalem-editor/themes/viewer.css";
+import "@kalem-editor/themes/editor.css";
+import "@kalem-editor/themes/ui.css";
+import "@kalem-editor/themes/plugin-code.css";
+import "@kalem-editor/themes/plugin-find.css";
+import "@kalem-editor/themes/plugin-image.css";
+import "@kalem-editor/themes/plugin-outline.css";
+import "@kalem-editor/themes/plugin-word-count.css";
+import "@kalem-editor/themes/plugin-source.css";
+import "@kalem-editor/themes/plugin-autosave.css";
 import "./stil.css";
 
 import { baglantiUret, coz, GUVENLI_UZUNLUK } from "./baglanti.js";

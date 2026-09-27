@@ -7,12 +7,12 @@ description: Sarmalayıcı yok — <kalem-editor> sıradan bir DOM elemanı.
 Custom Element; Svelte onu sıradan bir DOM elemanı gibi ele alıyor.
 
 ```bash
-npm i @kalem/wc @kalem/themes
+npm i @kalem-editor/wc @kalem-editor/themes
 ```
 
 ```svelte
 <script lang="ts">
-  import '@kalem/wc/define';
+  import '@kalem-editor/wc/define';
 
   let metin = $state('# Merhaba');
   let saltOkunur = $state(false);
@@ -81,15 +81,15 @@ ya da `mountUi` çağırmak için.
 ## Stil
 
 ```ts
-import '@kalem/themes/tokens.css';
-import '@kalem/themes/viewer.css';
-import '@kalem/themes/editor.css';
-import '@kalem/themes/ui.css';
+import '@kalem-editor/themes/tokens.css';
+import '@kalem-editor/themes/viewer.css';
+import '@kalem-editor/themes/editor.css';
+import '@kalem-editor/themes/ui.css';
 ```
 
 Svelte'nin bileşen kapsamlı CSS'i (`<style>` bloğu) editörün **içine**
 ulaşmıyor: oradaki düğümleri Svelte üretmediği için `svelte-xxxx` sınıfını
-almıyorlar. Belge tipografisini `@kalem/themes` veriyor; kabuğu
+almıyorlar. Belge tipografisini `@kalem-editor/themes` veriyor; kabuğu
 (kenarlık, dolgu) `:global()` ile ya da global bir stil dosyasıyla yazın.
 
 ## Çalışan örnek

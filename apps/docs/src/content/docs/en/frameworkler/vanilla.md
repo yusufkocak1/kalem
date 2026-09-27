@@ -4,16 +4,16 @@ description: Setup without a framework — the library in its natural form.
 ---
 
 Kalem's core knows no framework. The code below is all there is to
-`@kalem/editor`; the wrappers add only lifecycle on top of it.
+`@kalem-editor/editor`; the wrappers add only lifecycle on top of it.
 
 ```ts
-import { Editor } from '@kalem/editor';
-import { mountUi } from '@kalem/ui';
+import { Editor } from '@kalem-editor/editor';
+import { mountUi } from '@kalem-editor/ui';
 
-import '@kalem/themes/tokens.css';
-import '@kalem/themes/viewer.css';
-import '@kalem/themes/editor.css';
-import '@kalem/themes/ui.css';
+import '@kalem-editor/themes/tokens.css';
+import '@kalem-editor/themes/viewer.css';
+import '@kalem-editor/themes/editor.css';
+import '@kalem-editor/themes/ui.css';
 
 const el = document.getElementById('app')!;
 
@@ -64,8 +64,8 @@ event as well.
 If there's no chance of editing, don't set up the editor at all:
 
 ```ts
-import { parse } from '@kalem/core';
-import { renderToDOM } from '@kalem/viewer';
+import { parse } from '@kalem-editor/core';
+import { renderToDOM } from '@kalem-editor/viewer';
 
 renderToDOM(parse(markdown), document.getElementById('app')!);
 ```
@@ -79,14 +79,14 @@ with `are-the-types-wrong`.
 
 ```js
 // ESM
-import { Editor } from '@kalem/editor';
+import { Editor } from '@kalem-editor/editor';
 
 // CJS
-const { Editor } = require('@kalem/editor');
+const { Editor } = require('@kalem-editor/editor');
 ```
 
-The sub-entries are separate: `@kalem/core/commands` (editor commands) and
-`@kalem/core/html` (the paste converter). A script that only processes
+The sub-entries are separate: `@kalem-editor/core/commands` (editor commands) and
+`@kalem-editor/core/html` (the paste converter). A script that only processes
 Markdown doesn't pay for their size.
 
 ## Without a build step

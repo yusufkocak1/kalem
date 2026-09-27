@@ -44,19 +44,19 @@ function sahteWorkspace(secenekler = {}) {
 		const dir = join(kok, "packages", ad);
 		mkdirSync(join(dir, "dist"), { recursive: true });
 		const pkg = {
-			name: `@kalem/${ad}`,
+			name: `@kalem-editor/${ad}`,
 			version: "0.0.0",
 			license: "MIT",
 			type: "module",
 			sideEffects: false,
 			exports: { ".": { types: "./dist/index.d.ts", import: "./dist/index.js" } },
-			dependencies: ad === "core" ? {} : { "@kalem/core": "workspace:^" },
+			dependencies: ad === "core" ? {} : { "@kalem-editor/core": "workspace:^" },
 		};
 		if (ad === "core" && secenekler.reactBagimliligi) pkg.dependencies = { react: "^19.0.0" };
 		if (ad === "core" && secenekler.peerBagimliligi) pkg.peerDependencies = { vue: "^3" };
 		writeFileSync(join(dir, "package.json"), JSON.stringify(pkg, null, 2));
 
-		let kod = `export const PACKAGE = "@kalem/${ad}";\n`;
+		let kod = `export const PACKAGE = "@kalem-editor/${ad}";\n`;
 		if (ad === "core" && secenekler.reactImport) kod = `import { useState } from "react";\n${kod}`;
 		if (ad === "core" && secenekler.domErisimi)
 			kod += `export const el = document.createElement("div");\n`;

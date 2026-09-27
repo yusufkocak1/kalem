@@ -1,5 +1,5 @@
 /**
- * @kalem/ui — Araç çubuğu eylemleri  (İş listesi: F3-01, F3-06)
+ * @kalem-editor/ui — Araç çubuğu eylemleri  (İş listesi: F3-01, F3-06)
  *
  * Balon çubuğu ile sabit çubuk aynı işleri yapıyor; ikisinin de kendi
  * düğme tanımını taşıması, "kalın" davranışının iki yerde ayrışması
@@ -10,9 +10,9 @@
  * olmadığı**. Üçüncüsü olmadan araç çubuğu kullanıcıya imlecin nerede
  * durduğunu söyleyemiyor.
  */
-import type { MarkType } from "@kalem/core/commands";
-import type { Editor } from "@kalem/editor";
-import { toggleList } from "@kalem/editor";
+import type { MarkType } from "@kalem-editor/core/commands";
+import type { Editor } from "@kalem-editor/editor";
+import { toggleList } from "@kalem-editor/editor";
 import { el } from "./dom.js";
 import type { UiLabels } from "./labels.js";
 

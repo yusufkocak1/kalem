@@ -37,10 +37,10 @@ koşturuldu.
 ```
 kalem/
 ├── packages/                 ← YAYIMLANIR (npm)
-│   ├── core/                 @kalem/core     0 bağımlılık, DOM'suz
-│   ├── viewer/               @kalem/viewer   → core
-│   ├── editor/               @kalem/editor   → core
-│   └── ui/                   @kalem/ui       → core, editor
+│   ├── core/                 @kalem-editor/core     0 bağımlılık, DOM'suz
+│   ├── viewer/               @kalem-editor/viewer   → core
+│   ├── editor/               @kalem-editor/editor   → core
+│   └── ui/                   @kalem-editor/ui       → core, editor
 ├── apps/                     ← YAYIMLANMAZ (private: true)
 │   ├── demo/                 mimari doğrulama prototipi
 │   └── docs/                 Astro Starlight doküman sitesi
@@ -100,7 +100,7 @@ Analiz iki kapı öngörüyordu; **üç** kuruldu.
 
 `packages/{core,viewer,editor,ui}` için denetler:
 
-- `dependencies` yalnızca `@kalem/*` içerebilir — 3rd-party yasak
+- `dependencies` yalnızca `@kalem-editor/*` içerebilir — 3rd-party yasak
 - `peerDependencies` boş olmalı
 - Üretim bundle'ında `react` / `react-dom` / `preact` / `vue` / `svelte` /
   `solid-js` import'u olamaz
@@ -117,10 +117,10 @@ için ikinci hat.
 
 | Hedef | Bütçe | Şu an |
 |---|---|---|
-| `@kalem/core` | 12 kB | 115 B |
-| `@kalem/viewer` | 14 kB | 117 B |
-| `@kalem/editor` (core dahil) | 38 kB | 116 B |
-| `@kalem/editor` + `@kalem/ui` | 58 kB | 115 B |
+| `@kalem-editor/core` | 12 kB | 115 B |
+| `@kalem-editor/viewer` | 14 kB | 117 B |
+| `@kalem-editor/editor` (core dahil) | 38 kB | 116 B |
+| `@kalem-editor/editor` + `@kalem-editor/ui` | 58 kB | 115 B |
 
 Bütçeler analiz §5.6'daki tablodan. Şu anki değerler yer tutucu kodun boyutu —
 anlamlı değil, ama **hat çalışıyor**. Faz 1'den itibaren her PR'da gerçek
@@ -188,7 +188,7 @@ bağımlılık, `charset=utf-8` açıkça set ediliyor. Playwright'ın duman tes
 artık bunu regresyon olarak koruyor: sayfa başlığı ve gövdedeki Türkçe metin
 doğrulanıyor.
 
-**publint `engines.node` istedi.** Dört pakete `>=18` eklendi — `@kalem/core`
+**publint `engines.node` istedi.** Dört pakete `>=18` eklendi — `@kalem-editor/core`
 sunucuda da çalışacağı için bu alan gerçekten anlamlı, susturma değil.
 
 ---
@@ -197,7 +197,7 @@ sunucuda da çalışacağı için bu alan gerçekten anlamlı, susturma değil.
 
 Dürüst olmak gerekirse:
 
-- **Sarmalayıcı paketler yok.** `@kalem/react`, `@kalem/vue`, `@kalem/wc`
+- **Sarmalayıcı paketler yok.** `@kalem-editor/react`, `@kalem-editor/vue`, `@kalem-editor/wc`
   Faz 5'te geliyor. Saflık kapısı bunları henüz denetlemiyor çünkü henüz
   yoklar — kapının `CEKIRDEK` listesi o zaman genişletilmeli.
 - **Boyut rakamları anlamsız.** Yer tutucu kod ölçülüyor. Bütçelerin gerçekten

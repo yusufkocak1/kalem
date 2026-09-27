@@ -2,7 +2,7 @@
   "name": "example-angular",
   "private": true,
   "version": "0.0.0",
-  "description": "@kalem/wc — Angular örneği",
+  "description": "@kalem-editor/wc — Angular örneği",
   "scripts": {
     "build": "ng build",
     "dev": "ng serve",
@@ -13,8 +13,8 @@
     "@angular/compiler": "catalog:",
     "@angular/core": "catalog:",
     "@angular/platform-browser": "catalog:",
-    "@kalem/themes": "workspace:^",
-    "@kalem/wc": "workspace:^",
+    "@kalem-editor/themes": "workspace:^",
+    "@kalem-editor/wc": "workspace:^",
     "rxjs": "catalog:",
     "tslib": "catalog:"
   },

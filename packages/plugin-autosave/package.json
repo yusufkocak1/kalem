@@ -1,5 +1,5 @@
 {
-  "name": "@kalem/plugin-autosave",
+  "name": "@kalem-editor/plugin-autosave",
   "version": "1.0.0",
   "description": "Kalem plugin: debounced autosave with status indicator and crash recovery",
   "keywords": [
@@ -49,8 +49,8 @@
     "dev": "tsdown --watch"
   },
   "dependencies": {
-    "@kalem/core": "workspace:^",
-    "@kalem/editor": "workspace:^"
+    "@kalem-editor/core": "workspace:^",
+    "@kalem-editor/editor": "workspace:^"
   },
   "devDependencies": {
     "tsdown": "catalog:",

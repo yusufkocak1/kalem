@@ -5,8 +5,8 @@
  * `Inline[]` ve iki ofset. Tarayıcı tarafı (seçimin ofsete çevrilmesi,
  * bloğun yeniden basılması, imlecin geri konması) `e2e/editor.spec.ts`'te.
  */
-import type { Inline } from "@kalem/core";
-import { serialize } from "@kalem/core";
+import type { Inline } from "@kalem-editor/core";
+import { serialize } from "@kalem-editor/core";
 import { describe, expect, it } from "vitest";
 import {
 	applyLink,

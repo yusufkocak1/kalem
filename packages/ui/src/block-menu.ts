@@ -1,5 +1,5 @@
 /**
- * @kalem/ui — Blok bağlam menüsü  (İş listesi: F3-05)
+ * @kalem-editor/ui — Blok bağlam menüsü  (İş listesi: F3-05)
  *
  * Tutamaca tıklayınca açılıyor: sil, çoğalt, kopyala, yukarı/aşağı taşı ve
  * blok türünü değiştir.
@@ -25,10 +25,10 @@
  * gezinme seviyesi daha ekliyor (sağ ok, geri dönüş, kapanma kuralları)
  * ve altı öğe için o karmaşıklık kazanç getirmiyor.
  */
-import type { NodeId } from "@kalem/core";
-import type { BlockType } from "@kalem/core/commands";
-import type { Editor } from "@kalem/editor";
-import { blocksPayload, deleteBlocks, duplicateBlocks, nudgeBlock } from "@kalem/editor";
+import type { NodeId } from "@kalem-editor/core";
+import type { BlockType } from "@kalem-editor/core/commands";
+import type { Editor } from "@kalem-editor/editor";
+import { blocksPayload, deleteBlocks, duplicateBlocks, nudgeBlock } from "@kalem-editor/editor";
 import { el, themed } from "./dom.js";
 import { position } from "./floating.js";
 import type { UiLabels } from "./labels.js";

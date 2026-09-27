@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * `@kalem/plugin-find-replace`  (İş listesi: F4-03)
+ * `@kalem-editor/plugin-find-replace`  (İş listesi: F4-03)
  *
  * Arama mantığının tamamı birim testleriyle sabit (`search.test.ts`);
  * burada ölçülen, tuşların panele, panelin de arama motoruna gerçekten

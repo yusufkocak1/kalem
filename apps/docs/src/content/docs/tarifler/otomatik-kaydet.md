@@ -3,17 +3,17 @@ title: Otomatik kaydetme
 description: Gecikmeli kaydetme, durum göstergesi ve çökme kurtarması.
 ---
 
-`@kalem/plugin-autosave` üç işi birden yapıyor: yazma durunca kaydetmek,
+`@kalem-editor/plugin-autosave` üç işi birden yapıyor: yazma durunca kaydetmek,
 durumu bildirmek ve sunucuya ulaşılamadığında metni yerel olarak
 kurtarmak.
 
 ```bash
-npm i @kalem/plugin-autosave
+npm i @kalem-editor/plugin-autosave
 ```
 
 ```ts
-import { autosavePlugin, createIndicator, trAutosaveLabels } from '@kalem/plugin-autosave';
-import '@kalem/themes/plugin-autosave.css';
+import { autosavePlugin, createIndicator, trAutosaveLabels } from '@kalem-editor/plugin-autosave';
+import '@kalem-editor/themes/plugin-autosave.css';
 
 const gosterge = createIndicator(document.getElementById('durum')!, {
   prefix: 'kalem-',

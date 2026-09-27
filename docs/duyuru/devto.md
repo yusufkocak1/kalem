@@ -54,7 +54,7 @@ which numbering delimiter, which emphasis marker, ATX or setext heading,
 backtick or tilde fence. The serializer reads those choices back:
 
 ```ts
-import { parse, serialize } from "@kalem/core";
+import { parse, serialize } from "@kalem-editor/core";
 
 const md = "* a bullet\n\n1) first\n";
 serialize(parse(md)) === md; // true
@@ -83,7 +83,7 @@ That buys a few things:
   an immutable tree, so undo is a stack of trees.
 - **Drag handles are natural.** Moving a block is moving a node.
 
-On top of the engine, `@kalem/ui` adds what Word users expect: a bubble
+On top of the engine, `@kalem-editor/ui` adds what Word users expect: a bubble
 toolbar on selection, a `/` slash menu, drag handles, a link popover, and
 paste from Word that turns Word's `mso-list` pseudo-lists into real lists.
 
@@ -99,7 +99,7 @@ form-associated custom element:
   <kalem-editor name="body" label="Post"># Hello</kalem-editor>
   <button>Save</button>
 </form>
-<script src="https://cdn.jsdelivr.net/npm/@kalem/wc/dist/kalem-editor.iife.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@kalem-editor/wc/dist/kalem-editor.iife.js"></script>
 ```
 
 The form submits Markdown, like a `<textarea>` would. No build step.
@@ -108,10 +108,10 @@ The form submits Markdown, like a `<textarea>` would. No build step.
 
 | Package | What it does | min+gzip |
 |---|---|---|
-| `@kalem/core` | Parse and serialize, no DOM | 12.8 kB |
-| `@kalem/viewer` | Render to DOM or to a string (SSR) | 2.7 kB |
-| `@kalem/editor` | The block engine | 27.5 kB |
-| `@kalem/editor` + `@kalem/ui` | The Word-like experience | 36.2 kB |
+| `@kalem-editor/core` | Parse and serialize, no DOM | 12.8 kB |
+| `@kalem-editor/viewer` | Render to DOM or to a string (SSR) | 2.7 kB |
+| `@kalem-editor/editor` | The block engine | 27.5 kB |
+| `@kalem-editor/editor` + `@kalem-editor/ui` | The Word-like experience | 36.2 kB |
 
 Every package has a size budget in CI, and a build over budget fails. The
 numbers in the docs are checked against the measurement, so they can't
@@ -153,7 +153,7 @@ I'd rather you read this here than find it on day one:
 - Docs: <DOCS_URL>
 
 ```bash
-npm i @kalem/editor @kalem/ui @kalem/themes
+npm i @kalem-editor/editor @kalem-editor/ui @kalem-editor/themes
 ```
 
 If you have a Markdown document that doesn't survive the round trip, please

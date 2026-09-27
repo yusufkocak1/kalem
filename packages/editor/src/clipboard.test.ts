@@ -4,8 +4,8 @@
  * İki biçimin de aynı AST parçasından üretildiği burada sabitleniyor.
  * Gerçek pano etkileşimi tarayıcı testinde.
  */
-import type { Inline } from "@kalem/core";
-import { parse } from "@kalem/core";
+import type { Inline } from "@kalem-editor/core";
+import { parse } from "@kalem-editor/core";
 import { describe, expect, it } from "vitest";
 import { blocksPayload, inlinePayload } from "./clipboard.js";
 

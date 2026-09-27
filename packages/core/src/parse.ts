@@ -1,5 +1,5 @@
 /**
- * @kalem/core — Genel ayrıştırıcı  (İş listesi: F1-03 + F1-04)
+ * @kalem-editor/core — Genel ayrıştırıcı  (İş listesi: F1-03 + F1-04)
  *
  * Blok ve satır içi katmanlarını birleştirir. Kütüphanenin dış dünyaya
  * gösterdiği ayrıştırma girişi budur.

@@ -7,7 +7,7 @@
  * `dist/` altına kopyalamak.
  *
  * Sebep: paketler henüz npm'de değil, yani gerçek bir CDN adresi
- * yok. Sayfa yayımlandığında `https://cdn.jsdelivr.net/npm/@kalem/…`
+ * yok. Sayfa yayımlandığında `https://cdn.jsdelivr.net/npm/@kalem-editor/…`
  * yazacak (README'ye bakın); burada aynı dosyalar yerelden geliyor ve
  * **derlenmiş paket çıktısından** kopyalanıyor, kaynaktan değil — yani
  * sınanan şey npm'e gidecek olanın aynısı.

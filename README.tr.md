@@ -9,8 +9,8 @@ Yazılım bilmeyen kullanıcıların Word rahatlığında doküman yazabilmesi, 
 ise projelerine 0 bağımlılıkla gömebilmesi için tasarlanıyor.
 
 **Durum:** v1.0 yayın hazırlığında. Çekirdek, görüntüleyici, editör, Word
-benzeri arayüz, yedi eklenti ve üç sarmalayıcı (`@kalem/react`,
-`@kalem/vue`, `@kalem/wc`) çalışıyor; doküman sitesi, playground ve duyuru
+benzeri arayüz, yedi eklenti ve üç sarmalayıcı (`@kalem-editor/react`,
+`@kalem-editor/vue`, `@kalem-editor/wc`) çalışıyor; doküman sitesi, playground ve duyuru
 materyalleri hazır. Henüz npm'de değil. Görev görev durum:
 [iş listesi](docs/01-is-listesi.md).
 
@@ -58,14 +58,14 @@ hepsi CI'da ve Türkçe yerel ayar altında koşuyor.
 ## Paketler
 
 ```
-@kalem/core      AST, parser, serializer          — 0 bağımlılık, DOM'suz
-@kalem/viewer    render (DOM + SSR string)        — salt okunur
-@kalem/editor    blok motoru, seçim, geçmiş       — başsız
-@kalem/ui        balon araç çubuğu, slash, drag   — Word deneyimi
-@kalem/react     @kalem/vue     @kalem/wc         — sarmalayıcılar
-@kalem/plugin-*  görsel, kod vurgulama, ara-değiştir, içindekiler,
+@kalem-editor/core      AST, parser, serializer          — 0 bağımlılık, DOM'suz
+@kalem-editor/viewer    render (DOM + SSR string)        — salt okunur
+@kalem-editor/editor    blok motoru, seçim, geçmiş       — başsız
+@kalem-editor/ui        balon araç çubuğu, slash, drag   — Word deneyimi
+@kalem-editor/react     @kalem-editor/vue     @kalem-editor/wc         — sarmalayıcılar
+@kalem-editor/plugin-*  görsel, kod vurgulama, ara-değiştir, içindekiler,
                  kelime sayacı, kaynak kipi, otomatik kaydetme
-@kalem/themes    saf CSS: açık, koyu, yalın
+@kalem-editor/themes    saf CSS: açık, koyu, yalın
 ```
 
 ## Geliştirme
@@ -97,10 +97,10 @@ pnpm build && pnpm demo     # http://localhost:5173
 
 | Sayfa | Ne gösterir |
 |---|---|
-| `/editor.html` | **`@kalem/editor`** — blok motoru: her blok kendi `contenteditable` elemanı, yazdıkça sağda gerçek Markdown çıktısı. |
-| `/viewer.html` | **`@kalem/viewer`** — aynı AST'nin `renderToDOM` ve `renderToString` çıktıları yan yana, byte-birebir eşitlik ölçümüyle. Ham HTML politikası canlı değiştirilebilir. |
-| `/core.html` | **`@kalem/core`** — Markdown → AST → Markdown, canlı gidiş-dönüş ve idempotans ölçümü. |
-| `/wc.html` | **`@kalem/wc`** — `<kalem-editor>` özel elemanı: ışık DOM, gölge DOM ve `ElementInternals` ile form entegrasyonu yan yana. |
+| `/editor.html` | **`@kalem-editor/editor`** — blok motoru: her blok kendi `contenteditable` elemanı, yazdıkça sağda gerçek Markdown çıktısı. |
+| `/viewer.html` | **`@kalem-editor/viewer`** — aynı AST'nin `renderToDOM` ve `renderToString` çıktıları yan yana, byte-birebir eşitlik ölçümüyle. Ham HTML politikası canlı değiştirilebilir. |
+| `/core.html` | **`@kalem-editor/core`** — Markdown → AST → Markdown, canlı gidiş-dönüş ve idempotans ölçümü. |
+| `/wc.html` | **`@kalem-editor/wc`** — `<kalem-editor>` özel elemanı: ışık DOM, gölge DOM ve `ElementInternals` ile form entegrasyonu yan yana. |
 | `/olcum.html` | **Performans ölçüm tezgâhı** — `pnpm olcum` buradan sürüyor: boyut boyut tuş gecikmesi, kuruluş süresi ve sızıntı döngüsü. |
 | `/` | Mimari doğrulama prototipi (`execCommand` ile; kütüphaneyi kullanmıyor) |
 

@@ -1,5 +1,5 @@
 /**
- * `@kalem/plugin-find-replace` — Eklenti  (İş listesi: F4-03)
+ * `@kalem-editor/plugin-find-replace` — Eklenti  (İş listesi: F4-03)
  *
  * Ctrl+F / Ctrl+H'yi paneli açmaya, paneli de arama motoruna bağlıyor.
  *
@@ -23,8 +23,8 @@
  * Arama çalışıyor, değiştirme düğmeleri kapalı. Aramanın okuma eylemi
  * olması, salt okunur belgede de en çok işe yarayan şey.
  */
-import type { Plugin, PluginContext } from "@kalem/editor";
-import { blockElementOf, holderIn, selectRange } from "@kalem/editor";
+import type { Plugin, PluginContext } from "@kalem-editor/editor";
+import { blockElementOf, holderIn, selectRange } from "@kalem-editor/editor";
 import { createDecorator } from "./decorate.js";
 import type { FindLabels } from "./labels.js";
 import { labelsFor } from "./labels.js";

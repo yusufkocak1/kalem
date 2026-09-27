@@ -39,8 +39,8 @@ mountUi(editor);
 
 | Paket | Boyut |
 |---|---|
-| \`@kalem/core\` | 11,5 kB |
-| \`@kalem/editor\` | 26,1 kB |
+| \`@kalem-editor/core\` | 11,5 kB |
+| \`@kalem-editor/editor\` | 26,1 kB |
 
 - [x] Kayıpsız gidiş-dönüş
 - [ ] Sizin ilk belgeniz

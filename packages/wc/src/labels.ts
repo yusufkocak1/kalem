@@ -1,5 +1,5 @@
 /**
- * @kalem/wc — Metinler  (İş listesi: F5-03)
+ * @kalem-editor/wc — Metinler  (İş listesi: F5-03)
  *
  * Tek bir kullanıcı metni var: `required` verilmiş ve belge boşken form
  * gönderiminde gösterilen doğrulama mesajı. Tarayıcı bunu kendi

@@ -1,5 +1,5 @@
 /**
- * `@kalem/plugin-source-mode` — Ham Markdown kipi  (İş listesi: F4-06)
+ * `@kalem-editor/plugin-source-mode` — Ham Markdown kipi  (İş listesi: F4-06)
  *
  * WYSIWYG ile kaynak metin arasında geçiş. Kaynak tarafı sıradan bir
  * `<textarea>`.
@@ -36,9 +36,9 @@
  * **ayrıştırmadan** geliyor, üretimden değil). Yanlış yere konan bir
  * imleç, hiç konmayandan kötü.
  */
-import { parse, serialize } from "@kalem/core";
-import type { Plugin, PluginContext } from "@kalem/editor";
-import { assignIds } from "@kalem/editor";
+import { parse, serialize } from "@kalem-editor/core";
+import type { Plugin, PluginContext } from "@kalem-editor/editor";
+import { assignIds } from "@kalem-editor/editor";
 import type { SourceLabels } from "./labels.js";
 import { labelsFor } from "./labels.js";
 import type { SourceView } from "./view.js";

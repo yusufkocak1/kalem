@@ -1,5 +1,5 @@
 /**
- * @kalem/editor — Satır içi aralık düzenleme  (İş listesi: F2-07)
+ * @kalem-editor/editor — Satır içi aralık düzenleme  (İş listesi: F2-07)
  *
  * ## Ne yapıyor
  *
@@ -22,9 +22,9 @@
  * Görsel eskiden 0'dı; imleç görselin iki yanında aynı ofsete düştüğü için
  * görsel seçilemiyor ve silinemiyordu (F4-01). Bkz. `offsets.ts`.
  */
-import type { Inline } from "@kalem/core";
-import type { MarkType } from "@kalem/core/commands";
-import { toggleMark } from "@kalem/core/commands";
+import type { Inline } from "@kalem-editor/core";
+import type { MarkType } from "@kalem-editor/core/commands";
+import { toggleMark } from "@kalem-editor/core/commands";
 import { normalizeInline } from "./read.js";
 
 /** Bir düğümün ofset uzunluğu. */
@@ -137,7 +137,7 @@ export function spliceInline(
 /**
  * Aralığa bir biçim uygular ya da kaldırır.
  *
- * Karar `@kalem/core/commands`'ın `toggleMark`'ına ait: aralığın tamamı o
+ * Karar `@kalem-editor/core/commands`'ın `toggleMark`'ına ait: aralığın tamamı o
  * biçimdeyse kaldırıyor, değilse uyguluyor — Word'ün kalın düğmesiyle aynı
  * davranış. Kararın çekirdekte olması, aynı mantığın başsız kullanımda
  * (SSR, betik) da geçerli olmasını sağlıyor.

@@ -3,11 +3,11 @@ title: Eklentiler
 description: Yedi resmî eklenti ve kendi eklentinizi yazmak.
 ---
 
-Eklentiler `@kalem/editor`e takılan ayrı paketler. Hiçbiri varsayılan
+Eklentiler `@kalem-editor/editor`e takılan ayrı paketler. Hiçbiri varsayılan
 olarak gelmiyor — ödemediğiniz şeyi indirmiyorsunuz.
 
 ```ts
-import { codeHighlightPlugin } from '@kalem/plugin-code-highlight';
+import { codeHighlightPlugin } from '@kalem-editor/plugin-code-highlight';
 
 const editor = new Editor(el, {
   value: md,
@@ -32,22 +32,22 @@ ve görev listesi. **Boş dizi vermek onları kapatıyor** — çekirdek
 
 | Paket | Ne yapıyor | Boyut (gzip) |
 |---|---|---|
-| `@kalem/plugin-code-highlight` | Kod bloğu vurgulama, 8 dil | 3,7 kB |
-| `@kalem/plugin-find-replace` | Ctrl+F / Ctrl+H | 4,4 kB |
-| `@kalem/plugin-image-upload` | Sürükle-bırak / yapıştır görsel yükleme | 2,9 kB |
-| `@kalem/plugin-outline` | İçindekiler paneli | 1,9 kB |
-| `@kalem/plugin-word-count` | Kelime sayacı ve okuma süresi | 1,4 kB |
-| `@kalem/plugin-source-mode` | Ham Markdown kaynağı (Ctrl+Shift+M) | 1,0 kB |
-| `@kalem/plugin-autosave` | Gecikmeli kaydetme + durum göstergesi | 652 B |
+| `@kalem-editor/plugin-code-highlight` | Kod bloğu vurgulama, 8 dil | 3,7 kB |
+| `@kalem-editor/plugin-find-replace` | Ctrl+F / Ctrl+H | 4,4 kB |
+| `@kalem-editor/plugin-image-upload` | Sürükle-bırak / yapıştır görsel yükleme | 2,9 kB |
+| `@kalem-editor/plugin-outline` | İçindekiler paneli | 1,9 kB |
+| `@kalem-editor/plugin-word-count` | Kelime sayacı ve okuma süresi | 1,4 kB |
+| `@kalem-editor/plugin-source-mode` | Ham Markdown kaynağı (Ctrl+Shift+M) | 1,0 kB |
+| `@kalem-editor/plugin-autosave` | Gecikmeli kaydetme + durum göstergesi | 657 B |
 
-Her birinin kendi CSS dosyası var: `@kalem/themes/plugin-code.css`,
+Her birinin kendi CSS dosyası var: `@kalem-editor/themes/plugin-code.css`,
 `plugin-find.css`, `plugin-image.css`, `plugin-outline.css`,
 `plugin-word-count.css`, `plugin-source.css`, `plugin-autosave.css`.
 
 ### Kod vurgulama
 
 ```ts
-import { codeHighlightPlugin } from '@kalem/plugin-code-highlight';
+import { codeHighlightPlugin } from '@kalem-editor/plugin-code-highlight';
 
 codeHighlightPlugin({
   maxLength: 20_000,
@@ -68,7 +68,7 @@ Kendi vurgulayıcınızı da verebilirsiniz — Prism ve Shiki için hazır
 dönüştürücüler var:
 
 ```ts
-import { codeHighlightPlugin, prismTokens } from '@kalem/plugin-code-highlight';
+import { codeHighlightPlugin, prismTokens } from '@kalem-editor/plugin-code-highlight';
 import Prism from 'prismjs';
 
 codeHighlightPlugin({
@@ -82,7 +82,7 @@ codeHighlightPlugin({
 ### Bul ve değiştir
 
 ```ts
-import { findReplacePlugin } from '@kalem/plugin-find-replace';
+import { findReplacePlugin } from '@kalem-editor/plugin-find-replace';
 
 const arama = findReplacePlugin({ limit: 5000 });
 arama.open('replace');  // kendi düğmenizden
@@ -100,7 +100,7 @@ tek bir yer tutucu karakter sayılıyor: `a![](x.png)b` içinde `ab` bulunmuyor,
 ### Görsel yükleme
 
 ```ts
-import { imageUploadPlugin } from '@kalem/plugin-image-upload';
+import { imageUploadPlugin } from '@kalem-editor/plugin-image-upload';
 
 imageUploadPlugin({
   maxSize: 5 * 1024 * 1024,
@@ -120,7 +120,7 @@ Tam tarif: [Görsel yükleme](/tarifler/gorsel-yukleme/).
 ### İçindekiler
 
 ```ts
-import { outlinePlugin } from '@kalem/plugin-outline';
+import { outlinePlugin } from '@kalem-editor/plugin-outline';
 
 outlinePlugin({
   container: document.getElementById('icindekiler'),
@@ -136,7 +136,7 @@ başına sahiplenmiyor — nereye ait olduğunu uygulama biliyor.
 ### Kelime sayacı
 
 ```ts
-import { wordCountPlugin } from '@kalem/plugin-word-count';
+import { wordCountPlugin } from '@kalem-editor/plugin-word-count';
 
 wordCountPlugin({
   container: document.getElementById('durum'),
@@ -150,7 +150,7 @@ sayılmıyor: `**kalın**` bir kelime, yedi değil.
 ### Kaynak kipi
 
 ```ts
-import { sourceModePlugin } from '@kalem/plugin-source-mode';
+import { sourceModePlugin } from '@kalem-editor/plugin-source-mode';
 
 const kaynak = sourceModePlugin({
   shortcut: true,                       // Ctrl/Cmd+Shift+M
@@ -165,7 +165,7 @@ gidiş-dönüşün kayıpsızlığı testle sabit.
 ### Otomatik kaydetme
 
 ```ts
-import { autosavePlugin, createIndicator, trAutosaveLabels } from '@kalem/plugin-autosave';
+import { autosavePlugin, createIndicator, trAutosaveLabels } from '@kalem-editor/plugin-autosave';
 
 const gosterge = createIndicator(document.getElementById('durum')!, {
   prefix: 'kalem-',
@@ -196,7 +196,7 @@ Tam tarif: [Otomatik kaydetme](/tarifler/otomatik-kaydet/).
 Bir eklenti dört alanlı bir nesne:
 
 ```ts
-import type { Plugin } from '@kalem/editor';
+import type { Plugin } from '@kalem-editor/editor';
 
 export function benimEklentim(): Plugin {
   return {

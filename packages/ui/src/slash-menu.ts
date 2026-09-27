@@ -1,5 +1,5 @@
 /**
- * @kalem/ui — Slash menü  (İş listesi: F3-03)
+ * @kalem-editor/ui — Slash menü  (İş listesi: F3-03)
  *
  * `/` yazınca açılan blok ekleme menüsü. Segment A için "ne
  * ekleyebilirim" sorusunun tek görünür cevabı: kısayolları bilmeyen
@@ -25,11 +25,11 @@
  * `aria-activedescendant` ile bildiriliyor. Odağı menüye taşımak yazmayı
  * durdururdu.
  */
-import type { Root } from "@kalem/core";
-import { replaceAt } from "@kalem/core";
-import { setBlockType } from "@kalem/core/commands";
-import type { Caret, Editor, EditResult } from "@kalem/editor";
-import { spliceInline, toggleList } from "@kalem/editor";
+import type { Root } from "@kalem-editor/core";
+import { replaceAt } from "@kalem-editor/core";
+import { setBlockType } from "@kalem-editor/core/commands";
+import type { Caret, Editor, EditResult } from "@kalem-editor/editor";
+import { spliceInline, toggleList } from "@kalem-editor/editor";
 import { el, themed } from "./dom.js";
 import { position } from "./floating.js";
 import type { UiLabels } from "./labels.js";
@@ -462,19 +462,21 @@ export function createSlashMenu(editor: Editor, options: SlashMenuOptions): Slas
 function dugumBul(
 	doc: Root,
 	caret: Caret,
-): { readonly children: readonly import("@kalem/core").Inline[] } | null {
+): { readonly children: readonly import("@kalem-editor/core").Inline[] } | null {
 	let current: unknown = doc.children[caret.blockIndex];
 	for (const index of caret.path) {
 		const children = (current as { children?: readonly unknown[] } | undefined)?.children;
 		if (children === undefined) return null;
 		current = children[index];
 	}
-	const dugum = current as { children?: readonly import("@kalem/core").Inline[] } | undefined;
+	const dugum = current as
+		| { children?: readonly import("@kalem-editor/core").Inline[] }
+		| undefined;
 	if (dugum?.children === undefined) return null;
-	return dugum as { readonly children: readonly import("@kalem/core").Inline[] };
+	return dugum as { readonly children: readonly import("@kalem-editor/core").Inline[] };
 }
 
-function duzMetin(node: import("@kalem/core").Inline): string {
+function duzMetin(node: import("@kalem-editor/core").Inline): string {
 	switch (node.type) {
 		case "text":
 		case "html":

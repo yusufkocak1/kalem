@@ -16,15 +16,15 @@ dosyası başka her yerde açılıyor.
 
 | Paket | Nerede |
 |---|---|
-| `@kalem/react` | `<KalemEditor>` — kontrolsüz kip, `useKalem()` |
-| `@kalem/ui` | `mountUi(editor, { toolbar: "both" })` — sabit çubuk + balon, slash menü, bağlantı balonu |
-| `@kalem/plugin-code-highlight` | kod blokları |
-| `@kalem/plugin-find-replace` | Ctrl+F / Ctrl+H |
-| `@kalem/plugin-outline` | sağdaki içindekiler paneli |
-| `@kalem/plugin-word-count` | durum çubuğu |
-| `@kalem/plugin-source-mode` | "Markdown kaynağı" düğmesi, Ctrl+Shift+M |
-| `@kalem/plugin-autosave` | 800 ms sessizlikten sonra `localStorage`, göstergesiyle |
-| `@kalem/ui` → `matches`, `score` | not listesindeki arama kutusu |
+| `@kalem-editor/react` | `<KalemEditor>` — kontrolsüz kip, `useKalem()` |
+| `@kalem-editor/ui` | `mountUi(editor, { toolbar: "both" })` — sabit çubuk + balon, slash menü, bağlantı balonu |
+| `@kalem-editor/plugin-code-highlight` | kod blokları |
+| `@kalem-editor/plugin-find-replace` | Ctrl+F / Ctrl+H |
+| `@kalem-editor/plugin-outline` | sağdaki içindekiler paneli |
+| `@kalem-editor/plugin-word-count` | durum çubuğu |
+| `@kalem-editor/plugin-source-mode` | "Markdown kaynağı" düğmesi, Ctrl+Shift+M |
+| `@kalem-editor/plugin-autosave` | 800 ms sessizlikten sonra `localStorage`, göstergesiyle |
+| `@kalem-editor/ui` → `matches`, `score` | not listesindeki arama kutusu |
 
 ## Neden böyle yazıldı
 
@@ -55,7 +55,7 @@ dogfooding uygulamasının ondan kaçınması anlamsız olurdu.
 
 Dogfooding'in çıktısı bunlar — hepsi düzeltildi:
 
-1. **`[data-theme]` atadan gelince çalışmıyordu.** `@kalem/themes` koyu
+1. **`[data-theme]` atadan gelince çalışmıyordu.** `@kalem-editor/themes` koyu
    tema seçicisi yalnızca bileşik hâlde yazılıydı
    (`:where(.kalem-theme, …)[data-theme="dark"]`), yani öznitelik
    `kalem-theme` sınıfıyla **aynı** elemanda olmak zorundaydı. Olağan

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * `@kalem/plugin-source-mode`  (İş listesi: F4-06)
+ * `@kalem-editor/plugin-source-mode`  (İş listesi: F4-06)
  *
  * Kabul kriteri: *iki mod arası geçişte içerik kaybı yok.* Gidiş-dönüşün
  * model tarafı birim testleriyle sabit (`roundtrip.test.ts`); burada

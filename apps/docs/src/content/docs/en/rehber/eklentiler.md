@@ -3,11 +3,11 @@ title: Plugins
 description: Seven official plugins, and writing your own.
 ---
 
-Plugins are separate packages attached to `@kalem/editor`. None of them
+Plugins are separate packages attached to `@kalem-editor/editor`. None of them
 ships by default — you don't download what you don't use.
 
 ```ts
-import { codeHighlightPlugin } from '@kalem/plugin-code-highlight';
+import { codeHighlightPlugin } from '@kalem-editor/plugin-code-highlight';
 
 const editor = new Editor(el, {
   value: md,
@@ -32,22 +32,22 @@ call `defaultPlugins()` and put it at the start of your own list.
 
 | Package | What it does | Size (gzip) |
 |---|---|---|
-| `@kalem/plugin-code-highlight` | Code block highlighting, 8 languages | 3.7 kB |
-| `@kalem/plugin-find-replace` | Ctrl+F / Ctrl+H | 4.4 kB |
-| `@kalem/plugin-image-upload` | Drag-and-drop / paste image upload | 2.9 kB |
-| `@kalem/plugin-outline` | Table of contents panel | 1.9 kB |
-| `@kalem/plugin-word-count` | Word count and reading time | 1.4 kB |
-| `@kalem/plugin-source-mode` | Raw Markdown source (Ctrl+Shift+M) | 1.0 kB |
-| `@kalem/plugin-autosave` | Debounced saving + status indicator | 652 B |
+| `@kalem-editor/plugin-code-highlight` | Code block highlighting, 8 languages | 3.7 kB |
+| `@kalem-editor/plugin-find-replace` | Ctrl+F / Ctrl+H | 4.4 kB |
+| `@kalem-editor/plugin-image-upload` | Drag-and-drop / paste image upload | 2.9 kB |
+| `@kalem-editor/plugin-outline` | Table of contents panel | 1.9 kB |
+| `@kalem-editor/plugin-word-count` | Word count and reading time | 1.4 kB |
+| `@kalem-editor/plugin-source-mode` | Raw Markdown source (Ctrl+Shift+M) | 1.0 kB |
+| `@kalem-editor/plugin-autosave` | Debounced saving + status indicator | 657 B |
 
-Each has its own CSS file: `@kalem/themes/plugin-code.css`,
+Each has its own CSS file: `@kalem-editor/themes/plugin-code.css`,
 `plugin-find.css`, `plugin-image.css`, `plugin-outline.css`,
 `plugin-word-count.css`, `plugin-source.css`, `plugin-autosave.css`.
 
 ### Code highlighting
 
 ```ts
-import { codeHighlightPlugin } from '@kalem/plugin-code-highlight';
+import { codeHighlightPlugin } from '@kalem-editor/plugin-code-highlight';
 
 codeHighlightPlugin({
   maxLength: 20_000,
@@ -69,7 +69,7 @@ You can bring your own highlighter — there are ready-made adapters for Prism
 and Shiki:
 
 ```ts
-import { codeHighlightPlugin, prismTokens } from '@kalem/plugin-code-highlight';
+import { codeHighlightPlugin, prismTokens } from '@kalem-editor/plugin-code-highlight';
 import Prism from 'prismjs';
 
 codeHighlightPlugin({
@@ -83,7 +83,7 @@ codeHighlightPlugin({
 ### Find and replace
 
 ```ts
-import { findReplacePlugin } from '@kalem/plugin-find-replace';
+import { findReplacePlugin } from '@kalem-editor/plugin-find-replace';
 
 const search = findReplacePlugin({ limit: 5000 });
 search.open('replace');  // from your own button
@@ -101,7 +101,7 @@ because there's an image between them on screen.
 ### Image upload
 
 ```ts
-import { imageUploadPlugin } from '@kalem/plugin-image-upload';
+import { imageUploadPlugin } from '@kalem-editor/plugin-image-upload';
 
 imageUploadPlugin({
   maxSize: 5 * 1024 * 1024,
@@ -121,7 +121,7 @@ Full recipe: [Image upload](/en/tarifler/gorsel-yukleme/).
 ### Table of contents
 
 ```ts
-import { outlinePlugin } from '@kalem/plugin-outline';
+import { outlinePlugin } from '@kalem-editor/plugin-outline';
 
 outlinePlugin({
   container: document.getElementById('toc'),
@@ -137,7 +137,7 @@ of the screen on its own — the app knows where it belongs.
 ### Word count
 
 ```ts
-import { wordCountPlugin } from '@kalem/plugin-word-count';
+import { wordCountPlugin } from '@kalem-editor/plugin-word-count';
 
 wordCountPlugin({
   container: document.getElementById('status'),
@@ -151,7 +151,7 @@ Markdown markers aren't counted: `**bold**` is one word, not seven.
 ### Source mode
 
 ```ts
-import { sourceModePlugin } from '@kalem/plugin-source-mode';
+import { sourceModePlugin } from '@kalem-editor/plugin-source-mode';
 
 const source = sourceModePlugin({
   shortcut: true,                       // Ctrl/Cmd+Shift+M
@@ -166,7 +166,7 @@ back into the document, and a lossless round-trip is pinned down by tests.
 ### Autosave
 
 ```ts
-import { autosavePlugin, createIndicator, enAutosaveLabels } from '@kalem/plugin-autosave';
+import { autosavePlugin, createIndicator, enAutosaveLabels } from '@kalem-editor/plugin-autosave';
 
 const indicator = createIndicator(document.getElementById('status')!, {
   prefix: 'kalem-',
@@ -197,7 +197,7 @@ Full recipe: [Autosave](/en/tarifler/otomatik-kaydet/).
 A plugin is an object with four fields:
 
 ```ts
-import type { Plugin } from '@kalem/editor';
+import type { Plugin } from '@kalem-editor/editor';
 
 export function myPlugin(): Plugin {
   return {

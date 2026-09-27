@@ -21,7 +21,7 @@ tercihi değil, sürdürülen bir sınır.
 Bağlantı ve görsel adresleri bir **beyaz listeden** geçiyor:
 
 ```ts
-import { ALLOWED_PROTOCOLS, isSafeUrl, sanitizeUrl } from '@kalem/core';
+import { ALLOWED_PROTOCOLS, isSafeUrl, sanitizeUrl } from '@kalem-editor/core';
 
 ALLOWED_PROTOCOLS; // ["http:", "https:", "mailto:", "tel:", "ftp:"]
 
@@ -82,14 +82,14 @@ kaybolmaktansa görünür ve zararsız olması tercih edildi.
 ## Yapıştırma
 
 Word ve Google Docs'tan yapıştırılan HTML, tarayıcının `DOMParser`ı ile
-değil Kalem'in kendi dönüştürücüsüyle (`@kalem/core/html`) işleniyor ve
+değil Kalem'in kendi dönüştürücüsüyle (`@kalem-editor/core/html`) işleniyor ve
 sonuç **AST'ye** çevriliyor. Yani yapıştırılan içerik de aynı beyaz
 listeden ve aynı kaçış kurallarından geçiyor; `<script>` ya da
 `onerror=` taşıyan bir yapıştırma belgeye giremiyor.
 
 ## Çekirdek sunucuda çalışıyor
 
-`@kalem/core` ve `@kalem/viewer` DOM'a dokunmuyor. Bunu bir **kapı**
+`@kalem-editor/core` ve `@kalem-editor/viewer` DOM'a dokunmuyor. Bunu bir **kapı**
 (`pnpm guard:purity`) doğruluyor: çekirdek bundle'ında `document`,
 `window`, `navigator`, `localStorage` ya da `HTMLElement` geçmesi CI'ı
 kırıyor.

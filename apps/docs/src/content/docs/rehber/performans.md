@@ -49,7 +49,7 @@ Editör bunu kendiliğinden kullanıyor; bir şey yapmanız gerekmiyor. Ama
 görüntüleyicinizi besliyorsanız) aynı kazanç size de açık:
 
 ```ts
-import { createSerializeCache, serialize } from "@kalem/core";
+import { createSerializeCache, serialize } from "@kalem-editor/core";
 
 const cache = createSerializeCache();
 

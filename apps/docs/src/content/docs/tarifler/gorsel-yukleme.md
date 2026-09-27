@@ -3,17 +3,17 @@ title: Görsel yükleme
 description: Sürükle-bırak, yapıştırma ve kendi depolama servisiniz.
 ---
 
-`@kalem/plugin-image-upload` sürükle-bırakı, yapıştırmayı ve dosya
+`@kalem-editor/plugin-image-upload` sürükle-bırakı, yapıştırmayı ve dosya
 seçiciyi hallediyor; **ağ hakkında hiçbir şey bilmiyor**. Hangi servis,
 hangi kimlik doğrulama, hangi yeniden deneme — hepsi sizin.
 
 ```bash
-npm i @kalem/plugin-image-upload
+npm i @kalem-editor/plugin-image-upload
 ```
 
 ```ts
-import { imageUploadPlugin } from '@kalem/plugin-image-upload';
-import '@kalem/themes/plugin-image.css';
+import { imageUploadPlugin } from '@kalem-editor/plugin-image-upload';
+import '@kalem-editor/themes/plugin-image.css';
 
 editor.addPlugin(
   imageUploadPlugin({

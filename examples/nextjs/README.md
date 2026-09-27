@@ -1,4 +1,4 @@
-# `@kalem/react` — Next.js App Router
+# `@kalem-editor/react` — Next.js App Router
 
 ```bash
 pnpm --filter example-nextjs dev

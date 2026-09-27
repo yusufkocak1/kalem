@@ -3,8 +3,8 @@ title: Temalar ve arayüz
 description: Renk sözlüğü, koyu tema ve mountUi seçenekleri.
 ---
 
-Kalem'in görünümü iki parçadan geliyor: **CSS dosyaları** (`@kalem/themes`)
-ve **arayüz bileşenleri** (`@kalem/ui`). İkisi bağımsız — kendi araç
+Kalem'in görünümü iki parçadan geliyor: **CSS dosyaları** (`@kalem-editor/themes`)
+ve **arayüz bileşenleri** (`@kalem-editor/ui`). İkisi bağımsız — kendi araç
 çubuğunuzu yazıp temayı kullanabilir ya da tersini yapabilirsiniz.
 
 ## CSS katmanları
@@ -22,10 +22,10 @@ Her katman ayrı bir dosya; yalnızca kullandığınızı yükleyin.
 | `plugin-*.css` | Eklenti başına stil | 210–665 B |
 
 ```ts
-import '@kalem/themes/tokens.css';
-import '@kalem/themes/viewer.css';
-import '@kalem/themes/editor.css';
-import '@kalem/themes/ui.css';
+import '@kalem-editor/themes/tokens.css';
+import '@kalem-editor/themes/viewer.css';
+import '@kalem-editor/themes/editor.css';
+import '@kalem-editor/themes/ui.css';
 ```
 
 Salt okunur bir sayfa yalnızca ilk ikisini yüklüyor: kullanıcıya
@@ -100,7 +100,7 @@ olursa olsun koyu kalır. Seçim sunuyorsanız `tokens.css` zaten yetiyor.
 Word deneyiminin tamamı tek çağrıda:
 
 ```ts
-import { mountUi } from '@kalem/ui';
+import { mountUi } from '@kalem-editor/ui';
 
 const ui = mountUi(editor, { toolbar: 'both' });
 // …
@@ -147,7 +147,7 @@ Sözlük belgenin diline göre seçiliyor (`tr` → Türkçe, aksi hâlde
 verebilirsiniz:
 
 ```ts
-import { mountUi, trLabels } from '@kalem/ui';
+import { mountUi, trLabels } from '@kalem-editor/ui';
 
 mountUi(editor, {
   labels: { ...trLabels, editor: 'Ürün açıklaması' },
@@ -161,9 +161,9 @@ kendisine çekiyor — kütüphanenin "kendi görünüşünü" tamamen geri ald�
 yer. Kendi tasarım sistemi olan uygulamalar için başlangıç noktası.
 
 ```ts
-import '@kalem/themes/tokens.css';
-import '@kalem/themes/viewer.css';
-import '@kalem/themes/editor.css';
-import '@kalem/themes/ui.css';
-import '@kalem/themes/minimal.css'; // en sonda
+import '@kalem-editor/themes/tokens.css';
+import '@kalem-editor/themes/viewer.css';
+import '@kalem-editor/themes/editor.css';
+import '@kalem-editor/themes/ui.css';
+import '@kalem-editor/themes/minimal.css'; // en sonda
 ```

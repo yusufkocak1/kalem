@@ -1,5 +1,5 @@
 /**
- * @kalem/editor — Eklenti sistemi  (İş listesi: F2-12)
+ * @kalem-editor/editor — Eklenti sistemi  (İş listesi: F2-12)
  *
  * ## Ne kadar yüzey
  *
@@ -14,7 +14,7 @@
  * Render'a kanca **bilerek yok**. Düğüm başına bir kanca, her blok için
  * bir dolaylı çağrı demek ve blok motorunun en sıcak yolu orası; ihtiyaç
  * ölçülmeden ödenecek bir bedel değil. Görsel genişletme Faz 3'ün
- * (`@kalem/ui`) işi.
+ * (`@kalem-editor/ui`) işi.
  *
  * ## Çakışma çözümü
  *
@@ -31,7 +31,7 @@
  * kadar geniş olduğunu kendi üstünde kanıtlıyor; kaldırılabildikleri
  * testle sabitleniyor.
  */
-import type { Root } from "@kalem/core";
+import type { Root } from "@kalem-editor/core";
 import type { Caret, EditResult } from "./block-edit.js";
 import type { Editor } from "./editor.js";
 

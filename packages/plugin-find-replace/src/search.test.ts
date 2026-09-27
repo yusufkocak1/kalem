@@ -4,7 +4,7 @@
  * Eklentinin saf yarısı. Kabul kriterlerinin ikisi de burada ölçülüyor:
  * Türkçe eşleşme çiftleri ve 100 sayfalık belgede tarama süresi.
  */
-import { parse, serialize } from "@kalem/core";
+import { parse, serialize } from "@kalem-editor/core";
 import { describe, expect, it } from "vitest";
 import { regionsOf } from "./regions.js";
 import { replaceAll, replaceOne } from "./replace.js";

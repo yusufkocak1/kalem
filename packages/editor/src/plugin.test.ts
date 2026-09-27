@@ -4,8 +4,8 @@
  * Kaydın kendisi saf; editöre bağlanması tarayıcı testinde. Buradaki
  * testler çakışma kuralını (kayıt sırası) ve yaşam döngüsünü sabitliyor.
  */
-import type { Root } from "@kalem/core";
-import { parse } from "@kalem/core";
+import type { Root } from "@kalem-editor/core";
+import { parse } from "@kalem-editor/core";
 import { describe, expect, it, vi } from "vitest";
 import type { Plugin, PluginContext } from "./plugin.js";
 import { PluginRegistry } from "./plugin.js";

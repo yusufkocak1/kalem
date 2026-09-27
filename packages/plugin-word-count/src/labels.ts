@@ -1,5 +1,5 @@
 /**
- * @kalem/plugin-word-count — Metinler  (İş listesi: F4-05)
+ * @kalem-editor/plugin-word-count — Metinler  (İş listesi: F4-05)
  *
  * Hepsi fonksiyon, çünkü hepsi sayı taşıyor ve **çoğul kuralı dile
  * bağlı**: İngilizce'de "1 word / 2 words", Türkçe'de her ikisi de

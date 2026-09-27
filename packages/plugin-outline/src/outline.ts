@@ -1,5 +1,5 @@
 /**
- * @kalem/plugin-outline — Başlık ağacı  (İş listesi: F4-04)
+ * @kalem-editor/plugin-outline — Başlık ağacı  (İş listesi: F4-04)
  *
  * Saf katman: belge girdi, içindekiler listesi çıktı. DOM yok.
  *
@@ -25,7 +25,7 @@
  * Biçimi taşımak, panelde ikinci bir satır içi çizici gerektirirdi ve
  * içindekiler listesi biçim değil **yapı** gösteriyor.
  */
-import type { Block, Heading, Inline, Root } from "@kalem/core";
+import type { Block, Heading, Inline, Root } from "@kalem-editor/core";
 
 /** İçindekiler listesindeki bir başlık. */
 export interface OutlineItem {

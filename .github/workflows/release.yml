@@ -20,7 +20,7 @@ name: Yayın
 #      zaten tek numara.
 #
 # Gereken: depo ayarlarında `NPM_TOKEN` sırrı (npm → Access Tokens →
-# "Automation" türü, yalnızca @kalem kapsamına yayın yetkisiyle).
+# "Automation" türü, yalnızca @kalem-editor kapsamına yayın yetkisiyle).
 
 on:
   workflow_dispatch:

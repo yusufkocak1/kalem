@@ -1,5 +1,5 @@
 /**
- * @kalem/editor — DOM → satır içi AST  (İş listesi: F2-05, F2-07)
+ * @kalem-editor/editor — DOM → satır içi AST  (İş listesi: F2-05, F2-07)
  *
  * ## Neden bu yön var
  *
@@ -19,7 +19,7 @@
  * Bilinmeyen etiket **şeffaf** sayılıyor: içeriği yukarı taşınır. Kullanıcı
  * bir yerden `<span style=…>` yapıştırırsa metni kalır, çöp gitmez.
  */
-import type { Inline } from "@kalem/core";
+import type { Inline } from "@kalem-editor/core";
 
 const ELEMENT = 1;
 const TEXT = 3;

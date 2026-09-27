@@ -3,8 +3,8 @@ title: Themes and UI
 description: Color tokens, dark theme and mountUi options.
 ---
 
-Kalem's look comes from two parts: **CSS files** (`@kalem/themes`) and **UI
-components** (`@kalem/ui`). They're independent — you can write your own
+Kalem's look comes from two parts: **CSS files** (`@kalem-editor/themes`) and **UI
+components** (`@kalem-editor/ui`). They're independent — you can write your own
 toolbar and use the theme, or the other way round.
 
 ## CSS layers
@@ -22,10 +22,10 @@ Each layer is a separate file; load only what you use.
 | `plugin-*.css` | Per-plugin styles | 210–665 B |
 
 ```ts
-import '@kalem/themes/tokens.css';
-import '@kalem/themes/viewer.css';
-import '@kalem/themes/editor.css';
-import '@kalem/themes/ui.css';
+import '@kalem-editor/themes/tokens.css';
+import '@kalem-editor/themes/viewer.css';
+import '@kalem-editor/themes/editor.css';
+import '@kalem-editor/themes/ui.css';
 ```
 
 A read-only page loads only the first two: there's no point making users
@@ -101,7 +101,7 @@ is already enough.
 The whole Word experience in one call:
 
 ```ts
-import { mountUi } from '@kalem/ui';
+import { mountUi } from '@kalem-editor/ui';
 
 const ui = mountUi(editor, { toolbar: 'both' });
 // …
@@ -148,7 +148,7 @@ language are on the [Language and direction](/en/rehber/dil-ve-yon/) page.
 You can pass your own dictionary:
 
 ```ts
-import { mountUi, enLabels } from '@kalem/ui';
+import { mountUi, enLabels } from '@kalem-editor/ui';
 
 mountUi(editor, {
   labels: { ...enLabels, editor: 'Product description' },
@@ -162,9 +162,9 @@ the text itself — the place where the library takes back its "own look"
 entirely. A starting point for apps with their own design system.
 
 ```ts
-import '@kalem/themes/tokens.css';
-import '@kalem/themes/viewer.css';
-import '@kalem/themes/editor.css';
-import '@kalem/themes/ui.css';
-import '@kalem/themes/minimal.css'; // last
+import '@kalem-editor/themes/tokens.css';
+import '@kalem-editor/themes/viewer.css';
+import '@kalem-editor/themes/editor.css';
+import '@kalem-editor/themes/ui.css';
+import '@kalem-editor/themes/minimal.css'; // last
 ```

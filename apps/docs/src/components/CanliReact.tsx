@@ -1,7 +1,7 @@
 /**
  * Canlı örnek — React  (İş listesi: F6-03)
  *
- * `@kalem/react` sarmalayıcısı, Astro'nun React adasında. Sayfadaki Vue
+ * `@kalem-editor/react` sarmalayıcısı, Astro'nun React adasında. Sayfadaki Vue
  * örneğiyle **aynı anda** yaşıyor: aynı sayfa, iki çerçeve, tek editör
  * motoru.
  *
@@ -9,9 +9,9 @@
  * bir kardeş bileşenin nasıl yazıldığını göstermek, kontrollü kipi
  * tekrarlamaktan daha öğretici.
  */
-import type { Editor } from "@kalem/editor";
-import { KalemEditor, useKalemValue } from "@kalem/react";
-import { mountUi, type Ui } from "@kalem/ui";
+import type { Editor } from "@kalem-editor/editor";
+import { KalemEditor, useKalemValue } from "@kalem-editor/react";
+import { mountUi, type Ui } from "@kalem-editor/ui";
 import { useCallback, useEffect, useRef } from "react";
 import { canliEtiket, type Dil, ornekBelge } from "./ornek-belge.js";
 

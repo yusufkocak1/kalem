@@ -3,17 +3,17 @@ title: Vanilla / TypeScript
 description: Çerçevesiz kurulum — kütüphanenin doğal hâli.
 ---
 
-Kalem'in çekirdeği hiçbir çerçeve bilmiyor. Aşağıdaki kod `@kalem/editor`in
+Kalem'in çekirdeği hiçbir çerçeve bilmiyor. Aşağıdaki kod `@kalem-editor/editor`in
 tamamı; sarmalayıcılar bunun üstüne yalnızca yaşam döngüsü ekliyor.
 
 ```ts
-import { Editor } from '@kalem/editor';
-import { mountUi } from '@kalem/ui';
+import { Editor } from '@kalem-editor/editor';
+import { mountUi } from '@kalem-editor/ui';
 
-import '@kalem/themes/tokens.css';
-import '@kalem/themes/viewer.css';
-import '@kalem/themes/editor.css';
-import '@kalem/themes/ui.css';
+import '@kalem-editor/themes/tokens.css';
+import '@kalem-editor/themes/viewer.css';
+import '@kalem-editor/themes/editor.css';
+import '@kalem-editor/themes/ui.css';
 
 const el = document.getElementById('app')!;
 
@@ -63,8 +63,8 @@ tetiklenmiyor; düğme durumunu `change` olayında da tazeleyin.
 Düzenleme ihtimali yoksa editörü hiç kurmayın:
 
 ```ts
-import { parse } from '@kalem/core';
-import { renderToDOM } from '@kalem/viewer';
+import { parse } from '@kalem-editor/core';
+import { renderToDOM } from '@kalem-editor/viewer';
 
 renderToDOM(parse(markdown), document.getElementById('app')!);
 ```
@@ -78,14 +78,14 @@ Paketler hem ESM hem CJS yayımlıyor ve `exports` haritaları
 
 ```js
 // ESM
-import { Editor } from '@kalem/editor';
+import { Editor } from '@kalem-editor/editor';
 
 // CJS
-const { Editor } = require('@kalem/editor');
+const { Editor } = require('@kalem-editor/editor');
 ```
 
-Alt girişler ayrı: `@kalem/core/commands` (editör komutları) ve
-`@kalem/core/html` (yapıştırma dönüştürücüsü). Yalnızca Markdown işleyen
+Alt girişler ayrı: `@kalem-editor/core/commands` (editör komutları) ve
+`@kalem-editor/core/html` (yapıştırma dönüştürücüsü). Yalnızca Markdown işleyen
 bir betik onların boyutunu ödemiyor.
 
 ## Derleme adımı olmadan

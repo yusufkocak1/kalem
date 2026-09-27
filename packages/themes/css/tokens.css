@@ -1,5 +1,5 @@
 /*
- * @kalem/themes — Tema sözlüğü  (İş listesi: F3-09)
+ * @kalem-editor/themes — Tema sözlüğü  (İş listesi: F3-09)
  *
  * Kalem'in bütün renkleri, tipografisi ve ölçüleri burada **bir kez**
  * tanımlanıyor. `viewer.css`, `editor.css` ve `ui.css` yalnızca tüketiyor.
@@ -21,7 +21,7 @@
  *
  *     .kalem-theme { --kalem-accent: #7c3aed; }
  *
- * `@kalem/ui` ürettiği her yüzen parçaya (araç çubuğu, menü, tutamaç)
+ * `@kalem-editor/ui` ürettiği her yüzen parçaya (araç çubuğu, menü, tutamaç)
  * `kalem-theme` sınıfını kendisi ekliyor; onlar `<body>` altında durduğu
  * için gömen sayfanın sarmalayıcısından miras alamıyorlardı. Görüntüleyici
  * kapsayıcısına sınıfı gömen sayfa yazıyor: `class="kalem-doc kalem-theme"`.

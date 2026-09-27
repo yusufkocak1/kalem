@@ -1,5 +1,5 @@
 /**
- * @kalem/viewer — `renderToDOM`  (İş listesi: F2-01)
+ * @kalem-editor/viewer — `renderToDOM`  (İş listesi: F2-01)
  *
  * ## `innerHTML` bu dosyada geçmiyor
  *
@@ -12,7 +12,7 @@
  * Tek istisna `html: "allow"` politikası — ki orada da bu dosya HTML
  * ayrıştırmaz, işi `renderRawHtml` kancasıyla çağırana devreder.
  */
-import type { Root } from "@kalem/core";
+import type { Root } from "@kalem-editor/core";
 import type { RenderElement, RenderNode, ViewerOptions } from "./plan.js";
 import { buildPlan } from "./plan.js";
 

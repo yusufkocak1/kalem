@@ -4,18 +4,18 @@ description: <KalemEditor />, useKalem and useKalemValue.
 ---
 
 ```bash
-npm i @kalem/react @kalem/editor @kalem/themes
+npm i @kalem-editor/react @kalem-editor/editor @kalem-editor/themes
 ```
 
 `react` is a **peer dependency** (`>=17`); the package doesn't bring its own
-copy. Its own size is 903 B.
+copy. Its own size is 907 B.
 
 ## Uncontrolled (most uses)
 
 The text lives in the editor; React stays out of it:
 
 ```tsx
-import { KalemEditor } from '@kalem/react';
+import { KalemEditor } from '@kalem-editor/react';
 
 <KalemEditor
   defaultValue="# Hello"
@@ -69,7 +69,7 @@ Callbacks are the exception: they're kept in a ref, so an inline
 For components that are **children** of `<KalemEditor>`:
 
 ```tsx
-import { KalemEditor, useKalem, useKalemValue } from '@kalem/react';
+import { KalemEditor, useKalem, useKalemValue } from '@kalem-editor/react';
 
 function Status() {
   const editor = useKalem();          // Editor | null
@@ -130,12 +130,12 @@ app.
 
 ## The Word-like UI
 
-`<KalemEditor>` sets up the engine; the toolbars come from `@kalem/ui`,
+`<KalemEditor>` sets up the engine; the toolbars come from `@kalem-editor/ui`,
 mounted through `onReady` — and torn down **before** the editor:
 
 ```tsx
-import { KalemEditor } from '@kalem/react';
-import { mountUi, type Ui } from '@kalem/ui';
+import { KalemEditor } from '@kalem-editor/react';
+import { mountUi, type Ui } from '@kalem-editor/ui';
 
 const uiRef = useRef<Ui | null>(null);
 useEffect(() => () => uiRef.current?.destroy(), []);

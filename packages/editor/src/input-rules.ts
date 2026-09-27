@@ -1,5 +1,5 @@
 /**
- * @kalem/editor — Giriş kuralları  (İş listesi: F2-10)
+ * @kalem-editor/editor — Giriş kuralları  (İş listesi: F2-10)
  *
  * ## Ne işe yarıyor
  *
@@ -21,8 +21,8 @@
  * bir Ctrl+Z kuralı iptal edip yazılan metni **olduğu gibi** bırakıyor.
  * "`# ` yazdım ama başlık istemiyordum" durumunun tek makul cevabı bu.
  */
-import type { Block, Inline, Root } from "@kalem/core";
-import { replaceAt } from "@kalem/core";
+import type { Block, Inline, Root } from "@kalem-editor/core";
+import { replaceAt } from "@kalem-editor/core";
 import type { Caret, EditResult } from "./block-edit.js";
 import { newId } from "./ids.js";
 import { listLength, sliceInline, spliceInline } from "./inline-edit.js";

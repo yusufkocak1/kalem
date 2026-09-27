@@ -1,5 +1,5 @@
 /**
- * @kalem/core — Kaynak tarayıcı  (İş listesi: F1-03'ün temeli)
+ * @kalem-editor/core — Kaynak tarayıcı  (İş listesi: F1-03'ün temeli)
  *
  * Blok ayrıştırıcısı satır satır çalışır. Bu dosya kaynağı satırlara böler ve
  * CommonMark'ın satır düzeyindeki kurallarını tek yerde toplar: satır sonu

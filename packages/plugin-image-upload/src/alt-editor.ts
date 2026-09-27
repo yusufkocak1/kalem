@@ -1,12 +1,12 @@
 /**
- * @kalem/plugin-image-upload — Alt metin düzenleme  (İş listesi: F4-01)
+ * @kalem-editor/plugin-image-upload — Alt metin düzenleme  (İş listesi: F4-01)
  *
  * Görsele tıklayınca açılan küçük alan. Tek iş yapıyor: alt metni okumak
  * ve yazmak.
  *
- * ## Neden `@kalem/ui`ye bağlanmıyor
+ * ## Neden `@kalem-editor/ui`ye bağlanmıyor
  *
- * `@kalem/ui` bu iş için hazır bir popover ve konumlandırma taşıyor. Ama
+ * `@kalem-editor/ui` bu iş için hazır bir popover ve konumlandırma taşıyor. Ama
  * eklentinin ona bağlanması, kendi arayüzünü yazan bir uygulamanın görsel
  * yüklemeyi almak için bütün arayüz katmanını indirmesi demek. Buradaki
  * kutu üç satırlık bir yerleştirme hesabı; o bedeli hak etmiyor.
@@ -18,7 +18,7 @@
  * `plugin-image.css` içinde işaretleniyor ve kutu açıldığında yer tutucu
  * "bu görseli tarif edin" diyor.
  */
-import type { PluginContext } from "@kalem/editor";
+import type { PluginContext } from "@kalem-editor/editor";
 import type { ImageLabels } from "./labels.js";
 
 export interface AltEditor {

@@ -1,5 +1,5 @@
 {
-  "name": "@kalem/wc",
+  "name": "@kalem-editor/wc",
   "version": "1.0.0",
   "description": "Kalem as a form-associated custom element — <kalem-editor>, no framework needed",
   "keywords": [
@@ -65,10 +65,10 @@
     "dev": "tsdown --watch"
   },
   "dependencies": {
-    "@kalem/editor": "workspace:^"
+    "@kalem-editor/editor": "workspace:^"
   },
   "devDependencies": {
-    "@kalem/core": "workspace:^",
+    "@kalem-editor/core": "workspace:^",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

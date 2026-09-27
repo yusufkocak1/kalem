@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * `@kalem/plugin-word-count`  (İş listesi: F4-05)
+ * `@kalem-editor/plugin-word-count`  (İş listesi: F4-05)
  *
  * Sayma birim testleriyle sabit (`count.test.ts`); burada ölçülen, durum
  * çubuğunun belgeyle birlikte güncellendiği ve gecikmenin yazmayı

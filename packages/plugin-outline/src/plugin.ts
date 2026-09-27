@@ -1,5 +1,5 @@
 /**
- * `@kalem/plugin-outline` — İçindekiler eklentisi  (İş listesi: F4-04)
+ * `@kalem-editor/plugin-outline` — İçindekiler eklentisi  (İş listesi: F4-04)
  *
  * Başlıkları listeler, tıklanınca oraya atlar ve **etkin** başlığı
  * işaretler.
@@ -32,8 +32,8 @@
  * değiştirmiyor. Liste `sameOutline` ile karşılaştırılıyor; eşitse DOM'a
  * dokunulmuyor, yani panelin kaydırma konumu ve klavye odağı duruyor.
  */
-import type { Plugin, PluginContext } from "@kalem/editor";
-import { blockElementOf, holderIn, selectRange } from "@kalem/editor";
+import type { Plugin, PluginContext } from "@kalem-editor/editor";
+import { blockElementOf, holderIn, selectRange } from "@kalem-editor/editor";
 import type { OutlineLabels } from "./labels.js";
 import { labelsFor } from "./labels.js";
 import type { OutlineItem } from "./outline.js";

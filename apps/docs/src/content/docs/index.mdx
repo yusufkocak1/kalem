@@ -21,7 +21,7 @@ import HeroDeneme from '../../components/HeroDeneme.astro';
 <HeroDeneme />
 
 <div class="kurulum">
-  <code>npm i @kalem/editor @kalem/ui @kalem/themes</code>
+  <code>npm i @kalem-editor/editor @kalem-editor/ui @kalem-editor/themes</code>
   <div class="rozetler">
     <span class="rozet"><b>editör + arayüz</b><span>36,2 kB</span></span>
     <span class="rozet"><b>çekirdek</b><span>12,8 kB</span></span>
@@ -49,7 +49,7 @@ editörü yok: ya ham metin yazdırılıyor ya da JSON tutup Markdown'a
     `-` olarak geri gelmez.
   </Card>
   <Card title="Framework-bağımsız" icon="puzzle">
-    Çekirdek saf TypeScript. `@kalem/react` ve `@kalem/vue` ayrı paketler
+    Çekirdek saf TypeScript. `@kalem-editor/react` ve `@kalem-editor/vue` ayrı paketler
     ve çerçeveyi `peerDependency` olarak alıyor. Svelte, Angular ve düz
     HTML için sarmalayıcı bile gerekmiyor: `<kalem-editor>` tarayıcının
     kendi bileşen modeli.
@@ -59,8 +59,8 @@ editörü yok: ya ham metin yazdırılıyor ya da JSON tutup Markdown'a
     Bütçeler CI'da zorlanıyor; aşım = build kırmızı.
   </Card>
   <Card title="Modüler" icon="setting">
-    Sadece göstermek için `@kalem/viewer`; düzenlemek için
-    `@kalem/editor`; Word benzeri arayüz için `@kalem/ui`. Ödemediğiniz
+    Sadece göstermek için `@kalem-editor/viewer`; düzenlemek için
+    `@kalem-editor/editor`; Word benzeri arayüz için `@kalem-editor/ui`. Ödemediğiniz
     şeyi indirmezsiniz.
   </Card>
 </CardGrid>
@@ -71,8 +71,8 @@ editörü yok: ya ham metin yazdırılıyor ya da JSON tutup Markdown'a
   <TabItem label="Vanilla">
 
 ```ts
-import { Editor } from '@kalem/editor';
-import { mountUi } from '@kalem/ui';
+import { Editor } from '@kalem-editor/editor';
+import { mountUi } from '@kalem-editor/ui';
 
 const editor = new Editor(document.getElementById('app')!, {
   value: '# Merhaba',
@@ -87,7 +87,7 @@ mountUi(editor);
   <TabItem label="React">
 
 ```tsx
-import { KalemEditor } from '@kalem/react';
+import { KalemEditor } from '@kalem-editor/react';
 
 <KalemEditor
   defaultValue="# Merhaba"
@@ -102,7 +102,7 @@ import { KalemEditor } from '@kalem/react';
 
 ```vue
 <script setup lang="ts">
-import { KalemEditor } from '@kalem/vue';
+import { KalemEditor } from '@kalem-editor/vue';
 import { ref } from 'vue';
 const metin = ref('# Merhaba');
 </script>
@@ -116,13 +116,13 @@ const metin = ref('# Merhaba');
   <TabItem label="HTML">
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/tokens.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/viewer.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/editor.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem-editor/themes/css/tokens.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem-editor/themes/css/viewer.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem-editor/themes/css/editor.css">
 
 <kalem-editor label="Belge"># Merhaba</kalem-editor>
 
-<script src="https://cdn.jsdelivr.net/npm/@kalem/wc/dist/kalem-editor.iife.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@kalem-editor/wc/dist/kalem-editor.iife.js"></script>
 ```
 
   </TabItem>

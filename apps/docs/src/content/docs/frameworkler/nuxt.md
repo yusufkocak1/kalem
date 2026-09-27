@@ -4,13 +4,13 @@ description: SSR — <ClientOnly> gerekmiyor, belge sunucuda çiziliyor.
 ---
 
 ```bash
-npm i @kalem/vue @kalem/editor @kalem/themes
+npm i @kalem-editor/vue @kalem-editor/editor @kalem-editor/themes
 ```
 
 ```vue
 <!-- app/app.vue -->
 <script setup lang="ts">
-import { KalemEditor } from '@kalem/vue';
+import { KalemEditor } from '@kalem-editor/vue';
 import { ref } from 'vue';
 
 const metin = ref('# Işık ve Gölge\n\nSunucuda çizilen belge.');
@@ -25,10 +25,10 @@ const metin = ref('# Işık ve Gölge\n\nSunucuda çizilen belge.');
 // nuxt.config.ts
 export default defineNuxtConfig({
   css: [
-    '@kalem/themes/tokens.css',
-    '@kalem/themes/viewer.css',
-    '@kalem/themes/editor.css',
-    '@kalem/themes/ui.css',
+    '@kalem-editor/themes/tokens.css',
+    '@kalem-editor/themes/viewer.css',
+    '@kalem-editor/themes/editor.css',
+    '@kalem-editor/themes/ui.css',
   ],
 });
 ```
@@ -41,7 +41,7 @@ Vue dünyasında editör sarmalayıcılarının neredeyse hepsi onu istiyor.
 Bedeli görünür: sunucu boş bir kutu gönderiyor, içerik sonradan beliriyor,
 arama motoru metni hiç görmüyor.
 
-Kalem'de sunucu belgeyi `@kalem/viewer` ile **gerçekten çiziyor**. Ham
+Kalem'de sunucu belgeyi `@kalem-editor/viewer` ile **gerçekten çiziyor**. Ham
 HTTP yanıtında `<h1>` ve `<li>` var; bunu bir test doğruluyor. İlk boyada
 okunabilir bir belge görünüyor ve JavaScript yüklendiğinde editör aynı
 elemanı devralıyor.
@@ -73,8 +73,8 @@ Editörü hiç yüklemeden, bir Nitro uç noktasında:
 
 ```ts
 // server/api/onizleme.post.ts
-import { parse } from '@kalem/core';
-import { renderToString } from '@kalem/viewer';
+import { parse } from '@kalem-editor/core';
+import { renderToString } from '@kalem-editor/viewer';
 
 export default defineEventHandler(async (event) => {
   const { markdown } = await readBody<{ markdown: string }>(event);
@@ -82,7 +82,7 @@ export default defineEventHandler(async (event) => {
 });
 ```
 
-`@kalem/core` ve `@kalem/viewer` DOM'a dokunmuyor; bir saflık kapısı bunu
+`@kalem-editor/core` ve `@kalem-editor/viewer` DOM'a dokunmuyor; bir saflık kapısı bunu
 CI'da doğruluyor.
 
 ## Çalışan örnek

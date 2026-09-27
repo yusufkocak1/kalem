@@ -1,5 +1,5 @@
 /**
- * @kalem/core — Blok ayrıştırıcı  (İş listesi: F1-03)
+ * @kalem-editor/core — Blok ayrıştırıcı  (İş listesi: F1-03)
  *
  * Kaynağı satır satır okuyup blok düğümleri üretir. Satır düzeyi ayrıntılar
  * (sekme genişletme, satır sonları, ofsetler) `scanner.ts`'te çözülmüş durumda.

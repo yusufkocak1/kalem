@@ -1,5 +1,5 @@
 /**
- * @kalem/plugin-find-replace — Arama  (İş listesi: F4-03)
+ * @kalem-editor/plugin-find-replace — Arama  (İş listesi: F4-03)
  *
  * Saf katman: belge girdi, eşleşme listesi çıktı. DOM yok, olay yok — bu
  * yüzden Türkçe kabul kriteri (`ışık` ↔ `IŞIK` eşleşiyor, `ışık` ↔ `İŞİK`
@@ -28,7 +28,7 @@
  * bölge önbelleğe alınıyor (`createIndex`): kullanıcı arama kutusuna her
  * harf eklediğinde belge yeniden katlanmıyor, yalnızca yeniden taranıyor.
  */
-import type { Root } from "@kalem/core";
+import type { Root } from "@kalem-editor/core";
 import type { FoldedText } from "./fold.js";
 import { atWordBoundary, foldCase } from "./fold.js";
 import type { Region } from "./regions.js";

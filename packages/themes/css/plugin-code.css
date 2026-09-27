@@ -1,7 +1,7 @@
 /*
- * @kalem/themes — Kod vurgulama  (İş listesi: F4-02)
+ * @kalem-editor/themes — Kod vurgulama  (İş listesi: F4-02)
  *
- * Yalnızca `@kalem/plugin-code-highlight` kullanılıyorsa yükleniyor.
+ * Yalnızca `@kalem-editor/plugin-code-highlight` kullanılıyorsa yükleniyor.
  * Eklenti her belirtece `kalem-tok-<tür>` sınıfı veriyor; renkler burada.
  *
  * ## Neden ayrı bir sözlük

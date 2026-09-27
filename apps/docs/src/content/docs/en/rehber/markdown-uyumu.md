@@ -7,7 +7,7 @@ Kalem's source of truth is **the Markdown text itself**. That isn't a
 slogan, it's a tested guarantee:
 
 ```ts
-import { parse, serialize } from '@kalem/core';
+import { parse, serialize } from '@kalem-editor/core';
 
 serialize(parse(md)) === md; // byte-for-byte on the test corpus
 ```
@@ -82,7 +82,7 @@ touched.
 
 :::note[v1.1]
 Adding or removing rows and columns, and changing alignment, come with
-`@kalem/plugin-table` (decision #5).
+`@kalem-editor/plugin-table` (decision #5).
 :::
 
 ## Locale-sensitive behavior
@@ -130,7 +130,7 @@ Details and rationale: [Security](/en/rehber/guvenlik/).
 ## Serialization options
 
 ```ts
-import { serialize } from '@kalem/core';
+import { serialize } from '@kalem-editor/core';
 
 serialize(doc, { /* SerializeOptions */ });
 ```

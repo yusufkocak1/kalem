@@ -6,9 +6,9 @@ description: No build step, no bundler, no JavaScript written by you.
 This is the whole page:
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/tokens.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/viewer.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/editor.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem-editor/themes/css/tokens.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem-editor/themes/css/viewer.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem-editor/themes/css/editor.css">
 
 <kalem-editor label="Document">
     # Hello
@@ -16,7 +16,7 @@ This is the whole page:
     Start writing.
 </kalem-editor>
 
-<script src="https://cdn.jsdelivr.net/npm/@kalem/wc/dist/kalem-editor.iife.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@kalem-editor/wc/dist/kalem-editor.iife.js"></script>
 ```
 
 No build step, no bundler, no import map — **and no JavaScript written by
@@ -25,10 +25,10 @@ write.
 
 ## Why a separate build
 
-`@kalem/wc`'s ESM output leaves `@kalem/core` and `@kalem/editor`
+`@kalem-editor/wc`'s ESM output leaves `@kalem-editor/core` and `@kalem-editor/editor`
 **external**; that's right for an app that uses a bundler, or the same code
 would be bundled twice. But a CDN user has no bundler, and a bare
-`import "@kalem/editor"` line can't be resolved in the browser.
+`import "@kalem-editor/editor"` line can't be resolved in the browser.
 
 `kalem-editor.iife.js` includes everything: **28.1 kB** (gzip), one request,
 not even `type="module"` needed.
@@ -71,7 +71,7 @@ written by you in between.
 In production, pin the version:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@kalem/wc@1.0.0/dist/kalem-editor.iife.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@kalem-editor/wc@1.0.0/dist/kalem-editor.iife.js"></script>
 ```
 
 jsDelivr and unpkg serve the file from its path in the tarball, without
@@ -79,13 +79,13 @@ looking at the `exports` map.
 
 ## If you want a toolbar
 
-The IIFE build carries the editor and the core, not `@kalem/ui`. For the
+The IIFE build carries the editor and the core, not `@kalem-editor/ui`. For the
 Word-like UI, either use a bundler ([Vanilla](/en/frameworkler/vanilla/)) or
 load it as a module:
 
 ```html
 <script type="module">
-  import { mountUi } from 'https://cdn.jsdelivr.net/npm/@kalem/ui/+esm';
+  import { mountUi } from 'https://cdn.jsdelivr.net/npm/@kalem-editor/ui/+esm';
 
   const el = document.querySelector('kalem-editor');
   el.addEventListener('kalem-ready', (e) => mountUi(e.detail.editor));

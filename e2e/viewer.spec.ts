@@ -20,7 +20,7 @@ declare global {
 }
 
 /**
- * `@kalem/viewer` — gerçek tarayıcı testleri  (İş listesi: F2-01, F2-02)
+ * `@kalem-editor/viewer` — gerçek tarayıcı testleri  (İş listesi: F2-01, F2-02)
  *
  * ## Neden jsdom yok
  *
@@ -135,7 +135,7 @@ test.describe("güvenlik", () => {
 });
 
 /**
- * F2-03 — `@kalem/themes/viewer.css`
+ * F2-03 — `@kalem-editor/themes/viewer.css`
  *
  * Stil dosyası gerçekten yükleniyor mu ve `.kalem-doc` kapsamından dışarı
  * sızıyor mu. İkincisi asıl iddia: görüntüleyici, gömüldüğü uygulamanın

@@ -1,4 +1,4 @@
-# @kalem/plugin-word-count
+# @kalem-editor/plugin-word-count
 
 Kalem plugin: word count, character count and reading time.
 
@@ -6,12 +6,12 @@ Part of [Kalem](https://github.com/yusufkocak1/kalem) — a WYSIWYG editor for p
 don't know Markdown, that saves Markdown.
 
 ```bash
-npm i @kalem/plugin-word-count
+npm i @kalem-editor/plugin-word-count
 ```
 
 ```ts
-import { wordCountPlugin } from '@kalem/plugin-word-count';
-import '@kalem/themes/plugin-word-count.css';
+import { wordCountPlugin } from '@kalem-editor/plugin-word-count';
+import '@kalem-editor/themes/plugin-word-count.css';
 
 editor.addPlugin(
   wordCountPlugin({ container: document.getElementById('status') }),

@@ -5,9 +5,9 @@
  * sürükle-bırakın buraya doğru bağlandığını doğruluyor.
  */
 
-import type { Image } from "@kalem/core";
-import { parse, serialize } from "@kalem/core";
-import type { Caret } from "@kalem/editor";
+import type { Image } from "@kalem-editor/core";
+import { parse, serialize } from "@kalem-editor/core";
+import type { Caret } from "@kalem-editor/editor";
 import { describe, expect, it } from "vitest";
 import {
 	altFromFilename,

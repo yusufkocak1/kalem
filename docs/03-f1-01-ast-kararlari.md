@@ -20,7 +20,7 @@ mdast'ta görsel satır içi bir düğümdür; tek başına duran bir görsel as
 `metin ![x](y.png) metin` arasında iki ayrı düğüm tipi gerektirirdi ve remark
 eklentileri ağacımızı okuyamazdı.
 
-Editörde "görsel bloğu" hissi vermek yine mümkün — `@kalem/ui` tek çocuğu
+Editörde "görsel bloğu" hissi vermek yine mümkün — `@kalem-editor/ui` tek çocuğu
 görsel olan paragrafı özel render eder. Bu bir **sunum** kararıdır, veri
 modeli kararı değil.
 

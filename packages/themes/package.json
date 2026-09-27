@@ -1,5 +1,5 @@
 {
-  "name": "@kalem/themes",
+  "name": "@kalem-editor/themes",
   "version": "1.0.0",
   "description": "Typography and theme tokens for Kalem — plain CSS, no build step",
   "keywords": [

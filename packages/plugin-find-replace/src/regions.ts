@@ -1,5 +1,5 @@
 /**
- * @kalem/plugin-find-replace — Aranabilir bölgeler  (İş listesi: F4-03)
+ * @kalem-editor/plugin-find-replace — Aranabilir bölgeler  (İş listesi: F4-03)
  *
  * Belgeyi, arama için **düz metin parçalarına** çeviriyor. Her parça bir
  * taşıyıcıya karşılık geliyor: paragraf ve başlık (satır içi) ya da
@@ -35,10 +35,10 @@
  * kullanıcıya yalan olurdu. Serileştirici artık yalnızca değişen satırı
  * yeniden üretiyor; o gerekçe ortadan kalktı.
  */
-import type { Block, Inline, Root } from "@kalem/core";
-import { nodeAtPath, replaceAt } from "@kalem/core";
-import type { Caret, EditResult } from "@kalem/editor";
-import { inlineLength, normalizeInline, sliceInline } from "@kalem/editor";
+import type { Block, Inline, Root } from "@kalem-editor/core";
+import { nodeAtPath, replaceAt } from "@kalem-editor/core";
+import type { Caret, EditResult } from "@kalem-editor/editor";
+import { inlineLength, normalizeInline, sliceInline } from "@kalem-editor/editor";
 
 /** `break` düğümünün arama metnindeki karşılığı (1 karakter, editörle aynı). */
 const SATIR_SONU = String.fromCharCode(10);

@@ -7,7 +7,7 @@ Gönderimden önce:
   bizim mi, belli değil).
 - Depo herkese açık mı? (bugün private; README'deki CI rozeti ve bağlantılar
   ancak açıldığında çalışır)
-- npm'de `@kalem/editor` var mı? (F6-13)
+- npm'de `@kalem-editor/editor` var mı? (F6-13)
 - Dil paragrafı bugünkü durumu söylüyor: doküman sitesi İngilizce, yalnızca
   üretilen API referansı Türkçe (kaynak yorumlarından geliyor).
 - Sayılar `pnpm size` ile aynı mı? (`pnpm guard:sizes` bu dosyayı da denetliyor)

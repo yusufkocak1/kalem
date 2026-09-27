@@ -1,4 +1,4 @@
-# `@kalem/react` — Vite + React
+# `@kalem-editor/react` — Vite + React
 
 ```bash
 pnpm --filter example-react-vite dev

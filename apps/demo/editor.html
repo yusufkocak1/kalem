@@ -126,17 +126,17 @@
 	.iyi { color: var(--iyi); }
 	.kotu { color: var(--kotu); }
 </style>
-<link rel="stylesheet" href="/@kalem/themes/tokens.css">
-<link rel="stylesheet" href="/@kalem/themes/viewer.css">
-<link rel="stylesheet" href="/@kalem/themes/editor.css">
-<link rel="stylesheet" href="/@kalem/themes/ui.css">
-<link rel="stylesheet" href="/@kalem/themes/plugin-image.css">
-<link rel="stylesheet" href="/@kalem/themes/plugin-code.css">
-<link rel="stylesheet" href="/@kalem/themes/plugin-find.css">
-<link rel="stylesheet" href="/@kalem/themes/plugin-outline.css">
-<link rel="stylesheet" href="/@kalem/themes/plugin-word-count.css">
-<link rel="stylesheet" href="/@kalem/themes/plugin-source.css">
-<link rel="stylesheet" href="/@kalem/themes/plugin-autosave.css">
+<link rel="stylesheet" href="/@kalem-editor/themes/tokens.css">
+<link rel="stylesheet" href="/@kalem-editor/themes/viewer.css">
+<link rel="stylesheet" href="/@kalem-editor/themes/editor.css">
+<link rel="stylesheet" href="/@kalem-editor/themes/ui.css">
+<link rel="stylesheet" href="/@kalem-editor/themes/plugin-image.css">
+<link rel="stylesheet" href="/@kalem-editor/themes/plugin-code.css">
+<link rel="stylesheet" href="/@kalem-editor/themes/plugin-find.css">
+<link rel="stylesheet" href="/@kalem-editor/themes/plugin-outline.css">
+<link rel="stylesheet" href="/@kalem-editor/themes/plugin-word-count.css">
+<link rel="stylesheet" href="/@kalem-editor/themes/plugin-source.css">
+<link rel="stylesheet" href="/@kalem-editor/themes/plugin-autosave.css">
 <!-- F3-09: tema seçici bu bağlantıyı çalışma anında değiştiriyor. -->
 <link rel="stylesheet" href="" id="temaEk">
 
@@ -222,32 +222,32 @@
 <script type="importmap">
 	{
 		"imports": {
-			"@kalem/core": "/@kalem/core/index.js",
-			"@kalem/core/commands": "/@kalem/core/commands.js",
-			"@kalem/core/html": "/@kalem/core/html.js",
-			"@kalem/editor": "/@kalem/editor/index.js",
-			"@kalem/viewer": "/@kalem/viewer/index.js",
-			"@kalem/ui": "/@kalem/ui/index.js",
-			"@kalem/plugin-image-upload": "/@kalem/plugin-image-upload/index.js",
-			"@kalem/plugin-code-highlight": "/@kalem/plugin-code-highlight/index.js",
-			"@kalem/plugin-find-replace": "/@kalem/plugin-find-replace/index.js",
-			"@kalem/plugin-outline": "/@kalem/plugin-outline/index.js",
-			"@kalem/plugin-word-count": "/@kalem/plugin-word-count/index.js",
-			"@kalem/plugin-source-mode": "/@kalem/plugin-source-mode/index.js",
-			"@kalem/plugin-autosave": "/@kalem/plugin-autosave/index.js"
+			"@kalem-editor/core": "/@kalem-editor/core/index.js",
+			"@kalem-editor/core/commands": "/@kalem-editor/core/commands.js",
+			"@kalem-editor/core/html": "/@kalem-editor/core/html.js",
+			"@kalem-editor/editor": "/@kalem-editor/editor/index.js",
+			"@kalem-editor/viewer": "/@kalem-editor/viewer/index.js",
+			"@kalem-editor/ui": "/@kalem-editor/ui/index.js",
+			"@kalem-editor/plugin-image-upload": "/@kalem-editor/plugin-image-upload/index.js",
+			"@kalem-editor/plugin-code-highlight": "/@kalem-editor/plugin-code-highlight/index.js",
+			"@kalem-editor/plugin-find-replace": "/@kalem-editor/plugin-find-replace/index.js",
+			"@kalem-editor/plugin-outline": "/@kalem-editor/plugin-outline/index.js",
+			"@kalem-editor/plugin-word-count": "/@kalem-editor/plugin-word-count/index.js",
+			"@kalem-editor/plugin-source-mode": "/@kalem-editor/plugin-source-mode/index.js",
+			"@kalem-editor/plugin-autosave": "/@kalem-editor/plugin-autosave/index.js"
 		}
 	}
 </script>
 <script type="module">
-	import { Editor, inputRulesPlugin, taskListPlugin } from "@kalem/editor";
-	import { autosavePlugin, createIndicator, trAutosaveLabels } from "@kalem/plugin-autosave";
-	import { codeHighlightPlugin } from "@kalem/plugin-code-highlight";
-	import { findReplacePlugin } from "@kalem/plugin-find-replace";
-	import { imageUploadPlugin } from "@kalem/plugin-image-upload";
-	import { outlinePlugin } from "@kalem/plugin-outline";
-	import { sourceModePlugin } from "@kalem/plugin-source-mode";
-	import { wordCountPlugin } from "@kalem/plugin-word-count";
-	import { mountUi } from "@kalem/ui";
+	import { Editor, inputRulesPlugin, taskListPlugin } from "@kalem-editor/editor";
+	import { autosavePlugin, createIndicator, trAutosaveLabels } from "@kalem-editor/plugin-autosave";
+	import { codeHighlightPlugin } from "@kalem-editor/plugin-code-highlight";
+	import { findReplacePlugin } from "@kalem-editor/plugin-find-replace";
+	import { imageUploadPlugin } from "@kalem-editor/plugin-image-upload";
+	import { outlinePlugin } from "@kalem-editor/plugin-outline";
+	import { sourceModePlugin } from "@kalem-editor/plugin-source-mode";
+	import { wordCountPlugin } from "@kalem-editor/plugin-word-count";
+	import { mountUi } from "@kalem-editor/ui";
 
 	const ORNEK = `# Işık ve Gölge
 
@@ -501,7 +501,7 @@ Son paragraf.
 	// varsayılanı veriyor, `dark.css`/`minimal.css` onu eziyor.
 	document.getElementById("tema").addEventListener("change", (e) => {
 		const ek = document.getElementById("temaEk");
-		ek.href = e.target.value === "" ? "" : `/@kalem/themes/${e.target.value}.css`;
+		ek.href = e.target.value === "" ? "" : `/@kalem-editor/themes/${e.target.value}.css`;
 	});
 
 	document.getElementById("kaynak").addEventListener("click", () => {

@@ -3,14 +3,14 @@ title: Editör
 description: Seçenekler, API, olaylar ve klavye kısayolları.
 ---
 
-`@kalem/editor` **başsız** bir blok editör motoru: model, DOM eşlemesi,
+`@kalem-editor/editor` **başsız** bir blok editör motoru: model, DOM eşlemesi,
 seçim, klavye, geçmiş. Hiçbir arayüz çizmiyor — araç çubuğu, balon menü ve
-slash menüsü [`@kalem/ui`](/rehber/temalar/) paketinde.
+slash menüsü [`@kalem-editor/ui`](/rehber/temalar/) paketinde.
 
 ## Kurulum
 
 ```ts
-import { Editor } from '@kalem/editor';
+import { Editor } from '@kalem-editor/editor';
 
 const editor = new Editor(document.getElementById('app')!, {
   value: '# Başlık\n\nParagraf.',
@@ -153,7 +153,7 @@ Ayrıntı: [Eklentiler](/rehber/eklentiler/).
 | `Ctrl/Cmd + I` | İtalik |
 | `Ctrl/Cmd + E` | Satır içi kod |
 | `Ctrl/Cmd + Shift + X` | Üstü çizili |
-| `Ctrl/Cmd + K` | Bağlantı (`@kalem/ui` ile) |
+| `Ctrl/Cmd + K` | Bağlantı (`@kalem-editor/ui` ile) |
 
 `Ctrl+U` **bilerek engelleniyor ve hiçbir şey yapmıyor**: Markdown'da altı
 çizili yok, engellenmezse tarayıcı `<u>` üretiyor ve o da bir sonraki
@@ -169,7 +169,7 @@ hiç tepki vermemesinden kötü.
 | `Ctrl/Cmd + Shift + 8` | Madde imli liste |
 | `Ctrl/Cmd + Shift + 7` | Numaralı liste |
 | `Tab` / `Shift + Tab` | Liste öğesini içeri/dışarı al |
-| `Ctrl/Cmd + Shift + ↑ / ↓` | Bloğu taşı (`@kalem/ui` ile) |
+| `Ctrl/Cmd + Shift + ↑ / ↓` | Bloğu taşı (`@kalem-editor/ui` ile) |
 
 Liste kısayolları Word ve GitHub ile aynı tuşlarda.
 
@@ -226,5 +226,5 @@ editor.setReadOnly(true);
 
 İçerik görünür kalıyor, düzenlenebilirlik kalkıyor ve `readonlychange`
 olayı yayılıyor — arayüz katmanı düğmelerini buna göre kapatıyor.
-Sürekli yoklamak yerine haber vermek, `@kalem/ui`nin editörü sorgulamasını
+Sürekli yoklamak yerine haber vermek, `@kalem-editor/ui`nin editörü sorgulamasını
 gereksiz kılıyor.

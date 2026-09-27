@@ -1,5 +1,5 @@
 /**
- * @kalem/wc — `<kalem-editor>`  (İş listesi: F5-03)
+ * @kalem-editor/wc — `<kalem-editor>`  (İş listesi: F5-03)
  *
  * Çerçevesi olmayan sarmalayıcı: tarayıcının kendi bileşen modeli.
  * React ve Vue sarmalayıcılarıyla aynı işi yapıyor ama Svelte, Angular,
@@ -8,7 +8,7 @@
  * ## Sınıf neden bir fonksiyonun içinde
  *
  * `class X extends HTMLElement` **değerlendirildiği anda** `HTMLElement`
- * globalini okuyor. Modül gövdesinde dursaydı, `import "@kalem/wc"` yazan
+ * globalini okuyor. Modül gövdesinde dursaydı, `import "@kalem-editor/wc"` yazan
  * bir Next.js/Nuxt sunucusu daha ilk satırda `HTMLElement is not defined`
  * ile düşerdi — üstelik eleman o sayfada hiç kullanılmasa bile.
  *
@@ -18,7 +18,7 @@
  *
  * ## Shadow DOM opsiyonel, varsayılan kapalı
  *
- * Gölge kök stilleri dışarıda bırakıyor: `@kalem/themes` sayfanın
+ * Gölge kök stilleri dışarıda bırakıyor: `@kalem-editor/themes` sayfanın
  * genelinde tanımlı ve gölgeye **girmiyor**. Varsayılan açık olsaydı
  * editör her kurulumda stilsiz açılır, herkes bir geçici çözüm arardı.
  *
@@ -37,8 +37,8 @@
  * kullanılıyor: programla yapılan `el.value = "…"` **olay yaymıyor**,
  * yalnızca kullanıcının yazdığı yayıyor.
  */
-import type { Plugin } from "@kalem/editor";
-import { Editor, resolveLang } from "@kalem/editor";
+import type { Plugin } from "@kalem-editor/editor";
+import { Editor, resolveLang } from "@kalem-editor/editor";
 import { labelsFor } from "./labels.js";
 import { dedent } from "./metin.js";
 

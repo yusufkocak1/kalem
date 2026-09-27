@@ -1,5 +1,5 @@
 /**
- * @kalem/ui — Blok tutamacı ve sürükle-bırak  (İş listesi: F3-04)
+ * @kalem-editor/ui — Blok tutamacı ve sürükle-bırak  (İş listesi: F3-04)
  *
  * Kullanıcının açıkça istediği özellik. Satırın başına gelen tutamaç (⠿)
  * ve altına blok ekleyen artı düğmesi.
@@ -24,9 +24,9 @@
  * ekranın yarısını kaplıyor. Çizgi "nereye düşecek" sorusunu daha net
  * cevaplıyor.
  */
-import type { NodeId } from "@kalem/core";
-import type { Editor } from "@kalem/editor";
-import { moveBlocks, newParagraph, nudgeBlock } from "@kalem/editor";
+import type { NodeId } from "@kalem-editor/core";
+import type { Editor } from "@kalem-editor/editor";
+import { moveBlocks, newParagraph, nudgeBlock } from "@kalem-editor/editor";
 import { button, el, themed } from "./dom.js";
 import type { UiLabels } from "./labels.js";
 

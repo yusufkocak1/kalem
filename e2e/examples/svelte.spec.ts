@@ -19,7 +19,7 @@ test.beforeEach(async ({ page }) => {
 
 test("eleman kayıtlı ve yükselmiş", async ({ page }) => {
 	expect(await page.evaluate(() => customElements.get("kalem-editor") !== undefined)).toBe(true);
-	// Yan etkili giriş (`@kalem/wc/define`) ağaç sarsmada düşseydi etiket
+	// Yan etkili giriş (`@kalem-editor/wc/define`) ağaç sarsmada düşseydi etiket
 	// boş bir kutu olarak kalırdı.
 	await expect(page.locator(".editor > div[role='textbox']").first()).toHaveCount(1);
 });

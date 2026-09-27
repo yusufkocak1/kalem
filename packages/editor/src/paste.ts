@@ -1,8 +1,8 @@
 /**
- * @kalem/editor — Yapıştırma boru hattı  (İş listesi: F3-07)
+ * @kalem-editor/editor — Yapıştırma boru hattı  (İş listesi: F3-07)
  *
  * Word'den, Google Docs'tan, bir web sayfasından ya da düz metin olarak
- * gelen içeriği modele çevirir. F1-09'daki `@kalem/core/html`
+ * gelen içeriği modele çevirir. F1-09'daki `@kalem-editor/core/html`
  * dönüştürücüsünün editöre bağlandığı yer.
  *
  * ## Neden tarayıcıya bırakılamıyor
@@ -31,9 +31,9 @@
  * kullanıcının bütün başlıklarını düz metne çeviriyor. Sezgisel olan,
  * ikisinin arasındaki tek makul yer.
  */
-import type { Block, Inline, Paragraph, Root } from "@kalem/core";
-import { parse } from "@kalem/core";
-import { fromHtml } from "@kalem/core/html";
+import type { Block, Inline, Paragraph, Root } from "@kalem-editor/core";
+import { parse } from "@kalem-editor/core";
+import { fromHtml } from "@kalem-editor/core/html";
 import type { Caret, EditResult } from "./block-edit.js";
 import { komsulukTazele } from "./block-edit.js";
 import { newId } from "./ids.js";
@@ -119,7 +119,7 @@ export function looksLikeMarkdown(text: string): boolean {
  * Yapıştırılacak içeriği belge parçasına çevirir.
  *
  * `parseHtml`, HTML metnini DOM'a çeviren fonksiyon; çağıran veriyor
- * çünkü `@kalem/core/html` bilerek DOM tanımıyor (F1-09). Tarayıcıda
+ * çünkü `@kalem-editor/core/html` bilerek DOM tanımıyor (F1-09). Tarayıcıda
  * `DOMParser`, testte düz nesneler.
  */
 export function pasteFragment(

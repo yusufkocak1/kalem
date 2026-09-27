@@ -1,5 +1,5 @@
 /**
- * @kalem/ui — Küçük DOM yardımcıları
+ * @kalem-editor/ui — Küçük DOM yardımcıları
  *
  * Arayüz katmanı çok sayıda küçük eleman kuruyor; her birini altı satır
  * `createElement`/`setAttribute` ile yazmak dosyaları okunmaz hâle

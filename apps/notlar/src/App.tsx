@@ -1,4 +1,4 @@
-import { KalemEditor } from "@kalem/react";
+import { KalemEditor } from "@kalem-editor/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Arayuz, type Kollar } from "./Arayuz.js";
 import { baslikCikar } from "./baslik.js";

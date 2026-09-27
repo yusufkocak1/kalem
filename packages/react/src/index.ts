@@ -1,10 +1,10 @@
 /**
- * `@kalem/react` — React sarmalayıcısı  (İş listesi: F5-01)
+ * `@kalem-editor/react` — React sarmalayıcısı  (İş listesi: F5-01)
  *
- *     import { KalemEditor } from "@kalem/react";
- *     import "@kalem/themes/tokens.css";
- *     import "@kalem/themes/viewer.css";
- *     import "@kalem/themes/editor.css";
+ *     import { KalemEditor } from "@kalem-editor/react";
+ *     import "@kalem-editor/themes/tokens.css";
+ *     import "@kalem-editor/themes/viewer.css";
+ *     import "@kalem-editor/themes/editor.css";
  *
  *     <KalemEditor defaultValue="# Merhaba" onChange={(md) => console.log(md)} />
  *
@@ -13,7 +13,7 @@
  * `use-sync-external-store` shim'i olmadan da 17'de derleniyor; kancayı
  * yalnızca `useKalemValue` kullanıyor.
  *
- * @module @kalem/react
+ * @module @kalem-editor/react
  */
 
 export { KalemContext, useKalem, useKalemValue } from "./context.js";

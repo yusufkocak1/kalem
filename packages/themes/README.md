@@ -1,4 +1,4 @@
-# @kalem/themes
+# @kalem-editor/themes
 
 Typography and theme tokens for Kalem — plain CSS, no build step.
 
@@ -6,14 +6,14 @@ Part of [Kalem](https://github.com/yusufkocak1/kalem) — a WYSIWYG editor for p
 don't know Markdown, that saves Markdown.
 
 ```bash
-npm i @kalem/themes
+npm i @kalem-editor/themes
 ```
 
 ```ts
-import '@kalem/themes/tokens.css';   // color, type and spacing tokens
-import '@kalem/themes/viewer.css';   // document typography
-import '@kalem/themes/editor.css';   // editing layer
-import '@kalem/themes/ui.css';       // toolbars and menus
+import '@kalem-editor/themes/tokens.css';   // color, type and spacing tokens
+import '@kalem-editor/themes/viewer.css';   // document typography
+import '@kalem-editor/themes/editor.css';   // editing layer
+import '@kalem-editor/themes/ui.css';       // toolbars and menus
 ```
 
 Plain CSS with custom properties, scoped to Kalem's own elements. Dark mode follows `prefers-color-scheme` and `[data-theme]`; `minimal.css` removes shadows and rounding.

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { KalemEditor } from "@kalem/vue";
+import { KalemEditor } from "@kalem-editor/vue";
 import { ref } from "vue";
 import Durum from "./Durum.vue";
 

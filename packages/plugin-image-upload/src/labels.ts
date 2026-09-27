@@ -1,10 +1,10 @@
 /**
- * @kalem/plugin-image-upload — Metinler  (İş listesi: F4-01)
+ * @kalem-editor/plugin-image-upload — Metinler  (İş listesi: F4-01)
  *
- * Eklentinin kullanıcıya gösterdiği her metin burada. `@kalem/ui`nin
+ * Eklentinin kullanıcıya gösterdiği her metin burada. `@kalem-editor/ui`nin
  * sözlüğüyle aynı kalıp: düz bir nesne, çeviri kütüphanesi yok.
  *
- * Ayrı bir sözlük olmasının sebebi bağımlılık: eklenti `@kalem/ui`ye
+ * Ayrı bir sözlük olmasının sebebi bağımlılık: eklenti `@kalem-editor/ui`ye
  * bağlanırsa, kendi arayüzünü yazan bir uygulama görsel yüklemeyi almak
  * için bütün arayüz katmanını indirmek zorunda kalırdı.
  */

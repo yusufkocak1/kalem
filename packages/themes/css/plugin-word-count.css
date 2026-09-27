@@ -1,7 +1,7 @@
 /*
- * @kalem/themes — Kelime sayacı  (İş listesi: F4-05)
+ * @kalem-editor/themes — Kelime sayacı  (İş listesi: F4-05)
  *
- * Yalnızca `@kalem/plugin-word-count` kullanılıyorsa yükleniyor. Sözlük
+ * Yalnızca `@kalem-editor/plugin-word-count` kullanılıyorsa yükleniyor. Sözlük
  * `tokens.css`ten; burada hiçbir renk tanımlanmıyor.
  *
  * Şerit, gömen uygulamanın verdiği kapsayıcıya çiziliyor; konumu ve

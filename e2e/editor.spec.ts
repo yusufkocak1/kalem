@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { WORD_HTML, WORD_TEXT } from "./fixtures/word-clipboard.js";
 
 /**
- * `@kalem/editor` — blok motoru  (İş listesi: F2-05)
+ * `@kalem-editor/editor` — blok motoru  (İş listesi: F2-05)
  *
  * Editörün tamamı DOM davranışı: `contenteditable`, seçim, `input` olayı.
  * Bunların hiçbirinin taklidi güvenilir değil, o yüzden testler gerçek

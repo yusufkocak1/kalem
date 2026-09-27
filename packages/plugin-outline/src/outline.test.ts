@@ -1,8 +1,8 @@
 /**
  * Başlık ağacı — testler  (İş listesi: F4-04)
  */
-import { parse } from "@kalem/core";
-import { assignIds } from "@kalem/editor";
+import { parse } from "@kalem-editor/core";
+import { assignIds } from "@kalem-editor/editor";
 import { describe, expect, it } from "vitest";
 import { outlineOf, sameOutline } from "./outline.js";
 

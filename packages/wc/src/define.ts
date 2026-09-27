@@ -1,5 +1,5 @@
 /**
- * @kalem/wc — Kayıt  (İş listesi: F5-03)
+ * @kalem-editor/wc — Kayıt  (İş listesi: F5-03)
  *
  * Kayıt neden otomatik değil: `customElements.define` global bir isim
  * alanına yazıyor ve aynı adı iki kez kaydetmek **hata atıyor**. Bir
@@ -24,7 +24,7 @@ export function defineKalemEditor(tag = "kalem-editor"): boolean {
 	 * Sunucuda (SSR) kayıt yapılmıyor ve hata da atılmıyor.
 	 *
 	 * SvelteKit, Astro ve Nuxt bileşenin betiğini sunucuda da çalıştırıyor;
-	 * belgelerdeki `import '@kalem/wc/define'` satırı orada
+	 * belgelerdeki `import '@kalem-editor/wc/define'` satırı orada
 	 * `customElements is not defined` ile **sunucuyu** çökertiyordu.
 	 * Yayın provası (F6-12), paketi Node'da içe aktarırken buldu. Sınıfın
 	 * kendisi zaten tembel kuruluyor (`element.ts`); eksik olan buydu.

@@ -1,5 +1,5 @@
 /**
- * @kalem/ui — Yer tutucu ve boş durum  (İş listesi: F3-08)
+ * @kalem-editor/ui — Yer tutucu ve boş durum  (İş listesi: F3-08)
  *
  * ## Neden CSS, neden DOM değil
  *
@@ -15,7 +15,7 @@
  * kayboluyor". Odakta gizlemek, kullanıcı tıklar tıklamaz ipucunu
  * kaybettiriyor — oysa okumaya en çok o an ihtiyacı var.
  */
-import type { Editor } from "@kalem/editor";
+import type { Editor } from "@kalem-editor/editor";
 
 export interface PlaceholderOptions {
 	readonly prefix: string;

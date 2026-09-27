@@ -1,5 +1,5 @@
 /**
- * @kalem/editor — Panoya yazma  (İş listesi: F2-11)
+ * @kalem-editor/editor — Panoya yazma  (İş listesi: F2-11)
  *
  * ## İki biçim, tek kaynak
  *
@@ -12,7 +12,7 @@
  *   `**kalın**` görür, düz "kalın" değil. Bu, projenin "doğru kaynak
  *   Markdown metnidir" kararının panoya yansıması.
  *
- * HTML tarafı `@kalem/viewer`'dan geliyor. Editör render'ı için viewer
+ * HTML tarafı `@kalem-editor/viewer`'dan geliyor. Editör render'ı için viewer
  * kullanılmıyordu (farklı ihtiyaç, bkz. `render.ts`) ama pano için
  * **tam olarak** viewer'ın ürettiği şey gerekiyor: sunum amaçlı, kimliksiz,
  * düzenleme özniteliği taşımayan HTML.
@@ -22,9 +22,9 @@
  * Hiç. Blok içi seçimde bile devralınıyor, çünkü asıl kazanç orada:
  * tarayıcının `text/plain`'i biçim işaretlerini atar, bizimki atmaz.
  */
-import type { Inline, Root } from "@kalem/core";
-import { serialize } from "@kalem/core";
-import { renderToString } from "@kalem/viewer";
+import type { Inline, Root } from "@kalem-editor/core";
+import { serialize } from "@kalem-editor/core";
+import { renderToString } from "@kalem-editor/viewer";
 
 export interface ClipboardPayload {
 	readonly html: string;

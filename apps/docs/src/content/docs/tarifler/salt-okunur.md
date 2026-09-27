@@ -54,15 +54,15 @@ Sayfada düzenleme **ihtimali yoksa** editörü yüklemeyin. 27 kB yerine
 2,7 kB:
 
 ```ts
-import { parse } from '@kalem/core';
-import { renderToDOM } from '@kalem/viewer';
+import { parse } from '@kalem-editor/core';
+import { renderToDOM } from '@kalem-editor/viewer';
 
 renderToDOM(parse(markdown), document.getElementById('app')!);
 ```
 
 ```ts
-import '@kalem/themes/tokens.css';
-import '@kalem/themes/viewer.css';
+import '@kalem-editor/themes/tokens.css';
+import '@kalem-editor/themes/viewer.css';
 // editor.css ve ui.css gerekmiyor
 ```
 
@@ -74,7 +74,7 @@ başlatmak daha az iş; **hiç yoksa** viewer daha küçük.
 Aynı belgeyi hem düzenleyip hem canlı göstermek:
 
 ```ts
-import { renderToDOM } from '@kalem/viewer';
+import { renderToDOM } from '@kalem-editor/viewer';
 
 const editor = new Editor(sol, {
   value: md,

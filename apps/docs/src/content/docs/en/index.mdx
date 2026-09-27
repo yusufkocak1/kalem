@@ -21,7 +21,7 @@ import HeroDeneme from '../../../components/HeroDeneme.astro';
 <HeroDeneme dil="en" />
 
 <div class="kurulum">
-  <code>npm i @kalem/editor @kalem/ui @kalem/themes</code>
+  <code>npm i @kalem-editor/editor @kalem-editor/ui @kalem-editor/themes</code>
   <div class="rozetler">
     <span class="rozet"><b>editor + UI</b><span>36.2 kB</span></span>
     <span class="rozet"><b>core</b><span>12.8 kB</span></span>
@@ -48,7 +48,7 @@ Word: either they're handed raw text, or an editor that stores JSON and
     come back as `-`.
   </Card>
   <Card title="Framework-agnostic" icon="puzzle">
-    The core is plain TypeScript. `@kalem/react` and `@kalem/vue` are
+    The core is plain TypeScript. `@kalem-editor/react` and `@kalem-editor/vue` are
     separate packages that take the framework as a `peerDependency`. Svelte,
     Angular and plain HTML don't even need a wrapper: `<kalem-editor>` is the
     browser's own component model.
@@ -58,7 +58,7 @@ Word: either they're handed raw text, or an editor that stores JSON and
     are enforced in CI; going over means a red build.
   </Card>
   <Card title="Modular" icon="setting">
-    `@kalem/viewer` just to display; `@kalem/editor` to edit; `@kalem/ui`
+    `@kalem-editor/viewer` just to display; `@kalem-editor/editor` to edit; `@kalem-editor/ui`
     for the Word-like interface. You don't download what you don't use.
   </Card>
 </CardGrid>
@@ -69,8 +69,8 @@ Word: either they're handed raw text, or an editor that stores JSON and
   <TabItem label="Vanilla">
 
 ```ts
-import { Editor } from '@kalem/editor';
-import { mountUi } from '@kalem/ui';
+import { Editor } from '@kalem-editor/editor';
+import { mountUi } from '@kalem-editor/ui';
 
 const editor = new Editor(document.getElementById('app')!, {
   value: '# Hello',
@@ -85,8 +85,8 @@ mountUi(editor);
   <TabItem label="React">
 
 ```tsx
-import { KalemEditor } from '@kalem/react';
-import { mountUi } from '@kalem/ui';
+import { KalemEditor } from '@kalem-editor/react';
+import { mountUi } from '@kalem-editor/ui';
 
 <KalemEditor
   defaultValue="# Hello"
@@ -102,8 +102,8 @@ import { mountUi } from '@kalem/ui';
 
 ```vue
 <script setup lang="ts">
-import { KalemEditor } from '@kalem/vue';
-import { mountUi } from '@kalem/ui';
+import { KalemEditor } from '@kalem-editor/vue';
+import { mountUi } from '@kalem-editor/ui';
 import { ref } from 'vue';
 const text = ref('# Hello');
 </script>
@@ -117,13 +117,13 @@ const text = ref('# Hello');
   <TabItem label="HTML">
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/tokens.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/viewer.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/editor.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem-editor/themes/css/tokens.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem-editor/themes/css/viewer.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem-editor/themes/css/editor.css">
 
 <kalem-editor label="Document"># Hello</kalem-editor>
 
-<script src="https://cdn.jsdelivr.net/npm/@kalem/wc/dist/kalem-editor.iife.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@kalem-editor/wc/dist/kalem-editor.iife.js"></script>
 ```
 
   </TabItem>

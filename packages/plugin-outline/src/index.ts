@@ -1,10 +1,10 @@
 /**
- * `@kalem/plugin-outline` — İçindekiler  (İş listesi: F4-04)
+ * `@kalem-editor/plugin-outline` — İçindekiler  (İş listesi: F4-04)
  *
  * Başlık listesi, tıklayarak atlama ve etkin başlık takibi.
  *
- *     import { outlinePlugin } from "@kalem/plugin-outline";
- *     import "@kalem/themes/plugin-outline.css";
+ *     import { outlinePlugin } from "@kalem-editor/plugin-outline";
+ *     import "@kalem-editor/themes/plugin-outline.css";
  *
  *     const editor = new Editor(el, {
  *       plugins: [outlinePlugin({ container: document.getElementById("yan") })],
@@ -16,7 +16,7 @@
  * `outlineOf` ayrıca saf: editörsüz bir betikte de içindekiler
  * üretilebiliyor.
  *
- * @module @kalem/plugin-outline
+ * @module @kalem-editor/plugin-outline
  */
 export type { OutlineLabels } from "./labels.js";
 export { enOutlineLabels, labelsFor, trOutlineLabels } from "./labels.js";

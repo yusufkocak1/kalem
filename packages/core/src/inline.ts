@@ -1,5 +1,5 @@
 /**
- * @kalem/core — Satır içi ayrıştırıcı  (İş listesi: F1-04)
+ * @kalem-editor/core — Satır içi ayrıştırıcı  (İş listesi: F1-04)
  *
  * Blok ayrıştırıcının verdiği ham metni satır içi düğümlere çevirir.
  *

@@ -41,7 +41,7 @@ new Editor(el, { value: md, label: 'Ürün açıklaması' });
    görünür bir başlığa bağlamak en iyisi,
 3. `mountUi` kullanmak; sözlüğünden bir ad koyuyor.
 
-`@kalem/editor` başsız olduğu için içinde hiçbir kullanıcı metni yok ve
+`@kalem-editor/editor` başsız olduğu için içinde hiçbir kullanıcı metni yok ve
 buraya varsayılan bir dize **yazılmıyor**: yazılsaydı Türkçe bir belgede
 İngilizce duyurulurdu.
 

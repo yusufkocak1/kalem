@@ -1,5 +1,5 @@
 /**
- * @kalem/core — Ağaç düzenleme  (İş listesi: F1-02)
+ * @kalem-editor/core — Ağaç düzenleme  (İş listesi: F1-02)
  *
  * ## Neden değişmez (immutable)
  *

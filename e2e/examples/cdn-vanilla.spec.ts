@@ -30,13 +30,13 @@ test("sayfada tek bir script etiketi var", async ({ page }) => {
 
 test("script çıplak import bırakmıyor", async ({ page }) => {
 	/*
-	 * ESM çıktısı `@kalem/editor`i dışarıda bırakıyor; CDN kullanıcısının
+	 * ESM çıktısı `@kalem-editor/editor`i dışarıda bırakıyor; CDN kullanıcısının
 	 * paketleyicisi yok ve çıplak bir tanımlayıcı tarayıcıda çözülmez.
-	 * Bu derlemede hepsi içeride — dosyada `@kalem/` geçmemeli.
+	 * Bu derlemede hepsi içeride — dosyada `@kalem-editor/` geçmemeli.
 	 */
 	const kod = await (await page.request.get(`${KOK}kalem-editor.iife.js`)).text();
-	expect(kod).not.toContain('from"@kalem/');
-	expect(kod).not.toContain('require("@kalem/');
+	expect(kod).not.toContain('from"@kalem-editor/');
+	expect(kod).not.toContain('require("@kalem-editor/');
 });
 
 test("eleman kendiliğinden kaydoluyor", async ({ page }) => {

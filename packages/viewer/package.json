@@ -1,5 +1,5 @@
 {
-  "name": "@kalem/viewer",
+  "name": "@kalem-editor/viewer",
   "version": "1.0.0",
   "description": "Render a Markdown AST to the DOM or to an HTML string (SSR) — read-only viewer",
   "keywords": [
@@ -49,7 +49,7 @@
     "dev": "tsdown --watch"
   },
   "dependencies": {
-    "@kalem/core": "workspace:^"
+    "@kalem-editor/core": "workspace:^"
   },
   "devDependencies": {
     "tsdown": "catalog:",

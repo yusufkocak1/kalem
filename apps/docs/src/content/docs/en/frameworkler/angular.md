@@ -7,7 +7,7 @@ description: Wrapper-free setup with CUSTOM_ELEMENTS_SCHEMA.
 needs to be told is "I don't know this tag, the browser does".
 
 ```bash
-npm i @kalem/wc @kalem/themes
+npm i @kalem-editor/wc @kalem-editor/themes
 ```
 
 ```ts
@@ -50,7 +50,7 @@ export class DocumentComponent {
 Don't forget to register the element — one line in `main.ts`:
 
 ```ts
-import '@kalem/wc/define';
+import '@kalem-editor/wc/define';
 ```
 
 ## How binding works
@@ -91,9 +91,9 @@ don't get the `_ngcontent-*` attribute. Add the theme files to the global
 
 ```json
 "styles": [
-  "node_modules/@kalem/themes/css/tokens.css",
-  "node_modules/@kalem/themes/css/viewer.css",
-  "node_modules/@kalem/themes/css/editor.css",
+  "node_modules/@kalem-editor/themes/css/tokens.css",
+  "node_modules/@kalem-editor/themes/css/viewer.css",
+  "node_modules/@kalem-editor/themes/css/editor.css",
   "src/styles.css"
 ]
 ```

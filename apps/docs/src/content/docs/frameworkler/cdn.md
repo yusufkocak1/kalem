@@ -6,9 +6,9 @@ description: Derleme adımı, paketleyici ve yazılmış JavaScript olmadan.
 Sayfanın tamamı bu:
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/tokens.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/viewer.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/editor.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem-editor/themes/css/tokens.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem-editor/themes/css/viewer.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem-editor/themes/css/editor.css">
 
 <kalem-editor label="Belge">
     # Merhaba
@@ -16,7 +16,7 @@ Sayfanın tamamı bu:
     Yazmaya başlayın.
 </kalem-editor>
 
-<script src="https://cdn.jsdelivr.net/npm/@kalem/wc/dist/kalem-editor.iife.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@kalem-editor/wc/dist/kalem-editor.iife.js"></script>
 ```
 
 Derleme adımı yok, paketleyici yok, import haritası yok — **yazılmış
@@ -25,10 +25,10 @@ kalmıyor.
 
 ## Neden ayrı bir derleme
 
-`@kalem/wc`in ESM çıktısı `@kalem/core` ve `@kalem/editor`i **dışarıda**
+`@kalem-editor/wc`in ESM çıktısı `@kalem-editor/core` ve `@kalem-editor/editor`i **dışarıda**
 bırakıyor; paketleyici kullanan uygulamada doğrusu bu, yoksa aynı kod iki
 kez paketlenirdi. Ama CDN kullanıcısının paketleyicisi yok ve çıplak bir
-`import "@kalem/editor"` satırı tarayıcıda çözülmez.
+`import "@kalem-editor/editor"` satırı tarayıcıda çözülmez.
 
 `kalem-editor.iife.js` hepsini içine alıyor: **28,1 kB** (gzip), tek
 istek, `type="module"` bile gerekmiyor.
@@ -68,7 +68,7 @@ geçiliyor, yani script sayfaya iki kez eklenirse hata vermiyor.
 Üretimde sürümü sabitleyin:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@kalem/wc@1.0.0/dist/kalem-editor.iife.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@kalem-editor/wc@1.0.0/dist/kalem-editor.iife.js"></script>
 ```
 
 jsDelivr ve unpkg dosyayı `exports` haritasına bakmadan, tarball'daki
@@ -76,13 +76,13 @@ yolundan servis ediyor.
 
 ## Araç çubuğu istiyorsanız
 
-IIFE derlemesi editörü ve çekirdeği taşıyor, `@kalem/ui`yi değil. Word
+IIFE derlemesi editörü ve çekirdeği taşıyor, `@kalem-editor/ui`yi değil. Word
 benzeri arayüz için ya bir paketleyici kullanın
 ([Vanilla](/frameworkler/vanilla/)) ya da modül olarak yükleyin:
 
 ```html
 <script type="module">
-  import { mountUi } from 'https://cdn.jsdelivr.net/npm/@kalem/ui/+esm';
+  import { mountUi } from 'https://cdn.jsdelivr.net/npm/@kalem-editor/ui/+esm';
 
   const el = document.querySelector('kalem-editor');
   el.addEventListener('kalem-ready', (e) => mountUi(e.detail.editor));

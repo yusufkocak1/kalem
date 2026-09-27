@@ -1,5 +1,5 @@
 /**
- * @kalem/plugin-autosave — Durum göstergesi  (İş listesi: F4-07)
+ * @kalem-editor/plugin-autosave — Durum göstergesi  (İş listesi: F4-07)
  *
  * "Kaydediliyor / kaydedildi" yazan küçük bir etiket.
  *

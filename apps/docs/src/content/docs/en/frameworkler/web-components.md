@@ -3,18 +3,18 @@ title: "Web Components: <kalem-editor>"
 description: The path that needs no framework — the browser's own component model.
 ---
 
-Writing one package per framework never ends. `@kalem/wc` packages the
+Writing one package per framework never ends. `@kalem-editor/wc` packages the
 editor into the browser's own component model: **Svelte, Angular, Astro,
 Rails, Django and plain HTML — the same tag everywhere.**
 
 ```bash
-npm i @kalem/wc @kalem/themes
+npm i @kalem-editor/wc @kalem-editor/themes
 ```
 
 Its own size is 1.99 kB (editor not included).
 
 ```ts
-import { defineKalemEditor } from '@kalem/wc';
+import { defineKalemEditor } from '@kalem-editor/wc';
 defineKalemEditor();
 ```
 
@@ -26,7 +26,7 @@ defineKalemEditor();
 </kalem-editor>
 ```
 
-There's also a one-line setup: `import '@kalem/wc/define';`
+There's also a one-line setup: `import '@kalem-editor/wc/define';`
 
 :::note[Why registration isn't automatic]
 `customElements.define` writes to a global namespace, and registering the
@@ -130,7 +130,7 @@ navigation — all the platform's own flow.
 
 ## Shadow DOM — optional, off by default
 
-A shadow root leaves styles outside: `@kalem/themes` is defined across the
+A shadow root leaves styles outside: `@kalem-editor/themes` is defined across the
 page and **doesn't get into** the shadow. If it were on by default, the
 editor would open unstyled on every setup and everyone would look for a
 workaround.
@@ -155,7 +155,7 @@ stylesheet through `el.shadowRoot.adoptedStyleSheets`.
 ## Styling
 
 Custom elements are `display: inline` by default.
-`@kalem/themes/editor.css` fixes that:
+`@kalem-editor/themes/editor.css` fixes that:
 
 ```css
 :where(kalem-editor) { display: block; }

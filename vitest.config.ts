@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 /**
  * Paketler arası import'lar **kaynağa** yönlendiriliyor, `dist`'e değil.
  *
- * Aksi hâlde `@kalem/core`'u kullanan bir test, `pnpm build` unutulduğunda
+ * Aksi hâlde `@kalem-editor/core`'u kullanan bir test, `pnpm build` unutulduğunda
  * eski bundle'a bakar ve yanlış sonuç verir — bu tuzağa F2-02 yazılırken
  * bir kez düşüldü: kaynakta düzeltilen ayrıştırıcı hatası testte hâlâ
  * hatalı görünüyordu.
@@ -14,8 +14,8 @@ const kaynak = (yol: string) => fileURLToPath(new URL(yol, import.meta.url));
 export default defineConfig({
 	resolve: {
 		alias: [
-			{ find: /^@kalem\/core$/, replacement: kaynak("./packages/core/src/index.ts") },
-			{ find: /^@kalem\/core\/(.*)$/, replacement: kaynak("./packages/core/src/$1.ts") },
+			{ find: /^@kalem-editor\/core$/, replacement: kaynak("./packages/core/src/index.ts") },
+			{ find: /^@kalem-editor\/core\/(.*)$/, replacement: kaynak("./packages/core/src/$1.ts") },
 		],
 	},
 	test: {

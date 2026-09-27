@@ -1,5 +1,5 @@
 /**
- * @kalem/editor — Model konumundan DOM elemanına  (İş listesi: F4-04)
+ * @kalem-editor/editor — Model konumundan DOM elemanına  (İş listesi: F4-04)
  *
  * Editörün çizdiği yapı üç öznitelikle işaretli (`render.ts`): blok
  * elemanında `data-kalem-id`, satır içi taşıyıcıda `data-kalem-path`,

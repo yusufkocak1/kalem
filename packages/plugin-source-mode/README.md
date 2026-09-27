@@ -1,4 +1,4 @@
-# @kalem/plugin-source-mode
+# @kalem-editor/plugin-source-mode
 
 Kalem plugin: toggle between WYSIWYG and raw Markdown source.
 
@@ -6,12 +6,12 @@ Part of [Kalem](https://github.com/yusufkocak1/kalem) — a WYSIWYG editor for p
 don't know Markdown, that saves Markdown.
 
 ```bash
-npm i @kalem/plugin-source-mode
+npm i @kalem-editor/plugin-source-mode
 ```
 
 ```ts
-import { sourceModePlugin } from '@kalem/plugin-source-mode';
-import '@kalem/themes/plugin-source.css';
+import { sourceModePlugin } from '@kalem-editor/plugin-source-mode';
+import '@kalem-editor/themes/plugin-source.css';
 
 editor.addPlugin(
   sourceModePlugin(),

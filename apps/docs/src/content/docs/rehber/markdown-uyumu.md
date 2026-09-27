@@ -7,7 +7,7 @@ Kalem'in doğru kaynağı **Markdown metninin kendisi**. Bu bir slogan değil,
 test edilen bir garanti:
 
 ```ts
-import { parse, serialize } from '@kalem/core';
+import { parse, serialize } from '@kalem-editor/core';
 
 serialize(parse(md)) === md; // test korpusunda byte-birebir
 ```
@@ -80,7 +80,7 @@ elle hizalanmış bir tablonun her satırını değiştirmek, dokunulmamış
 satırları değiştirmek olurdu.
 
 :::note[v1.1]
-Satır ve sütun ekleme/silme ile hizalama değiştirme `@kalem/plugin-table`
+Satır ve sütun ekleme/silme ile hizalama değiştirme `@kalem-editor/plugin-table`
 ile geliyor (Karar #5).
 :::
 
@@ -128,7 +128,7 @@ Ayrıntı ve gerekçe: [Güvenlik](/rehber/guvenlik/).
 ## Serileştirme seçenekleri
 
 ```ts
-import { serialize } from '@kalem/core';
+import { serialize } from '@kalem-editor/core';
 
 serialize(doc, { /* SerializeOptions */ });
 ```

@@ -17,7 +17,7 @@ Both are fed from the same place: **the document language**.
 ## Where the document language comes from
 
 ```ts
-import { Editor } from '@kalem/editor';
+import { Editor } from '@kalem-editor/editor';
 
 const editor = new Editor(element, { lang: 'en' });
 editor.getLang(); // "en"
@@ -43,7 +43,7 @@ changing the language, mount the UI again — the same model as the toolbar
 mode:
 
 ```ts
-import { mountUi } from '@kalem/ui';
+import { mountUi } from '@kalem-editor/ui';
 
 editor.getElement().lang = 'tr';
 ui.destroy();
@@ -64,14 +64,14 @@ Every package has its own dictionary, and they're all exported the same way:
 
 | Package | Type | English | Turkish |
 | --- | --- | --- | --- |
-| `@kalem/ui` | `UiLabels` | `enLabels` | `trLabels` |
-| `@kalem/wc` | `WcLabels` | `enWcLabels` | `trWcLabels` |
-| `@kalem/plugin-find-replace` | `FindLabels` | `enFindLabels` | `trFindLabels` |
-| `@kalem/plugin-outline` | `OutlineLabels` | `enOutlineLabels` | `trOutlineLabels` |
-| `@kalem/plugin-word-count` | `WordCountLabels` | `enWordCountLabels` | `trWordCountLabels` |
-| `@kalem/plugin-source-mode` | `SourceLabels` | `enSourceLabels` | `trSourceLabels` |
-| `@kalem/plugin-image-upload` | `ImageLabels` | `enImageLabels` | `trImageLabels` |
-| `@kalem/plugin-autosave` | `AutosaveLabels` | `enAutosaveLabels` | `trAutosaveLabels` |
+| `@kalem-editor/ui` | `UiLabels` | `enLabels` | `trLabels` |
+| `@kalem-editor/wc` | `WcLabels` | `enWcLabels` | `trWcLabels` |
+| `@kalem-editor/plugin-find-replace` | `FindLabels` | `enFindLabels` | `trFindLabels` |
+| `@kalem-editor/plugin-outline` | `OutlineLabels` | `enOutlineLabels` | `trOutlineLabels` |
+| `@kalem-editor/plugin-word-count` | `WordCountLabels` | `enWordCountLabels` | `trWordCountLabels` |
+| `@kalem-editor/plugin-source-mode` | `SourceLabels` | `enSourceLabels` | `trSourceLabels` |
+| `@kalem-editor/plugin-image-upload` | `ImageLabels` | `enImageLabels` | `trImageLabels` |
+| `@kalem-editor/plugin-autosave` | `AutosaveLabels` | `enAutosaveLabels` | `trAutosaveLabels` |
 
 Errors thrown for developers (misusing the API, `throw new Error(...)`)
 aren't UI strings; they're always in English.
@@ -79,7 +79,7 @@ aren't UI strings; they're always in English.
 ### Changing a single string
 
 ```ts
-import { mountUi, enLabels } from '@kalem/ui';
+import { mountUi, enLabels } from '@kalem-editor/ui';
 
 mountUi(editor, {
   labels: { ...enLabels, editor: 'Product description' },
@@ -92,8 +92,8 @@ A dictionary is a plain object; its type makes the compiler point out any
 missing key. A German UI:
 
 ```ts
-import { mountUi, enLabels, type UiLabels } from '@kalem/ui';
-import { wordCountPlugin, type WordCountLabels } from '@kalem/plugin-word-count';
+import { mountUi, enLabels, type UiLabels } from '@kalem-editor/ui';
+import { wordCountPlugin, type WordCountLabels } from '@kalem-editor/plugin-word-count';
 
 const deLabels: UiLabels = {
   ...enLabels,          // untranslated keys stay in English
@@ -127,7 +127,7 @@ language yourself, take it from the context — that way you always speak the
 same language as the UI:
 
 ```ts
-import type { Plugin } from '@kalem/editor';
+import type { Plugin } from '@kalem-editor/editor';
 
 export function myPlugin(options: { labels?: MyLabels } = {}): Plugin {
   return {

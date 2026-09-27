@@ -6,7 +6,7 @@ import { defineKalemEditor } from "./define.js";
  *
  * Bu dosya Node ortamında koşuyor: `customElements` ve `HTMLElement` yok.
  * SvelteKit, Astro ve Nuxt bileşen betiğini sunucuda da çalıştırıyor;
- * `import '@kalem/wc/define'` orada sunucuyu çökertmemeli.
+ * `import '@kalem-editor/wc/define'` orada sunucuyu çökertmemeli.
  */
 describe("defineKalemEditor — sunucuda", () => {
 	it("customElements yokken hata atmadan false döndürüyor", () => {

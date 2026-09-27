@@ -1,5 +1,5 @@
 /**
- * @kalem/ui — Arayüz katmanının montajı  (İş listesi: F3-01)
+ * @kalem-editor/ui — Arayüz katmanının montajı  (İş listesi: F3-01)
  *
  * ## Neden ayrı paket, neden ayrı montaj
  *
@@ -11,7 +11,7 @@
  * Bağlantı yönü tek: arayüz editörü tanıyor, editör arayüzü tanımıyor.
  * Ters bağımlılık, başsız kullanımı imkânsız kılardı.
  */
-import type { Editor } from "@kalem/editor";
+import type { Editor } from "@kalem-editor/editor";
 import type { BlockHandle } from "./block-handle.js";
 import { createBlockHandle } from "./block-handle.js";
 import type { BlockMenu } from "./block-menu.js";

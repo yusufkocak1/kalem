@@ -1,5 +1,5 @@
 /**
- * @kalem/editor — Seçim modeli  (İş listesi: F2-06)
+ * @kalem-editor/editor — Seçim modeli  (İş listesi: F2-06)
  *
  * ## İki seviyeli seçim
  *
@@ -25,7 +25,7 @@
  * belgede seçim değiştiren **her** şeyi bildirir. Bedeli sık tetiklenmesi,
  * o yüzden işleyicinin ucuz olması gerekiyor.
  */
-import type { NodeId } from "@kalem/core";
+import type { NodeId } from "@kalem-editor/core";
 import { ID_ATTR } from "./render.js";
 
 /** İmleç ya da seçim tek bir bloğun içinde; ayrıntısı tarayıcıda. */

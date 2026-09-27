@@ -1,5 +1,5 @@
 /**
- * @kalem/wc — Metin yardımcıları  (İş listesi: F5-03)
+ * @kalem-editor/wc — Metin yardımcıları  (İş listesi: F5-03)
  *
  * Saf fonksiyonlar; DOM'a dokunmuyorlar ve birim testleri Node altında
  * koşuyor. Elemanın geri kalanı tarayıcıda sınanıyor.

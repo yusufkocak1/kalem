@@ -1,13 +1,13 @@
 /**
- * @kalem/plugin-find-replace — Panel  (İş listesi: F4-03)
+ * @kalem-editor/plugin-find-replace — Panel  (İş listesi: F4-03)
  *
  * Ctrl+F ile açılan kutu. Kendi durumunu tutmuyor: ne yazıldığını
  * bildiriyor, ne gösterileceğini söyleyen `plugin.ts`. Bu ayrım, arama
  * mantığının tamamının tarayıcısız test edilebilmesini sağlıyor.
  *
- * ## Neden `@kalem/ui` kullanılmıyor
+ * ## Neden `@kalem-editor/ui` kullanılmıyor
  *
- * `@kalem/ui` hazır bir popover ve düğme sözlüğü taşıyor. Bağlanmak,
+ * `@kalem-editor/ui` hazır bir popover ve düğme sözlüğü taşıyor. Bağlanmak,
  * kendi arayüzünü yazan bir uygulamanın bul-değiştir için bütün arayüz
  * katmanını indirmesi demekti (F4-01'deki aynı karar).
  *

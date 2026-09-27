@@ -1,4 +1,4 @@
-# @kalem/ui
+# @kalem-editor/ui
 
 Word-like UI for Kalem — bubble toolbar, slash menu, drag handles.
 
@@ -6,16 +6,16 @@ Part of [Kalem](https://github.com/yusufkocak1/kalem) — a WYSIWYG editor for p
 don't know Markdown, that saves Markdown.
 
 ```bash
-npm i @kalem/editor @kalem/ui @kalem/themes
+npm i @kalem-editor/editor @kalem-editor/ui @kalem-editor/themes
 ```
 
 ```ts
-import { Editor } from '@kalem/editor';
-import { mountUi } from '@kalem/ui';
-import '@kalem/themes/tokens.css';
-import '@kalem/themes/viewer.css';
-import '@kalem/themes/editor.css';
-import '@kalem/themes/ui.css';
+import { Editor } from '@kalem-editor/editor';
+import { mountUi } from '@kalem-editor/ui';
+import '@kalem-editor/themes/tokens.css';
+import '@kalem-editor/themes/viewer.css';
+import '@kalem-editor/themes/editor.css';
+import '@kalem-editor/themes/ui.css';
 
 const editor = new Editor(document.getElementById('app')!, { value: '# Hello', lang: 'en' });
 const ui = mountUi(editor, { toolbar: 'both' });

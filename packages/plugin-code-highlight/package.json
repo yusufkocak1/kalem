@@ -1,5 +1,5 @@
 {
-  "name": "@kalem/plugin-code-highlight",
+  "name": "@kalem-editor/plugin-code-highlight",
   "version": "1.0.0",
   "description": "Kalem plugin: code block highlighting with lazily loaded language packs",
   "keywords": [
@@ -59,7 +59,7 @@
     "dev": "tsdown --watch"
   },
   "dependencies": {
-    "@kalem/editor": "workspace:^"
+    "@kalem-editor/editor": "workspace:^"
   },
   "devDependencies": {
     "tsdown": "catalog:",

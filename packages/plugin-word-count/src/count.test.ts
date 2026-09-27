@@ -1,7 +1,7 @@
 /**
  * Sayma — testler  (İş listesi: F4-05)
  */
-import { parse } from "@kalem/core";
+import { parse } from "@kalem-editor/core";
 import { describe, expect, it } from "vitest";
 import { countText, countWords } from "./count.js";
 import { textOf } from "./text.js";

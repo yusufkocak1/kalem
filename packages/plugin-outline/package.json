@@ -1,5 +1,5 @@
 {
-  "name": "@kalem/plugin-outline",
+  "name": "@kalem-editor/plugin-outline",
   "version": "1.0.0",
   "description": "Kalem plugin: table of contents with active heading tracking",
   "keywords": [
@@ -50,8 +50,8 @@
     "dev": "tsdown --watch"
   },
   "dependencies": {
-    "@kalem/core": "workspace:^",
-    "@kalem/editor": "workspace:^"
+    "@kalem-editor/core": "workspace:^",
+    "@kalem-editor/editor": "workspace:^"
   },
   "devDependencies": {
     "tsdown": "catalog:",

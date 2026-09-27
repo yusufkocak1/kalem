@@ -1,18 +1,18 @@
 /**
- * @kalem/core/html — HTML → AST dönüştürücü  (İş listesi: F1-09)
+ * @kalem-editor/core/html — HTML → AST dönüştürücü  (İş listesi: F1-09)
  *
  * Yapıştırma normalleştirmesinin beyni. Word, Google Docs, Excel, Notion ve
  * genel web HTML'ini AST'ye çevirir.
  *
  * ## Neden ayrı giriş noktası
  *
- * `@kalem/core/html` olarak yayımlanıyor. Yalnızca Markdown işleyen bir
+ * `@kalem-editor/core/html` olarak yayımlanıyor. Yalnızca Markdown işleyen bir
  * kullanıcı bu kodu indirmemeli; yapıştırma bir **editör** ihtiyacı (F3-07
  * boru hattı bunu kullanacak). Analiz §5.3 bunu zaten öngörmüştü.
  *
  * ## Neden DOM tipleri yok
  *
- * `@kalem/core` sunucuda da çalışmak zorunda ve saflık kapısı DOM globallerini
+ * `@kalem-editor/core` sunucuda da çalışmak zorunda ve saflık kapısı DOM globallerini
  * yasaklıyor. Bu yüzden dönüştürücü, gerçek bir `Element`'in **yapısal olarak
  * uyduğu** küçük bir arayüzle çalışır. İki kazanç:
  *
@@ -24,7 +24,7 @@
  * Bilinmeyen etiket = **içeriği düz metne düşür**. Kara liste yaklaşımı
  * Word'ün her sürümde yeni ürettiği çöple baş edemez; beyaz liste eder.
  *
- * @module @kalem/core/html
+ * @module @kalem-editor/core/html
  */
 import type { Block, Inline, List, Root } from "./ast.js";
 import { isSafeUrl, NEUTRALIZED_URL } from "./security.js";

@@ -3,18 +3,18 @@ title: "Web Components: <kalem-editor>"
 description: Çerçeve gerektirmeyen yol — tarayıcının kendi bileşen modeli.
 ---
 
-Çerçeve başına bir paket yazmanın sonu yok. `@kalem/wc`, editörü
+Çerçeve başına bir paket yazmanın sonu yok. `@kalem-editor/wc`, editörü
 tarayıcının kendi bileşen modeline paketliyor: **Svelte, Angular, Astro,
 Rails, Django ve düz HTML — hepsinde aynı etiket.**
 
 ```bash
-npm i @kalem/wc @kalem/themes
+npm i @kalem-editor/wc @kalem-editor/themes
 ```
 
 Kendi boyutu 1,99 kB (editör hariç).
 
 ```ts
-import { defineKalemEditor } from '@kalem/wc';
+import { defineKalemEditor } from '@kalem-editor/wc';
 defineKalemEditor();
 ```
 
@@ -26,7 +26,7 @@ defineKalemEditor();
 </kalem-editor>
 ```
 
-Tek satırlık kurulum da var: `import '@kalem/wc/define';`
+Tek satırlık kurulum da var: `import '@kalem-editor/wc/define';`
 
 :::note[Kayıt neden otomatik değil]
 `customElements.define` global bir isim alanına yazıyor ve aynı adı iki kez
@@ -128,7 +128,7 @@ yükleme — hepsi platformun kendi akışı.
 
 ## Gölge DOM — opsiyonel, varsayılan kapalı
 
-Gölge kök stilleri dışarıda bırakıyor: `@kalem/themes` sayfanın genelinde
+Gölge kök stilleri dışarıda bırakıyor: `@kalem-editor/themes` sayfanın genelinde
 tanımlı ve gölgeye **girmiyor**. Varsayılan açık olsaydı editör her
 kurulumda stilsiz açılır, herkes bir geçici çözüm arardı.
 
@@ -152,7 +152,7 @@ hazır stil sayfası da verebilirsiniz.
 ## Stil
 
 Özel elemanlar varsayılan olarak `display: inline`.
-`@kalem/themes/editor.css` bunu düzeltiyor:
+`@kalem-editor/themes/editor.css` bunu düzeltiyor:
 
 ```css
 :where(kalem-editor) { display: block; }

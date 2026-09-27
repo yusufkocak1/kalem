@@ -4,16 +4,16 @@ description: <KalemEditor v-model />, useKalem and SSR.
 ---
 
 ```bash
-npm i @kalem/vue @kalem/editor @kalem/themes
+npm i @kalem-editor/vue @kalem-editor/editor @kalem-editor/themes
 ```
 
-`vue` is a **peer dependency** (`^3`). Its own size is 682 B.
+`vue` is a **peer dependency** (`^3`). Its own size is 686 B.
 
 ## `v-model`
 
 ```vue
 <script setup lang="ts">
-import { KalemEditor } from '@kalem/vue';
+import { KalemEditor } from '@kalem-editor/vue';
 import { ref } from 'vue';
 
 const text = ref('# Hello');
@@ -48,7 +48,7 @@ Components inside `<KalemEditor>` reach the editor through it:
 
 ```vue
 <script setup lang="ts">
-import { useKalem } from '@kalem/vue';
+import { useKalem } from '@kalem-editor/vue';
 const editor = useKalem();   // ShallowRef<Editor | null>
 </script>
 
@@ -69,7 +69,7 @@ the cost is visible: the server sends an empty box, the content appears
 later, and search engines never see the text.
 
 With Kalem, the server **really renders** the document with
-`@kalem/viewer`. There's a readable document on first paint; when the
+`@kalem-editor/viewer`. There's a readable document on first paint; when the
 JavaScript loads, the editor takes over the same element.
 
 Hydration mismatch is prevented by freezing `innerHTML`: the string is
@@ -100,12 +100,12 @@ removed on the editor's first render.
 
 ## The Word-like UI
 
-The toolbars come from `@kalem/ui`, mounted on the `ready` event:
+The toolbars come from `@kalem-editor/ui`, mounted on the `ready` event:
 
 ```vue
 <script setup lang="ts">
-import { KalemEditor } from '@kalem/vue';
-import { mountUi, type Ui } from '@kalem/ui';
+import { KalemEditor } from '@kalem-editor/vue';
+import { mountUi, type Ui } from '@kalem-editor/ui';
 import { onBeforeUnmount, ref } from 'vue';
 
 const text = ref('# Hello');

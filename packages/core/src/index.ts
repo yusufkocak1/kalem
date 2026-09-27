@@ -1,17 +1,17 @@
 /**
- * @kalem/core — Markdown AST, ayrıştırıcı ve serileştirici
+ * @kalem-editor/core — Markdown AST, ayrıştırıcı ve serileştirici
  *
  * DOM'a dokunmaz; sunucuda, worker'da ve tarayıcıda aynı şekilde çalışır.
  * Üçüncü parti bağımlılığı yoktur ve olmayacaktır (bkz. CONTRIBUTING.md).
  *
  * İki modül **kasten** burada değil, kendi giriş noktalarında:
- * `@kalem/core/commands` (editör komutları) ve `@kalem/core/html`
+ * `@kalem-editor/core/commands` (editör komutları) ve `@kalem-editor/core/html`
  * (yapıştırma dönüştürücüsü). Yalnızca Markdown işleyen kullanıcı —
  * SSR, derleme betiği — onların boyutunu ödemez.
  *
  * `scanner` de dışarıda: ayrıştırıcının iç tesisatı, kararlı API değil.
  *
- * @module @kalem/core
+ * @module @kalem-editor/core
  */
 
 // --- AST tipleri (F1-01) ---

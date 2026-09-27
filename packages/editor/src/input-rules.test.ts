@@ -5,7 +5,7 @@
  * Tarayıcı tarafı yalnızca "hangi tuştan sonra çalıştırılır" sorusunu
  * cevaplıyor ve orası `e2e/editor.spec.ts`'te.
  */
-import { parse, serialize } from "@kalem/core";
+import { parse, serialize } from "@kalem-editor/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Caret, EditResult } from "./block-edit.js";
 import { assignIds, resetIds } from "./ids.js";

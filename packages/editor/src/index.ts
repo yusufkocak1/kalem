@@ -1,8 +1,8 @@
 /**
- * @kalem/editor — Başsız blok editör motoru
+ * @kalem-editor/editor — Başsız blok editör motoru
  *
  * "Başsız" (headless) burada gerçek anlamıyla: bu paket **hiçbir arayüz
- * çizmez**. Araç çubuğu, balon menü, slash menüsü — hepsi `@kalem/ui`
+ * çizmez**. Araç çubuğu, balon menü, slash menüsü — hepsi `@kalem-editor/ui`
  * (Faz 3). Buradaki iş, düzenlemenin kendisi: model, DOM eşlemesi, seçim,
  * klavye, geçmiş.
  *
@@ -10,7 +10,7 @@
  * sistemi olan bir uygulamaya gömülebilir. Arayüz gömülü olsaydı ya
  * uygulamanın tasarımına yabancı kalırdı ya da ezilmek zorunda kalırdı.
  *
- * @module @kalem/editor
+ * @module @kalem-editor/editor
  */
 
 export type { Caret, EditResult } from "./block-edit.js";

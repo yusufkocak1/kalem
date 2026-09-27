@@ -1,5 +1,5 @@
 /**
- * @kalem/vue — `<KalemEditor v-model />`  (İş listesi: F5-02)
+ * @kalem-editor/vue — `<KalemEditor v-model />`  (İş listesi: F5-02)
  *
  * ## `<ClientOnly>` gerekmiyor
  *
@@ -8,7 +8,7 @@
  * Bedeli görünür: sunucu boş bir kutu gönderiyor, sayfa açıldığında
  * içerik **sonradan** beliriyor ve arama motoru metni hiç görmüyor.
  *
- * Burada sunucu belgeyi `@kalem/viewer` ile gerçekten çiziyor. Yani ilk
+ * Burada sunucu belgeyi `@kalem-editor/viewer` ile gerçekten çiziyor. Yani ilk
  * boyada okunabilir bir belge var; JavaScript yüklendiğinde editör aynı
  * elemanı devralıyor.
  *
@@ -33,10 +33,10 @@
  * Kontrolsüz kullanım da destekleniyor — `modelValue` verilmezse metin
  * editörde yaşıyor ve olay yine yayılıyor.
  */
-import { parse } from "@kalem/core";
-import type { Plugin } from "@kalem/editor";
-import { Editor } from "@kalem/editor";
-import { renderToString } from "@kalem/viewer";
+import { parse } from "@kalem-editor/core";
+import type { Plugin } from "@kalem-editor/editor";
+import { Editor } from "@kalem-editor/editor";
+import { renderToString } from "@kalem-editor/viewer";
 import type { PropType } from "vue";
 import {
 	defineComponent,

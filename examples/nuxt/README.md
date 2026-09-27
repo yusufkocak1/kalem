@@ -1,4 +1,4 @@
-# `@kalem/vue` — Nuxt (SSR)
+# `@kalem-editor/vue` — Nuxt (SSR)
 
 ```bash
 pnpm --filter example-nuxt dev
@@ -8,7 +8,7 @@ pnpm --filter example-nuxt dev
 neredeyse hepsi onu istiyor ve bedeli görünür: sunucu boş bir kutu
 gönderiyor, içerik sonradan beliriyor, arama motoru metni hiç görmüyor.
 
-Burada belge sunucuda `@kalem/viewer` ile çiziliyor — ilk boyada okunabilir
+Burada belge sunucuda `@kalem-editor/viewer` ile çiziliyor — ilk boyada okunabilir
 bir metin var, JavaScript geldiğinde editör **aynı elemanı** devralıyor.
 Bir test ham HTTP yanıtında `<h1>` ve `<li>` olduğunu, bir başkası
 hidrasyonda tek bir konsol uyarısı bile olmadığını doğruluyor.

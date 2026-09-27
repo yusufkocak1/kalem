@@ -1,8 +1,8 @@
 /**
- * @kalem/plugin-find-replace — Metinler  (İş listesi: F4-03)
+ * @kalem-editor/plugin-find-replace — Metinler  (İş listesi: F4-03)
  *
- * Kullanıcıya görünen her metin burada. `@kalem/plugin-image-upload` ile
- * aynı kalıp: düz bir nesne, çeviri kütüphanesi yok, `@kalem/ui`ye
+ * Kullanıcıya görünen her metin burada. `@kalem-editor/plugin-image-upload` ile
+ * aynı kalıp: düz bir nesne, çeviri kütüphanesi yok, `@kalem-editor/ui`ye
  * bağımlılık yok (kendi arayüzünü yazan uygulama, bul-değiştir için bütün
  * arayüz katmanını indirmemeli).
  *

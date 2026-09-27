@@ -1,5 +1,5 @@
 /**
- * @kalem/ui — Ekran okuyucu duyuruları  (İş listesi: F3-04, F3-10)
+ * @kalem-editor/ui — Ekran okuyucu duyuruları  (İş listesi: F3-04, F3-10)
  *
  * Görsel olmayan bir geri bildirim kanalı. Blok taşımak, silmek, biçim
  * uygulamak — hepsi ekranda görülüyor ama ekran okuyucuya hiçbir şey

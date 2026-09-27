@@ -21,7 +21,7 @@ isn't a matter of style, it's a boundary that's actively maintained.
 Link and image addresses go through an **allowlist**:
 
 ```ts
-import { ALLOWED_PROTOCOLS, isSafeUrl, sanitizeUrl } from '@kalem/core';
+import { ALLOWED_PROTOCOLS, isSafeUrl, sanitizeUrl } from '@kalem-editor/core';
 
 ALLOWED_PROTOCOLS; // ["http:", "https:", "mailto:", "tel:", "ftp:"]
 
@@ -82,14 +82,14 @@ harmless was preferred over silently disappearing.
 ## Pasting
 
 HTML pasted from Word and Google Docs is processed not with the browser's
-`DOMParser` but with Kalem's own converter (`@kalem/core/html`), and the
+`DOMParser` but with Kalem's own converter (`@kalem-editor/core/html`), and the
 result is turned into **an AST**. So pasted content goes through the same
 allowlist and the same escaping rules; a paste carrying `<script>` or
 `onerror=` can't get into the document.
 
 ## The core runs on the server
 
-`@kalem/core` and `@kalem/viewer` don't touch the DOM. A **gate**
+`@kalem-editor/core` and `@kalem-editor/viewer` don't touch the DOM. A **gate**
 (`pnpm guard:purity`) verifies this: `document`, `window`, `navigator`,
 `localStorage` or `HTMLElement` appearing in the core bundle breaks CI.
 

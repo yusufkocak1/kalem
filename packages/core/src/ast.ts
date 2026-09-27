@@ -1,5 +1,5 @@
 /**
- * @kalem/core — AST tip tanımları  (İş listesi: F1-01)
+ * @kalem-editor/core — AST tip tanımları  (İş listesi: F1-01)
  *
  * Bu dosya **yalnızca tip içerir**. Derlendiğinde geriye tek byte runtime kod
  * kalmaz; `ast.test.ts` bunu doğrular. Çalışan kod `spec.ts` ve `guards.ts`'te.
@@ -225,7 +225,7 @@ export interface ReferenceSyntax {
  * kayıpsız korumak zorunda — kullanıcının dosyasını bozmamak için. Hücre
  * dolgusu, ayraç satırındaki tire sayısı ve kenar boruları tek tek
  * modellenmek yerine ham metin olarak saklanır; düzenleme geldiğinde
- * (v1.1, `@kalem/plugin-table`) bu alan yerini gerçek modele bırakır.
+ * (v1.1, `@kalem-editor/plugin-table`) bu alan yerini gerçek modele bırakır.
  */
 export interface TableSyntax {
 	raw: string;

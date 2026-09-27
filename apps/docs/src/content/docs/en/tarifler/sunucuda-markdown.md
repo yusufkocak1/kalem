@@ -3,12 +3,12 @@ title: Markdown → HTML on the server
 description: No browser emulation — in Node, in workers and at the edge.
 ---
 
-`@kalem/core` and `@kalem/viewer` don't touch the DOM. You don't need to
+`@kalem-editor/core` and `@kalem-editor/viewer` don't touch the DOM. You don't need to
 install jsdom to turn Markdown into HTML on the server.
 
 ```ts
-import { parse } from '@kalem/core';
-import { renderToString } from '@kalem/viewer';
+import { parse } from '@kalem-editor/core';
+import { renderToString } from '@kalem-editor/viewer';
 
 export function markdownToHtml(md: string): string {
   return renderToString(parse(md));
@@ -39,8 +39,8 @@ mismatch — the Nuxt example is built exactly on this.
 ```
 
 ```html
-<link rel="stylesheet" href="/@kalem/themes/tokens.css">
-<link rel="stylesheet" href="/@kalem/themes/viewer.css">
+<link rel="stylesheet" href="/@kalem-editor/themes/tokens.css">
+<link rel="stylesheet" href="/@kalem-editor/themes/viewer.css">
 ```
 
 `editor.css` and `ui.css` aren't needed: there's no point making readers
@@ -81,8 +81,8 @@ app.get('/posts/:id', async (req, res) => {
 
 ```astro
 ---
-import { parse } from '@kalem/core';
-import { renderToString } from '@kalem/viewer';
+import { parse } from '@kalem-editor/core';
+import { renderToString } from '@kalem-editor/viewer';
 
 const html = renderToString(parse(Astro.props.markdown));
 ---
@@ -110,7 +110,7 @@ If you want to work with the AST without producing HTML — extracting
 headings, checking links, migrating content:
 
 ```ts
-import { parse, visit } from '@kalem/core';
+import { parse, visit } from '@kalem-editor/core';
 
 const headings: string[] = [];
 visit(parse(md), (node) => {
@@ -118,4 +118,4 @@ visit(parse(md), (node) => {
 });
 ```
 
-`@kalem/core` on its own is 12.8 kB and doesn't need `@kalem/viewer`.
+`@kalem-editor/core` on its own is 12.8 kB and doesn't need `@kalem-editor/viewer`.

@@ -1,5 +1,5 @@
 /**
- * @kalem/editor — Yerleşik eklentiler  (İş listesi: F2-12)
+ * @kalem-editor/editor — Yerleşik eklentiler  (İş listesi: F2-12)
  *
  * ## Neden bunlar eklenti
  *
@@ -21,7 +21,7 @@
  * her düğüm için bir dolaylı çağrı demek; ihtiyaç ölçülmeden ödenecek bir
  * bedel değil (bkz. `plugin.ts`).
  */
-import { replaceAt } from "@kalem/core";
+import { replaceAt } from "@kalem-editor/core";
 import { applyBlockRule, applyInlineRule } from "./input-rules.js";
 import type { Plugin } from "./plugin.js";
 import { ID_ATTR } from "./render.js";

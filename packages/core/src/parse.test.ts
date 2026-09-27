@@ -47,8 +47,8 @@ describe("parse — blok ve satır içi birlikte", () => {
 			"",
 			"**Word kadar kolay**, [Markdown](https://commonmark.org) kadar taşınabilir.",
 			"",
-			"- `@kalem/core` — ayrıştırıcı",
-			"- `@kalem/editor` — motor",
+			"- `@kalem-editor/core` — ayrıştırıcı",
+			"- `@kalem-editor/editor` — motor",
 		].join("\n");
 		const kok: Root = parse(md);
 		expect(kok.children.map((c) => c.type)).toEqual(["heading", "paragraph", "list"]);

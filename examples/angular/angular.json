@@ -17,9 +17,9 @@
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
             "styles": [
-              "node_modules/@kalem/themes/css/tokens.css",
-              "node_modules/@kalem/themes/css/viewer.css",
-              "node_modules/@kalem/themes/css/editor.css",
+              "node_modules/@kalem-editor/themes/css/tokens.css",
+              "node_modules/@kalem-editor/themes/css/viewer.css",
+              "node_modules/@kalem-editor/themes/css/editor.css",
               "src/stil.css"
             ]
           },

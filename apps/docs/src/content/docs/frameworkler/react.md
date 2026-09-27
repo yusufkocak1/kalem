@@ -4,18 +4,18 @@ description: <KalemEditor />, useKalem ve useKalemValue.
 ---
 
 ```bash
-npm i @kalem/react @kalem/editor @kalem/themes
+npm i @kalem-editor/react @kalem-editor/editor @kalem-editor/themes
 ```
 
 `react` bir **peer bağımlılık** (`>=17`); paket kendi kopyasını getirmiyor.
-Kendi boyutu 903 B.
+Kendi boyutu 907 B.
 
 ## Kontrolsüz (çoğu kullanım)
 
 Metin editörde yaşıyor, React karışmıyor:
 
 ```tsx
-import { KalemEditor } from '@kalem/react';
+import { KalemEditor } from '@kalem-editor/react';
 
 <KalemEditor
   defaultValue="# Merhaba"
@@ -69,7 +69,7 @@ Geri çağırmalar istisna: bir ref'te tutuluyorlar, yani satır içi yazılan
 `<KalemEditor>`in **çocuğu** olan bileşenler için:
 
 ```tsx
-import { KalemEditor, useKalem, useKalemValue } from '@kalem/react';
+import { KalemEditor, useKalem, useKalemValue } from '@kalem-editor/react';
 
 function Durum() {
   const editor = useKalem();          // Editor | null

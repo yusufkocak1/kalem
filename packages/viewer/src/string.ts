@@ -1,12 +1,12 @@
 /**
- * @kalem/viewer — `renderToString`  (İş listesi: F2-02)
+ * @kalem-editor/viewer — `renderToString`  (İş listesi: F2-02)
  *
  * Saf fonksiyon: DOM yok, global yok. Node'da, Deno'da, worker'da,
  * edge runtime'da aynı çıktıyı verir.
  *
  * ## Kaçışlama neden `escapeHtml` değil
  *
- * `@kalem/core`'un `escapeHtml`'i beş karakteri de kaçışlar (`&<>"'`) —
+ * `@kalem-editor/core`'un `escapeHtml`'i beş karakteri de kaçışlar (`&<>"'`) —
  * bilinmeyen bir bağlama metin gömerken doğru olan davranış budur.
  * Burada bağlam biliniyor ve hedef farklı: çıktı, `renderToDOM`'un ürettiği
  * ağacın `innerHTML`'iyle **byte-birebir** eşleşmeli. Tarayıcı HTML
@@ -19,7 +19,7 @@
  * dolayısıyla `'` kaçışlamaya gerek kalmıyor; `<` ve `>` öznitelik
  * değerinde ayrıştırıcıyı etkilemez.
  */
-import type { Root } from "@kalem/core";
+import type { Root } from "@kalem-editor/core";
 import type { RenderElement, RenderNode, ViewerOptions } from "./plan.js";
 import { buildPlan, VOID_TAGS } from "./plan.js";
 

@@ -1,5 +1,5 @@
 {
-  "name": "@kalem/plugin-source-mode",
+  "name": "@kalem-editor/plugin-source-mode",
   "version": "1.0.0",
   "description": "Kalem plugin: toggle between WYSIWYG and raw Markdown source",
   "keywords": [
@@ -49,8 +49,8 @@
     "dev": "tsdown --watch"
   },
   "dependencies": {
-    "@kalem/core": "workspace:^",
-    "@kalem/editor": "workspace:^"
+    "@kalem-editor/core": "workspace:^",
+    "@kalem-editor/editor": "workspace:^"
   },
   "devDependencies": {
     "tsdown": "catalog:",

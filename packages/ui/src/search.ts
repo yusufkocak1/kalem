@@ -1,5 +1,5 @@
 /**
- * @kalem/ui — Locale duyarlı arama katlaması  (İş listesi: F3-03)
+ * @kalem-editor/ui — Locale duyarlı arama katlaması  (İş listesi: F3-03)
  *
  * ## Sorun
  *

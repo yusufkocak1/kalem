@@ -1,11 +1,11 @@
 /**
- * `@kalem/plugin-autosave` — Otomatik kaydetme  (İş listesi: F4-07)
+ * `@kalem-editor/plugin-autosave` — Otomatik kaydetme  (İş listesi: F4-07)
  *
  * Yazma durunca kaydeder, durumu bildirir, kaydedilemeyeni yerel depoda
  * tutar.
  *
- *     import { autosavePlugin } from "@kalem/plugin-autosave";
- *     import "@kalem/themes/plugin-autosave.css";
+ *     import { autosavePlugin } from "@kalem-editor/plugin-autosave";
+ *     import "@kalem-editor/themes/plugin-autosave.css";
  *
  *     const eklenti = autosavePlugin({
  *       storageKey: "kalem:taslak:42",
@@ -17,7 +17,7 @@
  * Ağ hakkında hiçbir şey bilmiyor: `save` kancası çağrılıyor, gerisi
  * gömen uygulamanın.
  *
- * @module @kalem/plugin-autosave
+ * @module @kalem-editor/plugin-autosave
  */
 export type { AutosaveLabels } from "./labels.js";
 export { enAutosaveLabels, labelsFor, trAutosaveLabels } from "./labels.js";

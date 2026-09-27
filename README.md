@@ -65,39 +65,39 @@ with backslashes. A few rare patterns are still normalized — they're listed
 
 | You want to… | Package | min+gzip |
 |---|---|---|
-| **Display** Markdown (read-only) | `@kalem/viewer` | 2.7 kB |
-| **Parse** Markdown (server, scripts) | `@kalem/core` | 12.8 kB |
-| **Edit**, with your own UI | `@kalem/editor` | 27.5 kB |
-| The full **Word-like** experience | `@kalem/editor` + `@kalem/ui` | 36.2 kB |
-| Drop it in with one `<script>` tag | `@kalem/wc` (IIFE build) | 28.1 kB |
+| **Display** Markdown (read-only) | `@kalem-editor/viewer` | 2.7 kB |
+| **Parse** Markdown (server, scripts) | `@kalem-editor/core` | 12.8 kB |
+| **Edit**, with your own UI | `@kalem-editor/editor` | 27.5 kB |
+| The full **Word-like** experience | `@kalem-editor/editor` + `@kalem-editor/ui` | 36.2 kB |
+| Drop it in with one `<script>` tag | `@kalem-editor/wc` (IIFE build) | 28.1 kB |
 
 Sizes are measured by [`size-limit`](.size-limit.json) and enforced in CI —
-a build that exceeds its budget fails. `@kalem/core` doesn't touch the DOM,
-so it parses and serializes on the server too; `@kalem/viewer` renders to a
+a build that exceeds its budget fails. `@kalem-editor/core` doesn't touch the DOM,
+so it parses and serializes on the server too; `@kalem-editor/viewer` renders to a
 string for SSR.
 
 Plugins: `plugin-image-upload`, `plugin-code-highlight` (eight languages,
 loaded on demand), `plugin-find-replace`, `plugin-outline` (table of
 contents), `plugin-word-count`, `plugin-source-mode` (toggle to raw
-Markdown), `plugin-autosave`. Styling lives in `@kalem/themes` as plain CSS
+Markdown), `plugin-autosave`. Styling lives in `@kalem-editor/themes` as plain CSS
 with custom properties — light, dark and minimal themes included.
 
 ## Quick start
 
 ```bash
-npm i @kalem/editor @kalem/ui @kalem/themes
+npm i @kalem-editor/editor @kalem-editor/ui @kalem-editor/themes
 ```
 
 ### Vanilla
 
 ```ts
-import { Editor } from "@kalem/editor";
-import { mountUi } from "@kalem/ui";
+import { Editor } from "@kalem-editor/editor";
+import { mountUi } from "@kalem-editor/ui";
 
-import "@kalem/themes/tokens.css";
-import "@kalem/themes/viewer.css";
-import "@kalem/themes/editor.css";
-import "@kalem/themes/ui.css";
+import "@kalem-editor/themes/tokens.css";
+import "@kalem-editor/themes/viewer.css";
+import "@kalem-editor/themes/editor.css";
+import "@kalem-editor/themes/ui.css";
 
 const editor = new Editor(document.getElementById("app")!, {
   value: "# Hello",
@@ -111,8 +111,8 @@ mountUi(editor);
 ### React
 
 ```tsx
-import { KalemEditor } from "@kalem/react";
-import { mountUi } from "@kalem/ui";
+import { KalemEditor } from "@kalem-editor/react";
+import { mountUi } from "@kalem-editor/ui";
 
 <KalemEditor
   defaultValue="# Hello"
@@ -127,8 +127,8 @@ import { mountUi } from "@kalem/ui";
 
 ```vue
 <script setup lang="ts">
-import { KalemEditor } from "@kalem/vue";
-import { mountUi } from "@kalem/ui";
+import { KalemEditor } from "@kalem-editor/vue";
+import { mountUi } from "@kalem-editor/ui";
 import { ref } from "vue";
 
 const text = ref("# Hello");
@@ -142,13 +142,13 @@ const text = ref("# Hello");
 ### Plain HTML — no build step
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/tokens.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/viewer.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/editor.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem-editor/themes/css/tokens.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem-editor/themes/css/viewer.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem-editor/themes/css/editor.css">
 
 <kalem-editor label="Document"># Hello</kalem-editor>
 
-<script src="https://cdn.jsdelivr.net/npm/@kalem/wc/dist/kalem-editor.iife.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@kalem-editor/wc/dist/kalem-editor.iife.js"></script>
 ```
 
 `<kalem-editor>` is a form-associated custom element: put it inside a

@@ -1,7 +1,7 @@
 /**
- * `@kalem/wc/global` — `<script>` etiketiyle düşen sürüm  (İş listesi: F5-04)
+ * `@kalem-editor/wc/global` — `<script>` etiketiyle düşen sürüm  (İş listesi: F5-04)
  *
- *     <script src="https://cdn.jsdelivr.net/npm/@kalem/wc/dist/kalem-editor.iife.js"></script>
+ *     <script src="https://cdn.jsdelivr.net/npm/@kalem-editor/wc/dist/kalem-editor.iife.js"></script>
  *     <kalem-editor label="Belge"># Merhaba</kalem-editor>
  *
  * Modül değil, **IIFE**: `type="module"` yok, import haritası yok, derleme
@@ -10,10 +10,10 @@
  *
  * ## Neden ayrı bir derleme
  *
- * ESM çıktısı `@kalem/core` ve `@kalem/editor`i **dışarıda** bırakıyor —
+ * ESM çıktısı `@kalem-editor/core` ve `@kalem-editor/editor`i **dışarıda** bırakıyor —
  * paketleyici kullanan uygulamada doğrusu bu, yoksa aynı kod iki kez
  * paketlenirdi. Ama bir CDN kullanıcısının paketleyicisi yok: çıplak
- * `import "@kalem/editor"` satırı tarayıcıda çözülmez. Bu giriş onları
+ * `import "@kalem-editor/editor"` satırı tarayıcıda çözülmez. Bu giriş onları
  * içeri alıyor.
  *
  * ## Neden kendiliğinden kaydoluyor

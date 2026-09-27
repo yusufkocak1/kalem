@@ -3,12 +3,12 @@ title: Sunucuda Markdown → HTML
 description: Tarayıcı taklidi olmadan, Node'da, worker'da ve edge'de.
 ---
 
-`@kalem/core` ve `@kalem/viewer` DOM'a dokunmuyor. Markdown'ı sunucuda
+`@kalem-editor/core` ve `@kalem-editor/viewer` DOM'a dokunmuyor. Markdown'ı sunucuda
 HTML'e çevirmek için jsdom kurmanıza gerek yok.
 
 ```ts
-import { parse } from '@kalem/core';
-import { renderToString } from '@kalem/viewer';
+import { parse } from '@kalem-editor/core';
+import { renderToString } from '@kalem-editor/viewer';
 
 export function markdownToHtml(md: string): string {
   return renderToString(parse(md));
@@ -40,8 +40,8 @@ Sunucuda ürettiğiniz HTML'i istemcide hidrate ederken uyuşmazlık
 ```
 
 ```html
-<link rel="stylesheet" href="/@kalem/themes/tokens.css">
-<link rel="stylesheet" href="/@kalem/themes/viewer.css">
+<link rel="stylesheet" href="/@kalem-editor/themes/tokens.css">
+<link rel="stylesheet" href="/@kalem-editor/themes/viewer.css">
 ```
 
 `editor.css` ve `ui.css` gerekmiyor: okuyucuya kullanmayacağı düzenleme
@@ -82,8 +82,8 @@ app.get('/yazi/:id', async (req, res) => {
 
 ```astro
 ---
-import { parse } from '@kalem/core';
-import { renderToString } from '@kalem/viewer';
+import { parse } from '@kalem-editor/core';
+import { renderToString } from '@kalem-editor/viewer';
 
 const html = renderToString(parse(Astro.props.markdown));
 ---
@@ -111,7 +111,7 @@ HTML üretmeden AST'yi işlemek isterseniz — başlıkları çıkarmak, bağlan
 denetlemek, içerik taşımak:
 
 ```ts
-import { parse, visit } from '@kalem/core';
+import { parse, visit } from '@kalem-editor/core';
 
 const basliklar: string[] = [];
 visit(parse(md), (node) => {
@@ -119,4 +119,4 @@ visit(parse(md), (node) => {
 });
 ```
 
-`@kalem/core` tek başına 12,8 kB ve `@kalem/viewer`e ihtiyaç duymuyor.
+`@kalem-editor/core` tek başına 12,8 kB ve `@kalem-editor/viewer`e ihtiyaç duymuyor.

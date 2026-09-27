@@ -1,5 +1,5 @@
 /**
- * @kalem/ui — Arayüz metinleri  (İş listesi: F3-03, F6-10 hazırlığı)
+ * @kalem-editor/ui — Arayüz metinleri  (İş listesi: F3-03, F6-10 hazırlığı)
  *
  * ## Neden tek bir nesne
  *

@@ -1,7 +1,7 @@
 /*
- * @kalem/themes — Otomatik kaydetme  (İş listesi: F4-07)
+ * @kalem-editor/themes — Otomatik kaydetme  (İş listesi: F4-07)
  *
- * Yalnızca `@kalem/plugin-autosave` kullanılıyorsa yükleniyor.
+ * Yalnızca `@kalem-editor/plugin-autosave` kullanılıyorsa yükleniyor.
  *
  * Hata durumu dışında bütün renkler sözlükten. Hata kendi rengini
  * taşıyor çünkü `tokens.css`te bir "hata" rengi yok ve onu ana sözlüğe

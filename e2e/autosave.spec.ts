@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * `@kalem/plugin-autosave`  (İş listesi: F4-07)
+ * `@kalem-editor/plugin-autosave`  (İş listesi: F4-07)
  *
  * Durum makinesinin tamamı birim testleriyle sabit (`plugin.test.ts`);
  * burada ölçülen, gerçek editörde yazmanın kaydı tetiklediği, göstergenin

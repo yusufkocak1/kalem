@@ -1,7 +1,7 @@
 # Markdown Editör Kütüphanesi — Teknik Analiz ve Mimari Karar Dokümanı
 
 > Durum: **Onaylandı — kararlar alındı (2026-09-08)**
-> Ürün adı: **Kalem** · npm scope: `@kalem/*`
+> Ürün adı: **Kalem** · npm scope: `@kalem-editor/*`
 > Devamı: [01-is-listesi.md](./01-is-listesi.md)
 > Tarih: 2026-09-08
 > Kapsam: Ürün tanımı, rakip analizi, mimari kararlar, risk analizi, yol haritası
@@ -97,7 +97,7 @@ En yakın rakip BlockNote (UX olarak) ama React'e bağlı ve JSON tabanlı. Milk
 - TypeScript tipleri, ESM + CJS + IIFE (CDN) çıktıları
 
 ### Should (v1.x)
-- Tablo — **KARAR: v1 dışı.** `@kalem/plugin-table` olarak v1.1'de. Parser tabloyu v1'de de kayıpsız korur, sadece düzenleme UI'ı ertelendi.
+- Tablo — **KARAR: v1 dışı.** `@kalem-editor/plugin-table` olarak v1.1'de. Parser tabloyu v1'de de kayıpsız korur, sadece düzenleme UI'ı ertelendi.
 - Görsel yükleme/sürükleme + yer tutucu + ilerleme
 - İçindekiler (outline) paneli, kelime sayacı
 - Bul & değiştir
@@ -204,21 +204,21 @@ Sorun: *"Vue projem var; kütüphane React ile yazılmışsa projeme React de gi
 
 | Yaklaşım | Nasıl | Artı | Eksi |
 |---|---|---|---|
-| **1. Vanilla çekirdek + ayrı sarmalayıcı paketler** (önerilen) | `@kalem/editor` sıfır framework; `@kalem/react`, `@kalem/vue` ayrı yayımlanır, framework `peerDependency` | Sıfır sızıntı; her framework idiomatik; en küçük boyut | Her sarmalayıcı ayrı bakım (ama her biri ~60 satır) |
+| **1. Vanilla çekirdek + ayrı sarmalayıcı paketler** (önerilen) | `@kalem-editor/editor` sıfır framework; `@kalem-editor/react`, `@kalem-editor/vue` ayrı yayımlanır, framework `peerDependency` | Sıfır sızıntı; her framework idiomatik; en küçük boyut | Her sarmalayıcı ayrı bakım (ama her biri ~60 satır) |
 | **2. Web Component (`<md-editor>`)** | Custom Element + Shadow DOM | Tek build her yerde | Vue'da `isCustomElement` yapılandırması; React 19 öncesi prop/event sancısı; Shadow DOM, CSS-değişkeni tabanlı temalarımızla çatışır; SSR zayıf; form entegrasyonu ek iş |
 | **3. Sadece imperatif API** | `new Editor(el, opts)` | En basit | React/Vue'da her kullanıcı aynı boilerplate'i yeniden yazar -> benimseme düşer |
 
 > **Öneri: Yaklaşım 1; Yaklaşım 2 ayrı, opsiyonel paket olarak sunulur.**
 
 **Somut kural seti:**
-- `@kalem/core`, `@kalem/viewer`, `@kalem/editor` paketlerinde `dependencies` **boş**, `peerDependencies` **boş**.
+- `@kalem-editor/core`, `@kalem-editor/viewer`, `@kalem-editor/editor` paketlerinde `dependencies` **boş**, `peerDependencies` **boş**.
 - Framework yok, JSX yok, sanal DOM yok. Kendi ~40 satırlık `h()` DOM yardımcımız.
-- `@kalem/react` -> `peerDependencies: { react: ">=17" }`, ~1 kB. `useSyncExternalStore` ile kontrollü/kontrolsüz bileşen.
-- `@kalem/vue` -> `peerDependencies: { vue: "^3" }`, `defineComponent` + `v-model` desteği.
-- `@kalem/wc` -> Custom Element (Shadow DOM **opsiyonel, varsayılan kapalı** — tema için Light DOM daha iyi). Angular/Svelte/Astro/vanilla için tek çözüm.
+- `@kalem-editor/react` -> `peerDependencies: { react: ">=17" }`, ~1 kB. `useSyncExternalStore` ile kontrollü/kontrolsüz bileşen.
+- `@kalem-editor/vue` -> `peerDependencies: { vue: "^3" }`, `defineComponent` + `v-model` desteği.
+- `@kalem-editor/wc` -> Custom Element (Shadow DOM **opsiyonel, varsayılan kapalı** — tema için Light DOM daha iyi). Angular/Svelte/Astro/vanilla için tek çözüm.
 - **CI kapısı:** çekirdek paketlerin bağımlılık ağacını doğrulayan test — `dependencies` boş mu, üretim bundle'ında `react`/`vue` izi var mı.
 
-Bu tasarımda Vue kullanıcısı `npm i @kalem/editor @kalem/vue` kurar; `node_modules`'a React'in adı bile geçmez.
+Bu tasarımda Vue kullanıcısı `npm i @kalem-editor/editor @kalem-editor/vue` kurar; `node_modules`'a React'in adı bile geçmez.
 
 ---
 
@@ -268,10 +268,10 @@ core  <-  viewer  <-  editor  <-  ui  <-  { react, vue, wc }
 
 | Katman | Import | Tahmini boyut | Senaryo |
 |---|---|---|---|
-| L0 | `@kalem/core` | ~10 kB | Sunucuda md işleme, AST dönüşümü |
-| L1 | `@kalem/viewer` | ~12 kB | Blog/dokümantasyon render, salt okunur |
-| L2 | `@kalem/editor` (başsız) | ~35 kB | Kendi UI'ını yazan geliştirici |
-| L3 | `@kalem/editor` + `@kalem/ui` | ~55 kB | **Word benzeri tam deneyim** (hedef) |
+| L0 | `@kalem-editor/core` | ~10 kB | Sunucuda md işleme, AST dönüşümü |
+| L1 | `@kalem-editor/viewer` | ~12 kB | Blog/dokümantasyon render, salt okunur |
+| L2 | `@kalem-editor/editor` (başsız) | ~35 kB | Kendi UI'ını yazan geliştirici |
+| L3 | `@kalem-editor/editor` + `@kalem-editor/ui` | ~55 kB | **Word benzeri tam deneyim** (hedef) |
 | L4 | + eklentiler | ihtiyaca göre, tembel | Kod vurgulama, matematik, diyagram |
 
 ---
@@ -307,7 +307,7 @@ Kalan üç yüzey ve önlemi:
 
 ### 5.8 KARAR 8 — SSR / statik render
 
-`@kalem/viewer` iki API sunar:
+`@kalem-editor/viewer` iki API sunar:
 - `renderToDOM(ast, element)` — tarayıcı
 - `renderToString(ast): string` — **DOM'suz, saf fonksiyon.** Node, Deno, Workers, Next.js RSC, Nuxt/Nitro'da çalışır.
 
@@ -326,7 +326,7 @@ interface Plugin {
   commands?: Record<string, Command>;
   keymap?: Record<string, string>;      // 'Mod-b' -> komut adı
   inputRules?: InputRule[];             // yazarken dönüşüm: '## ' -> heading
-  toolbar?: ToolbarItem[];              // @kalem/ui'a katkı
+  toolbar?: ToolbarItem[];              // @kalem-editor/ui'a katkı
   parse?(token, ctx): Node;             // md -> AST
   serialize?(node, ctx): string;        // AST -> md
   view?(node, ctx): NodeView;           // özel DOM davranışı (ör. mermaid)
@@ -470,7 +470,7 @@ Contenteditable tabanlı bir editörde test opsiyonel değil, **hayati.**
 ## 11. Lisans, Marka, Topluluk
 
 - **Lisans:** MIT (benimseme için en düşük sürtünme). Ticari niyet varsa "open-core": çekirdek MIT, ileri eklentiler (collab, docx-export, AI) ayrı lisans. **Karar v1'den önce verilmeli** — lisans değişimi geriye dönük zordur.
-- **İsim:** **Kalem** · `@kalem/*`. Scoped paket olduğu için npm isim çakışma riski yok.
+- **İsim:** **Kalem** · `@kalem-editor/*`. Scoped paket olduğu için npm isim çakışma riski yok.
 - **Topluluk:** README (İngilizce, GIF'li), CONTRIBUTING, CODE_OF_CONDUCT, issue şablonları. İlk duyuru: Hacker News "Show HN", r/webdev, X, dev.to. **Duyuru öncesi doküman sitesi ve demo hazır olmalı** — ilk izlenim tek seferliktir.
 
 ---
@@ -480,10 +480,10 @@ Contenteditable tabanlı bir editörde test opsiyonel değil, **hayati.**
 | Faz | İçerik | Çıktı |
 |---|---|---|
 | **0. Temel** | Monorepo, build, CI, boyut kapısı, test iskeleti | Boş ama sağlam altyapı |
-| **1. Core** | AST, parser, serializer, gidiş-dönüş testleri, `renderToString` | `@kalem/core` yayımlanabilir |
+| **1. Core** | AST, parser, serializer, gidiş-dönüş testleri, `renderToString` | `@kalem-editor/core` yayımlanabilir |
 | **1.5 Spike** | contenteditable / IME / mobil doğrulama | **Karar noktası: mimari onayı** |
-| **2. Viewer + Başsız Editör** | Render, blok motoru, seçim, geçmiş, kısayollar, giriş kuralları | `@kalem/viewer`, `@kalem/editor` |
-| **3. Word Deneyimi** | Balon araç çubuğu, slash menü, sürükle-bırak, yapıştırma normalizasyonu | `@kalem/ui` — **ürünün kalbi** |
+| **2. Viewer + Başsız Editör** | Render, blok motoru, seçim, geçmiş, kısayollar, giriş kuralları | `@kalem-editor/viewer`, `@kalem-editor/editor` |
+| **3. Word Deneyimi** | Balon araç çubuğu, slash menü, sürükle-bırak, yapıştırma normalizasyonu | `@kalem-editor/ui` — **ürünün kalbi** |
 | **4. Eklentiler** | Tablo, görsel yükleme, bul-değiştir, TOC, kod vurgulama | Eklenti ekosistemi |
 | **5. Sarmalayıcılar** | React, Vue, Web Component + `examples/*` | Framework kanıtı |
 | **6. Cila ve Yayın** | A11y, mobil, i18n, doküman sitesi, demo, duyuru | **v1.0** |
@@ -497,10 +497,10 @@ Faz 5 teknik olarak Faz 2'den sonra herhangi bir anda yapılabilir; erken yapıl
 | # | Konu | Karar | Gerekçe / Sonucu |
 |---|---|---|---|
 | 1 | **Editör motoru** | **Seçenek C — kendi blok-tabanlı motorumuz** | Boyut + özgünlük + Word UX hedeflerini aynı anda karşılayan tek yol. Risk, F1.5 spike'ı ile kod yazmadan doğrulanır. |
-| 2 | **Marka / scope** | **Kalem** · `@kalem/*` | Kısa, telaffuz edilebilir, hikayesi var, scoped paket. |
+| 2 | **Marka / scope** | **Kalem** · `@kalem-editor/*` | Kısa, telaffuz edilebilir, hikayesi var, scoped paket. |
 | 3 | **Lisans** | **MIT** *(F0-08'de nihai onay)* | Benimseme için en düşük sürtünme. Open-core'a geçiş her zaman mümkün; tersi değil. |
 | 4 | **Dokümantasyon** | **Astro Starlight** | Vanilla/React/Vue demolarını aynı sayfada gömebilmesi, ürünün framework-agnostik iddiasını sitenin kendisiyle kanıtlar. |
-| 5 | **Tablo** | **v1 dışı** -> `@kalem/plugin-table` (v1.1) | Blok motorunun en pahalı parçası. **Ancak parser/serializer tabloyu v1'de de kayıpsız korur** — kullanıcının dosyasını bozmamak zorunlu. |
+| 5 | **Tablo** | **v1 dışı** -> `@kalem-editor/plugin-table` (v1.1) | Blok motorunun en pahalı parçası. **Ancak parser/serializer tabloyu v1'de de kayıpsız korur** — kullanıcının dosyasını bozmamak zorunlu. |
 | 6 | **Mobil** | **v1'de "çalışır ama optimize değil"** | Dokunmatik sürükle-bırak ve mobil araç çubuğu v1.1'e. v1'de sadece *bozuk olmadığı* doğrulanır (F6-09). |
 | 7 | **Yayın stratejisi** | **Sessiz geliştirme, tam üründe çık** | Tek ve güçlü duyuru. Bedeli aşağıda. |
 

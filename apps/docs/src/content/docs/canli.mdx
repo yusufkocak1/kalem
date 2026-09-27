@@ -21,8 +21,8 @@ liste `-` olmuyor, `1)` ayracı `1.` olmuyor.
 <CanliVanilla />
 
 ```ts
-import { Editor } from '@kalem/editor';
-import { mountUi } from '@kalem/ui';
+import { Editor } from '@kalem-editor/editor';
+import { mountUi } from '@kalem-editor/ui';
 
 const editor = new Editor(kap, {
   value: ORNEK_BELGE,
@@ -40,8 +40,8 @@ mountUi(editor, { toolbar: 'both' });
 <CanliReact client:load />
 
 ```tsx
-import { KalemEditor, useKalemValue } from '@kalem/react';
-import { mountUi } from '@kalem/ui';
+import { KalemEditor, useKalemValue } from '@kalem-editor/react';
+import { mountUi } from '@kalem-editor/ui';
 
 function Cikti() {
   const metin = useKalemValue(ORNEK_BELGE);
@@ -65,8 +65,8 @@ function Cikti() {
 
 ```vue
 <script setup lang="ts">
-import { KalemEditor } from '@kalem/vue';
-import { mountUi } from '@kalem/ui';
+import { KalemEditor } from '@kalem-editor/vue';
+import { mountUi } from '@kalem-editor/ui';
 import { ref } from 'vue';
 
 const metin = ref(ORNEK_BELGE);
@@ -93,7 +93,7 @@ kanıtlaması başka bir şey.
 
 Bu site [Astro Starlight](https://starlight.astro.build) ile kurulu ve
 **hem React hem Vue adalarını** aynı anda çalıştırıyor. Yukarıdaki üç
-editör tek bir sayfada, tek bir `@kalem/editor` motoruyla yaşıyor.
+editör tek bir sayfada, tek bir `@kalem-editor/editor` motoruyla yaşıyor.
 
 Vue tabanlı VitePress ya da React tabanlı Docusaurus ile bu sayfa
 yazılamazdı — dokümantasyon aracının seçimi de mesajın parçası.

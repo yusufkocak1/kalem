@@ -1,5 +1,5 @@
 /**
- * `@kalem/plugin-code-highlight` — Eklenti  (İş listesi: F4-02)
+ * `@kalem-editor/plugin-code-highlight` — Eklenti  (İş listesi: F4-02)
  *
  * Editördeki kod bloklarını boyuyor. Modele **hiç dokunmuyor**: vurgulama
  * bir okuma kolaylığı, belgenin parçası değil. Markdown'a serileştirilen
@@ -8,7 +8,7 @@
  *
  * ## Neden `change` olayına abone
  *
- * Eklenti API'sinde render kancası bilerek yok (`@kalem/editor/plugin.ts`).
+ * Eklenti API'sinde render kancası bilerek yok (`@kalem-editor/editor/plugin.ts`).
  * Süsleme, çizimden **sonra** uygulanıyor ve belge her değiştiğinde
  * yeniden — F4-01'de görsel ilerleme süslemesi için kurulan aynı düzen.
  *
@@ -32,7 +32,7 @@
  * Editörün kendisi de aynı sebeple bileşim boyunca DOM'dan uzak duruyor
  * (`editor.ts` başındaki not). Boyama `compositionend`e kadar bekliyor.
  */
-import type { Plugin, PluginContext } from "@kalem/editor";
+import type { Plugin, PluginContext } from "@kalem-editor/editor";
 import type { Highlighter, HighlighterOptions } from "./highlighter.js";
 import { createHighlighter } from "./highlighter.js";
 

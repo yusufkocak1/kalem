@@ -1,5 +1,5 @@
 /**
- * @kalem/plugin-word-count — Sayma  (İş listesi: F4-05)
+ * @kalem-editor/plugin-word-count — Sayma  (İş listesi: F4-05)
  *
  * Saf katman: belge girdi, sayılar çıktı.
  *

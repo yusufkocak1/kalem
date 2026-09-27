@@ -1,5 +1,5 @@
 {
-  "name": "@kalem/ui",
+  "name": "@kalem-editor/ui",
   "version": "1.0.0",
   "description": "Word-like UI for Kalem — bubble toolbar, slash menu, drag handles",
   "keywords": [
@@ -50,8 +50,8 @@
     "dev": "tsdown --watch"
   },
   "dependencies": {
-    "@kalem/core": "workspace:^",
-    "@kalem/editor": "workspace:^"
+    "@kalem-editor/core": "workspace:^",
+    "@kalem-editor/editor": "workspace:^"
   },
   "devDependencies": {
     "tsdown": "catalog:",

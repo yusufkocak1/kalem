@@ -223,8 +223,8 @@ try {
 	writeFileSync(
 		join(PROJE, "esm.mjs"),
 		`${girisler.map((g, i) => `import * as m${i} from ${JSON.stringify(g)};`).join("\n")}
-import { parse, serialize } from "@kalem/core";
-import { renderToString } from "@kalem/viewer";
+import { parse, serialize } from "@kalem-editor/core";
+import { renderToString } from "@kalem-editor/viewer";
 const md = "* list\\n\\n1) item\\n";
 if (serialize(parse(md)) !== md) throw new Error("gidiş-dönüş bozuk");
 if (!renderToString(parse("# Hi")).includes("<h1")) throw new Error("renderToString bozuk");
@@ -244,7 +244,7 @@ for (const g of girisler) {
   if (/define$/.test(g)) continue;
   require(g); n++;
 }
-const { parse, serialize } = require("@kalem/core");
+const { parse, serialize } = require("@kalem-editor/core");
 if (serialize(parse("_a_\\n")) !== "_a_\\n") throw new Error("CJS gidiş-dönüş bozuk");
 console.log(n);
 `,
@@ -256,15 +256,15 @@ console.log(n);
 	adim("6 · Paketleyiciyle derlenmiş uygulama, tarayıcıda");
 	writeFileSync(
 		join(PROJE, "uygulama.js"),
-		`import { Editor } from "@kalem/editor";
-import { mountUi } from "@kalem/ui";
-import { codeHighlightPlugin } from "@kalem/plugin-code-highlight";
-import { findReplacePlugin } from "@kalem/plugin-find-replace";
-import { wordCountPlugin } from "@kalem/plugin-word-count";
-import "@kalem/themes/tokens.css";
-import "@kalem/themes/viewer.css";
-import "@kalem/themes/editor.css";
-import "@kalem/themes/ui.css";
+		`import { Editor } from "@kalem-editor/editor";
+import { mountUi } from "@kalem-editor/ui";
+import { codeHighlightPlugin } from "@kalem-editor/plugin-code-highlight";
+import { findReplacePlugin } from "@kalem-editor/plugin-find-replace";
+import { wordCountPlugin } from "@kalem-editor/plugin-word-count";
+import "@kalem-editor/themes/tokens.css";
+import "@kalem-editor/themes/viewer.css";
+import "@kalem-editor/themes/editor.css";
+import "@kalem-editor/themes/ui.css";
 
 const editor = new Editor(document.getElementById("app"), {
   value: "# Hello\\n\\nText.\\n",
@@ -297,7 +297,7 @@ window.editor = editor;
 	);
 
 	// -----------------------------------------------------------------------
-	const iife = join(PROJE, "node_modules", "@kalem", "wc", "dist", "kalem-editor.iife.js");
+	const iife = join(PROJE, "node_modules", "@kalem-editor", "wc", "dist", "kalem-editor.iife.js");
 	writeFileSync(
 		join(PROJE, "out", "iife.html"),
 		`<!doctype html><meta charset="utf-8">

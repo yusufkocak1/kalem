@@ -8,12 +8,12 @@ description: No wrapper — <kalem-editor> is an ordinary DOM element.
 element.
 
 ```bash
-npm i @kalem/wc @kalem/themes
+npm i @kalem-editor/wc @kalem-editor/themes
 ```
 
 ```svelte
 <script lang="ts">
-  import '@kalem/wc/define';
+  import '@kalem-editor/wc/define';
 
   let text = $state('# Hello');
   let readOnly = $state(false);
@@ -82,15 +82,15 @@ call `mountUi`.
 ## Styling
 
 ```ts
-import '@kalem/themes/tokens.css';
-import '@kalem/themes/viewer.css';
-import '@kalem/themes/editor.css';
-import '@kalem/themes/ui.css';
+import '@kalem-editor/themes/tokens.css';
+import '@kalem-editor/themes/viewer.css';
+import '@kalem-editor/themes/editor.css';
+import '@kalem-editor/themes/ui.css';
 ```
 
 Svelte's component-scoped CSS (the `<style>` block) doesn't reach **inside**
 the editor: Svelte didn't create those nodes, so they don't get the
-`svelte-xxxx` class. `@kalem/themes` provides the document typography; write
+`svelte-xxxx` class. `@kalem-editor/themes` provides the document typography; write
 the shell (border, padding) with `:global()` or in a global stylesheet.
 
 ## Working example

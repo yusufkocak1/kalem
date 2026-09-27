@@ -1,5 +1,5 @@
 {
-  "name": "@kalem/editor",
+  "name": "@kalem-editor/editor",
   "version": "1.0.0",
   "description": "Headless block editor engine for Markdown — selection, history, commands",
   "keywords": [
@@ -50,8 +50,8 @@
     "dev": "tsdown --watch"
   },
   "dependencies": {
-    "@kalem/core": "workspace:^",
-    "@kalem/viewer": "workspace:^"
+    "@kalem-editor/core": "workspace:^",
+    "@kalem-editor/viewer": "workspace:^"
   },
   "devDependencies": {
     "tsdown": "catalog:",

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * `@kalem/plugin-outline`  (İş listesi: F4-04)
+ * `@kalem-editor/plugin-outline`  (İş listesi: F4-04)
  *
  * Başlık çıkarma birim testleriyle sabit (`outline.test.ts`); burada
  * ölçülen, panelin belgeyle birlikte güncellendiği, tıklamanın imleci

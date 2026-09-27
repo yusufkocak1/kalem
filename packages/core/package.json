@@ -1,5 +1,5 @@
 {
-  "name": "@kalem/core",
+  "name": "@kalem-editor/core",
   "version": "1.0.0",
   "description": "Markdown AST, parser and lossless serializer — no DOM, zero dependencies",
   "keywords": [

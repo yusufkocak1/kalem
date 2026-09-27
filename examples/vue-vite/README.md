@@ -1,4 +1,4 @@
-# `@kalem/vue` — Vite + Vue 3
+# `@kalem-editor/vue` — Vite + Vue 3
 
 ```bash
 pnpm --filter example-vue-vite dev

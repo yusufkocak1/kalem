@@ -62,10 +62,10 @@ No trace of `react` / `vue` / `preact` / `svelte` may appear in a production
 bundle. React never getting into a user's Vue project is a core promise of
 this library.
 
-Framework bindings live only in the `@kalem/react` and `@kalem/vue` wrappers,
+Framework bindings live only in the `@kalem-editor/react` and `@kalem-editor/vue` wrappers,
 as `peerDependencies`.
 
-### 3. `@kalem/core` doesn't touch the DOM
+### 3. `@kalem-editor/core` doesn't touch the DOM
 
 The core must run on the server (SSR, Node, workers). `document`, `window`,
 `navigator` and `localStorage` are forbidden in core — blocked at the type
@@ -100,10 +100,10 @@ const proto = url.toLowerCase(); // kalem-locale-ok: URL scheme is ASCII
 
 | Package | Budget (min+gzip) |
 |---|---|
-| `@kalem/core` | 14 kB |
-| `@kalem/viewer` | 14 kB |
-| `@kalem/editor` (core included) | 38 kB |
-| `@kalem/editor` + `@kalem/ui` | 58 kB |
+| `@kalem-editor/core` | 14 kB |
+| `@kalem-editor/viewer` | 14 kB |
+| `@kalem-editor/editor` (core included) | 38 kB |
+| `@kalem-editor/editor` + `@kalem-editor/ui` | 58 kB |
 
 `pnpm size` checks this. Going over budget fails the build — raising a
 budget is a decision, and it needs a justification in the PR.
@@ -136,7 +136,7 @@ Every PR that changes behavior should include a changeset:
 pnpm changeset
 ```
 
-All `@kalem/*` packages share one version number (`fixed` group).
+All `@kalem-editor/*` packages share one version number (`fixed` group).
 
 ## Code style
 

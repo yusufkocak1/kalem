@@ -1,5 +1,5 @@
 {
-  "name": "@kalem/react",
+  "name": "@kalem-editor/react",
   "version": "1.0.0",
   "description": "React wrapper for Kalem — <KalemEditor /> and useKalem()",
   "keywords": [
@@ -49,8 +49,8 @@
     "dev": "tsdown --watch"
   },
   "dependencies": {
-    "@kalem/core": "workspace:^",
-    "@kalem/editor": "workspace:^"
+    "@kalem-editor/core": "workspace:^",
+    "@kalem-editor/editor": "workspace:^"
   },
   "peerDependencies": {
     "react": ">=17"

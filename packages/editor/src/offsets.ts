@@ -1,5 +1,5 @@
 /**
- * @kalem/editor — DOM konumu ↔ karakter ofseti  (İş listesi: F2-07)
+ * @kalem-editor/editor — DOM konumu ↔ karakter ofseti  (İş listesi: F2-07)
  *
  * ## Neden gerekli
  *

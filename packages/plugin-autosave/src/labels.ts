@@ -1,5 +1,5 @@
 /**
- * @kalem/plugin-autosave — Metinler  (İş listesi: F4-07)
+ * @kalem-editor/plugin-autosave — Metinler  (İş listesi: F4-07)
  *
  * Durum adları doğrudan anahtar: gösterge `labels[state]` diyor ve yeni
  * bir durum eklendiğinde derleyici eksik metni gösteriyor.

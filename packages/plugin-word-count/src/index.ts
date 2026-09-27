@@ -1,10 +1,10 @@
 /**
- * `@kalem/plugin-word-count` — Kelime sayacı  (İş listesi: F4-05)
+ * `@kalem-editor/plugin-word-count` — Kelime sayacı  (İş listesi: F4-05)
  *
  * Kelime, karakter ve okuma süresi.
  *
- *     import { wordCountPlugin } from "@kalem/plugin-word-count";
- *     import "@kalem/themes/plugin-word-count.css";
+ *     import { wordCountPlugin } from "@kalem-editor/plugin-word-count";
+ *     import "@kalem-editor/themes/plugin-word-count.css";
  *
  *     const editor = new Editor(el, {
  *       plugins: [wordCountPlugin({ container: document.getElementById("durum") })],
@@ -16,7 +16,7 @@
  * Saf katman (`textOf`, `countText`) ayrıca dışa açık: bir derleme
  * betiğinde de aynı sayılar üretilebiliyor.
  *
- * @module @kalem/plugin-word-count
+ * @module @kalem-editor/plugin-word-count
  */
 export type { CountOptions, Counts } from "./count.js";
 export { countText, countWords } from "./count.js";

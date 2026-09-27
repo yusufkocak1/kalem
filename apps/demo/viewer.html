@@ -125,14 +125,14 @@
 	/*
 	 * Demo kabuğu.
 	 *
-	 * Belge tipografisi burada DEĞİL: `@kalem/themes/viewer.css` yükleniyor
+	 * Belge tipografisi burada DEĞİL: `@kalem-editor/themes/viewer.css` yükleniyor
 	 * (aşağıdaki <link>). Böylece sayfa, kütüphane kullanıcısının göreceği
 	 * şeyin aynısını gösteriyor — demoya özel güzelleştirme yok.
 	 */
 	.onizleme { flex: 1; overflow: auto; padding: 18px 20px; }
 </style>
-<link rel="stylesheet" href="/@kalem/themes/tokens.css">
-<link rel="stylesheet" href="/@kalem/themes/viewer.css">
+<link rel="stylesheet" href="/@kalem-editor/themes/tokens.css">
+<link rel="stylesheet" href="/@kalem-editor/themes/viewer.css">
 
 <header>
 	<h1>Kalem Viewer <span>— iki render hedefi, tek plan</span></h1>
@@ -185,16 +185,16 @@
 <script type="importmap">
 	{
 		"imports": {
-			"@kalem/core": "/@kalem/core/index.js",
-			"@kalem/core/commands": "/@kalem/core/commands.js",
-			"@kalem/core/html": "/@kalem/core/html.js",
-			"@kalem/viewer": "/@kalem/viewer/index.js"
+			"@kalem-editor/core": "/@kalem-editor/core/index.js",
+			"@kalem-editor/core/commands": "/@kalem-editor/core/commands.js",
+			"@kalem-editor/core/html": "/@kalem-editor/core/html.js",
+			"@kalem-editor/viewer": "/@kalem-editor/viewer/index.js"
 		}
 	}
 </script>
 <script type="module">
-	import { parse } from "@kalem/core";
-	import { buildPlan, renderToDOM, renderToString } from "@kalem/viewer";
+	import { parse } from "@kalem-editor/core";
+	import { buildPlan, renderToDOM, renderToString } from "@kalem-editor/viewer";
 
 	const ORNEKLER = {
 		temel: `# Kalem

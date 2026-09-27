@@ -1,4 +1,4 @@
-# @kalem/viewer
+# @kalem-editor/viewer
 
 Render a Markdown AST to the DOM or to an HTML string (SSR) — read-only viewer.
 
@@ -6,12 +6,12 @@ Part of [Kalem](https://github.com/yusufkocak1/kalem) — a WYSIWYG editor for p
 don't know Markdown, that saves Markdown.
 
 ```bash
-npm i @kalem/core @kalem/viewer
+npm i @kalem-editor/core @kalem-editor/viewer
 ```
 
 ```ts
-import { parse } from '@kalem/core';
-import { renderToDOM, renderToString } from '@kalem/viewer';
+import { parse } from '@kalem-editor/core';
+import { renderToDOM, renderToString } from '@kalem-editor/viewer';
 
 const ast = parse('# Hello\n\nSome **Markdown**.');
 renderToDOM(ast, document.getElementById('app')!);  // in the browser

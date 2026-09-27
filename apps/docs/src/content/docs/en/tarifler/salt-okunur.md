@@ -54,15 +54,15 @@ If there's **no chance** of editing on the page, don't load the editor.
 2.7 kB instead of 27 kB:
 
 ```ts
-import { parse } from '@kalem/core';
-import { renderToDOM } from '@kalem/viewer';
+import { parse } from '@kalem-editor/core';
+import { renderToDOM } from '@kalem-editor/viewer';
 
 renderToDOM(parse(markdown), document.getElementById('app')!);
 ```
 
 ```ts
-import '@kalem/themes/tokens.css';
-import '@kalem/themes/viewer.css';
+import '@kalem-editor/themes/tokens.css';
+import '@kalem-editor/themes/viewer.css';
 // editor.css and ui.css aren't needed
 ```
 
@@ -75,7 +75,7 @@ smaller.
 Editing a document and showing it live at the same time:
 
 ```ts
-import { renderToDOM } from '@kalem/viewer';
+import { renderToDOM } from '@kalem-editor/viewer';
 
 const editor = new Editor(left, {
   value: md,

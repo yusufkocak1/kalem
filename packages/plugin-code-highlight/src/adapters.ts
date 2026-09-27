@@ -1,5 +1,5 @@
 /**
- * @kalem/plugin-code-highlight — Dış vurgulayıcı adaptörleri  (F4-02)
+ * @kalem-editor/plugin-code-highlight — Dış vurgulayıcı adaptörleri  (F4-02)
  *
  * İçerideki belirteçleyici (`token.ts`) küçük olmayı seçiyor ve bunun bir
  * tavanı var: iç içe gramerler, sözdizimine bağlı ayrımlar, yüzlerce dil.

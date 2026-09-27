@@ -1,5 +1,5 @@
 /**
- * @kalem/editor — Blok yapısı düzenlemeleri  (İş listesi: F2-08)
+ * @kalem-editor/editor — Blok yapısı düzenlemeleri  (İş listesi: F2-08)
  *
  * ## Neden tarayıcıya bırakılmıyor
  *
@@ -16,9 +16,9 @@
  * sabitlenebiliyor; tarayıcı testleri yalnızca tuşun buraya doğru
  * bağlandığını doğruluyor.
  */
-import type { Block, Inline, ListItem, NodeId, Paragraph, Root } from "@kalem/core";
-import { isFrontmatter, nodeAtPath, replaceAt } from "@kalem/core";
-import { emptyParagraph } from "@kalem/core/commands";
+import type { Block, Inline, ListItem, NodeId, Paragraph, Root } from "@kalem-editor/core";
+import { isFrontmatter, nodeAtPath, replaceAt } from "@kalem-editor/core";
+import { emptyParagraph } from "@kalem-editor/core/commands";
 import { newId } from "./ids.js";
 import { listLength, sliceInline } from "./inline-edit.js";
 

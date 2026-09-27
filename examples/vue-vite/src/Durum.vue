@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useKalem } from "@kalem/vue";
+import { useKalem } from "@kalem-editor/vue";
 import { onUnmounted, ref, watch } from "vue";
 
 /**

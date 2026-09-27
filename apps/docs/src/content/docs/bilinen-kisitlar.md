@@ -31,7 +31,7 @@ ikinci kez koşturmuyoruz; farklı olan kabuk ve onu geçiş testi yokluyor.
 Kalem hiçbir tarayıcı sürümüne özel kod taşımıyor ve derleme hedefi
 yaygın olarak desteklenen modern sözdizimi. Kullanılan API'lerden en
 yenileri `ElementInternals` (form bütünleşmesi, yalnızca
-`@kalem/wc` kullanıyorsa) ve `CompressionStream` (yalnızca playground'un
+`@kalem-editor/wc` kullanıyorsa) ve `CompressionStream` (yalnızca playground'un
 paylaşma özelliğinde, yokluğunda kendiliğinden devre dışı kalıyor).
 :::
 
@@ -113,7 +113,7 @@ içinde script çalışıyor.
 
 **Tablolar kısmen düzenlenebilir.** Hücre metni düzenlenebiliyor; yalnızca
 düzenlenen satır yeniden yazılıyor ve sütun hizası korunuyor. Satır ve
-sütun ekleme/silme ile hizalama değiştirme v1.1'de `@kalem/plugin-table`
+sütun ekleme/silme ile hizalama değiştirme v1.1'de `@kalem-editor/plugin-table`
 ile geliyor.
 
 ## Henüz ölçülmemiş

@@ -7,7 +7,7 @@ description: CUSTOM_ELEMENTS_SCHEMA ile sarmalayıcısız kurulum.
 "bu etiketi ben bilmiyorum, tarayıcı biliyor".
 
 ```bash
-npm i @kalem/wc @kalem/themes
+npm i @kalem-editor/wc @kalem-editor/themes
 ```
 
 ```ts
@@ -50,7 +50,7 @@ export class BelgeComponent {
 Elemanı kaydetmeyi unutmayın — `main.ts` içinde tek satır:
 
 ```ts
-import '@kalem/wc/define';
+import '@kalem-editor/wc/define';
 ```
 
 ## Bağlama nasıl çalışıyor
@@ -90,9 +90,9 @@ Bileşen kapsamlı CSS (`ViewEncapsulation.Emulated`, varsayılan) editörün
 
 ```json
 "styles": [
-  "node_modules/@kalem/themes/css/tokens.css",
-  "node_modules/@kalem/themes/css/viewer.css",
-  "node_modules/@kalem/themes/css/editor.css",
+  "node_modules/@kalem-editor/themes/css/tokens.css",
+  "node_modules/@kalem-editor/themes/css/viewer.css",
+  "node_modules/@kalem-editor/themes/css/editor.css",
   "src/styles.css"
 ]
 ```

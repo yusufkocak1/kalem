@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { KalemEditor } from "@kalem/vue";
+import { KalemEditor } from "@kalem-editor/vue";
 import { ref } from "vue";
 
 /*
  * Sunucuda da çalışan bir bileşen.
  *
  * `<ClientOnly>` **yok**: `<KalemEditor>` sunucuda belgeyi
- * `@kalem/viewer` ile çiziyor, yani ilk boyada okunabilir bir metin var
+ * `@kalem-editor/viewer` ile çiziyor, yani ilk boyada okunabilir bir metin var
  * ve arama motoru onu görüyor. JavaScript geldiğinde editör aynı elemanı
  * devralıyor.
  */

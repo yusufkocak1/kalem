@@ -14,7 +14,7 @@
  * `?inline` ile CSS metin olarak alınıyor: sayfa açılışında yüklenip
  * beklemiyor, seçildiğinde enjekte ediliyor.
  */
-import yalinCss from "@kalem/themes/minimal.css?inline";
+import yalinCss from "@kalem-editor/themes/minimal.css?inline";
 
 const KIMLIK = "kalem-yalin-tema";
 

@@ -2,7 +2,7 @@
 /**
  * Canlı örnek — Vue  (İş listesi: F6-03)
  *
- * `@kalem/vue` sarmalayıcısı, Astro'nun Vue adasında. Sayfadaki React
+ * `@kalem-editor/vue` sarmalayıcısı, Astro'nun Vue adasında. Sayfadaki React
  * örneğiyle aynı anda yaşıyor.
  *
  * Ada `client:load` ile kuruluyor, yani bileşen **önce sunucuda**
@@ -10,9 +10,9 @@
  * Nuxt sayfasında anlatılan "`<ClientOnly>` gerekmiyor" iddiası, bu
  * sayfanın kendi HTML'inde görünüyor.
  */
-import type { Editor } from "@kalem/editor";
-import { mountUi, type Ui } from "@kalem/ui";
-import { KalemEditor } from "@kalem/vue";
+import type { Editor } from "@kalem-editor/editor";
+import { mountUi, type Ui } from "@kalem-editor/ui";
+import { KalemEditor } from "@kalem-editor/vue";
 import { onBeforeUnmount, ref } from "vue";
 import { canliEtiket, type Dil, ornekBelge } from "./ornek-belge.js";
 

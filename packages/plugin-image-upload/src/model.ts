@@ -1,5 +1,5 @@
 /**
- * @kalem/plugin-image-upload — Model düzenlemeleri  (İş listesi: F4-01)
+ * @kalem-editor/plugin-image-upload — Model düzenlemeleri  (İş listesi: F4-01)
  *
  * Yüklemenin DOM'a ve ağa dokunmayan yarısı: dosyanın kabul edilip
  * edilmediği ve görsel düğümünün belgeye nasıl girip nasıl güncellendiği.
@@ -7,9 +7,9 @@
  * Ayrı dosya olmasının sebebi test edilebilirlik: aşağıdaki her fonksiyon
  * girdi alıp çıktı veriyor, `File` ya da `fetch` taklit etmek gerekmiyor.
  */
-import type { Image, Inline, Root } from "@kalem/core";
-import type { Caret, EditResult } from "@kalem/editor";
-import { spliceInline } from "@kalem/editor";
+import type { Image, Inline, Root } from "@kalem-editor/core";
+import type { Caret, EditResult } from "@kalem-editor/editor";
+import { spliceInline } from "@kalem-editor/editor";
 
 /** Yüklenecek dosyanın reddedilme sebebi. */
 export type RejectReason = "type" | "size";

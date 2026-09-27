@@ -1,5 +1,5 @@
 /**
- * @kalem/editor — `Editor` sınıfı  (İş listesi: F2-05)
+ * @kalem-editor/editor — `Editor` sınıfı  (İş listesi: F2-05)
  *
  * ## Veri akışı
  *
@@ -17,14 +17,14 @@
  *
  * Yama hedefli: her blok kimliğiyle eşlenmiş bir elemana sahip ve bir blok
  * yalnızca **kimliği (referansı) değiştiyse** yeniden kuruluyor. Bu,
- * `@kalem/core`'un değişmez düzenleme kararının (F1-02) karşılığını aldığı
+ * `@kalem-editor/core`'un değişmez düzenleme kararının (F1-02) karşılığını aldığı
  * yer: `replaceAt` yalnızca yoldaki ataları kopyaladığı için, dokunulmayan
  * blokların referansı **aynı kalıyor** ve karşılaştırma tek bir `!==`.
  */
-import type { Definition, Inline, NodeId, Root } from "@kalem/core";
-import { createSerializeCache, parse, removeAt, replaceAt, serialize } from "@kalem/core";
-import type { BlockType, MarkType } from "@kalem/core/commands";
-import { emptyParagraph, setBlockType } from "@kalem/core/commands";
+import type { Definition, Inline, NodeId, Root } from "@kalem-editor/core";
+import { createSerializeCache, parse, removeAt, replaceAt, serialize } from "@kalem-editor/core";
+import type { BlockType, MarkType } from "@kalem-editor/core/commands";
+import { emptyParagraph, setBlockType } from "@kalem-editor/core/commands";
 import type { Caret, EditResult } from "./block-edit.js";
 import {
 	indentItem,
@@ -116,7 +116,7 @@ export interface EditorOptions {
 	 *
 	 * - bu seçeneği vermek,
 	 * - kök elemana kendiniz `aria-label` / `aria-labelledby` yazmak,
-	 * - `@kalem/ui` kullanmak — `mountUi` sözlüğünden bir ad koyuyor.
+	 * - `@kalem-editor/ui` kullanmak — `mountUi` sözlüğünden bir ad koyuyor.
 	 *
 	 * Zaten bir adı olan elemana dokunulmuyor.
 	 */
@@ -180,7 +180,7 @@ export class Editor {
 	 *
 	 * Kurucudaki `onChange`/`onSelectionChange` seçenekleri tek dinleyici
 	 * alıyor ve editör kurulduktan **sonra** eklenemiyor. Arayüz katmanı
-	 * (`@kalem/ui`) editöre dışarıdan takılıyor, o yüzden abonelik gerekli.
+	 * (`@kalem-editor/ui`) editöre dışarıdan takılıyor, o yüzden abonelik gerekli.
 	 */
 	readonly #listeners = new Map<EditorEvent, Set<(...args: never[]) => void>>();
 	readonly #plugins: PluginRegistry;
@@ -341,7 +341,7 @@ export class Editor {
 		this.#readOnly = readOnly;
 		this.#applyReadOnly();
 		// Arayüz katmanı düğmelerini buna göre kapatıyor; yoklamak yerine
-		// haber vermek, `@kalem/ui`nin editörü sürekli sorgulamasını
+		// haber vermek, `@kalem-editor/ui`nin editörü sürekli sorgulamasını
 		// gereksiz kılıyor.
 		this.#dispatch("readonlychange", readOnly);
 	}
@@ -705,7 +705,7 @@ export class Editor {
 		 * değiştiriyor ve model kalıcı: geri kalan bloklar aynı nesne
 		 * olarak kalıyor, o yüzden yeniden yazılmaları gerekmiyor.
 		 *
-		 * Önbellek `@kalem/core`'da varsayılan olarak kapalı çünkü AST
+		 * Önbellek `@kalem-editor/core`'da varsayılan olarak kapalı çünkü AST
 		 * herkese açık ve yerinde değiştirilirse bayat çıktı verir. Burada
 		 * açılabiliyor: bu belgeyi üreten de, değiştiren de editörün
 		 * kendisi.
@@ -728,7 +728,7 @@ export class Editor {
 		/*
 		 * Odaklı eleman **editörün kendi kökünden** soruluyor.
 		 *
-		 * Editör bir gölge kökün içindeyse (`@kalem/wc`nin `shadow` kipi,
+		 * Editör bir gölge kökün içindeyse (`@kalem-editor/wc`nin `shadow` kipi,
 		 * F5-03) `document.activeElement` düzenlenen bloğu değil, gölgeyi
 		 * taşıyan ana makineyi veriyor — `closest` boş dönüyor ve model
 		 * kullanıcının yazdığını hiç görmüyor. `getRootNode()` belgede

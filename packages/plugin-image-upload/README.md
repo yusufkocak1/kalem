@@ -1,4 +1,4 @@
-# @kalem/plugin-image-upload
+# @kalem-editor/plugin-image-upload
 
 Kalem plugin: image upload by drag and drop or paste, with your own upload hook.
 
@@ -6,12 +6,12 @@ Part of [Kalem](https://github.com/yusufkocak1/kalem) — a WYSIWYG editor for p
 don't know Markdown, that saves Markdown.
 
 ```bash
-npm i @kalem/plugin-image-upload
+npm i @kalem-editor/plugin-image-upload
 ```
 
 ```ts
-import { imageUploadPlugin } from '@kalem/plugin-image-upload';
-import '@kalem/themes/plugin-image.css';
+import { imageUploadPlugin } from '@kalem-editor/plugin-image-upload';
+import '@kalem-editor/themes/plugin-image.css';
 
 editor.addPlugin(
   imageUploadPlugin({

@@ -1,4 +1,4 @@
-import { matches, score } from "@kalem/ui";
+import { matches, score } from "@kalem-editor/ui";
 import { useMemo } from "react";
 import { baslikCikar, ozetCikar } from "./baslik.js";
 import type { Not } from "./depo.js";
@@ -6,7 +6,7 @@ import type { Not } from "./depo.js";
 /**
  * Kalem Notlar — Not listesi  (İş listesi: F5-05)
  *
- * ## Arama neden `@kalem/ui`den geliyor
+ * ## Arama neden `@kalem-editor/ui`den geliyor
  *
  * `foldForSearch` slash menüsü için yazılmıştı (F3-03) ama işi genel:
  * Türkçe'de `ısık` yazan biri `Işık`ı bulmalı, `İSTANBUL` araması

@@ -1,12 +1,12 @@
 /*
- * @kalem/themes — Bul ve değiştir  (İş listesi: F4-03)
+ * @kalem-editor/themes — Bul ve değiştir  (İş listesi: F4-03)
  *
- * Yalnızca `@kalem/plugin-find-replace` kullanılıyorsa yükleniyor.
+ * Yalnızca `@kalem-editor/plugin-find-replace` kullanılıyorsa yükleniyor.
  * Sözlük `tokens.css`ten; burada yalnızca eşleşme boyaması kendi rengini
  * tanımlıyor (aşağıya bakın).
  *
  * Panel `.kalem-menu` ve `.kalem-theme` sınıflarını taşıyor, yani zemin,
- * kenarlık ve gölge `ui.css`ten geliyor. Eklenti `@kalem/ui`ye
+ * kenarlık ve gölge `ui.css`ten geliyor. Eklenti `@kalem-editor/ui`ye
  * bağlanmıyor ama arayüz katmanı yüklüyse görsel olarak onunla aynı
  * dünyada duruyor; yüklü değilse buradaki kurallar tek başına yetiyor.
  */

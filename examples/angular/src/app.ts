@@ -34,7 +34,7 @@ Bu editör bir **özel eleman**. Angular için sarmalayıcı paket yok — olan
 * çünkü yazım tercihi modelde duruyor
 `;
 
-/** Elemanın yüzeyi; \`@kalem/wc\` tipi ayrıca import edilebilir. */
+/** Elemanın yüzeyi; \`@kalem-editor/wc\` tipi ayrıca import edilebilir. */
 type Kalem = HTMLElement & { value: string; readOnly: boolean };
 
 @Component({

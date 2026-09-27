@@ -15,29 +15,29 @@ download what you don't use.
 
 | What you want to do | Package | Size (min+gzip) |
 |---|---|---|
-| **Display** Markdown (read-only) | `@kalem/viewer` | 2.7 kB |
-| **Parse** Markdown (on the server, in scripts) | `@kalem/core` | 12.8 kB |
-| **Edit**, with your own UI | `@kalem/editor` | 27.5 kB |
-| The full **Word-like** experience | `@kalem/editor` + `@kalem/ui` | 36.2 kB |
+| **Display** Markdown (read-only) | `@kalem-editor/viewer` | 2.7 kB |
+| **Parse** Markdown (on the server, in scripts) | `@kalem-editor/core` | 12.8 kB |
+| **Edit**, with your own UI | `@kalem-editor/editor` | 27.5 kB |
+| The full **Word-like** experience | `@kalem-editor/editor` + `@kalem-editor/ui` | 36.2 kB |
 
 The framework wrappers add a few hundred bytes on top:
-`@kalem/react` 903 B, `@kalem/vue` 682 B, `@kalem/wc` 1.99 kB.
+`@kalem-editor/react` 907 B, `@kalem-editor/vue` 686 B, `@kalem-editor/wc` 1.99 kB.
 
 ```bash
 # The full Word-like experience
-npm i @kalem/editor @kalem/ui @kalem/themes
+npm i @kalem-editor/editor @kalem-editor/ui @kalem-editor/themes
 ```
 
 ## Your first editor in five lines
 
 ```ts
-import { Editor } from '@kalem/editor';
-import { mountUi } from '@kalem/ui';
+import { Editor } from '@kalem-editor/editor';
+import { mountUi } from '@kalem-editor/ui';
 
-import '@kalem/themes/tokens.css';
-import '@kalem/themes/viewer.css';
-import '@kalem/themes/editor.css';
-import '@kalem/themes/ui.css';
+import '@kalem-editor/themes/tokens.css';
+import '@kalem-editor/themes/viewer.css';
+import '@kalem-editor/themes/editor.css';
+import '@kalem-editor/themes/ui.css';
 
 const editor = new Editor(document.getElementById('app')!, {
   value: '# Hello\n\nStart writing, or press `/` for commands.',
@@ -71,7 +71,7 @@ language model.
 What's more, a line you didn't touch stays the same **byte-for-byte**:
 
 ```ts
-import { parse, serialize } from '@kalem/core';
+import { parse, serialize } from '@kalem-editor/core';
 
 const md = '* a list written with asterisks\n';
 serialize(parse(md)) === md; // true — it doesn't come back as `-`
@@ -91,7 +91,7 @@ The cost and the payoff of this are on the [Architecture](/en/mimari/) page.
 
 ### The UI is a separate package
 
-`@kalem/editor` works on its own but **draws no UI** — it's fully usable
+`@kalem-editor/editor` works on its own but **draws no UI** — it's fully usable
 from the keyboard. The Word-like experience comes with `mountUi`. An app
 with its own design system can write its own UI and use only the engine.
 

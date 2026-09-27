@@ -1,4 +1,4 @@
-# @kalem/plugin-find-replace
+# @kalem-editor/plugin-find-replace
 
 Kalem plugin: locale-aware find and replace.
 
@@ -6,12 +6,12 @@ Part of [Kalem](https://github.com/yusufkocak1/kalem) — a WYSIWYG editor for p
 don't know Markdown, that saves Markdown.
 
 ```bash
-npm i @kalem/plugin-find-replace
+npm i @kalem-editor/plugin-find-replace
 ```
 
 ```ts
-import { findReplacePlugin } from '@kalem/plugin-find-replace';
-import '@kalem/themes/plugin-find.css';
+import { findReplacePlugin } from '@kalem-editor/plugin-find-replace';
+import '@kalem-editor/themes/plugin-find.css';
 
 editor.addPlugin(
   findReplacePlugin(),

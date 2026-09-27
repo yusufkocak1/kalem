@@ -1,5 +1,5 @@
 /**
- * @kalem/plugin-source-mode — Kaynak kutusu  (İş listesi: F4-06)
+ * @kalem-editor/plugin-source-mode — Kaynak kutusu  (İş listesi: F4-06)
  *
  * Editörün yerine geçen `<textarea>`.
  *

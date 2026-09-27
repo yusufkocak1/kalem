@@ -1,4 +1,4 @@
-# @kalem/plugin-autosave
+# @kalem-editor/plugin-autosave
 
 Kalem plugin: debounced autosave with status indicator and crash recovery.
 
@@ -6,12 +6,12 @@ Part of [Kalem](https://github.com/yusufkocak1/kalem) — a WYSIWYG editor for p
 don't know Markdown, that saves Markdown.
 
 ```bash
-npm i @kalem/plugin-autosave
+npm i @kalem-editor/plugin-autosave
 ```
 
 ```ts
-import { autosavePlugin } from '@kalem/plugin-autosave';
-import '@kalem/themes/plugin-autosave.css';
+import { autosavePlugin } from '@kalem-editor/plugin-autosave';
+import '@kalem-editor/themes/plugin-autosave.css';
 
 editor.addPlugin(
   autosavePlugin({

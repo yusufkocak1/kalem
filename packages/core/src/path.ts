@@ -1,5 +1,5 @@
 /**
- * @kalem/core — Konum yolları  (İş listesi: F1-02)
+ * @kalem-editor/core — Konum yolları  (İş listesi: F1-02)
  *
  * Bir düğümün ağaçtaki yeri, kökten ona inen **çocuk indisleri dizisidir**.
  * `[1, 0, 2]` = kökün 1. çocuğunun 0. çocuğunun 2. çocuğu. Boş dizi kökün

@@ -6,7 +6,7 @@
  * `readInline` gerçek bir `Element`'in yalnızca dört alanına dokunuyor:
  * `nodeType`, `nodeName`, `childNodes`, `nodeValue`/`textContent` ve
  * `getAttribute`. Bu yüzden jsdom'a gerek yok — düz nesnelerle beslenebilir.
- * Aynı seçim `@kalem/core/html`'de de yapılmıştı (F1-09) ve orada işe
+ * Aynı seçim `@kalem-editor/core/html`'de de yapılmıştı (F1-09) ve orada işe
  * yaramıştı: testler hızlı, bağımlılık sıfır.
  *
  * Asıl davranış (tarayıcının gerçekten ne ürettiği) `e2e/editor.spec.ts`'te

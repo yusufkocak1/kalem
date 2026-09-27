@@ -1,5 +1,5 @@
 /**
- * @kalem/plugin-find-replace — Eşleşmeleri boyama  (İş listesi: F4-03)
+ * @kalem-editor/plugin-find-replace — Eşleşmeleri boyama  (İş listesi: F4-03)
  *
  * ## DOM'a hiç dokunulmuyor
  *
@@ -35,7 +35,7 @@
  * ayrı bir `<style>` yazmak demekti — aynı sayfada iki arama panelini
  * birden açık tutmanın bedeli olarak fazla.
  */
-import { blockElementOf, holderIn, pointAt } from "@kalem/editor";
+import { blockElementOf, holderIn, pointAt } from "@kalem-editor/editor";
 import type { Match } from "./search.js";
 
 /** Bütün eşleşmeler. */

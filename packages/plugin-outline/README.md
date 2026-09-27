@@ -1,4 +1,4 @@
-# @kalem/plugin-outline
+# @kalem-editor/plugin-outline
 
 Kalem plugin: table of contents with active heading tracking.
 
@@ -6,12 +6,12 @@ Part of [Kalem](https://github.com/yusufkocak1/kalem) — a WYSIWYG editor for p
 don't know Markdown, that saves Markdown.
 
 ```bash
-npm i @kalem/plugin-outline
+npm i @kalem-editor/plugin-outline
 ```
 
 ```ts
-import { outlinePlugin } from '@kalem/plugin-outline';
-import '@kalem/themes/plugin-outline.css';
+import { outlinePlugin } from '@kalem-editor/plugin-outline';
+import '@kalem-editor/themes/plugin-outline.css';
 
 editor.addPlugin(
   outlinePlugin({ container: document.getElementById('toc') }),

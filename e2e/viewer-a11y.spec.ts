@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 /**
- * `@kalem/viewer` — erişilebilirlik taraması  (İş listesi: F2-04)
+ * `@kalem-editor/viewer` — erişilebilirlik taraması  (İş listesi: F2-04)
  *
  * ## Ne ölçülüyor, ne ölçülmüyor
  *

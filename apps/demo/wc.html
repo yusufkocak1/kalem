@@ -3,9 +3,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kalem — &lt;kalem-editor&gt; Custom Element</title>
-<link rel="stylesheet" href="/@kalem/themes/tokens.css">
-<link rel="stylesheet" href="/@kalem/themes/viewer.css">
-<link rel="stylesheet" href="/@kalem/themes/editor.css">
+<link rel="stylesheet" href="/@kalem-editor/themes/tokens.css">
+<link rel="stylesheet" href="/@kalem-editor/themes/viewer.css">
+<link rel="stylesheet" href="/@kalem-editor/themes/editor.css">
 <style>
 	:root {
 		color-scheme: light;
@@ -165,17 +165,17 @@
 <script type="importmap">
 	{
 		"imports": {
-			"@kalem/core": "/@kalem/core/index.js",
-			"@kalem/core/commands": "/@kalem/core/commands.js",
-			"@kalem/core/html": "/@kalem/core/html.js",
-			"@kalem/editor": "/@kalem/editor/index.js",
-			"@kalem/viewer": "/@kalem/viewer/index.js",
-			"@kalem/wc": "/@kalem/wc/index.js"
+			"@kalem-editor/core": "/@kalem-editor/core/index.js",
+			"@kalem-editor/core/commands": "/@kalem-editor/core/commands.js",
+			"@kalem-editor/core/html": "/@kalem-editor/core/html.js",
+			"@kalem-editor/editor": "/@kalem-editor/editor/index.js",
+			"@kalem-editor/viewer": "/@kalem-editor/viewer/index.js",
+			"@kalem-editor/wc": "/@kalem-editor/wc/index.js"
 		}
 	}
 </script>
 <script type="module">
-	import { defineKalemEditor } from "@kalem/wc";
+	import { defineKalemEditor } from "@kalem-editor/wc";
 
 	// Kayıt açık ve tekrarlanabilir; ikinci çağrı `false` dönüyor.
 	const ilk = defineKalemEditor();

@@ -50,7 +50,7 @@ call `serialize` often yourself (for example to feed your own viewer), the
 same gain is available to you:
 
 ```ts
-import { createSerializeCache, serialize } from "@kalem/core";
+import { createSerializeCache, serialize } from "@kalem-editor/core";
 
 const cache = createSerializeCache();
 

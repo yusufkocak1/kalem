@@ -41,7 +41,7 @@ You have to choose one of three:
    linking it to a visible heading is best,
 3. use `mountUi`; it sets a name from its dictionary.
 
-Since `@kalem/editor` is headless, it contains no user-facing text and **no**
+Since `@kalem-editor/editor` is headless, it contains no user-facing text and **no**
 default string is written here: if it were, a Turkish document would be
 announced in English.
 

@@ -1,5 +1,5 @@
 /**
- * @kalem/editor — Blok kimlikleri  (İş listesi: F2-05)
+ * @kalem-editor/editor — Blok kimlikleri  (İş listesi: F2-05)
  *
  * ## Kimlik neye yarıyor
  *
@@ -14,12 +14,12 @@
  * ayrıştırıcı doldurmuyor, serileştirici yok sayıyor. Yani kimlik
  * Markdown çıktısına sızmıyor.
  */
-import type { NodeId, Root } from "@kalem/core";
+import type { NodeId, Root } from "@kalem-editor/core";
 
 /**
  * Sayaç tabanlı kimlik.
  *
- * `crypto.randomUUID` kullanılmadı: `@kalem/editor` tarayıcı paketidir ama
+ * `crypto.randomUUID` kullanılmadı: `@kalem-editor/editor` tarayıcı paketidir ama
  * kimliklerin evrensel benzersiz olması gerekmiyor — tek bir belge içinde
  * benzersiz olmaları yeter. Sayaç hem daha kısa hem test edilebilir
  * (rastgelelik yok, aynı girdi aynı kimlikleri verir).

@@ -1,5 +1,5 @@
 /**
- * @kalem/plugin-word-count — Durum çubuğu  (İş listesi: F4-05)
+ * @kalem-editor/plugin-word-count — Durum çubuğu  (İş listesi: F4-05)
  *
  * Üç sayıyı gösteren küçük bir şerit.
  *

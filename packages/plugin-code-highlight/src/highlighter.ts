@@ -1,8 +1,8 @@
 /**
- * @kalem/plugin-code-highlight — DOM boyama  (İş listesi: F4-02)
+ * @kalem-editor/plugin-code-highlight — DOM boyama  (İş listesi: F4-02)
  *
  * Belirteç listesini `<code>` elemanına yazan katman. Eklentiden ayrı
- * duruyor çünkü tek başına da işi var: `@kalem/viewer` çıktısı da aynı
+ * duruyor çünkü tek başına da işi var: `@kalem-editor/viewer` çıktısı da aynı
  * yapıyı üretiyor (`<pre><code class="language-…">`) ve salt okunur bir
  * sayfa editörü hiç yüklemeden vurgulama alabiliyor (`highlightAll`).
  *
@@ -19,7 +19,7 @@
  * düğümlerle birlikte kayboluyor. Bu yüzden karakter ofseti boyamadan
  * önce ölçülüyor, sonra geri kuruluyor.
  *
- * Ofset matematiği `@kalem/editor`den geliyor, kopyalanmadı: kural
+ * Ofset matematiği `@kalem-editor/editor`den geliyor, kopyalanmadı: kural
  * (`<br>` = 1 karakter, `<input>` = 0) editörün seçim koduyla **aynı**
  * olmak zorunda, ayrışırlarsa imleç kayar. İçe aktarılan iki fonksiyon
  * saf ve yan etkisiz; ağaç sallayan bir paketleyicide editörün geri
@@ -33,7 +33,7 @@
  * yazdığı satırın kaybolduğunu görürdü. Editörün `readCode`u da aynı
  * sebeple kendi okuyucusunu yazıyor.
  */
-import { offsetOf, pointAt } from "@kalem/editor";
+import { offsetOf, pointAt } from "@kalem-editor/editor";
 import type { LanguageLoader } from "./languages.js";
 import { builtinLanguages, langOf } from "./languages.js";
 import type { Grammar, Token } from "./token.js";

@@ -1,5 +1,5 @@
 /*
- * @kalem/themes — Arayüz katmanı  (İş listesi: F3-01)
+ * @kalem-editor/themes — Arayüz katmanı  (İş listesi: F3-01)
  *
  * `viewer.css` + `editor.css` üstüne yükleniyor. Belge tipografisi ve
  * düzenleme davranışı oradan gelir; burada yalnızca **arayüz parçaları**
@@ -17,7 +17,7 @@
  *
  * Burada **tanımlanmıyor**, yalnızca tüketiliyor. Sözlüğün tamamı
  * `tokens.css` içinde (F3-09) ve yüzen parçalar ondan okuyabilsin diye
- * `@kalem/ui` her birine `kalem-theme` sınıfını ekliyor — `<body>` altında
+ * `@kalem-editor/ui` her birine `kalem-theme` sınıfını ekliyor — `<body>` altında
  * durdukları için gömen sayfanın sarmalayıcısından miras alamıyorlar.
  *
  * Eskiden bu dosyanın kendi sözlüğü vardı (`--kalem-ui-*`) ve marka rengini
@@ -333,7 +333,7 @@
  * Tutamaç metnin **yanında** durmak zorunda; üstüne binerse tıklamaları
  * yutuyor — bağlantıya tıklamak ve bloklar arası sürükleyerek seçim
  * yapmak ikisi de tutamaca çarpıyor. Boşluğu arayüz katmanı ayırıyor,
- * çünkü ihtiyacı doğuran o: `@kalem/ui` yüklenmemişse editör boşluk
+ * çünkü ihtiyacı doğuran o: `@kalem-editor/ui` yüklenmemişse editör boşluk
  * ödemiyor.
  */
 .kalem-ui {

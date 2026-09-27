@@ -1,5 +1,5 @@
 /**
- * @kalem/plugin-source-mode — Metinler  (İş listesi: F4-06)
+ * @kalem-editor/plugin-source-mode — Metinler  (İş listesi: F4-06)
  */
 
 export interface SourceLabels {

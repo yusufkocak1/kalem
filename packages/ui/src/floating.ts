@@ -1,5 +1,5 @@
 /**
- * @kalem/ui — Yüzen katman konumlandırma  (İş listesi: F3-01)
+ * @kalem-editor/ui — Yüzen katman konumlandırma  (İş listesi: F3-01)
  *
  * ## Neden Floating UI değil
  *

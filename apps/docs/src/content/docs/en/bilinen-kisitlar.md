@@ -30,7 +30,7 @@ test twice; what's different is the shell, and the smoke test covers that.
 :::note[What "the last two versions" means]
 Kalem carries no code specific to any browser version, and the build target
 is widely supported modern syntax. The newest APIs it uses are
-`ElementInternals` (form integration, only if you use `@kalem/wc`) and
+`ElementInternals` (form integration, only if you use `@kalem-editor/wc`) and
 `CompressionStream` (only in the playground's share feature, which turns
 itself off when it's missing).
 :::
@@ -112,7 +112,7 @@ excluded**, because scripts run inside SVG.
 
 **Tables are only partly editable.** Cell text can be edited; only the edited
 row is rewritten and column alignment is kept. Adding or removing rows and
-columns, and changing alignment, comes with `@kalem/plugin-table` in v1.1.
+columns, and changing alignment, comes with `@kalem-editor/plugin-table` in v1.1.
 
 ## Not yet measured
 

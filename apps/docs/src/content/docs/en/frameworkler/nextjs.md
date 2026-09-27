@@ -4,7 +4,7 @@ description: The App Router, the server/client boundary and "use client".
 ---
 
 ```bash
-npm i @kalem/react @kalem/editor @kalem/themes
+npm i @kalem-editor/react @kalem-editor/editor @kalem-editor/themes
 ```
 
 There's **not a single line** for Kalem in the Next.js configuration: no
@@ -33,7 +33,7 @@ export default function Page() {
 // app/document-editor.tsx  — client component
 'use client';
 
-import { KalemEditor } from '@kalem/react';
+import { KalemEditor } from '@kalem-editor/react';
 import { useState } from 'react';
 
 export function DocumentEditor({ initial }: { initial: string }) {
@@ -44,7 +44,7 @@ export function DocumentEditor({ initial }: { initial: string }) {
 
 ## `"use client"` is inside the package
 
-`@kalem/react` carries its own `"use client"` directive in its build output.
+`@kalem-editor/react` carries its own `"use client"` directive in its build output.
 That removes something the host app would otherwise have to remember on
 every page.
 
@@ -67,10 +67,10 @@ text), so a `'use client'` component doesn't error while being
 
 ```tsx
 // app/layout.tsx
-import '@kalem/themes/tokens.css';
-import '@kalem/themes/viewer.css';
-import '@kalem/themes/editor.css';
-import '@kalem/themes/ui.css';
+import '@kalem-editor/themes/tokens.css';
+import '@kalem-editor/themes/viewer.css';
+import '@kalem-editor/themes/editor.css';
+import '@kalem-editor/themes/ui.css';
 ```
 
 ## Markdown → HTML on the server
@@ -78,8 +78,8 @@ import '@kalem/themes/ui.css';
 In a server component, without loading the editor at all:
 
 ```tsx
-import { parse } from '@kalem/core';
-import { renderToString } from '@kalem/viewer';
+import { parse } from '@kalem-editor/core';
+import { renderToString } from '@kalem-editor/viewer';
 
 export default function Post({ md }: { md: string }) {
   return <article className="kalem-doc kalem-theme"

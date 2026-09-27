@@ -1,5 +1,5 @@
 /**
- * @kalem/plugin-image-upload — Eklenti  (İş listesi: F4-01)
+ * @kalem-editor/plugin-image-upload — Eklenti  (İş listesi: F4-01)
  *
  * Sürüklenen ya da yapıştırılan görseli belgeye koyuyor, yüklenmesini
  * bekliyor ve adresi gerçek adresle değiştiriyor.
@@ -54,8 +54,8 @@
  * kararımız değil — `onResize` kancası veriliyor, ne yapacağına gömen
  * uygulama karar veriyor.
  */
-import type { Image, Root } from "@kalem/core";
-import type { Plugin, PluginContext } from "@kalem/editor";
+import type { Image, Root } from "@kalem-editor/core";
+import type { Plugin, PluginContext } from "@kalem-editor/editor";
 import type { AltEditor } from "./alt-editor.js";
 import { createAltEditor } from "./alt-editor.js";
 import type { ImageLabels } from "./labels.js";

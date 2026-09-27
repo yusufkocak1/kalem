@@ -1,4 +1,4 @@
-# `@kalem/wc` — tek `<script>`, derleme yok
+# `@kalem-editor/wc` — tek `<script>`, derleme yok
 
 ```bash
 pnpm build && pnpm --filter example-cdn-vanilla dev
@@ -8,15 +8,15 @@ Bu örnekte **derleme adımı, paketleyici, import haritası ve yazılmış
 JavaScript yok**. Sayfanın tamamı budur:
 
 ```html
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/tokens.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/viewer.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem/themes/css/editor.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem-editor/themes/css/tokens.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem-editor/themes/css/viewer.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@kalem-editor/themes/css/editor.css">
 
 <kalem-editor label="Belge">
     # Merhaba
 </kalem-editor>
 
-<script src="https://cdn.jsdelivr.net/npm/@kalem/wc/dist/kalem-editor.iife.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@kalem-editor/wc/dist/kalem-editor.iife.js"></script>
 ```
 
 Script IIFE: editörün ve çekirdeğin tamamı içinde (26,7 kB gzip) ve eleman

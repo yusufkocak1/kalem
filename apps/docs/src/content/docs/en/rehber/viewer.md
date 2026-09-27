@@ -3,15 +3,15 @@ title: Viewer (read-only)
 description: Render Markdown to the DOM or to an HTML string — without downloading editing code.
 ---
 
-`@kalem/viewer` **displays** Markdown; it doesn't edit it. 2.7 kB (min+gzip)
+`@kalem-editor/viewer` **displays** Markdown; it doesn't edit it. 2.7 kB (min+gzip)
 and completely independent of the editing engine: for a blog, a comment
 list or an email preview you don't need to download the editor's 27 kB.
 
 There are two outputs, and they give **the same result**:
 
 ```ts
-import { parse } from '@kalem/core';
-import { renderToDOM, renderToString } from '@kalem/viewer';
+import { parse } from '@kalem-editor/core';
+import { renderToDOM, renderToString } from '@kalem-editor/viewer';
 
 const ast = parse('# Heading\n\nA **paragraph**.');
 
@@ -77,12 +77,12 @@ clashes with your own CSS.
 
 ## Styling
 
-Typography lives in `@kalem/themes/viewer.css` and is scoped under
+Typography lives in `@kalem-editor/themes/viewer.css` and is scoped under
 `.kalem-doc` — not a single rule leaks into the rest of the page.
 
 ```ts
-import '@kalem/themes/tokens.css';
-import '@kalem/themes/viewer.css';
+import '@kalem-editor/themes/tokens.css';
+import '@kalem-editor/themes/viewer.css';
 ```
 
 If you use `renderToString`, wrap the container yourself:
@@ -98,15 +98,15 @@ The `kalem-theme` class brings in the color tokens; details in
 
 ## On the server
 
-`@kalem/core` and `@kalem/viewer` don't touch the DOM — they work the same
+`@kalem-editor/core` and `@kalem-editor/viewer` don't touch the DOM — they work the same
 in Node, in workers and in edge runtimes. A purity gate
 (`pnpm guard:purity`) verifies this in CI: `document`, `window` or
 `navigator` appearing in the core bundle fails the build.
 
 ```ts
 // On an Astro / Next.js / Express server
-import { parse } from '@kalem/core';
-import { renderToString } from '@kalem/viewer';
+import { parse } from '@kalem-editor/core';
+import { renderToString } from '@kalem-editor/viewer';
 
 export function markdownToHtml(md: string): string {
   return renderToString(parse(md));

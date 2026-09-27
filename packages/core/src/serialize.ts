@@ -1,5 +1,5 @@
 /**
- * @kalem/core — Serileştirici (AST → Markdown)  (İş listesi: F1-07)
+ * @kalem-editor/core — Serileştirici (AST → Markdown)  (İş listesi: F1-07)
  *
  * ## Tek kural
  *
@@ -450,7 +450,7 @@ function definition(node: Definition): string {
  * kelime için bütün hizalamayı bozardı.
  *
  * Satır ekleme, silme ve hizalama arayüzü v1'de yok (Karar #5, v1.1'de
- * `@kalem/plugin-table`); satır sayısı ham metinle tutmazsa tablo baştan
+ * `@kalem-editor/plugin-table`); satır sayısı ham metinle tutmazsa tablo baştan
  * üretiliyor.
  */
 function table(node: Table, o: Resolved): string {

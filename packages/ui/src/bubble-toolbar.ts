@@ -1,5 +1,5 @@
 /**
- * @kalem/ui — Balon araç çubuğu  (İş listesi: F3-01)
+ * @kalem-editor/ui — Balon araç çubuğu  (İş listesi: F3-01)
  *
  * Metin seçilince seçimin üstünde beliren araç çubuğu. Word'ün mini araç
  * çubuğunun karşılığı ve Segment A (yazılım bilmeyen kullanıcı) için
@@ -25,8 +25,8 @@
  * yalnız başına anlaşılır bir adı var ve basılı durum `aria-pressed` ile
  * duyuruluyor. Tam geçiş F3-10'da.
  */
-import type { MarkType } from "@kalem/core/commands";
-import type { Editor } from "@kalem/editor";
+import type { MarkType } from "@kalem-editor/core/commands";
+import type { Editor } from "@kalem-editor/editor";
 import { button, el, themed } from "./dom.js";
 import { position, selectionRect } from "./floating.js";
 import type { UiLabels } from "./labels.js";

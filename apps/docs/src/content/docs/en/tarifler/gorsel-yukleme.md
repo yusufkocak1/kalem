@@ -3,17 +3,17 @@ title: Image upload
 description: Drag and drop, paste, and your own storage service.
 ---
 
-`@kalem/plugin-image-upload` handles drag and drop, pasting and the file
+`@kalem-editor/plugin-image-upload` handles drag and drop, pasting and the file
 picker; **it knows nothing about the network**. Which service, which
 authentication, which retry policy — all yours.
 
 ```bash
-npm i @kalem/plugin-image-upload
+npm i @kalem-editor/plugin-image-upload
 ```
 
 ```ts
-import { imageUploadPlugin } from '@kalem/plugin-image-upload';
-import '@kalem/themes/plugin-image.css';
+import { imageUploadPlugin } from '@kalem-editor/plugin-image-upload';
+import '@kalem-editor/themes/plugin-image.css';
 
 editor.addPlugin(
   imageUploadPlugin({

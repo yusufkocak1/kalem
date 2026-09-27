@@ -1,5 +1,5 @@
 {
-  "name": "@kalem/plugin-image-upload",
+  "name": "@kalem-editor/plugin-image-upload",
   "version": "1.0.0",
   "description": "Kalem plugin: image upload by drag and drop or paste, with your own upload hook",
   "keywords": [
@@ -49,8 +49,8 @@
     "dev": "tsdown --watch"
   },
   "dependencies": {
-    "@kalem/core": "workspace:^",
-    "@kalem/editor": "workspace:^"
+    "@kalem-editor/core": "workspace:^",
+    "@kalem-editor/editor": "workspace:^"
   },
   "devDependencies": {
     "tsdown": "catalog:",

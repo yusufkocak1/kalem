@@ -5,7 +5,7 @@
  * özellik var: kimlikler benzersiz, ve kimlik atama ağacı **yerinde
  * değiştirmiyor** — editörün her yerinde değişmezlik varsayılıyor.
  */
-import { parse } from "@kalem/core";
+import { parse } from "@kalem-editor/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import { assignIds, newId, resetIds } from "./ids.js";
 

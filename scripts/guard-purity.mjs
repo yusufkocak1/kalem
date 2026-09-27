@@ -5,7 +5,7 @@
  * Projenin iki vaadini otomatik korur:
  *   1. "Vue projene React sızmaz"  → çekirdek paketlerde 3rd-party bağımlılık yok,
  *      üretim bundle'ında react/vue/preact izi yok.
- *   2. "@kalem/core SSR güvenlidir" → core bundle'ı DOM'a dokunmaz.
+ *   2. "@kalem-editor/core SSR güvenlidir" → core bundle'ı DOM'a dokunmaz.
  *
  * Bu kapı olmadan vaatler zamanla erir: birisi "sadece şu ufak yardımcıyı
  * çekeyim" der, altı ay sonra kütüphane 3 bağımlılıklı olur.
@@ -78,11 +78,11 @@ for (const ad of CEKIRDEK) {
 
 	// --- 1. Bağımlılık beyanı -------------------------------------------------
 	for (const [d] of Object.entries(pkg.dependencies ?? {})) {
-		if (!d.startsWith("@kalem/")) {
+		if (!d.startsWith("@kalem-editor/")) {
 			hata(
 				ad,
 				`3rd-party bağımlılık beyan edilmiş: "${d}"`,
-				"Çekirdek paketlerde yalnızca @kalem/* bağımlılığına izin var. Kodu içeri al ya da opsiyonel bir eklenti paketine taşı.",
+				"Çekirdek paketlerde yalnızca @kalem-editor/* bağımlılığına izin var. Kodu içeri al ya da opsiyonel bir eklenti paketine taşı.",
 			);
 		}
 	}
@@ -90,7 +90,7 @@ for (const ad of CEKIRDEK) {
 		hata(
 			ad,
 			`peerDependency beyan edilmiş: "${d}"`,
-			"Çekirdek paketlerin peerDependencies'i boş olmalı. Framework bağı yalnızca @kalem/react, @kalem/vue gibi sarmalayıcılarda olur.",
+			"Çekirdek paketlerin peerDependencies'i boş olmalı. Framework bağı yalnızca @kalem-editor/react, @kalem-editor/vue gibi sarmalayıcılarda olur.",
 		);
 	}
 
@@ -141,7 +141,7 @@ for (const ad of CEKIRDEK) {
 					hata(
 						ad,
 						`${kisa} → Node yerleşiği "${hedef}" import ediyor`,
-						"@kalem/core tarayıcıda da çalışmalı. Node'a özgü kod viewer/editor tarafına ya da ayrı bir pakete ait.",
+						"@kalem-editor/core tarayıcıda da çalışmalı. Node'a özgü kod viewer/editor tarafına ya da ayrı bir pakete ait.",
 					);
 				}
 			}
@@ -152,7 +152,7 @@ for (const ad of CEKIRDEK) {
 					hata(
 						ad,
 						`${kisa} → DOM globali "${g}" kullanıyor`,
-						"@kalem/core sunucuda (SSR, Node, worker) çalışabilmeli. DOM'a dokunan kod @kalem/viewer ya da @kalem/editor'e ait.",
+						"@kalem-editor/core sunucuda (SSR, Node, worker) çalışabilmeli. DOM'a dokunan kod @kalem-editor/viewer ya da @kalem-editor/editor'e ait.",
 					);
 				}
 			}
@@ -207,7 +207,7 @@ if (hatalar.length === 0) {
 if (!SESSIZ) {
 	console.error(`\n✗ SAFLIK KAPISI — ${hatalar.length} ihlal\n`);
 	for (const h of hatalar) {
-		console.error(`  [@kalem/${h.paket}] ${h.mesaj}`);
+		console.error(`  [@kalem-editor/${h.paket}] ${h.mesaj}`);
 		if (h.ipucu) console.error(`      ${h.ipucu}`);
 		console.error("");
 	}

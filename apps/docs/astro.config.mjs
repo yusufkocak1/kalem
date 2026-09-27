@@ -66,9 +66,9 @@ const bag = (label, en, link) => ({ label, translations: { en }, link });
 export default defineConfig({
 	site: "https://kalem.dev",
 	/*
-	 * `@kalem/core/html` modülünün dosyası `html-1.md` oluyor.
+	 * `@kalem-editor/core/html` modülünün dosyası `html-1.md` oluyor.
 	 *
-	 * TypeDoc'un dosya kaydı büyük/küçük harfe duyarsız ve `@kalem/core`
+	 * TypeDoc'un dosya kaydı büyük/küçük harfe duyarsız ve `@kalem-editor/core`
 	 * zaten `Html` adlı bir AST tipi dışa aktarıyor; iki ad çakışınca
 	 * sonrakine son ek veriliyor. Adresi elle yazan okuyucu ise `/html/`
 	 * deneyecek, o yüzden doğrusuna yönlendiriliyor.
@@ -118,7 +118,7 @@ export default defineConfig({
 						 * Varsayılan ("members") her dışa aktarma için ayrı bir
 						 * dosya üretiyor: 396 sayfa, iki dille 792 rota ve
 						 * Pagefind indeksi yirmi saniye. Okuyucunun istediği ise
-						 * "`@kalem/editor` neler veriyor" sorusunun tek yerde
+						 * "`@kalem-editor/editor` neler veriyor" sorusunun tek yerde
 						 * cevabı; sayfa içi içindekiler zaten gezinmeyi
 						 * sağlıyor.
 						 */
@@ -136,7 +136,7 @@ export default defineConfig({
 						 *
 						 * `KalemEditorElement` `HTMLElement`i genişletiyor ve
 						 * TypeDoc onun bütün üyelerini sayfaya döküyordu:
-						 * `@kalem/wc` referansı 140 kB, çekirdeğinkinden
+						 * `@kalem-editor/wc` referansı 140 kB, çekirdeğinkinden
 						 * büyük. Okuyucunun aradığı şey Kalem'in eklediği
 						 * yüzey; `HTMLElement`i MDN anlatıyor.
 						 */
@@ -163,10 +163,10 @@ export default defineConfig({
 			 * sızmıyor.
 			 */
 			customCss: [
-				"@kalem/themes/tokens.css",
-				"@kalem/themes/viewer.css",
-				"@kalem/themes/editor.css",
-				"@kalem/themes/ui.css",
+				"@kalem-editor/themes/tokens.css",
+				"@kalem-editor/themes/viewer.css",
+				"@kalem-editor/themes/editor.css",
+				"@kalem-editor/themes/ui.css",
 				"./src/styles/kalem.css",
 			],
 			// Kenar çubuğu etiketleri de çeviriliyor; dil değiştiren okuyucu

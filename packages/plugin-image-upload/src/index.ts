@@ -1,13 +1,13 @@
 /**
- * `@kalem/plugin-image-upload` — Görsel yükleme eklentisi  (İş listesi: F4-01)
+ * `@kalem-editor/plugin-image-upload` — Görsel yükleme eklentisi  (İş listesi: F4-01)
  *
  * Sürükleyerek ya da yapıştırarak görsel eklemek. Ağ hakkında hiçbir şey
  * bilmiyor: dosyayı `upload` kancasına veriyor, dönen adresi belgeye
  * yazıyor.
  *
- * Stiller ayrı: `@kalem/themes/plugin-image.css`.
+ * Stiller ayrı: `@kalem-editor/themes/plugin-image.css`.
  *
- * @module @kalem/plugin-image-upload
+ * @module @kalem-editor/plugin-image-upload
  */
 export type { AltEditor, AltEditorOptions } from "./alt-editor.js";
 export { createAltEditor } from "./alt-editor.js";

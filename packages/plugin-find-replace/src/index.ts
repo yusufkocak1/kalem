@@ -1,12 +1,12 @@
 /**
- * `@kalem/plugin-find-replace` — Bul ve değiştir  (İş listesi: F4-03)
+ * `@kalem-editor/plugin-find-replace` — Bul ve değiştir  (İş listesi: F4-03)
  *
  * Ctrl+F ile arama, Ctrl+H ile değiştirme. Arama **modelde** yapılıyor:
  * tarayıcının kendi araması ekrandaki metni bulur, bulduğunu değiştiremez
  * ve Türkçe kasa katlamasını bilmez.
  *
- *     import { findReplacePlugin } from "@kalem/plugin-find-replace";
- *     import "@kalem/themes/plugin-find.css";
+ *     import { findReplacePlugin } from "@kalem-editor/plugin-find-replace";
+ *     import "@kalem-editor/themes/plugin-find.css";
  *
  *     const editor = new Editor(el, { plugins: [findReplacePlugin()] });
  *
@@ -16,7 +16,7 @@
  * Saf katman (`createIndex`, `findMatches`, `replaceAll`) ayrıca
  * dışa açık: editörsüz bir betikte de aynı arama yapılabiliyor.
  *
- * @module @kalem/plugin-find-replace
+ * @module @kalem-editor/plugin-find-replace
  */
 export type { FoldedText } from "./fold.js";
 export { atWordBoundary, foldCase, isWordChar } from "./fold.js";

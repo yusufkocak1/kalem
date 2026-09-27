@@ -1,14 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
-import "@kalem/themes/tokens.css";
-import "@kalem/themes/viewer.css";
-import "@kalem/themes/editor.css";
+import "@kalem-editor/themes/tokens.css";
+import "@kalem-editor/themes/viewer.css";
+import "@kalem-editor/themes/editor.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
 	title: "Kalem — Next.js örneği",
-	description: "@kalem/react, App Router ile",
+	description: "@kalem-editor/react, App Router ile",
 };
 
 export const viewport: Viewport = {

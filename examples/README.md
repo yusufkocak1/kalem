@@ -6,13 +6,13 @@ derleniyor ve tarayıcıda sınanıyor (`pnpm e2e:examples`).
 
 | Örnek | Paket | Öne çıkan |
 |---|---|---|
-| [`react-vite`](react-vite/) | `@kalem/react` | Kontrollü/kontrolsüz kip, `useKalem`, `useKalemValue`, Strict Mode |
-| [`nextjs`](nextjs/) | `@kalem/react` | App Router; paket kendi `"use client"` yönergesini taşıyor |
-| [`vue-vite`](vue-vite/) | `@kalem/vue` | `v-model`, `provide`/`inject` |
-| [`nuxt`](nuxt/) | `@kalem/vue` | SSR — **`<ClientOnly>` gerekmiyor**, belge sunucuda çiziliyor |
-| [`svelte`](svelte/) | `@kalem/wc` | Sarmalayıcı yok; özel eleman özellik/olay köprüsü |
-| [`angular`](angular/) | `@kalem/wc` | Sarmalayıcı yok; `CUSTOM_ELEMENTS_SCHEMA`, zonesiz |
-| [`cdn-vanilla`](cdn-vanilla/) | `@kalem/wc` | **Tek `<script>`**, derleme yok, yazılmış JavaScript yok |
+| [`react-vite`](react-vite/) | `@kalem-editor/react` | Kontrollü/kontrolsüz kip, `useKalem`, `useKalemValue`, Strict Mode |
+| [`nextjs`](nextjs/) | `@kalem-editor/react` | App Router; paket kendi `"use client"` yönergesini taşıyor |
+| [`vue-vite`](vue-vite/) | `@kalem-editor/vue` | `v-model`, `provide`/`inject` |
+| [`nuxt`](nuxt/) | `@kalem-editor/vue` | SSR — **`<ClientOnly>` gerekmiyor**, belge sunucuda çiziliyor |
+| [`svelte`](svelte/) | `@kalem-editor/wc` | Sarmalayıcı yok; özel eleman özellik/olay köprüsü |
+| [`angular`](angular/) | `@kalem-editor/wc` | Sarmalayıcı yok; `CUSTOM_ELEMENTS_SCHEMA`, zonesiz |
+| [`cdn-vanilla`](cdn-vanilla/) | `@kalem-editor/wc` | **Tek `<script>`**, derleme yok, yazılmış JavaScript yok |
 
 ## Çalıştırmak
 
@@ -34,6 +34,6 @@ pnpm e2e:examples              # derlemeyi kendisi de çalıştırıyor
 
 ## Neden yedi tane
 
-Üçü sarmalayıcıları sınıyor (`@kalem/react`, `@kalem/vue`), dördü
+Üçü sarmalayıcıları sınıyor (`@kalem-editor/react`, `@kalem-editor/vue`), dördü
 sarmalayıcı **olmadan** çalıştığını. Bir kütüphanenin "framework-bağımsız"
 sözü, ancak bağımsızlığın ölçüldüğü yerde bir şey ifade ediyor.

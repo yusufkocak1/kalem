@@ -1,11 +1,11 @@
 /**
- * @kalem/editor — Geçmiş yığını  (İş listesi: F2-09)
+ * @kalem-editor/editor — Geçmiş yığını  (İş listesi: F2-09)
  *
  * ## Neden anlık görüntü, neden ters işlem değil
  *
  * Klasik editör geçmişi her komut için bir "ters işlem" saklar; bu, her
  * yeni komutun ayrıca tersini yazmasını gerektirir ve o tersler zamanla
- * sessizce yanlışlanır. Burada gerek yok: `@kalem/core`'un düzenleme
+ * sessizce yanlışlanır. Burada gerek yok: `@kalem-editor/core`'un düzenleme
  * işlemleri **değişmez** ve yapısal paylaşımlı (F1-02), yani bir anlık
  * görüntü tüm belgeyi kopyalamıyor — yalnızca değişen yoldaki ataları.
  * Bir geçmiş kaydı pratikte tek bir kök referansı.
@@ -21,7 +21,7 @@
  * (Enter, silme, biçim) hiç toplanmıyor: onlar kullanıcının kafasında
  * ayrı birer adım.
  */
-import type { Root } from "@kalem/core";
+import type { Root } from "@kalem-editor/core";
 import type { Caret } from "./block-edit.js";
 
 export interface HistoryState {

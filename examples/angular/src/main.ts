@@ -9,7 +9,7 @@ import { App } from "./app";
  * bileşen modeli ve Angular onu `CUSTOM_ELEMENTS_SCHEMA` ile tanıyor
  * (`app.ts`).
  */
-import "@kalem/wc/define";
+import "@kalem-editor/wc/define";
 
 bootstrapApplication(App, {
 	// Zone.js yok: değişiklik algılama sinyallerden besleniyor. Editörün

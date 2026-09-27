@@ -1,5 +1,5 @@
 /**
- * @kalem/plugin-outline — Metinler  (İş listesi: F4-04)
+ * @kalem-editor/plugin-outline — Metinler  (İş listesi: F4-04)
  *
  * İki metin; yine de ayrı dosya, çünkü diğer eklentilerle aynı kalıp ve
  * gömen uygulama `labels` seçeneğiyle ikisini de değiştirebiliyor.

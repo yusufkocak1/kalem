@@ -6,7 +6,7 @@
  * satırında yazıyor ve ikinci bir alan istemek, kullanıcıdan aynı şeyi
  * iki kez yazmasını istemek olurdu.
  *
- * Ayrıştırıcıya gitmiyor. `@kalem/core.parse` doğru cevabı verirdi ama
+ * Ayrıştırıcıya gitmiyor. `@kalem-editor/core.parse` doğru cevabı verirdi ama
  * liste her tuşta yeniden çiziliyor ve tüm notların tam ayrıştırması
  * gereksiz; burada ilk anlamlı satıra bakmak yetiyor.
  */

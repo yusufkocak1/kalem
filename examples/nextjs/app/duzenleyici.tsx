@@ -1,12 +1,12 @@
 "use client";
 
-import { KalemEditor, useKalemValue } from "@kalem/react";
+import { KalemEditor, useKalemValue } from "@kalem-editor/react";
 import { useState } from "react";
 
 /**
  * İstemci bileşeni.
  *
- * `'use client'` burada gerekli çünkü `useState` kullanıyor. `@kalem/react`
+ * `'use client'` burada gerekli çünkü `useState` kullanıyor. `@kalem-editor/react`
  * kendi yönergesini zaten taşıyor; bu dosya onu tekrar etmek zorunda
  * değildi ama kendi durumunu tuttuğu için ediyor.
  */

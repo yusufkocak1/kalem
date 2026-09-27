@@ -8,9 +8,9 @@
  * Asıl sınanan şey zamanlama: eş zamanlı kayıtlar, hata sonrası kurtarma
  * ve söküldükten sonra dönen yanıtlar.
  */
-import type { Root } from "@kalem/core";
-import { parse } from "@kalem/core";
-import type { PluginContext } from "@kalem/editor";
+import type { Root } from "@kalem-editor/core";
+import { parse } from "@kalem-editor/core";
+import type { PluginContext } from "@kalem-editor/editor";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SaveState } from "./plugin.js";
 import { autosavePlugin } from "./plugin.js";

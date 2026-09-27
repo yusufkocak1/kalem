@@ -1,5 +1,5 @@
 /**
- * @kalem/plugin-code-highlight — Belirteçleyici  (İş listesi: F4-02)
+ * @kalem-editor/plugin-code-highlight — Belirteçleyici  (İş listesi: F4-02)
  *
  * ## Neden kendi belirteçleyicimiz var
  *

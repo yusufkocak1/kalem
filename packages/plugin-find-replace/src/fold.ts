@@ -1,7 +1,7 @@
 /**
- * @kalem/plugin-find-replace — Büyük/küçük harf katlaması  (İş listesi: F4-03)
+ * @kalem-editor/plugin-find-replace — Büyük/küçük harf katlaması  (İş listesi: F4-03)
  *
- * ## Neden `@kalem/ui`nin `foldForSearch`u kullanılmadı
+ * ## Neden `@kalem-editor/ui`nin `foldForSearch`u kullanılmadı
  *
  * F3-03'te slash menüsü için yazılan katlama **aksanları da atıyor**
  * (`baş` → `bas`). Orada doğru: menüde `/bas` yazan kullanıcı "Başlık"ı

@@ -1,5 +1,5 @@
 /**
- * @kalem/core — Düğüm künye kaydı  (İş listesi: F1-01)
+ * @kalem-editor/core — Düğüm künye kaydı  (İş listesi: F1-01)
  *
  * Her düğüm tipinin hangi katmana ait olduğu ve ne tuttuğu burada tek bir
  * yerde yazılıdır. Gezinme (F1-02), render (F2) ve serileştirme (F1-07) bu

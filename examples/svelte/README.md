@@ -1,4 +1,4 @@
-# `@kalem/wc` — Vite + Svelte 5
+# `@kalem-editor/wc` — Vite + Svelte 5
 
 ```bash
 pnpm --filter example-svelte dev
@@ -9,7 +9,7 @@ Element; Svelte onu sıradan bir DOM elemanı gibi ele alıyor.
 
 ```svelte
 <script lang="ts">
-  import "@kalem/wc/define";
+  import "@kalem-editor/wc/define";
   let metin = $state("# Merhaba");
 </script>
 

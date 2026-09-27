@@ -1,5 +1,5 @@
 {
-  "name": "@kalem/plugin-find-replace",
+  "name": "@kalem-editor/plugin-find-replace",
   "version": "1.0.0",
   "description": "Kalem plugin: locale-aware find and replace",
   "keywords": [
@@ -50,8 +50,8 @@
     "dev": "tsdown --watch"
   },
   "dependencies": {
-    "@kalem/core": "workspace:^",
-    "@kalem/editor": "workspace:^"
+    "@kalem-editor/core": "workspace:^",
+    "@kalem-editor/editor": "workspace:^"
   },
   "devDependencies": {
     "tsdown": "catalog:",

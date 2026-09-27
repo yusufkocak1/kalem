@@ -48,14 +48,14 @@ const DOCS = "apps/docs/src/content/docs";
 const EN = `${DOCS}/en`;
 
 // size-limit girdilerinin adları (.size-limit.json)
-const CORE = "@kalem/core";
-const VIEWER = "@kalem/viewer";
-const EDITOR = "@kalem/editor (core dahil)";
-const WORD = "@kalem/editor + @kalem/ui — Word deneyimi";
-const IIFE = "@kalem/wc — <script> ile düşen tam paket (çekirdek + editör dâhil)";
-const REACT = "@kalem/react (React ve editör hariç)";
-const VUE = "@kalem/vue (Vue ve editör hariç)";
-const WC = "@kalem/wc (editör hariç)";
+const CORE = "@kalem-editor/core";
+const VIEWER = "@kalem-editor/viewer";
+const EDITOR = "@kalem-editor/editor (core dahil)";
+const WORD = "@kalem-editor/editor + @kalem-editor/ui — Word deneyimi";
+const IIFE = "@kalem-editor/wc — <script> ile düşen tam paket (çekirdek + editör dâhil)";
+const REACT = "@kalem-editor/react (React ve editör hariç)";
+const VUE = "@kalem-editor/vue (Vue ve editör hariç)";
+const WC = "@kalem-editor/wc (editör hariç)";
 
 const SAYI = String.raw`(\d+(?:[.,]\d+)? k?B)`;
 
@@ -76,20 +76,28 @@ function desen(kaynak) {
  */
 const IDDIALAR = [
 	// README — GitHub ve npm'in ilk gösterdiği sayfa
-	{ dosya: "README.md", desen: sonra("`@kalem/viewer` |"), olcum: VIEWER },
-	{ dosya: "README.md", desen: sonra("`@kalem/core` |"), olcum: CORE },
-	{ dosya: "README.md", desen: sonra("| `@kalem/editor` |"), olcum: EDITOR },
-	{ dosya: "README.md", desen: sonra("`@kalem/editor` + `@kalem/ui` |"), olcum: WORD },
-	{ dosya: "README.md", desen: sonra("`@kalem/wc` (IIFE build) |"), olcum: IIFE },
+	{ dosya: "README.md", desen: sonra("`@kalem-editor/viewer` |"), olcum: VIEWER },
+	{ dosya: "README.md", desen: sonra("`@kalem-editor/core` |"), olcum: CORE },
+	{ dosya: "README.md", desen: sonra("| `@kalem-editor/editor` |"), olcum: EDITOR },
+	{
+		dosya: "README.md",
+		desen: sonra("`@kalem-editor/editor` + `@kalem-editor/ui` |"),
+		olcum: WORD,
+	},
+	{ dosya: "README.md", desen: sonra("`@kalem-editor/wc` (IIFE build) |"), olcum: IIFE },
 	{ dosya: "README.md", desen: sonra("Editor + UI (min+gzip) |"), olcum: WORD },
 
 	// Duyuru metinleri ve sosyal önizleme
 	{ dosya: "docs/duyuru/show-hn.md", desen: desen("SAYI for the parser"), olcum: CORE },
 	{ dosya: "docs/duyuru/show-hn.md", desen: desen("SAYI for the editor plus"), olcum: WORD },
-	{ dosya: "docs/duyuru/devto.md", desen: sonra("| `@kalem/core` |"), olcum: CORE },
-	{ dosya: "docs/duyuru/devto.md", desen: sonra("| `@kalem/viewer` |"), olcum: VIEWER },
-	{ dosya: "docs/duyuru/devto.md", desen: sonra("| `@kalem/editor` |"), olcum: EDITOR },
-	{ dosya: "docs/duyuru/devto.md", desen: sonra("`@kalem/editor` + `@kalem/ui` |"), olcum: WORD },
+	{ dosya: "docs/duyuru/devto.md", desen: sonra("| `@kalem-editor/core` |"), olcum: CORE },
+	{ dosya: "docs/duyuru/devto.md", desen: sonra("| `@kalem-editor/viewer` |"), olcum: VIEWER },
+	{ dosya: "docs/duyuru/devto.md", desen: sonra("| `@kalem-editor/editor` |"), olcum: EDITOR },
+	{
+		dosya: "docs/duyuru/devto.md",
+		desen: sonra("`@kalem-editor/editor` + `@kalem-editor/ui` |"),
+		olcum: WORD,
+	},
 	{ dosya: "scripts/duyuru/onizleme.html", desen: desen('id="boyut">SAYI'), olcum: WORD },
 	{ dosya: "docs/duyuru/sosyal.md", desen: desen("dependencies; SAYI min\\+gzip"), olcum: WORD },
 
@@ -100,19 +108,31 @@ const IDDIALAR = [
 	{ dosya: `${DOCS}/index.mdx`, desen: sonra("Editör + arayüz (min+gzip) |"), olcum: WORD },
 
 	// Başlangıç ve mimari
-	{ dosya: `${DOCS}/baslangic.md`, desen: sonra("`@kalem/viewer` |"), olcum: VIEWER },
-	{ dosya: `${DOCS}/baslangic.md`, desen: sonra("`@kalem/core` |"), olcum: CORE },
-	{ dosya: `${DOCS}/baslangic.md`, desen: sonra("| `@kalem/editor` |"), olcum: EDITOR },
-	{ dosya: `${DOCS}/baslangic.md`, desen: sonra("`@kalem/editor` + `@kalem/ui` |"), olcum: WORD },
+	{ dosya: `${DOCS}/baslangic.md`, desen: sonra("`@kalem-editor/viewer` |"), olcum: VIEWER },
+	{ dosya: `${DOCS}/baslangic.md`, desen: sonra("`@kalem-editor/core` |"), olcum: CORE },
+	{ dosya: `${DOCS}/baslangic.md`, desen: sonra("| `@kalem-editor/editor` |"), olcum: EDITOR },
 	{
 		dosya: `${DOCS}/baslangic.md`,
-		desen: desen("`@kalem/react` SAYI, `@kalem/vue` SAYI, `@kalem/wc` SAYI"),
+		desen: sonra("`@kalem-editor/editor` + `@kalem-editor/ui` |"),
+		olcum: WORD,
+	},
+	{
+		dosya: `${DOCS}/baslangic.md`,
+		desen: desen("`@kalem-editor/react` SAYI, `@kalem-editor/vue` SAYI, `@kalem-editor/wc` SAYI"),
 		olcum: [REACT, VUE, WC],
 	},
-	{ dosya: `${DOCS}/mimari.md`, desen: sonra("| `@kalem/core` |"), olcum: CORE },
-	{ dosya: `${DOCS}/mimari.md`, desen: sonra("| `@kalem/viewer` |"), olcum: VIEWER },
-	{ dosya: `${DOCS}/mimari.md`, desen: sonra("`@kalem/editor` (çekirdek dâhil) |"), olcum: EDITOR },
-	{ dosya: `${DOCS}/mimari.md`, desen: sonra("`@kalem/editor` + `@kalem/ui` |"), olcum: WORD },
+	{ dosya: `${DOCS}/mimari.md`, desen: sonra("| `@kalem-editor/core` |"), olcum: CORE },
+	{ dosya: `${DOCS}/mimari.md`, desen: sonra("| `@kalem-editor/viewer` |"), olcum: VIEWER },
+	{
+		dosya: `${DOCS}/mimari.md`,
+		desen: sonra("`@kalem-editor/editor` (çekirdek dâhil) |"),
+		olcum: EDITOR,
+	},
+	{
+		dosya: `${DOCS}/mimari.md`,
+		desen: sonra("`@kalem-editor/editor` + `@kalem-editor/ui` |"),
+		olcum: WORD,
+	},
 	{ dosya: `${DOCS}/mimari.md`, desen: sonra("tek `<script>` derlemesi |"), olcum: IIFE },
 	{
 		dosya: `${DOCS}/mimari.md`,
@@ -144,26 +164,26 @@ const IDDIALAR = [
 	},
 	{
 		dosya: `${DOCS}/tarifler/sunucuda-markdown.md`,
-		desen: desen("`@kalem/core` tek başına SAYI"),
+		desen: desen("`@kalem-editor/core` tek başına SAYI"),
 		olcum: CORE,
 	},
 	{
 		dosya: `${DOCS}/rehber/temalar.md`,
 		desen: sonra("| `ui.css` |"),
-		olcum: "@kalem/themes/ui.css",
+		olcum: "@kalem-editor/themes/ui.css",
 	},
 	...[
-		["plugin-code-highlight", "@kalem/plugin-code-highlight (sekiz dil paketi dahil)"],
-		["plugin-find-replace", "@kalem/plugin-find-replace"],
-		["plugin-image-upload", "@kalem/plugin-image-upload"],
-		["plugin-outline", "@kalem/plugin-outline"],
-		["plugin-word-count", "@kalem/plugin-word-count"],
-		["plugin-source-mode", "@kalem/plugin-source-mode"],
-		["plugin-autosave", "@kalem/plugin-autosave"],
+		["plugin-code-highlight", "@kalem-editor/plugin-code-highlight (sekiz dil paketi dahil)"],
+		["plugin-find-replace", "@kalem-editor/plugin-find-replace"],
+		["plugin-image-upload", "@kalem-editor/plugin-image-upload"],
+		["plugin-outline", "@kalem-editor/plugin-outline"],
+		["plugin-word-count", "@kalem-editor/plugin-word-count"],
+		["plugin-source-mode", "@kalem-editor/plugin-source-mode"],
+		["plugin-autosave", "@kalem-editor/plugin-autosave"],
 	].flatMap(([paket, olcum]) =>
 		[`${DOCS}/rehber/eklentiler.md`, `${EN}/rehber/eklentiler.md`].map((dosya) => ({
 			dosya,
-			desen: sonra(`| \`@kalem/${paket}\` |`),
+			desen: sonra(`| \`@kalem-editor/${paket}\` |`),
 			olcum,
 		})),
 	),
@@ -182,19 +202,31 @@ const IDDIALAR = [
 	{ dosya: `${EN}/index.mdx`, desen: sonra("<b>core</b>"), olcum: CORE },
 	{ dosya: `${EN}/index.mdx`, desen: sonra("<b>viewer</b>"), olcum: VIEWER },
 	{ dosya: `${EN}/index.mdx`, desen: sonra("Editor + UI (min+gzip) |"), olcum: WORD },
-	{ dosya: `${EN}/baslangic.md`, desen: sonra("`@kalem/viewer` |"), olcum: VIEWER },
-	{ dosya: `${EN}/baslangic.md`, desen: sonra("`@kalem/core` |"), olcum: CORE },
-	{ dosya: `${EN}/baslangic.md`, desen: sonra("| `@kalem/editor` |"), olcum: EDITOR },
-	{ dosya: `${EN}/baslangic.md`, desen: sonra("`@kalem/editor` + `@kalem/ui` |"), olcum: WORD },
+	{ dosya: `${EN}/baslangic.md`, desen: sonra("`@kalem-editor/viewer` |"), olcum: VIEWER },
+	{ dosya: `${EN}/baslangic.md`, desen: sonra("`@kalem-editor/core` |"), olcum: CORE },
+	{ dosya: `${EN}/baslangic.md`, desen: sonra("| `@kalem-editor/editor` |"), olcum: EDITOR },
 	{
 		dosya: `${EN}/baslangic.md`,
-		desen: desen("`@kalem/react` SAYI, `@kalem/vue` SAYI, `@kalem/wc` SAYI"),
+		desen: sonra("`@kalem-editor/editor` + `@kalem-editor/ui` |"),
+		olcum: WORD,
+	},
+	{
+		dosya: `${EN}/baslangic.md`,
+		desen: desen("`@kalem-editor/react` SAYI, `@kalem-editor/vue` SAYI, `@kalem-editor/wc` SAYI"),
 		olcum: [REACT, VUE, WC],
 	},
-	{ dosya: `${EN}/mimari.md`, desen: sonra("| `@kalem/core` |"), olcum: CORE },
-	{ dosya: `${EN}/mimari.md`, desen: sonra("| `@kalem/viewer` |"), olcum: VIEWER },
-	{ dosya: `${EN}/mimari.md`, desen: sonra("`@kalem/editor` (core included) |"), olcum: EDITOR },
-	{ dosya: `${EN}/mimari.md`, desen: sonra("`@kalem/editor` + `@kalem/ui` |"), olcum: WORD },
+	{ dosya: `${EN}/mimari.md`, desen: sonra("| `@kalem-editor/core` |"), olcum: CORE },
+	{ dosya: `${EN}/mimari.md`, desen: sonra("| `@kalem-editor/viewer` |"), olcum: VIEWER },
+	{
+		dosya: `${EN}/mimari.md`,
+		desen: sonra("`@kalem-editor/editor` (core included) |"),
+		olcum: EDITOR,
+	},
+	{
+		dosya: `${EN}/mimari.md`,
+		desen: sonra("`@kalem-editor/editor` + `@kalem-editor/ui` |"),
+		olcum: WORD,
+	},
 	{ dosya: `${EN}/mimari.md`, desen: sonra("the single `<script>` build |"), olcum: IIFE },
 	{
 		dosya: `${EN}/mimari.md`,
@@ -228,10 +260,14 @@ const IDDIALAR = [
 	},
 	{
 		dosya: `${EN}/tarifler/sunucuda-markdown.md`,
-		desen: desen("`@kalem/core` on its own is SAYI"),
+		desen: desen("`@kalem-editor/core` on its own is SAYI"),
 		olcum: CORE,
 	},
-	{ dosya: `${EN}/rehber/temalar.md`, desen: sonra("| `ui.css` |"), olcum: "@kalem/themes/ui.css" },
+	{
+		dosya: `${EN}/rehber/temalar.md`,
+		desen: sonra("| `ui.css` |"),
+		olcum: "@kalem-editor/themes/ui.css",
+	},
 ];
 
 // ---------------------------------------------------------------------------

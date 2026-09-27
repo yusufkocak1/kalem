@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * `@kalem/plugin-code-highlight`  (İş listesi: F4-02)
+ * `@kalem-editor/plugin-code-highlight`  (İş listesi: F4-02)
  *
  * Birim testleri belirteçleyicinin doğruluğunu sabitliyor; burada ölçülen
  * gerçek tarayıcıda **tembel yüklemenin** çalıştığı, boyamanın belgeyi
@@ -89,7 +89,7 @@ test("dil paketi ayrı bir istek olarak ve yalnızca gerekince iniyor", async ({
 	// ulaşıyor ve WebKit'te bu gecikme `whenIdle`ın ötesine taşabiliyor.
 	// Beklenen liste yine tam — yalnızca varışı bekleniyor.
 	await yaz(page, '```json\n{"a": 1}\n```\n');
-	await expect.poll(() => inenler).toEqual(["/@kalem/plugin-code-highlight/langs/json.js"]);
+	await expect.poll(() => inenler).toEqual(["/@kalem-editor/plugin-code-highlight/langs/json.js"]);
 	await expect(page.locator("#editor pre code .kalem-tok-property")).toHaveText('"a"');
 
 	// Belgede geçmeyen diller hiç inmiyor — kabul kriterinin çalışma
@@ -98,8 +98,8 @@ test("dil paketi ayrı bir istek olarak ve yalnızca gerekince iniyor", async ({
 	await expect
 		.poll(() => inenler)
 		.toEqual([
-			"/@kalem/plugin-code-highlight/langs/json.js",
-			"/@kalem/plugin-code-highlight/langs/sql.js",
+			"/@kalem-editor/plugin-code-highlight/langs/json.js",
+			"/@kalem-editor/plugin-code-highlight/langs/sql.js",
 		]);
 });
 

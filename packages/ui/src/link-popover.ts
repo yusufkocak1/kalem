@@ -1,5 +1,5 @@
 /**
- * @kalem/ui — Bağlantı düzenleme akışı  (İş listesi: F3-02)
+ * @kalem-editor/ui — Bağlantı düzenleme akışı  (İş listesi: F3-02)
  *
  * ## Üç giriş yolu
  *
@@ -22,8 +22,8 @@
  * kullanıcıların çoğu şema yazmıyor ve göreli yol niyetiyle `ornek.com`
  * yazan kimse yok.
  */
-import { isSafeUrl } from "@kalem/core";
-import type { Editor } from "@kalem/editor";
+import { isSafeUrl } from "@kalem-editor/core";
+import type { Editor } from "@kalem-editor/editor";
 import { button, el, themed } from "./dom.js";
 import { position } from "./floating.js";
 import type { UiLabels } from "./labels.js";

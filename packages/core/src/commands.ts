@@ -1,5 +1,5 @@
 /**
- * @kalem/core — Komut çekirdeği  (İş listesi: F1-11)
+ * @kalem-editor/core — Komut çekirdeği  (İş listesi: F1-11)
  *
  * Editörün AST üzerinde yapacağı işlemler — **DOM'suz ve saf**. Faz 2'deki
  * editör motoru bunları çağıracak; saf oldukları için ondan bağımsız test
@@ -13,7 +13,7 @@
  * Editör bir seçim tutar ve seçim yollarla ifade edilir. Komutlar da aynı
  * dili konuşursa aradaki dönüşüm katmanı gerekmez.
  *
- * @module @kalem/core/commands
+ * @module @kalem-editor/core/commands
  */
 import type { Block, Heading, Inline, List, ListItem, Node, Paragraph, Root } from "./ast.js";
 import { insertAt, removeAt, replaceAt } from "./edit.js";

@@ -49,61 +49,64 @@ derle();
 /**
  * Paket çıktılarını da servis eder.
  *
- * Demo sayfası `@kalem/core`'u **gerçek derlenmiş bundle'dan** yükler —
+ * Demo sayfası `@kalem-editor/core`'u **gerçek derlenmiş bundle'dan** yükler —
  * kaynak kodu tekrar etmek yerine. Böylece sayfada görülen davranış, npm'e
  * gidecek olanla birebir aynı.
  */
 const PAKETLER = [
-	{ onEk: "/@kalem/core/", kok: fileURLToPath(new URL("../packages/core/dist/", import.meta.url)) },
 	{
-		onEk: "/@kalem/viewer/",
+		onEk: "/@kalem-editor/core/",
+		kok: fileURLToPath(new URL("../packages/core/dist/", import.meta.url)),
+	},
+	{
+		onEk: "/@kalem-editor/viewer/",
 		kok: fileURLToPath(new URL("../packages/viewer/dist/", import.meta.url)),
 	},
 	{
-		onEk: "/@kalem/editor/",
+		onEk: "/@kalem-editor/editor/",
 		kok: fileURLToPath(new URL("../packages/editor/dist/", import.meta.url)),
 	},
 	{
-		onEk: "/@kalem/ui/",
+		onEk: "/@kalem-editor/ui/",
 		kok: fileURLToPath(new URL("../packages/ui/dist/", import.meta.url)),
 	},
 	{
-		onEk: "/@kalem/plugin-image-upload/",
+		onEk: "/@kalem-editor/plugin-image-upload/",
 		kok: fileURLToPath(new URL("../packages/plugin-image-upload/dist/", import.meta.url)),
 	},
 	// Dil paketleri `dist/langs/` altında; önek eşlemesi alt klasörü de
 	// taşıyor, yani tarayıcının `import()` çağrısı doğrudan çalışıyor.
 	{
-		onEk: "/@kalem/plugin-code-highlight/",
+		onEk: "/@kalem-editor/plugin-code-highlight/",
 		kok: fileURLToPath(new URL("../packages/plugin-code-highlight/dist/", import.meta.url)),
 	},
 	{
-		onEk: "/@kalem/plugin-find-replace/",
+		onEk: "/@kalem-editor/plugin-find-replace/",
 		kok: fileURLToPath(new URL("../packages/plugin-find-replace/dist/", import.meta.url)),
 	},
 	{
-		onEk: "/@kalem/plugin-outline/",
+		onEk: "/@kalem-editor/plugin-outline/",
 		kok: fileURLToPath(new URL("../packages/plugin-outline/dist/", import.meta.url)),
 	},
 	{
-		onEk: "/@kalem/plugin-word-count/",
+		onEk: "/@kalem-editor/plugin-word-count/",
 		kok: fileURLToPath(new URL("../packages/plugin-word-count/dist/", import.meta.url)),
 	},
 	{
-		onEk: "/@kalem/plugin-source-mode/",
+		onEk: "/@kalem-editor/plugin-source-mode/",
 		kok: fileURLToPath(new URL("../packages/plugin-source-mode/dist/", import.meta.url)),
 	},
 	{
-		onEk: "/@kalem/plugin-autosave/",
+		onEk: "/@kalem-editor/plugin-autosave/",
 		kok: fileURLToPath(new URL("../packages/plugin-autosave/dist/", import.meta.url)),
 	},
 	{
-		onEk: "/@kalem/wc/",
+		onEk: "/@kalem-editor/wc/",
 		kok: fileURLToPath(new URL("../packages/wc/dist/", import.meta.url)),
 	},
 	// Temalar saf CSS; derleme adımı yok, kaynak doğrudan servis ediliyor.
 	{
-		onEk: "/@kalem/themes/",
+		onEk: "/@kalem-editor/themes/",
 		kok: fileURLToPath(new URL("../packages/themes/css/", import.meta.url)),
 	},
 ];

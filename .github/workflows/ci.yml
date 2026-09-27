@@ -194,6 +194,6 @@ jobs:
 
       # Kapı derlemeden **sonra**: iki denetimi var ve ikincisi üretilen
       # referansa bakıyor. Birincisi elle yazılan sayfalardaki her
-      # `import { … } from "@kalem/…"` adının gerçekten var olduğunu,
+      # `import { … } from "@kalem-editor/…"` adının gerçekten var olduğunu,
       # ikincisi her genel dışa aktarmanın referansta geçtiğini ölçüyor.
       - run: pnpm guard:docs

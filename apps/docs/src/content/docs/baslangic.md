@@ -15,29 +15,29 @@ indirmezsiniz.
 
 | Ne yapmak istiyorsunuz | Paket | Boyut (min+gzip) |
 |---|---|---|
-| Markdown'ı **göstermek** (salt okunur) | `@kalem/viewer` | 2,7 kB |
-| Markdown'ı **ayrıştırmak** (sunucuda, betikte) | `@kalem/core` | 12,8 kB |
-| **Düzenlemek**, kendi arayüzünüzle | `@kalem/editor` | 27,5 kB |
-| **Word benzeri** tam deneyim | `@kalem/editor` + `@kalem/ui` | 36,2 kB |
+| Markdown'ı **göstermek** (salt okunur) | `@kalem-editor/viewer` | 2,7 kB |
+| Markdown'ı **ayrıştırmak** (sunucuda, betikte) | `@kalem-editor/core` | 12,8 kB |
+| **Düzenlemek**, kendi arayüzünüzle | `@kalem-editor/editor` | 27,5 kB |
+| **Word benzeri** tam deneyim | `@kalem-editor/editor` + `@kalem-editor/ui` | 36,2 kB |
 
 Çerçeve sarmalayıcıları bunların üstüne birkaç yüz bayt ekliyor:
-`@kalem/react` 903 B, `@kalem/vue` 682 B, `@kalem/wc` 1,99 kB.
+`@kalem-editor/react` 907 B, `@kalem-editor/vue` 686 B, `@kalem-editor/wc` 1,99 kB.
 
 ```bash
 # Word benzeri tam deneyim
-npm i @kalem/editor @kalem/ui @kalem/themes
+npm i @kalem-editor/editor @kalem-editor/ui @kalem-editor/themes
 ```
 
 ## Beş satırda ilk editör
 
 ```ts
-import { Editor } from '@kalem/editor';
-import { mountUi } from '@kalem/ui';
+import { Editor } from '@kalem-editor/editor';
+import { mountUi } from '@kalem-editor/ui';
 
-import '@kalem/themes/tokens.css';
-import '@kalem/themes/viewer.css';
-import '@kalem/themes/editor.css';
-import '@kalem/themes/ui.css';
+import '@kalem-editor/themes/tokens.css';
+import '@kalem-editor/themes/viewer.css';
+import '@kalem-editor/themes/editor.css';
+import '@kalem-editor/themes/ui.css';
 
 const editor = new Editor(document.getElementById('app')!, {
   value: '# Merhaba\n\nYazmaya başlayın veya `/` ile komut çalıştırın.',
@@ -71,7 +71,7 @@ bir dil modeline doğrudan verilebiliyor.
 Dahası, dokunulmayan satır **byte düzeyinde** aynı kalıyor:
 
 ```ts
-import { parse, serialize } from '@kalem/core';
+import { parse, serialize } from '@kalem-editor/core';
 
 const md = '* yıldızla yazılmış liste\n';
 serialize(parse(md)) === md; // true — `-` olarak geri gelmiyor
@@ -90,7 +90,7 @@ Bunun bedeli ve kazancı [Mimari](/mimari/) sayfasında.
 
 ### Arayüz ayrı bir paket
 
-`@kalem/editor` tek başına çalışıyor ama **hiçbir arayüz çizmiyor** —
+`@kalem-editor/editor` tek başına çalışıyor ama **hiçbir arayüz çizmiyor** —
 klavyeyle tam işlevli. Word benzeri deneyim `mountUi` ile geliyor.
 Kendi tasarım sistemi olan bir uygulama, arayüzü kendisi yazıp yalnızca
 motoru kullanabiliyor.

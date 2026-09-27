@@ -21,8 +21,8 @@ asterisk list doesn't turn into `-`, and the `1)` delimiter doesn't become `1.`.
 <CanliVanilla dil="en" />
 
 ```ts
-import { Editor } from '@kalem/editor';
-import { mountUi } from '@kalem/ui';
+import { Editor } from '@kalem-editor/editor';
+import { mountUi } from '@kalem-editor/ui';
 
 const editor = new Editor(container, {
   value: SAMPLE_DOCUMENT,
@@ -40,8 +40,8 @@ mountUi(editor, { toolbar: 'both' });
 <CanliReact client:load dil="en" />
 
 ```tsx
-import { KalemEditor, useKalemValue } from '@kalem/react';
-import { mountUi } from '@kalem/ui';
+import { KalemEditor, useKalemValue } from '@kalem-editor/react';
+import { mountUi } from '@kalem-editor/ui';
 
 function Output() {
   const text = useKalemValue(SAMPLE_DOCUMENT);
@@ -65,8 +65,8 @@ function Output() {
 
 ```vue
 <script setup lang="ts">
-import { KalemEditor } from '@kalem/vue';
-import { mountUi } from '@kalem/ui';
+import { KalemEditor } from '@kalem-editor/vue';
+import { mountUi } from '@kalem-editor/ui';
 import { ref } from 'vue';
 
 const text = ref(SAMPLE_DOCUMENT);
@@ -93,7 +93,7 @@ proving it is another matter.
 
 This site is built with [Astro Starlight](https://starlight.astro.build) and
 runs **both React and Vue islands** at the same time. The three editors above
-live on one page, on one `@kalem/editor` engine.
+live on one page, on one `@kalem-editor/editor` engine.
 
 This page couldn't have been written with Vue-based VitePress or React-based
 Docusaurus — the choice of documentation tool is part of the message.

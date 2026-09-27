@@ -1,5 +1,5 @@
 /**
- * @kalem/plugin-find-replace — Değiştirme  (İş listesi: F4-03)
+ * @kalem-editor/plugin-find-replace — Değiştirme  (İş listesi: F4-03)
  *
  * ## Neden sondan başa
  *
@@ -20,8 +20,8 @@
  * yazardı ve kullanıcı Ctrl+Z'ye basınca değişikliğin tamamı değil
  * sonuncusu geri alınırdı — istediği şey bu değil.
  */
-import type { Root } from "@kalem/core";
-import type { EditResult } from "@kalem/editor";
+import type { Root } from "@kalem-editor/core";
+import type { EditResult } from "@kalem-editor/editor";
 import type { Region } from "./regions.js";
 import { caretAt, replaceInRegion } from "./regions.js";
 import type { Match } from "./search.js";

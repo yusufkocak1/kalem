@@ -5,7 +5,7 @@
  * saf olarak sınanıyor. Tarayıcı testleri yalnızca `paste` olayının buraya
  * doğru bağlandığını doğruluyor.
  */
-import { parse, serialize } from "@kalem/core";
+import { parse, serialize } from "@kalem-editor/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Caret } from "./block-edit.js";
 import { assignIds, resetIds } from "./ids.js";

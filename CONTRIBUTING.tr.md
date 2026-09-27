@@ -41,10 +41,10 @@ eklenti paketine taşı.
 Üretim bundle'ında `react` / `vue` / `preact` / `svelte` izi olamaz.
 Kullanıcının Vue projesine React girmemesi bu kütüphanenin temel vaadi.
 
-Framework bağı yalnızca `@kalem/react`, `@kalem/vue` sarmalayıcılarında,
+Framework bağı yalnızca `@kalem-editor/react`, `@kalem-editor/vue` sarmalayıcılarında,
 `peerDependencies` olarak bulunur.
 
-### 3. `@kalem/core` DOM'a dokunmaz
+### 3. `@kalem-editor/core` DOM'a dokunmaz
 
 Core sunucuda (SSR, Node, worker) çalışabilmeli. `document`, `window`,
 `navigator`, `localStorage` core'da yasak — tip düzeyinde de engelli
@@ -77,10 +77,10 @@ const proto = url.toLowerCase(); // kalem-locale-ok: URL şeması ASCII
 
 | Paket | Bütçe (min+gzip) |
 |---|---|
-| `@kalem/core` | 14 kB |
-| `@kalem/viewer` | 14 kB |
-| `@kalem/editor` (core dahil) | 38 kB |
-| `@kalem/editor` + `@kalem/ui` | 58 kB |
+| `@kalem-editor/core` | 14 kB |
+| `@kalem-editor/viewer` | 14 kB |
+| `@kalem-editor/editor` (core dahil) | 38 kB |
+| `@kalem-editor/editor` + `@kalem-editor/ui` | 58 kB |
 
 `pnpm size` bunu denetler. Bütçe aşımı build'i kırar — bütçeyi yükseltmek
 bir karardır, PR'da gerekçelendirilmelidir.

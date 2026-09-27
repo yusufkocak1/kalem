@@ -2,16 +2,16 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.js";
 
-import "@kalem/themes/tokens.css";
-import "@kalem/themes/viewer.css";
-import "@kalem/themes/editor.css";
-import "@kalem/themes/ui.css";
-import "@kalem/themes/plugin-code.css";
-import "@kalem/themes/plugin-find.css";
-import "@kalem/themes/plugin-outline.css";
-import "@kalem/themes/plugin-word-count.css";
-import "@kalem/themes/plugin-source.css";
-import "@kalem/themes/plugin-autosave.css";
+import "@kalem-editor/themes/tokens.css";
+import "@kalem-editor/themes/viewer.css";
+import "@kalem-editor/themes/editor.css";
+import "@kalem-editor/themes/ui.css";
+import "@kalem-editor/themes/plugin-code.css";
+import "@kalem-editor/themes/plugin-find.css";
+import "@kalem-editor/themes/plugin-outline.css";
+import "@kalem-editor/themes/plugin-word-count.css";
+import "@kalem-editor/themes/plugin-source.css";
+import "@kalem-editor/themes/plugin-autosave.css";
 import "./stil.css";
 
 /*

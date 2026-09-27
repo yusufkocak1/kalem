@@ -1,4 +1,4 @@
-# @kalem/core
+# @kalem-editor/core
 
 Markdown AST, parser and lossless serializer — no DOM, zero dependencies.
 
@@ -6,11 +6,11 @@ Part of [Kalem](https://github.com/yusufkocak1/kalem) — a WYSIWYG editor for p
 don't know Markdown, that saves Markdown.
 
 ```bash
-npm i @kalem/core
+npm i @kalem-editor/core
 ```
 
 ```ts
-import { parse, serialize } from '@kalem/core';
+import { parse, serialize } from '@kalem-editor/core';
 
 const md = '* a list written with asterisks\n';
 const ast = parse(md);        // an mdast-shaped tree

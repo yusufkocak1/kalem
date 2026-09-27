@@ -4,7 +4,7 @@ description: App Router, sunucu/istemci sınırı ve "use client".
 ---
 
 ```bash
-npm i @kalem/react @kalem/editor @kalem/themes
+npm i @kalem-editor/react @kalem-editor/editor @kalem-editor/themes
 ```
 
 Next.js yapılandırmasında Kalem'e ait **tek satır yok**: ne
@@ -33,7 +33,7 @@ export default function Sayfa() {
 // app/duzenleyici.tsx  — istemci bileşeni
 'use client';
 
-import { KalemEditor } from '@kalem/react';
+import { KalemEditor } from '@kalem-editor/react';
 import { useState } from 'react';
 
 export function Duzenleyici({ baslangic }: { baslangic: string }) {
@@ -44,7 +44,7 @@ export function Duzenleyici({ baslangic }: { baslangic: string }) {
 
 ## `"use client"` paketin içinde
 
-`@kalem/react` derleme çıktısında kendi `"use client"` yönergesini
+`@kalem-editor/react` derleme çıktısında kendi `"use client"` yönergesini
 taşıyor. Bu, gömen uygulamanın her sayfada hatırlaması gereken bir şeyi
 ortadan kaldırıyor.
 
@@ -67,10 +67,10 @@ hata çıkmıyor.
 
 ```tsx
 // app/layout.tsx
-import '@kalem/themes/tokens.css';
-import '@kalem/themes/viewer.css';
-import '@kalem/themes/editor.css';
-import '@kalem/themes/ui.css';
+import '@kalem-editor/themes/tokens.css';
+import '@kalem-editor/themes/viewer.css';
+import '@kalem-editor/themes/editor.css';
+import '@kalem-editor/themes/ui.css';
 ```
 
 ## Sunucuda Markdown → HTML
@@ -78,8 +78,8 @@ import '@kalem/themes/ui.css';
 Editörü hiç yüklemeden, sunucu bileşeninde:
 
 ```tsx
-import { parse } from '@kalem/core';
-import { renderToString } from '@kalem/viewer';
+import { parse } from '@kalem-editor/core';
+import { renderToString } from '@kalem-editor/viewer';
 
 export default function Yazi({ md }: { md: string }) {
   return <article className="kalem-doc kalem-theme"

@@ -12,7 +12,7 @@
  * `mountUi(editor)`. Bir okuyucu o satırı kopyalasa `is not a function`
  * alırdı ve kütüphaneyi bir daha denemezdi.
  *
- * Denetlenen şey dar ve bu bilerek: her `import { … } from "@kalem/…"`
+ * Denetlenen şey dar ve bu bilerek: her `import { … } from "@kalem-editor/…"`
  * satırındaki her ad, o paketin gerçekten dışa aktardığı bir şey mi.
  * Tip denetimi değil — örnekler kısaltılmış ve bağlamsız olduğu için
  * derlenmeleri beklenmiyor; ama **yazılan adların** var olması
@@ -143,7 +143,7 @@ for (const sayfa of sayfaListesi) {
 	).replaceAll("\\", "/");
 
 	for (const m of kod.matchAll(
-		/import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+['"](@kalem\/[^'"]+)['"]/g,
+		/import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+['"](@kalem-editor\/[^'"]+)['"]/g,
 	)) {
 		const paket = m[2];
 		// CSS girişleri ve dil paketleri denetim dışı.
@@ -190,6 +190,21 @@ if (!apiAtlandi) {
 			}
 		}
 	}
+}
+
+/*
+ * Hiçbir içe aktarma yakalanmadıysa kapı **boşa** çalışıyor demek.
+ *
+ * Paket kapsamı `@kalem` → `@kalem-editor` olunca yukarıdaki desen eski
+ * adda kaldı; kapı 73 sayfayı tarayıp "0 import adı doğrulandı" diyerek
+ * yeşil geçti. Belgelerde yüzlerce içe aktarma varken sıfır, ancak desenin
+ * bozulduğu anlamına gelir.
+ */
+if (sayfaListesi.length > 0 && denetlenen === 0) {
+	hatalar.push({
+		sayfa: "(kapı)",
+		mesaj: "hiçbir import yakalanmadı — içe aktarma deseni paket adlarıyla uyuşmuyor",
+	});
 }
 
 // ---------------------------------------------------------------------------
