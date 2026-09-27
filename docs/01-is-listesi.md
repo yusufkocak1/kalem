@@ -3004,8 +3004,10 @@ ve release — changesets'in paket başına 15 ayrı release'i yerine.
 
 1. **`@kalem` kapsamı sende mi?** Paket adları npm'de boş (404), ama
    kapsamın sahibi buradan doğrulanamadı (npm oturumu yok, npmjs.com
-   otomatik isteğe 403). `npm login`, sonra `npm org create kalem` ya da
-   npm'de "kalem" adlı bir kuruluş oluştur. Kapsam başkasınınsa bütün
+   otomatik isteğe 403). `npm login`, sonra kuruluşu **web sitesinden**
+   aç: https://www.npmjs.com/org/create → ad `kalem` (npm CLI'da kuruluş
+   oluşturan komut yok; `npm org` yalnızca üyeleri yönetiyor). Doğrulama:
+   `npm org ls kalem` seni `owner` olarak listelemeli. Kapsam başkasınınsa bütün
    paket adları değişmeli (ör. `@kalemjs/*`) — o durumda söyle, adlar tek
    komutla değiştirilebilir ama belgelerde çok yerde geçiyor.
 2. **Depoyu herkese açık yap.** Provenance imzası özel depolarda çalışmıyor;
