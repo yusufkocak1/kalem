@@ -44,5 +44,6 @@ Thumbs.db
 # Duyuru kaydının ara kareleri (scripts/duyuru/kaydet.mjs)
 docs/duyuru/.kareler/
 
-# electron-builder output (apps/desktop)
-apps/desktop/release/
+# electron-builder output (apps/desktop); only the portable build is tracked
+apps/desktop/release/*
+!apps/desktop/release/*.exe

@@ -14,6 +14,7 @@ packages/core/fixtures/** -text
 *.webp binary
 *.woff2 binary
 *.ico binary
+*.exe binary
 
 # Diff gürültüsünü azalt
 pnpm-lock.yaml -diff linguist-generated
