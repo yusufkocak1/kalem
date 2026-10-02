@@ -184,14 +184,18 @@ test.describe("erişilebilirlik", () => {
 	});
 
 	test("ok tuşlarıyla düğmeler arasında geziniliyor", async ({ page }) => {
+		/*
+		 * Önce balonun görünmesi bekleniyor: balon seçimden bir kare sonra
+		 * beliriyor ve gizli bir düğmeye `focus()` sessizce boşa gidiyor.
+		 * CI'da odak hiç düğmeye geçmiyor, ok tuşu da editöre gidiyordu.
+		 */
 		await secimYap(page);
-		await page.locator(`${BALON} button`).first().focus();
+		await expect(page.locator(BALON)).toBeVisible();
+		const ilk = page.locator(`${BALON} button`).first();
+		await ilk.focus();
+		await expect(ilk).toBeFocused();
 		await page.keyboard.press("ArrowRight");
-		const odakEtiketi = await page.evaluate(
-			() => document.activeElement?.getAttribute("aria-label") ?? "",
-		);
-		const ikinciEtiket = await page.locator(`${BALON} button`).nth(1).getAttribute("aria-label");
-		expect(odakEtiketi).toBe(ikinciEtiket);
+		await expect(page.locator(`${BALON} button`).nth(1)).toBeFocused();
 	});
 
 	/** Belge `lang="tr"`; metinler Türkçe gelmeli. */

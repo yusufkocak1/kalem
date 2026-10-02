@@ -45,6 +45,15 @@ test.beforeEach(async ({ page }) => {
  * `<input>` gerektiriyor ve burada öyle bir eleman yok — kullanıcı dosyayı
  * doğrudan metnin üstüne bırakıyor.
  */
+/**
+ * Ağdan bağımsız sınama görseli: 120×80 düz renkli bir SVG.
+ *
+ * Tıklanacak kadar büyük olmalı — 1×1'lik bir görselde Firefox'ta
+ * tıklama görsele değil çevreleyen paragrafa düşüyordu.
+ */
+const SVG_GORSEL =
+	'<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"><rect width="120" height="80" fill="#8ab"/></svg>';
+
 async function dosyaBirak(
 	page: import("@playwright/test").Page,
 	ad: string,
@@ -304,7 +313,19 @@ test.describe("yaşam döngüsü", () => {
  */
 test.describe("alt metin", () => {
 	test.beforeEach(async ({ page }) => {
+		/*
+		 * Görsel adresi gerçek bir görsele bağlanıyor.
+		 *
+		 * `ornek` diye bir alan adı yok; CI'da DNS yanıtı gelene kadar
+		 * WebKit görseli 0×0 çiziyor ve tıklama "element is not visible"
+		 * ile zaman aşımına düşüyordu. Ağdan bağımsız olunca görselin
+		 * boyutu her koşuda aynı.
+		 */
+		await page.route("https://ornek/**", (route) =>
+			route.fulfill({ contentType: "image/svg+xml", body: SVG_GORSEL }),
+		);
 		await page.evaluate(() => window.kalem.editor.setValue("![eski ad](https://ornek/a.png)\n"));
+		await expect(page.locator("#editor img")).toBeVisible();
 	});
 
 	test("görsele tıklamak düzenleyiciyi açıyor", async ({ page }) => {
