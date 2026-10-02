@@ -95,7 +95,14 @@ editor.setBlockType({ type: 'heading', depth: 2 });
 editor.getBlockIds();                               // block IDs in order
 editor.getBlockElement(id);                         // HTMLElement | undefined
 editor.selectBlocks(anchorId, focusId);
+editor.mergeBlocks();                               // merges the selected blocks into the first
+editor.canMergeBlocks();                            // boolean
 ```
+
+Without a block selection, `mergeBlocks` merges the caret's block into the
+one above it. Paragraphs and headings are joined with hard line breaks; if
+the first block is a code block the others become code lines, if it is a
+list they become items, and if it is a quote they become its content.
 
 ### Selection and caret
 

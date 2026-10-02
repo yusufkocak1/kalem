@@ -696,3 +696,123 @@ export function deleteBlocks(doc: Root, from: number, count = 1): EditResult | n
 		caret: { blockIndex: Math.min(from, children.length - 1), path: [], offset: 0 },
 	};
 }
+
+// ---------------------------------------------------------------------------
+// Merging blocks
+// ---------------------------------------------------------------------------
+
+/**
+ * Merges `count` consecutive top-level blocks into the first one.
+ *
+ * The first block decides the result: text blocks are joined line by line
+ * (hard breaks), a code block takes the others as code lines, a list takes
+ * them as items and a quote takes them as its content. Returns `null` when a
+ * block cannot go into the first one (tables, rules, frontmatter…).
+ */
+export function mergeBlocks(doc: Root, from: number, count: number): EditResult | null {
+	if (from < 0 || count < 2 || from + count > doc.children.length) return null;
+	const [target, ...rest] = doc.children.slice(from, from + count);
+	if (target === undefined || isFrontmatter(target) || rest.some(isFrontmatter)) return null;
+
+	const merged = mergeInto(target, rest as Block[]);
+	if (merged === null) return null;
+
+	const children = komsulukTazele(doc.children, [
+		...doc.children.slice(0, from),
+		konumsuz(merged.block),
+		...doc.children.slice(from + count),
+	]);
+	return {
+		doc: withBlocks(doc, children as Root["children"]),
+		caret: { blockIndex: from, path: merged.path, offset: merged.offset },
+	};
+}
+
+interface Merged {
+	readonly block: Block;
+	readonly path: readonly number[];
+	readonly offset: number;
+}
+
+function mergeInto(target: Block, rest: readonly Block[]): Merged | null {
+	if (isTextBlock(target)) {
+		const children = [...target.children];
+		for (const block of rest) {
+			const line = isTextBlock(block)
+				? block.children
+				: block.type === "code"
+					? codeLines(block)
+					: null;
+			if (line === null) return null;
+			if (line.length === 0) continue;
+			if (children.length > 0) children.push({ type: "break" });
+			children.push(...line);
+		}
+		return { block: { ...target, children }, path: [], offset: listLength(target.children) };
+	}
+
+	if (target.type === "code") {
+		const parts = [target.value];
+		for (const block of rest) {
+			if (block.type === "code") parts.push(block.value);
+			else if (isTextBlock(block)) parts.push(plainLines(block.children));
+			else return null;
+		}
+		const lines = parts.map((part) => part.replace(/\n$/, "")).filter((part) => part !== "");
+		const value = lines.join("\n") + (target.value.endsWith("\n") ? "\n" : "");
+		return { block: { ...target, value }, path: [], offset: 0 };
+	}
+
+	if (target.type === "list") {
+		const items = [...target.children];
+		for (const block of rest) {
+			if (block.type === "list") items.push(...block.children.map(konumsuz));
+			else if (isTextBlock(block)) items.push(listItemOf(paragraf(block.children)));
+			else if (block.type === "code") items.push(listItemOf(nested(block)));
+			else return null;
+		}
+		return { block: { ...target, children: items }, path: [0, 0], offset: 0 };
+	}
+
+	if (target.type === "blockquote") {
+		const children = [...target.children];
+		for (const block of rest) {
+			if (block.type === "blockquote") children.push(...block.children);
+			else children.push(nested(block));
+		}
+		return { block: { ...target, children }, path: [0], offset: 0 };
+	}
+
+	return null;
+}
+
+/** Only top-level blocks carry an id and a source position. */
+function nested<T extends Block>(block: T): T {
+	const { id, position, ...rest } = block;
+	return rest as T;
+}
+
+function listItemOf(block: Block): ListItem {
+	return { type: "listItem", checked: null, spread: false, children: [block] };
+}
+
+function codeLines(block: Extract<Block, { type: "code" }>): Inline[] {
+	const out: Inline[] = [];
+	for (const line of block.value.replace(/\n$/, "").split("\n")) {
+		if (out.length > 0) out.push({ type: "break" });
+		if (line !== "") out.push({ type: "text", value: line });
+	}
+	return out;
+}
+
+function plainLines(nodes: readonly Inline[]): string {
+	let out = "";
+	for (const node of nodes) {
+		if (node.type === "break") out += "\n";
+		else if (node.type === "text" || node.type === "inlineCode" || node.type === "html")
+			out += node.value;
+		else if ("children" in node) out += plainLines(node.children);
+		else if (node.type === "image") out += node.alt ?? "";
+	}
+	return out;
+}

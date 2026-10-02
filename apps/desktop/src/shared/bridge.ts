@@ -147,6 +147,7 @@ export const COMMANDS = [
 	"ordered-list",
 	"indent",
 	"outdent",
+	"merge-blocks",
 	"source",
 	"read-only",
 	"focus",

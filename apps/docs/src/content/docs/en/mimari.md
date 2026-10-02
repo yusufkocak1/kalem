@@ -111,9 +111,9 @@ since the project's first day, and they have their own self-tests
 |---|---|
 | `@kalem-editor/core` | 13.3 kB |
 | `@kalem-editor/viewer` | 2.9 kB |
-| `@kalem-editor/editor` (core included) | 28.7 kB |
-| `@kalem-editor/editor` + `@kalem-editor/ui` | 37.4 kB |
-| `@kalem-editor/wc` — the single `<script>` build | 29.3 kB |
+| `@kalem-editor/editor` (core included) | 29.3 kB |
+| `@kalem-editor/editor` + `@kalem-editor/ui` | 38.0 kB |
+| `@kalem-editor/wc` — the single `<script>` build | 29.9 kB |
 | Wrappers (react / vue / wc) | 907 B / 686 B / 1.99 kB |
 
 Verification: over 1,400 unit tests, over 1,200 browser tests (Chromium ·

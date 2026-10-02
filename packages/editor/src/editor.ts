@@ -29,6 +29,7 @@ import type { Caret, EditResult } from "./block-edit.js";
 import {
 	indentItem,
 	insertBreak,
+	mergeBlocks,
 	mergeWithNext,
 	mergeWithPrevious,
 	normalizeDocument,
@@ -469,6 +470,36 @@ export class Editor {
 			caret: { blockIndex: caret.blockIndex, path: [], offset: caret.offset },
 		});
 		return true;
+	}
+
+	/**
+	 * Merges the selected blocks into the first one; with only a caret, merges
+	 * the caret's block into the one above it.
+	 */
+	mergeBlocks(): boolean {
+		const range = this.#mergeRange();
+		return range !== null && this.applyEdit(mergeBlocks(this.#doc, range.from, range.count));
+	}
+
+	canMergeBlocks(): boolean {
+		const range = this.#mergeRange();
+		if (range === null || this.#readOnly) return false;
+		return mergeBlocks(this.#doc, range.from, range.count) !== null;
+	}
+
+	#mergeRange(): { from: number; count: number } | null {
+		if (this.#selection?.kind === "block") {
+			const order = this.#blockOrder();
+			const ids = selectedRange(this.#selection, order);
+			const from = ids[0] === undefined ? -1 : order.indexOf(ids[0]);
+			return ids.length < 2 || from < 0 ? null : { from, count: ids.length };
+		}
+		const node = this.#element.ownerDocument.getSelection()?.anchorNode ?? null;
+		const element = node instanceof Element ? node : (node?.parentElement ?? null);
+		const block = element?.closest(`[${ID_ATTR}]`);
+		if (!(block instanceof HTMLElement) || !this.#element.contains(block)) return null;
+		const index = this.#indexOf(block);
+		return index < 1 ? null : { from: index - 1, count: 2 };
 	}
 
 	/**

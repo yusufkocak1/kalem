@@ -19,6 +19,7 @@ export {
 	duplicateBlocks,
 	indentItem,
 	insertBreak,
+	mergeBlocks,
 	mergeWithNext,
 	mergeWithPrevious,
 	moveBlocks,

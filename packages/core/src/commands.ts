@@ -69,13 +69,14 @@ function unwrapMark(node: Inline, mark: MarkType): Inline[] {
 }
 
 /** Alt ağaçtaki düz metin. */
-function plainText(nodes: readonly Inline[]): string {
+function plainText(nodes: readonly Inline[], lineBreak = ""): string {
 	let out = "";
 	for (const node of nodes) {
 		if (node.type === "text" || node.type === "inlineCode" || node.type === "html")
 			out += node.value;
-		else if ("children" in node) out += plainText(node.children);
+		else if ("children" in node) out += plainText(node.children, lineBreak);
 		else if (node.type === "image") out += node.alt ?? "";
+		else if (node.type === "break") out += lineBreak;
 	}
 	return out;
 }
@@ -127,7 +128,8 @@ function inlineContentOf(node: Block): Inline[] {
 /** Bloğun kod bloğu olarak değeri. */
 function codeValueOf(node: Block): string {
 	if (node.type === "code") return node.value;
-	const text = plainText(inlineContentOf(node));
+	// A hard break is a line of code; without this the lines ran together.
+	const text = plainText(inlineContentOf(node), "\n");
 	return text === "" ? "" : `${text}\n`;
 }
 

@@ -40,7 +40,7 @@ Other things that may be interesting:
 
 - Block-based engine: each block is its own contenteditable, and the engine owns the model. Zero runtime dependencies.
 - Framework-agnostic: vanilla core, thin React and Vue wrappers, and a form-associated <kalem-editor> custom element for Svelte, Angular or plain HTML.
-- Size budgets enforced in CI: 13.3 kB for the parser/serializer, 37.4 kB for the editor plus the Word-like UI (min+gzip).
+- Size budgets enforced in CI: 13.3 kB for the parser/serializer, 38.0 kB for the editor plus the Word-like UI (min+gzip).
 - No innerHTML anywhere. Raw HTML inside Markdown is kept as text, and links go through a protocol allowlist.
 - Tests run in Chromium, Firefox and WebKit under a Turkish locale, because locale bugs that pass in English tend to fail in Turkish (the dotted/dotless i breaks naive case folding).
 

@@ -43,6 +43,7 @@ const PATHS = {
 	],
 	taskList: ["M3.5 4.5h5v5h-5z", "m5 7 .9.9L7.5 6", "M3.5 14.5h5v5h-5z", "M12 7h8.5", "M12 17h8.5"],
 	outdent: [...LINES, "m7 9-3 3 3 3"],
+	mergeBlocks: ["M4 12h16", "M12 3v5", "m9 6 3 3 3-3", "M12 21v-5", "m9 18 3-3 3 3"],
 	indent: [...LINES, "m4 9 3 3-3 3"],
 	find: MAGNIFIER,
 	replace: ["M4 8h13", "m14 5 3 3-3 3", "M20 16H7", "m10 13-3 3 3 3"],

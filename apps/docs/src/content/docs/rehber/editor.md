@@ -92,7 +92,13 @@ editor.setBlockType({ type: 'heading', depth: 2 });
 editor.getBlockIds();                               // sıradaki blok kimlikleri
 editor.getBlockElement(id);                         // HTMLElement | undefined
 editor.selectBlocks(anchorId, focusId);
+editor.mergeBlocks();                               // seçili blokları ilkinde birleştirir
+editor.canMergeBlocks();                            // boolean
 ```
+
+`mergeBlocks` seçim yoksa imlecin bloğunu bir üsttekiyle birleştirir.
+Paragraf ve başlıklar satır sonuyla birleşir; ilk blok kod bloğuysa ötekiler
+kod satırı, listeyse madde, alıntıysa alıntının içeriği olur.
 
 ### Seçim ve imleç
 

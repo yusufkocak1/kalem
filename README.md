@@ -67,9 +67,9 @@ with backslashes. A few rare patterns are still normalized — they're listed
 |---|---|---|
 | **Display** Markdown (read-only) | `@kalem-editor/viewer` | 2.9 kB |
 | **Parse** Markdown (server, scripts) | `@kalem-editor/core` | 13.3 kB |
-| **Edit**, with your own UI | `@kalem-editor/editor` | 28.7 kB |
-| The full **Word-like** experience | `@kalem-editor/editor` + `@kalem-editor/ui` | 37.4 kB |
-| Drop it in with one `<script>` tag | `@kalem-editor/wc` (IIFE build) | 29.3 kB |
+| **Edit**, with your own UI | `@kalem-editor/editor` | 29.3 kB |
+| The full **Word-like** experience | `@kalem-editor/editor` + `@kalem-editor/ui` | 38.0 kB |
+| Drop it in with one `<script>` tag | `@kalem-editor/wc` (IIFE build) | 29.9 kB |
 
 Sizes are measured by [`size-limit`](.size-limit.json) and enforced in CI —
 a build that exceeds its budget fails. `@kalem-editor/core` doesn't touch the DOM,
@@ -164,7 +164,7 @@ live in [`examples/`](examples/) and are built and tested in CI.
 | Stores Markdown natively | ✅ | ❌ HTML / JSON | ❌ JSON | ❌ JSON |
 | Framework-agnostic | ✅ | ✅ | ❌ React only | ✅ |
 | Runtime dependencies | **0** | ~10 packages | ~15 packages | a few |
-| Editor + UI (min+gzip) | **37.4 kB** | ~90–120 kB | ~150 kB+ | ~30 kB + plugins |
+| Editor + UI (min+gzip) | **38.0 kB** | ~90–120 kB | ~150 kB+ | ~30 kB + plugins |
 | Drag-and-drop blocks | ✅ | Extension | ✅ | ✅ |
 | Lossless Markdown round-trip | ✅ | Partial | ❌ | ❌ |
 

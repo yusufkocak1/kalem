@@ -241,6 +241,11 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 				},
 				{ label: t.indent, ...editorShortcut("Tab"), click: send(ctx, "indent") },
 				{ label: t.outdent, ...editorShortcut("Shift+Tab"), click: send(ctx, "outdent") },
+				{
+					label: t.mergeBlocks,
+					accelerator: "CmdOrCtrl+Shift+M",
+					click: send(ctx, "merge-blocks"),
+				},
 				{ type: "separator" },
 				{ label: t.formatCode, accelerator: "Shift+Alt+F", click: send(ctx, "format-code") },
 				{ label: t.formatAllCode, click: send(ctx, "format-all-code") },

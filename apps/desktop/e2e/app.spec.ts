@@ -407,6 +407,64 @@ test("colors selected text and keeps the color in the file", async () => {
 	await reopened.app.close();
 });
 
+test("merges selected blocks into one and turns them into a code block", async () => {
+	const path = join(await tempDir("merge"), "birlestir.md");
+	await writeFile(path, "satır bir\n\nsatır iki\n\nsatır üç\n\nson\n\nek\n");
+	const { app, page, errors } = await launch({ args: [path] });
+	const blocks = page.locator("#editor > [data-kalem-id]");
+	const merge = page.locator('[data-command="merge-blocks"]');
+
+	// Nothing above the first block to merge into.
+	await blocks.first().click();
+	await expect(merge).toBeDisabled();
+
+	const first = await blocks.nth(0).boundingBox();
+	const third = await blocks.nth(2).boundingBox();
+	if (first === null || third === null) throw new Error("blocks are not laid out");
+	await page.mouse.move(first.x + 6, first.y + first.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(third.x + third.width - 6, third.y + third.height / 2, { steps: 12 });
+	await page.mouse.up();
+	await expect(page.locator("#editor .kalem-selected")).toHaveCount(3);
+
+	await expect(merge).toBeEnabled();
+	await merge.click();
+	await expect(blocks).toHaveCount(3);
+	await expect(blocks.first().locator("br")).toHaveCount(2);
+
+	await page.locator('[data-command="style-code"]').click();
+	await expect(page.locator("#editor > pre")).toHaveText("satır bir\nsatır iki\nsatır üç\n");
+
+	// With only a caret, the block joins the one above it.
+	await blocks.nth(2).click();
+	await clickMenu(app, "Format", "Merge Blocks");
+	await expect(blocks).toHaveCount(2);
+
+	await save(page);
+	await expect(status(page)).toHaveText("Saved");
+	expect(await readFile(path, "utf8")).toBe(
+		"```\nsatır bir\nsatır iki\nsatır üç\n```\n\nson\\\nek\n",
+	);
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+for (const language of ["en", "tr"]) {
+	test(`keeps every ribbon tab on one row (${language})`, async () => {
+		const { app, page } = await launch({ settings: { language } });
+		for (const tab of ["home", "insert", "view"]) {
+			await page.locator(`[data-tab="${tab}"]`).click();
+			const tops = await page
+				.locator(".ribbon-group:visible")
+				.evaluateAll((groups) =>
+					groups.map((group) => Math.round(group.getBoundingClientRect().top)),
+				);
+			expect(new Set(tops).size, tab).toBe(1);
+		}
+		await app.close();
+	});
+}
+
 test("switches the theme and remembers it", async () => {
 	const { app, page, userData } = await launch();
 	const isDark = () => page.evaluate(() => matchMedia("(prefers-color-scheme: dark)").matches);

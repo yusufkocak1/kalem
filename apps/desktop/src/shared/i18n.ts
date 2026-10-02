@@ -59,6 +59,8 @@ const en = {
 	orderedList: "Numbered List",
 	indent: "Increase Indent",
 	outdent: "Decrease Indent",
+	mergeBlocks: "Merge Blocks",
+	mergeBlocksBlocked: "These blocks cannot be merged into one.",
 
 	view: "View",
 	navigationPane: "Navigation Pane",
@@ -272,6 +274,8 @@ const tr: Strings = {
 	orderedList: "Numaralı Liste",
 	indent: "Girintiyi Artır",
 	outdent: "Girintiyi Azalt",
+	mergeBlocks: "Blokları Birleştir",
+	mergeBlocksBlocked: "Bu bloklar tek blokta birleştirilemez.",
 
 	view: "Görünüm",
 	navigationPane: "Gezinti Bölmesi",

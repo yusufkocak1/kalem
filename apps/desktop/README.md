@@ -87,6 +87,14 @@ gösterilebilir; exe taşınırsa bağ kopar.
   boyanır, **Otomatik** rengi kaldırır. Markdown'da renk sözdizimi olmadığı
   için dosyaya `<span style="color:#e03131">metin</span>` olarak yazılır;
   HTML/PDF dışa aktarmada ve yazdırmada da görünür.
+- **Blokları birleştirme** (Giriş → Paragraf, **Biçim → Blokları Birleştir**,
+  `Ctrl+Shift+M`): fareyle sürükleyerek seçilen bloklar ilk blokta toplanır.
+  Yalnızca imleç varsa blok bir üsttekiyle birleşir. Paragraf ve başlıklar
+  satır satır (satır sonuyla) birleşir; ilk blok kod bloğuysa ötekiler kod
+  satırı, listeyse madde, alıntıysa alıntının içeriği olur. Birleştirilmiş
+  paragrafı **Kod** stiline çevirmek satırları korur — çok satırlı bir metni
+  tek kod bloğuna almanın yolu budur.
+- Kod bloğunun içine doğrudan yapıştırılabilir; panodaki metin biçimsiz girer.
 - Kalem'in balon araç çubuğu, `/` menüsü, blok tutamağı ve bağlantı balonu.
 - Görsel ekleme: dosyadan, yapıştırarak ya da sürükleyerek.
 - **Dosya ekleme** (Ekle → Dosya Ekle ya da dosyayı pencereye sürükleyerek):
@@ -130,6 +138,8 @@ e2e/            Playwright ile gerçek uygulamayı süren testler
   kayabilir. Bu stiller yalnızca en üst düzeydeki tablolarda çalışır
   (liste ya da alıntı içindekilerde değil) ve HTML dışa aktarmaya taşınmaz;
   PDF ve yazdırmada görünür.
+- Tablo, yatay çizgi ve ham HTML blokları birleştirilemez; paragraf bir listeyle
+  ancak liste **üstteyse** birleşir (madde olur).
 - Yazı rengi için önce metin seçilmelidir ("bundan sonra yazacaklarım renkli
   olsun" kipi yok) ve seçim tek bir paragrafın/hücrenin içinde olmalıdır.
   Paletteki renkler sabittir; dosyaya elle yazılmış başka bir renk (`red`,

@@ -13,6 +13,7 @@ import {
 	toggleMark,
 	wrapIn,
 } from "./commands.js";
+import { parse } from "./parse.js";
 import { nodeAtPath } from "./path.js";
 import { serialize } from "./serialize.js";
 
@@ -90,6 +91,11 @@ describe("setBlockType", () => {
 	it("paragrafı kod bloğuna çeviriyor", () => {
 		const sonuc = setBlockType(belge(), [0], { type: "code", lang: "ts" });
 		expect(md(sonuc)).toContain("```ts\nbir\n```");
+	});
+
+	it("keeps hard breaks as code lines", () => {
+		const doc = parse("bir\\\n**iki**\\\nüç\n");
+		expect(serialize(setBlockType(doc, [0], { type: "code" }))).toBe("```\nbir\niki\nüç\n```\n");
 	});
 
 	/** Kod biçim taşıyamaz: satır içi biçimler düz metne iner. */

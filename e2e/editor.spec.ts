@@ -19,6 +19,10 @@ declare global {
 				getDocument(): { children: { type: string; id?: string }[] };
 				setValue(markdown: string): void;
 				selectBlocks(anchor: string, focus?: string): void;
+				mergeBlocks(): boolean;
+				canMergeBlocks(): boolean;
+				setColor(color: string | null): boolean;
+				getColor(): string | null;
 				toggleMark(mark: string): boolean;
 				isMarkActive(mark: string): boolean;
 				setLink(url: string): boolean;
@@ -1148,6 +1152,64 @@ test.describe("eklentiler", () => {
 		await page.keyboard.press("Control+b");
 		// Çekirdek Ctrl+B kalın yapardı; eklenti onu tüketti.
 		await expect(page.locator("#cikti")).not.toContainText("**");
+	});
+});
+
+test.describe("blok birleştirme", () => {
+	const value = (page: import("@playwright/test").Page) =>
+		page.evaluate(() => window.kalem.editor.getValue());
+
+	const selectBlocks = (page: import("@playwright/test").Page, first: number, last: number) =>
+		page.evaluate(
+			([a, b]) => {
+				const ids = window.kalem.editor.getDocument().children.map((block) => block.id as string);
+				window.kalem.editor.selectBlocks(ids[a as number] as string, ids[b as number] as string);
+			},
+			[first, last],
+		);
+
+	test("seçili bloklar tek blokta birleşiyor ve geri alınabiliyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("bir\n\niki\n\nüç\n\ndört\n"));
+		await selectBlocks(page, 0, 2);
+		expect(await page.evaluate(() => window.kalem.editor.canMergeBlocks())).toBe(true);
+		expect(await page.evaluate(() => window.kalem.editor.mergeBlocks())).toBe(true);
+		expect(await value(page)).toBe("bir\\\niki\\\nüç\n\ndört\n");
+		await expect(page.locator(BLOK)).toHaveCount(2);
+
+		// The caret lands where the first block ended.
+		await page.keyboard.type("X");
+		expect(await value(page)).toBe("birX\\\niki\\\nüç\n\ndört\n");
+		await page.keyboard.press("ControlOrMeta+z");
+		await page.keyboard.press("ControlOrMeta+z");
+		expect(await value(page)).toBe("bir\n\niki\n\nüç\n\ndört\n");
+	});
+
+	test("imleç varken blok üsttekiyle birleşiyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("bir\n\niki\n"));
+		await page.locator(BLOK).nth(1).click();
+		expect(await page.evaluate(() => window.kalem.editor.mergeBlocks())).toBe(true);
+		expect(await value(page)).toBe("bir\\\niki\n");
+
+		await page.locator(BLOK).first().click();
+		expect(await page.evaluate(() => window.kalem.editor.canMergeBlocks())).toBe(false);
+		expect(await page.evaluate(() => window.kalem.editor.mergeBlocks())).toBe(false);
+	});
+
+	test("paragraflar kod bloğuna satır olarak giriyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("```\na\n```\n\nb\n\nc\n"));
+		await selectBlocks(page, 0, 2);
+		expect(await page.evaluate(() => window.kalem.editor.mergeBlocks())).toBe(true);
+		expect(await value(page)).toBe("```\na\nb\nc\n```\n");
+		await expect(page.locator("#editor > pre")).toHaveCount(1);
+	});
+
+	test("birleşemeyen bloklar olduğu gibi kalıyor", async ({ page }) => {
+		const source = "bir\n\n| a |\n| --- |\n| b |\n";
+		await page.evaluate((markdown) => window.kalem.editor.setValue(markdown), source);
+		await selectBlocks(page, 0, 1);
+		expect(await page.evaluate(() => window.kalem.editor.canMergeBlocks())).toBe(false);
+		expect(await page.evaluate(() => window.kalem.editor.mergeBlocks())).toBe(false);
+		expect(await value(page)).toBe(source);
 	});
 });
 

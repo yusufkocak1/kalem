@@ -580,6 +580,9 @@ const commands: Record<Command, () => void> = {
 	"ordered-list": () => edit((doc, caret) => toggleList(doc, caret, true)),
 	indent: () => edit(indentItem),
 	outdent: () => edit(outdentItem),
+	"merge-blocks": () => {
+		if (canEdit() && !session.editor.mergeBlocks()) warn(t.mergeBlocksBlocked);
+	},
 	source: () => session.source?.toggle(),
 	"read-only": () => session.editor.setReadOnly(!session.editor.isReadOnly()),
 	focus: toggleFocusMode,
@@ -907,6 +910,11 @@ const ribbonTabs: RibbonTab[] = [
 					{ kind: "separator" },
 					command("outdent", t.outdent, "outdent", { shortcut: "Shift+Tab" }),
 					command("indent", t.indent, "indent", { shortcut: "Tab" }),
+					{ kind: "separator" },
+					command("merge-blocks", t.mergeBlocks, "mergeBlocks", {
+						shortcut: `${MOD}+Shift+M`,
+						enabled: () => canEdit() && session.editor.canMergeBlocks(),
+					}),
 				],
 			},
 			{
@@ -921,7 +929,7 @@ const ribbonTabs: RibbonTab[] = [
 						run: commands.find,
 						enabled: () => !inSource(),
 					},
-					command("replace", t.replace, "replace", { showLabel: true, shortcut: `${MOD}+H` }),
+					command("replace", t.replace, "replace", { shortcut: `${MOD}+H` }),
 				],
 			},
 		],
