@@ -12,7 +12,20 @@ import { defineConfig } from "vitest/config";
 const kaynak = (yol: string) => fileURLToPath(new URL(yol, import.meta.url));
 
 export default defineConfig({
+	/*
+	 * Öteki paketler (`@kalem-editor/editor`, eklentiler…) `package.json`
+	 * içindeki `kalem-source` koşuluyla kaynağa çözülüyor — tsconfig'deki
+	 * `customConditions` ile aynı koşul. Bu olmadan CI'daki birim testi işi
+	 * (`pnpm build`'den önce koşuyor) `dist`'i arayıp bulamıyordu.
+	 * Testler `node` ortamında koştuğu için sunucu tarafı koşulları da gerekli.
+	 */
+	ssr: {
+		resolve: {
+			conditions: ["kalem-source", "module", "node", "development|production"],
+		},
+	},
 	resolve: {
+		conditions: ["kalem-source", "module", "browser", "development|production"],
 		alias: [
 			{ find: /^@kalem-editor\/core$/, replacement: kaynak("./packages/core/src/index.ts") },
 			{ find: /^@kalem-editor\/core\/(.*)$/, replacement: kaynak("./packages/core/src/$1.ts") },

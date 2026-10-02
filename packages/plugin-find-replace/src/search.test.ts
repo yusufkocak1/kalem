@@ -310,7 +310,12 @@ describe("100 sayfalık belge", () => {
 		const kucuk = Math.max(sure(250), 1);
 		const buyuk = sure(1000);
 		expect(buyuk / kucuk).toBeLessThan(8);
-	});
+		/*
+		 * Süre sınırı geniş: `test:cov` altında eklenti kaynaktan ölçümle
+		 * koşuyor ve 1.250 sayfalık iki ayrıştırma vitest'in 5 sn
+		 * varsayılanını aşabiliyor. Asıl denetim yukarıdaki oran.
+		 */
+	}, 30_000);
 
 	it("her tuş vuruşunda yeniden tarama hızlı", () => {
 		const index = createIndex(doc, "tr");
