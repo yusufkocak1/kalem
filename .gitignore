@@ -43,3 +43,6 @@ Thumbs.db
 
 # Duyuru kaydının ara kareleri (scripts/duyuru/kaydet.mjs)
 docs/duyuru/.kareler/
+
+# electron-builder output (apps/desktop)
+apps/desktop/release/

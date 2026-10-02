@@ -1,0 +1,44 @@
+appId: dev.kalem.desktop
+productName: Kalem
+copyright: Copyright © 2026 Yusuf Koçak
+
+directories:
+  output: release
+  buildResources: resources
+
+# Everything is bundled into dist/; no node_modules are shipped.
+files:
+  - dist/**
+  - package.json
+  - "!**/*.map"
+
+fileAssociations:
+  - ext: md
+    name: Markdown
+    description: Markdown document
+    role: Editor
+  - ext: markdown
+    name: Markdown
+    description: Markdown document
+    role: Editor
+
+win:
+  target:
+    - nsis
+    - portable
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+
+mac:
+  category: public.app-category.productivity
+  target:
+    - dmg
+
+linux:
+  category: Office
+  target:
+    - AppImage
+    - deb

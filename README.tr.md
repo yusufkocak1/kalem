@@ -34,6 +34,7 @@ materyalleri hazır. Henüz npm'de değil. Görev görev durum:
 | [examples/](examples/) | Yedi çalışan uygulama: React, Next.js, Vue, Nuxt, Svelte, Angular, düz HTML — hepsi CI'da derleniyor |
 | [apps/notlar/](apps/notlar/) | **Kalem Notlar** — kütüphanenin kendi kullanım denemesi (dogfooding): yerel not defteri, altı eklenti bir arada |
 | [apps/playground/](apps/playground/) | **Playground** — ürünün vitrini: Word deneyimi, canlı Markdown çıktısı, Word'den yapıştırma, bin bloklu belge |
+| [apps/desktop/](apps/desktop/) | **Kalem Masaüstü** — Electron ile yazılmış, Word benzeri Markdown editörü: şerit, `.md` açma/kaydetme, Word (`.docx`) içe aktarma, yedi eklenti bir arada |
 | [apps/demo/](apps/demo/) | Beş canlı sayfa (aşağıda) + Faz 0 mimari prototipi |
 | [apps/docs/](apps/docs/) | Astro Starlight dokümantasyon sitesi — anlattığı her API'nin gerçekten var olduğunu `guard:docs` sınıyor |
 | [docs/02-faz0-sonuc.md](docs/02-faz0-sonuc.md) | Faz 0 sonuç raporu — ne kuruldu, ne doğrulandı, ne kapsanmadı |

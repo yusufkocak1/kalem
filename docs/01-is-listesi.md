@@ -60,6 +60,13 @@ F6-13 ve F6-14 bölümlerinde.
   dönüyor. GitHub Pages seçilirse Astro `base` ayarı gerekiyor ve içerikteki
   mutlak bağlantılar (`/en/…`) ona göre değişmeli.
 
+> **Yol haritası dışı (2026-10-03):** `apps/desktop` — **Kalem Masaüstü**,
+> Electron ile yazılmış Word benzeri Markdown editörü (şerit, sekmeler,
+> `.md` ve `.txt` açma/kaydetme, `.docx` içe aktarma, tablo sıralama ve
+> renklendirme, dosya ekleme, yedi eklenti). 72 görevlik sayıma dâhil
+> değil. 130 birim + 20 uçtan uca test; ayrıntı ve bilinen sınırlar
+> [apps/desktop/README.md](../apps/desktop/README.md) içinde.
+
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
 >
