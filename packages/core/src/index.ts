@@ -24,6 +24,8 @@ export type {
 	BreakSyntax,
 	Code,
 	CodeSyntax,
+	Color,
+	ColorSyntax,
 	ContentModel,
 	Data,
 	Definition,
@@ -80,6 +82,7 @@ export type {
 // almak isteyen (editör, özel eklenti) için. Sıradan kullanım `parse`.
 export type { InlineParser, ParseBlocksOptions } from "./blocks.js";
 export { parseBlocks } from "./blocks.js";
+export { sanitizeColor } from "./color.js";
 // --- Ağaç düzenleme (F1-02) ---
 export type { CloneOptions } from "./edit.js";
 export { clone, insertAt, remove, removeAt, replace, replaceAt } from "./edit.js";

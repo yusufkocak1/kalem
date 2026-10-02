@@ -21,6 +21,22 @@ pnpm --filter kalem-desktop dev     # geliştirme kipi
 
 Birim testleri depo kökünden: `pnpm test`.
 
+## `.md` dosyalarının varsayılan uygulaması yapmak
+
+Bunu **kurulum paketi** (`release/Kalem Setup <sürüm>.exe`) yapar; taşınabilir
+`Kalem <sürüm>.exe` kayıt defterine hiçbir şey yazmaz.
+
+1. `pnpm --filter kalem-desktop package` ile kurulum paketini üretin ve kurun.
+   Kurulum `.md` ve `.markdown` uzantılarını Kalem'e bağlar
+   (`HKCU\Software\Classes\Kalem.Markdown`); kaldırınca bağ da silinir.
+2. Uzantı için daha önce başka bir uygulama seçilmişse Windows o seçimi korur;
+   uygulamalar bunu kendileri değiştiremez. Bir `.md` dosyasına sağ tıklayıp
+   **Birlikte aç → Başka bir uygulama seç → Kalem → Her zaman** deyin ya da
+   **Ayarlar → Uygulamalar → Varsayılan uygulamalar → Kalem** yolunu izleyin.
+
+Taşınabilir sürümde aynı menüden **Bilgisayarda bir uygulama seçin** ile exe
+gösterilebilir; exe taşınırsa bağ kopar.
+
 ## Özellikler
 
 **Belgeler**
@@ -67,6 +83,10 @@ Birim testleri depo kökünden: `pnpm test`.
   `<!-- kalem:table color=blue widths=120,,200 -->` biçiminde bir yorum olarak
   yazılır. Editörde bu yorum görünmez; başka Markdown araçları tabloyu düz
   gösterir.
+- **Yazı rengi** (Giriş → **A** düğmesi): seçili metin dokuz renkten birine
+  boyanır, **Otomatik** rengi kaldırır. Markdown'da renk sözdizimi olmadığı
+  için dosyaya `<span style="color:#e03131">metin</span>` olarak yazılır;
+  HTML/PDF dışa aktarmada ve yazdırmada da görünür.
 - Kalem'in balon araç çubuğu, `/` menüsü, blok tutamağı ve bağlantı balonu.
 - Görsel ekleme: dosyadan, yapıştırarak ya da sürükleyerek.
 - **Dosya ekleme** (Ekle → Dosya Ekle ya da dosyayı pencereye sürükleyerek):
@@ -110,6 +130,10 @@ e2e/            Playwright ile gerçek uygulamayı süren testler
   kayabilir. Bu stiller yalnızca en üst düzeydeki tablolarda çalışır
   (liste ya da alıntı içindekilerde değil) ve HTML dışa aktarmaya taşınmaz;
   PDF ve yazdırmada görünür.
+- Yazı rengi için önce metin seçilmelidir ("bundan sonra yazacaklarım renkli
+  olsun" kipi yok) ve seçim tek bir paragrafın/hücrenin içinde olmalıdır.
+  Paletteki renkler sabittir; dosyaya elle yazılmış başka bir renk (`red`,
+  `#123456`, `rgb(…)`) korunur ve gösterilir.
 - Kod biçimlendirme yalnızca JSON ve XML (SVG, RSS, plist… dâhil) içindir;
   yorumlu JSON (JSONC), HTML, YAML ve öteki diller biçimlendirilmez.
 - `.txt` dosyası düz metin olarak değil Markdown olarak yorumlanır: `#` ile
@@ -121,5 +145,6 @@ e2e/            Playwright ile gerçek uygulamayı süren testler
 - Word'deki birleştirilmiş tablo hücreleri boş hücrelere açılır; dipnot
   bağlantıları düz metne iner; EMF/WMF görseller atlanır ve bildirilir.
 - Uygulama simgesi henüz yok (Electron'un varsayılan simgesi kullanılıyor).
-- macOS ve Linux'ta denenmedi; kurulum paketi (`package`) üretimi
-  denenmedi, yalnızca `package:dir` çıktısı çalıştırıldı.
+- macOS ve Linux'ta denenmedi. Windows kurulum paketi üretiliyor ama
+  kurulup denenmedi; çalıştırılanlar `package:dir` çıktısı ve taşınabilir exe.
+- Kurulum paketi 100 MB'ı aştığı için depoya konmaz (GitHub sınırı).

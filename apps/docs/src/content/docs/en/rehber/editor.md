@@ -79,7 +79,13 @@ editor.toggleMark('strong');            // strong | emphasis | delete | inlineCo
 editor.isMarkActive('emphasis');        // boolean
 editor.setLink('https://example.com');  // turns the selected text into a link
 editor.getActiveLink();                 // { url, title, from, to } | null
+editor.setColor('#e03131');             // colors the selected text; null removes the color
+editor.getColor();                      // string | null (uncolored or mixed)
 ```
+
+Color is written to Markdown as `<span style="color:#e03131">text</span>`,
+because Markdown has no syntax of its own for it. The viewer renders that span
+in color even under the `escape` raw HTML policy.
 
 ### Blocks
 

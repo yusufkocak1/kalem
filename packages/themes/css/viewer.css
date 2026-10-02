@@ -103,6 +103,12 @@
 	text-underline-offset: 0.16em;
 }
 
+/* Colored text keeps its color across a link. */
+.kalem-doc [data-kalem-color] a,
+.kalem-doc span[style^="color:"] a {
+	color: inherit;
+}
+
 .kalem-doc a:focus-visible {
 	outline: 2px solid var(--kalem-accent);
 	outline-offset: 2px;

@@ -63,9 +63,14 @@ F6-13 ve F6-14 bölümlerinde.
 > **Yol haritası dışı (2026-10-03):** `apps/desktop` — **Kalem Masaüstü**,
 > Electron ile yazılmış Word benzeri Markdown editörü (şerit, sekmeler,
 > `.md` ve `.txt` açma/kaydetme, `.docx` içe aktarma, tablo sıralama ve
-> renklendirme, dosya ekleme, yedi eklenti). 72 görevlik sayıma dâhil
-> değil. 130 birim + 20 uçtan uca test; ayrıntı ve bilinen sınırlar
+> renklendirme, yazı rengi, dosya ekleme, yedi eklenti). 72 görevlik sayıma
+> dâhil değil. 130 birim + 22 uçtan uca test; ayrıntı ve bilinen sınırlar
 > [apps/desktop/README.md](../apps/desktop/README.md) içinde.
+>
+> Masaüstünden çekirdeğe dönen iki iş (2026-10-03): **yazı rengi** — yeni
+> `color` satır içi düğümü (`<span style="color:…">`), `editor.setColor` /
+> `getColor`; ve **kod bloğuna yapıştırma** — editör yapıştırılan içeriği
+> sessizce atıyordu.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.

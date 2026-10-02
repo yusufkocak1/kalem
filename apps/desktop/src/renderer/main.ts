@@ -41,7 +41,13 @@ import {
 import { icon } from "./icons.js";
 import { createNotices } from "./notices.js";
 import type { RibbonButton, RibbonTab, RibbonWidget } from "./ribbon.js";
-import { createRibbon, createStyleGallery, createSwatches, createTablePicker } from "./ribbon.js";
+import {
+	createColorMenu,
+	createRibbon,
+	createStyleGallery,
+	createSwatches,
+	createTablePicker,
+} from "./ribbon.js";
 import { Session } from "./session.js";
 import { enableColumnResize } from "./table-styles.js";
 import { createTabStrip } from "./tabs.js";
@@ -790,6 +796,29 @@ const tableColors = createSwatches<TableColor>({
 	enabled: canEdit,
 });
 
+const textColors = createColorMenu({
+	id: "text-color",
+	icon: "textColor",
+	label: t.textColor,
+	noneLabel: t.textColorNone,
+	colors: [
+		{ value: "#e03131", label: t.colorRed },
+		{ value: "#e8590c", label: t.colorOrange },
+		{ value: "#f08c00", label: t.colorYellow },
+		{ value: "#2f9e44", label: t.colorGreen },
+		{ value: "#0c8599", label: t.colorTeal },
+		{ value: "#1c7ed6", label: t.colorBlue },
+		{ value: "#7950f2", label: t.colorPurple },
+		{ value: "#d6336c", label: t.colorPink },
+		{ value: "#868e96", label: t.colorGray },
+	],
+	current: () => session.editor.getColor(),
+	pick: (color) => {
+		if (!session.editor.setColor(color)) warn(t.selectTextFirst);
+	},
+	enabled: canEdit,
+});
+
 function alignButton(
 	align: AlignType,
 	label: string,
@@ -855,6 +884,7 @@ const ribbonTabs: RibbonTab[] = [
 					markButton("italic", t.italic, "emphasis", `${MOD}+I`),
 					markButton("strikethrough", t.strikethrough, "delete", `${MOD}+Shift+X`),
 					markButton("inline-code", t.inlineCode, "inlineCode", `${MOD}+E`),
+					textColors,
 					{ kind: "separator" },
 					command("link", t.link, "link", {
 						shortcut: `${MOD}+K`,

@@ -51,7 +51,7 @@ can't be edited.
 ## Not setting up the editor at all
 
 If there's **no chance** of editing on the page, don't load the editor.
-2.7 kB instead of 27 kB:
+2.9 kB instead of 29 kB:
 
 ```ts
 import { parse } from '@kalem-editor/core';

@@ -466,3 +466,130 @@ export function createTablePicker(options: TablePickerOptions): RibbonWidget {
 		},
 	};
 }
+
+// --- Color menu -------------------------------------------------------------
+
+export interface ColorMenuOptions {
+	readonly id: string;
+	readonly icon: IconName;
+	readonly label: string;
+	readonly noneLabel: string;
+	readonly colors: readonly { readonly value: string; readonly label: string }[];
+	current(): string | null;
+	pick(value: string | null): void;
+	enabled(): boolean;
+}
+
+/** A button that shows the current color and opens a palette; the first entry clears the color. */
+export function createColorMenu(options: ColorMenuOptions): RibbonWidget {
+	let open = false;
+
+	const button = createButton({
+		id: options.id,
+		label: options.label,
+		icon: options.icon,
+		run: () => (open ? hide(false) : show()),
+	});
+	button.classList.add("color-menu-button");
+	button.setAttribute("aria-haspopup", "dialog");
+	button.setAttribute("aria-expanded", "false");
+	const bar = el("span", { class: "color-menu-bar", attrs: { "aria-hidden": "true" } });
+	button.append(bar);
+
+	const choices: { value: string | null; label: string }[] = [
+		{ value: null, label: options.noneLabel },
+		...options.colors,
+	];
+	const swatches = choices.map(({ value, label }) => {
+		const swatch = el("button", {
+			class: "ribbon-swatch",
+			attrs: {
+				type: "button",
+				title: label,
+				"aria-label": label,
+				"data-color": value ?? "none",
+				"data-command": `${options.id}-${value?.replace("#", "") ?? "none"}`,
+			},
+		});
+		if (value !== null) swatch.style.setProperty("--table-color", value);
+		keepSelection(swatch);
+		swatch.addEventListener("click", () => {
+			hide(false);
+			options.pick(value);
+		});
+		return { swatch, value };
+	});
+
+	const popup = el("div", {
+		class: "color-menu",
+		attrs: { role: "dialog", "aria-label": options.label },
+		children: swatches.map((entry) => entry.swatch),
+	});
+	popup.hidden = true;
+
+	button.addEventListener("click", (event) => {
+		if (event.detail === 0 && open) swatches[0]?.swatch.focus();
+	});
+
+	popup.addEventListener("keydown", (event) => {
+		const index = swatches.findIndex((entry) => entry.swatch === document.activeElement);
+		if (index === -1) return;
+		const step = event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+		if (step === 0) return;
+		event.preventDefault();
+		swatches[(index + step + swatches.length) % swatches.length]?.swatch.focus();
+	});
+
+	const onEscape = (event: KeyboardEvent): void => {
+		if (event.key !== "Escape") return;
+		event.preventDefault();
+		event.stopPropagation();
+		hide(popup.contains(document.activeElement));
+	};
+
+	const onOutsidePress = (event: MouseEvent): void => {
+		const target = event.target;
+		if (target instanceof Node && (popup.contains(target) || button.contains(target))) return;
+		hide(false);
+	};
+
+	function show(): void {
+		open = true;
+		button.setAttribute("aria-expanded", "true");
+		const box = button.getBoundingClientRect();
+		popup.style.left = `${Math.round(box.left)}px`;
+		popup.style.top = `${Math.round(box.bottom + 4)}px`;
+		popup.hidden = false;
+		document.addEventListener("mousedown", onOutsidePress, true);
+		document.addEventListener("keydown", onEscape, true);
+	}
+
+	function hide(focusButton: boolean): void {
+		if (!open) return;
+		open = false;
+		button.setAttribute("aria-expanded", "false");
+		popup.hidden = true;
+		document.removeEventListener("mousedown", onOutsidePress, true);
+		document.removeEventListener("keydown", onEscape, true);
+		if (focusButton) button.focus();
+	}
+
+	document.body.append(popup);
+
+	return {
+		kind: "widget",
+		element: button,
+		update() {
+			const on = options.enabled();
+			button.disabled = !on;
+			if (!on) hide(false);
+			// kalem-locale-ok: CSS colors are ASCII
+			const current = on ? (options.current()?.toLowerCase() ?? null) : null;
+			if (current === null) bar.style.removeProperty("background");
+			else bar.style.background = current;
+			for (const { swatch, value } of swatches) {
+				swatch.setAttribute("aria-pressed", String(value !== null && value === current));
+			}
+		},
+	};
+}

@@ -69,7 +69,7 @@ import { renderToDOM } from '@kalem-editor/viewer';
 renderToDOM(parse(markdown), document.getElementById('app')!);
 ```
 
-2,7 kB, düzenleme kodu yok. Ayrıntı: [Viewer](/rehber/viewer/).
+2,9 kB, düzenleme kodu yok. Ayrıntı: [Viewer](/rehber/viewer/).
 
 ## Modül sistemi
 

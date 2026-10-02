@@ -22,6 +22,7 @@
  * ikinci geçiş onların içine bakmaz.
  */
 import type { Inline, InlineCode, Link, LinkSyntax, Text } from "./ast.js";
+import { pairColors } from "./color.js";
 
 /**
  * Açık bir `[` ya da `![` — bağlantı/görsel adayı.
@@ -260,7 +261,7 @@ function normalizeLabel(label: string): string {
 export function parseInline(raw: string): Inline[] {
 	const { slots, delimiters } = tokenize(raw);
 	resolveEmphasis(slots, delimiters);
-	return compact(slots);
+	return pairColors(compact(slots));
 }
 
 // ---------------------------------------------------------------------------

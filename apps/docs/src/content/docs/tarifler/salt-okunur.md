@@ -50,8 +50,8 @@ düzenlenemiyor.
 
 ## Editörü hiç kurmamak
 
-Sayfada düzenleme **ihtimali yoksa** editörü yüklemeyin. 27 kB yerine
-2,7 kB:
+Sayfada düzenleme **ihtimali yoksa** editörü yüklemeyin. 29 kB yerine
+2,9 kB:
 
 ```ts
 import { parse } from '@kalem-editor/core';

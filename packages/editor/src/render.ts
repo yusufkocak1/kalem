@@ -28,7 +28,7 @@
  * ayrıştırılmıyor.
  */
 import type { Block, Definition, Frontmatter, Inline, Root } from "@kalem-editor/core";
-import { sanitizeUrl } from "@kalem-editor/core";
+import { sanitizeColor, sanitizeUrl } from "@kalem-editor/core";
 
 /**
  * Editörün "blok" saydığı şey: kökün doğrudan çocuğu.
@@ -44,6 +44,7 @@ export const PATH_ATTR = "data-kalem-path";
 export const ID_ATTR = "data-kalem-id";
 /** Kod bloğunun metin gövdesi — satır içi değil, düz metin. */
 export const CODE_ATTR = "data-kalem-code";
+export const COLOR_ATTR = "data-kalem-color";
 
 export interface RenderContext {
 	readonly document: Document;
@@ -366,6 +367,13 @@ function appendInline(target: HTMLElement, node: Inline, ctx: RenderContext): vo
 		case "imageReference":
 			appendReference(target, node, ctx);
 			return;
+		case "color": {
+			const span = wrap("span", node.children, ctx);
+			span.setAttribute(COLOR_ATTR, node.color);
+			span.style.color = sanitizeColor(node.color) ?? "";
+			target.append(span);
+			return;
+		}
 	}
 }
 

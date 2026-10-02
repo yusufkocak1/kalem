@@ -9,8 +9,10 @@ import type { Inline } from "@kalem-editor/core";
 import { serialize } from "@kalem-editor/core";
 import { describe, expect, it } from "vitest";
 import {
+	applyColor,
 	applyLink,
 	applyMark,
+	colorAt,
 	listLength,
 	markActive,
 	sliceInline,
@@ -245,5 +247,62 @@ describe("sıfır uzunluklu düğümler", () => {
 		const nodes: Inline[] = [metin("ab"), gorsel(), metin("cd")];
 		const sonuc = spliceInline(nodes, 2, 2, [metin("Z")]);
 		expect(sonuc.filter((n) => n.type === "image")).toHaveLength(1);
+	});
+});
+
+describe("text color", () => {
+	const text = (value: string): Inline => ({ type: "text", value });
+	const strong = (...children: Inline[]): Inline => ({ type: "strong", children });
+	const red = (...children: Inline[]): Inline => ({ type: "color", color: "red", children });
+
+	it("colors a range and merges with the same color next to it", () => {
+		const once = applyColor([text("abcdef")], 2, 4, "red");
+		expect(md(once)).toBe('ab<span style="color:red">cd</span>ef');
+		expect(md(applyColor(once, 4, 6, "red"))).toBe('ab<span style="color:red">cdef</span>');
+	});
+
+	it("replaces the color of a range inside colored text", () => {
+		expect(md(applyColor([red(text("abcdef"))], 2, 4, "blue"))).toBe(
+			'<span style="color:red">ab</span><span style="color:blue">cd</span><span style="color:red">ef</span>',
+		);
+	});
+
+	it("removes the color with null and refuses an unsafe value", () => {
+		expect(md(applyColor([red(text("abcdef"))], 0, 6, null))).toBe("abcdef");
+		expect(md(applyColor([text("abc")], 0, 3, "red; background: url(x)"))).toBe("abc");
+	});
+
+	it("keeps the color outside marks", () => {
+		const colored = applyColor([strong(text("abcdef"))], 2, 4, "red");
+		expect(md(colored)).toBe('**ab**<span style="color:red">**cd**</span>**ef**');
+		expect(md(applyMark([text("x"), red(text("b")), text("y")], 1, 2, "strong"))).toBe(
+			'x<span style="color:red">**b**</span>y',
+		);
+	});
+
+	it("toggles a mark off through the color", () => {
+		const nodes = [red(strong(text("abc")))];
+		expect(markActive(nodes, 0, 3, "strong")).toBe(true);
+		expect(md(applyMark(nodes, 0, 3, "strong"))).toBe('<span style="color:red">abc</span>');
+	});
+
+	it("moves a line break at the edge out of the color", () => {
+		const nodes = applyColor([text("ab"), { type: "break" }, text("cd")], 0, 3, "red");
+		expect(nodes.map((node) => node.type)).toEqual(["color", "break", "text"]);
+		expect(md(nodes)).toBe('<span style="color:red">ab</span>\\\ncd');
+	});
+
+	it("keeps the length of the range unchanged", () => {
+		const nodes = [text("ab"), strong(text("cd")), text("ef")];
+		expect(listLength(applyColor(nodes, 1, 5, "red"))).toBe(listLength(nodes));
+	});
+
+	it("reports the color of a range", () => {
+		const nodes = [text("ab"), red(text("cd"), strong(text("ef"))), text("gh")];
+		expect(colorAt(nodes, 2, 6)).toBe("red");
+		expect(colorAt(nodes, 3, 3)).toBe("red");
+		expect(colorAt(nodes, 2, 2)).toBeNull();
+		expect(colorAt(nodes, 1, 4)).toBeNull();
+		expect(colorAt(nodes, 6, 8)).toBeNull();
 	});
 });

@@ -23,8 +23,9 @@
  * görsel seçilemiyor ve silinemiyordu (F4-01). Bkz. `offsets.ts`.
  */
 import type { Inline } from "@kalem-editor/core";
+import { sanitizeColor } from "@kalem-editor/core";
 import type { MarkType } from "@kalem-editor/core/commands";
-import { toggleMark } from "@kalem-editor/core/commands";
+import { hasMark, toggleMark } from "@kalem-editor/core/commands";
 import { normalizeInline } from "./read.js";
 
 /** Bir düğümün ofset uzunluğu. */
@@ -172,8 +173,54 @@ export function markActive(
 	mark: MarkType,
 ): boolean {
 	const [bas, bit] = from >= to ? (from > 0 ? [from - 1, from] : [0, 1]) : [from, to];
-	const secili = sliceInline(nodes, bas, bit);
-	return secili.length > 0 && secili.every((node) => node.type === mark);
+	return hasMark(sliceInline(nodes, bas, bit), mark);
+}
+
+/** Colors the range; `null` (or an unsafe value) removes the color instead. */
+export function applyColor(
+	nodes: readonly Inline[],
+	from: number,
+	to: number,
+	color: string | null,
+): Inline[] {
+	if (from >= to) return [...nodes];
+	const plain = stripColor(sliceInline(nodes, from, to));
+	const safe = color === null ? null : sanitizeColor(color);
+	if (safe === null) return spliceInline(nodes, from, to, plain);
+	return spliceInline(nodes, from, to, [{ type: "color", color: safe, children: plain }]);
+}
+
+function stripColor(nodes: readonly Inline[]): Inline[] {
+	return nodes.flatMap((node): Inline[] => {
+		if (node.type === "color") return stripColor(node.children);
+		if ("children" in node) return [{ ...node, children: stripColor(node.children) } as Inline];
+		return [node];
+	});
+}
+
+/**
+ * The color of the whole range, or `null` when it is uncolored or mixed.
+ * An empty range reports the character before the caret, like `markActive`.
+ */
+export function colorAt(nodes: readonly Inline[], from: number, to: number): string | null {
+	const [start, end] = from >= to ? (from > 0 ? [from - 1, from] : [0, 1]) : [from, to];
+	const colors = new Set<string | null>();
+	collectColors(sliceInline(nodes, start, end), null, colors);
+	const [only] = colors;
+	return colors.size === 1 && only !== undefined ? only : null;
+}
+
+function collectColors(
+	nodes: readonly Inline[],
+	inherited: string | null,
+	out: Set<string | null>,
+): void {
+	for (const node of nodes) {
+		if (node.type === "break") continue;
+		if ("children" in node) {
+			collectColors(node.children, node.type === "color" ? node.color : inherited, out);
+		} else out.add(inherited);
+	}
 }
 
 /**

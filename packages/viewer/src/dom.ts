@@ -49,7 +49,11 @@ function toNode(
 
 function toElement(node: RenderElement, doc: Document, options: RenderToDomOptions): Element {
 	const element = doc.createElement(node.tag);
-	for (const [name, value] of node.attrs) element.setAttribute(name, value);
+	for (const [name, value] of node.attrs) {
+		// CSSOM, not the attribute: an inline `style` attribute is blocked by a strict CSP.
+		if (name === "style") (element as HTMLElement).style.cssText = value;
+		else element.setAttribute(name, value);
+	}
 	appendAll(element, node.children, doc, options);
 	return element;
 }

@@ -76,7 +76,13 @@ editor.toggleMark('strong');            // strong | emphasis | delete | inlineCo
 editor.isMarkActive('emphasis');        // boolean
 editor.setLink('https://ornek.com');    // seçili metni bağlantı yapar
 editor.getActiveLink();                 // { url, title, from, to } | null
+editor.setColor('#e03131');             // seçili metni renklendirir; null rengi kaldırır
+editor.getColor();                      // string | null (renksiz ya da karışık)
 ```
+
+Renk Markdown'da `<span style="color:#e03131">metin</span>` olarak yazılır;
+Markdown'ın renk için kendi sözdizimi yok. Görüntüleyici bu span'i ham HTML
+`escape` politikasında da renkli basar.
 
 ### Blok
 

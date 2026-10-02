@@ -319,6 +319,94 @@ test("stores a pasted image next to a saved document", async () => {
 	await app.close();
 });
 
+test("pastes into a code block as plain code", async () => {
+	const path = join(await tempDir("paste-code"), "kod.md");
+	await writeFile(path, "```json\n{}\n```\n");
+	const { app, page, errors } = await launch({ args: [path] });
+
+	await page.locator("#editor pre").click();
+	await page.keyboard.press("End");
+	await page.keyboard.press("ArrowLeft");
+	await page.evaluate(() => {
+		const data = new DataTransfer();
+		data.setData("text/html", "<p><b>ad</b></p>");
+		data.setData("text/plain", '\r\n  "ad": "# Ayşe",\r\n  "yaş": 30\r\n');
+		document.activeElement?.dispatchEvent(
+			new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }),
+		);
+	});
+
+	await save(page);
+	await expect(status(page)).toHaveText("Saved");
+	expect(await readFile(path, "utf8")).toBe('```json\n{\n  "ad": "# Ayşe",\n  "yaş": 30\n}\n```\n');
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("colors selected text and keeps the color in the file", async () => {
+	const path = join(await tempDir("text-color"), "renk.md");
+	await writeFile(path, "önemli not\n\n[bağlantı](https://example.com)\n");
+	const { app, page, errors } = await launch({ args: [path] });
+	const menu = page.locator('[data-command="text-color"]');
+	const red = page.locator('[data-command="text-color-e03131"]');
+
+	// Without a selection nothing is colored and the user is told why.
+	await page.locator("#editor p").first().click();
+	await menu.click();
+	await red.click();
+	await expect(page.locator(".notice")).toContainText("Select the text");
+	await expect(page.locator("#editor [data-kalem-color]")).toHaveCount(0);
+
+	await page.keyboard.press("End");
+	for (let i = 0; i < 3; i++) await page.keyboard.press("Shift+ArrowLeft");
+	await menu.click();
+	await expect(red).toBeVisible();
+	await red.click();
+	await expect(red).toBeHidden();
+	const colored = page.locator("#editor [data-kalem-color]");
+	await expect(colored).toHaveText("not");
+	await expect(colored).toHaveCSS("color", "rgb(224, 49, 49)");
+	await menu.click();
+	await expect(red).toHaveAttribute("aria-pressed", "true");
+	await page.keyboard.press("Escape");
+
+	// A colored link takes the color too.
+	await page.locator("#editor p").nth(1).click();
+	await page.keyboard.press("End");
+	await page.keyboard.press("Shift+Home");
+	await menu.click();
+	await red.click();
+	await expect(page.locator("#editor [data-kalem-color] a")).toHaveCSS("color", "rgb(224, 49, 49)");
+
+	await save(page);
+	await expect(status(page)).toHaveText("Saved");
+	expect(await readFile(path, "utf8")).toBe(
+		[
+			'önemli <span style="color:#e03131">not</span>',
+			"",
+			'<span style="color:#e03131">[bağlantı](https://example.com)</span>',
+			"",
+		].join("\n"),
+	);
+	await app.close();
+
+	const reopened = await launch({ args: [path] });
+	await expect(reopened.page.locator("#editor [data-kalem-color]").first()).toHaveText("not");
+	await reopened.page.locator("#editor p").first().click();
+	await reopened.page.keyboard.press("End");
+	for (let i = 0; i < 3; i++) await reopened.page.keyboard.press("Shift+ArrowLeft");
+	await reopened.page.locator('[data-command="text-color"]').click();
+	await reopened.page.locator('[data-command="text-color-none"]').click();
+	await expect(
+		reopened.page.locator("#editor p").first().locator("[data-kalem-color]"),
+	).toHaveCount(0);
+	await save(reopened.page);
+	await expect(status(reopened.page)).toHaveText("Saved");
+	expect(await readFile(path, "utf8")).toContain("önemli not\n");
+	expect([...errors, ...reopened.errors]).toEqual([]);
+	await reopened.app.close();
+});
+
 test("switches the theme and remembers it", async () => {
 	const { app, page, userData } = await launch();
 	const isDark = () => page.evaluate(() => matchMedia("(prefers-color-scheme: dark)").matches);

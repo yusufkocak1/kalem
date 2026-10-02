@@ -59,6 +59,6 @@ export { PluginRegistry } from "./plugin.js";
 export { defaultPlugins, inputRulesPlugin, taskListPlugin } from "./plugins-builtin.js";
 export { normalizeInline, readCode, readInline } from "./read.js";
 export type { TopNode } from "./render.js";
-export { CODE_ATTR, ID_ATTR, PATH_ATTR } from "./render.js";
+export { CODE_ATTR, COLOR_ATTR, ID_ATTR, PATH_ATTR } from "./render.js";
 export type { BlockSelection, EditorSelection, TextSelection } from "./selection.js";
 export { placeCaret, readSelection, selectedRange } from "./selection.js";

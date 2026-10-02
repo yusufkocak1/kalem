@@ -43,10 +43,7 @@ export type BlockType =
 export function toggleMark(nodes: readonly Inline[], mark: MarkType): Inline[] {
 	if (nodes.length === 0) return [];
 
-	if (nodes.every((n) => n.type === mark)) {
-		// Tamamı işaretli: sarmalayıcıları aç.
-		return nodes.flatMap((n) => ("children" in n ? [...n.children] : [n]));
-	}
+	if (hasMark(nodes, mark)) return nodes.flatMap((n) => unwrapMark(n, mark));
 
 	// `inlineCode` çocuk taşımaz; içerik düz metne indirgenir.
 	if (mark === "inlineCode") {
@@ -57,7 +54,18 @@ export function toggleMark(nodes: readonly Inline[], mark: MarkType): Inline[] {
 
 /** Düğümün (ya da alt ağacının) o biçimi taşıyıp taşımadığı. */
 export function hasMark(nodes: readonly Inline[], mark: MarkType): boolean {
-	return nodes.length > 0 && nodes.every((n) => n.type === mark);
+	return (
+		nodes.length > 0 &&
+		nodes.every((n) => n.type === mark || (n.type === "color" && hasMark(n.children, mark)))
+	);
+}
+
+/** Color is transparent to marks: `color[strong[x]]` counts as bold and can be un-bolded. */
+function unwrapMark(node: Inline, mark: MarkType): Inline[] {
+	if (node.type === "color") {
+		return [{ ...node, children: node.children.flatMap((child) => unwrapMark(child, mark)) }];
+	}
+	return node.type === mark && "children" in node ? [...node.children] : [node];
 }
 
 /** Alt ağaçtaki düz metin. */

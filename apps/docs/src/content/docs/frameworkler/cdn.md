@@ -30,7 +30,7 @@ bırakıyor; paketleyici kullanan uygulamada doğrusu bu, yoksa aynı kod iki
 kez paketlenirdi. Ama CDN kullanıcısının paketleyicisi yok ve çıplak bir
 `import "@kalem-editor/editor"` satırı tarayıcıda çözülmez.
 
-`kalem-editor.iife.js` hepsini içine alıyor: **28,1 kB** (gzip), tek
+`kalem-editor.iife.js` hepsini içine alıyor: **29,3 kB** (gzip), tek
 istek, `type="module"` bile gerekmiyor.
 
 ## Eleman kendiliğinden kaydoluyor

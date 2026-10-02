@@ -454,6 +454,32 @@ button {
 	background: var(--table-color, var(--app-raised));
 }
 
+.color-menu {
+	position: fixed;
+	z-index: 60;
+	display: flex;
+	gap: 4px;
+	padding: 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	box-shadow: var(--app-shadow);
+}
+
+.color-menu-button {
+	position: relative;
+}
+
+.color-menu-bar {
+	position: absolute;
+	right: 6px;
+	bottom: 3px;
+	left: 6px;
+	height: 3px;
+	border-radius: 2px;
+	background: var(--app-text);
+}
+
 /* "No color": an empty swatch with a diagonal stroke. */
 .ribbon-swatch[data-color="none"] {
 	background: linear-gradient(

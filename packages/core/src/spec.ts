@@ -58,6 +58,7 @@ export const SPECS: NodeSpecs = {
 		hasSyntax: true,
 	},
 	break: { type: "break", groups: ["inline"], content: "void", hasSyntax: true },
+	color: { type: "color", groups: ["inline"], content: "inlines", hasSyntax: true },
 };
 
 /** Bilinen bütün düğüm tipleri. */

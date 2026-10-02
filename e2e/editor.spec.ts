@@ -1151,6 +1151,50 @@ test.describe("eklentiler", () => {
 	});
 });
 
+test.describe("yazı rengi", () => {
+	const value = (page: import("@playwright/test").Page) =>
+		page.evaluate(() => window.kalem.editor.getValue());
+
+	test("seçili metin renkleniyor ve renk kaldırılabiliyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("abc def\n"));
+		await page.locator("#editor > [data-kalem-id]").first().click();
+		await page.keyboard.press("End");
+		for (let i = 0; i < 3; i++) await page.keyboard.press("Shift+ArrowLeft");
+		expect(await page.evaluate(() => window.kalem.editor.setColor("#e03131"))).toBe(true);
+		expect(await value(page)).toBe('abc <span style="color:#e03131">def</span>\n');
+		await expect(page.locator("#editor [data-kalem-color]")).toHaveCSS("color", "rgb(224, 49, 49)");
+		expect(await page.evaluate(() => window.kalem.editor.getColor())).toBe("#e03131");
+
+		await page.keyboard.press("ControlOrMeta+b");
+		expect(await value(page)).toBe('abc <span style="color:#e03131">**def**</span>\n');
+		await page.keyboard.press("ControlOrMeta+b");
+		expect(await value(page)).toBe('abc <span style="color:#e03131">def</span>\n');
+
+		expect(await page.evaluate(() => window.kalem.editor.setColor(null))).toBe(true);
+		expect(await value(page)).toBe("abc def\n");
+	});
+
+	test("renkli metnin içine yazılan metin rengi koruyor", async ({ page }) => {
+		await page.evaluate(() =>
+			window.kalem.editor.setValue('<span style="color:red">abc</span> def\n'),
+		);
+		await page.locator("#editor > [data-kalem-id]").first().click();
+		await page.keyboard.press("Home");
+		await page.keyboard.press("ArrowRight");
+		await page.keyboard.type("X");
+		expect(await value(page)).toBe('<span style="color:red">aXbc</span> def\n');
+		await page.keyboard.press("ControlOrMeta+z");
+		expect(await value(page)).toBe('<span style="color:red">abc</span> def\n');
+	});
+
+	test("seçim yokken renk uygulanmıyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("abc\n"));
+		await page.locator("#editor > [data-kalem-id]").first().click();
+		expect(await page.evaluate(() => window.kalem.editor.setColor("red"))).toBe(false);
+		expect(await value(page)).toBe("abc\n");
+	});
+});
+
 /**
  * Yapıştırma boru hattı  (İş listesi: F3-07)
  *
@@ -1203,6 +1247,34 @@ test.describe("yapıştırma", () => {
 		await page.locator("#editor > [data-kalem-id]").first().click();
 		await yapistir(page, { text: "# Başlık\n\nmetin\n" });
 		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("# Başlık\n\nmetin\n");
+	});
+
+	test("kod bloğuna yapıştırılan metin koda giriyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("```\nbir\n```\n"));
+		await page.locator("#editor > pre").click();
+		await page.keyboard.press("End");
+		await yapistir(page, {
+			html: "<p><b>iki</b></p><p># üç</p>",
+			text: "\r\niki\r\n# üç",
+		});
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe(
+			"```\nbir\niki\n# üç\n```\n",
+		);
+		await page.keyboard.type("!");
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe(
+			"```\nbir\niki\n# üç!\n```\n",
+		);
+	});
+
+	test("kod bloğunda seçili metin yapıştırılanla değişiyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("```\nbir\n```\n"));
+		await page.locator("#editor > pre").click();
+		await page.keyboard.press("End");
+		await page.keyboard.press("Shift+Home");
+		await yapistir(page, { text: "iki" });
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("```\niki\n```\n");
+		await page.keyboard.press("ControlOrMeta+z");
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("```\nbir\n```\n");
 	});
 
 	/** `2 * 3 * 4` yazan kullanıcının metni bozulmamalı. */

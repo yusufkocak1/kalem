@@ -28,7 +28,7 @@ I built a WYSIWYG editor for people who don't know Markdown. It feels like Word 
 
 Most rich-text editors store JSON or HTML and convert to Markdown on save, which normalizes everything: `*` lists become `-`, `1.` `1.` `1.` gets renumbered, four-space nested lists get re-indented. Kalem's parser records how each construct was written and the serializer writes it back the same way.
 
-- Zero runtime dependencies; 36 kB min+gzip for the editor plus the Word-like UI
+- Zero runtime dependencies; 37 kB min+gzip for the editor plus the Word-like UI
 - Vanilla core, thin React and Vue wrappers, and a `<kalem-editor>` custom element for everything else (it's form-associated, so a plain HTML form submits Markdown)
 - Tested in Chromium, Firefox and WebKit, under a Turkish locale on purpose (the dotted/dotless i breaks naive case folding)
 

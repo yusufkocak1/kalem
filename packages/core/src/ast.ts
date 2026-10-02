@@ -492,6 +492,20 @@ export interface ImageReference extends NodeBase {
 	syntax?: ReferenceSyntax;
 }
 
+/** The raw tags a `color` node was parsed from, kept for byte-exact round trips. */
+export interface ColorSyntax {
+	open: string;
+	close: string;
+}
+
+/** Colored text, written in Markdown as `<span style="color:…">…</span>`. Not part of mdast. */
+export interface Color extends NodeBase {
+	type: "color";
+	color: string;
+	children: Inline[];
+	syntax?: ColorSyntax;
+}
+
 /** Sert satır sonu: satır sonunda iki boşluk ya da ters bölü. */
 export interface Break extends NodeBase {
 	type: "break";
@@ -517,6 +531,7 @@ export type Inline =
 	| LinkReference
 	| ImageReference
 	| Html
+	| Color
 	| Break;
 
 // ---------------------------------------------------------------------------

@@ -42,8 +42,10 @@ import type { HistoryState } from "./history.js";
 import { History } from "./history.js";
 import { assignIds, newId } from "./ids.js";
 import {
+	applyColor,
 	applyLink,
 	applyMark,
+	colorAt,
 	linkAt,
 	markActive,
 	sliceInline,
@@ -538,6 +540,17 @@ export class Editor {
 		return markActive(hedef.children, hedef.from, hedef.to, mark);
 	}
 
+	/** Colors the selected text; `null` removes the color. Does nothing without a selection. */
+	setColor(color: string | null): boolean {
+		return this.#editRange((children, from, to) => applyColor(children, from, to, color));
+	}
+
+	/** The color of the selection (or of the character before the caret); `null` if none or mixed. */
+	getColor(): string | null {
+		const target = this.#rangeTarget();
+		return target === null ? null : colorAt(target.children, target.from, target.to);
+	}
+
 	/** Seçili aralığı bağlantıya çevirir; `url` boşsa bağlantıyı kaldırır. */
 	setLink(url: string): boolean {
 		const etkin = this.getActiveLink();
@@ -823,6 +836,13 @@ export class Editor {
 		if (girdi.html === "" && girdi.text === "") return;
 
 		event.preventDefault();
+		if (this.#selection?.kind !== "block" && this.#selectionInsideSource()) {
+			this.#plainPaste = false;
+			const text =
+				girdi.text !== "" ? girdi.text : (this.#parseHtml(girdi.html)?.textContent ?? "");
+			if (text !== "") this.#insertIntoSource(text.replace(/\r\n?/g, SATIR_SONU));
+			return;
+		}
 		const parca = pasteFragment(girdi, (html) => this.#parseHtml(html), {
 			// Ctrl+Shift+V: bir sonraki yapıştırma biçimsiz.
 			plainOnly: this.#plainPaste,
@@ -1441,6 +1461,13 @@ export class Editor {
 		const element = node instanceof Element ? node : node.parentElement;
 		const holder = element?.closest(`[${CODE_ATTR}]`);
 		return holder instanceof HTMLElement && this.#element.contains(holder) ? holder : null;
+	}
+
+	#selectionInsideSource(): boolean {
+		const holder = this.#sourceHolder();
+		if (holder === null) return false;
+		const selection = this.#element.ownerDocument.getSelection();
+		return selection !== null && holder.contains(selection.getRangeAt(0).endContainer);
 	}
 
 	#insertIntoSource(metin: string): void {

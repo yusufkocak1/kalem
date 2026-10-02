@@ -29,7 +29,7 @@ import type {
 	Node,
 	Root,
 } from "@kalem-editor/core";
-import { sanitizeUrl } from "@kalem-editor/core";
+import { sanitizeColor, sanitizeUrl } from "@kalem-editor/core";
 
 // ---------------------------------------------------------------------------
 // Plan düğümleri
@@ -396,6 +396,13 @@ function inline(node: Inline, out: RenderNode[], ctx: Ctx): void {
 		case "html": {
 			const rendered = rawHtml(node.value, ctx);
 			if (rendered !== null) out.push(rendered);
+			return;
+		}
+		case "color": {
+			const color = sanitizeColor(node.color);
+			const children = inlines(node.children, ctx);
+			if (color === null) out.push(...children);
+			else out.push(el("span", [["style", `color:${color}`]], children));
 			return;
 		}
 		default:

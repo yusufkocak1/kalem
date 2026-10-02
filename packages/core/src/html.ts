@@ -27,6 +27,7 @@
  * @module @kalem-editor/core/html
  */
 import type { Block, Inline, List, Root } from "./ast.js";
+import { sanitizeColor } from "./color.js";
 import { isSafeUrl, NEUTRALIZED_URL } from "./security.js";
 
 /**
@@ -443,7 +444,31 @@ function toInlines(node: HtmlNode, o: FromHtmlOptions): Inline[] {
 		? marksFromStyle(node).filter((m) => m !== "strong")
 		: [...(INLINE_MARKS[tag] !== undefined ? [INLINE_MARKS[tag]] : []), ...marksFromStyle(node)];
 
-	return applyMarks(children, dedupe(marks));
+	return withColor(applyMarks(children, dedupe(marks)), node);
+}
+
+const DEFAULT_COLORS = new Set([
+	"black",
+	"#000",
+	"#000000",
+	"windowtext",
+	"inherit",
+	"initial",
+	"currentcolor",
+]);
+
+/**
+ * Only a span whose style is the color and nothing else. Browsers copy every
+ * computed property onto each span, so taking any `color` would paint pasted
+ * web pages in their source theme.
+ */
+function withColor(children: Inline[], node: HtmlNode): Inline[] {
+	if (children.length === 0 || tagOf(node) !== "SPAN") return children;
+	const style = styleMap(node);
+	const value = style.size === 1 ? style.get("color") : undefined;
+	if (value === undefined || DEFAULT_COLORS.has(value)) return children;
+	const color = sanitizeColor(value);
+	return color === null ? children : [{ type: "color", color, children }];
 }
 
 /**

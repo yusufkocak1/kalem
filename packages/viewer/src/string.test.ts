@@ -328,3 +328,30 @@ describe("erişilebilirlik", () => {
 		expect(html("![](/uzun-dosya-adi.png)")).toContain('alt=""');
 	});
 });
+
+describe("text color", () => {
+	it("renders a color span even when raw HTML is escaped", () => {
+		expect(renderToString(parse('a <span style="color:#c00">**b**</span>\n'))).toBe(
+			'<p>a <span style="color:#c00"><strong>b</strong></span></p>',
+		);
+	});
+
+	it("drops the wrapper when the color is not safe", () => {
+		const root: Root = {
+			type: "root",
+			children: [
+				{
+					type: "paragraph",
+					children: [
+						{
+							type: "color",
+							color: "red;background:url(x)",
+							children: [{ type: "text", value: "a" }],
+						},
+					],
+				},
+			],
+		};
+		expect(renderToString(root)).toBe("<p>a</p>");
+	});
+});

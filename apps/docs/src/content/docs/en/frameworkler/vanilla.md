@@ -70,7 +70,7 @@ import { renderToDOM } from '@kalem-editor/viewer';
 renderToDOM(parse(markdown), document.getElementById('app')!);
 ```
 
-2.7 kB, no editing code. Details: [Viewer](/en/rehber/viewer/).
+2.9 kB, no editing code. Details: [Viewer](/en/rehber/viewer/).
 
 ## Module system
 

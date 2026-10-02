@@ -20,6 +20,7 @@
  * bir yerden `<span style=…>` yapıştırırsa metni kalır, çöp gitmez.
  */
 import type { Inline } from "@kalem-editor/core";
+import { COLOR_ATTR } from "./render.js";
 
 const ELEMENT = 1;
 const TEXT = 3;
@@ -111,6 +112,13 @@ function readNode(node: Node, out: Inline[]): void {
 		return;
 	}
 
+	const color = name === "SPAN" ? element.getAttribute(COLOR_ATTR) : null;
+	if (color !== null) {
+		const children = normalize(collect(element));
+		if (children.length > 0) out.push({ type: "color", color, children });
+		return;
+	}
+
 	const mark = MARKS[name];
 	if (mark !== undefined) {
 		const children = normalize(collect(element));
@@ -161,7 +169,7 @@ function normalize(nodes: readonly Inline[]): Inline[] {
  */
 export function normalizeInline(nodes: readonly Inline[]): Inline[] {
 	const flat: Inline[] = [];
-	for (const node of nodes) flattenInto(flat, node, null);
+	for (const node of nodes) flattenInto(flat, node, null, null);
 	return mergeAdjacent(flat);
 }
 
@@ -178,6 +186,14 @@ function mergeAdjacent(nodes: readonly Inline[]): Inline[] {
 		// `**a****b**` değil `**ab**`. Bölünmüş kalınlık, biçim uygulandıktan
 		// sonra doğal olarak oluşuyor ve serileştirilince gerçekten bozuk
 		// Markdown üretiyor.
+		if (node.type === "color" && last?.type === "color" && node.color === last.color) {
+			out[out.length - 1] = {
+				type: "color",
+				color: last.color,
+				children: mergeAdjacent([...last.children, ...node.children]),
+			};
+			continue;
+		}
 		if (isMark(node) && isMark(last) && node.type === last.type) {
 			out[out.length - 1] = {
 				...last,
@@ -204,21 +220,70 @@ function isMark(node: Inline | undefined): node is MarkNode {
  * **her seviyede** tekrar çalışmak zorunda; yalnızca en dışta yapılsaydı
  * modelde `text(a), text(b)` kalır ve her tuşta gereksiz fark üretirdi.
  */
-function flattenInto(out: Inline[], node: Inline, insideMark: string | null): void {
+function flattenInto(
+	out: Inline[],
+	node: Inline,
+	insideMark: string | null,
+	insideColor: string | null,
+): void {
 	if (node.type === "strong" || node.type === "emphasis" || node.type === "delete") {
 		if (node.type === insideMark) {
 			// Aynı biçim zaten dışarıda: bu seviye anlamsız, çocuklar yukarı.
-			for (const child of node.children) flattenInto(out, child, insideMark);
+			for (const child of node.children) flattenInto(out, child, insideMark, insideColor);
 			return;
 		}
 		const inner: Inline[] = [];
-		for (const child of node.children) flattenInto(inner, child, node.type);
+		for (const child of node.children) flattenInto(inner, child, node.type, insideColor);
 		const merged = mergeAdjacent(inner);
 		if (merged.length === 0) return;
-		out.push({ ...node, children: merged });
+		out.push(...liftColors(node, merged));
+		return;
+	}
+	if (node.type === "color") {
+		if (node.color === insideColor) {
+			for (const child of node.children) flattenInto(out, child, insideMark, insideColor);
+			return;
+		}
+		const inner: Inline[] = [];
+		for (const child of node.children) flattenInto(inner, child, insideMark, node.color);
+		const merged = mergeAdjacent(inner);
+		// The serializer drops a break at either edge of a wrapper, so it moves outside.
+		let start = 0;
+		let end = merged.length;
+		while (start < end && merged[start]?.type === "break") start++;
+		while (end > start && merged[end - 1]?.type === "break") end--;
+		out.push(...merged.slice(0, start));
+		if (end > start) out.push({ ...node, children: merged.slice(start, end) });
+		out.push(...merged.slice(end));
 		return;
 	}
 	out.push(node);
+}
+
+/**
+ * Keeps color outside marks: `**<span>x</span>**` next to a letter is not
+ * emphasis in CommonMark (the `<` makes the run non-flanking), while
+ * `<span>**x**</span>` always is.
+ */
+function liftColors(mark: MarkNode, children: readonly Inline[]): Inline[] {
+	if (!children.some((child) => child.type === "color"))
+		return [{ ...mark, children: [...children] }];
+	const out: Inline[] = [];
+	let run: Inline[] = [];
+	const flush = (): void => {
+		if (run.length > 0) out.push({ ...mark, children: run });
+		run = [];
+	};
+	for (const child of children) {
+		if (child.type !== "color") {
+			run.push(child);
+			continue;
+		}
+		flush();
+		out.push({ ...child, children: liftColors(mark, child.children) });
+	}
+	flush();
+	return out;
 }
 
 /**

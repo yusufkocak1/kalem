@@ -14,11 +14,11 @@ files:
 
 fileAssociations:
   - ext: md
-    name: Markdown
+    name: Kalem.Markdown
     description: Markdown document
     role: Editor
   - ext: markdown
-    name: Markdown
+    name: Kalem.Markdown
     description: Markdown document
     role: Editor
 

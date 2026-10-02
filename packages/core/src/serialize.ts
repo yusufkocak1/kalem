@@ -29,6 +29,7 @@ import type {
 	Block,
 	Blockquote,
 	Code,
+	Color,
 	Definition,
 	Heading,
 	Inline,
@@ -42,6 +43,7 @@ import type {
 	ThematicBreak,
 } from "./ast.js";
 import { splitRow } from "./blocks.js";
+import { colorOfOpenTag, colorOpenTag, sanitizeColor } from "./color.js";
 import { parseInline } from "./inline.js";
 
 /** Yeni düğümler için yazım varsayılanları. */
@@ -583,6 +585,7 @@ function isInlineNode(node: Node): node is Inline {
 		node.type === "image" ||
 		node.type === "linkReference" ||
 		node.type === "imageReference" ||
+		node.type === "color" ||
 		node.type === "break"
 	);
 }
@@ -739,7 +742,18 @@ function inline(node: Inline, o: Resolved, startsLine = false, enclosing = ""): 
 			return node.syntax?.marker === "spaces" ? `${" ".repeat(node.syntax.width ?? 2)}\n` : "\\\n";
 		case "html":
 			return node.value;
+		case "color":
+			return colored(node, inlines(node.children, o, false, enclosing));
 	}
+}
+
+function colored(node: Color, inner: string): string {
+	const color = sanitizeColor(node.color);
+	if (color === null || inner === "") return inner;
+	const raw = node.syntax;
+	const open =
+		raw !== undefined && colorOfOpenTag(raw.open) === color ? raw.open : colorOpenTag(color);
+	return `${open}${inner}${raw?.close ?? "</span>"}`;
 }
 
 /**
