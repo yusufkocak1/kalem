@@ -12,6 +12,11 @@ files:
   - package.json
   - "!**/*.map"
 
+# Chromium ships ~50 MB of UI locales; the app only speaks these two.
+electronLanguages:
+  - en-US
+  - tr
+
 fileAssociations:
   - ext: md
     name: Kalem.Markdown
@@ -26,6 +31,11 @@ win:
   target:
     - nsis
     - portable
+
+# The launcher unpacks the app into a per-build cache (see patches/app-builder-lib*.patch),
+# so only the first launch of a new exe waits; the splash covers that wait.
+portable:
+  splashImage: resources/splash.bmp
 
 nsis:
   oneClick: false

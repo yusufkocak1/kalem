@@ -1,0 +1,63 @@
+diff --git a/templates/nsis/portable.nsi b/templates/nsis/portable.nsi
+index e5436bb0f810058b52e15ce65b3d256f86dabc6f..62466e547d47b2ea328a3a93664c5a906ed1242b 100644
+--- a/templates/nsis/portable.nsi
++++ b/templates/nsis/portable.nsi
+@@ -32,9 +32,17 @@ Section
+ 
+   StrCpy $INSTDIR "$PLUGINSDIR\app"
+   !ifdef UNPACK_DIR_NAME
+-    StrCpy $INSTDIR "$TEMP\${UNPACK_DIR_NAME}"
++    # Kalem: unpack once per build into a cache and reuse it on later launches.
++    # A define, not a register: the extraction macros overwrite $R1.
++    !define UNPACK_CACHE "$LOCALAPPDATA\${APP_FILENAME}-portable"
++    StrCpy $INSTDIR "${UNPACK_CACHE}\${UNPACK_DIR_NAME}"
+   !endif
+ 
++  ${If} ${FileExists} "$INSTDIR\.unpacked"
++  ${AndIf} ${FileExists} "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
++    Goto unpacked
++  ${EndIf}
++
+   RMDir /r $INSTDIR
+   SetOutPath $INSTDIR
+ 
+@@ -74,6 +82,25 @@ Section
+     !endif
+   !endif
+ 
++  !ifdef UNPACK_DIR_NAME
++    FileOpen $R2 "$INSTDIR\.unpacked" w
++    FileClose $R2
++    # Earlier builds' caches; one that is still running stays locked and is kept.
++    FindFirst $R2 $R3 "${UNPACK_CACHE}\*.*"
++    ${DoWhile} $R3 != ""
++      ${If} $R3 != "."
++      ${AndIf} $R3 != ".."
++      ${AndIf} $R3 != "${UNPACK_DIR_NAME}"
++        RMDir /r "${UNPACK_CACHE}\$R3"
++      ${EndIf}
++      FindNext $R2 $R3
++    ${Loop}
++    FindClose $R2
++  !endif
++
++  unpacked:
++  SetOutPath $INSTDIR
++
+   System::Call 'Kernel32::SetEnvironmentVariable(t, t)i ("PORTABLE_EXECUTABLE_DIR", "$EXEDIR").r0'
+   System::Call 'Kernel32::SetEnvironmentVariable(t, t)i ("PORTABLE_EXECUTABLE_FILE", "$EXEPATH").r0'
+   System::Call 'Kernel32::SetEnvironmentVariable(t, t)i ("PORTABLE_EXECUTABLE_APP_FILENAME", "${APP_FILENAME}").r0'
+@@ -83,9 +110,11 @@ Section
+     BgImage::Destroy
+   !endif
+ 
+-	ExecWait "$INSTDIR\${APP_EXECUTABLE_FILENAME} $R0" $0
++	ExecWait '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" $R0' $0
+   SetErrorLevel $0
+ 
+   SetOutPath $EXEDIR
+-	RMDir /r $INSTDIR
++  !ifndef UNPACK_DIR_NAME
++	  RMDir /r $INSTDIR
++  !endif
+ SectionEnd

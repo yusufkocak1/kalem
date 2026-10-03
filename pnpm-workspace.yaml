@@ -47,6 +47,9 @@ onlyBuiltDependencies:
   - esbuild
   - sharp
 
+patchedDependencies:
+  app-builder-lib@26.15.3: patches/app-builder-lib@26.15.3.patch
+
 peerDependencyRules:
   allowedVersions:
     '@angular/build>vitest': '*'

@@ -37,6 +37,22 @@ Bunu **kurulum paketi** (`release/Kalem Setup <sürüm>.exe`) yapar; taşınabil
 Taşınabilir sürümde aynı menüden **Bilgisayarda bir uygulama seçin** ile exe
 gösterilebilir; exe taşınırsa bağ kopar.
 
+## Taşınabilir exe neden ilk açılışta bekliyor
+
+Taşınabilir exe, içindeki uygulamayı (~320 MB) çalıştırmadan önce diske açmak
+zorunda. Bu açma işlemi **her yeni exe için bir kez** yapılıyor (~7 sn,
+bu sırada açılış görseli görünür) ve sonuç
+`%LOCALAPPDATA%\kalem-desktop-portable\` altında saklanıyor. Sonraki
+açılışlar ~0,7 sn sürüyor. Yeni bir exe ilk açıldığında eski sürümün klasörü
+silinir; klasörü elle silmek de güvenlidir, yalnızca bir sonraki açılış yine
+bekler. Kurulu sürüm (`Kalem Setup`) hiç beklemez.
+
+Bu davranış electron-builder'ın taşınabilir başlatıcısına yapılan bir yamadan
+geliyor (`patches/app-builder-lib@26.15.3.patch`); özgün başlatıcı her
+açılışta yeniden açıp kapanınca siliyordu. electron-builder sürümü
+yükseltilirken yamanın da taşınması gerekir — uymazsa `pnpm install` hata
+verir.
+
 ## Özellikler
 
 **Belgeler**

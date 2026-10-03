@@ -465,6 +465,14 @@ for (const language of ["en", "tr"]) {
 	});
 }
 
+test("removes the loading screen once the editor is ready", async () => {
+	const { app, page, errors } = await launch();
+	await expect(page.locator("#editor")).toBeVisible();
+	await expect(page.locator("#boot")).toHaveCount(0);
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
 test("switches the theme and remembers it", async () => {
 	const { app, page, userData } = await launch();
 	const isDark = () => page.evaluate(() => matchMedia("(prefers-color-scheme: dark)").matches);

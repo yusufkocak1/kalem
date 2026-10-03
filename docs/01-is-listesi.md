@@ -64,7 +64,7 @@ F6-13 ve F6-14 bölümlerinde.
 > Electron ile yazılmış Word benzeri Markdown editörü (şerit, sekmeler,
 > `.md` ve `.txt` açma/kaydetme, `.docx` içe aktarma, tablo sıralama ve
 > renklendirme, yazı rengi, blok birleştirme, dosya ekleme, yedi eklenti).
-> 72 görevlik sayıma dâhil değil. 130 birim + 25 uçtan uca test; ayrıntı ve
+> 72 görevlik sayıma dâhil değil. 130 birim + 26 uçtan uca test; ayrıntı ve
 > bilinen sınırlar [apps/desktop/README.md](../apps/desktop/README.md) içinde.
 >
 > Masaüstünden çekirdeğe dönen üç iş (2026-10-03): **yazı rengi** — yeni

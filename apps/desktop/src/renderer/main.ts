@@ -1292,3 +1292,11 @@ deskArea.addEventListener(
 	},
 	true,
 );
+
+// --- Loading screen -----------------------------------------------------------
+
+const boot = document.getElementById("boot");
+if (boot !== null) {
+	boot.classList.add("done");
+	setTimeout(() => boot.remove(), 200);
+}
