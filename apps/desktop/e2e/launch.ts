@@ -61,8 +61,26 @@ export async function launch(options: LaunchOptions = {}): Promise<Launched> {
 
 export async function stubSaveDialog(app: ElectronApplication, filePath: string): Promise<void> {
 	await app.evaluate(({ dialog }, path) => {
-		dialog.showSaveDialog = async () => ({ canceled: false, filePath: path });
+		dialog.showSaveDialog = (async (...args: unknown[]) => {
+			const options = (args.length > 1 ? args[1] : args[0]) as Electron.SaveDialogOptions;
+			(globalThis as { lastSaveDialog?: unknown }).lastSaveDialog = {
+				defaultPath: options.defaultPath,
+				filters: options.filters,
+			};
+			return { canceled: false, filePath: path };
+		}) as typeof dialog.showSaveDialog;
 	}, filePath);
+}
+
+/** What the app asked the (stubbed) save dialog for the last time. */
+export async function lastSaveDialog(
+	app: ElectronApplication,
+): Promise<{ defaultPath?: string; filters?: Electron.FileFilter[] }> {
+	return app.evaluate(
+		() =>
+			(globalThis as { lastSaveDialog?: { defaultPath?: string; filters?: Electron.FileFilter[] } })
+				.lastSaveDialog ?? {},
+	);
 }
 
 /** Makes every message box answer with the given button index. */

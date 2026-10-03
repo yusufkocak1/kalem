@@ -544,6 +544,7 @@ function heading(depth: 1 | 2 | 3 | 4 | 5 | 6): () => void {
 const commands: Record<Command, () => void> = {
 	save: () => void session.save(),
 	"save-as": () => void session.save(true),
+	"save-as-package": () => void session.save(true, "package"),
 	"close-tab": () => void closeTab(session.id),
 	"next-tab": () => cycleTab(1),
 	"previous-tab": () => cycleTab(-1),

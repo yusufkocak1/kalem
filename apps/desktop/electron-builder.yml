@@ -26,6 +26,10 @@ fileAssociations:
     name: Kalem.Markdown
     description: Markdown document
     role: Editor
+  - ext: kmd
+    name: Kalem.Package
+    description: Kalem package
+    role: Editor
 
 win:
   target:

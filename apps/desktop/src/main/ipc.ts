@@ -1,11 +1,12 @@
 import { readFile, stat, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import type { IpcMainEvent, IpcMainInvokeEvent } from "electron";
 import { app, dialog, ipcMain } from "electron";
 import type {
 	Attachment,
 	DraftRequest,
 	ImageFile,
+	SaveResult,
 	Settings,
 	Startup,
 	WindowState,
@@ -13,16 +14,23 @@ import type {
 import { CHANNEL } from "../shared/bridge.js";
 import { toTextFormat } from "../shared/encoding.js";
 import type { Lang, Strings } from "../shared/i18n.js";
+import { assetsFolderName } from "../shared/images.js";
 import {
 	extension,
 	isEditablePath,
+	isPackagePath,
 	isWordPath,
 	MARKDOWN_EXTENSIONS,
+	PACKAGE_EXTENSIONS,
+	stripExtension,
 	TEXT_EXTENSIONS,
 } from "../shared/paths.js";
 import type { DraftStore } from "./drafts.js";
 import { copyAttachment, MAX_IMAGE_SIZE, writeDocument, writeImage } from "./files.js";
+import type { PackageStore } from "./package.js";
+import { PACKAGE_ASSETS } from "./package.js";
 import { DOCUMENT_SCHEME } from "./protocol.js";
+import { relocateLinks } from "./relocate.js";
 import type { SettingsStore } from "./settings.js";
 import type { AppWindow, WindowManager } from "./windows.js";
 import { errorMessage, pathKey } from "./windows.js";
@@ -31,6 +39,7 @@ export interface IpcContext {
 	readonly windows: WindowManager;
 	readonly store: SettingsStore;
 	readonly drafts: DraftStore;
+	readonly packages: PackageStore;
 	strings(): Strings;
 	language(): Lang;
 	changeSettings(patch: Partial<Settings>): void;
@@ -102,6 +111,17 @@ export function registerIpc(ctx: IpcContext): void {
 		return documentPath;
 	};
 
+	/** Where a document's images and attachments go: next to it, or into the package. */
+	const assetsTarget = async (
+		documentPath: string,
+	): Promise<{ contentPath: string; folderName: string }> => {
+		if (!isPackagePath(documentPath)) {
+			return { contentPath: documentPath, folderName: assetsFolderName(basename(documentPath)) };
+		}
+		const work = await ctx.packages.workFolder(documentPath);
+		return { contentPath: join(work.folder, work.textName), folderName: PACKAGE_ASSETS };
+	};
+
 	ipcMain.handle(CHANNEL.getStartup, async (event): Promise<Startup> => {
 		const win = senderOf(event);
 		return {
@@ -130,40 +150,68 @@ export function registerIpc(ctx: IpcContext): void {
 
 	ipcMain.handle(CHANNEL.importWord, (event) => windows.showWordDialog(senderOf(event)));
 
-	ipcMain.handle(CHANNEL.chooseSavePath, async (event, tabId: unknown, suggested: unknown) => {
-		const win = senderOf(event);
-		const tab = tabOf(win, tabId);
-		const t = ctx.strings();
-		const name = toFileName(typeof suggested === "string" ? suggested : "", t.untitled);
+	ipcMain.handle(
+		CHANNEL.chooseSavePath,
+		async (event, tabId: unknown, suggested: unknown, kind: unknown) => {
+			const win = senderOf(event);
+			const tab = tabOf(win, tabId);
+			const t = ctx.strings();
+			const name = toFileName(typeof suggested === "string" ? suggested : "", t.untitled);
 
-		const markdown = { name: t.markdownDocuments, extensions: [...MARKDOWN_EXTENSIONS] };
-		const text = { name: t.textDocuments, extensions: [...TEXT_EXTENSIONS] };
-		const isText = tab.path !== null && TEXT_EXTENSIONS.includes(extension(tab.path));
-		const result = await dialog.showSaveDialog(win.window, {
-			defaultPath: tab.path ?? join(windows.defaultFolder(win), `${name}.md`),
-			// The first filter decides the extension the dialog proposes.
-			filters: isText ? [text, markdown] : [markdown, text],
-		});
-		if (result.canceled || result.filePath === "") return null;
-
-		const path = isEditablePath(result.filePath) ? result.filePath : `${result.filePath}.md`;
-		if (windows.isOpenElsewhere(path, tab.id)) {
-			await dialog.showMessageBox(win.window, {
-				type: "warning",
-				message: t.saveFailed,
-				detail: t.openInAnotherWindow,
+			const markdown = { name: t.markdownDocuments, extensions: [...MARKDOWN_EXTENSIONS] };
+			const text = { name: t.textDocuments, extensions: [...TEXT_EXTENSIONS] };
+			const packaged = { name: t.packages, extensions: [...PACKAGE_EXTENSIONS] };
+			const current = tab.path === null ? "md" : extension(tab.path);
+			// Markdown unless asked for a package or already something else.
+			const wanted =
+				kind === "package"
+					? "kmd"
+					: TEXT_EXTENSIONS.includes(current) || PACKAGE_EXTENSIONS.includes(current)
+						? current
+						: "md";
+			const first = TEXT_EXTENSIONS.includes(wanted)
+				? text
+				: PACKAGE_EXTENSIONS.includes(wanted)
+					? packaged
+					: markdown;
+			const stem =
+				tab.path === null
+					? join(windows.defaultFolder(win), name)
+					: join(dirname(tab.path), stripExtension(basename(tab.path)));
+			const result = await dialog.showSaveDialog(win.window, {
+				defaultPath: `${stem}.${wanted}`,
+				// The first filter decides the extension the dialog proposes.
+				filters: [first, ...[markdown, text, packaged].filter((filter) => filter !== first)],
 			});
-			return null;
-		}
+			if (result.canceled || result.filePath === "") return null;
 
-		// The user picked this path, so this window may now write to it.
-		win.writable.add(pathKey(path));
-		return path;
-	});
+			const path = isEditablePath(result.filePath)
+				? result.filePath
+				: `${result.filePath}.${wanted}`;
+			if (windows.isOpenElsewhere(path, tab.id)) {
+				await dialog.showMessageBox(win.window, {
+					type: "warning",
+					message: t.saveFailed,
+					detail: t.openInAnotherWindow,
+				});
+				return null;
+			}
+
+			// The user picked this path, so this window may now write to it.
+			win.writable.add(pathKey(path));
+			return path;
+		},
+	);
 
 	ipcMain.handle(
 		CHANNEL.writeDocument,
-		async (event, tabId: unknown, path: unknown, text: unknown, format: unknown) => {
+		async (
+			event,
+			tabId: unknown,
+			path: unknown,
+			text: unknown,
+			rawFormat: unknown,
+		): Promise<SaveResult> => {
 			const win = senderOf(event);
 			const tab = tabOf(win, tabId);
 			if (typeof path !== "string" || typeof text !== "string") {
@@ -172,10 +220,38 @@ export function registerIpc(ctx: IpcContext): void {
 			if (!win.writable.has(pathKey(path))) {
 				throw new Error("This window is not allowed to write to that path");
 			}
-			const modified = await writeDocument(path, text, toTextFormat(format));
-			windows.markSaved(win, tab.id, path, modified);
+			const format = toTextFormat(rawFormat);
+			// Links in the editor resolve against this until the save completes.
+			const from = tab.base ?? tab.path;
+
+			let saved: { modified: number; text: string; changed: boolean; base: string | null };
+			if (isPackagePath(path)) {
+				saved = await ctx.packages.save(path, text, format, from);
+			} else {
+				const relocated =
+					from === null
+						? { text, changed: false }
+						: await relocateLinks(text, from, path, assetsFolderName(basename(path)));
+				const modified = await writeDocument(path, relocated.text, format);
+				saved = { modified, ...relocated, base: null };
+			}
+			windows.markSaved(win, tab.id, path, saved.modified, saved.base);
 			await ctx.drafts.delete(tab.id).catch(() => {});
-			return modified;
+
+			const movedBase =
+				saved.base !== null && (from === null || pathKey(from) !== pathKey(saved.base));
+			if (!saved.changed && !movedBase) return { modified: saved.modified };
+			return {
+				modified: saved.modified,
+				file: {
+					path,
+					name: basename(path),
+					text: saved.text,
+					format,
+					modified: saved.modified,
+					...(saved.base === null ? {} : { base: saved.base }),
+				},
+			};
 		},
 	);
 
@@ -214,7 +290,8 @@ export function registerIpc(ctx: IpcContext): void {
 	// --- Images and attachments ---------------------------------------------
 
 	ipcMain.handle(CHANNEL.writeImage, async (event, documentPath: unknown, raw: unknown) => {
-		return writeImage(writableDocument(senderOf(event), documentPath), toImageFile(raw));
+		const target = await assetsTarget(writableDocument(senderOf(event), documentPath));
+		return writeImage(target.contentPath, toImageFile(raw), target.folderName);
 	});
 
 	ipcMain.handle(CHANNEL.pickImages, async (event): Promise<ImageFile[]> => {
@@ -251,9 +328,10 @@ export function registerIpc(ctx: IpcContext): void {
 		paths: readonly string[],
 	): Promise<Attachment[]> => {
 		const attachments: Attachment[] = [];
+		const target = await assetsTarget(documentPath);
 		for (const path of paths) {
 			try {
-				attachments.push(await copyAttachment(documentPath, path));
+				attachments.push(await copyAttachment(target.contentPath, path, target.folderName));
 			} catch (error) {
 				await dialog.showMessageBox(win.window, {
 					type: "error",

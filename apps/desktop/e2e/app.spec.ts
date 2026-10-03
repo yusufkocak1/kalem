@@ -1,12 +1,14 @@
-import { readdir, readFile, stat, utimes, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, utimes, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ElectronApplication, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
+import JSZip from "jszip";
 import { createSampleDocx, PNG_1X1 } from "../src/main/sample-docx.test-helper.js";
 import type { KalemBridge } from "../src/shared/bridge.js";
 import type { Launched } from "./launch.js";
 import {
 	clickMenu,
+	lastSaveDialog,
 	launch,
 	stubMessageBox,
 	stubOpenDialog,
@@ -469,6 +471,175 @@ test("removes the loading screen once the editor is ready", async () => {
 	const { app, page, errors } = await launch();
 	await expect(page.locator("#editor")).toBeVisible();
 	await expect(page.locator("#boot")).toHaveCount(0);
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+async function zipEntries(path: string): Promise<Record<string, Buffer>> {
+	const zip = await JSZip.loadAsync(await readFile(path));
+	const out: Record<string, Buffer> = {};
+	for (const entry of Object.values(zip.files)) {
+		if (!entry.dir) out[entry.name] = await entry.async("nodebuffer");
+	}
+	return out;
+}
+
+const imageWidth = (page: Page) =>
+	page
+		.locator("#editor img")
+		.first()
+		.evaluate((img: HTMLImageElement) => img.naturalWidth);
+
+test("proposes Markdown when saving and a package only when asked", async () => {
+	const folder = await tempDir("save-kind");
+	const { app, page } = await launch();
+	await page.locator("#editor p").first().click();
+	await page.keyboard.type("Not");
+
+	await stubSaveDialog(app, join(folder, "not.md"));
+	await save(page);
+	await expect(status(page)).toHaveText("Saved");
+	const asked = await lastSaveDialog(app);
+	expect(asked.defaultPath?.endsWith(".md")).toBe(true);
+	expect(asked.filters?.[0]?.extensions).toEqual(["md", "markdown"]);
+	expect(asked.filters?.map((filter) => filter.extensions[0])).toContain("kmd");
+
+	await stubSaveDialog(app, join(folder, "not.kmd"));
+	await clickMenu(app, "File", "Save as Package…");
+	await expect(page.locator(".doc-tab").first()).toContainText("not");
+	await expect.poll(async () => (await lastSaveDialog(app)).defaultPath).toMatch(/not\.kmd$/);
+	expect((await lastSaveDialog(app)).filters?.[0]?.extensions).toEqual(["kmd", "textpack"]);
+	await expect
+		.poll(async () => Object.keys(await zipEntries(join(folder, "not.kmd"))).sort())
+		.toEqual(["info.json", "text.md"]);
+	await app.close();
+});
+
+test("packs a document with its images and files and opens the package again", async () => {
+	const folder = await tempDir("package");
+	await mkdir(join(folder, "notlar.assets"));
+	await writeFile(join(folder, "notlar.assets", "logo.png"), PNG_1X1);
+	await writeFile(join(folder, "notlar.assets", "rapor.pdf"), "%PDF-1.4");
+	const source =
+		"# Notlar\n\n![logo](notlar.assets/logo.png)\n\n[rapor](notlar.assets/rapor.pdf)\n";
+	await writeFile(join(folder, "notlar.md"), source);
+	await mkdir(join(folder, "paylas"));
+	const packagePath = join(folder, "paylas", "Notlar.kmd");
+
+	const first = await launch({ args: [join(folder, "notlar.md")] });
+	await stubSaveDialog(first.app, packagePath);
+	await clickMenu(first.app, "File", "Save as Package…");
+	await expect(status(first.page)).toHaveText("Saved");
+	await expect.poll(() => windowTitle(first.app)).toBe("Notlar – Kalem");
+	// The image now comes from inside the package.
+	await expect.poll(() => imageWidth(first.page)).toBe(1);
+
+	let files = await zipEntries(packagePath);
+	expect(Object.keys(files).sort()).toEqual([
+		"assets/logo.png",
+		"assets/rapor.pdf",
+		"info.json",
+		"text.md",
+	]);
+	expect(files["text.md"]?.toString("utf8")).toBe(
+		"# Notlar\n\n![logo](assets/logo.png)\n\n[rapor](assets/rapor.pdf)\n",
+	);
+	expect(files["assets/logo.png"]).toEqual(Buffer.from(PNG_1X1));
+	// The Markdown file it came from is left as it was.
+	expect(await readFile(join(folder, "notlar.md"), "utf8")).toBe(source);
+
+	// An image pasted into the package goes into it on the next save.
+	await first.page.locator("#editor h1").click();
+	await first.page.keyboard.press("End");
+	await first.page.keyboard.press("Enter");
+	await first.page.evaluate((base64) => {
+		const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+		const data = new DataTransfer();
+		data.items.add(new File([bytes], "ekran.png", { type: "image/png" }));
+		document.activeElement?.dispatchEvent(
+			new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }),
+		);
+	}, PNG_1X1.toString("base64"));
+	await expect(first.page.locator("#editor img")).toHaveCount(2);
+	await save(first.page);
+	await expect(status(first.page)).toHaveText("Saved");
+	files = await zipEntries(packagePath);
+	expect(Object.keys(files)).toContain("assets/ekran.png");
+	expect(files["text.md"]?.toString("utf8")).toContain("![ekran](assets/ekran.png)");
+	expect(first.errors).toEqual([]);
+	await first.app.close();
+
+	// Elsewhere, with the original files gone, the package carries everything.
+	const moved = await tempDir("package-moved");
+	await writeFile(join(moved, "Notlar.kmd"), await readFile(packagePath));
+	const second = await launch({ args: [join(moved, "Notlar.kmd")] });
+	await expect(second.page.locator("#editor h1")).toHaveText("Notlar");
+	await expect.poll(() => imageWidth(second.page)).toBe(1);
+	await expect(second.page.locator("#editor img")).toHaveCount(2);
+	expect(second.errors).toEqual([]);
+	await second.app.close();
+});
+
+test("brings images along when a document is saved into another folder", async () => {
+	const folder = await tempDir("save-elsewhere");
+	await mkdir(join(folder, "a", "rapor.assets"), { recursive: true });
+	await writeFile(join(folder, "a", "rapor.assets", "grafik.png"), PNG_1X1);
+	await writeFile(join(folder, "a", "rapor.md"), "![grafik](rapor.assets/grafik.png)\n");
+	await mkdir(join(folder, "b"));
+
+	const { app, page, errors } = await launch({ args: [join(folder, "a", "rapor.md")] });
+	await stubSaveDialog(app, join(folder, "b", "kopya.md"));
+	await clickMenu(app, "File", "Save As…");
+	await expect(status(page)).toHaveText("Saved");
+	expect(await readFile(join(folder, "b", "kopya.md"), "utf8")).toBe(
+		"![grafik](kopya.assets/grafik.png)\n",
+	);
+	expect(await readdir(join(folder, "b", "kopya.assets"))).toEqual(["grafik.png"]);
+	await expect.poll(() => imageWidth(page)).toBe(1);
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("recovers unsaved changes to a package with its images", async () => {
+	const folder = await tempDir("package-crash");
+	const zip = new JSZip();
+	zip.file("text.md", "# Albüm\n\n![foto](assets/foto.png)\n");
+	zip.file("assets/foto.png", PNG_1X1);
+	const path = join(folder, "Albüm.kmd");
+	await writeFile(path, await zip.generateAsync({ type: "nodebuffer" }));
+
+	const first = await launch({ args: [path] });
+	await first.page.locator("#editor h1").click();
+	await first.page.keyboard.press("End");
+	await first.page.keyboard.type(" 2026");
+	const drafts = join(first.userData, "drafts");
+	await expect.poll(async () => (await readdir(drafts).catch(() => [])).length).toBe(1);
+	process.kill(await first.app.evaluate(() => process.pid));
+
+	const second = await relaunch(first.userData);
+	await expect(second.page.locator("#editor h1")).toHaveText("Albüm 2026");
+	await expect.poll(() => imageWidth(second.page)).toBe(1);
+	await save(second.page);
+	await expect(status(second.page)).toHaveText("Saved");
+	expect((await zipEntries(path))["text.md"]?.toString("utf8")).toBe(
+		"# Albüm 2026\n\n![foto](assets/foto.png)\n",
+	);
+	expect(second.errors).toEqual([]);
+	await second.app.close();
+});
+
+test("opens a TextBundle package made by another app", async () => {
+	const folder = await tempDir("textpack");
+	const zip = new JSZip();
+	zip.file("Gezi.textbundle/text.markdown", "# Gezi\n\n![foto](assets/foto.png)\n");
+	zip.file("Gezi.textbundle/assets/foto.png", PNG_1X1);
+	zip.file("Gezi.textbundle/info.json", '{"version":2}');
+	const path = join(folder, "Gezi.textpack");
+	await writeFile(path, await zip.generateAsync({ type: "nodebuffer" }));
+
+	const { app, page, errors } = await launch({ args: [path] });
+	await expect(page.locator("#editor h1")).toHaveText("Gezi");
+	await expect.poll(() => imageWidth(page)).toBe(1);
 	expect(errors).toEqual([]);
 	await app.close();
 });

@@ -23,8 +23,8 @@ const bridge: KalemBridge = {
 	showOpenDialog: () => ipcRenderer.invoke(CHANNEL.showOpenDialog),
 	openPath: (path) => ipcRenderer.invoke(CHANNEL.openPath, path),
 	importWord: () => ipcRenderer.invoke(CHANNEL.importWord),
-	chooseSavePath: (tabId, suggestedName) =>
-		ipcRenderer.invoke(CHANNEL.chooseSavePath, tabId, suggestedName),
+	chooseSavePath: (tabId, suggestedName, kind) =>
+		ipcRenderer.invoke(CHANNEL.chooseSavePath, tabId, suggestedName, kind),
 	writeDocument: (tabId, path, text, format) =>
 		ipcRenderer.invoke(CHANNEL.writeDocument, tabId, path, text, format),
 	reloadDocument: (tabId) => ipcRenderer.invoke(CHANNEL.reloadDocument, tabId),

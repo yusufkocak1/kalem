@@ -17,13 +17,17 @@ import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import {
 	isEditablePath,
+	isPackagePath,
 	isWordPath,
 	MARKDOWN_EXTENSIONS,
+	PACKAGE_EXTENSIONS,
 	stripExtension,
 	TEXT_EXTENSIONS,
 } from "../shared/paths.js";
 import type { DraftStore } from "./drafts.js";
 import { modifiedTime, readDocument } from "./files.js";
+import type { PackageStore } from "./package.js";
+import { pathKey } from "./path-key.js";
 import type { SettingsStore, WindowBounds } from "./settings.js";
 import { readWord, WordError } from "./word.js";
 
@@ -35,6 +39,8 @@ export interface DocumentTab {
 	/** Also the id of the tab's recovery draft. */
 	readonly id: string;
 	path: string | null;
+	/** What relative links resolve against when it is not `path` (an unpacked package). */
+	base: string | null;
 	name: string;
 	dirty: boolean;
 	/** Last known mtime of the file on disk. */
@@ -60,6 +66,7 @@ export interface AppWindow {
 export interface WindowManagerOptions {
 	readonly store: SettingsStore;
 	readonly drafts: DraftStore;
+	readonly packages: PackageStore;
 	readonly preloadPath: string;
 	readonly devUrl: string | null;
 	readonly rendererFile: string;
@@ -69,12 +76,7 @@ export interface WindowManagerOptions {
 	showContextMenu(contents: WebContents, params: Electron.ContextMenuParams): void;
 }
 
-/** Windows and macOS file systems are case-insensitive. */
-export function pathKey(path: string): string {
-	const full = resolve(path);
-	// kalem-locale-ok: file-system comparison; the Turkish rule would be wrong here
-	return process.platform === "linux" ? full : full.toLowerCase();
-}
+export { pathKey } from "./path-key.js";
 
 export function errorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
@@ -218,6 +220,7 @@ export class WindowManager {
 			this.#windows.delete(id);
 			for (const tab of win.tabs.values()) {
 				void this.#options.drafts.delete(tab.id).catch(() => {});
+				this.#releasePackage(tab.path);
 			}
 			for (const resolveSave of win.saveRequests.values()) resolveSave(false);
 			if (this.#quitting && this.#windows.size > 0) app.quit();
@@ -296,7 +299,9 @@ export class WindowManager {
 
 	/** The renderer closed a tab; closing the last one closes the window. */
 	tabClosed(win: AppWindow, tabId: string): void {
-		if (!win.tabs.delete(tabId)) return;
+		const tab = win.tabs.get(tabId);
+		if (tab === undefined || !win.tabs.delete(tabId)) return;
+		this.#releasePackage(tab.path);
 		void this.#options.drafts.delete(tabId).catch(() => {});
 		if (win.tabs.size === 0) {
 			win.closeConfirmed = true;
@@ -342,10 +347,18 @@ export class WindowManager {
 		window.setRepresentedFilename(tab?.path ?? "");
 	}
 
-	markSaved(win: AppWindow, tabId: string, path: string, modified: number): void {
+	markSaved(
+		win: AppWindow,
+		tabId: string,
+		path: string,
+		modified: number,
+		base: string | null,
+	): void {
 		const tab = win.tabs.get(tabId);
 		if (tab === undefined) return;
+		if (tab.path !== null && pathKey(tab.path) !== pathKey(path)) this.#releasePackage(tab.path);
 		tab.path = path;
+		tab.base = base;
 		tab.modified = modified;
 		tab.name = stripExtension(basename(path));
 		win.writable.add(pathKey(path));
@@ -395,6 +408,7 @@ export class WindowManager {
 		const tab: DocumentTab = {
 			id: tabId,
 			path: null,
+			base: null,
 			name: t.untitled,
 			dirty: false,
 			modified: null,
@@ -403,6 +417,7 @@ export class WindowManager {
 		switch (payload.kind) {
 			case "file":
 				tab.path = payload.file.path;
+				tab.base = payload.file.base ?? null;
 				tab.name = stripExtension(payload.file.name);
 				tab.modified = payload.file.modified;
 				win.writable.add(pathKey(payload.file.path));
@@ -413,6 +428,7 @@ export class WindowManager {
 				break;
 			case "draft":
 				tab.path = payload.draft.path;
+				tab.base = payload.draft.base ?? null;
 				tab.name = payload.draft.name === "" ? t.untitled : payload.draft.name;
 				tab.dirty = true;
 				if (payload.draft.path !== null) win.writable.add(pathKey(payload.draft.path));
@@ -481,7 +497,7 @@ export class WindowManager {
 			let payload: DocumentPayload = { kind: "empty" };
 			if (tab.path !== null) {
 				try {
-					payload = { kind: "file", file: await readDocument(tab.path, this.#legacyEncoding()) };
+					payload = { kind: "file", file: await this.read(tab.path) };
 				} catch {
 					// The file is gone: fall back to an empty document.
 				}
@@ -494,6 +510,18 @@ export class WindowManager {
 		return documents;
 	}
 
+	/** Reads a document from disk; a package is unpacked into its working folder. */
+	read(path: string): Promise<OpenedFile> {
+		return isPackagePath(path)
+			? this.#options.packages.open(path, this.#legacyEncoding())
+			: readDocument(path, this.#legacyEncoding());
+	}
+
+	#releasePackage(path: string | null): void {
+		if (path !== null && isPackagePath(path))
+			void this.#options.packages.release(path).catch(() => {});
+	}
+
 	#legacyEncoding(): LegacyEncoding {
 		return this.#options.language() === "tr" ? "windows-1254" : "windows-1252";
 	}
@@ -501,8 +529,9 @@ export class WindowManager {
 	async reload(win: AppWindow, tabId: string): Promise<OpenedFile | null> {
 		const tab = win.tabs.get(tabId);
 		if (tab === undefined || tab.path === null) return null;
-		const file = await readDocument(tab.path, this.#legacyEncoding());
+		const file = await this.read(tab.path);
 		tab.modified = file.modified;
+		tab.base = file.base ?? null;
 		return file;
 	}
 
@@ -530,7 +559,7 @@ export class WindowManager {
 		}
 
 		try {
-			const file = await readDocument(full, this.#legacyEncoding());
+			const file = await this.read(full);
 			this.#place({ kind: "file", file }, preferred);
 			this.#addRecentFile(full);
 		} catch (error) {
@@ -579,10 +608,11 @@ export class WindowManager {
 			filters: [
 				{
 					name: t.supportedDocuments,
-					extensions: [...MARKDOWN_EXTENSIONS, ...TEXT_EXTENSIONS, "docx"],
+					extensions: [...MARKDOWN_EXTENSIONS, ...TEXT_EXTENSIONS, ...PACKAGE_EXTENSIONS, "docx"],
 				},
 				{ name: t.markdownDocuments, extensions: [...MARKDOWN_EXTENSIONS] },
 				{ name: t.textDocuments, extensions: [...TEXT_EXTENSIONS] },
+				{ name: t.packages, extensions: [...PACKAGE_EXTENSIONS] },
 				{ name: t.wordDocuments, extensions: ["docx"] },
 				{ name: t.allFiles, extensions: ["*"] },
 			],
@@ -633,7 +663,8 @@ export class WindowManager {
 			await shell.openExternal(href);
 			return;
 		}
-		const documentPath = this.activeTab(win)?.path ?? null;
+		const tab = this.activeTab(win);
+		const documentPath = tab?.base ?? tab?.path ?? null;
 		if (/^[a-z][a-z0-9+.-]*:/i.test(href) || documentPath === null) return;
 
 		let relative: string;

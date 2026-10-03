@@ -59,6 +59,25 @@ verir.
 
 - `.md` / `.markdown` açma, kaydetme, farklı kaydetme; son kullanılanlar;
   dosyayı pencereye sürükleyerek ya da çift tıklayarak açma.
+- **Kalem paketi (`.kmd`)** — isteğe bağlı. Varsayılan kayıt her zaman
+  `.md`'dir. **Dosya → Paket Olarak Kaydet…** belgeyi, bağlantı verdiği
+  görsel ve dosyalarla birlikte tek bir dosyaya toplar; böylece e-postayla ya
+  da USB bellekle taşınınca hiçbir şey kopmaz. Özgün `.md` ve `.assets`
+  klasörü olduğu gibi kalır. Paket açılınca normal belge gibi düzenlenir;
+  eklenen görsel ve dosyalar pakete girer.
+  - İçi [TextBundle](https://textbundle.org/spec/) düzeninde bir zip:
+    `text.md` + `assets/` + `info.json`. Uzantı `.textpack` yapılırsa Bear,
+    Ulysses gibi TextBundle destekleyen uygulamalar da açar; Kalem de
+    onların `.textpack` paketlerini açar.
+  - Paket açıkken içeriği `%APPDATA%\kalem-desktop\packages\` altında geçici
+    bir klasörde durur; sekme kapanınca silinir.
+  - Paketten tekrar `.md`'ye dönmek için **Farklı Kaydet** ve
+    "Markdown belgeleri" yeterli: görseller yeni belgenin `.assets`
+    klasörüne çıkarılır.
+- **Farklı Kaydet** belgeyi başka bir klasöre taşırsa bağlantı verdiği
+  görsel ve dosyalar da yeni yerin `.assets` klasörüne kopyalanır ve
+  bağlantılar güncellenir (yeni yerden zaten ulaşılabilen dosyalara
+  dokunulmaz).
 - `.txt` dosyaları da açılır ve kendi uzantısıyla kaydedilir. İçerik
   **Markdown olarak** okunur; satırlar dosyada yazıldığı gibi alt alta
   gösterilir (bkz. bilinen sınırlar).
@@ -166,8 +185,11 @@ e2e/            Playwright ile gerçek uygulamayı süren testler
   başlayan satır başlık, `- ` ile başlayan satır liste olur. Kaydederken
   paragraf başındaki boşluklar (girinti) düşer. `.txt` için "birlikte aç"
   ilişkilendirmesi kurulmaz; Not Defteri'nin yerini almaz.
-- **Farklı Kaydet** belgeyi başka bir klasöre taşırsa, daha önce
-  `.assets` klasörüne yazılmış görseller eski yerinde kalır.
+- Paket kaydedilirken yalnızca metinde bağlantısı olan dosyalar pakete girer;
+  bağlantısı silinmiş bir görsel bir sonraki kayıtta paketten düşer. Paketin
+  içindeki metin her zaman UTF-8 `text.md`'dir; başka bir uygulamanın
+  `.textpack`'i açılıp kaydedilirse paket kökünde (sarmalayıcı klasörsüz)
+  yazılır.
 - Word'deki birleştirilmiş tablo hücreleri boş hücrelere açılır; dipnot
   bağlantıları düz metne iner; EMF/WMF görseller atlanır ve bildirilir.
 - Uygulama simgesi henüz yok (Electron'un varsayılan simgesi kullanılıyor).

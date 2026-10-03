@@ -95,6 +95,7 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 		{ type: "separator" },
 		{ label: t.save, accelerator: "CmdOrCtrl+S", click: send(ctx, "save") },
 		{ label: t.saveAs, accelerator: "CmdOrCtrl+Shift+S", click: send(ctx, "save-as") },
+		{ label: t.saveAsPackage, click: send(ctx, "save-as-package") },
 		{ type: "separator" },
 		{
 			label: t.importWord,

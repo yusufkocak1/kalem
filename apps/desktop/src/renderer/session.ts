@@ -29,6 +29,7 @@ import {
 	documentBaseUrl,
 	extension,
 	fileName,
+	isPackagePath,
 	stripExtension,
 	TEXT_EXTENSIONS,
 } from "../shared/paths.js";
@@ -78,6 +79,8 @@ export class Session {
 	#images: ImageUploadPlugin | null = null;
 
 	#path: string | null = null;
+	/** What relative links resolve against: the path, or a package's unpacked text. */
+	#base: string | null = null;
 	#name = "";
 	#format: TextFormat = DEFAULT_FORMAT;
 	/** Text as last saved; `null` when the document has never matched a file. */
@@ -185,6 +188,7 @@ export class Session {
 		notices.clear();
 		this.#saveFailed = false;
 		this.#path = null;
+		this.#base = null;
 		this.#name = t.untitled;
 		this.#format = DEFAULT_FORMAT;
 		this.#finalNewline = true;
@@ -197,6 +201,7 @@ export class Session {
 				const { file } = payload;
 				text = file.text;
 				this.#path = file.path;
+				this.#base = file.base ?? file.path;
 				this.#name = stripExtension(file.name);
 				this.#format = file.format;
 				this.#finalNewline = file.text === "" || file.text.endsWith("\n");
@@ -233,6 +238,7 @@ export class Session {
 				const { draft } = payload;
 				text = draft.text;
 				this.#path = draft.path;
+				this.#base = draft.base ?? draft.path;
 				this.#name = draft.name === "" ? t.untitled : draft.name;
 				this.#format = draft.format;
 				clean = false;
@@ -281,9 +287,9 @@ export class Session {
 		// The element is never removed or left without an href: Chromium reports
 		// both as a violation of the `base-uri` policy.
 		const href =
-			this.#path === null
+			this.#base === null
 				? `${this.#o.documentScheme}://local/`
-				: documentBaseUrl(this.#o.documentScheme, this.#path);
+				: documentBaseUrl(this.#o.documentScheme, this.#base);
 		const existing = document.querySelector("base");
 		if (existing !== null) {
 			existing.href = href;
@@ -419,13 +425,13 @@ export class Session {
 	// --- Saving -------------------------------------------------------------
 
 	/** Saves are serialized: autosave and Ctrl+S must not write concurrently. */
-	save(saveAs = false): Promise<boolean> {
-		const result = this.#saveQueue.then(() => this.#save(saveAs));
+	save(saveAs = false, kind?: "package"): Promise<boolean> {
+		const result = this.#saveQueue.then(() => this.#save(saveAs, kind));
 		this.#saveQueue = result.catch(() => false);
 		return result;
 	}
 
-	async #save(saveAs: boolean): Promise<boolean> {
+	async #save(saveAs: boolean, kind?: "package"): Promise<boolean> {
 		const { bridge, t, notices } = this.#o;
 		const editor = this.editor;
 
@@ -437,7 +443,7 @@ export class Session {
 
 		let path = this.#path;
 		if (path === null || saveAs) {
-			path = await bridge.chooseSavePath(this.id, this.#name);
+			path = await bridge.chooseSavePath(this.id, this.#name, kind);
 			if (path === null) return false;
 		} else if (!this.#dirty) {
 			return true;
@@ -451,7 +457,11 @@ export class Session {
 			if (path !== this.#path) {
 				this.#path = path;
 				this.#name = stripExtension(fileName(path));
-				this.#updateBase();
+				// A package's links resolve inside it; the save result brings that base.
+				if (!isPackagePath(path)) {
+					this.#base = path;
+					this.#updateBase();
+				}
 			}
 			await this.#extractEmbeddedImages(editor, path);
 
@@ -461,7 +471,12 @@ export class Session {
 				: this.#format;
 			const needsNewline = this.#finalNewline && text !== "" && !text.endsWith("\n");
 			const output = needsNewline ? `${text}\n` : text;
-			await bridge.writeDocument(this.id, path, output, target);
+			const result = await bridge.writeDocument(this.id, path, output, target);
+			if (result.file !== undefined) {
+				// Links were moved with their files: show the document as it was written.
+				this.load({ kind: "file", file: result.file });
+				return true;
+			}
 
 			this.#format = target;
 			this.#savedText = text;

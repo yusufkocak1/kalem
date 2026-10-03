@@ -43,6 +43,8 @@ export interface OpenedFile {
 	readonly format: TextFormat;
 	/** mtime in ms, used to detect external changes. */
 	readonly modified: number;
+	/** What relative links resolve against when it is not `path`: a package's unpacked text. */
+	readonly base?: string;
 }
 
 export interface WordContent {
@@ -61,6 +63,8 @@ export interface Draft {
 	readonly text: string;
 	readonly format: TextFormat;
 	readonly time: number;
+	/** See `OpenedFile.base`. */
+	readonly base?: string;
 }
 
 export type DocumentPayload =
@@ -94,6 +98,16 @@ export interface WindowState {
 
 export type CloseChoice = "save" | "discard" | "cancel";
 
+export interface SaveResult {
+	/** New mtime of the file. */
+	readonly modified: number;
+	/**
+	 * Set when the saved document differs from what the editor shows: its links
+	 * were moved along with the files, or it became a package. Load it.
+	 */
+	readonly file?: OpenedFile;
+}
+
 export interface ImageFile {
 	readonly name: string;
 	readonly type: string;
@@ -116,6 +130,7 @@ export interface DraftRequest {
 export const COMMANDS = [
 	"save",
 	"save-as",
+	"save-as-package",
 	"close-tab",
 	"next-tab",
 	"previous-tab",
@@ -170,9 +185,9 @@ export interface KalemBridge {
 	showOpenDialog(): Promise<void>;
 	openPath(path: string): Promise<void>;
 	importWord(): Promise<void>;
-	chooseSavePath(tabId: string, suggestedName: string): Promise<string | null>;
-	/** Resolves with the new mtime of the file. */
-	writeDocument(tabId: string, path: string, text: string, format: TextFormat): Promise<number>;
+	/** `package` proposes a `.kmd`; otherwise Markdown (or the tab's current type) comes first. */
+	chooseSavePath(tabId: string, suggestedName: string, kind?: "package"): Promise<string | null>;
+	writeDocument(tabId: string, path: string, text: string, format: TextFormat): Promise<SaveResult>;
 	reloadDocument(tabId: string): Promise<OpenedFile | null>;
 	reportState(tabId: string, state: WindowState): void;
 	tabActivated(tabId: string): void;

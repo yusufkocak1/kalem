@@ -18,11 +18,21 @@ export function extension(path: string): string {
 
 export const MARKDOWN_EXTENSIONS: readonly string[] = ["md", "markdown"];
 export const TEXT_EXTENSIONS: readonly string[] = ["txt"];
+/** Zipped TextBundles: Kalem's own `.kmd` and the standard `.textpack`. */
+export const PACKAGE_EXTENSIONS: readonly string[] = ["kmd", "textpack"];
 
-/** Files the editor opens and saves in place: Markdown and plain text. */
+export function isPackagePath(path: string): boolean {
+	return PACKAGE_EXTENSIONS.includes(extension(path));
+}
+
+/** Files the editor opens and saves in place: Markdown, plain text and packages. */
 export function isEditablePath(path: string): boolean {
 	const ext = extension(path);
-	return MARKDOWN_EXTENSIONS.includes(ext) || TEXT_EXTENSIONS.includes(ext);
+	return (
+		MARKDOWN_EXTENSIONS.includes(ext) ||
+		TEXT_EXTENSIONS.includes(ext) ||
+		PACKAGE_EXTENSIONS.includes(ext)
+	);
 }
 
 export function isWordPath(path: string): boolean {

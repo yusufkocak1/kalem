@@ -102,13 +102,16 @@ export async function writeDocument(
  * the relative URL. The extension comes from the validated MIME type, never
  * from the (untrusted) file name.
  */
-export async function writeImage(documentPath: string, image: ImageFile): Promise<string> {
+export async function writeImage(
+	documentPath: string,
+	image: ImageFile,
+	folderName = assetsFolderName(basename(documentPath)),
+): Promise<string> {
 	// kalem-locale-ok: MIME types are ASCII
 	const ext = IMAGE_EXTENSIONS[image.type.toLowerCase()];
 	if (ext === undefined) throw new FileError("image-type", image.type);
 	if (image.bytes.byteLength > MAX_IMAGE_SIZE) throw new FileError("too-large", image.name);
 
-	const folderName = assetsFolderName(basename(documentPath));
 	const folder = join(dirname(documentPath), folderName);
 	await mkdir(folder, { recursive: true });
 
@@ -134,12 +137,12 @@ export async function writeImage(documentPath: string, image: ImageFile): Promis
 export async function copyAttachment(
 	documentPath: string,
 	sourcePath: string,
+	folderName = assetsFolderName(basename(documentPath)),
 ): Promise<Attachment> {
 	const info = await stat(sourcePath);
 	if (!info.isFile()) throw new FileError("not-a-file", basename(sourcePath));
 
 	const original = basename(sourcePath);
-	const folderName = assetsFolderName(basename(documentPath));
 	const folder = join(dirname(documentPath), folderName);
 
 	// A file that already lives in the assets folder is linked as it is.

@@ -1,14 +1,15 @@
 import { writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { app, BrowserWindow, dialog, nativeTheme, session } from "electron";
-import type { Settings } from "../shared/bridge.js";
+import type { Draft, Settings } from "../shared/bridge.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format, pickLanguage, stringsFor } from "../shared/i18n.js";
-import { isEditablePath, isWordPath } from "../shared/paths.js";
+import { isEditablePath, isPackagePath, isWordPath } from "../shared/paths.js";
 import { DraftStore } from "./drafts.js";
 import { registerIpc } from "./ipc.js";
 import type { MenuContext } from "./menu.js";
 import { installMenu, popupContextMenu, popupFileMenu, welcomeDocument } from "./menu.js";
+import { PackageStore } from "./package.js";
 import { handleDocumentScheme, registerDocumentScheme } from "./protocol.js";
 import { SettingsStore } from "./settings.js";
 import type { AppWindow } from "./windows.js";
@@ -33,6 +34,7 @@ function documentArguments(argv: readonly string[], cwd: string): string[] {
 function start(): void {
 	const store = new SettingsStore(join(app.getPath("userData"), "settings.json"));
 	const drafts = new DraftStore(join(app.getPath("userData"), "drafts"));
+	const packages = new PackageStore(join(app.getPath("userData"), "packages"));
 
 	// Resolved once at startup; a language change applies after a restart.
 	let language: Lang = "en";
@@ -45,6 +47,7 @@ function start(): void {
 	const windows: WindowManager = new WindowManager({
 		store,
 		drafts,
+		packages,
 		preloadPath: join(__dirname, "preload.cjs"),
 		devUrl: process.env.KALEM_DEV_URL || null,
 		rendererFile: join(__dirname, "..", "renderer", "index.html"),
@@ -154,6 +157,20 @@ function start(): void {
 		if (ready) installMenu(menuContext());
 	}
 
+	/** A recovered package draft needs the package unpacked so its images resolve. */
+	async function withPackageBase(draft: Draft): Promise<Draft> {
+		if (draft.path === null || !isPackagePath(draft.path)) return draft;
+		try {
+			const file = await packages.open(
+				draft.path,
+				language === "tr" ? "windows-1254" : "windows-1252",
+			);
+			return file.base === undefined ? draft : { ...draft, base: file.base };
+		} catch {
+			return draft;
+		}
+	}
+
 	async function openDocuments(paths: readonly string[]): Promise<void> {
 		for (const path of paths) await windows.openPath(path, windows.focused());
 	}
@@ -201,6 +218,7 @@ function start(): void {
 			windows,
 			store,
 			drafts,
+			packages,
 			strings: () => t,
 			language: () => language,
 			changeSettings,
@@ -210,7 +228,9 @@ function start(): void {
 
 		// A recovered tab keeps the draft's id: with a fresh id the document
 		// would have no copy on disk until edited, and a second crash would lose it.
-		const recovered = await drafts.list();
+		// Working folders of packages from the last session; nothing is open yet.
+		await packages.clear().catch(() => {});
+		const recovered = await Promise.all((await drafts.list()).map(withPackageBase));
 		if (recovered.length > 0) {
 			windows.open(
 				recovered.map((draft) => ({ tabId: draft.id, payload: { kind: "draft", draft } })),
