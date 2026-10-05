@@ -21,7 +21,15 @@
  * yer: `replaceAt` yalnızca yoldaki ataları kopyaladığı için, dokunulmayan
  * blokların referansı **aynı kalıyor** ve karşılaştırma tek bir `!==`.
  */
-import type { Definition, Inline, NodeId, Root } from "@kalem-editor/core";
+import type {
+	Definition,
+	Inline,
+	NodeId,
+	Root,
+	Table,
+	TableCell,
+	TableRow,
+} from "@kalem-editor/core";
 import { createSerializeCache, parse, removeAt, replaceAt, serialize } from "@kalem-editor/core";
 import type { BlockType, MarkType } from "@kalem-editor/core/commands";
 import { emptyParagraph, setBlockType } from "@kalem-editor/core/commands";
@@ -1302,6 +1310,50 @@ export class Editor {
 	};
 
 	/**
+	 * Tab and Shift+Tab move between the cells of a table, as in word
+	 * processors: the cell's content is selected, so typing replaces it.
+	 * Tab in the last cell adds a row.
+	 */
+	#tabInTable(table: Table, caret: Caret, step: 1 | -1): void {
+		const cells: [number, number][] = [];
+		for (const [r, row] of table.children.entries()) {
+			for (const c of row.children.keys()) cells.push([r, c]);
+		}
+		const [row, column] = caret.path as [number, number];
+		const index = cells.findIndex(([r, c]) => r === row && c === column) + step;
+		if (index < 0) return;
+
+		if (index >= cells.length) {
+			const width = table.children[0]?.children.length ?? 0;
+			if (width === 0) return;
+			const added: TableRow = {
+				type: "tableRow",
+				children: Array.from(
+					{ length: width },
+					(): TableCell => ({ type: "tableCell", children: [] }),
+				),
+			};
+			const doc = replaceAt(this.#doc, [caret.blockIndex], {
+				...table,
+				children: [...table.children, added],
+			} as never);
+			this.#applyEdit({
+				doc,
+				caret: { blockIndex: caret.blockIndex, path: [table.children.length, 0], offset: 0 },
+			});
+			return;
+		}
+
+		const element = this.#elements.get(table.id as string);
+		const holder =
+			element === undefined ? null : holderAt(element, cells[index] as [number, number]);
+		if (element === undefined || holder === null) return;
+		selectRange(holder, 0, contentLength(holder));
+		element.focus({ preventScroll: true });
+		holder.scrollIntoView({ block: "nearest", inline: "nearest" });
+	}
+
+	/**
 	 * Blok yapısını değiştiren tuşlar.
 	 *
 	 * Hepsinde ortak kalıp: imleci bul, saf bir model işlemi çağır, sonucu
@@ -1328,6 +1380,13 @@ export class Editor {
 			this.#applyEdit(
 				event.shiftKey ? insertBreak(this.#doc, caret) : splitAtCaret(this.#doc, caret),
 			);
+			return;
+		}
+
+		const block = this.#doc.children[caret.blockIndex];
+		if (event.key === "Tab" && block?.type === "table" && caret.path.length === 2) {
+			event.preventDefault();
+			this.#tabInTable(block, caret, event.shiftKey ? -1 : 1);
 			return;
 		}
 

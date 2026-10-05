@@ -209,6 +209,8 @@ verir.
 **Düzenleme**
 
 - Şerit: Giriş / Ekle / Görünüm sekmeleri, stil galerisi, hızlı erişim.
+- Tabloda **Tab** sonraki, **Shift+Tab** önceki hücreye geçer ve içeriğini
+  seçer (yazınca değişir); son hücrede Tab yeni bir satır ekler.
 - İmleç tablodayken **Tablo** sekmesi: satır/sütun ekleme-silme, hizalama,
   bir sütuna göre **sıralama** (A→Z / Z→A; sayılar değerine, metin belgenin
   dilinin alfabesine göre), **sütun genişliği** (sütun kenarını sürükleyerek

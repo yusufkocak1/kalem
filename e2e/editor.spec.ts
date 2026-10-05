@@ -1568,3 +1568,42 @@ test.describe("Word belgesi yapıştırma", () => {
 		expect(await cikti(page)).toBe("");
 	});
 });
+
+test.describe("moving through a table with Tab", () => {
+	test("Tab selects the next cell, Shift+Tab the previous, and the last cell adds a row", async ({
+		page,
+	}) => {
+		await page.evaluate(() =>
+			window.kalem.editor.setValue("| A | B |\n| --- | --- |\n| 1 | 2 |\n"),
+		);
+		await page.locator("#editor th").first().click();
+
+		await page.keyboard.press("Tab");
+		await page.keyboard.type("Bb");
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe(
+			"| A | Bb |\n| --- | --- |\n| 1 | 2 |\n",
+		);
+
+		await page.keyboard.press("Tab");
+		await page.keyboard.press("Tab");
+		await page.keyboard.press("Shift+Tab");
+		await page.keyboard.type("bir");
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe(
+			"| A | Bb |\n| --- | --- |\n| bir | 2 |\n",
+		);
+
+		await page.keyboard.press("Tab");
+		await page.keyboard.press("Tab");
+		await page.keyboard.type("yeni");
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe(
+			"| A | Bb |\n| --- | --- |\n| bir | 2 |\n| yeni |  |\n",
+		);
+
+		// Shift+Tab in the first cell stays put.
+		await page.locator("#editor th").first().click();
+		await page.keyboard.press("Home");
+		await page.keyboard.press("Shift+Tab");
+		await page.keyboard.type("x");
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toContain("| xA | Bb |");
+	});
+});

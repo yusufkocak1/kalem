@@ -121,7 +121,7 @@ Teknik borç
 
 Sonradan eklenenler
 - [x] D-25 · Büyük/küçük harf araçları ve fazla boşluk silme (editöre `transformText`)
-- [ ] D-26 · Tabloda Tab / Shift+Tab ile hücreler arasında gezinme
+- [x] D-26 · Tabloda Tab / Shift+Tab ile hücreler arasında gezinme
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.

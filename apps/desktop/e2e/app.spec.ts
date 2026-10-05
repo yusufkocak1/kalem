@@ -1363,6 +1363,30 @@ test("changes the case of the selection or the word at the caret", async () => {
 	await app.close();
 });
 
+test("moves between table cells with Tab and adds a row at the end", async () => {
+	const path = join(await tempDir("table-tab"), "tablo.md");
+	await writeFile(path, "| Ad | Yaş |\n| --- | --- |\n| Ali | 30 |\n");
+	const { app, page, errors } = await launch({ args: [path] });
+
+	await page.locator("#editor td").first().click();
+	await page.keyboard.press("Tab");
+	await page.keyboard.type("31");
+	await page.keyboard.press("Tab");
+	await page.keyboard.type("Ayşe");
+	await page.keyboard.press("Shift+Tab");
+	await page.keyboard.press("Shift+Tab");
+	await page.keyboard.type("32");
+
+	await expect(page.locator("#editor tr")).toHaveCount(3);
+	await save(page);
+	await expect(status(page)).toHaveText("Saved");
+	expect(await readFile(path, "utf8")).toBe(
+		"| Ad | Yaş |\n| --- | --- |\n| 32 | 31 |\n| Ayşe |  |\n",
+	);
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
 test("keeps several documents open in tabs", async () => {
 	const folder = await tempDir("tabs");
 	const first = join(folder, "birinci.md");
