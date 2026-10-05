@@ -13,6 +13,7 @@ describe("parseStoredState", () => {
 				recentFiles: [],
 				window: null,
 				welcomed: false,
+				workspace: null,
 			});
 		}
 	});

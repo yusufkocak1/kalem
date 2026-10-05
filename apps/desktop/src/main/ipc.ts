@@ -1,5 +1,5 @@
 import { readFile, stat, writeFile } from "node:fs/promises";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { IpcMainEvent, IpcMainInvokeEvent } from "electron";
 import { app, dialog, ipcMain } from "electron";
@@ -8,9 +8,11 @@ import type {
 	DraftRequest,
 	ImageFile,
 	SaveResult,
+	SearchResult,
 	Settings,
 	Startup,
 	WindowState,
+	Workspace,
 } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
 import { toTextFormat } from "../shared/encoding.js";
@@ -38,6 +40,7 @@ import { relocateLinks } from "./relocate.js";
 import type { SettingsStore } from "./settings.js";
 import type { AppWindow, WindowManager } from "./windows.js";
 import { errorMessage, pathKey } from "./windows.js";
+import { listWorkspace, searchWorkspace } from "./workspace.js";
 
 export interface IpcContext {
 	readonly windows: WindowManager;
@@ -48,6 +51,9 @@ export interface IpcContext {
 	language(): Lang;
 	changeSettings(patch: Partial<Settings>): void;
 	showFileMenu(win: AppWindow, x: number, y: number): void;
+	/** Lets the user pick a folder and opens it in every window. */
+	openFolder(win: AppWindow): Promise<void>;
+	closeFolder(): void;
 }
 
 const TYPE_BY_EXTENSION: Readonly<Record<string, string>> = {
@@ -449,6 +455,44 @@ export function registerIpc(ctx: IpcContext): void {
 			return true;
 		},
 	);
+
+	// --- Workspace ----------------------------------------------------------
+
+	/** Without an open folder, the folder each window last showed. */
+	const followedRoots = new WeakMap<AppWindow, string>();
+
+	const workspaceRoot = (win: AppWindow): { root: string | null; opened: boolean } => {
+		const opened = ctx.store.state.workspace;
+		if (opened !== null) return { root: opened, opened: true };
+		const path = windows.activeTab(win)?.path ?? null;
+		const followed = followedRoots.get(win);
+		if (path === null) return { root: followed ?? null, opened: false };
+		// A document further down the shown folder keeps the folder in place.
+		if (followed !== undefined && pathKey(path).startsWith(pathKey(followed) + sep)) {
+			return { root: followed, opened: false };
+		}
+		followedRoots.set(win, dirname(path));
+		return { root: dirname(path), opened: false };
+	};
+
+	const collator = () => new Intl.Collator(ctx.language(), { numeric: true, sensitivity: "base" });
+
+	ipcMain.handle(CHANNEL.getWorkspace, async (event): Promise<Workspace> => {
+		const { root, opened } = workspaceRoot(senderOf(event));
+		if (root === null) return { root, opened, entries: [], truncated: false };
+		const listing = await listWorkspace(root, collator());
+		return { root, opened, ...listing };
+	});
+
+	ipcMain.handle(CHANNEL.openFolder, (event) => ctx.openFolder(senderOf(event)));
+	on(CHANNEL.closeFolder, () => ctx.closeFolder());
+
+	ipcMain.handle(CHANNEL.searchWorkspace, async (event, query: unknown): Promise<SearchResult> => {
+		const { root } = workspaceRoot(senderOf(event));
+		if (root === null || typeof query !== "string") return { hits: [], truncated: false };
+		const { entries } = await listWorkspace(root, collator());
+		return searchWorkspace(entries, root, query, ctx.language());
+	});
 
 	// --- App ----------------------------------------------------------------
 

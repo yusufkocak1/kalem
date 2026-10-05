@@ -12,6 +12,10 @@ export interface MenuContext {
 	readonly t: Strings;
 	readonly settings: Settings;
 	readonly recentFiles: readonly string[];
+	/** The folder opened with Open Folder. */
+	readonly workspace: string | null;
+	openFolder(win: AppWindow | undefined): void;
+	closeFolder(): void;
 	changeSettings(patch: Partial<Settings>): void;
 	changeLanguage(language: Lang | null): void;
 	clearRecentFiles(): void;
@@ -92,6 +96,17 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 			click: (_item, window) => void windows.showOpenDialog(targetOf(ctx, window)),
 		},
 		{ label: t.openRecent, submenu: recent },
+		{
+			label: t.quickOpen,
+			accelerator: "CmdOrCtrl+Shift+P",
+			click: send(ctx, "quick-open"),
+		},
+		{ type: "separator" },
+		{
+			label: t.openFolder,
+			click: (_item, window) => ctx.openFolder(targetOf(ctx, window)),
+		},
+		{ label: t.closeFolder, enabled: ctx.workspace !== null, click: () => ctx.closeFolder() },
 		{ type: "separator" },
 		{ label: t.save, accelerator: "CmdOrCtrl+S", click: send(ctx, "save") },
 		{ label: t.saveAs, accelerator: "CmdOrCtrl+Shift+S", click: send(ctx, "save-as") },
@@ -234,6 +249,11 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 				{ type: "separator" },
 				{ label: `${t.find}…`, accelerator: "CmdOrCtrl+F", click: send(ctx, "find") },
 				{ label: `${t.replace}…`, accelerator: "CmdOrCtrl+H", click: send(ctx, "replace") },
+				{
+					label: t.searchFolder,
+					accelerator: "CmdOrCtrl+Shift+E",
+					click: send(ctx, "search-folder"),
+				},
 			],
 		},
 		{

@@ -83,6 +83,20 @@ verir.
   - Paketten tekrar `.md`'ye dönmek için **Farklı Kaydet** ve
     "Markdown belgeleri" yeterli: görseller yeni belgenin `.assets`
     klasörüne çıkarılır.
+- **Dosyalar bölmesi** (gezinti bölmesinde **Başlıklar / Dosyalar**):
+  **Dosya → Klasör Aç…** ile seçilen klasörün, klasör açılmamışsa etkin
+  belgenin klasörünün `.md`, `.txt` ve `.kmd` belgeleri ağaç olarak
+  listelenir; tıklanan belge sekmede açılır. Belge olmayan dosyalar, boş
+  klasörler, gizli klasörler, `node_modules` gibi araç klasörleri ve
+  `.assets` klasörleri gösterilmez. Açılan klasör uygulama yeniden
+  başlayınca da açık kalır; **Klasörü Kapat** ile bırakılır.
+- **Klasörde arama** (`Ctrl+Shift+E` ya da bölmedeki arama kutusu):
+  klasördeki belgelerin satırları arayüz dilinin büyük/küçük harf
+  kurallarıyla (İ/ı) aranır, sonuçlar dosyaya göre gruplanır. Bir sonuca
+  tıklamak belgeyi açar ve bul panelini aynı sözcükle doldurur. Paketlerin
+  (`.kmd`) içinde arama yapılmaz.
+- **Hızlı Aç** (`Ctrl+Shift+P`): klasördeki belgeleri adla bulup açar;
+  yazılan her sözcük yolda geçmeli, adı sözcükle başlayanlar öne gelir.
 - **Farklı Kaydet** belgeyi başka bir klasöre taşırsa bağlantı verdiği
   görsel ve dosyalar da yeni yerin `.assets` klasörüne kopyalanır ve
   bağlantılar güncellenir (yeni yerden zaten ulaşılabilen dosyalara

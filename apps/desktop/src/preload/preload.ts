@@ -59,6 +59,11 @@ const bridge: KalemBridge = {
 	onSaveRequest: (handler) => listen<[string]>(CHANNEL.saveRequest, handler),
 	onSettings: (handler) => listen<[Settings]>(CHANNEL.settings, handler),
 	onExternalChange: (handler) => listen<[string, number]>(CHANNEL.externalChange, handler),
+	getWorkspace: () => ipcRenderer.invoke(CHANNEL.getWorkspace),
+	openFolder: () => ipcRenderer.invoke(CHANNEL.openFolder),
+	closeFolder: () => ipcRenderer.send(CHANNEL.closeFolder),
+	searchWorkspace: (query) => ipcRenderer.invoke(CHANNEL.searchWorkspace, query),
+	onWorkspaceChange: (handler) => listen<[]>(CHANNEL.workspaceChange, handler),
 };
 
 contextBridge.exposeInMainWorld("kalem", bridge);

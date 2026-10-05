@@ -2,6 +2,7 @@ import { writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { app, BrowserWindow, dialog, nativeTheme, session } from "electron";
 import type { Draft, Settings } from "../shared/bridge.js";
+import { CHANNEL } from "../shared/bridge.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format, pickLanguage, stringsFor } from "../shared/i18n.js";
 import { isEditablePath, isPackagePath, isWordPath } from "../shared/paths.js";
@@ -147,12 +148,40 @@ function start(): void {
 		}
 	}
 
+	function setWorkspace(folder: string | null): void {
+		store.update({ workspace: folder });
+		for (const win of windows.all()) win.window.webContents.send(CHANNEL.workspaceChange);
+		refreshMenu();
+	}
+
+	async function openFolder(win: AppWindow | undefined): Promise<void> {
+		const start = store.state.workspace ?? (win === undefined ? null : windows.defaultFolder(win));
+		const options: Electron.OpenDialogOptions = {
+			properties: ["openDirectory"],
+			...(start === null ? {} : { defaultPath: start }),
+		};
+		const result =
+			win === undefined
+				? await dialog.showOpenDialog(options)
+				: await dialog.showOpenDialog(win.window, options);
+		const folder = result.filePaths[0];
+		if (result.canceled || folder === undefined) return;
+		setWorkspace(folder);
+		// The files are what the user asked to see.
+		if (store.settings.sidePane !== "files" || !store.settings.navigation) {
+			changeSettings({ sidePane: "files", navigation: true });
+		}
+	}
+
 	function menuContext(): MenuContext {
 		return {
 			windows,
 			t,
 			settings: store.settings,
 			recentFiles: store.state.recentFiles,
+			workspace: store.state.workspace,
+			openFolder: (win) => void openFolder(win),
+			closeFolder: () => setWorkspace(null),
 			changeSettings,
 			changeLanguage,
 			clearRecentFiles: () => {
@@ -276,6 +305,8 @@ function start(): void {
 			language: () => language,
 			changeSettings,
 			showFileMenu: (win, x, y) => popupFileMenu(menuContext(), win, x, y),
+			openFolder,
+			closeFolder: () => setWorkspace(null),
 		});
 		refreshMenu();
 

@@ -91,9 +91,9 @@ Yayın kalitesi
 - [ ] D-05 · Kurulum paketi, macOS ve Linux denemesi — makine kullanıcının
 
 Belge iş akışı
-- [ ] D-06 · Klasör kenar çubuğu (çalışma alanı)
-- [ ] D-07 · Klasörde arama (`Ctrl+Shift+F`)
-- [ ] D-08 · Hızlı açma (`Ctrl+P`)
+- [x] D-06 · Klasör kenar çubuğu (çalışma alanı)
+- [x] D-07 · Klasörde arama (`Ctrl+Shift+E`; `Ctrl+Shift+F` odak modunun)
+- [x] D-08 · Hızlı açma (`Ctrl+Shift+P`; `Ctrl+P` yazdırmanın)
 - [ ] D-09 · Sürüm geçmişi (kayıt anlık görüntüleri)
 - [ ] D-10 · Sekmeyi yeni pencereye taşıma
 

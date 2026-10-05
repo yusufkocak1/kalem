@@ -41,7 +41,11 @@ export interface Settings {
 	readonly margins: PageMargins;
 	/** PDF export only: the print dialog has its own header and footer option. */
 	readonly pageNumbers: boolean;
+	/** What the side pane shows. */
+	readonly sidePane: SidePane;
 }
+
+export type SidePane = "outline" | "files";
 
 export const DEFAULT_SETTINGS: Settings = {
 	theme: "system",
@@ -55,6 +59,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	landscape: false,
 	margins: "normal",
 	pageNumbers: false,
+	sidePane: "outline",
 };
 
 /** The `@page` rule printing and PDF export lay the document out with. */
@@ -128,6 +133,38 @@ export interface Startup {
 	readonly documents: readonly TabDocument[];
 	/** URL scheme that serves document-relative images. */
 	readonly documentScheme: string;
+}
+
+export interface WorkspaceEntry {
+	readonly path: string;
+	readonly name: string;
+	/** Nesting below the workspace root, from 0. */
+	readonly depth: number;
+	readonly folder: boolean;
+}
+
+export interface Workspace {
+	/** `null` when no folder is open and the active document has never been saved. */
+	readonly root: string | null;
+	/** Opened with Open Folder, rather than the active document's folder. */
+	readonly opened: boolean;
+	readonly entries: readonly WorkspaceEntry[];
+	readonly truncated: boolean;
+}
+
+export interface SearchHit {
+	readonly path: string;
+	/** Path below the workspace root, with `/`. */
+	readonly relative: string;
+	/** From 1. */
+	readonly line: number;
+	readonly column: number;
+	readonly text: string;
+}
+
+export interface SearchResult {
+	readonly hits: readonly SearchHit[];
+	readonly truncated: boolean;
 }
 
 export interface WindowState {
@@ -210,6 +247,8 @@ export const COMMANDS = [
 	"zoom-reset",
 	"export-html",
 	"export-docx",
+	"quick-open",
+	"search-folder",
 	"format-code",
 	"format-all-code",
 ] as const;
@@ -265,6 +304,14 @@ export interface KalemBridge {
 	onSaveRequest(handler: (tabId: string) => void): () => void;
 	onSettings(handler: (settings: Settings) => void): () => void;
 	onExternalChange(handler: (tabId: string, modified: number) => void): () => void;
+
+	/** The open folder, or the active document's folder. */
+	getWorkspace(): Promise<Workspace>;
+	openFolder(): Promise<void>;
+	closeFolder(): void;
+	searchWorkspace(query: string): Promise<SearchResult>;
+	/** The open folder changed, in this window or another. */
+	onWorkspaceChange(handler: () => void): () => void;
 }
 
 export const CHANNEL = {
@@ -300,4 +347,9 @@ export const CHANNEL = {
 	saveRequest: "kalem:save-request",
 	settings: "kalem:settings",
 	externalChange: "kalem:external-change",
+	getWorkspace: "kalem:get-workspace",
+	openFolder: "kalem:open-folder",
+	closeFolder: "kalem:close-folder",
+	searchWorkspace: "kalem:search-workspace",
+	workspaceChange: "kalem:workspace-change",
 } as const;

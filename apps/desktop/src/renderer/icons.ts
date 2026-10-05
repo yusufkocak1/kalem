@@ -15,6 +15,8 @@ const BRACES = [
 const PATHS = {
 	new: [...PAGE, "M12 11v6", "M9 14h6"],
 	open: ["M3 6h6l2 2h10v11H3z"],
+	file: PAGE,
+	refresh: ["M20 12a8 8 0 1 1-2.34-5.66", "M20 4v5h-5"],
 	save: ["M5 3h11l3 3v15H5z", "M8 3v5h7V3", "M8 21v-7h8v7"],
 	undo: ["M9 14 4 9l5-5", "M4 9h10a6 6 0 0 1 0 12h-3"],
 	redo: ["m15 14 5-5-5-5", "M20 9H10a6 6 0 0 0 0 12h3"],

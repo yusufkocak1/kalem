@@ -20,6 +20,8 @@ export interface StoredState {
 	readonly window: WindowBounds | null;
 	/** Whether the welcome document has been shown once. */
 	readonly welcomed: boolean;
+	/** The folder opened with Open Folder. */
+	readonly workspace: string | null;
 }
 
 const THEMES: readonly Theme[] = ["system", "light", "dark"];
@@ -78,10 +80,12 @@ export function parseStoredState(raw: unknown): StoredState {
 				? (s.margins as PageMargins)
 				: d.margins,
 			pageNumbers: asBoolean(s.pageNumbers, d.pageNumbers),
+			sidePane: s.sidePane === "files" ? "files" : "outline",
 		},
 		recentFiles: [...new Set(recentFiles)].slice(0, MAX_RECENT_FILES),
 		window: parseBounds(root.window),
 		welcomed: asBoolean(root.welcomed, false),
+		workspace: typeof root.workspace === "string" && root.workspace !== "" ? root.workspace : null,
 	};
 }
 

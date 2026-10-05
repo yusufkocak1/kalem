@@ -1016,6 +1016,67 @@ test("undo and redo step through table styles", async () => {
 	await app.close();
 });
 
+test("browses, searches and quick-opens the documents of a folder", async () => {
+	const folder = await tempDir("workspace");
+	await mkdir(join(folder, "alt"));
+	await writeFile(join(folder, "elma.md"), "# Elma\n\nKırmızı elma.\n");
+	await writeFile(join(folder, "alt", "kiraz.md"), "Kiraz ve ELMA.\n");
+	await writeFile(join(folder, "resim.png"), PNG_1X1);
+	const { app, page, errors } = await launch({ args: [join(folder, "elma.md")] });
+	const items = page.locator(".files-item");
+
+	// Without an open folder the pane shows the document's folder.
+	await page.locator('.side-pane-tab[data-pane="files"]').click();
+	await expect(items).toHaveText(["▾alt", "kiraz.md", "elma.md"]);
+	await expect(page.locator('.files-item[aria-current="page"]')).toHaveText("elma.md");
+
+	await items.filter({ hasText: "kiraz.md" }).click();
+	await expect(page.locator(".doc-tab")).toHaveCount(2);
+	await expect(page.locator("#editor p").first()).toHaveText("Kiraz ve ELMA.");
+	await expect(page.locator('.files-item[aria-current="page"]')).toHaveText("kiraz.md");
+
+	// Folders collapse.
+	await items.filter({ hasText: "alt" }).click();
+	await expect(items).toHaveText(["▸alt", "elma.md"]);
+
+	// Search in files folds case and opens the match with the find panel filled in.
+	await page.locator(".files-search").fill("elma");
+	await expect(page.locator(".search-hit")).toHaveCount(3);
+	await expect(page.locator(".files-message")).toHaveText("3 matches in 2 files");
+	await page.locator('.search-hit[data-line="3"]').click();
+	await expect(page.locator("#editor h1")).toHaveText("Elma");
+	await expect(page.locator(".kalem-find-input:visible").first()).toHaveValue("elma");
+	await expect(page.locator(".kalem-find-count:visible")).toContainText("1");
+
+	// Open Folder pins the folder and offers Close Folder.
+	await stubOpenDialog(app, [join(folder, "alt")]);
+	await clickMenu(app, "File", "Open Folder…");
+	await page.locator(".files-search").fill("");
+	await expect(items).toHaveText(["kiraz.md"]);
+	await expect(page.locator('.files-toolbar [aria-label="Close Folder"]')).toBeVisible();
+
+	// Quick open.
+	await clickMenu(app, "File", "Quick Open…");
+	await expect(page.locator(".quick-open")).toBeVisible();
+	await page.keyboard.type("kir");
+	await expect(page.locator(".quick-open-item")).toHaveCount(1);
+	await page.screenshot({ path: "test-results/quick-open.png" });
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".quick-open")).toBeHidden();
+	await expect(page.locator(".doc-tab", { hasText: "kiraz" })).toHaveAttribute(
+		"aria-selected",
+		"true",
+	);
+
+	await page.locator('.files-toolbar [aria-label="Close Folder"]').click();
+	await expect(items).toHaveText(["▸alt", "elma.md"]);
+	await expect(page.locator('.files-toolbar [aria-label="Close Folder"]')).toBeHidden();
+	await page.screenshot({ path: "test-results/files-pane.png" });
+
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
 test("keeps several documents open in tabs", async () => {
 	const folder = await tempDir("tabs");
 	const first = join(folder, "birinci.md");

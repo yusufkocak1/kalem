@@ -6,7 +6,7 @@ import { CODE_ATTR, ID_ATTR, indentItem, outdentItem, toggleList } from "@kalem-
 import codeCss from "@kalem-editor/themes/plugin-code.css?inline";
 import tokensCss from "@kalem-editor/themes/tokens.css?inline";
 import viewerCss from "@kalem-editor/themes/viewer.css?inline";
-import type { Command, KalemBridge, Settings, TabDocument } from "../shared/bridge.js";
+import type { Command, KalemBridge, Settings, SidePane, TabDocument } from "../shared/bridge.js";
 import { clampZoom, MAX_ZOOM, MIN_ZOOM, pageRule, ZOOM_STEP } from "../shared/bridge.js";
 import { formatAllCodeBlocks, formatCodeBlock } from "../shared/code-blocks.js";
 import { buildHtmlDocument } from "../shared/html-export.js";
@@ -38,8 +38,10 @@ import {
 	tableAt,
 	toggleTaskList,
 } from "./edits.js";
+import { createFilesPane } from "./files-pane.js";
 import { icon } from "./icons.js";
 import { createNotices } from "./notices.js";
+import { createQuickOpen } from "./quick-open.js";
 import type { RibbonButton, RibbonTab, RibbonWidget } from "./ribbon.js";
 import {
 	createColorMenu,
@@ -93,15 +95,44 @@ const closeNavigation = el("button", {
 	children: [icon("close")],
 });
 closeNavigation.addEventListener("click", () => updateSettings({ navigation: false }));
+
+const filesPane = createFilesPane({
+	t,
+	bridge,
+	lang: startup.language,
+	activePath: () => session?.path ?? null,
+	open: (path, query) => void openFromFolder(path, query),
+});
+const quickOpen = createQuickOpen({
+	t,
+	lang: startup.language,
+	workspace: () => bridge.getWorkspace(),
+	open: (path) => void bridge.openPath(path),
+});
+
+function sidePaneTab(pane: SidePane, label: string): HTMLButtonElement {
+	const button = el("button", {
+		class: "side-pane-tab",
+		text: label,
+		attrs: { type: "button", role: "tab", "data-pane": pane },
+	});
+	button.addEventListener("click", () => updateSettings({ sidePane: pane }));
+	return button;
+}
+const sidePaneTabs = [sidePaneTab("outline", t.outlineTab), sidePaneTab("files", t.filesTab)];
 const navigation = el("nav", {
 	class: "navigation kalem-theme",
 	attrs: { "aria-label": t.navigation },
 	children: [
 		el("div", {
 			class: "navigation-header",
-			children: [el("h2", { text: t.navigation }), closeNavigation],
+			children: [
+				el("div", { class: "side-pane-tabs", attrs: { role: "tablist" }, children: sidePaneTabs }),
+				closeNavigation,
+			],
 		}),
 		outlineArea,
+		filesPane.element,
 	],
 });
 
@@ -200,6 +231,29 @@ const STATUS_TEXT = {
 	error: t.statusError,
 } as const;
 
+/** Without an open folder the pane follows the active document's folder. */
+function refreshFiles(): void {
+	if (filesPane.workspace()?.opened === true) filesPane.highlightActive();
+	else void filesPane.refresh();
+}
+
+/** Opens a document picked in the files pane; from search results, its matches are shown. */
+async function openFromFolder(path: string, query?: string): Promise<void> {
+	await bridge.openPath(path);
+	if (query === undefined) return;
+	// The document arrives through `onDocument`; give it a frame to load.
+	requestAnimationFrame(() => {
+		if (session.path !== path) return;
+		session.find?.open("find");
+		// Opening the panel focuses its search field.
+		const input = document.activeElement;
+		if (!(input instanceof HTMLInputElement) || !input.classList.contains("kalem-find-input"))
+			return;
+		input.value = query;
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+	});
+}
+
 function renderState(): void {
 	saveStatus.textContent = STATUS_TEXT[session.status];
 	saveStatus.dataset.status = session.status;
@@ -279,6 +333,7 @@ function activateTab(id: string): void {
 	tabStrip.select(id);
 	bridge.tabActivated(id);
 	renderState();
+	refreshFiles();
 	scheduleRibbonUpdate();
 }
 
@@ -332,6 +387,11 @@ function applySettings(): void {
 	app.style.setProperty("--zoom", String(settings.zoom / 100));
 	app.toggleAttribute("data-full-width", settings.fullWidth);
 	navigation.hidden = !settings.navigation;
+	outlineArea.hidden = settings.sidePane !== "outline";
+	filesPane.element.hidden = settings.sidePane !== "files";
+	for (const tab of sidePaneTabs) {
+		tab.setAttribute("aria-selected", String(tab.dataset.pane === settings.sidePane));
+	}
 	zoomSlider.value = String(settings.zoom);
 	zoomValue.textContent = `${settings.zoom}%`;
 }
@@ -615,6 +675,13 @@ const commands: Record<Command, () => void> = {
 	"export-docx": () => void exportDocx(),
 	"format-code": formatCode,
 	"format-all-code": formatAllCode,
+	"quick-open": () => void quickOpen.show(),
+	"search-folder": () => {
+		if (!settings.navigation || settings.sidePane !== "files") {
+			updateSettings({ navigation: true, sidePane: "files" });
+		}
+		filesPane.focusSearch();
+	},
 };
 
 // The ribbon reads editor state as soon as it is built, so the documents come first.
@@ -1266,6 +1333,12 @@ bridge.onSaveRequest((tabId) => {
 	const saving = tab === undefined ? Promise.resolve(false) : tab.session.save();
 	void saving.then((saved) => bridge.answerSave(tabId, saved));
 });
+bridge.onWorkspaceChange(() => void filesPane.refresh());
+// Files may have been added or renamed elsewhere.
+window.addEventListener("focus", () => {
+	if (settings.navigation && settings.sidePane === "files") void filesPane.refresh();
+});
+
 bridge.onSettings((next) => {
 	settings = next;
 	applySettings();
