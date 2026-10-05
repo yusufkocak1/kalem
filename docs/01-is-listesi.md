@@ -116,7 +116,7 @@ Masaüstü entegrasyonu
 - [ ] D-22 · Gezgin önizlemesi — yerel kabuk eklentisi gerekir
 
 Teknik borç
-- [ ] D-23 · `renderer/main.ts`'i modüllere bölme
+- [x] D-23 · `renderer/main.ts`'i modüllere bölme (şerit → `ribbon-layout.ts`, kod biçimlendirme ve dışa aktarma → `document-tools.ts`; 1458 → 679 satır)
 - [ ] D-24 · Çökme raporlama — servis ve rıza kararı kullanıcının
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.

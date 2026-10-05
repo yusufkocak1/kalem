@@ -712,7 +712,6 @@ button {
 	overflow-y: auto;
 }
 
-
 /* --- Side pane: headings and files ---------------------------------------- */
 
 .side-pane-tabs {
@@ -1367,7 +1366,9 @@ pre[data-preview="error"]::after {
 	display: block;
 	margin-top: 0.6em;
 	color: var(--app-error);
-	font: 12px / 1.4 system-ui, sans-serif;
+	font:
+		12px / 1.4 system-ui,
+		sans-serif;
 	white-space: pre-wrap;
 }
 

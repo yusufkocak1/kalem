@@ -116,6 +116,13 @@ export interface TableContext {
 	readonly table: Table;
 }
 
+/** A table change: the new table (`null` deletes it) and where the caret goes. */
+export interface TableEdit {
+	readonly table: Table | null;
+	readonly row: number;
+	readonly column: number;
+}
+
 /** The table cell the caret is in, if any. */
 export function tableAt(doc: Root, caret: Caret | null): TableContext | null {
 	if (caret === null) return null;
