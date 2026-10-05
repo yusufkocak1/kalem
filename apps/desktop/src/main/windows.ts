@@ -489,6 +489,11 @@ export class WindowManager {
 				tab.dirty = true;
 				if (payload.draft.path !== null) win.writable.add(pathKey(payload.draft.path));
 				break;
+			case "new-file":
+				tab.path = payload.path;
+				tab.name = payload.name;
+				win.writable.add(pathKey(payload.path));
+				break;
 			case "moved":
 				tab.path = payload.draft.path;
 				tab.base = payload.draft.base ?? null;

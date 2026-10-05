@@ -5,6 +5,7 @@ import type { Command, Settings, TabDocument } from "../shared/bridge.js";
 import { CHANNEL, PAGE_SIZES } from "../shared/bridge.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
+import { QUICK_NOTE_SHORTCUT } from "./tray.js";
 import type { AppWindow, WindowManager } from "./windows.js";
 
 export interface MenuContext {
@@ -23,6 +24,7 @@ export interface MenuContext {
 	print(doc: AppWindow): void;
 	showAbout(): void;
 	checkForUpdates(): void;
+	quickNote(): void;
 }
 
 type Click = NonNullable<MenuItemConstructorOptions["click"]>;
@@ -91,6 +93,13 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 			},
 		},
 		{ label: t.newWindow, accelerator: "CmdOrCtrl+Shift+N", click: () => void windows.open() },
+		{
+			label: t.quickNote,
+			accelerator: QUICK_NOTE_SHORTCUT,
+			// With the tray on, the shortcut is registered system-wide instead.
+			registerAccelerator: !ctx.settings.tray,
+			click: () => ctx.quickNote(),
+		},
 		{
 			label: t.open,
 			accelerator: "CmdOrCtrl+O",
@@ -361,6 +370,16 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 				{ label: t.previousTab, accelerator: "Ctrl+Shift+Tab", click: send(ctx, "previous-tab") },
 				{ type: "separator" },
 				{ label: t.fullScreen, role: "togglefullscreen" },
+				...(isMac
+					? []
+					: [
+							{
+								label: t.runInTray,
+								type: "checkbox",
+								checked: settings.tray,
+								click: () => ctx.changeSettings({ tray: !settings.tray }),
+							} satisfies MenuItemConstructorOptions,
+						]),
 				...(app.isPackaged
 					? []
 					: [{ label: t.devTools, role: "toggleDevTools" } satisfies MenuItemConstructorOptions]),

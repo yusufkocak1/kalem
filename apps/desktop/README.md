@@ -140,6 +140,17 @@ verir.
   arasında gezer. Her sekmenin kendi geri alma geçmişi, kayıt durumu ve
   kurtarma taslağı vardır. Zaten açık olan belge yeniden açılmaz, sekmesi
   öne gelir. Son sekme kapanınca pencere kapanır.
+- **Hızlı Not** (**Dosya → Hızlı Not**, `Ctrl+Shift+Alt+N`): açık
+  klasörde, klasör yoksa `Belgeler\Kalem Notları` içinde
+  `Not 2026-10-05 14.30.md` gibi tarihli bir not açar. Dosya ancak bir şey
+  yazılıp kaydedilince oluşur; `Ctrl+S` kaydetme kutusu sormaz, boş
+  bırakılan not hiçbir iz bırakmaz.
+- **Sistem tepsisi** (**Görünüm → Sistem Tepsisinde Çalış**, Windows ve
+  Linux): bildirim alanına bir simge konur ve hızlı not kısayolu sistem
+  genelinde çalışır; uygulama başka bir penceredeyken de not açılır. Bu
+  kipte son pencere kapanınca uygulama kapanmaz, tepside bekler; tepsi
+  menüsündeki **Çıkış** kapatır. Kısayolu başka bir uygulama tutuyorsa
+  tepsi menüsü yine çalışır.
 - **Sekmeyi yeni pencereye taşıma**: sekmeye sağ tıklayıp **Sekmeyi Yeni
   Pencereye Taşı**, **Görünüm** menüsündeki aynı komut ya da sekmeyi
   pencerenin dışına sürükleyip bırakmak. Kaydedilmemiş değişiklikler de

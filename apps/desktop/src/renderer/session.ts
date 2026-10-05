@@ -269,6 +269,11 @@ export class Session {
 				notices.show({ id: "recovered", kind: "warning", text: t.recovered });
 				break;
 			}
+			case "new-file":
+				this.#path = payload.path;
+				this.#base = payload.path;
+				this.#name = payload.name;
+				break;
 			case "moved": {
 				const { draft } = payload;
 				text = draft.text;

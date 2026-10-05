@@ -84,6 +84,7 @@ export function parseStoredState(raw: unknown): StoredState {
 			pageNumbers: asBoolean(s.pageNumbers, d.pageNumbers),
 			sidePane: s.sidePane === "files" ? "files" : "outline",
 			checkUpdates: asBoolean(s.checkUpdates, d.checkUpdates),
+			tray: asBoolean(s.tray, d.tray),
 		},
 		recentFiles: [...new Set(recentFiles)].slice(0, MAX_RECENT_FILES),
 		window: parseBounds(root.window),

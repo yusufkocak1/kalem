@@ -45,6 +45,8 @@ export interface Settings {
 	readonly sidePane: SidePane;
 	/** Look for a new release once a day (a request to GitHub). */
 	readonly checkUpdates: boolean;
+	/** A notification-area icon and the system-wide quick note shortcut; the app stays there when its windows close. */
+	readonly tray: boolean;
 }
 
 export type SidePane = "outline" | "files";
@@ -63,6 +65,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	pageNumbers: false,
 	sidePane: "outline",
 	checkUpdates: true,
+	tray: false,
 };
 
 /** The `@page` rule printing and PDF export lay the document out with. */
@@ -119,6 +122,8 @@ export type DocumentPayload =
 	| { readonly kind: "file"; readonly file: OpenedFile }
 	| { readonly kind: "word"; readonly word: WordContent }
 	| { readonly kind: "draft"; readonly draft: Draft }
+	/** An empty document that saves to `path` without asking; the file appears on first save. */
+	| { readonly kind: "new-file"; readonly path: string; readonly name: string }
 	/** A tab moved over from another window, with its unsaved edits. */
 	| { readonly kind: "moved"; readonly draft: Draft; readonly dirty: boolean }
 	| { readonly kind: "welcome" };

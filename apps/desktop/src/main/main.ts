@@ -1,10 +1,13 @@
-import { writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { app, BrowserWindow, dialog, nativeTheme, session } from "electron";
+import { app, BrowserWindow, dialog, globalShortcut, nativeTheme, session } from "electron";
 import type { Draft, Settings } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format, pickLanguage, stringsFor } from "../shared/i18n.js";
+import { quickNoteName } from "../shared/notes.js";
 import { isEditablePath, isPackagePath, isWordPath } from "../shared/paths.js";
 import { DraftStore } from "./drafts.js";
 import { VersionStore } from "./history.js";
@@ -20,6 +23,7 @@ import {
 import { PackageStore } from "./package.js";
 import { handleDocumentScheme, registerDocumentScheme } from "./protocol.js";
 import { SettingsStore } from "./settings.js";
+import { TrayIcon } from "./tray.js";
 import { Updater } from "./updater.js";
 import type { AppWindow } from "./windows.js";
 import { errorMessage, WindowManager } from "./windows.js";
@@ -73,6 +77,41 @@ function start(): void {
 		window: () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0],
 	});
 
+	/** A dated note in the open folder, or in Documents; nothing is written until it is saved. */
+	async function quickNote(): Promise<void> {
+		const folder = store.state.workspace ?? join(app.getPath("documents"), t.quickNotesFolder);
+		await mkdir(folder, { recursive: true });
+		const name = quickNoteName(t.quickNoteName, new Date(), (candidate) =>
+			existsSync(join(folder, `${candidate}.md`)),
+		);
+		const win = windows.open([
+			{
+				tabId: randomUUID(),
+				payload: { kind: "new-file", path: join(folder, `${name}.md`), name },
+			},
+		]);
+		win.window.focus();
+	}
+
+	function showWindow(): void {
+		const window = BrowserWindow.getAllWindows()[0];
+		if (window === undefined) {
+			windows.open();
+			return;
+		}
+		if (window.isMinimized()) window.restore();
+		window.show();
+		window.focus();
+	}
+
+	const tray = new TrayIcon({
+		strings: () => t,
+		quickNote: () => void quickNote(),
+		newWindow: () => void windows.open(),
+		show: showWindow,
+		quit: () => app.quit(),
+	});
+
 	const windows: WindowManager = new WindowManager({
 		store,
 		drafts,
@@ -102,6 +141,7 @@ function start(): void {
 
 	function changeSettings(patch: Partial<Settings>): void {
 		store.updateSettings(patch);
+		tray.apply(store.settings.tray);
 		nativeTheme.themeSource = store.settings.theme;
 		applySpellCheck();
 		windows.broadcastSettings(store.settings);
@@ -213,6 +253,7 @@ function start(): void {
 			},
 			exportPdf: (win) => void exportPdf(win),
 			checkForUpdates: () => void updater.check(true),
+			quickNote: () => void quickNote(),
 			print: (win) =>
 				void onPaper(
 					win,
@@ -303,8 +344,11 @@ function start(): void {
 	app.on("before-quit", () => windows.beginQuit());
 
 	app.on("window-all-closed", () => {
-		if (process.platform !== "darwin") app.quit();
+		// With the tray icon the app stays, ready for the next quick note.
+		if (process.platform !== "darwin" && !tray.enabled) app.quit();
 	});
+
+	app.on("will-quit", () => globalShortcut.unregisterAll());
 
 	app.on("activate", () => {
 		if (ready && BrowserWindow.getAllWindows().length === 0) windows.open();
@@ -334,6 +378,7 @@ function start(): void {
 			closeFolder: () => setWorkspace(null),
 		});
 		refreshMenu();
+		tray.apply(store.settings.tray);
 
 		// A recovered tab keeps the draft's id: with a fresh id the document
 		// would have no copy on disk until edited, and a second crash would lose it.

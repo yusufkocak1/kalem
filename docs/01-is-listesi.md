@@ -112,7 +112,7 @@ Editör
 Masaüstü entegrasyonu
 - [x] D-19 · Windows atlama listesi / son belgeler
 - [x] D-20 · Tek örnek: çift tıklanan dosya açık pencerede sekme olur
-- [ ] D-21 · Tepsiden hızlı not
+- [x] D-21 · Tepsiden hızlı not
 - [ ] D-22 · Gezgin önizlemesi — yerel kabuk eklentisi gerekir
 
 Teknik borç

@@ -1291,6 +1291,46 @@ test("previews Mermaid diagrams and math under their code and exports them", asy
 	await discardAndClose(app);
 });
 
+test("writes a quick note into the open folder and stays in the tray", async () => {
+	const folder = await tempDir("quick-note");
+	const { app, errors } = await launch();
+	await stubOpenDialog(app, [folder]);
+	await clickMenu(app, "File", "Open Folder…");
+	await clickMenu(app, "View", "Run in Notification Area");
+
+	const opened = app.waitForEvent("window");
+	await clickMenu(app, "File", "Quick Note");
+	const note = await opened;
+	await note.locator("#editor [contenteditable]").first().waitFor();
+	await expect(note.locator(".doc-tab")).toContainText(/^Note \d{4}-\d{2}-\d{2} \d{2}\.\d{2}/);
+	// Nothing is written until there is something to keep.
+	expect(await readdir(folder)).toEqual([]);
+
+	await note.locator("#editor p").first().click();
+	await note.keyboard.type("Hızlı fikir");
+	await save(note);
+	await expect(status(note)).toHaveText("Saved");
+	const [file] = await readdir(folder);
+	expect(file).toMatch(/^Note \d{4}-\d{2}-\d{2} \d{2}\.\d{2}\.md$/);
+	expect(await readFile(join(folder, file as string), "utf8")).toBe("Hızlı fikir\n");
+
+	// Closing every window leaves the app running in the tray.
+	await app.evaluate(({ BrowserWindow }) => {
+		for (const window of BrowserWindow.getAllWindows()) window.close();
+	});
+	await expect
+		.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length))
+		.toBe(0);
+	expect(
+		await app.evaluate(({ globalShortcut }) =>
+			globalShortcut.isRegistered("CommandOrControl+Shift+Alt+N"),
+		),
+	).toBe(true);
+
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
 test("keeps several documents open in tabs", async () => {
 	const folder = await tempDir("tabs");
 	const first = join(folder, "birinci.md");
