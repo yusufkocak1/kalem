@@ -881,6 +881,38 @@ test("resizes, colors and sorts a table and keeps the styling in the file", asyn
 	await reopened.app.close();
 });
 
+test("undo and redo step through table styles", async () => {
+	const path = join(await tempDir("table-undo"), "tablo.md");
+	await writeFile(path, "| A | B |\n| --- | --- |\n| 1 | 2 |\n");
+	const { app, page, errors } = await launch({ args: [path] });
+	const table = page.locator("#editor table");
+	const cell = table.locator("td").first();
+
+	await cell.click();
+	await page.locator('[data-tab="table"]').click();
+	await page.locator('[data-command="color-blue"]').click();
+	await page.locator('[data-command="table-column-widen"]').click();
+	const widened = Math.round((await table.locator("th").first().boundingBox())?.width ?? 0);
+
+	await cell.click();
+	await page.keyboard.press("Control+z");
+	await expect(table).toHaveAttribute("data-table-color", "blue");
+	expect(Math.round((await table.locator("th").first().boundingBox())?.width ?? 0)).toBeLessThan(
+		widened,
+	);
+	await page.keyboard.press("Control+z");
+	await expect(table).not.toHaveAttribute("data-table-color", /.*/);
+	await expect(status(page)).toHaveText("Saved");
+
+	await page.keyboard.press("Control+y");
+	await expect(table).toHaveAttribute("data-table-color", "blue");
+	await expect(status(page)).toHaveText("Unsaved");
+	await page.keyboard.press("Control+z");
+	await expect(status(page)).toHaveText("Saved");
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
 test("keeps several documents open in tabs", async () => {
 	const folder = await tempDir("tabs");
 	const first = join(folder, "birinci.md");

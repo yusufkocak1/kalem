@@ -103,7 +103,6 @@ export class Session {
 	readonly #tables = new TableStyles();
 	/** Whether this is the visible tab; only that one owns `<base>` and `#editor`. */
 	#active = false;
-	#styleTimer: ReturnType<typeof setTimeout> | null = null;
 
 	constructor(options: SessionOptions) {
 		this.#o = options;
@@ -179,14 +178,12 @@ export class Session {
 		this.#tables.decorate(this.editor);
 		if (!commit) return;
 
-		this.#refreshDirty(this.#text());
-		this.#o.onEditorChange();
-		// A style change is not an editor edit, so the autosave plugin never sees it.
-		if (this.#styleTimer !== null) clearTimeout(this.#styleTimer);
-		this.#styleTimer = setTimeout(() => {
-			this.#styleTimer = null;
-			void this.#autoSave().catch(() => {});
-		}, AUTOSAVE_DELAY);
+		// A copy of the document is a new history state; `reconcile` ties the new styles to it.
+		const doc = this.editor.getDocument();
+		if (!this.editor.applyEdit({ doc: { ...doc }, caret: null })) {
+			this.#refreshDirty(this.#text());
+			this.#o.onEditorChange();
+		}
 	}
 
 	// --- Loading ------------------------------------------------------------
@@ -392,8 +389,6 @@ export class Session {
 	}
 
 	#unmount(): void {
-		if (this.#styleTimer !== null) clearTimeout(this.#styleTimer);
-		this.#styleTimer = null;
 		// UI first: it removes its own shortcut plugin from the editor.
 		this.#ui?.destroy();
 		this.#editor?.destroy();

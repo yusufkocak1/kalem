@@ -106,7 +106,7 @@ Editör
 - [ ] D-14 · KaTeX matematik
 - [ ] D-15 · Dipnotlar
 - [ ] D-16 · Özel yazı rengi ve "bundan sonra renkli yaz"
-- [ ] D-17 · Tablo stilleri geri alma geçmişinde
+- [x] D-17 · Tablo stilleri geri alma geçmişinde
 - [ ] D-18 · Kod biçimlendirme: YAML, HTML, JSONC
 
 Masaüstü entegrasyonu

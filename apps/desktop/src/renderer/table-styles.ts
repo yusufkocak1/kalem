@@ -16,7 +16,9 @@ function tableIds(doc: Root): string[] {
  * sees plain tables, and the styles are written back as comments on save.
  */
 export class TableStyles {
-	readonly #styles = new Map<string, TableStyle>();
+	#styles = new Map<string, TableStyle>();
+	/** The styles each editor history state had, so undo and redo bring them back. */
+	#snapshots = new WeakMap<Root, ReadonlyMap<string, TableStyle>>();
 	/** Table ids in document order as of the last reconcile. */
 	#order: string[] = [];
 	/** Styles for the tables the next change inserts, in order. */
@@ -30,6 +32,7 @@ export class TableStyles {
 			const style = styles[i];
 			if (style !== undefined && !isPlain(style)) this.#styles.set(id, style);
 		}
+		this.#snapshots = new WeakMap([[doc, new Map(this.#styles)]]);
 	}
 
 	get(id: string): TableStyle {
@@ -53,11 +56,25 @@ export class TableStyles {
 	}
 
 	/**
+	 * Called after every editor change. A state seen before (undo, redo)
+	 * gets its styles back; a new one keeps the current styles.
+	 *
 	 * Leaving source mode re-parses the document and gives every block a new
 	 * id. When that happens the styles are carried over by table position.
-	 * Styles of a deleted table are kept, so undo brings them back.
 	 */
 	reconcile(doc: Root): void {
+		const snapshot = this.#snapshots.get(doc);
+		if (snapshot !== undefined) {
+			this.#styles = new Map(snapshot);
+			this.#order = tableIds(doc);
+			this.#pasted = null;
+			return;
+		}
+		this.#carryOver(doc);
+		this.#snapshots.set(doc, new Map(this.#styles));
+	}
+
+	#carryOver(doc: Root): void {
 		const ids = tableIds(doc);
 		const current = new Set(ids);
 		const previous = this.#order;

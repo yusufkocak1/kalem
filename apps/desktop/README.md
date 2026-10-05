@@ -126,7 +126,8 @@ verir.
 - Genişlik ve renk Markdown'da karşılığı olmayan şeylerdir; tablonun üstüne
   `<!-- kalem:table color=blue widths=120,,200 -->` biçiminde bir yorum olarak
   yazılır. Editörde bu yorum görünmez; başka Markdown araçları tabloyu düz
-  gösterir.
+  gösterir. Renk ve genişlik değişiklikleri Ctrl+Z ile geri alınır; HTML ve
+  PDF dışa aktarmada, yazdırmada ve kopyalamada korunur.
 - **Yazı rengi** (Giriş → **A** düğmesi): seçili metin dokuz renkten birine
   boyanır, **Otomatik** rengi kaldırır. Markdown'da renk sözdizimi olmadığı
   için dosyaya `<span style="color:#e03131">metin</span>` olarak yazılır;
@@ -186,11 +187,8 @@ e2e/            Playwright ile gerçek uygulamayı süren testler
 
 ## Bilinen sınırlar
 
-- Tablo rengi ve sütun genişliği geri alma (Ctrl+Z) geçmişine girmez;
-  sıralama girer. Sütun ekleme/silme geri alınırsa genişlikler bir sütun
-  kayabilir. Bu stiller yalnızca en üst düzeydeki tablolarda çalışır
-  (liste ya da alıntı içindekilerde değil) ve HTML dışa aktarmaya taşınmaz;
-  PDF ve yazdırmada görünür.
+- Tablo rengi ve sütun genişliği yalnızca en üst düzeydeki tablolarda
+  çalışır (liste ya da alıntı içindekilerde değil).
 - Tablo, yatay çizgi ve ham HTML blokları birleştirilemez; paragraf bir listeyle
   ancak liste **üstteyse** birleşir (madde olur).
 - Yazı rengi için önce metin seçilmelidir ("bundan sonra yazacaklarım renkli
