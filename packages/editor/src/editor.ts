@@ -215,6 +215,16 @@ export class Editor {
 	 * bileşim durumunu düşürüyor ve yarım kalan hece kayboluyor.
 	 */
 	#composing = false;
+	/**
+	 * A color picked with only a caret: what is typed next at that spot gets
+	 * it ("stored mark"). Moving the caret anywhere else forgets it.
+	 */
+	#storedColor: {
+		readonly color: string | null;
+		readonly blockId: string;
+		readonly path: string;
+		offset: number;
+	} | null = null;
 
 	constructor(element: HTMLElement, options: EditorOptions = {}) {
 		this.#element = element;
@@ -586,15 +596,77 @@ export class Editor {
 		return markActive(hedef.children, hedef.from, hedef.to, mark);
 	}
 
-	/** Colors the selected text; `null` removes the color. Does nothing without a selection. */
+	/**
+	 * Colors the selected text; `null` removes the color. With only a caret,
+	 * the color applies to what is typed next at the caret.
+	 */
 	setColor(color: string | null): boolean {
+		if (this.#readOnly) return false;
+		const target = this.#rangeTarget();
+		if (target !== null && target.from === target.to) {
+			const blockId = this.#doc.children[target.blockIndex]?.id;
+			if (blockId === undefined) return false;
+			this.#storedColor = { color, blockId, path: target.path.join(","), offset: target.from };
+			this.#dispatch("selectionchange", this.getSelection());
+			return true;
+		}
 		return this.#editRange((children, from, to) => applyColor(children, from, to, color));
 	}
 
-	/** The color of the selection (or of the character before the caret); `null` if none or mixed. */
+	/**
+	 * The color of the selection (or of the character before the caret); `null`
+	 * if none or mixed. A color stored at the caret wins.
+	 */
 	getColor(): string | null {
 		const target = this.#rangeTarget();
-		return target === null ? null : colorAt(target.children, target.from, target.to);
+		if (target === null) return null;
+		const stored = this.#storedColorAt(target);
+		if (stored !== null) return stored.color;
+		return colorAt(target.children, target.from, target.to);
+	}
+
+	#storedColorAt(
+		target: { blockIndex: number; path: readonly number[]; from: number; to: number } | null,
+	): { color: string | null; offset: number } | null {
+		const stored = this.#storedColor;
+		if (stored === null || target === null) return null;
+		const here =
+			target.from === target.to &&
+			target.from === stored.offset &&
+			this.#doc.children[target.blockIndex]?.id === stored.blockId &&
+			target.path.join(",") === stored.path;
+		if (!here) this.#storedColor = null;
+		return here ? stored : null;
+	}
+
+	/** Types `text` in the stored color instead of letting the browser insert it. */
+	#typeStoredColor(event: InputEvent): boolean {
+		if (this.#storedColor === null || this.#readOnly) return false;
+		if (event.inputType !== "insertText" || event.isComposing || this.#composing) return false;
+		const text = event.data;
+		const target = this.#rangeTarget();
+		const stored = this.#storedColorAt(target);
+		if (text === null || text === "" || stored === null || target === null) return false;
+
+		event.preventDefault();
+		const from = target.from;
+		const to = from + text.length;
+		this.#editRangeAt(
+			target.blockIndex,
+			target.path,
+			from,
+			from,
+			(children) =>
+				applyColor(
+					spliceInline(children, from, from, [{ type: "text", value: text }]),
+					from,
+					to,
+					stored.color,
+				),
+			{ select: to, coalesceKey: `color:${this.#storedColor?.blockId ?? ""}` },
+		);
+		if (this.#storedColor !== null) this.#storedColor.offset = to;
+		return true;
 	}
 
 	/** Seçili aralığı bağlantıya çevirir; `url` boşsa bağlantıyı kaldırır. */
@@ -842,6 +914,7 @@ export class Editor {
 	 * başına yetmez.
 	 */
 	#onBeforeInput = (event: InputEvent): void => {
+		if (this.#typeStoredColor(event)) return;
 		if (event.inputType !== "historyUndo" && event.inputType !== "historyRedo") return;
 		event.preventDefault();
 		if (this.#readOnly) return;
@@ -1460,6 +1533,7 @@ export class Editor {
 		from: number,
 		to: number,
 		donustur: (children: readonly Inline[], from: number, to: number) => Inline[],
+		options: { readonly select?: number; readonly coalesceKey?: string } = {},
 	): boolean {
 		if (this.#readOnly) return false;
 		const dugumHam = nodeAt(this.#doc.children[blockIndex], path) as
@@ -1481,14 +1555,21 @@ export class Editor {
 		// seçim henüz kurulmamışken çağrılırdı; o anda `isMarkActive`
 		// sorulunca cevap yanlış çıkıyordu (demo düğmeleri bunu yakaladı).
 		// Dinleyici her zaman tutarlı bir durum görmeli.
-		this.#record({ blockIndex: hedef.blockIndex, path: hedef.path, offset: hedef.from }, doc, null);
+		this.#record(
+			{ blockIndex: hedef.blockIndex, path: hedef.path, offset: hedef.from },
+			doc,
+			options.coalesceKey ?? null,
+		);
 		this.#doc = doc;
 		this.#defs = collectDefinitions(doc);
 		this.#sync();
 
 		const blockElement = this.#elements.get(doc.children[hedef.blockIndex]?.id as string);
 		const holder = blockElement === undefined ? null : holderAt(blockElement, hedef.path);
-		if (holder !== null) selectRange(holder, hedef.from, hedef.to);
+		if (holder !== null) {
+			if (options.select === undefined) selectRange(holder, hedef.from, hedef.to);
+			else selectRange(holder, options.select, options.select);
+		}
 
 		this.#emit();
 		return true;

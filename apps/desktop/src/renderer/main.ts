@@ -826,6 +826,7 @@ const textColors = createColorMenu({
 		{ value: "#868e96", label: t.colorGray },
 	],
 	current: () => session.editor.getColor(),
+	customLabel: t.moreColors,
 	pick: (color) => {
 		if (!session.editor.setColor(color)) warn(t.selectTextFirst);
 	},

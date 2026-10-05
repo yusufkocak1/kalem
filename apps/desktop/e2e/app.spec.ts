@@ -345,6 +345,36 @@ test("pastes into a code block as plain code", async () => {
 	await app.close();
 });
 
+test("types in a color picked at the caret, including a custom one", async () => {
+	const path = join(await tempDir("caret-color"), "renk.md");
+	await writeFile(path, "Not\n");
+	const { app, page, errors } = await launch({ args: [path] });
+	const menu = page.locator('[data-command="text-color"]');
+
+	await page.locator("#editor p").first().click();
+	await page.keyboard.press("End");
+	await menu.click();
+	await page.locator('[data-command="text-color-e03131"]').click();
+	await page.keyboard.type(" acil");
+	await expect(page.locator("#editor [data-kalem-color]")).toHaveText(" acil");
+
+	// Any other color from the system picker.
+	await menu.click();
+	await page.locator('[data-command="text-color-custom"]').evaluate((input: HTMLInputElement) => {
+		input.value = "#123456";
+		input.dispatchEvent(new Event("change", { bubbles: true }));
+	});
+	await page.keyboard.type(" son");
+
+	await save(page);
+	await expect(status(page)).toHaveText("Saved");
+	expect(await readFile(path, "utf8")).toBe(
+		'Not<span style="color:#e03131"> acil</span><span style="color:#123456"> son</span>\n',
+	);
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
 test("colors selected text and keeps the color in the file", async () => {
 	const path = join(await tempDir("text-color"), "renk.md");
 	await writeFile(path, "önemli not\n\n[bağlantı](https://example.com)\n");
@@ -352,13 +382,7 @@ test("colors selected text and keeps the color in the file", async () => {
 	const menu = page.locator('[data-command="text-color"]');
 	const red = page.locator('[data-command="text-color-e03131"]');
 
-	// Without a selection nothing is colored and the user is told why.
 	await page.locator("#editor p").first().click();
-	await menu.click();
-	await red.click();
-	await expect(page.locator(".notice")).toContainText("Select the text");
-	await expect(page.locator("#editor [data-kalem-color]")).toHaveCount(0);
-
 	await page.keyboard.press("End");
 	for (let i = 0; i < 3; i++) await page.keyboard.press("Shift+ArrowLeft");
 	await menu.click();

@@ -1274,11 +1274,38 @@ test.describe("yazı rengi", () => {
 		expect(await value(page)).toBe('<span style="color:red">abc</span> def\n');
 	});
 
-	test("seçim yokken renk uygulanmıyor", async ({ page }) => {
+	test("a color picked at the caret applies to what is typed next", async ({ page }) => {
 		await page.evaluate(() => window.kalem.editor.setValue("abc\n"));
 		await page.locator("#editor > [data-kalem-id]").first().click();
-		expect(await page.evaluate(() => window.kalem.editor.setColor("red"))).toBe(false);
+		await page.keyboard.press("End");
+		expect(await page.evaluate(() => window.kalem.editor.setColor("#e03131"))).toBe(true);
 		expect(await value(page)).toBe("abc\n");
+		expect(await page.evaluate(() => window.kalem.editor.getColor())).toBe("#e03131");
+
+		await page.keyboard.type("de f");
+		expect(await value(page)).toBe('abc<span style="color:#e03131">de f</span>\n');
+		await page.keyboard.press("ControlOrMeta+z");
+		expect(await value(page)).toBe("abc\n");
+	});
+
+	test("moving the caret forgets the stored color", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("abc\n"));
+		await page.locator("#editor > [data-kalem-id]").first().click();
+		await page.keyboard.press("End");
+		await page.evaluate(() => window.kalem.editor.setColor("red"));
+		await page.keyboard.press("Home");
+		expect(await page.evaluate(() => window.kalem.editor.getColor())).toBeNull();
+		await page.keyboard.type("X");
+		expect(await value(page)).toBe("Xabc\n");
+	});
+
+	test("Automatic at the caret types uncolored text after colored text", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue('<span style="color:red">abc</span>\n'));
+		await page.locator("#editor > [data-kalem-id]").first().click();
+		await page.keyboard.press("End");
+		await page.evaluate(() => window.kalem.editor.setColor(null));
+		await page.keyboard.type("d");
+		expect(await value(page)).toBe('<span style="color:red">abc</span>d\n');
 	});
 });
 

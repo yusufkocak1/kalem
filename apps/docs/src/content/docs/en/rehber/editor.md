@@ -79,7 +79,7 @@ editor.toggleMark('strong');            // strong | emphasis | delete | inlineCo
 editor.isMarkActive('emphasis');        // boolean
 editor.setLink('https://example.com');  // turns the selected text into a link
 editor.getActiveLink();                 // { url, title, from, to } | null
-editor.setColor('#e03131');             // colors the selected text; null removes the color
+editor.setColor('#e03131');             // colors the selection, or what is typed next at the caret; null removes
 editor.getColor();                      // string | null (uncolored or mixed)
 ```
 

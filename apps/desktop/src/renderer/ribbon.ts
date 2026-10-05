@@ -475,6 +475,8 @@ export interface ColorMenuOptions {
 	readonly label: string;
 	readonly noneLabel: string;
 	readonly colors: readonly { readonly value: string; readonly label: string }[];
+	/** Adds a system color picker for any other color. */
+	readonly customLabel?: string;
 	current(): string | null;
 	pick(value: string | null): void;
 	enabled(): boolean;
@@ -527,6 +529,34 @@ export function createColorMenu(options: ColorMenuOptions): RibbonWidget {
 	});
 	popup.hidden = true;
 
+	// The system picker takes focus, and with it the document selection; it is put back before `pick`.
+	let savedRange: Range | null = null;
+	if (options.customLabel !== undefined) {
+		const input = el("input", {
+			attrs: { type: "color", "data-command": `${options.id}-custom` },
+		}) as HTMLInputElement;
+		const custom = el("label", {
+			class: "color-menu-custom",
+			attrs: { title: options.customLabel },
+			children: [input, el("span", { text: options.customLabel })],
+		});
+		input.addEventListener("change", () => {
+			hide(false);
+			const range = savedRange;
+			const editable = range?.startContainer.parentElement?.closest<HTMLElement>(
+				"[contenteditable='true']",
+			);
+			if (range !== null && editable != null) {
+				editable.focus({ preventScroll: true });
+				const selection = document.getSelection();
+				selection?.removeAllRanges();
+				selection?.addRange(range);
+			}
+			options.pick(input.value);
+		});
+		popup.append(custom);
+	}
+
 	button.addEventListener("click", (event) => {
 		if (event.detail === 0 && open) swatches[0]?.swatch.focus();
 	});
@@ -555,6 +585,9 @@ export function createColorMenu(options: ColorMenuOptions): RibbonWidget {
 
 	function show(): void {
 		open = true;
+		const selection = document.getSelection();
+		savedRange =
+			selection !== null && selection.rangeCount > 0 ? selection.getRangeAt(0).cloneRange() : null;
 		button.setAttribute("aria-expanded", "true");
 		const box = button.getBoundingClientRect();
 		popup.style.left = `${Math.round(box.left)}px`;

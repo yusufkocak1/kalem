@@ -76,7 +76,7 @@ editor.toggleMark('strong');            // strong | emphasis | delete | inlineCo
 editor.isMarkActive('emphasis');        // boolean
 editor.setLink('https://ornek.com');    // seçili metni bağlantı yapar
 editor.getActiveLink();                 // { url, title, from, to } | null
-editor.setColor('#e03131');             // seçili metni renklendirir; null rengi kaldırır
+editor.setColor('#e03131');             // seçimi ya da imleçte bundan sonra yazılanı renklendirir; null kaldırır
 editor.getColor();                      // string | null (renksiz ya da karışık)
 ```
 

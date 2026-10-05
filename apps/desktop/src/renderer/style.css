@@ -470,6 +470,25 @@ button {
 	position: relative;
 }
 
+.color-menu-custom {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-inline-start: 4px;
+	padding-inline-start: 8px;
+	border-inline-start: 1px solid var(--app-border);
+	white-space: nowrap;
+}
+
+.color-menu-custom input {
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	border: 1px solid var(--app-border);
+	border-radius: 4px;
+	background: none;
+}
+
 .color-menu-bar {
 	position: absolute;
 	right: 6px;

@@ -199,10 +199,8 @@ e2e/            Playwright ile gerçek uygulamayı süren testler
   çalışır (liste ya da alıntı içindekilerde değil).
 - Tablo, yatay çizgi ve ham HTML blokları birleştirilemez; paragraf bir listeyle
   ancak liste **üstteyse** birleşir (madde olur).
-- Yazı rengi için önce metin seçilmelidir ("bundan sonra yazacaklarım renkli
-  olsun" kipi yok) ve seçim tek bir paragrafın/hücrenin içinde olmalıdır.
-  Paletteki renkler sabittir; dosyaya elle yazılmış başka bir renk (`red`,
-  `#123456`, `rgb(…)`) korunur ve gösterilir.
+- Yazı rengi seçimi tek bir paragrafın/hücrenin içinde olmalıdır. Dosyaya
+  elle yazılmış renkler (`red`, `#123456`, `rgb(…)`) korunur ve gösterilir.
 - Kod biçimlendirme JSON, JSONC, XML (SVG, RSS, plist… dâhil), HTML ve
   YAML içindir; JSON5, CSS, JavaScript ve öteki diller biçimlendirilmez.
   YAML'da katlanmış (`>`) metnin satırları birleşebilir (anlamı değişmez).
