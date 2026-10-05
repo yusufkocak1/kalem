@@ -102,8 +102,8 @@ Dışa / içe aktarma
 - [x] D-12 · PDF ayarları (sayfa boyutu, kenar boşluğu, sayfa numarası)
 
 Editör
-- [ ] D-13 · Mermaid diyagramları
-- [ ] D-14 · KaTeX matematik
+- [x] D-13 · Mermaid diyagramları
+- [x] D-14 · KaTeX matematik (` ```math ` blokları; satır içi `$…$` çekirdek ayrıştırıcı işi)
 - [ ] D-15 · Dipnotlar
 - [ ] D-16 · Özel yazı rengi ve "bundan sonra renkli yaz"
 - [x] D-17 · Tablo stilleri geri alma geçmişinde

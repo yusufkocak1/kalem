@@ -1,6 +1,6 @@
 import type { Root, Table } from "@kalem-editor/core";
 import { parse } from "@kalem-editor/core";
-import type { RenderElement } from "@kalem-editor/viewer";
+import type { RenderElement, RenderNode } from "@kalem-editor/viewer";
 import { buildPlan, stringifyPlan } from "@kalem-editor/viewer";
 
 export const TABLE_COLORS = ["gray", "blue", "teal", "green", "orange", "red", "purple"] as const;
@@ -251,6 +251,24 @@ function styledTable(table: RenderElement, style: TableStyle): RenderElement {
 	return { ...table, children: sections };
 }
 
+/** Code blocks render as `<pre><code>`; they are counted in document order. */
+function replaceCodeBlocks(
+	plan: readonly RenderNode[],
+	replacement: (index: number) => string | null,
+): RenderNode[] {
+	let index = 0;
+	const visit = (node: RenderNode): RenderNode => {
+		if (node.kind !== "element") return node;
+		const [first] = node.children;
+		if (node.tag === "pre" && first?.kind === "element" && first.tag === "code") {
+			const html = replacement(index++);
+			return html === null ? node : { kind: "raw", value: html };
+		}
+		return { ...node, children: node.children.map(visit) };
+	};
+	return plan.map(visit);
+}
+
 /**
  * Renders `doc` to HTML with the table styles written into the cells, so
  * they survive where Kalem's stylesheet does not go.
@@ -258,6 +276,8 @@ function styledTable(table: RenderElement, style: TableStyle): RenderElement {
 export function renderStyledHtml(
 	doc: Root,
 	styleOf: (table: Table) => TableStyle | undefined,
+	/** Raw markup for the n-th code block in document order, or `null` to keep it. */
+	codeReplacement?: (index: number) => string | null,
 ): string {
 	const tables = doc.children.filter((block) => block.type === "table");
 	// A raw HTML block renders as `raw`, so top-level `<table>` elements match
@@ -269,5 +289,7 @@ export function renderStyledHtml(
 		const style = table === undefined ? undefined : styleOf(table);
 		return style === undefined || isPlain(style) ? node : styledTable(node, style);
 	});
-	return stringifyPlan(plan);
+	return stringifyPlan(
+		codeReplacement === undefined ? plan : replaceCodeBlocks(plan, codeReplacement),
+	);
 }

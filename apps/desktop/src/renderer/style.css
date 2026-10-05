@@ -1349,3 +1349,37 @@ button {
 .dialog-button:disabled {
 	opacity: 0.5;
 }
+
+/* --- Diagram and math previews (see previews.ts) ---------------------------- */
+
+pre[data-preview="ready"]::after {
+	content: "";
+	display: block;
+	width: min(100%, calc(var(--preview-width) * var(--zoom, 1)));
+	aspect-ratio: var(--preview-ratio);
+	margin-top: 0.75em;
+	border-radius: 6px;
+	background: #fff var(--preview) no-repeat center / contain;
+}
+
+pre[data-preview="error"]::after {
+	content: attr(data-preview-error);
+	display: block;
+	margin-top: 0.6em;
+	color: var(--app-error);
+	font: 12px / 1.4 system-ui, sans-serif;
+	white-space: pre-wrap;
+}
+
+@media (prefers-color-scheme: dark) {
+	/* The previews are drawn dark on light; the screen gets them inverted, paper does not. */
+	pre[data-preview="ready"]::after {
+		filter: invert(0.9) hue-rotate(180deg);
+	}
+}
+
+@media print {
+	pre[data-preview="ready"]::after {
+		filter: none;
+	}
+}

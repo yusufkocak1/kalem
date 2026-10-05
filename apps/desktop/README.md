@@ -208,6 +208,13 @@ verir.
   klasörüne **kopyalanır** ve belgeye bağlantı olarak girer; özgün dosyaya
   dokunulmaz. Kaydedilmemiş belge önce kaydedilir. Bağlantıya `Ctrl+tık`
   dosyayı klasöründe gösterir (hiçbir zaman çalıştırmaz).
+- **Mermaid diyagramları ve matematik**: dili `mermaid` olan kod blokları
+  diyagram, `math` (ya da `latex`, `katex`, `tex`) olanlar KaTeX ile formül
+  olarak kodun altında önizlenir. Kod olduğu gibi kalır ve düzenlenir;
+  yazmaya ara verilince önizleme yenilenir, hatalı içerikte hata iletisi
+  görünür. Önizlemeler PDF'te ve yazdırmada da çıkar; HTML dışa aktarmada
+  kodun yerine satır içi SVG (diyagram) ve MathML (formül) yazılır. Mermaid
+  ve KaTeX ilk gerektiklerinde yüklenir, açılışı yavaşlatmaz.
 - Bul ve değiştir, Markdown kaynağı kipi, gezinti (içindekiler) bölmesi,
   kelime sayacı, kod vurgulama.
 - Kod bloklarındaki **JSON, JSONC, XML, HTML ve YAML'ı biçimlendirme**: imleç kod bloğundayken
@@ -258,6 +265,9 @@ e2e/            Playwright ile gerçek uygulamayı süren testler
   ancak liste **üstteyse** birleşir (madde olur).
 - Yazı rengi seçimi tek bir paragrafın/hücrenin içinde olmalıdır. Dosyaya
   elle yazılmış renkler (`red`, `#123456`, `rgb(…)`) korunur ve gösterilir.
+- Matematik yalnızca kod bloğu olarak yazılır (` ```math `); satır içi
+  `$…$` ve `$$…$$` söz dizimi tanınmaz. Word'e dışa aktarmada diyagram ve
+  formüller kod bloğu olarak kalır.
 - Kod biçimlendirme JSON, JSONC, XML (SVG, RSS, plist… dâhil), HTML ve
   YAML içindir; JSON5, CSS, JavaScript ve öteki diller biçimlendirilmez.
   YAML'da katlanmış (`>`) metnin satırları birleşebilir (anlamı değişmez).

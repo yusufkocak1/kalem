@@ -45,6 +45,7 @@ import {
 } from "../shared/table-style.js";
 import { insertLink, insertTable } from "./edits.js";
 import type { Notices } from "./notices.js";
+import type { Previews } from "./previews.js";
 import { TableStyles } from "./table-styles.js";
 import { welcomeDocument } from "./welcome.js";
 import { wordHtmlToMarkdown } from "./word.js";
@@ -62,6 +63,8 @@ export interface SessionOptions {
 	readonly outline: HTMLElement;
 	readonly wordCount: HTMLElement;
 	readonly notices: Notices;
+	/** Diagram and math previews; shared by the window's tabs. */
+	readonly previews: Previews;
 	settings(): Settings;
 	/** Name, path, format or save status changed. */
 	onStateChange(): void;
@@ -290,6 +293,7 @@ export class Session {
 		this.#mount(extracted.markdown);
 		this.#tables.reset(this.editor.getDocument(), extracted.styles);
 		this.#tables.decorate(this.editor);
+		this.#o.previews.decorate(this.#o.canvas);
 		// The baseline is what the editor serializes, not the file text: a file
 		// that does not round-trip byte for byte must not open as "modified".
 		this.#savedText = clean ? this.#text() : null;
@@ -459,6 +463,7 @@ export class Session {
 		if (editor === null) return;
 		this.#tables.reconcile(editor.getDocument());
 		this.#tables.decorate(editor);
+		this.#o.previews.decorate(this.#o.canvas);
 		this.#refreshDirty(this.#tables.isEmpty ? value : this.#text());
 		this.#o.onEditorChange();
 	}

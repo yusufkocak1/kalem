@@ -41,3 +41,27 @@ describe("buildHtmlDocument with table styles", () => {
 		expect(html).not.toContain("kalem:table");
 	});
 });
+
+describe("buildHtmlDocument with previews", () => {
+	it("puts rendered markup in place of the matching code blocks only", () => {
+		const html = buildHtmlDocument({
+			markdown:
+				"```mermaid\ngraph LR\n```\n\n- liste\n\n  ```math\nx^2\n  ```\n\n```js\nlet a;\n```\n\n<b>ham</b>\n",
+			title: "t",
+			lang: "tr",
+			css: "",
+			preview: (code) =>
+				code.lang === "mermaid"
+					? "<svg>diyagram</svg>"
+					: code.lang === "math"
+						? "<math>x</math>"
+						: null,
+		});
+		expect(html).toContain('<figure class="kalem-preview"><svg>diyagram</svg></figure>');
+		expect(html).toContain('<figure class="kalem-preview"><math>x</math></figure>');
+		expect(html).toContain('class="language-js"');
+		expect(html).not.toContain("language-mermaid");
+		// The document's own raw HTML is still escaped.
+		expect(html).toContain("&lt;b&gt;ham&lt;/b&gt;");
+	});
+});

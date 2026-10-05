@@ -1191,6 +1191,70 @@ test("checks GitHub for a newer desktop release on request", async () => {
 	await app.close();
 });
 
+test("previews Mermaid diagrams and math under their code and exports them", async () => {
+	const folder = await tempDir("previews");
+	const path = join(folder, "diyagram.md");
+	await writeFile(
+		path,
+		[
+			"# Akış",
+			"",
+			"```mermaid",
+			"graph LR",
+			"  A[Başla] --> B{Karar}",
+			"  B -->|Evet| C[Bitir]",
+			"```",
+			"",
+			"```math",
+			"E = mc^2 + \\sum_{i=1}^{n} \\frac{1}{i}",
+			"```",
+			"",
+			"```mermaid",
+			"graph LR",
+			"  A -->",
+			"```",
+			"",
+		].join("\n"),
+	);
+	const { app, page, errors } = await launch({ args: [path] });
+	const blocks = page.locator("#editor pre");
+
+	await expect(blocks.nth(0)).toHaveAttribute("data-preview", "ready", { timeout: 15000 });
+	await expect(blocks.nth(1)).toHaveAttribute("data-preview", "ready");
+	await expect(blocks.nth(2)).toHaveAttribute("data-preview", "error");
+	// The code stays as written and editable.
+	await expect(blocks.nth(0).locator("code")).toContainText("A[Başla] --> B{Karar}");
+	const height = await blocks.nth(0).evaluate((pre) => {
+		const after = getComputedStyle(pre, "::after");
+		return Number.parseFloat(after.height);
+	});
+	expect(height).toBeGreaterThan(40);
+	await page.screenshot({ path: "test-results/previews.png" });
+
+	// Editing the diagram renders it again.
+	await blocks.nth(0).locator("code").click();
+	await page.keyboard.press("Control+End");
+	await page.keyboard.type("\n  C --> D[Son]");
+	await expect
+		.poll(() =>
+			blocks.nth(0).evaluate((pre) => decodeURIComponent(pre.style.getPropertyValue("--preview"))),
+		)
+		.toContain("Son");
+
+	const html = join(folder, "diyagram.html");
+	await stubSaveDialog(app, html);
+	await clickMenu(app, "File", "Export", "HTML…");
+	await expect
+		.poll(() => readFile(html, "utf8").catch(() => ""))
+		.toContain('<figure class="kalem-preview"><svg');
+	const exported = await readFile(html, "utf8");
+	expect(exported).toContain("<math");
+	expect(exported).toContain("language-mermaid");
+
+	expect(errors).toEqual([]);
+	await discardAndClose(app);
+});
+
 test("keeps several documents open in tabs", async () => {
 	const folder = await tempDir("tabs");
 	const first = join(folder, "birinci.md");

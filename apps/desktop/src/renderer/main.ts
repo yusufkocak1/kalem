@@ -1,5 +1,5 @@
-import type { AlignType, Root, Table } from "@kalem-editor/core";
-import { replaceAt } from "@kalem-editor/core";
+import type { AlignType, Code, Root, Table } from "@kalem-editor/core";
+import { parse, replaceAt } from "@kalem-editor/core";
 import type { BlockType, MarkType } from "@kalem-editor/core/commands";
 import type { Caret, EditResult } from "@kalem-editor/editor";
 import { CODE_ATTR, ID_ATTR, indentItem, outdentItem, toggleList } from "@kalem-editor/editor";
@@ -9,7 +9,7 @@ import viewerCss from "@kalem-editor/themes/viewer.css?inline";
 import type { Command, KalemBridge, Settings, SidePane, TabDocument } from "../shared/bridge.js";
 import { clampZoom, MAX_ZOOM, MIN_ZOOM, pageRule, ZOOM_STEP } from "../shared/bridge.js";
 import { formatAllCodeBlocks, formatCodeBlock } from "../shared/code-blocks.js";
-import { buildHtmlDocument } from "../shared/html-export.js";
+import { buildHtmlDocument, codeBlocks } from "../shared/html-export.js";
 import { format, stringsFor } from "../shared/i18n.js";
 import { isEditablePath, isWordPath } from "../shared/paths.js";
 import type { SortDirection } from "../shared/table.js";
@@ -23,6 +23,7 @@ import {
 } from "../shared/table.js";
 import type { TableColor, TableStyle } from "../shared/table-style.js";
 import {
+	extractTableStyles,
 	TABLE_COLORS,
 	withColumnDeleted,
 	withColumnInserted,
@@ -41,6 +42,7 @@ import {
 import { createFilesPane } from "./files-pane.js";
 import { icon } from "./icons.js";
 import { createNotices } from "./notices.js";
+import { Previews, previewKind } from "./previews.js";
 import { createQuickOpen } from "./quick-open.js";
 import type { RibbonButton, RibbonTab, RibbonWidget } from "./ribbon.js";
 import {
@@ -105,6 +107,9 @@ const filesPane = createFilesPane({
 	open: (path, query) => void openFromFolder(path, query),
 });
 const versionHistory = createVersionHistory({ t, lang: startup.language });
+const previews: Previews = new Previews(() => {
+	for (const tab of tabs.values()) previews.decorate(tab.canvas);
+});
 const quickOpen = createQuickOpen({
 	t,
 	lang: startup.language,
@@ -293,6 +298,7 @@ function createTab(id: string): Tab {
 		outline,
 		wordCount,
 		notices: createNotices(noticeHost, t.dismiss),
+		previews,
 		settings: () => settings,
 		onStateChange: () => {
 			tabStrip.update(id, {
@@ -624,11 +630,22 @@ async function exportDocx(): Promise<void> {
 }
 
 async function exportHtml(): Promise<void> {
+	const markdown = session.styledMarkdown();
+	// Diagrams and formulas go into the file rendered.
+	const key = (code: Code): string => `${code.lang}\u0000${code.value}`;
+	const rendered = new Map<string, string>();
+	for (const code of codeBlocks(parse(extractTableStyles(markdown).markdown))) {
+		const kind = previewKind(code.lang);
+		if (kind === null) continue;
+		const outcome = await previews.get(kind, code.value);
+		if (outcome.ok) rendered.set(key(code), outcome.value.html);
+	}
 	const html = buildHtmlDocument({
-		markdown: session.styledMarkdown(),
+		markdown,
 		title: session.name,
 		lang: startup.language,
 		css: [tokensCss, viewerCss, codeCss].join("\n"),
+		preview: (code) => rendered.get(key(code)) ?? null,
 	});
 	try {
 		await bridge.writeHtml(session.name, html);
