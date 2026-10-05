@@ -12,6 +12,11 @@ files:
   - package.json
   - "!**/*.map"
 
+# Smaller installers at the cost of a slower build.
+compression: maximum
+
+afterPack: scripts/after-pack.cjs
+
 # Chromium ships ~50 MB of UI locales; the app only speaks these two.
 electronLanguages:
   - en-US

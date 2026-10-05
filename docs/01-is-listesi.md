@@ -86,7 +86,7 @@ F6-13 ve F6-14 bölümlerinde.
 Yayın kalitesi
 - [x] D-01 · Uygulama simgesi (`.ico` / `.icns` / `.png`)
 - [x] D-02 · Otomatik güncelleme (kurulu sürüm `electron-updater`, taşınabilir sürüm bildirim)
-- [ ] D-03 · Paket boyutunu küçültme
+- [x] D-03 · Paket boyutunu küçültme
 - [ ] D-04 · Kod imzalama — sertifika kullanıcının
 - [ ] D-05 · Kurulum paketi, macOS ve Linux denemesi — makine kullanıcının
 

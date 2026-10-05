@@ -64,9 +64,22 @@ Bunu **kurulum paketi** (`release/Kalem-Setup-<sürüm>.exe`) yapar; taşınabil
 Taşınabilir sürümde aynı menüden **Bilgisayarda bir uygulama seçin** ile exe
 gösterilebilir; exe taşınırsa bağ kopar.
 
+## Paket boyutu
+
+Boyutun neredeyse tamamı Electron'un kendisi (`Kalem.exe` ~235 MB); uygulama
+kodu `app.asar` içinde ~3 MB. Küçültmek için yapılanlar:
+
+- Yalnızca `en-US` ve `tr` Chromium dil dosyaları paketlenir.
+- `scripts/after-pack.cjs` Windows'ta `dxcompiler.dll` ve `dxil.dll`'i
+  (~26 MB) siler: yalnızca WebGPU gölgelendiricilerini derlerler, Kalem
+  WebGPU kullanmaz. WebGL'in kullandığı `d3dcompiler_47.dll`, yazılım GPU
+  yedeği (SwiftShader) ve Chromium lisans dosyası yerinde kalır.
+- Yükleyiciler en yüksek sıkıştırmayla üretilir (`compression: maximum`):
+  kurulum paketi ~103 MB'tan ~96 MB'a indi; derleme biraz uzar.
+
 ## Taşınabilir exe neden ilk açılışta bekliyor
 
-Taşınabilir exe, içindeki uygulamayı (~320 MB) çalıştırmadan önce diske açmak
+Taşınabilir exe, içindeki uygulamayı (~300 MB) çalıştırmadan önce diske açmak
 zorunda. Bu açma işlemi **her yeni exe için bir kez** yapılıyor (~7 sn,
 bu sırada açılış görseli görünür) ve sonuç
 `%LOCALAPPDATA%\kalem-desktop-portable\` altında saklanıyor. Sonraki
