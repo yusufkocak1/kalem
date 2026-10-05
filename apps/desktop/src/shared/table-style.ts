@@ -188,7 +188,7 @@ export function styleByOrder(
 // --- HTML with the styles inlined ---------------------------------------------
 
 /** Mixes `amount` of `color` into `base`; both are `#rrggbb`. */
-function mix(color: string, base: string, amount: number): string {
+export function mix(color: string, base: string, amount: number): string {
 	const channel = (hex: string, i: number): number =>
 		Number.parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16);
 	let out = "#";

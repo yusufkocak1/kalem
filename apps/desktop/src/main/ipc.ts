@@ -1,5 +1,6 @@
 import { readFile, stat, writeFile } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { IpcMainEvent, IpcMainInvokeEvent } from "electron";
 import { app, dialog, ipcMain } from "electron";
 import type {
@@ -14,7 +15,8 @@ import type {
 import { CHANNEL } from "../shared/bridge.js";
 import { toTextFormat } from "../shared/encoding.js";
 import type { Lang, Strings } from "../shared/i18n.js";
-import { assetsFolderName } from "../shared/images.js";
+import { imageInfo } from "../shared/image-size.js";
+import { assetsFolderName, parseDataUrl } from "../shared/images.js";
 import {
 	extension,
 	isEditablePath,
@@ -25,6 +27,8 @@ import {
 	stripExtension,
 	TEXT_EXTENSIONS,
 } from "../shared/paths.js";
+import type { DocxImage } from "./docx.js";
+import { markdownToDocx } from "./docx.js";
 import type { DraftStore } from "./drafts.js";
 import { copyAttachment, MAX_IMAGE_SIZE, writeDocument, writeImage } from "./files.js";
 import type { PackageStore } from "./package.js";
@@ -404,6 +408,47 @@ export function registerIpc(ctx: IpcContext): void {
 		await writeFile(result.filePath, html, "utf8");
 		return true;
 	});
+
+	/** Images of a Word export: embedded, or files next to the document. Never fetched from the web. */
+	const docxImage = async (base: string | null, url: string): Promise<DocxImage | null> => {
+		let bytes: Uint8Array | null = null;
+		if (/^data:/i.test(url)) {
+			bytes = parseDataUrl(url)?.bytes ?? null;
+		} else {
+			let path: string | null = null;
+			if (/^file:/i.test(url)) path = fileURLToPath(url);
+			else if (!/^[a-z][a-z0-9+.-]*:/i.test(url) && base !== null) {
+				path = resolve(dirname(base), decodeURIComponent(url.split(/[?#]/)[0] ?? ""));
+			}
+			if (path === null || (await stat(path)).size > MAX_IMAGE_SIZE) return null;
+			bytes = new Uint8Array(await readFile(path));
+		}
+		const info = bytes === null ? null : imageInfo(bytes);
+		return bytes === null || info === null ? null : { data: bytes, info };
+	};
+
+	ipcMain.handle(
+		CHANNEL.writeDocx,
+		async (event, tabId: unknown, suggestedName: unknown, markdown: unknown) => {
+			const win = senderOf(event);
+			const tab = tabOf(win, tabId);
+			if (typeof markdown !== "string") throw new Error("Invalid export request");
+			const t = ctx.strings();
+			const name = toFileName(typeof suggestedName === "string" ? suggestedName : "", t.untitled);
+			const result = await dialog.showSaveDialog(win.window, {
+				defaultPath: join(windows.defaultFolder(win), `${name}.docx`),
+				filters: [{ name: "Word", extensions: ["docx"] }],
+			});
+			if (result.canceled || result.filePath === "") return false;
+			const docx = await markdownToDocx(markdown, {
+				title: name,
+				page: ctx.store.settings,
+				loadImage: (url) => docxImage(tab.base ?? tab.path, url),
+			});
+			await writeFile(result.filePath, docx);
+			return true;
+		},
+	);
 
 	// --- App ----------------------------------------------------------------
 

@@ -714,6 +714,35 @@ test("exports the document as HTML and PDF", async () => {
 	await discardAndClose(app);
 });
 
+test("exports the document to Word with its images", async () => {
+	const folder = await tempDir("docx");
+	const path = join(folder, "rapor.md");
+	const docx = join(folder, "rapor.docx");
+	await mkdir(join(folder, "rapor.assets"));
+	await writeFile(join(folder, "rapor.assets", "logo.png"), PNG_1X1);
+	await writeFile(
+		path,
+		"# Rapor\n\nGiriş **kalın**.\n\n![Logo](rapor.assets/logo.png)\n\n- bir\n- iki\n",
+	);
+	const { app, errors } = await launch({ args: [path] });
+
+	await stubSaveDialog(app, docx);
+	await clickMenu(app, "File", "Export", "Word (.docx)…");
+	await expect
+		.poll(async () => (await stat(docx).catch(() => null))?.size ?? 0)
+		.toBeGreaterThan(1000);
+	const zip = await JSZip.loadAsync(await readFile(docx));
+	const document = (await zip.file("word/document.xml")?.async("string")) ?? "";
+	expect(document).toContain("Rapor");
+	expect(document).toContain("kalın");
+	expect(document).toContain("<w:numPr>");
+	expect(Object.keys(zip.files).some((name) => name.startsWith("word/media/"))).toBe(true);
+	expect((await lastSaveDialog(app)).defaultPath).toMatch(/rapor\.docx$/);
+
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
 test("lays the PDF out with the page setup", async () => {
 	const folder = await tempDir("page-setup");
 	const pdf = join(folder, "yatay.pdf");

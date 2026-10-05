@@ -528,6 +528,18 @@ function formatAllCode(): void {
 	});
 }
 
+async function exportDocx(): Promise<void> {
+	try {
+		await bridge.writeDocx(session.id, session.name, session.styledMarkdown());
+	} catch (error) {
+		session.notices.show({
+			id: "export",
+			kind: "error",
+			text: `${t.exportFailed}: ${error instanceof Error ? error.message : String(error)}`,
+		});
+	}
+}
+
 async function exportHtml(): Promise<void> {
 	const html = buildHtmlDocument({
 		markdown: session.styledMarkdown(),
@@ -600,6 +612,7 @@ const commands: Record<Command, () => void> = {
 	"zoom-out": () => setZoom(settings.zoom - ZOOM_STEP),
 	"zoom-reset": () => setZoom(100),
 	"export-html": () => void exportHtml(),
+	"export-docx": () => void exportDocx(),
 	"format-code": formatCode,
 	"format-all-code": formatAllCode,
 };

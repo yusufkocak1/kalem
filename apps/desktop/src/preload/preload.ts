@@ -44,6 +44,8 @@ const bridge: KalemBridge = {
 	deleteDraft: (tabId) => ipcRenderer.invoke(CHANNEL.deleteDraft, tabId),
 
 	writeHtml: (suggestedName, html) => ipcRenderer.invoke(CHANNEL.writeHtml, suggestedName, html),
+	writeDocx: (tabId, suggestedName, markdown) =>
+		ipcRenderer.invoke(CHANNEL.writeDocx, tabId, suggestedName, markdown),
 
 	updateSettings: (patch) => ipcRenderer.send(CHANNEL.updateSettings, patch),
 	clipboard: (action) => ipcRenderer.send(CHANNEL.clipboard, action),

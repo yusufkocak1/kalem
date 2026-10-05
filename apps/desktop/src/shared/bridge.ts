@@ -9,8 +9,17 @@ export type PageSize = (typeof PAGE_SIZES)[number];
 export const PAGE_MARGINS = ["normal", "narrow", "wide"] as const;
 export type PageMargins = (typeof PAGE_MARGINS)[number];
 
+/** Portrait width and height in mm. */
+export const PAGE_SIZE_MM: Readonly<Record<PageSize, readonly [number, number]>> = {
+	A4: [210, 297],
+	A3: [297, 420],
+	A5: [148, 210],
+	Letter: [215.9, 279.4],
+	Legal: [215.9, 355.6],
+};
+
 /** Vertical and horizontal margin in cm, as Word's presets. */
-const MARGIN_CM: Readonly<Record<PageMargins, readonly [number, number]>> = {
+export const MARGIN_CM: Readonly<Record<PageMargins, readonly [number, number]>> = {
 	normal: [2.5, 2.5],
 	narrow: [1.27, 1.27],
 	wide: [2.54, 5.08],
@@ -200,6 +209,7 @@ export const COMMANDS = [
 	"zoom-out",
 	"zoom-reset",
 	"export-html",
+	"export-docx",
 	"format-code",
 	"format-all-code",
 ] as const;
@@ -239,6 +249,8 @@ export interface KalemBridge {
 	deleteDraft(tabId: string): Promise<void>;
 
 	writeHtml(suggestedName: string, html: string): Promise<boolean>;
+	/** Converts the tab's Markdown to Word; images resolve against the tab's document. */
+	writeDocx(tabId: string, suggestedName: string, markdown: string): Promise<boolean>;
 
 	updateSettings(patch: Partial<Settings>): void;
 	clipboard(action: "cut" | "copy" | "paste"): void;
@@ -277,6 +289,7 @@ export const CHANNEL = {
 	writeDraft: "kalem:write-draft",
 	deleteDraft: "kalem:delete-draft",
 	writeHtml: "kalem:write-html",
+	writeDocx: "kalem:write-docx",
 	updateSettings: "kalem:update-settings",
 	clipboard: "kalem:clipboard",
 	openLink: "kalem:open-link",

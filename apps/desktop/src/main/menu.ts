@@ -106,6 +106,7 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 			label: t.export,
 			submenu: [
 				{ label: t.exportHtml, click: send(ctx, "export-html") },
+				{ label: t.exportDocx, click: send(ctx, "export-docx") },
 				{ label: t.exportPdf, click: withWindow(ctx, (win) => ctx.exportPdf(win)) },
 			],
 		},
