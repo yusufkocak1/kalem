@@ -14,6 +14,7 @@ describe("parseStoredState", () => {
 				window: null,
 				welcomed: false,
 				workspace: null,
+				lastUpdateCheck: null,
 			});
 		}
 	});

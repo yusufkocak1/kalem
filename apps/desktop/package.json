@@ -34,6 +34,7 @@
     "docx": "^9.8.1",
     "electron": "^44.5.1",
     "electron-builder": "^26.15.3",
+    "electron-updater": "^6.8.9",
     "esbuild": "^0.28.2",
     "jszip": "^3.10.1",
     "mammoth": "^1.13.0",

@@ -22,6 +22,7 @@ export interface MenuContext {
 	exportPdf(doc: AppWindow): void;
 	print(doc: AppWindow): void;
 	showAbout(): void;
+	checkForUpdates(): void;
 }
 
 type Click = NonNullable<MenuItemConstructorOptions["click"]>;
@@ -376,6 +377,14 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 						if (win === undefined) ctx.windows.open([welcomeDocument()]);
 						else ctx.windows.addTab(win, { kind: "welcome" });
 					},
+				},
+				{ type: "separator" },
+				{ label: t.checkForUpdates, click: () => ctx.checkForUpdates() },
+				{
+					label: t.checkUpdatesAutomatically,
+					type: "checkbox",
+					checked: settings.checkUpdates,
+					click: () => ctx.changeSettings({ checkUpdates: !settings.checkUpdates }),
 				},
 				...(isMac ? [] : [{ label: t.about, click: () => ctx.showAbout() }]),
 			],

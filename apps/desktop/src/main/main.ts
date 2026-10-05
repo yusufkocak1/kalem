@@ -20,6 +20,7 @@ import {
 import { PackageStore } from "./package.js";
 import { handleDocumentScheme, registerDocumentScheme } from "./protocol.js";
 import { SettingsStore } from "./settings.js";
+import { Updater } from "./updater.js";
 import type { AppWindow } from "./windows.js";
 import { errorMessage, WindowManager } from "./windows.js";
 
@@ -65,6 +66,12 @@ function start(): void {
 	/** macOS "open with" requests that arrive before the app is ready. */
 	const queuedFiles: string[] = [];
 	let ready = false;
+
+	const updater = new Updater({
+		store,
+		strings: () => t,
+		window: () => BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0],
+	});
 
 	const windows: WindowManager = new WindowManager({
 		store,
@@ -205,6 +212,7 @@ function start(): void {
 				refreshMenu();
 			},
 			exportPdf: (win) => void exportPdf(win),
+			checkForUpdates: () => void updater.check(true),
 			print: (win) =>
 				void onPaper(
 					win,
@@ -344,6 +352,8 @@ function start(): void {
 			windows.open(store.state.welcomed ? [] : [welcomeDocument()]);
 		}
 		if (!store.state.welcomed) store.update({ welcomed: true });
+		// Not in the way of startup.
+		setTimeout(() => updater.checkInBackground(), 10_000);
 	});
 }
 

@@ -40,8 +40,11 @@ win:
 # so only the first launch of a new exe waits; the splash covers that wait.
 portable:
   splashImage: resources/splash.bmp
+  # Hyphens, as GitHub names the uploaded assets; latest.yml must match them.
+  artifactName: ${productName}-${version}.${ext}
 
 nsis:
+  artifactName: ${productName}-Setup-${version}.${ext}
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
@@ -56,3 +59,10 @@ linux:
   target:
     - AppImage
     - deb
+
+# Writes latest.yml next to the installer and app-update.yml into the app.
+# The app picks the release itself (desktop-v* tags) and points the updater
+# at that release's downloads; see src/main/updater.ts.
+publish:
+  provider: generic
+  url: https://github.com/yusufkocak1/kalem/releases/latest/download

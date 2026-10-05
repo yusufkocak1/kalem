@@ -43,6 +43,8 @@ export interface Settings {
 	readonly pageNumbers: boolean;
 	/** What the side pane shows. */
 	readonly sidePane: SidePane;
+	/** Look for a new release once a day (a request to GitHub). */
+	readonly checkUpdates: boolean;
 }
 
 export type SidePane = "outline" | "files";
@@ -60,6 +62,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	margins: "normal",
 	pageNumbers: false,
 	sidePane: "outline",
+	checkUpdates: true,
 };
 
 /** The `@page` rule printing and PDF export lay the document out with. */

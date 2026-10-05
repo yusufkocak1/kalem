@@ -1148,6 +1148,49 @@ test("moves a tab with its unsaved edits into a new window", async () => {
 	await app.close();
 });
 
+test("checks GitHub for a newer desktop release on request", async () => {
+	const { app, errors } = await launch();
+	await app.evaluate(({ dialog, net, shell }) => {
+		const state = globalThis as unknown as { messages: string[]; opened: string[] };
+		state.messages = [];
+		state.opened = [];
+		net.fetch = async () =>
+			new Response(
+				JSON.stringify([
+					{ tag_name: "v99.0.0", draft: false, prerelease: false, assets: [] },
+					{
+						tag_name: "desktop-v99.0.0",
+						draft: false,
+						prerelease: false,
+						html_url: "https://github.com/yusufkocak1/kalem/releases/tag/desktop-v99.0.0",
+						assets: [],
+					},
+				]),
+			);
+		dialog.showMessageBox = (async (...args: unknown[]) => {
+			const options = args.at(-1) as { message: string };
+			state.messages.push(options.message);
+			return { response: 0, checkboxChecked: false };
+		}) as typeof dialog.showMessageBox;
+		shell.openExternal = async (url: string) => {
+			state.opened.push(url);
+		};
+	});
+
+	await clickMenu(app, "Help", "Check for Updates…");
+	const seen = () =>
+		app.evaluate(() => globalThis as unknown as { messages: string[]; opened: string[] });
+	await expect
+		.poll(async () => (await seen()).opened)
+		.toEqual(["https://github.com/yusufkocak1/kalem/releases/tag/desktop-v99.0.0"]);
+	expect((await seen()).messages[0]).toMatch(
+		/^Kalem 99\.0\.0 is available \(you have \d+\.\d+\.\d+\)\.$/,
+	);
+
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
 test("keeps several documents open in tabs", async () => {
 	const folder = await tempDir("tabs");
 	const first = join(folder, "birinci.md");

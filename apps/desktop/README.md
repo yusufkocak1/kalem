@@ -24,16 +24,34 @@ Birim testleri depo kökünden: `pnpm test`.
 ## İndirme
 
 Hazır Windows sürümleri [GitHub Releases](https://github.com/yusufkocak1/kalem/releases)
-sayfasında: kurulum paketi (`Kalem Setup <sürüm>.exe`) ve taşınabilir exe
-(`Kalem <sürüm>.exe`). Exe'ler depoda tutulmuyor.
+sayfasında: kurulum paketi (`Kalem-Setup-<sürüm>.exe`) ve taşınabilir exe
+(`Kalem-<sürüm>.exe`). Exe'ler depoda tutulmuyor.
 
 Yeni sürüm: `package.json`'daki `version` artırılır, `package` çalıştırılır,
-`desktop-v<sürüm>` etiketiyle bir release açılıp iki exe ona eklenir.
+`desktop-v<sürüm>` etiketiyle bir release açılıp `release/` klasöründen
+dört dosya ona eklenir: iki exe, `latest.yml` ve
+`Kalem-Setup-<sürüm>.exe.blockmap`. `latest.yml` olmadan kurulu sürümler
+yeni sürümü kendileri kuramaz, yalnızca indirme sayfasını gösterir.
+
+## Güncellemeler
+
+Uygulama açıldıktan ~10 sn sonra, günde en çok bir kez, GitHub'dan
+`desktop-v` ile başlayan en yeni kararlı sürümü sorar (**Yardım →
+Güncellemeleri Otomatik Denetle** ile kapatılır; **Güncellemeleri
+Denetle…** elle sorar). Yeni sürüm varsa:
+
+- **Kurulu sürüm** sorar, onay verilirse yükleyiciyi o sürümün
+  `latest.yml`'ına göre indirir (sha512 doğrulanır) ve yeniden başlatınca
+  ya da bir sonraki kapanışta kurar. Kaydedilmemiş belgeler her zamanki gibi
+  sorulur.
+- **Taşınabilir exe** kendini değiştiremez; yalnızca indirme sayfasını açar.
+
+Geliştirme kipinde (`dev`, `start`) otomatik denetim yapılmaz.
 
 ## `.md` dosyalarının varsayılan uygulaması yapmak
 
-Bunu **kurulum paketi** (`release/Kalem Setup <sürüm>.exe`) yapar; taşınabilir
-`Kalem <sürüm>.exe` kayıt defterine hiçbir şey yazmaz.
+Bunu **kurulum paketi** (`release/Kalem-Setup-<sürüm>.exe`) yapar; taşınabilir
+`Kalem-<sürüm>.exe` kayıt defterine hiçbir şey yazmaz.
 
 1. `pnpm --filter kalem-desktop package` ile kurulum paketini üretin ve kurun.
    Kurulum `.md` ve `.markdown` uzantılarını Kalem'e bağlar

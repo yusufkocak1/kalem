@@ -22,6 +22,8 @@ export interface StoredState {
 	readonly welcomed: boolean;
 	/** The folder opened with Open Folder. */
 	readonly workspace: string | null;
+	/** When releases were last looked up, in ms. */
+	readonly lastUpdateCheck: number | null;
 }
 
 const THEMES: readonly Theme[] = ["system", "light", "dark"];
@@ -81,11 +83,13 @@ export function parseStoredState(raw: unknown): StoredState {
 				: d.margins,
 			pageNumbers: asBoolean(s.pageNumbers, d.pageNumbers),
 			sidePane: s.sidePane === "files" ? "files" : "outline",
+			checkUpdates: asBoolean(s.checkUpdates, d.checkUpdates),
 		},
 		recentFiles: [...new Set(recentFiles)].slice(0, MAX_RECENT_FILES),
 		window: parseBounds(root.window),
 		welcomed: asBoolean(root.welcomed, false),
 		workspace: typeof root.workspace === "string" && root.workspace !== "" ? root.workspace : null,
+		lastUpdateCheck: asNumber(root.lastUpdateCheck),
 	};
 }
 
