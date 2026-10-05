@@ -81,6 +81,44 @@ F6-13 ve F6-14 bölümlerinde.
 > yapıştırılınca stil yeni tabloya geçiyor. HTML dışa aktarma da stilleri
 > taşıyor. `.md` ve `.kmd` kaydı bunu zaten yapıyordu.
 
+#### Masaüstü yol haritası (2026-10-05)
+
+Yayın kalitesi
+- [x] D-01 · Uygulama simgesi (`.ico` / `.icns` / `.png`)
+- [ ] D-02 · Otomatik güncelleme (kurulu sürüm `electron-updater`, taşınabilir sürüm bildirim)
+- [ ] D-03 · Paket boyutunu küçültme
+- [ ] D-04 · Kod imzalama — sertifika kullanıcının
+- [ ] D-05 · Kurulum paketi, macOS ve Linux denemesi — makine kullanıcının
+
+Belge iş akışı
+- [ ] D-06 · Klasör kenar çubuğu (çalışma alanı)
+- [ ] D-07 · Klasörde arama (`Ctrl+Shift+F`)
+- [ ] D-08 · Hızlı açma (`Ctrl+P`)
+- [ ] D-09 · Sürüm geçmişi (kayıt anlık görüntüleri)
+- [ ] D-10 · Sekmeyi yeni pencereye taşıma
+
+Dışa / içe aktarma
+- [ ] D-11 · Word'e dışa aktarma (`.docx`)
+- [ ] D-12 · PDF ayarları (sayfa boyutu, kenar boşluğu, sayfa numarası)
+
+Editör
+- [ ] D-13 · Mermaid diyagramları
+- [ ] D-14 · KaTeX matematik
+- [ ] D-15 · Dipnotlar
+- [ ] D-16 · Özel yazı rengi ve "bundan sonra renkli yaz"
+- [ ] D-17 · Tablo stilleri geri alma geçmişinde
+- [ ] D-18 · Kod biçimlendirme: YAML, HTML, JSONC
+
+Masaüstü entegrasyonu
+- [x] D-19 · Windows atlama listesi / son belgeler
+- [x] D-20 · Tek örnek: çift tıklanan dosya açık pencerede sekme olur
+- [ ] D-21 · Tepsiden hızlı not
+- [ ] D-22 · Gezgin önizlemesi — yerel kabuk eklentisi gerekir
+
+Teknik borç
+- [ ] D-23 · `renderer/main.ts`'i modüllere bölme
+- [ ] D-24 · Çökme raporlama — servis ve rıza kararı kullanıcının
+
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.
 >

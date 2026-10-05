@@ -153,9 +153,18 @@ verir.
   Biçimlendir** belgedeki hepsini düzenler. Değerler yeniden yazılmaz
   (`1.0`, büyük sayılar, XML'deki metin olduğu gibi kalır); geçersiz içerik
   değiştirilmez ve bildirilir. Dili yazılmamış blok içerikten tanınır.
+- Windows görev çubuğu atlama listesi: son belgeler ve **Yeni Pencere**
+  (kurulu ve taşınabilir sürüm). Zaten açıkken çift tıklanan belge açık
+  pencerede yeni sekme olur.
 - Açık / koyu / sistem teması, yakınlaştırma, tam genişlik, odak modu,
   salt okunur kip, yazım denetimi.
 - Arayüz Türkçe ve İngilizce (sistem diline göre; **Görünüm → Dil**).
+
+## Simge
+
+Kaynak `resources/icon.svg`. Değiştirildikten sonra
+`node scripts/render-icon.mjs` 1024 px `resources/icon.png` üretir;
+electron-builder `.ico` ve `.icns`'i bundan çıkarır.
 
 ## Yapı
 
@@ -201,7 +210,6 @@ e2e/            Playwright ile gerçek uygulamayı süren testler
   yazılır.
 - Word'deki birleştirilmiş tablo hücreleri boş hücrelere açılır; dipnot
   bağlantıları düz metne iner; EMF/WMF görseller atlanır ve bildirilir.
-- Uygulama simgesi henüz yok (Electron'un varsayılan simgesi kullanılıyor).
 - macOS ve Linux'ta denenmedi. Windows kurulum paketi üretiliyor ama
   kurulup denenmedi; çalıştırılanlar `package:dir` çıktısı ve taşınabilir exe.
 - Kurulum paketi 100 MB'ı aştığı için depoya konmaz (GitHub sınırı).

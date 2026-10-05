@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { basename, dirname, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import type { WebContents } from "electron";
 import { app, BrowserWindow, dialog, nativeTheme, screen, shell } from "electron";
 import type {
@@ -124,6 +124,7 @@ export class WindowManager {
 			minHeight: 400,
 			show: false,
 			title: this.#options.strings().appName,
+			icon: join(__dirname, "icon.png"),
 			backgroundColor: nativeTheme.shouldUseDarkColors ? DARK_BACKGROUND : LIGHT_BACKGROUND,
 			autoHideMenuBar: true,
 			webPreferences: {

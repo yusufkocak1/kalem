@@ -24,6 +24,8 @@ if (userDataDir !== undefined && userDataDir !== "") {
 
 registerDocumentScheme();
 
+const NEW_WINDOW_FLAG = "--new-window";
+
 function documentArguments(argv: readonly string[], cwd: string): string[] {
 	return argv
 		.slice(1)
@@ -175,7 +177,28 @@ function start(): void {
 		for (const path of paths) await windows.openPath(path, windows.focused());
 	}
 
+	/** Taskbar jump list tasks; recent documents come from `app.addRecentDocument`. */
+	function installUserTasks(): void {
+		if (process.platform !== "win32" || !app.isPackaged) return;
+		// The portable launcher runs a copy from a cache folder; tasks must start the launcher.
+		const program = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
+		app.setUserTasks([
+			{
+				program,
+				arguments: NEW_WINDOW_FLAG,
+				iconPath: program,
+				iconIndex: 0,
+				title: t.newWindow,
+				description: t.newWindow,
+			},
+		]);
+	}
+
 	app.on("second-instance", (_event, argv, cwd) => {
+		if (argv.includes(NEW_WINDOW_FLAG)) {
+			windows.open();
+			return;
+		}
 		const paths = documentArguments(argv, cwd);
 		if (paths.length > 0) {
 			void openDocuments(paths);
@@ -214,6 +237,7 @@ function start(): void {
 		nativeTheme.themeSource = store.settings.theme;
 		handleDocumentScheme();
 		applySpellCheck();
+		installUserTasks();
 		registerIpc({
 			windows,
 			store,

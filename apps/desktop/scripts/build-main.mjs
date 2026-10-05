@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { copyFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
@@ -31,6 +32,8 @@ export async function buildMain() {
 			outfile: join(root, "dist/main/preload.cjs"),
 		}),
 	]);
+	// The window icon; installers take theirs from resources/ directly.
+	await copyFile(join(root, "resources/icon.png"), join(root, "dist/main/icon.png"));
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await buildMain();
