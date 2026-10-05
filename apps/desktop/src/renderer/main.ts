@@ -424,7 +424,13 @@ function editTable(
 	});
 }
 
-const LANGUAGE_NAMES = { json: "JSON", xml: "XML" } as const;
+const LANGUAGE_NAMES = {
+	json: "JSON",
+	jsonc: "JSONC",
+	xml: "XML",
+	html: "HTML",
+	yaml: "YAML",
+} as const;
 
 interface CodeLocation {
 	/** Path of the code node from the document root. */
@@ -454,7 +460,7 @@ function codeLocation(): CodeLocation | null {
 	return { path: [blockIndex, ...inner], blockId, holderKey };
 }
 
-/** Pretty-prints the JSON or XML code block at the caret. */
+/** Pretty-prints the code block at the caret. */
 function formatCode(): void {
 	const editor = session.editor;
 	if (inSource()) return;

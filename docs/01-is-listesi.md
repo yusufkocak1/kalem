@@ -107,7 +107,7 @@ Editör
 - [ ] D-15 · Dipnotlar
 - [ ] D-16 · Özel yazı rengi ve "bundan sonra renkli yaz"
 - [x] D-17 · Tablo stilleri geri alma geçmişinde
-- [ ] D-18 · Kod biçimlendirme: YAML, HTML, JSONC
+- [x] D-18 · Kod biçimlendirme: YAML, HTML, JSONC
 
 Masaüstü entegrasyonu
 - [x] D-19 · Windows atlama listesi / son belgeler

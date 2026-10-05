@@ -1,4 +1,6 @@
-export type BeautifyLanguage = "json" | "xml";
+import { parseAllDocuments } from "yaml";
+
+export type BeautifyLanguage = "json" | "jsonc" | "xml" | "html" | "yaml";
 
 export type BeautifyResult =
 	| { readonly ok: true; readonly text: string; readonly language: BeautifyLanguage }
@@ -16,6 +18,11 @@ const LANGUAGES: Readonly<Record<string, BeautifyLanguage>> = {
 	json: "json",
 	geojson: "json",
 	webmanifest: "json",
+	jsonc: "jsonc",
+	html: "html",
+	htm: "html",
+	yaml: "yaml",
+	yml: "yaml",
 	xml: "xml",
 	svg: "xml",
 	xsd: "xml",
@@ -38,81 +45,147 @@ export function detectLanguage(code: string, lang: string | null): BeautifyLangu
 	// kalem-locale-ok: language names are ASCII
 	if (hasLanguage(lang)) return LANGUAGES[(lang as string).trim().toLowerCase()] ?? null;
 
-	const start = code.trimStart()[0];
+	const trimmed = code.trimStart();
+	const start = trimmed[0];
 	if (start === "{" || start === "[") return "json";
+	if (/^<(!doctype\s+html|html[\s>])/i.test(trimmed)) return "html";
 	if (start === "<") return "xml";
 	return null;
 }
 
 // --- JSON -------------------------------------------------------------------
 
+type JsonToken =
+	| { readonly kind: "punct" | "value"; readonly text: string }
+	/** `ownLine`: nothing but whitespace precedes it on its source line. */
+	| { readonly kind: "comment"; readonly text: string; readonly ownLine: boolean };
+
+function tokenizeJson(text: string): JsonToken[] {
+	const tokens: JsonToken[] = [];
+	let lineStart = true;
+	for (let i = 0; i < text.length; ) {
+		const char = text[i] as string;
+		if (/\s/.test(char)) {
+			if (char === "\n") lineStart = true;
+			i++;
+			continue;
+		}
+		if (char === "/" && (text[i + 1] === "/" || text[i + 1] === "*")) {
+			const line = text[i + 1] === "/";
+			let end = line ? text.indexOf("\n", i) : text.indexOf("*/", i + 2);
+			if (end < 0) {
+				if (!line) throw new Error("Unclosed comment");
+				end = text.length;
+			} else if (!line) {
+				end += 2;
+			}
+			tokens.push({ kind: "comment", text: text.slice(i, end).trimEnd(), ownLine: lineStart });
+			i = end;
+			continue;
+		}
+		lineStart = false;
+		if (char === '"') {
+			let end = i + 1;
+			while (end < text.length && text[end] !== '"') end += text[end] === "\\" ? 2 : 1;
+			tokens.push({ kind: "value", text: text.slice(i, end + 1) });
+			i = end + 1;
+		} else if ("{}[],:".includes(char)) {
+			tokens.push({ kind: "punct", text: char });
+			i++;
+		} else {
+			let end = i;
+			while (end < text.length && !/[\s{}[\],:"/]/.test(text[end] as string)) end++;
+			if (end === i) end++;
+			tokens.push({ kind: "value", text: text.slice(i, end) });
+			i = end;
+		}
+	}
+	return tokens;
+}
+
+/** Comments and trailing commas removed, for validation with `JSON.parse`. */
+function strictJson(tokens: readonly JsonToken[]): string {
+	const kept = tokens.filter((token) => token.kind !== "comment");
+	return kept
+		.filter((token, i) => {
+			const next = kept[i + 1]?.text;
+			return !(token.text === "," && (next === "}" || next === "]"));
+		})
+		.map((token) => token.text)
+		.join("");
+}
+
 /**
  * Re-indents JSON without re-serializing values: `JSON.stringify(JSON.parse(x))`
  * would rewrite `1.0` as `1`, lose precision on large integers and drop
  * duplicate keys. `JSON.parse` is used only to validate.
+ *
+ * With `comments` (JSONC), comments stay where they were — at the end of a
+ * line or on a line of their own — and so do trailing commas.
  */
-export function formatJson(text: string): string {
-	JSON.parse(text);
-
-	const tokens: string[] = [];
-	for (let i = 0; i < text.length; ) {
-		const char = text[i] as string;
-		if (/\s/.test(char)) {
-			i++;
-		} else if (char === '"') {
-			let end = i + 1;
-			while (text[end] !== '"') end += text[end] === "\\" ? 2 : 1;
-			tokens.push(text.slice(i, end + 1));
-			i = end + 1;
-		} else if ("{}[],:".includes(char)) {
-			tokens.push(char);
-			i++;
-		} else {
-			let end = i;
-			while (end < text.length && !/[\s{}[\],:"]/.test(text[end] as string)) end++;
-			tokens.push(text.slice(i, end));
-			i = end;
-		}
+export function formatJson(text: string, comments = false): string {
+	const tokens = comments ? tokenizeJson(text) : [];
+	if (comments) JSON.parse(strictJson(tokens));
+	else {
+		JSON.parse(text);
+		tokens.push(...tokenizeJson(text));
 	}
 
 	let out = "";
 	let depth = 0;
-	const newline = (): string => `\n${INDENT.repeat(depth)}`;
+	/** A line break is owed before the next token. */
+	let pending = false;
+	const emit = (piece: string): void => {
+		if (pending && out !== "") out += `\n${INDENT.repeat(depth)}`;
+		pending = false;
+		out += piece;
+	};
 
 	for (const [i, token] of tokens.entries()) {
-		if (token === "{" || token === "[") {
-			const closing = token === "{" ? "}" : "]";
-			if (tokens[i + 1] === closing) {
-				out += token;
+		const value = token.text;
+		if (token.kind === "comment") {
+			if (token.ownLine || out === "") {
+				pending = true;
+				emit(value);
 			} else {
+				out += ` ${value}`;
+			}
+			if (token.ownLine || value.startsWith("//")) pending = true;
+			continue;
+		}
+		if (value === "{" || value === "[") {
+			emit(value);
+			const closing = value === "{" ? "}" : "]";
+			if (tokens[i + 1]?.text !== closing) {
 				depth++;
-				out += token + newline();
+				pending = true;
 			}
-		} else if (token === "}" || token === "]") {
-			const opening = token === "}" ? "{" : "[";
-			if (tokens[i - 1] === opening) {
-				out += token;
-			} else {
+		} else if (value === "}" || value === "]") {
+			const opening = value === "}" ? "{" : "[";
+			if (tokens[i - 1]?.text !== opening) {
 				depth--;
-				out += newline() + token;
+				pending = true;
 			}
-		} else if (token === ",") {
-			out += token + newline();
-		} else if (token === ":") {
-			out += ": ";
+			emit(value);
+		} else if (value === ",") {
+			emit(value);
+			pending = true;
+		} else if (value === ":") {
+			emit(": ");
 		} else {
-			out += token;
+			emit(value);
 		}
 	}
 	return out;
 }
 
-// --- XML --------------------------------------------------------------------
+// --- XML and HTML -------------------------------------------------------------
 
 interface XmlElement {
 	readonly kind: "element";
 	readonly name: string;
 	readonly open: string;
+	/** Empty when HTML let the closing tag be left out. */
 	close: string;
 	readonly children: XmlNode[];
 	/** Offsets of the content between the open and close tags. */
@@ -127,6 +200,18 @@ interface XmlLeaf {
 }
 
 type XmlNode = XmlElement | XmlLeaf;
+
+const VOID_ELEMENTS = new Set(
+	"area base br col embed hr img input link meta param source track wbr".split(" "),
+);
+/** Their content is not markup and is kept exactly. */
+const RAW_TEXT_ELEMENTS = new Set(["script", "style", "textarea", "pre", "title"]);
+/** Elements whose closing tag HTML lets authors leave out. */
+const OPTIONAL_CLOSE = new Set(
+	"p li dt dd tr td th thead tbody tfoot option optgroup colgroup caption head body html".split(
+		" ",
+	),
+);
 
 /** End offset (exclusive) of the markup starting at `<`, skipping quoted `>`. */
 function tagEnd(text: string, start: number): number {
@@ -162,10 +247,21 @@ function doctypeEnd(text: string, start: number): number {
 	throw new Error("Unclosed DOCTYPE");
 }
 
-function parseXml(text: string): XmlNode[] {
+function parseMarkup(text: string, html: boolean): XmlNode[] {
 	const root: XmlNode[] = [];
 	const stack: XmlElement[] = [];
 	const siblings = (): XmlNode[] => stack[stack.length - 1]?.children ?? root;
+	// kalem-locale-ok: tag names are ASCII
+	const key = (name: string): string => (html ? name.toLowerCase() : name);
+	const lower = html ? text.toLowerCase() : text; // kalem-locale-ok: searched for ASCII tag names
+	/** Ends the open element if HTML lets its closing tag be left out. */
+	const implicitClose = (at: number): boolean => {
+		const top = stack[stack.length - 1];
+		if (!html || top === undefined || !OPTIONAL_CLOSE.has(key(top.name))) return false;
+		stack.pop();
+		top.contentEnd = at;
+		return true;
+	};
 
 	let i = 0;
 	while (i < text.length) {
@@ -200,16 +296,35 @@ function parseXml(text: string): XmlNode[] {
 			if (name === undefined) throw new Error(`Malformed tag: ${raw}`);
 
 			if (raw.startsWith("</")) {
+				while (key(stack[stack.length - 1]?.name ?? name) !== key(name) && implicitClose(i)) {}
 				const element = stack.pop();
 				if (element === undefined) throw new Error(`Unexpected closing tag </${name}>`);
-				if (element.name !== name) {
+				if (key(element.name) !== key(name)) {
 					throw new Error(`Expected </${element.name}> but found </${name}>`);
 				}
 				element.close = raw;
 				element.contentEnd = i;
-			} else if (raw.endsWith("/>")) {
+			} else if (raw.endsWith("/>") || (html && VOID_ELEMENTS.has(key(name)))) {
 				siblings().push({ kind: "other", raw });
+			} else if (html && RAW_TEXT_ELEMENTS.has(key(name))) {
+				const closeAt = lower.indexOf(`</${key(name)}`, end);
+				if (closeAt < 0) throw new Error(`Missing closing tag </${name}>`);
+				const closeEnd = tagEnd(text, closeAt);
+				siblings().push({
+					kind: "element",
+					name,
+					open: raw,
+					close: text.slice(closeAt, closeEnd),
+					children: [{ kind: "cdata", raw: text.slice(end, closeAt) }],
+					contentStart: end,
+					contentEnd: closeAt,
+				});
+				i = closeEnd;
+				continue;
 			} else {
+				// An `<li>` ends the open `<li>`; the same for the other repeating items.
+				const top = stack[stack.length - 1];
+				if (top !== undefined && key(top.name) === key(name)) implicitClose(i);
 				const element: XmlElement = {
 					kind: "element",
 					name,
@@ -226,6 +341,7 @@ function parseXml(text: string): XmlNode[] {
 		}
 	}
 
+	while (implicitClose(text.length)) {}
 	const unclosed = stack[stack.length - 1];
 	if (unclosed !== undefined) throw new Error(`Missing closing tag </${unclosed.name}>`);
 	return root;
@@ -238,9 +354,11 @@ function isBlank(node: XmlNode): boolean {
 /**
  * Like `xmllint --format`: indentation is added only where there is no text.
  * An element that contains text (or asks for `xml:space="preserve"`) is
- * written exactly as it was, because whitespace there is content.
+ * written exactly as it was, because whitespace there is content. In HTML,
+ * void elements need no closing tag, optional closing tags may be left out
+ * and the content of `script`, `style`, `pre`… is kept as written.
  */
-export function formatXml(text: string): string {
+export function formatXml(text: string, html = false): string {
 	const lines: string[] = [];
 
 	const write = (nodes: readonly XmlNode[], depth: number): void => {
@@ -257,37 +375,88 @@ export function formatXml(text: string): string {
 			);
 			const preserve = /\sxml:space\s*=\s*["']preserve["']/.test(node.open);
 			if (hasText || preserve) {
-				lines.push(pad + node.open + text.slice(node.contentStart, node.contentEnd) + node.close);
+				const content = text.slice(node.contentStart, node.contentEnd);
+				lines.push(
+					pad + node.open + (node.close === "" ? content.trimEnd() : content) + node.close,
+				);
 			} else if (node.children.every(isBlank)) {
 				lines.push(pad + node.open + node.close);
 			} else {
 				lines.push(pad + node.open);
 				write(node.children, depth + 1);
-				lines.push(pad + node.close);
+				if (node.close !== "") lines.push(pad + node.close);
 			}
 		}
 	};
 
-	const nodes = parseXml(text.trim());
+	const nodes = parseMarkup(text.trim(), html);
 	if (!nodes.some((node) => node.kind === "element" || /^<[^!?]/.test(node.raw))) {
 		throw new Error("No root element");
 	}
 	// Text outside the root element is not XML.
-	if (nodes.some((node) => node.kind === "text" && !isBlank(node))) {
+	if (!html && nodes.some((node) => node.kind === "text" && !isBlank(node))) {
 		throw new Error("Text outside the root element");
 	}
 	write(nodes, 0);
 	return lines.join("\n");
 }
 
+// --- YAML -------------------------------------------------------------------
+
+/**
+ * Re-indents YAML with two spaces. The failsafe schema reads every scalar
+ * as a string, so `1E5`, `010` or `yes` are written exactly as they were;
+ * comments, anchors, tags and quoting styles are kept.
+ */
+export function formatYaml(text: string): string {
+	const documents = parseAllDocuments(text, { schema: "failsafe" });
+	if (!Array.isArray(documents) || documents.length === 0) throw new Error("Empty YAML");
+	for (const document of documents) {
+		const error = document.errors[0];
+		if (error !== undefined) throw new Error(error.message.split("\n")[0]);
+	}
+	return documents
+		.map((document) => document.toString({ indent: 2, lineWidth: 0 }))
+		.join("")
+		.replace(/\n$/, "");
+}
+
 // --- Entry point ------------------------------------------------------------
 
+function formatAs(code: string, language: BeautifyLanguage): string {
+	switch (language) {
+		case "json":
+			return formatJson(code);
+		case "jsonc":
+			return formatJson(code, true);
+		case "xml":
+			return formatXml(code);
+		case "html":
+			return formatXml(code, true);
+		case "yaml":
+			return formatYaml(code);
+	}
+}
+
+/** When a guess does not parse, a more lenient relative gets a try. */
+const FALLBACK: Partial<Record<BeautifyLanguage, BeautifyLanguage>> = {
+	json: "jsonc",
+	xml: "html",
+};
+
 export function beautify(code: string, lang: string | null): BeautifyResult {
-	const language = detectLanguage(code, lang);
+	let language = detectLanguage(code, lang);
 	if (language === null) return { ok: false, reason: "unsupported" };
+	const fallback = hasLanguage(lang) ? undefined : FALLBACK[language];
+	if (fallback !== undefined) {
+		try {
+			return { ok: true, text: formatAs(code, language), language };
+		} catch {
+			language = fallback;
+		}
+	}
 	try {
-		const text = language === "json" ? formatJson(code) : formatXml(code);
-		return { ok: true, text, language };
+		return { ok: true, text: formatAs(code, language), language };
 	} catch (error) {
 		// A guess that does not parse was simply a wrong guess, not an error.
 		if (!hasLanguage(lang)) return { ok: false, reason: "unsupported" };

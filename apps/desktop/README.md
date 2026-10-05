@@ -149,11 +149,15 @@ verir.
   dosyayı klasöründe gösterir (hiçbir zaman çalıştırmaz).
 - Bul ve değiştir, Markdown kaynağı kipi, gezinti (içindekiler) bölmesi,
   kelime sayacı, kod vurgulama.
-- Kod bloklarındaki **JSON ve XML'i biçimlendirme**: imleç kod bloğundayken
+- Kod bloklarındaki **JSON, JSONC, XML, HTML ve YAML'ı biçimlendirme**: imleç kod bloğundayken
   açılan **Kod** sekmesi ya da `Shift+Alt+F`; **Biçim → Tüm Kod Bloklarını
   Biçimlendir** belgedeki hepsini düzenler. Değerler yeniden yazılmaz
-  (`1.0`, büyük sayılar, XML'deki metin olduğu gibi kalır); geçersiz içerik
-  değiştirilmez ve bildirilir. Dili yazılmamış blok içerikten tanınır.
+  (`1.0`, büyük sayılar, XML'deki metin, YAML'daki `010` / `yes` olduğu
+  gibi kalır); geçersiz içerik değiştirilmez ve bildirilir. Dili yazılmamış
+  blok içerikten tanınır. JSONC'de yorumlar ve sondaki virgüller, YAML'da
+  yorumlar, çapalar ve tırnak biçimi korunur. HTML'de `script`, `style`,
+  `pre` içeriği ve metin içeren elemanlar olduğu gibi kalır; `</li>`, `</p>`
+  gibi isteğe bağlı kapanış etiketleri eksik olabilir.
 - Windows görev çubuğu atlama listesi: son belgeler ve **Yeni Pencere**
   (kurulu ve taşınabilir sürüm). Zaten açıkken çift tıklanan belge açık
   pencerede yeni sekme olur.
@@ -195,8 +199,9 @@ e2e/            Playwright ile gerçek uygulamayı süren testler
   olsun" kipi yok) ve seçim tek bir paragrafın/hücrenin içinde olmalıdır.
   Paletteki renkler sabittir; dosyaya elle yazılmış başka bir renk (`red`,
   `#123456`, `rgb(…)`) korunur ve gösterilir.
-- Kod biçimlendirme yalnızca JSON ve XML (SVG, RSS, plist… dâhil) içindir;
-  yorumlu JSON (JSONC), HTML, YAML ve öteki diller biçimlendirilmez.
+- Kod biçimlendirme JSON, JSONC, XML (SVG, RSS, plist… dâhil), HTML ve
+  YAML içindir; JSON5, CSS, JavaScript ve öteki diller biçimlendirilmez.
+  YAML'da katlanmış (`>`) metnin satırları birleşebilir (anlamı değişmez).
 - `.txt` dosyası düz metin olarak değil Markdown olarak yorumlanır: `#` ile
   başlayan satır başlık, `- ` ile başlayan satır liste olur. Kaydederken
   paragraf başındaki boşluklar (girinti) düşer. `.txt` için "birlikte aç"

@@ -207,12 +207,12 @@ const en = {
 	noCaret: "Click in the document where you want to insert first.",
 	attachNeedsSave: "Save the document first: attached files are stored next to it.",
 	formatNotCode: "Place the caret in a code block first.",
-	formatUnsupported: "Only JSON and XML code blocks can be formatted.",
+	formatUnsupported: "Only JSON, XML, HTML and YAML code blocks can be formatted.",
 	formatInvalid: "This code block is not valid {0}, so it was left unchanged: {1}",
 	formatAllDone: "{0} code block(s) formatted.",
 	formatAllSkipped:
 		"{0} code block(s) formatted; {1} left unchanged because the content is not valid.",
-	formatAllNone: "No JSON or XML code block needed formatting.",
+	formatAllNone: "No JSON, XML, HTML or YAML code block needed formatting.",
 } as const;
 
 export type Strings = { readonly [K in keyof typeof en]: string };
@@ -426,12 +426,12 @@ const tr: Strings = {
 	attachNeedsSave:
 		"Dosya eklemek için önce belgeyi kaydedin; eklenen dosyalar belgenin yanında saklanır.",
 	formatNotCode: "Önce imleci bir kod bloğuna getirin.",
-	formatUnsupported: "Yalnızca JSON ve XML kod blokları biçimlendirilebiliyor.",
+	formatUnsupported: "Yalnızca JSON, XML, HTML ve YAML kod blokları biçimlendirilebiliyor.",
 	formatInvalid: "Bu kod bloğu geçerli {0} değil, olduğu gibi bırakıldı: {1}",
 	formatAllDone: "{0} kod bloğu biçimlendirildi.",
 	formatAllSkipped:
 		"{0} kod bloğu biçimlendirildi; {1} blok, içeriği geçerli olmadığı için olduğu gibi bırakıldı.",
-	formatAllNone: "Biçimlendirilecek JSON ya da XML kod bloğu yok.",
+	formatAllNone: "Biçimlendirilecek JSON, XML, HTML ya da YAML kod bloğu yok.",
 };
 
 export function stringsFor(lang: Lang): Strings {

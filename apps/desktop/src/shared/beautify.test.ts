@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { beautify, detectLanguage, formatJson, formatXml } from "./beautify.js";
+import { beautify, detectLanguage, formatJson, formatXml, formatYaml } from "./beautify.js";
 
 describe("formatJson", () => {
 	it("indents objects and arrays", () => {
@@ -167,5 +167,133 @@ describe("beautify", () => {
 	it("treats a wrong guess and other languages as unsupported", () => {
 		expect(beautify("{ not: json }", null)).toEqual({ ok: false, reason: "unsupported" });
 		expect(beautify("print(1)", "python")).toEqual({ ok: false, reason: "unsupported" });
+	});
+});
+
+describe("formatJson with comments (JSONC)", () => {
+	it("keeps line and block comments where they were", () => {
+		const source = '{ // settings\n"a":1, /* inline */ "b":[1,2],\n// own line\n"c":{}}';
+		expect(formatJson(source, true)).toBe(
+			[
+				"{ // settings",
+				'  "a": 1, /* inline */',
+				'  "b": [',
+				"    1,",
+				"    2",
+				"  ],",
+				"  // own line",
+				'  "c": {}',
+				"}",
+			].join("\n"),
+		);
+	});
+
+	it("keeps trailing commas and ignores comment markers in strings", () => {
+		expect(formatJson('{"url":"http://x//y","a":[1,],}', true)).toBe(
+			'{\n  "url": "http://x//y",\n  "a": [\n    1,\n  ],\n}',
+		);
+	});
+
+	it("rejects comments in plain JSON and invalid JSONC", () => {
+		expect(() => formatJson('{"a":1 // x\n}')).toThrow();
+		expect(() => formatJson('{"a": /* x */ }', true)).toThrow();
+		expect(() => formatJson('{"a":1 /* open', true)).toThrow("Unclosed comment");
+	});
+});
+
+describe("formatXml as HTML", () => {
+	it("knows void elements and keeps text and raw content as written", () => {
+		const source =
+			'<!DOCTYPE html><html><head><meta charset="utf-8"><style>a { b: c }\n</style></head><body><p>Bir  <b>kalın</b> söz<br></p><script>if (a < b) x();</script></body></html>';
+		expect(formatXml(source, true)).toBe(
+			[
+				"<!DOCTYPE html>",
+				"<html>",
+				"  <head>",
+				'    <meta charset="utf-8">',
+				"    <style>a { b: c }\n</style>",
+				"  </head>",
+				"  <body>",
+				"    <p>Bir  <b>kalın</b> söz<br></p>",
+				"    <script>if (a < b) x();</script>",
+				"  </body>",
+				"</html>",
+			].join("\n"),
+		);
+	});
+
+	it("accepts left-out optional closing tags and mixed-case names", () => {
+		expect(formatXml("<UL><li>bir<li>iki</ul>", true)).toBe("<UL>\n  <li>bir\n  <li>iki\n</ul>");
+	});
+
+	it("still reports a missing required closing tag", () => {
+		expect(() => formatXml("<div><span></div>", true)).toThrow("Expected </span> but found </div>");
+	});
+});
+
+describe("formatYaml", () => {
+	it("re-indents without rewriting values or dropping comments", () => {
+		const source = [
+			"# top",
+			"big:    12345678901234567890",
+			"e: 1E5",
+			"octal: 010",
+			"flag: yes",
+			"q: 'single'   # kept",
+			"list:",
+			"      - a",
+			"      - &x {k: v}",
+			"ref: *x",
+			"lit: |",
+			"    line1",
+			"      line2",
+		].join("\n");
+		expect(formatYaml(source)).toBe(
+			[
+				"# top",
+				"big: 12345678901234567890",
+				"e: 1E5",
+				"octal: 010",
+				"flag: yes",
+				"q: 'single' # kept",
+				"list:",
+				"  - a",
+				"  - &x { k: v }",
+				"ref: *x",
+				"lit: |",
+				"  line1",
+				"    line2",
+			].join("\n"),
+		);
+	});
+
+	it("keeps every document of a stream", () => {
+		expect(formatYaml("a:   1\n---\nb:   2\n")).toBe("a: 1\n---\nb: 2");
+	});
+
+	it("reports invalid YAML", () => {
+		expect(() => formatYaml("a: [1, 2\nb: c")).toThrow();
+	});
+});
+
+describe("beautify with the newer languages", () => {
+	it("takes yaml, yml, html, htm and jsonc fences", () => {
+		expect(detectLanguage("x", "yml")).toBe("yaml");
+		expect(detectLanguage("x", "htm")).toBe("html");
+		expect(detectLanguage("x", "jsonc")).toBe("jsonc");
+		expect(detectLanguage("<!doctype html><p>x", null)).toBe("html");
+	});
+
+	it("falls back to JSONC and HTML when a guess does not parse strictly", () => {
+		expect(beautify('{"a":1, // c\n}', null)).toMatchObject({ ok: true, language: "jsonc" });
+		expect(beautify("<ul><li>a<li>b</ul>", null)).toMatchObject({ ok: true, language: "html" });
+	});
+
+	it("reports invalid YAML in a yaml fence", () => {
+		expect(beautify("a: [1", "yaml")).toMatchObject({
+			ok: false,
+			reason: "invalid",
+			language: "yaml",
+		});
 	});
 });

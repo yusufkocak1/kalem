@@ -35,7 +35,7 @@ export function formatCodeBlock(code: Code): FormattedCode {
 export interface FormatAllResult {
 	readonly doc: Root;
 	readonly formatted: number;
-	/** Blocks with a declared JSON/XML language whose content does not parse. */
+	/** Blocks with a declared, supported language whose content does not parse. */
 	readonly invalid: number;
 }
 
