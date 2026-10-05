@@ -510,7 +510,9 @@ test("proposes Markdown when saving and a package only when asked", async () => 
 	await expect.poll(async () => (await lastSaveDialog(app)).defaultPath).toMatch(/not\.kmd$/);
 	expect((await lastSaveDialog(app)).filters?.[0]?.extensions).toEqual(["kmd", "textpack"]);
 	await expect
-		.poll(async () => Object.keys(await zipEntries(join(folder, "not.kmd"))).sort())
+		.poll(async () =>
+			Object.keys(await zipEntries(join(folder, "not.kmd")).catch(() => ({}))).sort(),
+		)
 		.toEqual(["info.json", "text.md"]);
 	await app.close();
 });
