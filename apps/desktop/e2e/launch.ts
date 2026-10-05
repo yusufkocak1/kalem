@@ -45,7 +45,12 @@ export async function launch(options: LaunchOptions = {}): Promise<Launched> {
 	const { ELECTRON_RUN_AS_NODE: _runAsNode, ...env } = process.env;
 	const app = await electron.launch({
 		args: [appDir, ...(options.args ?? [])],
-		env: { ...(env as Record<string, string>), KALEM_USER_DATA_DIR: userData, KALEM_DEV_URL: "" },
+		env: {
+			...(env as Record<string, string>),
+			KALEM_USER_DATA_DIR: userData,
+			KALEM_DEV_URL: "",
+			KALEM_VERSION_INTERVAL: "0",
+		},
 		// Playwright forces a light colour scheme by default, which would hide the app's own theme.
 		colorScheme: null,
 	});

@@ -186,6 +186,18 @@ export class Session {
 		}
 	}
 
+	/** Puts `text` in place of the document as one edit, so undo brings the old text back. */
+	replaceText(text: string): boolean {
+		const editor = this.editor;
+		if (editor.isReadOnly() || this.#source?.isSource() === true) return false;
+		const extracted = extractTableStyles(text);
+		// Every table of the new document is new; their styles go in by position.
+		this.#tables.expectPaste(extracted.styles);
+		const replaced = editor.applyEdit({ doc: parse(extracted.markdown), caret: null });
+		this.#tables.expectPaste(null);
+		return replaced;
+	}
+
 	// --- Loading ------------------------------------------------------------
 
 	load(payload: DocumentPayload): void {

@@ -33,6 +33,7 @@ import type { DocxImage } from "./docx.js";
 import { markdownToDocx } from "./docx.js";
 import type { DraftStore } from "./drafts.js";
 import { copyAttachment, MAX_IMAGE_SIZE, writeDocument, writeImage } from "./files.js";
+import type { VersionStore } from "./history.js";
 import type { PackageStore } from "./package.js";
 import { PACKAGE_ASSETS } from "./package.js";
 import { DOCUMENT_SCHEME } from "./protocol.js";
@@ -47,6 +48,7 @@ export interface IpcContext {
 	readonly store: SettingsStore;
 	readonly drafts: DraftStore;
 	readonly packages: PackageStore;
+	readonly versions: VersionStore;
 	strings(): Strings;
 	language(): Lang;
 	changeSettings(patch: Partial<Settings>): void;
@@ -246,6 +248,7 @@ export function registerIpc(ctx: IpcContext): void {
 				saved = { modified, ...relocated, base: null };
 			}
 			windows.markSaved(win, tab.id, path, saved.modified, saved.base);
+			void ctx.versions.record(path, saved.text).catch(() => {});
 			await ctx.drafts.delete(tab.id).catch(() => {});
 
 			const movedBase =
@@ -492,6 +495,19 @@ export function registerIpc(ctx: IpcContext): void {
 		if (root === null || typeof query !== "string") return { hits: [], truncated: false };
 		const { entries } = await listWorkspace(root, collator());
 		return searchWorkspace(entries, root, query, ctx.language());
+	});
+
+	// --- Version history ----------------------------------------------------
+
+	ipcMain.handle(CHANNEL.listVersions, (event, tabId: unknown) => {
+		const path = tabOf(senderOf(event), tabId).path;
+		return path === null ? [] : ctx.versions.list(path);
+	});
+
+	ipcMain.handle(CHANNEL.readVersion, (event, tabId: unknown, id: unknown) => {
+		const path = tabOf(senderOf(event), tabId).path;
+		if (path === null || typeof id !== "string") throw new Error("Invalid version request");
+		return ctx.versions.read(path, id);
 	});
 
 	// --- App ----------------------------------------------------------------

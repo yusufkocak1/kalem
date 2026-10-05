@@ -53,6 +53,7 @@ import {
 import { Session } from "./session.js";
 import { enableColumnResize } from "./table-styles.js";
 import { createTabStrip } from "./tabs.js";
+import { createVersionHistory } from "./version-history.js";
 
 import "@kalem-editor/themes/tokens.css";
 import "@kalem-editor/themes/viewer.css";
@@ -103,6 +104,7 @@ const filesPane = createFilesPane({
 	activePath: () => session?.path ?? null,
 	open: (path, query) => void openFromFolder(path, query),
 });
+const versionHistory = createVersionHistory({ t, lang: startup.language });
 const quickOpen = createQuickOpen({
 	t,
 	lang: startup.language,
@@ -676,6 +678,19 @@ const commands: Record<Command, () => void> = {
 	"format-code": formatCode,
 	"format-all-code": formatAllCode,
 	"quick-open": () => void quickOpen.show(),
+	"version-history": () => {
+		const tab = session;
+		void versionHistory.show({
+			saved: tab.path !== null,
+			list: () => bridge.listVersions(tab.id),
+			read: (id) => bridge.readVersion(tab.id, id),
+			restore: (text, label) => {
+				if (!tab.replaceText(text)) return false;
+				tab.notices.show({ id: "version", text: format(t.versionRestored, label) });
+				return true;
+			},
+		});
+	},
 	"search-folder": () => {
 		if (!settings.navigation || settings.sidePane !== "files") {
 			updateSettings({ navigation: true, sidePane: "files" });

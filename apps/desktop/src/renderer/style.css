@@ -1225,3 +1225,127 @@ button {
 		padding-inline-start: 0;
 	}
 }
+
+/* --- Version history ------------------------------------------------------- */
+
+.versions {
+	display: none;
+	flex-direction: column;
+	gap: 10px;
+	box-sizing: border-box;
+	width: min(920px, calc(100vw - 48px));
+	height: min(640px, calc(100vh - 64px));
+	padding: 16px;
+	border: 1px solid var(--app-border);
+	border-radius: 10px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: var(--app-shadow);
+}
+
+.versions[open] {
+	display: flex;
+}
+
+.versions::backdrop {
+	background: rgb(0 0 0 / 18%);
+}
+
+.versions-title {
+	margin: 0;
+	font-size: 15px;
+}
+
+.versions-message {
+	margin: 0;
+	color: var(--app-muted);
+}
+
+.versions-message[hidden] {
+	display: none;
+}
+
+.versions-body {
+	display: flex;
+	flex: 1;
+	gap: 12px;
+	min-height: 0;
+}
+
+.versions-list {
+	flex: none;
+	width: 210px;
+	margin: 0;
+	padding: 0;
+	overflow-y: auto;
+	list-style: none;
+}
+
+.versions-item {
+	padding: 7px 10px;
+	border-radius: 6px;
+	cursor: default;
+	font-variant-numeric: tabular-nums;
+}
+
+.versions-item:hover {
+	background: var(--app-hover);
+}
+
+.versions-item[aria-selected="true"] {
+	background: var(--app-pressed);
+	color: var(--app-accent);
+	font-weight: 600;
+}
+
+.versions-item:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -2px;
+}
+
+.versions-preview {
+	flex: 1;
+	min-width: 0;
+	padding: 8px 20px;
+	overflow: auto;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-page);
+}
+
+.versions-preview:empty {
+	display: none;
+}
+
+.versions-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.dialog-button {
+	padding: 6px 14px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+}
+
+.dialog-button:hover:not(:disabled) {
+	background: var(--app-hover);
+}
+
+.dialog-button.primary {
+	border-color: var(--app-accent);
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+}
+
+.dialog-button.primary:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--app-accent) 88%, black);
+}
+
+.dialog-button:disabled {
+	opacity: 0.5;
+}

@@ -113,6 +113,14 @@ verir.
   UTF-16, CRLF/LF. UTF-8 olmayan eski dosyalar (Windows-1254/1252) bozuk
   karaktere dönüşmeden okunur ve kaydederken UTF-8'e çevrilir.
 - Kaydetme atomiktir: yazma yarıda kesilirse eski belge yerinde kalır.
+- **Sürüm geçmişi** (**Dosya → Sürüm Geçmişi…**): her kayıtta belgenin bir
+  kopyası `%APPDATA%\kalem-desktop\history\` altında saklanır. 10 dakika
+  içindeki kayıtlar tek sürümde birleşir (otomatik kaydetme geçmişi
+  doldurmasın diye); belge başına en yeni 50 sürüm tutulur. Listeden seçilen
+  sürüm önizlenir; **Bu Sürümü Geri Yükle** metni editöre tek bir düzenleme
+  olarak koyar, Ctrl+Z önceki metne döndürür. Geçmiş belgenin yoluna
+  bağlıdır: taşınan ya da yeniden adlandırılan belge yeni bir geçmişle
+  başlar.
 - Kaydedilmemiş değişiklikler kurtarma taslağına yazılır; uygulama
   çökerse sonraki açılışta belge geri gelir.
 - Dosya başka bir programda değişirse pencereye dönünce fark edilir.

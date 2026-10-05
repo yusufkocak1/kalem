@@ -7,6 +7,7 @@ import type { Lang, Strings } from "../shared/i18n.js";
 import { format, pickLanguage, stringsFor } from "../shared/i18n.js";
 import { isEditablePath, isPackagePath, isWordPath } from "../shared/paths.js";
 import { DraftStore } from "./drafts.js";
+import { VersionStore } from "./history.js";
 import { registerIpc } from "./ipc.js";
 import type { MenuContext } from "./menu.js";
 import { installMenu, popupContextMenu, popupFileMenu, welcomeDocument } from "./menu.js";
@@ -42,6 +43,14 @@ function start(): void {
 	const store = new SettingsStore(join(app.getPath("userData"), "settings.json"));
 	const drafts = new DraftStore(join(app.getPath("userData"), "drafts"));
 	const packages = new PackageStore(join(app.getPath("userData"), "packages"));
+	// End-to-end tests keep every save as its own version.
+	const versionInterval = Number(process.env.KALEM_VERSION_INTERVAL);
+	const versions = new VersionStore(
+		join(app.getPath("userData"), "history"),
+		Number.isFinite(versionInterval) && process.env.KALEM_VERSION_INTERVAL !== ""
+			? versionInterval
+			: undefined,
+	);
 
 	// Resolved once at startup; a language change applies after a restart.
 	let language: Lang = "en";
@@ -301,6 +310,7 @@ function start(): void {
 			store,
 			drafts,
 			packages,
+			versions,
 			strings: () => t,
 			language: () => language,
 			changeSettings,

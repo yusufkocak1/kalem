@@ -64,6 +64,8 @@ const bridge: KalemBridge = {
 	closeFolder: () => ipcRenderer.send(CHANNEL.closeFolder),
 	searchWorkspace: (query) => ipcRenderer.invoke(CHANNEL.searchWorkspace, query),
 	onWorkspaceChange: (handler) => listen<[]>(CHANNEL.workspaceChange, handler),
+	listVersions: (tabId) => ipcRenderer.invoke(CHANNEL.listVersions, tabId),
+	readVersion: (tabId, id) => ipcRenderer.invoke(CHANNEL.readVersion, tabId, id),
 };
 
 contextBridge.exposeInMainWorld("kalem", bridge);

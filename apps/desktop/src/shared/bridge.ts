@@ -162,6 +162,15 @@ export interface SearchHit {
 	readonly text: string;
 }
 
+export interface Version {
+	/** Opaque; pass back to `readVersion`. */
+	readonly id: string;
+	/** When it was saved, in ms. */
+	readonly time: number;
+	/** In bytes. */
+	readonly size: number;
+}
+
 export interface SearchResult {
 	readonly hits: readonly SearchHit[];
 	readonly truncated: boolean;
@@ -249,6 +258,7 @@ export const COMMANDS = [
 	"export-docx",
 	"quick-open",
 	"search-folder",
+	"version-history",
 	"format-code",
 	"format-all-code",
 ] as const;
@@ -310,6 +320,10 @@ export interface KalemBridge {
 	openFolder(): Promise<void>;
 	closeFolder(): void;
 	searchWorkspace(query: string): Promise<SearchResult>;
+
+	/** Earlier saved states of the tab's document, newest first. */
+	listVersions(tabId: string): Promise<readonly Version[]>;
+	readVersion(tabId: string, id: string): Promise<string>;
 	/** The open folder changed, in this window or another. */
 	onWorkspaceChange(handler: () => void): () => void;
 }
@@ -352,4 +366,6 @@ export const CHANNEL = {
 	closeFolder: "kalem:close-folder",
 	searchWorkspace: "kalem:search-workspace",
 	workspaceChange: "kalem:workspace-change",
+	listVersions: "kalem:list-versions",
+	readVersion: "kalem:read-version",
 } as const;

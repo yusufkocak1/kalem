@@ -1077,6 +1077,43 @@ test("browses, searches and quick-opens the documents of a folder", async () => 
 	await app.close();
 });
 
+test("keeps saved versions and restores one as an undoable edit", async () => {
+	const path = join(await tempDir("versions"), "taslak.md");
+	await writeFile(path, "Birinci.\n");
+	const { app, page, errors } = await launch({ args: [path] });
+	const paragraph = page.locator("#editor p").first();
+
+	await paragraph.click();
+	await page.keyboard.press("End");
+	await page.keyboard.type(" ek");
+	await save(page);
+	await expect(status(page)).toHaveText("Saved");
+	await page.keyboard.press("End");
+	await page.keyboard.type(" daha");
+	await save(page);
+	await expect(status(page)).toHaveText("Saved");
+
+	await clickMenu(app, "File", "Version History…");
+	const items = page.locator(".versions-item");
+	await expect(items).toHaveCount(2);
+	await expect(page.locator(".versions-preview")).toContainText("Birinci. ek daha");
+	await items.nth(1).click();
+	await expect(page.locator(".versions-preview")).toHaveText("Birinci. ek");
+	await page.screenshot({ path: "test-results/versions.png" });
+	await page.locator(".versions-actions .primary").click();
+	await expect(page.locator(".versions")).toBeHidden();
+
+	await expect(paragraph).toHaveText("Birinci. ek");
+	await expect(status(page)).toHaveText("Unsaved");
+	await paragraph.click();
+	await page.keyboard.press("Control+z");
+	await expect(paragraph).toHaveText("Birinci. ek daha");
+	await expect(status(page)).toHaveText("Saved");
+
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
 test("keeps several documents open in tabs", async () => {
 	const folder = await tempDir("tabs");
 	const first = join(folder, "birinci.md");

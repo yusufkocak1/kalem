@@ -94,7 +94,7 @@ Belge iş akışı
 - [x] D-06 · Klasör kenar çubuğu (çalışma alanı)
 - [x] D-07 · Klasörde arama (`Ctrl+Shift+E`; `Ctrl+Shift+F` odak modunun)
 - [x] D-08 · Hızlı açma (`Ctrl+Shift+P`; `Ctrl+P` yazdırmanın)
-- [ ] D-09 · Sürüm geçmişi (kayıt anlık görüntüleri)
+- [x] D-09 · Sürüm geçmişi (kayıt anlık görüntüleri)
 - [ ] D-10 · Sekmeyi yeni pencereye taşıma
 
 Dışa / içe aktarma
