@@ -10,7 +10,13 @@ import { DraftStore } from "./drafts.js";
 import { VersionStore } from "./history.js";
 import { registerIpc } from "./ipc.js";
 import type { MenuContext } from "./menu.js";
-import { installMenu, popupContextMenu, popupFileMenu, welcomeDocument } from "./menu.js";
+import {
+	installMenu,
+	popupContextMenu,
+	popupFileMenu,
+	popupTabMenu,
+	welcomeDocument,
+} from "./menu.js";
 import { PackageStore } from "./package.js";
 import { handleDocumentScheme, registerDocumentScheme } from "./protocol.js";
 import { SettingsStore } from "./settings.js";
@@ -315,6 +321,7 @@ function start(): void {
 			language: () => language,
 			changeSettings,
 			showFileMenu: (win, x, y) => popupFileMenu(menuContext(), win, x, y),
+			showTabMenu: (win, tabId, x, y) => popupTabMenu(menuContext(), win, tabId, x, y),
 			openFolder,
 			closeFolder: () => setWorkspace(null),
 		});

@@ -1114,6 +1114,40 @@ test("keeps saved versions and restores one as an undoable edit", async () => {
 	await app.close();
 });
 
+test("moves a tab with its unsaved edits into a new window", async () => {
+	const folder = await tempDir("move-tab");
+	const first = join(folder, "birinci.md");
+	const second = join(folder, "ikinci.md");
+	await writeFile(first, "Birinci.\n");
+	await writeFile(second, "İkinci.\n");
+	const { app, page, errors } = await launch({ args: [first, second] });
+
+	await page.locator("#editor p").first().click();
+	await page.keyboard.press("End");
+	await page.keyboard.type(" taşındı");
+	await expect(status(page)).toHaveText("Unsaved");
+
+	const opened = app.waitForEvent("window");
+	await clickMenu(app, "View", "Move Tab to New Window");
+	const moved = await opened;
+	await moved.locator("#editor [contenteditable]").first().waitFor();
+
+	await expect(page.locator(".doc-tab")).toHaveCount(1);
+	await expect(page.locator(".doc-tab")).toContainText("birinci");
+	await expect(moved.locator(".doc-tab")).toHaveCount(1);
+	await expect(moved.locator("#editor p").first()).toHaveText("İkinci. taşındı");
+	await expect(status(moved)).toHaveText("Unsaved");
+
+	// The new window may save to the document's path.
+	await moved.locator("#editor p").first().click();
+	await save(moved);
+	await expect(status(moved)).toHaveText("Saved");
+	expect(await readFile(second, "utf8")).toBe("İkinci. taşındı\n");
+
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
 test("keeps several documents open in tabs", async () => {
 	const folder = await tempDir("tabs");
 	const first = join(folder, "birinci.md");

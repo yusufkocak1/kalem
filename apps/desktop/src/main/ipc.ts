@@ -53,6 +53,7 @@ export interface IpcContext {
 	language(): Lang;
 	changeSettings(patch: Partial<Settings>): void;
 	showFileMenu(win: AppWindow, x: number, y: number): void;
+	showTabMenu(win: AppWindow, tabId: string, x: number, y: number): void;
 	/** Lets the user pick a folder and opens it in every window. */
 	openFolder(win: AppWindow): Promise<void>;
 	closeFolder(): void;
@@ -528,6 +529,25 @@ export function registerIpc(ctx: IpcContext): void {
 
 	on(CHANNEL.openLink, (win, href) => {
 		if (typeof href === "string") void windows.openLink(win, href);
+	});
+
+	on(CHANNEL.showTabMenu, (win, tabId, x, y) => {
+		if (typeof tabId !== "string" || !win.tabs.has(tabId)) return;
+		if (typeof x === "number" && typeof y === "number") ctx.showTabMenu(win, tabId, x, y);
+	});
+
+	on(CHANNEL.moveTabToWindow, (win, tabId, raw, at) => {
+		const moved = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+		if (typeof tabId !== "string" || typeof moved.text !== "string") return;
+		const point = (typeof at === "object" && at !== null ? at : {}) as Record<string, unknown>;
+		windows.moveTab(
+			win,
+			tabId,
+			{ text: moved.text, format: toTextFormat(moved.format), dirty: moved.dirty === true },
+			typeof point.x === "number" && typeof point.y === "number"
+				? { x: point.x, y: point.y }
+				: null,
+		);
 	});
 
 	on(CHANNEL.showFileMenu, (win, x, y) => {

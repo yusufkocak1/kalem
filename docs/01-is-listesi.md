@@ -95,7 +95,7 @@ Belge iş akışı
 - [x] D-07 · Klasörde arama (`Ctrl+Shift+E`; `Ctrl+Shift+F` odak modunun)
 - [x] D-08 · Hızlı açma (`Ctrl+Shift+P`; `Ctrl+P` yazdırmanın)
 - [x] D-09 · Sürüm geçmişi (kayıt anlık görüntüleri)
-- [ ] D-10 · Sekmeyi yeni pencereye taşıma
+- [x] D-10 · Sekmeyi yeni pencereye taşıma
 
 Dışa / içe aktarma
 - [ ] D-11 · Word'e dışa aktarma (`.docx`)

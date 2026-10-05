@@ -356,6 +356,7 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 				},
 				{ type: "separator" },
 				{ label: t.nextTab, accelerator: "Ctrl+Tab", click: send(ctx, "next-tab") },
+				{ label: t.moveTabToWindow, click: send(ctx, "move-tab") },
 				{ label: t.previousTab, accelerator: "Ctrl+Shift+Tab", click: send(ctx, "previous-tab") },
 				{ type: "separator" },
 				{ label: t.fullScreen, role: "togglefullscreen" },
@@ -384,6 +385,23 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 
 export function installMenu(ctx: MenuContext): void {
 	Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate(ctx)));
+}
+
+export function popupTabMenu(
+	ctx: MenuContext,
+	win: AppWindow,
+	tabId: string,
+	x: number,
+	y: number,
+): void {
+	const { t } = ctx;
+	const action = (name: "move" | "close") => () =>
+		win.window.webContents.send(CHANNEL.tabMenu, tabId, name);
+	Menu.buildFromTemplate([
+		{ label: t.moveTabToWindow, enabled: win.tabs.size > 1, click: action("move") },
+		{ type: "separator" },
+		{ label: t.closeTab, click: action("close") },
+	]).popup({ window: win.window, x: Math.round(x), y: Math.round(y) });
 }
 
 export function popupFileMenu(ctx: MenuContext, win: AppWindow, x: number, y: number): void {

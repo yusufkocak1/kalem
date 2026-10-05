@@ -8,6 +8,9 @@ export interface TabStripOptions {
 	onSelect(id: string): void;
 	onClose(id: string): void;
 	onNew(): void;
+	onContextMenu(id: string, x: number, y: number): void;
+	/** The tab was dragged and dropped outside the window, at this screen point. */
+	onDragOut(id: string, screenX: number, screenY: number): void;
 }
 
 export interface TabInfo {
@@ -78,8 +81,32 @@ export function createTabStrip(options: TabStripOptions): TabStrip {
 
 			const tab = el("div", {
 				class: "doc-tab",
-				attrs: { role: "tab", "data-document": id, "aria-selected": "false", tabindex: "-1" },
+				attrs: {
+					role: "tab",
+					"data-document": id,
+					"aria-selected": "false",
+					tabindex: "-1",
+					draggable: "true",
+				},
 				children: [title, close],
+			});
+			tab.addEventListener("contextmenu", (event) => {
+				event.preventDefault();
+				options.onContextMenu(id, event.clientX, event.clientY);
+			});
+			tab.addEventListener("dragstart", (event) => {
+				event.dataTransfer?.setData("application/x-kalem-tab", id);
+				if (event.dataTransfer !== null) event.dataTransfer.effectAllowed = "move";
+			});
+			tab.addEventListener("dragend", (event) => {
+				const outside =
+					event.screenX < window.screenX ||
+					event.screenX > window.screenX + window.outerWidth ||
+					event.screenY < window.screenY ||
+					event.screenY > window.screenY + window.outerHeight;
+				if (outside && event.dataTransfer?.dropEffect === "none") {
+					options.onDragOut(id, event.screenX, event.screenY);
+				}
 			});
 			tab.addEventListener("click", () => options.onSelect(id));
 			tab.addEventListener("keydown", (event) => {

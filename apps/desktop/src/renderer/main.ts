@@ -176,6 +176,8 @@ const tabStrip = createTabStrip({
 	onSelect: (id) => activateTab(id),
 	onClose: (id) => void closeTab(id),
 	onNew: () => bridge.newTab(),
+	onContextMenu: (id, x, y) => bridge.showTabMenu(id, x, y),
+	onDragOut: (id, x, y) => moveTab(id, { x, y }),
 });
 
 const app = document.getElementById("app") ?? document.body.appendChild(el("div"));
@@ -359,7 +361,28 @@ async function closeTab(id: string): Promise<void> {
 		if (choice === "save" && !(await tab.session.save())) return;
 	}
 	if (!tabs.has(id)) return;
+	discardTab(id);
+	// The main process closes the window when its last tab is gone.
+	bridge.tabClosed(id);
+}
 
+/** Hands the tab, unsaved edits included, to a new window. */
+function moveTab(id: string, at?: { x: number; y: number }): void {
+	const tab = tabs.get(id);
+	if (tab === undefined || tabs.size < 2) return;
+	const moved = {
+		text: tab.session.styledMarkdown(),
+		format: tab.session.format,
+		dirty: tab.session.dirty,
+	};
+	if (at === undefined) bridge.moveTabToWindow(id, moved);
+	else bridge.moveTabToWindow(id, moved, at);
+}
+
+/** Removes the tab from this window without asking anything. */
+function discardTab(id: string): void {
+	const tab = tabs.get(id);
+	if (tab === undefined) return;
 	if (tab.session === session) {
 		const order = tabStrip.order();
 		const index = order.indexOf(id);
@@ -370,8 +393,6 @@ async function closeTab(id: string): Promise<void> {
 	tabStrip.remove(id);
 	tab.session.dispose();
 	for (const view of tab.views) view.remove();
-	// The main process closes the window when its last tab is gone.
-	bridge.tabClosed(id);
 }
 
 function cycleTab(step: 1 | -1): void {
@@ -678,6 +699,7 @@ const commands: Record<Command, () => void> = {
 	"format-code": formatCode,
 	"format-all-code": formatAllCode,
 	"quick-open": () => void quickOpen.show(),
+	"move-tab": () => moveTab(session.id),
 	"version-history": () => {
 		const tab = session;
 		void versionHistory.show({
@@ -1349,6 +1371,11 @@ bridge.onSaveRequest((tabId) => {
 	void saving.then((saved) => bridge.answerSave(tabId, saved));
 });
 bridge.onWorkspaceChange(() => void filesPane.refresh());
+bridge.onTabMoved((id) => discardTab(id));
+bridge.onTabMenu((id, action) => {
+	if (action === "move") moveTab(id);
+	else void closeTab(id);
+});
 // Files may have been added or renamed elsewhere.
 window.addEventListener("focus", () => {
 	if (settings.navigation && settings.sidePane === "files") void filesPane.refresh();

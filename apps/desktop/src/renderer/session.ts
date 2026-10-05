@@ -142,6 +142,10 @@ export class Session {
 		return this.#name;
 	}
 
+	get format(): TextFormat {
+		return this.#format;
+	}
+
 	get formatLabel(): string {
 		return formatLabel(this.#format);
 	}
@@ -260,6 +264,16 @@ export class Session {
 				this.#format = draft.format;
 				clean = false;
 				notices.show({ id: "recovered", kind: "warning", text: t.recovered });
+				break;
+			}
+			case "moved": {
+				const { draft } = payload;
+				text = draft.text;
+				this.#path = draft.path;
+				this.#base = draft.base ?? draft.path;
+				this.#name = draft.name === "" ? t.untitled : draft.name;
+				this.#format = draft.format;
+				clean = !payload.dirty;
 				break;
 			}
 			case "welcome":

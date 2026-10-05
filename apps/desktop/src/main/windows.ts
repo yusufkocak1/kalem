@@ -6,6 +6,7 @@ import { app, BrowserWindow, dialog, nativeTheme, screen, shell } from "electron
 import type {
 	CloseChoice,
 	DocumentPayload,
+	MovedTab,
 	OpenedFile,
 	Settings,
 	TabDocument,
@@ -302,6 +303,56 @@ export class WindowManager {
 		}
 	}
 
+	/**
+	 * Opens the tab in a new window and drops it from this one. The path and
+	 * package folder come from this window's record, not from the renderer;
+	 * the package folder is handed over, not released.
+	 */
+	moveTab(
+		win: AppWindow,
+		tabId: string,
+		moved: MovedTab,
+		at: { x: number; y: number } | null,
+	): void {
+		const tab = win.tabs.get(tabId);
+		if (tab === undefined || win.tabs.size < 2) return;
+		const id = randomUUID();
+		const next = this.open([
+			{
+				tabId: id,
+				payload: {
+					kind: "moved",
+					dirty: moved.dirty,
+					draft: {
+						id,
+						path: tab.path,
+						name: tab.name,
+						text: moved.text,
+						format: moved.format,
+						time: tab.modified ?? 0,
+						...(tab.base === null ? {} : { base: tab.base }),
+					},
+				},
+			},
+		]);
+		if (at !== null) next.window.setPosition(Math.round(at.x - 80), Math.round(at.y - 20));
+
+		win.tabs.delete(tabId);
+		const drafts = this.#options.drafts;
+		// Unsaved text must survive a crash before the new window writes its own draft.
+		const handover = moved.dirty
+			? drafts.write(
+					id,
+					{ name: tab.name, text: moved.text, format: moved.format, path: tab.path },
+					Date.now(),
+				)
+			: Promise.resolve();
+		void handover.then(() => drafts.delete(tabId)).catch(() => {});
+		if (win.activeTabId === tabId) win.activeTabId = [...win.tabs.keys()].at(-1) ?? null;
+		this.#updateTitle(win);
+		win.window.webContents.send(CHANNEL.tabMoved, tabId);
+	}
+
 	/** The renderer closed a tab; closing the last one closes the window. */
 	tabClosed(win: AppWindow, tabId: string): void {
 		const tab = win.tabs.get(tabId);
@@ -436,6 +487,14 @@ export class WindowManager {
 				tab.base = payload.draft.base ?? null;
 				tab.name = payload.draft.name === "" ? t.untitled : payload.draft.name;
 				tab.dirty = true;
+				if (payload.draft.path !== null) win.writable.add(pathKey(payload.draft.path));
+				break;
+			case "moved":
+				tab.path = payload.draft.path;
+				tab.base = payload.draft.base ?? null;
+				tab.name = payload.draft.name === "" ? t.untitled : payload.draft.name;
+				tab.dirty = payload.dirty;
+				tab.modified = payload.draft.time === 0 ? null : payload.draft.time;
 				if (payload.draft.path !== null) win.writable.add(pathKey(payload.draft.path));
 				break;
 			case "welcome":

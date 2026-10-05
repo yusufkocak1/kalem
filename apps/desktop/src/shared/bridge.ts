@@ -116,6 +116,8 @@ export type DocumentPayload =
 	| { readonly kind: "file"; readonly file: OpenedFile }
 	| { readonly kind: "word"; readonly word: WordContent }
 	| { readonly kind: "draft"; readonly draft: Draft }
+	/** A tab moved over from another window, with its unsaved edits. */
+	| { readonly kind: "moved"; readonly draft: Draft; readonly dirty: boolean }
 	| { readonly kind: "welcome" };
 
 /** A document and the tab it belongs to. An existing tab id means "load into that tab". */
@@ -133,6 +135,13 @@ export interface Startup {
 	readonly documents: readonly TabDocument[];
 	/** URL scheme that serves document-relative images. */
 	readonly documentScheme: string;
+}
+
+/** What the renderer knows of a tab that is moving to another window. */
+export interface MovedTab {
+	readonly text: string;
+	readonly format: TextFormat;
+	readonly dirty: boolean;
 }
 
 export interface WorkspaceEntry {
@@ -259,6 +268,7 @@ export const COMMANDS = [
 	"quick-open",
 	"search-folder",
 	"version-history",
+	"move-tab",
 	"format-code",
 	"format-all-code",
 ] as const;
@@ -305,6 +315,13 @@ export interface KalemBridge {
 	clipboard(action: "cut" | "copy" | "paste"): void;
 	openLink(href: string): void;
 	showFileMenu(x: number, y: number): void;
+	showTabMenu(tabId: string, x: number, y: number): void;
+	/** Moves a tab into a new window, placed at the screen point when given. */
+	moveTabToWindow(tabId: string, tab: MovedTab, at?: { x: number; y: number }): void;
+	/** The tab now lives in another window; drop it without asking. */
+	onTabMoved(handler: (tabId: string) => void): () => void;
+	/** The tab menu asked for something to be done with a tab. */
+	onTabMenu(handler: (tabId: string, action: "move" | "close") => void): () => void;
 	pathForFile(file: File): string;
 
 	onCommand(handler: (command: Command) => void): () => void;
@@ -355,6 +372,10 @@ export const CHANNEL = {
 	clipboard: "kalem:clipboard",
 	openLink: "kalem:open-link",
 	showFileMenu: "kalem:show-file-menu",
+	showTabMenu: "kalem:show-tab-menu",
+	moveTabToWindow: "kalem:move-tab-to-window",
+	tabMoved: "kalem:tab-moved",
+	tabMenu: "kalem:tab-menu",
 	command: "kalem:command",
 	document: "kalem:document",
 	activateTab: "kalem:activate-tab",

@@ -109,6 +109,10 @@ verir.
   arasında gezer. Her sekmenin kendi geri alma geçmişi, kayıt durumu ve
   kurtarma taslağı vardır. Zaten açık olan belge yeniden açılmaz, sekmesi
   öne gelir. Son sekme kapanınca pencere kapanır.
+- **Sekmeyi yeni pencereye taşıma**: sekmeye sağ tıklayıp **Sekmeyi Yeni
+  Pencereye Taşı**, **Görünüm** menüsündeki aynı komut ya da sekmeyi
+  pencerenin dışına sürükleyip bırakmak. Kaydedilmemiş değişiklikler de
+  taşınır; geri alma geçmişi taşınmaz.
 - Dosyanın kodlaması ve satır sonu korunur: UTF-8 (BOM'lu/BOM'suz),
   UTF-16, CRLF/LF. UTF-8 olmayan eski dosyalar (Windows-1254/1252) bozuk
   karaktere dönüşmeden okunur ve kaydederken UTF-8'e çevrilir.
