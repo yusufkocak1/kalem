@@ -120,6 +120,18 @@ describe("setBlockType", () => {
 		expect(md(setBlockType(belge(), [0], { type: "blockquote" }))).toContain("> bir");
 	});
 
+	it.each([
+		["table", "| a | b |\n|---|---|\n| c | d |\n"],
+		["list", "- a\n- b\n"],
+		["blockquote", "> a\n"],
+		["definition", "[a]: https://example.com\n"],
+	])("leaves a %s untouched instead of dropping its content", (_, source) => {
+		const doc = parse(source);
+		expect(setBlockType(doc, [0], { type: "code" })).toBe(doc);
+		expect(setBlockType(doc, [0], { type: "paragraph" })).toBe(doc);
+		expect(setBlockType(doc, [0], { type: "heading", depth: 2 })).toBe(doc);
+	});
+
 	it("olmayan yolda anlaşılır hata", () => {
 		expect(() => setBlockType(belge(), [9], { type: "paragraph" })).toThrow(/no node at path/);
 	});

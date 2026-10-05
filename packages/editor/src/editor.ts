@@ -465,8 +465,14 @@ export class Editor {
 	setBlockType(target: BlockType): boolean {
 		const caret = this.#caret();
 		if (caret === null || this.#readOnly) return false;
+		// A table cell holds a single line, so the selection becomes inline code instead.
+		if (this.#doc.children[caret.blockIndex]?.type === "table") {
+			return target.type === "code" && this.toggleMark("inlineCode");
+		}
+		const doc = setBlockType(this.#doc, [caret.blockIndex], target);
+		if (doc === this.#doc) return false;
 		this.#applyEdit({
-			doc: setBlockType(this.#doc, [caret.blockIndex], target),
+			doc,
 			caret: { blockIndex: caret.blockIndex, path: [], offset: caret.offset },
 		});
 		return true;
@@ -1277,10 +1283,7 @@ export class Editor {
 				derinlik === 0
 					? { type: "paragraph" }
 					: { type: "heading", depth: derinlik as 1 | 2 | 3 | 4 | 5 | 6 };
-			this.#applyEdit({
-				doc: setBlockType(this.#doc, [caret.blockIndex], hedef),
-				caret: { ...caret, path: [] },
-			});
+			this.setBlockType(hedef);
 			return;
 		}
 

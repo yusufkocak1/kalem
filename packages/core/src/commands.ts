@@ -94,9 +94,13 @@ function plainText(nodes: readonly Inline[], lineBreak = ""): string {
 export function setBlockType<T extends Node>(tree: T, path: Path, target: BlockType): T {
 	const node = nodeAtPath(tree, path);
 	if (node === undefined) throw new Error(`setBlockType: no node at path [${path.join(", ")}]`);
+	if (target.type !== "blockquote" && CONTAINERS.has(node.type)) return tree;
 
 	return replaceAt(tree, path, convertBlock(node as Block, target));
 }
+
+/** Blocks whose content cannot be flattened into text without losing it; converting them is a no-op. */
+const CONTAINERS: ReadonlySet<string> = new Set(["table", "list", "blockquote", "definition"]);
 
 function convertBlock(node: Block, target: BlockType): Block {
 	const inline = inlineContentOf(node);

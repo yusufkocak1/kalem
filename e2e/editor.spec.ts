@@ -24,6 +24,7 @@ declare global {
 				setColor(color: string | null): boolean;
 				getColor(): string | null;
 				toggleMark(mark: string): boolean;
+				setBlockType(target: { type: string }): boolean;
 				isMarkActive(mark: string): boolean;
 				setLink(url: string): boolean;
 				setReadOnly(readOnly: boolean): void;
@@ -180,6 +181,30 @@ test.describe("yazma", () => {
 		await expect(page.locator("#cikti")).toContainText("| Alican |  30 |");
 		const value = await page.evaluate(() => window.kalem.editor.getValue());
 		expect(value).toBe("| Ad    | Yaş |\n|:------|----:|\n| Alican |  30 |\n| Ayşe  |  25 |\n");
+	});
+
+	test("code block in a table cell turns the selection into inline code", async ({ page }) => {
+		await page.evaluate(() =>
+			window.kalem.editor.setValue("| Ad | Yaş |\n|----|-----|\n| Ali | 30 |\n"),
+		);
+		const hucre = page.locator("#editor table tr").nth(1).locator("td").first();
+		await hucre.click();
+		await page.keyboard.press("End");
+		for (let i = 0; i < 3; i++) await page.keyboard.press("Shift+ArrowLeft");
+
+		expect(await page.evaluate(() => window.kalem.editor.setBlockType({ type: "code" }))).toBe(
+			true,
+		);
+		const value = await page.evaluate(() => window.kalem.editor.getValue());
+		expect(value).toContain("| `Ali` | 30 |");
+		expect(await page.evaluate(() => window.kalem.editor.getDocument().children[0]?.type)).toBe(
+			"table",
+		);
+
+		expect(await page.evaluate(() => window.kalem.editor.setBlockType({ type: "paragraph" }))).toBe(
+			false,
+		);
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe(value);
 	});
 });
 
