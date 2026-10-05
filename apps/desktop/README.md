@@ -21,6 +21,15 @@ pnpm --filter kalem-desktop dev     # geliştirme kipi
 
 Birim testleri depo kökünden: `pnpm test`.
 
+## İndirme
+
+Hazır Windows sürümleri [GitHub Releases](https://github.com/yusufkocak1/kalem/releases)
+sayfasında: kurulum paketi (`Kalem Setup <sürüm>.exe`) ve taşınabilir exe
+(`Kalem <sürüm>.exe`). Exe'ler depoda tutulmuyor.
+
+Yeni sürüm: `package.json`'daki `version` artırılır, `package` çalıştırılır,
+`desktop-v<sürüm>` etiketiyle bir release açılıp iki exe ona eklenir.
+
 ## `.md` dosyalarının varsayılan uygulaması yapmak
 
 Bunu **kurulum paketi** (`release/Kalem Setup <sürüm>.exe`) yapar; taşınabilir

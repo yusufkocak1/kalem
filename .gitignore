@@ -44,8 +44,5 @@ Thumbs.db
 # Duyuru kaydının ara kareleri (scripts/duyuru/kaydet.mjs)
 docs/duyuru/.kareler/
 
-# electron-builder output (apps/desktop); only the portable build is tracked
-apps/desktop/release/*
-!apps/desktop/release/*.exe
-# the installer is over GitHub's 100 MB file limit; it ships as a release asset
-apps/desktop/release/*Setup*.exe
+# electron-builder output (apps/desktop); the exes ship as GitHub release assets
+apps/desktop/release/
