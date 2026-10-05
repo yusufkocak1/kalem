@@ -33,3 +33,11 @@ describe("buildHtmlDocument", () => {
 		expect(build("![şema](rapor.assets/sema.png)\n")).toContain('src="rapor.assets/sema.png"');
 	});
 });
+
+describe("buildHtmlDocument with table styles", () => {
+	it("turns table comments into inline styles", () => {
+		const html = build("<!-- kalem:table color=teal -->\n\n| a |\n| --- |\n| 1 |\n");
+		expect(html).toContain('<th style="background:#0f7f78;color:#fff;border-color:#0f7f78">a</th>');
+		expect(html).not.toContain("kalem:table");
+	});
+});

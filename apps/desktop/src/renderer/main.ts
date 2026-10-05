@@ -521,7 +521,7 @@ function formatAllCode(): void {
 
 async function exportHtml(): Promise<void> {
 	const html = buildHtmlDocument({
-		markdown: session.markdown(),
+		markdown: session.styledMarkdown(),
 		title: session.name,
 		lang: startup.language,
 		css: [tokensCss, viewerCss, codeCss].join("\n"),

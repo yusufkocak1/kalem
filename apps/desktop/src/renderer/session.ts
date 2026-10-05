@@ -1,4 +1,6 @@
-import { serialize } from "@kalem-editor/core";
+import type { Root } from "@kalem-editor/core";
+import { parse, serialize } from "@kalem-editor/core";
+import type { ClipboardPayload, PasteInput } from "@kalem-editor/editor";
 import { Editor } from "@kalem-editor/editor";
 import { autosavePlugin } from "@kalem-editor/plugin-autosave";
 import { codeHighlightPlugin } from "@kalem-editor/plugin-code-highlight";
@@ -34,7 +36,13 @@ import {
 	TEXT_EXTENSIONS,
 } from "../shared/paths.js";
 import type { TableStyle } from "../shared/table-style.js";
-import { extractTableStyles, injectTableStyles } from "../shared/table-style.js";
+import {
+	extractTableStyles,
+	hasTableDirective,
+	injectTableStyles,
+	isPlain,
+	renderStyledHtml,
+} from "../shared/table-style.js";
 import { insertLink, insertTable } from "./edits.js";
 import type { Notices } from "./notices.js";
 import { TableStyles } from "./table-styles.js";
@@ -149,9 +157,9 @@ export class Session {
 		return this.#path === null ? "new" : "saved";
 	}
 
-	/** The document as plain Markdown, without the table style comments. */
-	markdown(): string {
-		return this.#source?.isSource() === true ? this.#source.text() : this.editor.getValue();
+	/** The document with its table style comments; in source mode, the source text. */
+	styledMarkdown(): string {
+		return this.#source?.isSource() === true ? this.#source.text() : this.#text();
 	}
 
 	/** The document as written to disk: the editor's Markdown plus table style comments. */
@@ -330,6 +338,8 @@ export class Session {
 			label: t.document,
 			onChange: (value) => this.#handleChange(value),
 			onSelectionChange: () => this.#o.onEditorChange(),
+			transformCopy: (payload, fragment) => this.#copyTables(payload, fragment),
+			transformPaste: (fragment, input, plain) => this.#pasteTables(fragment, input, plain),
 		});
 
 		const find = findReplacePlugin();
@@ -393,6 +403,34 @@ export class Session {
 		this.#find = null;
 		this.#source = null;
 		this.#images = null;
+	}
+
+	/** Copied tables take their styles along, as comments in the Markdown and inline in the HTML. */
+	#copyTables(payload: ClipboardPayload, fragment: Root): ClipboardPayload {
+		const styleOf = this.#tables.styleOf;
+		const styled = fragment.children.some((block) => {
+			const style = block.type === "table" ? styleOf(block) : undefined;
+			return style !== undefined && !isPlain(style);
+		});
+		if (!styled) return payload;
+		return {
+			text: serialize(injectTableStyles(fragment, styleOf)).replace(/\n$/, ""),
+			html: renderStyledHtml(fragment, styleOf),
+		};
+	}
+
+	/**
+	 * Markdown with table style comments (copied from Kalem, or from a styled
+	 * file) is pasted from its text, which is lossless; the styles go to the
+	 * tables the paste inserts.
+	 */
+	#pasteTables(fragment: Root, input: PasteInput, plain: boolean): Root {
+		if (plain || !hasTableDirective(input.text)) return fragment;
+		const extracted = extractTableStyles(input.text);
+		this.#tables.expectPaste(extracted.styles);
+		// The paste's change arrives synchronously; a paste that changes nothing must not leave them behind.
+		queueMicrotask(() => this.#tables.expectPaste(null));
+		return parse(extracted.markdown);
 	}
 
 	#handleChange(value: string): void {

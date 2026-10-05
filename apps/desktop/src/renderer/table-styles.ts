@@ -19,6 +19,8 @@ export class TableStyles {
 	readonly #styles = new Map<string, TableStyle>();
 	/** Table ids in document order as of the last reconcile. */
 	#order: string[] = [];
+	/** Styles for the tables the next change inserts, in order. */
+	#pasted: readonly TableStyle[] | null = null;
 
 	/** `styles` holds one entry per table, in document order. */
 	reset(doc: Root, styles: readonly TableStyle[]): void {
@@ -46,6 +48,10 @@ export class TableStyles {
 	readonly styleOf = (table: Table): TableStyle | undefined =>
 		table.id === undefined ? undefined : this.#styles.get(table.id);
 
+	expectPaste(styles: readonly TableStyle[] | null): void {
+		this.#pasted = styles;
+	}
+
 	/**
 	 * Leaving source mode re-parses the document and gives every block a new
 	 * id. When that happens the styles are carried over by table position.
@@ -66,6 +72,16 @@ export class TableStyles {
 			for (const [i, style] of moved.entries()) {
 				const id = ids[i];
 				if (style !== undefined && id !== undefined) this.#styles.set(id, style);
+			}
+		}
+
+		const pasted = this.#pasted;
+		this.#pasted = null;
+		if (pasted !== null) {
+			const before = new Set(previous);
+			const added = ids.filter((id) => !before.has(id));
+			if (added.length === pasted.length) {
+				for (const [i, id] of added.entries()) this.set(id, pasted[i] ?? NO_STYLE);
 			}
 		}
 		this.#order = ids;

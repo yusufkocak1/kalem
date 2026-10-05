@@ -5,11 +5,14 @@ import type { TableStyle } from "./table-style.js";
 import {
 	extractTableStyles,
 	formatDirective,
+	hasTableDirective,
 	injectTableStyles,
 	isPlain,
 	NO_STYLE,
 	parseDirective,
+	renderStyledHtml,
 	sameStyle,
+	styleByOrder,
 	withColumnDeleted,
 	withColumnInserted,
 	withColumnWidth,
@@ -129,5 +132,41 @@ describe("injectTableStyles", () => {
 		const reopened = extractTableStyles(saved);
 		expect(reopened.styles).toEqual([style]);
 		expect(reopened.markdown).toBe(`# A\n\n${TABLE}`);
+	});
+});
+
+describe("styled HTML", () => {
+	const doc = parse(`${TABLE}\n${TABLE}`);
+	const [first, second] = doc.children;
+
+	it("inlines the color and widths into the cells", () => {
+		const html = renderStyledHtml(doc, (table) =>
+			table === first ? { color: "blue", widths: [120] } : undefined,
+		);
+		expect(html).toContain(
+			'<th style="background:#2f6fd0;color:#fff;border-color:#2f6fd0;width:120px;min-width:120px;max-width:120px">a</th>',
+		);
+		expect(html).toContain('<th style="background:#2f6fd0;color:#fff;border-color:#2f6fd0">b</th>');
+		// Only the first table is styled.
+		expect(html.match(/<th>a<\/th>/g)).toHaveLength(1);
+	});
+
+	it("tints every other body row", () => {
+		const table = parse("| a |\n| --- |\n| 1 |\n| 2 |\n");
+		const html = renderStyledHtml(table, () => ({ color: "red", widths: [] }));
+		const cells = html.match(/<td[^>]*>/g) ?? [];
+		expect(cells[0]).not.toContain("background");
+		expect(cells[1]).toContain("background:#f8e9e8");
+	});
+
+	it("matches tables by order", () => {
+		const styleOf = styleByOrder(doc, [NO_STYLE, { color: "red", widths: [] }]);
+		expect(styleOf(first as Table)).toEqual(NO_STYLE);
+		expect(styleOf(second as Table)?.color).toBe("red");
+	});
+
+	it("detects a directive on its own line", () => {
+		expect(hasTableDirective(`x\n<!-- kalem:table color=red -->\n${TABLE}`)).toBe(true);
+		expect(hasTableDirective("`<!-- kalem:table -->` inside text")).toBe(false);
 	});
 });

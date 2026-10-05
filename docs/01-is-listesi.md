@@ -65,7 +65,7 @@ F6-13 ve F6-14 bölümlerinde.
 > `.md` ve `.txt` açma/kaydetme, `.docx` içe aktarma, tablo sıralama ve
 > renklendirme, yazı rengi, blok birleştirme, dosya ekleme, isteğe bağlı
 > `.kmd` paketi (TextBundle), yedi eklenti). 72 görevlik sayıma dâhil değil.
-> 141 birim + 31 uçtan uca test; ayrıntı ve bilinen sınırlar
+> 146 birim + 32 uçtan uca test; ayrıntı ve bilinen sınırlar
 > [apps/desktop/README.md](../apps/desktop/README.md) içinde.
 >
 > Masaüstünden çekirdeğe dönen üç iş (2026-10-03): **yazı rengi** — yeni
@@ -73,6 +73,13 @@ F6-13 ve F6-14 bölümlerinde.
 > `getColor`; **kod bloğuna yapıştırma** — editör yapıştırılan içeriği
 > sessizce atıyordu; **blok birleştirme** — `editor.mergeBlocks` /
 > `canMergeBlocks` ve saf `mergeBlocks(doc, from, count)`.
+>
+> **Tablo stilleri kopyalanınca ve dışa aktarılınca korunuyor** (2026-10-05):
+> editöre `transformCopy` / `transformPaste` kancaları eklendi. Masaüstü,
+> kopyalanan tablonun Markdown'ına `<!-- kalem:table … -->` yorumunu,
+> HTML'ine satır içi renk ve genişliği yazıyor. Yorumlu Markdown
+> yapıştırılınca stil yeni tabloya geçiyor. HTML dışa aktarma da stilleri
+> taşıyor. `.md` ve `.kmd` kaydı bunu zaten yapıyordu.
 
 > **Faz 1.5 atlandı.** Karar kullanıcının: doğrudan Faz 2'ye geçildi.
 > Prototip (`apps/demo/index.html`) duruyor, riskli senaryo matrisi boş.

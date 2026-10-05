@@ -38,6 +38,7 @@ import {
 	splitAtCaret,
 	toggleList,
 } from "./block-edit.js";
+import type { ClipboardPayload } from "./clipboard.js";
 import { blocksPayload, inlinePayload } from "./clipboard.js";
 import type { HistoryState } from "./history.js";
 import { History } from "./history.js";
@@ -151,6 +152,14 @@ export interface EditorOptions {
 	 * Sıra önemli: önce kayıtlı eklenti tuşu ve giriş kuralını önce görür.
 	 */
 	plugins?: readonly Plugin[];
+	/**
+	 * Rewrites what copying or cutting whole blocks puts on the clipboard.
+	 * `fragment` holds the copied blocks with their ids, so the host can add
+	 * presentation it keeps outside the document.
+	 */
+	transformCopy?: (payload: ClipboardPayload, fragment: Root) => ClipboardPayload;
+	/** Replaces the fragment a paste is about to insert; `plain` is set for Ctrl+Shift+V. */
+	transformPaste?: (fragment: Root, input: PasteInput, plain: boolean) => Root;
 }
 
 export class Editor {
@@ -880,15 +889,16 @@ export class Editor {
 			if (text !== "") this.#insertIntoSource(text.replace(/\r\n?/g, SATIR_SONU));
 			return;
 		}
-		const parca = pasteFragment(girdi, (html) => this.#parseHtml(html), {
+		const plain = this.#plainPaste;
+		const parsed = pasteFragment(girdi, (html) => this.#parseHtml(html), {
 			// Ctrl+Shift+V: bir sonraki yapıştırma biçimsiz.
-			plainOnly: this.#plainPaste,
+			plainOnly: plain,
 			...(this.#options.parseMarkdownOnPaste !== undefined
 				? { parseMarkdown: this.#options.parseMarkdownOnPaste }
 				: {}),
 		});
 		this.#plainPaste = false;
-		this.#insertPaste(parca);
+		this.#insertPaste(this.#options.transformPaste?.(parsed, girdi, plain) ?? parsed);
 	};
 
 	/**
@@ -952,7 +962,9 @@ export class Editor {
 			const secili = new Set(selectedRange(this.#selection, this.#blockOrder()));
 			const bloklar = this.#doc.children.filter((c) => secili.has(c.id as NodeId));
 			if (bloklar.length === 0) return false;
-			const yuk = blocksPayload({ type: "root", children: bloklar as Root["children"] });
+			const fragment: Root = { type: "root", children: bloklar as Root["children"] };
+			const payload = blocksPayload(fragment);
+			const yuk = this.#options.transformCopy?.(payload, fragment) ?? payload;
 			event.preventDefault();
 			veri.setData("text/plain", yuk.text);
 			veri.setData("text/html", yuk.html);

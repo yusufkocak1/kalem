@@ -1,8 +1,21 @@
 import type { Root, Table } from "@kalem-editor/core";
 import { parse } from "@kalem-editor/core";
+import type { RenderElement } from "@kalem-editor/viewer";
+import { buildPlan, stringifyPlan } from "@kalem-editor/viewer";
 
 export const TABLE_COLORS = ["gray", "blue", "teal", "green", "orange", "red", "purple"] as const;
 export type TableColor = (typeof TABLE_COLORS)[number];
+
+/** The same values as `--table-color` in the renderer's style.css. */
+export const TABLE_COLOR_VALUES: Record<TableColor, string> = {
+	gray: "#6b7280",
+	blue: "#2f6fd0",
+	teal: "#0f7f78",
+	green: "#2e8540",
+	orange: "#c96a12",
+	red: "#c0392b",
+	purple: "#7b3fc4",
+};
 
 export const MIN_COLUMN_WIDTH = 40;
 export const MAX_COLUMN_WIDTH = 900;
@@ -67,6 +80,11 @@ export function withColumnDeleted(style: TableStyle, column: number): TableStyle
 // --- The comment that carries the style --------------------------------------
 
 const DIRECTIVE = /^<!--\s*kalem:table\b([^>]*?)-->\s*$/;
+
+/** Whether the text carries at least one table directive. */
+export function hasTableDirective(markdown: string): boolean {
+	return /^[ \t]*<!--\s*kalem:table\b/m.test(markdown);
+}
 
 /** `<!-- kalem:table color=blue widths=120,,200 -->` */
 export function formatDirective(style: TableStyle): string {
@@ -153,4 +171,103 @@ export function injectTableStyles(
 		children.push(block);
 	}
 	return changed ? { ...doc, children: children as Root["children"] } : doc;
+}
+
+/** Assigns styles to the top-level tables of `doc`, in document order. */
+export function styleByOrder(
+	doc: Root,
+	styles: readonly TableStyle[],
+): (table: Table) => TableStyle | undefined {
+	const tables = doc.children.filter((block) => block.type === "table");
+	return (table) => {
+		const index = tables.indexOf(table);
+		return index === -1 ? undefined : styles[index];
+	};
+}
+
+// --- HTML with the styles inlined ---------------------------------------------
+
+/** Mixes `amount` of `color` into `base`; both are `#rrggbb`. */
+function mix(color: string, base: string, amount: number): string {
+	const channel = (hex: string, i: number): number =>
+		Number.parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16);
+	let out = "#";
+	for (let i = 0; i < 3; i++) {
+		const value = Math.round(channel(color, i) * amount + channel(base, i) * (1 - amount));
+		out += value.toString(16).padStart(2, "0");
+	}
+	return out;
+}
+
+function withStyle(node: RenderElement, css: string): RenderElement {
+	if (css === "") return node;
+	const own = node.attrs.find(([name]) => name === "style")?.[1];
+	const attrs = node.attrs.filter(([name]) => name !== "style");
+	return { ...node, attrs: [...attrs, ["style", own === undefined ? css : `${own};${css}`]] };
+}
+
+/**
+ * Inline styles that reproduce the editor's look (style.css) where no
+ * stylesheet comes along: Word, e-mail and exported HTML files.
+ */
+function styledTable(table: RenderElement, style: TableStyle): RenderElement {
+	const value = style.color === null ? null : TABLE_COLOR_VALUES[style.color];
+	const width = (column: number): string => {
+		const px = style.widths[column] ?? null;
+		return px === null ? "" : `width:${px}px;min-width:${px}px;max-width:${px}px`;
+	};
+	const cellCss = (cell: string, column: number): string =>
+		[cell, width(column)].filter((part) => part !== "").join(";");
+
+	const sections = table.children.map((section) => {
+		if (section.kind !== "element") return section;
+		const head = section.tag === "thead";
+		let row = -1;
+		return {
+			...section,
+			children: section.children.map((tr) => {
+				if (tr.kind !== "element") return tr;
+				row++;
+				const tint = !head && row % 2 === 1;
+				let column = -1;
+				return {
+					...tr,
+					children: tr.children.map((cell) => {
+						if (cell.kind !== "element") return cell;
+						column++;
+						let colors = "";
+						if (value !== null && head) {
+							colors = `background:${value};color:#fff;border-color:${value}`;
+						} else if (value !== null) {
+							colors = `border-color:${mix(value, "#d4d4d8", 0.45)}`;
+							if (tint) colors += `;background:${mix(value, "#ffffff", 0.11)}`;
+						}
+						return withStyle(cell, cellCss(colors, column));
+					}),
+				};
+			}),
+		};
+	});
+	return { ...table, children: sections };
+}
+
+/**
+ * Renders `doc` to HTML with the table styles written into the cells, so
+ * they survive where Kalem's stylesheet does not go.
+ */
+export function renderStyledHtml(
+	doc: Root,
+	styleOf: (table: Table) => TableStyle | undefined,
+): string {
+	const tables = doc.children.filter((block) => block.type === "table");
+	// A raw HTML block renders as `raw`, so top-level `<table>` elements match
+	// the top-level Markdown tables one to one.
+	let index = 0;
+	const plan = buildPlan(doc).map((node) => {
+		if (node.kind !== "element" || node.tag !== "table") return node;
+		const table = tables[index++];
+		const style = table === undefined ? undefined : styleOf(table);
+		return style === undefined || isPlain(style) ? node : styledTable(node, style);
+	});
+	return stringifyPlan(plan);
 }

@@ -1030,3 +1030,72 @@ test("saves an untitled document before attaching a file to it", async () => {
 	expect(await windowTitle(app)).toContain("yeni");
 	await discardAndClose(app);
 });
+
+test("copies a styled table with its style and pastes it back styled", async () => {
+	const path = join(await tempDir("table-copy"), "tablo.md");
+	await writeFile(
+		path,
+		[
+			"Üst",
+			"",
+			"<!-- kalem:table color=green widths=150 -->",
+			"",
+			"| Ad | Yaş |",
+			"| --- | --- |",
+			"| Ali | 3 |",
+			"",
+			"Alt",
+			"",
+		].join("\n"),
+	);
+	const { app, page, errors } = await launch({ args: [path] });
+	const blocks = page.locator("#editor > *");
+	await expect(page.locator("#editor > table")).toHaveAttribute("data-table-color", "green");
+
+	// Dragging from the first paragraph to the last selects all three blocks.
+	const top = await blocks.nth(0).boundingBox();
+	const bottom = await blocks.nth(2).boundingBox();
+	if (top === null || bottom === null) throw new Error("blocks are not visible");
+	await page.mouse.move(top.x + 6, top.y + top.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(bottom.x + 20, bottom.y + bottom.height / 2, { steps: 12 });
+	await page.mouse.up();
+
+	const copied = await page.evaluate(() => {
+		const data = new DataTransfer();
+		document
+			.getElementById("editor")
+			?.dispatchEvent(
+				new ClipboardEvent("copy", { clipboardData: data, bubbles: true, cancelable: true }),
+			);
+		return { text: data.getData("text/plain"), html: data.getData("text/html") };
+	});
+	expect(copied.text).toContain("<!-- kalem:table color=green widths=150 -->");
+	expect(copied.html).toContain("background:#2e8540");
+	expect(copied.html).toContain("width:150px");
+	expect(copied.html).not.toContain("kalem:table");
+
+	await page.locator("#editor > p").last().click();
+	await page.keyboard.press("End");
+	await page.evaluate((input) => {
+		const data = new DataTransfer();
+		data.setData("text/plain", input.text);
+		data.setData("text/html", input.html);
+		document.activeElement?.dispatchEvent(
+			new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }),
+		);
+	}, copied);
+
+	const tables = page.locator("#editor > table");
+	await expect(tables).toHaveCount(2);
+	await expect(tables.nth(1)).toHaveAttribute("data-table-color", "green");
+	// The comment is consumed, not left above the table as raw HTML.
+	await expect(page.locator("#editor")).not.toContainText("kalem:table");
+
+	await save(page);
+	await expect(status(page)).toHaveText("Saved");
+	const saved = await readFile(path, "utf8");
+	expect(saved.match(/<!-- kalem:table color=green widths=150 -->/g)).toHaveLength(2);
+	expect(errors).toEqual([]);
+	await app.close();
+});

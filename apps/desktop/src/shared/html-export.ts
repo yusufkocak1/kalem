@@ -1,7 +1,8 @@
 import { escapeHtml, parse } from "@kalem-editor/core";
-import { renderToString } from "@kalem-editor/viewer";
+import { extractTableStyles, renderStyledHtml, styleByOrder } from "./table-style.js";
 
 export interface HtmlExportOptions {
+	/** May carry table style comments; they become inline styles. */
 	readonly markdown: string;
 	readonly title: string;
 	readonly lang: string;
@@ -15,7 +16,9 @@ body { margin: 0 auto; max-width: 46rem; padding: 2.5rem 1.25rem 4rem; }
 @media print { body { max-width: none; padding: 0; } }`;
 
 export function buildHtmlDocument(options: HtmlExportOptions): string {
-	const body = renderToString(parse(options.markdown));
+	const extracted = extractTableStyles(options.markdown);
+	const doc = parse(extracted.markdown);
+	const body = renderStyledHtml(doc, styleByOrder(doc, extracted.styles));
 	return `<!doctype html>
 <html lang="${escapeHtml(options.lang)}">
 <head>
