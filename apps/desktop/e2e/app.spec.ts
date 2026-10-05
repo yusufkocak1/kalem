@@ -3,8 +3,10 @@ import { join } from "node:path";
 import type { ElectronApplication, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import JSZip from "jszip";
+import { markdownToDocx } from "../src/main/docx.js";
 import { createSampleDocx, PNG_1X1 } from "../src/main/sample-docx.test-helper.js";
 import type { KalemBridge } from "../src/shared/bridge.js";
+import { DEFAULT_SETTINGS } from "../src/shared/bridge.js";
 import type { Launched } from "./launch.js";
 import {
 	clickMenu,
@@ -157,6 +159,40 @@ test("imports a Word document and writes its images next to the Markdown file", 
 	const image = page.locator("#editor img");
 	await expect(image).toHaveAttribute("src", "rapor.assets/K%C4%B1rm%C4%B1z%C4%B1-nokta.png");
 	await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1);
+
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("keeps footnotes through a Word export and import", async () => {
+	const folder = await tempDir("footnotes");
+	const docx = join(folder, "Dipnotlar.docx");
+	await writeFile(
+		docx,
+		await markdownToDocx(
+			"Bir iddia[^1] ve bir kaynak[^2].\n\n[^1]: Kısa\n\n[^2]: Uzun bir **açıklama**.\n",
+			{
+				title: "Dipnotlar",
+				page: DEFAULT_SETTINGS,
+				loadImage: async () => null,
+			},
+		),
+	);
+
+	const { app, page, errors } = await launch();
+	await page.evaluate(
+		(path) => (window as unknown as { kalem: KalemBridge }).kalem.openPath(path),
+		docx,
+	);
+	await expect(page.locator("#editor p").first()).toContainText("ve bir kaynak[^2].");
+
+	const target = join(folder, "dipnotlar.md");
+	await stubSaveDialog(app, target);
+	await save(page);
+	await expect(status(page)).toHaveText("Saved");
+	expect(await readFile(target, "utf8")).toBe(
+		"Bir iddia[^1] ve bir kaynak[^2].\n\n[^1]: Kısa\n\n[^2]: Uzun bir **açıklama**.\n",
+	);
 
 	expect(errors).toEqual([]);
 	await app.close();

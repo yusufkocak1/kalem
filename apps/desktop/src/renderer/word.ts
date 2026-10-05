@@ -3,7 +3,55 @@ import { fromHtml } from "@kalem-editor/core/html";
 
 const BLOCK_SELECTOR = "p, li, div, h1, h2, h3, h4, h5, h6, blockquote, pre";
 
-/** Footnote and bookmark targets do not exist in Markdown: keep the text, drop the link. */
+/**
+ * mammoth writes a note as `<sup><a href="#footnote-1">` in the text and an
+ * `<li id="footnote-1">` in a list at the end. They become GFM footnotes:
+ * `[^1]` and a `[^1]: …` paragraph. Endnotes get labels `e1`, `e2`….
+ */
+function convertNotes(root: HTMLElement): void {
+	const doc = root.ownerDocument;
+	const label = (id: string): string | null => {
+		const match = /^(footnote|endnote)-(\d+)$/.exec(id);
+		if (match === null) return null;
+		return match[1] === "endnote" ? `e${match[2]}` : (match[2] as string);
+	};
+
+	for (const link of root.querySelectorAll<HTMLAnchorElement>(
+		'a[href^="#footnote-"], a[href^="#endnote-"]',
+	)) {
+		const name = label(link.getAttribute("href")?.slice(1) ?? "");
+		if (name === null) continue;
+		const target = link.parentElement?.tagName === "SUP" ? link.parentElement : link;
+		target.replaceWith(doc.createTextNode(`[^${name}]`));
+	}
+
+	const definitions: HTMLElement[] = [];
+	const lists = new Set<Element>();
+	for (const item of root.querySelectorAll<HTMLLIElement>(
+		'li[id^="footnote-"], li[id^="endnote-"]',
+	)) {
+		const name = label(item.id);
+		if (name === null) continue;
+		for (const back of item.querySelectorAll(
+			'a[href^="#footnote-ref-"], a[href^="#endnote-ref-"]',
+		)) {
+			back.remove();
+		}
+		const paragraph = doc.createElement("p");
+		paragraph.append(`[^${name}]: `);
+		const blocks = Array.from(item.querySelectorAll("p"));
+		for (const [i, block] of (blocks.length > 0 ? blocks : [item]).entries()) {
+			if (i > 0) paragraph.append(" ");
+			paragraph.append(...Array.from(block.childNodes));
+		}
+		definitions.push(paragraph);
+		if (item.parentElement !== null) lists.add(item.parentElement);
+	}
+	for (const list of lists) list.remove();
+	root.append(...definitions);
+}
+
+/** Bookmark targets do not exist in Markdown: keep the text, drop the link. */
 function unwrapInternalLinks(root: HTMLElement): void {
 	for (const back of root.querySelectorAll('a[href^="#footnote-ref-"], a[href^="#endnote-ref-"]')) {
 		back.remove();
@@ -79,7 +127,9 @@ function normalizeTables(root: HTMLElement): void {
  */
 export function wordHtmlToMarkdown(html: string): string {
 	const doc = new DOMParser().parseFromString(html, "text/html");
+	convertNotes(doc.body);
 	unwrapInternalLinks(doc.body);
 	normalizeTables(doc.body);
-	return serialize(fromHtml(doc.body));
+	// The serializer escapes brackets in text; footnote markers must stay as written.
+	return serialize(fromHtml(doc.body)).replace(/\\\[\^([^\]\s\\]+)\\\]/g, "[^$1]");
 }

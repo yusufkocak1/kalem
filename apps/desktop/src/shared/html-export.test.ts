@@ -65,3 +65,14 @@ describe("buildHtmlDocument with previews", () => {
 		expect(html).toContain("&lt;b&gt;ham&lt;/b&gt;");
 	});
 });
+
+describe("buildHtmlDocument with footnotes", () => {
+	it("links references to a numbered list of notes after the body", () => {
+		const html = build("Bir[^n] cümle.\n\n[^n]: Açıklama **kalın**.\n");
+		expect(html).toContain('Bir<sup id="kalem-fnref-1"><a href="#kalem-fn-1">1</a></sup> cümle.');
+		expect(html).toContain(
+			'<section class="kalem-footnotes"><hr><ol><li id="kalem-fn-1">Açıklama <strong>kalın</strong>. <a href="#kalem-fnref-1" aria-label="↩">↩</a></li></ol></section>',
+		);
+		expect(html).not.toContain("[^n]");
+	});
+});

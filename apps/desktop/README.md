@@ -166,6 +166,24 @@ verir.
   Ayarlar kalıcıdır ve hem PDF'e hem yazdırmaya uygulanır (sayfa numarası
   yalnızca PDF'te; yazdırma kutusunun kendi üst/alt bilgi seçeneği var).
 
+**Word'e dışa aktarma**
+
+- **Dosya → Dışa Aktar → Word (.docx)**: başlıklar, kalın/italik/üstü
+  çizili, satır içi kod, yazı rengi, bağlantılar, iç içe madde ve numaralı
+  listeler (her numaralı liste kendi başlangıcından sayar), görev
+  kutuları (☑/☐), alıntılar, kod blokları, yatay çizgi ve tablolar
+  (hizalama, renk ve sütun genişliğiyle) Word öğelerine çevrilir.
+- Belgenin yanındaki ve pakete gömülü PNG, JPEG, GIF ve BMP görseller
+  dosyaya gömülür, sayfaya sığacak şekilde küçültülür; web'deki görseller
+  indirilmez, yerlerine alt metinleri yazılır.
+- Sayfa boyutu, yönlendirme, kenar boşlukları ve sayfa numarası
+  **Sayfa Yapısı** ayarlarından alınır.
+- **Dipnotlar** (GFM söz dizimi: metinde `[^1]`, ayrı paragrafta
+  `[^1]: açıklama`) gerçek Word dipnotu olur; tanım paragrafları gövdeden
+  çıkar. HTML dışa aktarmada referanslar üst simge numaraya, tanımlar
+  belgenin sonunda geri bağlantılı bir listeye dönüşür. Numaralar ilk
+  referans sırasına göre verilir.
+
 **Word'den içe aktarma**
 
 - **Dosya → Word'den İçe Aktar** (`.docx`): başlıklar, kalın/italik/üstü
@@ -190,7 +208,10 @@ verir.
   gösterir. Renk ve genişlik değişiklikleri Ctrl+Z ile geri alınır; HTML ve
   PDF dışa aktarmada, yazdırmada ve kopyalamada korunur.
 - **Yazı rengi** (Giriş → **A** düğmesi): seçili metin dokuz renkten birine
-  boyanır, **Otomatik** rengi kaldırır. Markdown'da renk sözdizimi olmadığı
+  ya da **Diğer renkler…** ile sistemin renk seçicisinden herhangi bir renge
+  boyanır, **Otomatik** rengi kaldırır. Seçim yokken seçilen renk imleçte
+  bundan sonra yazılana uygulanır (imleç başka yere gidince unutulur).
+  Markdown'da renk sözdizimi olmadığı
   için dosyaya `<span style="color:#e03131">metin</span>` olarak yazılır;
   HTML/PDF dışa aktarmada ve yazdırmada da görünür.
 - **Blokları birleştirme** (Giriş → Paragraf, **Biçim → Blokları Birleştir**,
@@ -280,8 +301,13 @@ e2e/            Playwright ile gerçek uygulamayı süren testler
   içindeki metin her zaman UTF-8 `text.md`'dir; başka bir uygulamanın
   `.textpack`'i açılıp kaydedilirse paket kökünde (sarmalayıcı klasörsüz)
   yazılır.
-- Word'deki birleştirilmiş tablo hücreleri boş hücrelere açılır; dipnot
-  bağlantıları düz metne iner; EMF/WMF görseller atlanır ve bildirilir.
+- Word'deki birleştirilmiş tablo hücreleri boş hücrelere açılır; EMF/WMF
+  görseller atlanır ve bildirilir. Dipnotlar `[^1]` ve belgenin sonunda
+  `[^1]: …` paragrafları olarak gelir; sonnotlar `[^e1]` olarak.
+- Dipnotlar editörde yazıldığı gibi görünür (çekirdekte dipnot söz dizimi
+  yok); gerçek dipnota yalnızca Word ve HTML dışa aktarmada dönüşür. PDF ve
+  yazdırmada metin olarak kalırlar. Tek kelimelik bir dipnotun referansı
+  editörde bağlantı gibi (`^1`) görünür.
 - macOS ve Linux'ta denenmedi. Windows kurulum paketi üretiliyor ama
   kurulup denenmedi; çalıştırılanlar `package:dir` çıktısı ve taşınabilir exe.
 - Kurulum paketi 100 MB'ı aştığı için depoya konmaz (GitHub sınırı).

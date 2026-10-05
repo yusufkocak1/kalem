@@ -127,3 +127,21 @@ describe("a Word reader", () => {
 		expect(value).toContain("<table>");
 	});
 });
+
+describe("footnotes", () => {
+	it("become Word footnotes and leave the body", async () => {
+		const zip = await JSZip.loadAsync(
+			await markdownToDocx(
+				"Bir[^1] iki[^uzun].\n\n[^1]: Tek\n\n[^uzun]: Uzun bir **not**.\n",
+				options(),
+			),
+		);
+		const document = (await zip.file("word/document.xml")?.async("string")) ?? "";
+		const notes = (await zip.file("word/footnotes.xml")?.async("string")) ?? "";
+		expect(document.match(/<w:footnoteReference w:id="\d+"\/>/g)).toHaveLength(2);
+		expect(document).not.toContain("[^");
+		expect(document).not.toContain("Uzun bir");
+		expect(notes).toContain("Tek");
+		expect(notes).toMatch(/<w:b\/>.*not/s);
+	});
+});

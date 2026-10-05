@@ -98,14 +98,14 @@ Belge iş akışı
 - [x] D-10 · Sekmeyi yeni pencereye taşıma
 
 Dışa / içe aktarma
-- [ ] D-11 · Word'e dışa aktarma (`.docx`)
+- [x] D-11 · Word'e dışa aktarma (`.docx`)
 - [x] D-12 · PDF ayarları (sayfa boyutu, kenar boşluğu, sayfa numarası)
 
 Editör
 - [x] D-13 · Mermaid diyagramları
 - [x] D-14 · KaTeX matematik (` ```math ` blokları; satır içi `$…$` çekirdek ayrıştırıcı işi)
-- [ ] D-15 · Dipnotlar
-- [ ] D-16 · Özel yazı rengi ve "bundan sonra renkli yaz"
+- [x] D-15 · Dipnotlar (Word/HTML dışa aktarma ve Word içe aktarma; editörde metin)
+- [x] D-16 · Özel yazı rengi ve "bundan sonra renkli yaz"
 - [x] D-17 · Tablo stilleri geri alma geçmişinde
 - [x] D-18 · Kod biçimlendirme: YAML, HTML, JSONC
 

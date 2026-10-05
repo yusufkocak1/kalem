@@ -15,6 +15,7 @@ import {
 	Document,
 	ExternalHyperlink,
 	Footer,
+	FootnoteReferenceRun,
 	HeadingLevel,
 	ImageRun,
 	LevelFormat,
@@ -31,6 +32,13 @@ import {
 } from "docx";
 import type { Settings } from "../shared/bridge.js";
 import { MARGIN_CM, PAGE_SIZE_MM } from "../shared/bridge.js";
+import type { Footnotes } from "../shared/footnotes.js";
+import {
+	collectFootnotes,
+	footnoteDefinitionLabel,
+	referenceLabel,
+	splitReferences,
+} from "../shared/footnotes.js";
 import type { ImageInfo } from "../shared/image-size.js";
 import type { TableStyle } from "../shared/table-style.js";
 import { extractTableStyles, mix, TABLE_COLOR_VALUES } from "../shared/table-style.js";
@@ -101,10 +109,12 @@ class Converter {
 	#listInstance = 0;
 	/** Content width in pixels at 96 dpi; images are scaled down to fit. */
 	readonly #contentWidth: number;
+	readonly #footnotes: Footnotes;
 
-	constructor(options: DocxOptions, tableStyles: readonly TableStyle[]) {
+	constructor(options: DocxOptions, tableStyles: readonly TableStyle[], footnotes: Footnotes) {
 		this.#options = options;
 		this.#tableStyles = tableStyles;
+		this.#footnotes = footnotes;
 		const [width, height] = PAGE_SIZE_MM[options.page.pageSize];
 		const across = options.page.landscape ? height : width;
 		const margin = (MARGIN_CM[options.page.margins][1] as number) * 10;
@@ -113,6 +123,20 @@ class Converter {
 
 	get orderedStarts(): readonly number[] {
 		return [...this.#orderedStarts];
+	}
+
+	/** Word footnotes, numbered from 1 in the order of `Footnotes.order`. */
+	async footnotes(): Promise<Record<number, { children: Paragraph[] }>> {
+		const out: Record<number, { children: Paragraph[] }> = {};
+		for (const [i, label] of this.#footnotes.order.entries()) {
+			const note = this.#footnotes.notes.get(label) ?? [];
+			out[i + 1] = { children: [new Paragraph({ children: await this.inline(note) })] };
+		}
+		return out;
+	}
+
+	#footnoteReference(label: string): FootnoteReferenceRun {
+		return new FootnoteReferenceRun(this.#footnotes.order.indexOf(label) + 1);
 	}
 
 	collectDefinitions(nodes: readonly (Block | Frontmatter)[]): void {
@@ -156,7 +180,9 @@ class Converter {
 		switch (node.type) {
 			case "text":
 				// A soft line break inside a paragraph reads as a space, as in HTML.
-				return [this.#text(node.value.replace(/\n/g, " "), marks)];
+				return splitReferences(node.value.replace(/\n/g, " "), this.#footnotes.notes).map((part) =>
+					typeof part === "string" ? this.#text(part, marks) : this.#footnoteReference(part.label),
+				);
 			case "strong":
 				return this.inline(node.children, { ...marks, bold: true });
 			case "emphasis":
@@ -174,6 +200,8 @@ class Converter {
 			case "link":
 				return [this.#link(node.url, await this.inline(node.children, { ...marks, link: true }))];
 			case "linkReference": {
+				const footnote = referenceLabel(node, this.#footnotes.notes);
+				if (footnote !== null) return [this.#footnoteReference(footnote)];
 				const children = await this.inline(node.children, { ...marks, link: true });
 				const definition = this.#definitions.get(node.identifier.toLowerCase()); // kalem-locale-ok: see collectDefinitions
 				return definition === undefined ? children : [this.#link(definition.url, children)];
@@ -238,6 +266,8 @@ class Converter {
 	}
 
 	async #block(node: Block | Frontmatter, ctx: Context): Promise<(Paragraph | Table)[]> {
+		// Footnote definitions become Word footnotes.
+		if (ctx.quote === 0 && ctx.indent === 0 && footnoteDefinitionLabel(node) !== null) return [];
 		switch (node.type) {
 			case "paragraph":
 				return [
@@ -418,9 +448,10 @@ function numberingLevels(format: (typeof LevelFormat)[keyof typeof LevelFormat],
 export async function markdownToDocx(markdown: string, options: DocxOptions): Promise<Uint8Array> {
 	const extracted = extractTableStyles(markdown);
 	const root: Root = parse(extracted.markdown);
-	const converter = new Converter(options, extracted.styles);
+	const converter = new Converter(options, extracted.styles, collectFootnotes(root));
 	converter.collectDefinitions(root.children);
 	const children = await converter.blocks(root.children, { quote: 0, indent: 0 });
+	const footnotes = await converter.footnotes();
 
 	const { page } = options;
 	const [width, height] = PAGE_SIZE_MM[page.pageSize];
@@ -428,6 +459,7 @@ export async function markdownToDocx(markdown: string, options: DocxOptions): Pr
 	const document = new Document({
 		title: options.title,
 		creator: "Kalem",
+		footnotes,
 		numbering: {
 			config: [
 				{ reference: "bullet", levels: numberingLevels(LevelFormat.BULLET, 1) },
