@@ -54,6 +54,7 @@ export interface IpcContext {
 	changeSettings(patch: Partial<Settings>): void;
 	showFileMenu(win: AppWindow, x: number, y: number): void;
 	showTabMenu(win: AppWindow, tabId: string, x: number, y: number): void;
+	showCaseMenu(win: AppWindow, x: number, y: number): void;
 	/** Lets the user pick a folder and opens it in every window. */
 	openFolder(win: AppWindow): Promise<void>;
 	closeFolder(): void;
@@ -529,6 +530,10 @@ export function registerIpc(ctx: IpcContext): void {
 
 	on(CHANNEL.openLink, (win, href) => {
 		if (typeof href === "string") void windows.openLink(win, href);
+	});
+
+	on(CHANNEL.showCaseMenu, (win, x, y) => {
+		if (typeof x === "number" && typeof y === "number") ctx.showCaseMenu(win, x, y);
 	});
 
 	on(CHANNEL.showTabMenu, (win, tabId, x, y) => {

@@ -225,6 +225,14 @@ verir.
   Markdown'da renk sözdizimi olmadığı
   için dosyaya `<span style="color:#e03131">metin</span>` olarak yazılır;
   HTML/PDF dışa aktarmada ve yazdırmada da görünür.
+- **Büyük/küçük harf** (Giriş → **Aa** düğmesi, **Biçim → Büyük/Küçük
+  Harf**): BÜYÜK HARF, küçük harf, Her Kelimenin İlk Harfi Büyük, Cümle
+  düzeni, bÜYÜK/kÜÇÜK dEĞİŞTİR ve **Fazla Boşlukları Sil**. Seçim yoksa
+  imlecin bulunduğu kelimeye uygulanır. `Shift+F3` Word'deki gibi küçük →
+  BÜYÜK → Başlık düzeni arasında dolaşır. Dönüşüm belgenin dilinin
+  kurallarıyla yapılır (Türkçede i ↔ İ, ı ↔ I); kalın, renk, bağlantı gibi
+  biçimler korunur, satır içi koda dokunulmaz. Seçim tek bir paragrafın ya
+  da hücrenin içinde olmalıdır.
 - **Blokları birleştirme** (Giriş → Paragraf, **Biçim → Blokları Birleştir**,
   `Ctrl+Shift+M`): fareyle sürükleyerek seçilen bloklar ilk blokta toplanır.
   Yalnızca imleç varsa blok bir üsttekiyle birleşir. Paragraf ve başlıklar

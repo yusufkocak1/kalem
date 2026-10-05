@@ -7,6 +7,7 @@ import { clampZoom, MAX_ZOOM, MIN_ZOOM, pageRule, ZOOM_STEP } from "../shared/br
 import { format, stringsFor } from "../shared/i18n.js";
 import { isEditablePath, isWordPath } from "../shared/paths.js";
 import { withColumnWidth } from "../shared/table-style.js";
+import { changeCase, collapseSpaces, nextCase } from "../shared/text-case.js";
 import { createDocumentTools } from "./document-tools.js";
 import { el, isTextFieldFocused } from "./dom.js";
 import type { TableContext, TableEdit } from "./edits.js";
@@ -452,6 +453,17 @@ function edit(change: (doc: Root, caret: Caret) => EditResult | null): void {
 	editor.applyEdit(change(editor.getDocument(), caret));
 }
 
+/** Rewrites the selection, or the word at the caret, keeping its formatting. */
+function rewriteText(transform: (text: string) => string): void {
+	if (isTextFieldFocused() || inSource()) return;
+	if (session.editor.isReadOnly()) {
+		warn(t.readOnlyBlocked);
+		return;
+	}
+	if (session.editor.transformText(transform)) session.notices.dismiss("edit");
+	else warn(t.noTextToChange);
+}
+
 function setBlock(type: BlockType): void {
 	edit(() => {
 		session.editor.setBlockType(type);
@@ -549,6 +561,18 @@ const commands: Record<Command, () => void> = {
 	"format-all-code": tools.formatAllCode,
 	"quick-open": () => void quickOpen.show(),
 	"move-tab": () => moveTab(session.id),
+	"case-upper": () => rewriteText((text) => changeCase(text, "upper", session.editor.getLang())),
+	"case-lower": () => rewriteText((text) => changeCase(text, "lower", session.editor.getLang())),
+	"case-title": () => rewriteText((text) => changeCase(text, "title", session.editor.getLang())),
+	"case-sentence": () =>
+		rewriteText((text) => changeCase(text, "sentence", session.editor.getLang())),
+	"case-toggle": () => rewriteText((text) => changeCase(text, "toggle", session.editor.getLang())),
+	"case-cycle": () =>
+		rewriteText((text) => {
+			const lang = session.editor.getLang();
+			return changeCase(text, nextCase(text, lang), lang);
+		}),
+	"collapse-spaces": () => rewriteText(collapseSpaces),
 	"version-history": () => {
 		const tab = session;
 		void versionHistory.show({
@@ -595,6 +619,14 @@ const ribbon = createAppRibbon(ribbonHost, saveStatus, {
 // The editor reports no selection inside code blocks, so moving into or between
 // them would not refresh the contextual Code tab.
 document.addEventListener("selectionchange", scheduleRibbonUpdate);
+
+// Shift+F3 cycles the case, as in Word; the menu only shows the shortcut.
+document.addEventListener("keydown", (event) => {
+	if (event.key !== "F3" || !event.shiftKey || event.ctrlKey || event.altKey || event.metaKey)
+		return;
+	event.preventDefault();
+	commands["case-cycle"]();
+});
 
 // --- Events from the main process -------------------------------------------
 

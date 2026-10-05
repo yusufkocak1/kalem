@@ -111,6 +111,7 @@ const LETTERS = {
 	italic: "I",
 	strikethrough: "S",
 	textColor: "A",
+	changeCase: "Aa",
 } as const;
 
 export type IconName = keyof typeof PATHS | keyof typeof LETTERS;

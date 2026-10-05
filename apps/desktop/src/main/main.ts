@@ -15,6 +15,7 @@ import { registerIpc } from "./ipc.js";
 import type { MenuContext } from "./menu.js";
 import {
 	installMenu,
+	popupCaseMenu,
 	popupContextMenu,
 	popupFileMenu,
 	popupTabMenu,
@@ -374,6 +375,7 @@ function start(): void {
 			changeSettings,
 			showFileMenu: (win, x, y) => popupFileMenu(menuContext(), win, x, y),
 			showTabMenu: (win, tabId, x, y) => popupTabMenu(menuContext(), win, tabId, x, y),
+			showCaseMenu: (win, x, y) => popupCaseMenu(menuContext(), win, x, y),
 			openFolder,
 			closeFolder: () => setWorkspace(null),
 		});

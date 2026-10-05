@@ -292,6 +292,7 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 					click: send(ctx, "strikethrough"),
 				},
 				{ label: t.inlineCode, ...editorShortcut("CmdOrCtrl+E"), click: send(ctx, "inline-code") },
+				{ label: t.changeCase, submenu: caseMenuTemplate(ctx) },
 				{ type: "separator" },
 				{
 					label: t.normalText,
@@ -413,6 +414,29 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 
 export function installMenu(ctx: MenuContext): void {
 	Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate(ctx)));
+}
+
+function caseMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
+	const { t } = ctx;
+	return [
+		{ label: t.caseSentence, click: send(ctx, "case-sentence") },
+		{ label: t.caseLower, click: send(ctx, "case-lower") },
+		{ label: t.caseUpper, click: send(ctx, "case-upper") },
+		{ label: t.caseTitle, click: send(ctx, "case-title") },
+		{ label: t.caseToggle, click: send(ctx, "case-toggle") },
+		{ type: "separator" },
+		{ label: t.caseCycle, ...editorShortcut("Shift+F3"), click: send(ctx, "case-cycle") },
+		{ type: "separator" },
+		{ label: t.collapseSpaces, click: send(ctx, "collapse-spaces") },
+	];
+}
+
+export function popupCaseMenu(ctx: MenuContext, win: AppWindow, x: number, y: number): void {
+	Menu.buildFromTemplate(caseMenuTemplate(ctx)).popup({
+		window: win.window,
+		x: Math.round(x),
+		y: Math.round(y),
+	});
 }
 
 export function popupTabMenu(

@@ -49,9 +49,12 @@ import {
 	applyMark,
 	colorAt,
 	linkAt,
+	listLength,
 	markActive,
 	sliceInline,
 	spliceInline,
+	transformText,
+	wordAt,
 } from "./inline-edit.js";
 import { resolveLang } from "./lang.js";
 import { contentLength, offsetOf, selectRange } from "./offsets.js";
@@ -667,6 +670,38 @@ export class Editor {
 		);
 		if (this.#storedColor !== null) this.#storedColor.offset = to;
 		return true;
+	}
+
+	/**
+	 * Rewrites the selected text with `transform` (to change its case, for
+	 * instance) and keeps its formatting. With only a caret, the word at the
+	 * caret is rewritten, as in word processors. `false` when the selection
+	 * is not text within one block, or the caret is not on a word.
+	 */
+	transformText(transform: (text: string) => string): boolean {
+		if (this.#readOnly) return false;
+		const target = this.#rangeTarget();
+		if (target === null) return false;
+		let { from, to } = target;
+		if (from === to) {
+			const word = wordAt(target.children, from, this.getLang());
+			if (word === null) return false;
+			[from, to] = word;
+		}
+		let length = to - from;
+		return this.#editRangeAt(
+			target.blockIndex,
+			target.path,
+			from,
+			to,
+			(children, start, end) => {
+				const next = transformText(children, start, end, transform);
+				length += listLength(next) - listLength(children);
+				return next;
+			},
+			// The caret goes back where it was; a selection stays selected.
+			target.from === target.to ? { select: target.from } : { selectEnd: from + length },
+		);
 	}
 
 	/** Seçili aralığı bağlantıya çevirir; `url` boşsa bağlantıyı kaldırır. */
@@ -1533,7 +1568,12 @@ export class Editor {
 		from: number,
 		to: number,
 		donustur: (children: readonly Inline[], from: number, to: number) => Inline[],
-		options: { readonly select?: number; readonly coalesceKey?: string } = {},
+		options: {
+			readonly select?: number;
+			/** End of the range to select afterwards, when the edit changed its length. */
+			readonly selectEnd?: number;
+			readonly coalesceKey?: string;
+		} = {},
 	): boolean {
 		if (this.#readOnly) return false;
 		const dugumHam = nodeAt(this.#doc.children[blockIndex], path) as
@@ -1567,8 +1607,9 @@ export class Editor {
 		const blockElement = this.#elements.get(doc.children[hedef.blockIndex]?.id as string);
 		const holder = blockElement === undefined ? null : holderAt(blockElement, hedef.path);
 		if (holder !== null) {
-			if (options.select === undefined) selectRange(holder, hedef.from, hedef.to);
-			else selectRange(holder, options.select, options.select);
+			if (options.select === undefined) {
+				selectRange(holder, hedef.from, options.selectEnd ?? hedef.to);
+			} else selectRange(holder, options.select, options.select);
 		}
 
 		this.#emit();

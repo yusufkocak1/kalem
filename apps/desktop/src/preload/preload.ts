@@ -52,6 +52,7 @@ const bridge: KalemBridge = {
 	openLink: (href) => ipcRenderer.send(CHANNEL.openLink, href),
 	showFileMenu: (x, y) => ipcRenderer.send(CHANNEL.showFileMenu, x, y),
 	showTabMenu: (tabId, x, y) => ipcRenderer.send(CHANNEL.showTabMenu, tabId, x, y),
+	showCaseMenu: (x, y) => ipcRenderer.send(CHANNEL.showCaseMenu, x, y),
 	moveTabToWindow: (tabId, tab, at) => ipcRenderer.send(CHANNEL.moveTabToWindow, tabId, tab, at),
 	onTabMoved: (handler) => listen<[string]>(CHANNEL.tabMoved, handler),
 	onTabMenu: (handler) => listen<[string, "move" | "close"]>(CHANNEL.tabMenu, handler),

@@ -17,6 +17,8 @@ import {
 	markActive,
 	sliceInline,
 	spliceInline,
+	transformText,
+	wordAt,
 } from "./inline-edit.js";
 
 const metin = (value: string): Inline => ({ type: "text", value });
@@ -304,5 +306,69 @@ describe("text color", () => {
 		expect(colorAt(nodes, 2, 2)).toBeNull();
 		expect(colorAt(nodes, 1, 4)).toBeNull();
 		expect(colorAt(nodes, 6, 8)).toBeNull();
+	});
+});
+
+describe("transformText", () => {
+	const upper = (text: string) => text.toLocaleUpperCase("tr");
+	const title = (text: string) =>
+		text.replace(/\p{L}+/gu, (word) => word[0]?.toLocaleUpperCase("tr") + word.slice(1));
+
+	it("keeps formatting and treats a word split by it as one word", () => {
+		const nodes: Inline[] = [
+			{ type: "strong", children: [{ type: "text", value: "he" }] },
+			{ type: "text", value: "llo dünya" },
+		];
+		expect(transformText(nodes, 0, 9, title)).toEqual([
+			{ type: "strong", children: [{ type: "text", value: "He" }] },
+			{ type: "text", value: "llo Dünya" },
+		]);
+	});
+
+	it("changes only the range and uses the given locale", () => {
+		const nodes: Inline[] = [{ type: "text", value: "iyi bir gün" }];
+		expect(transformText(nodes, 4, 7, upper)).toEqual([{ type: "text", value: "iyi BİR gün" }]);
+	});
+
+	it("leaves code untouched and transforms piece by piece when the length changes", () => {
+		const nodes: Inline[] = [
+			{ type: "text", value: "straße " },
+			{ type: "inlineCode", value: "x" },
+			{ type: "text", value: " ß" },
+		];
+		expect(transformText(nodes, 0, 10, (text) => text.toLocaleUpperCase("de"))).toEqual([
+			{ type: "text", value: "STRASSE " },
+			{ type: "inlineCode", value: "x" },
+			{ type: "text", value: " SS" },
+		]);
+	});
+});
+
+describe("wordAt", () => {
+	const nodes: Inline[] = [{ type: "text", value: "Merhaba güzel dünya." }];
+
+	it("finds the word at or next to the offset", () => {
+		expect(wordAt(nodes, 10, "tr")).toEqual([8, 13]);
+		expect(wordAt(nodes, 13, "tr")).toEqual([8, 13]);
+	});
+
+	it("finds nothing between punctuation", () => {
+		expect(wordAt([{ type: "text", value: "a -- b" }], 3, "tr")).toBeNull();
+	});
+});
+
+describe("transformText removing characters", () => {
+	it("takes them out of the nodes they were in", () => {
+		const nodes: Inline[] = [
+			{ type: "text", value: "a  " },
+			{ type: "strong", children: [{ type: "text", value: "b" }] },
+			{ type: "text", value: "   c" },
+		];
+		const collapse = (text: string) => text.replace(/ {2,}/g, " ").replace(/ +$/gm, "");
+		expect(transformText(nodes, 0, 8, collapse)).toEqual([
+			{ type: "text", value: "a " },
+			{ type: "strong", children: [{ type: "text", value: "b" }] },
+			{ type: "text", value: " c" },
+		]);
 	});
 });

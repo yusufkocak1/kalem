@@ -277,6 +277,13 @@ export const COMMANDS = [
 	"search-folder",
 	"version-history",
 	"move-tab",
+	"case-upper",
+	"case-lower",
+	"case-title",
+	"case-sentence",
+	"case-toggle",
+	"case-cycle",
+	"collapse-spaces",
 	"format-code",
 	"format-all-code",
 ] as const;
@@ -324,6 +331,7 @@ export interface KalemBridge {
 	openLink(href: string): void;
 	showFileMenu(x: number, y: number): void;
 	showTabMenu(tabId: string, x: number, y: number): void;
+	showCaseMenu(x: number, y: number): void;
 	/** Moves a tab into a new window, placed at the screen point when given. */
 	moveTabToWindow(tabId: string, tab: MovedTab, at?: { x: number; y: number }): void;
 	/** The tab now lives in another window; drop it without asking. */
@@ -381,6 +389,7 @@ export const CHANNEL = {
 	openLink: "kalem:open-link",
 	showFileMenu: "kalem:show-file-menu",
 	showTabMenu: "kalem:show-tab-menu",
+	showCaseMenu: "kalem:show-case-menu",
 	moveTabToWindow: "kalem:move-tab-to-window",
 	tabMoved: "kalem:tab-moved",
 	tabMenu: "kalem:tab-menu",

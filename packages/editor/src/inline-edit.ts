@@ -285,3 +285,112 @@ export function linkAt(
 	}
 	return null;
 }
+
+/** Which characters of `original` make up `result` read left to right; `null` if it is not a subsequence. */
+function keptCharacters(original: string, result: string): boolean[] | null {
+	const kept: boolean[] = new Array(original.length).fill(false);
+	let next = 0;
+	for (let i = 0; i < original.length && next < result.length; i++) {
+		if (original[i] === result[next]) {
+			kept[i] = true;
+			next++;
+		}
+	}
+	return next === result.length ? kept : null;
+}
+
+/**
+ * Rewrites the text of the range and keeps its formatting.
+ *
+ * The text nodes of the range are joined and transformed as one string, so a
+ * word split by formatting (`**he**llo`) is still one word. Nodes that are
+ * not text (code, images, breaks) separate the pieces and are left alone.
+ * When the result has the same length, its characters go back into the
+ * original nodes; when characters were only removed, each node loses its
+ * own; otherwise (`ß` → `SS`) each text node is transformed on its own.
+ */
+export function transformText(
+	nodes: readonly Inline[],
+	from: number,
+	to: number,
+	transform: (text: string) => string,
+): Inline[] {
+	if (from >= to) return [...nodes];
+	const range = sliceInline(nodes, from, to);
+
+	const texts: string[] = [];
+	/** Where each text node starts in `joined`. */
+	const starts: number[] = [];
+	let joined = "";
+	let previousWasText = false;
+	const collect = (list: readonly Inline[]): void => {
+		for (const node of list) {
+			if (node.type === "text") {
+				texts.push(node.value);
+				starts.push(joined.length);
+				joined += node.value;
+				previousWasText = true;
+			} else if ("children" in node) {
+				collect(node.children);
+			} else {
+				if (previousWasText) joined += "\n";
+				previousWasText = false;
+			}
+		}
+	};
+	collect(range);
+
+	const whole = transform(joined);
+	const replacements: string[] = [];
+	const kept = whole.length < joined.length ? keptCharacters(joined, whole) : null;
+	if (whole.length === joined.length) {
+		for (const [i, text] of texts.entries()) {
+			const start = starts[i] as number;
+			replacements.push(whole.slice(start, start + text.length));
+		}
+	} else if (kept !== null) {
+		// Only deletions: each node keeps its surviving characters.
+		for (const [i, text] of texts.entries()) {
+			const start = starts[i] as number;
+			let value = "";
+			for (let c = 0; c < text.length; c++) if (kept[start + c]) value += text[c];
+			replacements.push(value);
+		}
+	} else {
+		for (const text of texts) replacements.push(transform(text));
+	}
+
+	let index = 0;
+	const rebuild = (list: readonly Inline[]): Inline[] =>
+		list.map((node): Inline => {
+			if (node.type === "text") return { ...node, value: replacements[index++] ?? node.value };
+			if ("children" in node) return { ...node, children: rebuild(node.children) } as Inline;
+			return node;
+		});
+	return spliceInline(nodes, from, to, rebuild(range));
+}
+
+/** The word around `offset` as `[from, to)`, or `null` when the offset is not in or next to a word. */
+export function wordAt(
+	nodes: readonly Inline[],
+	offset: number,
+	lang: string,
+): [number, number] | null {
+	// Non-text nodes keep their length so offsets line up.
+	let text = "";
+	const visit = (list: readonly Inline[]): void => {
+		for (const node of list) {
+			if (node.type === "text") text += node.value;
+			else if ("children" in node) visit(node.children);
+			else text += "￼".repeat(inlineLength(node));
+		}
+	};
+	visit(nodes);
+	for (const segment of new Intl.Segmenter(lang, { granularity: "word" }).segment(text)) {
+		const end = segment.index + segment.segment.length;
+		if (segment.isWordLike === true && segment.index <= offset && offset <= end) {
+			return [segment.index, end];
+		}
+	}
+	return null;
+}

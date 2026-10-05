@@ -368,6 +368,17 @@ export function createAppRibbon(
 						markButton("strikethrough", t.strikethrough, "delete", `${MOD}+Shift+X`),
 						markButton("inline-code", t.inlineCode, "inlineCode", `${MOD}+E`),
 						textColors,
+						{
+							id: "change-case",
+							label: t.changeCase,
+							icon: "changeCase",
+							run: () => {
+								const button = document.querySelector('[data-command="change-case"]');
+								const box = button?.getBoundingClientRect();
+								if (box !== undefined) ctx.bridge.showCaseMenu(box.left, box.bottom);
+							},
+							enabled: ctx.canEdit,
+						},
 						{ kind: "separator" },
 						command("link", t.link, "link", {
 							shortcut: `${MOD}+K`,
@@ -404,7 +415,6 @@ export function createAppRibbon(
 							id: "find",
 							label: t.find,
 							icon: "find",
-							showLabel: true,
 							shortcut: `${MOD}+F`,
 							run: ctx.commands.find,
 							enabled: () => !ctx.inSource(),

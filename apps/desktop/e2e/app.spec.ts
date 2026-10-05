@@ -1331,6 +1331,38 @@ test("writes a quick note into the open folder and stays in the tray", async () 
 	await app.close();
 });
 
+test("changes the case of the selection or the word at the caret", async () => {
+	const path = join(await tempDir("case"), "harf.md");
+	await writeFile(path, "Bugün **iyi** bir   gün\n");
+	const { app, page, errors } = await launch({ args: [path], settings: { language: "tr" } });
+	const paragraph = page.locator("#editor p").first();
+
+	await paragraph.click();
+	await page.keyboard.press("Home");
+	await page.keyboard.press("Shift+End");
+	await clickMenu(app, "Biçim", "Büyük/Küçük Harf", "BÜYÜK HARF");
+	await expect(paragraph).toHaveText("BUGÜN İYİ BİR   GÜN");
+	await expect(paragraph.locator("strong")).toHaveText("İYİ");
+	await clickMenu(app, "Biçim", "Büyük/Küçük Harf", "Fazla Boşlukları Sil");
+	await expect(paragraph).toHaveText("BUGÜN İYİ BİR GÜN");
+
+	// Shift+F3 on the word at the caret: UPPER → Title → lower.
+	await page.keyboard.press("End");
+	await page.keyboard.press("ArrowLeft");
+	await page.keyboard.press("Shift+F3");
+	await expect(paragraph).toHaveText("BUGÜN İYİ BİR Gün");
+	await page.keyboard.press("Shift+F3");
+	await expect(paragraph).toHaveText("BUGÜN İYİ BİR gün");
+	await page.keyboard.press("Control+z");
+	await expect(paragraph).toHaveText("BUGÜN İYİ BİR Gün");
+
+	await save(page);
+	await expect(status(page)).toHaveText("Kaydedildi");
+	expect(await readFile(path, "utf8")).toBe("BUGÜN **İYİ** BİR Gün\n");
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
 test("keeps several documents open in tabs", async () => {
 	const folder = await tempDir("tabs");
 	const first = join(folder, "birinci.md");
