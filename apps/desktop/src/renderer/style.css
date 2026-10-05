@@ -933,4 +933,13 @@ button {
 	.kalem-editor > [contenteditable="true"]:focus {
 		outline: none;
 	}
+
+	.kalem-editor {
+		caret-color: transparent;
+	}
+
+	/* The gutter holds the block handle; on paper the margin is the page setup's. */
+	.kalem-ui {
+		padding-inline-start: 0;
+	}
 }

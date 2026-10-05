@@ -26,6 +26,10 @@ registerDocumentScheme();
 
 const NEW_WINDOW_FLAG = "--new-window";
 
+const PAGE_NUMBER_FOOTER =
+	'<div style="width:100%;font:9px sans-serif;color:#555;text-align:center">' +
+	'<span class="pageNumber"></span> / <span class="totalPages"></span></div>';
+
 function documentArguments(argv: readonly string[], cwd: string): string[] {
 	return argv
 		.slice(1)
@@ -102,6 +106,16 @@ function start(): void {
 			});
 	}
 
+	/** The window's background shows through the page margins; paper is white. */
+	async function onPaper<T>(win: AppWindow, print: () => Promise<T>): Promise<T> {
+		win.window.setBackgroundColor("#ffffff");
+		try {
+			return await print();
+		} finally {
+			win.window.setBackgroundColor(windows.backgroundColor());
+		}
+	}
+
 	/** Prints the active tab: the renderer only lays out the visible document. */
 	async function exportPdf(win: AppWindow): Promise<void> {
 		const name = windows.activeTab(win)?.name ?? t.untitled;
@@ -111,10 +125,18 @@ function start(): void {
 		});
 		if (result.canceled || result.filePath === "") return;
 		try {
-			const pdf = await win.window.webContents.printToPDF({
-				printBackground: true,
-				pageSize: "A4",
-			});
+			const { pageNumbers } = store.settings;
+			// Size, orientation and margins come from the page's `@page` rule (see `pageRule`).
+			const pdf = await onPaper(win, () =>
+				win.window.webContents.printToPDF({
+					printBackground: true,
+					preferCSSPageSize: true,
+					displayHeaderFooter: pageNumbers,
+					...(pageNumbers
+						? { headerTemplate: "<span></span>", footerTemplate: PAGE_NUMBER_FOOTER }
+						: {}),
+				}),
+			);
 			await writeFile(result.filePath, pdf);
 		} catch (error) {
 			void dialog.showMessageBox(win.window, {
@@ -139,7 +161,14 @@ function start(): void {
 				refreshMenu();
 			},
 			exportPdf: (win) => void exportPdf(win),
-			print: (win) => win.window.webContents.print({ printBackground: true }),
+			print: (win) =>
+				void onPaper(
+					win,
+					() =>
+						new Promise<void>((resolve) =>
+							win.window.webContents.print({ printBackground: true }, () => resolve()),
+						),
+				),
 			showAbout: () => {
 				void dialog.showMessageBox({
 					type: "info",

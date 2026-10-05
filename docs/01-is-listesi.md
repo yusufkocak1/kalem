@@ -99,7 +99,7 @@ Belge iş akışı
 
 Dışa / içe aktarma
 - [ ] D-11 · Word'e dışa aktarma (`.docx`)
-- [ ] D-12 · PDF ayarları (sayfa boyutu, kenar boşluğu, sayfa numarası)
+- [x] D-12 · PDF ayarları (sayfa boyutu, kenar boşluğu, sayfa numarası)
 
 Editör
 - [ ] D-13 · Mermaid diyagramları

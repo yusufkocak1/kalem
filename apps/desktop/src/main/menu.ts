@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { MenuItemConstructorOptions, WebContents } from "electron";
 import { app, BrowserWindow, Menu, session, shell } from "electron";
 import type { Command, Settings, TabDocument } from "../shared/bridge.js";
-import { CHANNEL } from "../shared/bridge.js";
+import { CHANNEL, PAGE_SIZES } from "../shared/bridge.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type { AppWindow, WindowManager } from "./windows.js";
@@ -109,6 +109,7 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 				{ label: t.exportPdf, click: withWindow(ctx, (win) => ctx.exportPdf(win)) },
 			],
 		},
+		{ label: t.pageSetup, submenu: pageSetupTemplate(ctx) },
 		{
 			label: t.print,
 			accelerator: "CmdOrCtrl+P",
@@ -126,6 +127,43 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 		{ label: t.closeTab, accelerator: "CmdOrCtrl+W", click: send(ctx, "close-tab") },
 		{ label: t.closeWindow, accelerator: "CmdOrCtrl+Shift+W", role: "close" },
 		...(isMac ? [] : [{ label: t.quit, role: "quit" } satisfies MenuItemConstructorOptions]),
+	];
+}
+
+function pageSetupTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
+	const { t, settings } = ctx;
+	const radio = <K extends keyof Settings>(
+		key: K,
+		value: Settings[K],
+		label: string,
+	): MenuItemConstructorOptions => ({
+		label,
+		type: "radio",
+		checked: settings[key] === value,
+		click: () => ctx.changeSettings({ [key]: value }),
+	});
+
+	return [
+		{ label: t.pageSize, submenu: PAGE_SIZES.map((size) => radio("pageSize", size, size)) },
+		{
+			label: t.orientation,
+			submenu: [radio("landscape", false, t.portrait), radio("landscape", true, t.landscape)],
+		},
+		{
+			label: t.margins,
+			submenu: [
+				radio("margins", "normal", t.marginsNormal),
+				radio("margins", "narrow", t.marginsNarrow),
+				radio("margins", "wide", t.marginsWide),
+			],
+		},
+		{ type: "separator" },
+		{
+			label: t.pageNumbers,
+			type: "checkbox",
+			checked: settings.pageNumbers,
+			click: () => ctx.changeSettings({ pageNumbers: !settings.pageNumbers }),
+		},
 	];
 }
 

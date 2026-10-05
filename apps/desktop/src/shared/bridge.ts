@@ -3,6 +3,19 @@ import type { Lang } from "./i18n.js";
 
 export type Theme = "system" | "light" | "dark";
 
+export const PAGE_SIZES = ["A4", "A3", "A5", "Letter", "Legal"] as const;
+export type PageSize = (typeof PAGE_SIZES)[number];
+
+export const PAGE_MARGINS = ["normal", "narrow", "wide"] as const;
+export type PageMargins = (typeof PAGE_MARGINS)[number];
+
+/** Vertical and horizontal margin in cm, as Word's presets. */
+const MARGIN_CM: Readonly<Record<PageMargins, readonly [number, number]>> = {
+	normal: [2.5, 2.5],
+	narrow: [1.27, 1.27],
+	wide: [2.54, 5.08],
+};
+
 export interface Settings {
 	readonly theme: Theme;
 	/** `null` follows the operating system. */
@@ -13,6 +26,12 @@ export interface Settings {
 	readonly navigation: boolean;
 	readonly autoSave: boolean;
 	readonly spellCheck: boolean;
+	/** Page setup for printing and PDF export. */
+	readonly pageSize: PageSize;
+	readonly landscape: boolean;
+	readonly margins: PageMargins;
+	/** PDF export only: the print dialog has its own header and footer option. */
+	readonly pageNumbers: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -23,7 +42,18 @@ export const DEFAULT_SETTINGS: Settings = {
 	navigation: true,
 	autoSave: false,
 	spellCheck: true,
+	pageSize: "A4",
+	landscape: false,
+	margins: "normal",
+	pageNumbers: false,
 };
+
+/** The `@page` rule printing and PDF export lay the document out with. */
+export function pageRule(settings: Settings): string {
+	const [vertical, horizontal] = MARGIN_CM[settings.margins];
+	const orientation = settings.landscape ? "landscape" : "portrait";
+	return `@page { size: ${settings.pageSize} ${orientation}; margin: ${vertical}cm ${horizontal}cm; }`;
+}
 
 export const MIN_ZOOM = 50;
 export const MAX_ZOOM = 200;

@@ -688,6 +688,54 @@ test("exports the document as HTML and PDF", async () => {
 	await discardAndClose(app);
 });
 
+test("lays the PDF out with the page setup", async () => {
+	const folder = await tempDir("page-setup");
+	const pdf = join(folder, "yatay.pdf");
+	const { app, page, errors } = await launch();
+	await page.keyboard.type("Sayfa yapısı.");
+
+	await clickMenu(app, "File", "Page Setup", "Size", "A5");
+	await clickMenu(app, "File", "Page Setup", "Orientation", "Landscape");
+	await clickMenu(app, "File", "Page Setup", "Page Numbers in PDF");
+	await expect
+		.poll(() =>
+			page.evaluate(() =>
+				Array.from(document.querySelectorAll("style")).some((style) =>
+					style.textContent?.includes("A5 landscape"),
+				),
+			),
+		)
+		.toBe(true);
+	await stubSaveDialog(app, pdf);
+	await clickMenu(app, "File", "Export", "PDF…");
+	await expect
+		.poll(async () => (await stat(pdf).catch(() => null))?.size ?? 0)
+		.toBeGreaterThan(1000);
+
+	// A5 landscape is 210 × 148 mm, i.e. about 595 × 420 pt.
+	const box = /\/MediaBox\s*\[\s*0 0 ([\d.]+) ([\d.]+)\s*\]/.exec(
+		(await readFile(pdf)).toString("latin1"),
+	);
+	expect(Math.round(Number(box?.[1]))).toBe(595);
+	expect(Math.round(Number(box?.[2]))).toBe(420);
+
+	// Kept for the next session.
+	await clickMenu(app, "File", "Page Setup", "Orientation", "Portrait");
+	const settings = await app.evaluate(({ Menu }) => {
+		const setup = Menu.getApplicationMenu()
+			?.items.find((item) => item.label === "File")
+			?.submenu?.items.find((item) => item.label === "Page Setup")?.submenu;
+		const checked = (label: string) =>
+			setup?.items.find((item) => item.label === label)?.submenu?.items.find((item) => item.checked)
+				?.label;
+		return { size: checked("Size"), orientation: checked("Orientation") };
+	});
+	expect(settings).toEqual({ size: "A5", orientation: "Portrait" });
+
+	expect(errors).toEqual([]);
+	await discardAndClose(app);
+});
+
 test("opens a plain text file, shows its lines as written and saves it in place", async () => {
 	const path = join(await tempDir("txt"), "notlar.txt");
 	await writeFile(path, "Alışveriş listesi\r\nsüt, ekmek\r\n\r\n2 * 3 * 4 = 24\r\n");

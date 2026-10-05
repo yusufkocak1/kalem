@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import type { Settings, Theme } from "../shared/bridge.js";
-import { clampZoom, DEFAULT_SETTINGS } from "../shared/bridge.js";
+import type { PageMargins, PageSize, Settings, Theme } from "../shared/bridge.js";
+import { clampZoom, DEFAULT_SETTINGS, PAGE_MARGINS, PAGE_SIZES } from "../shared/bridge.js";
 import type { Lang } from "../shared/i18n.js";
 
 export const MAX_RECENT_FILES = 12;
@@ -72,6 +72,12 @@ export function parseStoredState(raw: unknown): StoredState {
 			navigation: asBoolean(s.navigation, d.navigation),
 			autoSave: asBoolean(s.autoSave, d.autoSave),
 			spellCheck: asBoolean(s.spellCheck, d.spellCheck),
+			pageSize: PAGE_SIZES.includes(s.pageSize as PageSize) ? (s.pageSize as PageSize) : d.pageSize,
+			landscape: asBoolean(s.landscape, d.landscape),
+			margins: PAGE_MARGINS.includes(s.margins as PageMargins)
+				? (s.margins as PageMargins)
+				: d.margins,
+			pageNumbers: asBoolean(s.pageNumbers, d.pageNumbers),
 		},
 		recentFiles: [...new Set(recentFiles)].slice(0, MAX_RECENT_FILES),
 		window: parseBounds(root.window),

@@ -103,7 +103,11 @@ verir.
   çökerse sonraki açılışta belge geri gelir.
 - Dosya başka bir programda değişirse pencereye dönünce fark edilir.
 - İsteğe bağlı otomatik kaydetme.
-- HTML ve PDF olarak dışa aktarma, yazdırma.
+- HTML ve PDF olarak dışa aktarma, yazdırma. **Dosya → Sayfa Yapısı**:
+  sayfa boyutu (A4, A3, A5, Letter, Legal), dikey/yatay, kenar boşlukları
+  (Word'ün Normal / Dar / Geniş ön ayarları) ve PDF'te sayfa numarası.
+  Ayarlar kalıcıdır ve hem PDF'e hem yazdırmaya uygulanır (sayfa numarası
+  yalnızca PDF'te; yazdırma kutusunun kendi üst/alt bilgi seçeneği var).
 
 **Word'den içe aktarma**
 

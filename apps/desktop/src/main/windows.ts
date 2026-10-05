@@ -98,6 +98,10 @@ export class WindowManager {
 		return this.#windows.get(contents.id);
 	}
 
+	backgroundColor(): string {
+		return nativeTheme.shouldUseDarkColors ? DARK_BACKGROUND : LIGHT_BACKGROUND;
+	}
+
 	focused(): AppWindow | undefined {
 		const window = BrowserWindow.getFocusedWindow();
 		return window === null ? undefined : this.#windows.get(window.webContents.id);
@@ -125,7 +129,7 @@ export class WindowManager {
 			show: false,
 			title: this.#options.strings().appName,
 			icon: join(__dirname, "icon.png"),
-			backgroundColor: nativeTheme.shouldUseDarkColors ? DARK_BACKGROUND : LIGHT_BACKGROUND,
+			backgroundColor: this.backgroundColor(),
 			autoHideMenuBar: true,
 			webPreferences: {
 				preload: this.#options.preloadPath,

@@ -7,7 +7,7 @@ import codeCss from "@kalem-editor/themes/plugin-code.css?inline";
 import tokensCss from "@kalem-editor/themes/tokens.css?inline";
 import viewerCss from "@kalem-editor/themes/viewer.css?inline";
 import type { Command, KalemBridge, Settings, TabDocument } from "../shared/bridge.js";
-import { clampZoom, MAX_ZOOM, MIN_ZOOM, ZOOM_STEP } from "../shared/bridge.js";
+import { clampZoom, MAX_ZOOM, MIN_ZOOM, pageRule, ZOOM_STEP } from "../shared/bridge.js";
 import { formatAllCodeBlocks, formatCodeBlock } from "../shared/code-blocks.js";
 import { buildHtmlDocument } from "../shared/html-export.js";
 import { format, stringsFor } from "../shared/i18n.js";
@@ -325,7 +325,10 @@ function cycleTab(step: 1 | -1): void {
 
 // --- Settings ---------------------------------------------------------------
 
+const pageSetup = document.head.appendChild(document.createElement("style"));
+
 function applySettings(): void {
+	pageSetup.textContent = pageRule(settings);
 	app.style.setProperty("--zoom", String(settings.zoom / 100));
 	app.toggleAttribute("data-full-width", settings.fullWidth);
 	navigation.hidden = !settings.navigation;
