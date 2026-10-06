@@ -20,6 +20,8 @@ async function fakeConfluence() {
 	const saves: { version: number; storage: string }[] = [];
 	const auth: string[] = [];
 	const searches: string[] = [];
+	/** Pages made through the API, under page 41. */
+	const created: { id: string; title: string; body: unknown }[] = [];
 
 	const json = (res: ServerResponse, body: unknown, status = 200) => {
 		res.writeHead(status, { "Content-Type": "application/json" });
@@ -45,7 +47,26 @@ async function fakeConfluence() {
 		}
 		if (url.pathname === "/rest/api/content/41/child/page") {
 			return json(res, {
-				results: [{ id: "42", title: page.title, children: { page: { size: 0 } } }],
+				results: [
+					{ id: "42", title: page.title, children: { page: { size: 0 } } },
+					...created.map(({ id, title }) => ({ id, title, children: { page: { size: 0 } } })),
+				],
+			});
+		}
+		if (url.pathname === "/rest/api/content" && req.method === "POST") {
+			const request = JSON.parse(await body(req));
+			const id = String(43 + created.length);
+			created.push({ id, title: request.title, body: request });
+			return json(res, { id });
+		}
+		const made = created.find((item) => url.pathname === `/rest/api/content/${item.id}`);
+		if (made !== undefined && req.method === "GET") {
+			return json(res, {
+				title: made.title,
+				version: { number: 1 },
+				body: { storage: { value: "<p></p>" } },
+				space: { key: "DEV" },
+				_links: { webui: `/pages/${made.id}` },
 			});
 		}
 		if (url.pathname === "/rest/api/search") {
@@ -97,6 +118,7 @@ async function fakeConfluence() {
 		saves,
 		auth,
 		searches,
+		created,
 		close: () => {
 			server.closeAllConnections();
 			server.close();
@@ -225,6 +247,50 @@ test("browses a space's page tree in the side pane and stars a page", async () =
 	// Unstarring from the favorites section takes it off.
 	await favorite.locator(".confluence-star").click();
 	await expect(pane.locator(".confluence-section")).toHaveCount(0);
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("adds a child page from the tree and opens it", async () => {
+	const confluence = await fakeConfluence();
+	cleanup.push(confluence.close);
+	const { app, page, errors } = await launch();
+
+	await page.getByRole("tab", { name: "Confluence" }).click();
+	const pane = page.locator(".confluence-pane");
+	await pane.getByRole("button", { name: "Connect" }).click();
+	const dialog = page.locator(".confluence-dialog");
+	await dialog.locator('input[type="url"]').fill(confluence.site);
+	await dialog.locator('input[type="password"]').fill(TOKEN);
+	await dialog.getByRole("button", { name: "Connect" }).click();
+	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
+	await page.keyboard.press("Escape");
+
+	await pane.locator("select").selectOption("DEV");
+	const root = pane.locator('[data-page="41"]');
+	await root.hover();
+	await root.getByRole("button", { name: "Add child page" }).click();
+	const title = pane.getByRole("textbox", { name: "Page title" });
+	await expect(title).toBeFocused();
+	// Escape gives up without a request.
+	await title.press("Escape");
+	await expect(title).toHaveCount(0);
+
+	await root.hover();
+	await root.getByRole("button", { name: "Add child page" }).click();
+	await title.fill("Toplantı Notları");
+	await title.press("Enter");
+
+	await expect(page.locator(".doc-tab", { hasText: "Toplantı Notları" })).toBeVisible();
+	const added = pane.locator('[data-page="43"]');
+	await expect(added).toContainText("Toplantı Notları");
+	await expect(added).toHaveAttribute("aria-current", "page");
+	expect(confluence.created[0]?.body).toMatchObject({
+		type: "page",
+		title: "Toplantı Notları",
+		space: { key: "DEV" },
+		ancestors: [{ id: "41" }],
+	});
 	expect(errors).toEqual([]);
 	await app.close();
 });

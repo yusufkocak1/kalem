@@ -29,6 +29,7 @@ const bridge: KalemBridge = {
 	confluenceDisconnect: () => ipcRenderer.invoke(CHANNEL.confluenceDisconnect),
 	confluenceSpaces: () => ipcRenderer.invoke(CHANNEL.confluenceSpaces),
 	confluenceTree: (parent) => ipcRenderer.invoke(CHANNEL.confluenceTree, parent),
+	confluenceCreatePage: (request) => ipcRenderer.invoke(CHANNEL.confluenceCreatePage, request),
 	confluenceSearch: (query, spaceKey) =>
 		ipcRenderer.invoke(CHANNEL.confluenceSearch, query, spaceKey),
 	confluenceOpenPage: (pageId) => ipcRenderer.invoke(CHANNEL.confluenceOpenPage, pageId),

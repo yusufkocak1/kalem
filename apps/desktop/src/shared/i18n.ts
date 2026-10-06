@@ -293,6 +293,10 @@ const en = {
 	confluenceAddFavorite: "Add to favorites",
 	confluenceRemoveFavorite: "Remove from favorites",
 	confluencePaneTree: "Pages",
+	confluenceNewPage: "New page",
+	confluenceAddChild: "Add child page",
+	confluencePageTitle: "Page title",
+	confluenceCreateFailed: "The page could not be created: {0}",
 	confluenceLossNotice:
 		"This page has content with no Markdown equivalent ({0}). Saving removes it from the page; earlier versions stay in the page history.",
 	confluenceLossConfirm: "Save to Confluence anyway?",
@@ -624,6 +628,10 @@ const tr: Strings = {
 	confluenceAddFavorite: "Favorilere ekle",
 	confluenceRemoveFavorite: "Favorilerden çıkar",
 	confluencePaneTree: "Sayfalar",
+	confluenceNewPage: "Yeni sayfa",
+	confluenceAddChild: "Alt sayfa ekle",
+	confluencePageTitle: "Sayfa başlığı",
+	confluenceCreateFailed: "Sayfa oluşturulamadı: {0}",
 	confluenceLossNotice:
 		"Bu sayfada Markdown karşılığı olmayan içerik var ({0}). Kaydetmek bunu sayfadan kaldırır; önceki sürümler sayfa geçmişinde kalır.",
 	confluenceLossConfirm: "Yine de Confluence'a kaydedilsin mi?",

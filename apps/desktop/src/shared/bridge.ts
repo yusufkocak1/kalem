@@ -168,6 +168,13 @@ export type ConfluenceTreeParent =
 	| { readonly space: string; readonly page?: undefined }
 	| { readonly page: string; readonly space?: undefined };
 
+export interface ConfluenceNewPage {
+	readonly space: string;
+	/** The parent page; `null` for a top-level page. */
+	readonly parent: string | null;
+	readonly title: string;
+}
+
 /** A page the user starred; kept per site in the settings. */
 export interface ConfluenceFavorite {
 	readonly site: string;
@@ -405,6 +412,8 @@ export interface KalemBridge {
 	confluenceSpaces(): Promise<readonly ConfluenceSpace[]>;
 	/** One level of a space's page tree. */
 	confluenceTree(parent: ConfluenceTreeParent): Promise<readonly ConfluenceTreePage[]>;
+	/** Creates an empty page (under `parent`, or at the top of the space) and opens it in a tab. */
+	confluenceCreatePage(request: ConfluenceNewPage): Promise<ConfluenceTreePage>;
 	/** Recently changed pages, filtered by title and space when given. */
 	confluenceSearch(
 		query: string,
@@ -492,6 +501,7 @@ export const CHANNEL = {
 	confluenceDisconnect: "kalem:confluence-disconnect",
 	confluenceSpaces: "kalem:confluence-spaces",
 	confluenceTree: "kalem:confluence-tree",
+	confluenceCreatePage: "kalem:confluence-create-page",
 	confluenceSearch: "kalem:confluence-search",
 	confluenceOpenPage: "kalem:confluence-open-page",
 	confluenceReloadPage: "kalem:confluence-reload-page",

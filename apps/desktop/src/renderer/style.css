@@ -1596,9 +1596,51 @@ pre[data-preview="error"]::after {
 	height: 14px;
 }
 
+.confluence-add {
+	flex: none;
+	align-self: center;
+	opacity: 0;
+}
+
+.confluence-add .icon {
+	width: 14px;
+	height: 14px;
+}
+
 .confluence-page-item:hover .confluence-star,
-.confluence-star:focus-visible {
+.confluence-star:focus-visible,
+.confluence-page-item:hover .confluence-add,
+.confluence-add:focus-visible {
 	opacity: 1;
+}
+
+.confluence-new-page {
+	align-items: center;
+	gap: 5px;
+	padding-top: 2px;
+	padding-bottom: 2px;
+}
+
+.confluence-new-page > .icon {
+	flex: none;
+	width: 15px;
+	height: 15px;
+	color: var(--app-muted);
+}
+
+.confluence-new-title {
+	flex: 1;
+	min-width: 0;
+	padding: 3px 6px;
+	border: 1px solid var(--app-accent);
+	border-radius: 5px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+}
+
+.confluence-new-title:focus {
+	outline: none;
 }
 
 .confluence-star[aria-pressed="true"] {

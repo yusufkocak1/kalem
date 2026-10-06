@@ -74,6 +74,17 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 	let generation = 0;
 	let searchTimer: ReturnType<typeof setTimeout> | undefined;
 	let searchId = 0;
+	/**
+	 * A new page being named: the title box shows at the top of `level`.
+	 * The box is one element for the whole naming, so a level arriving
+	 * while the user types re-renders the tree without losing the text.
+	 */
+	let creating: {
+		readonly level: string;
+		readonly space: string;
+		readonly parent: string | null;
+		readonly input: HTMLInputElement;
+	} | null = null;
 
 	const title = el("span", { class: "confluence-pane-title" });
 	const refreshButton = el("button", {
@@ -82,6 +93,12 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 		children: [icon("refresh")],
 	});
 	refreshButton.addEventListener("click", () => void refresh());
+	const newPageButton = el("button", {
+		class: "icon-button",
+		attrs: { type: "button", "aria-label": t.confluenceNewPage, title: t.confluenceNewPage },
+		children: [icon("new")],
+	});
+	newPageButton.addEventListener("click", () => startCreate(space.value, null));
 
 	const space = el("select", {
 		class: "confluence-pane-space",
@@ -110,7 +127,10 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 	const element = el("div", {
 		class: "confluence-pane",
 		children: [
-			el("div", { class: "confluence-pane-toolbar", children: [title, refreshButton] }),
+			el("div", {
+				class: "confluence-pane-toolbar",
+				children: [title, newPageButton, refreshButton],
+			}),
 			space,
 			search,
 			message,
@@ -139,6 +159,7 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 		space.hidden = !signedIn;
 		search.hidden = !signedIn;
 		refreshButton.hidden = !signedIn;
+		newPageButton.hidden = !signedIn || space.value === "";
 	}
 
 	// --- Favorites -----------------------------------------------------------
@@ -200,6 +221,8 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 		readonly meta?: string;
 		/** A page (opened on click, can be starred) or a space (expands on click). */
 		readonly page: string | null;
+		/** Where a page added from this row goes. */
+		readonly add?: { readonly space: string; readonly parent: string | null };
 	}
 
 	function row(row: RowOptions): HTMLElement {
@@ -240,11 +263,100 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 			children: [
 				twisty(row.branch, row.title),
 				main,
+				...(row.add === undefined ? [] : [addButton(row.add.space, row.add.parent)]),
 				...(page === null ? [] : [starButton({ id: page, title: row.title })]),
 			],
 		});
 		item.style.setProperty("--depth", String(row.depth));
 		return item;
+	}
+
+	function addButton(spaceKey: string, parent: string | null): HTMLElement {
+		const label = parent === null ? t.confluenceNewPage : t.confluenceAddChild;
+		const button = el("button", {
+			class: "icon-button confluence-add",
+			attrs: { type: "button", "aria-label": label, title: label },
+			children: [icon("new")],
+		});
+		button.addEventListener("click", () => startCreate(spaceKey, parent));
+		return button;
+	}
+
+	// --- New page ------------------------------------------------------------
+
+	function startCreate(spaceKey: string, parent: string | null): void {
+		if (spaceKey === "") return;
+		const level = parent === null ? spaceLevel(spaceKey) : pageLevel(parent);
+		creating = { level, space: spaceKey, parent, input: titleInput() };
+		expanded.add(level);
+		// The box lives in the tree; search results would hide it.
+		search.value = "";
+		results = null;
+		render();
+		creating.input.focus();
+	}
+
+	function titleInput(): HTMLInputElement {
+		const input = el("input", {
+			class: "confluence-new-title",
+			attrs: {
+				type: "text",
+				placeholder: t.confluencePageTitle,
+				"aria-label": t.confluencePageTitle,
+				maxlength: "255",
+			},
+		});
+		const cancel = (): void => {
+			creating = null;
+			render();
+		};
+		input.addEventListener("keydown", (event) => {
+			if (event.key === "Escape") {
+				event.preventDefault();
+				event.stopPropagation();
+				cancel();
+			} else if (event.key === "Enter") {
+				event.preventDefault();
+				void create(input);
+			}
+		});
+		// No cancel on blur: the tree re-renders as levels arrive and focus can
+		// briefly leave the box. Escape, another "+" or another space ends it.
+		return input;
+	}
+
+	function titleRow(depth: number, input: HTMLInputElement): HTMLElement {
+		const item = el("div", {
+			class: "confluence-page-item confluence-new-page",
+			children: [el("span", { class: "confluence-twisty" }), icon("file"), input],
+		});
+		item.style.setProperty("--depth", String(depth));
+		return item;
+	}
+
+	async function create(input: HTMLInputElement): Promise<void> {
+		const request = creating;
+		const name = input.value.trim();
+		if (request === null || name === "") return;
+		input.disabled = true;
+		showMessage(t.confluenceLoading);
+		try {
+			await bridge.confluenceCreatePage({
+				space: request.space,
+				parent: request.parent,
+				title: name,
+			});
+			creating = null;
+			// The level is listed again with the new page in Confluence's order.
+			levels.delete(request.level);
+			showMessage("");
+			render();
+			requestAnimationFrame(() => highlightActive());
+		} catch (error) {
+			input.disabled = false;
+			input.focus();
+			showMessage(format(t.confluenceCreateFailed, errorText(error)));
+		}
 	}
 
 	function note(text: string, depth: number): HTMLElement {
@@ -280,35 +392,60 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 	}
 
 	/** The rows of a level and, below each expanded page, its own level. */
-	function levelRows(key: string, depth: number): HTMLElement[] {
+	function levelRows(key: string, depth: number, spaceKey: string): HTMLElement[] {
 		load(key);
 		const level = levels.get(key);
-		if (level === undefined || level.status === "loading")
-			return [note(t.confluenceLoading, depth)];
-		if (level.status === "error") {
-			return [note(format(t.confluenceRequestFailed, level.message), depth)];
+		const naming = creating?.level === key ? [titleRow(depth, creating.input)] : [];
+		if (level === undefined || level.status === "loading") {
+			return [...naming, note(t.confluenceLoading, depth)];
 		}
-		if (level.pages.length === 0) return depth === 0 ? [note(t.confluenceNoPages, depth)] : [];
-		return level.pages.flatMap((page) => {
-			const branch = pageLevel(page.id);
-			const childLevel = levels.get(branch);
-			// Cloud does not say whether a page has children; an empty answer settles it.
-			const leaf =
-				page.hasChildren === false ||
-				(childLevel?.status === "done" && childLevel.pages.length === 0);
-			const rows = [row({ depth, branch: leaf ? null : branch, title: page.title, page: page.id })];
-			if (!leaf && expanded.has(branch)) rows.push(...levelRows(branch, depth + 1));
-			return rows;
-		});
+		if (level.status === "error") {
+			return [...naming, note(format(t.confluenceRequestFailed, level.message), depth)];
+		}
+		if (level.pages.length === 0 && naming.length === 0) {
+			return depth === 0 ? [note(t.confluenceNoPages, depth)] : [];
+		}
+		return [
+			...naming,
+			...level.pages.flatMap((page) => {
+				const branch = pageLevel(page.id);
+				const childLevel = levels.get(branch);
+				// Cloud does not say whether a page has children; an empty answer settles it.
+				// A child being added, or a level listed again after one was, decides anew.
+				const leaf =
+					creating?.level !== branch &&
+					((page.hasChildren === false && childLevel === undefined) ||
+						(childLevel?.status === "done" && childLevel.pages.length === 0));
+				const rows = [
+					row({
+						depth,
+						branch: leaf ? null : branch,
+						title: page.title,
+						page: page.id,
+						add: { space: spaceKey, parent: page.id },
+					}),
+				];
+				if (!leaf && expanded.has(branch)) rows.push(...levelRows(branch, depth + 1, spaceKey));
+				return rows;
+			}),
+		];
 	}
 
 	function treeRows(): HTMLElement[] {
-		if (space.value !== "") return levelRows(spaceLevel(space.value), 0);
+		if (space.value !== "") return levelRows(spaceLevel(space.value), 0, space.value);
 		if (spaces.length === 0) return [note(t.confluenceNoPages, 0)];
 		return spaces.flatMap((item) => {
 			const branch = spaceLevel(item.key);
-			const rows = [row({ depth: 0, branch, title: item.name, page: null })];
-			if (expanded.has(branch)) rows.push(...levelRows(branch, 1));
+			const rows = [
+				row({
+					depth: 0,
+					branch,
+					title: item.name,
+					page: null,
+					add: { space: item.key, parent: null },
+				}),
+			];
+			if (expanded.has(branch)) rows.push(...levelRows(branch, 1, item.key));
 			return rows;
 		});
 	}
@@ -334,6 +471,13 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 				: results.map((page) =>
 						row({ depth: 0, branch: null, title: page.title, meta: describe(page), page: page.id }),
 					);
+		// Focus stays in the title box across re-renders, or comes back to it when a
+		// removed row (the "+" just clicked) left it nowhere; it is not taken from
+		// anything else the user went to.
+		const focused = list.ownerDocument.activeElement;
+		const typing =
+			creating !== null &&
+			(focused === creating.input || focused === null || focused === list.ownerDocument.body);
 		list.replaceChildren(
 			...(favorites.length === 0
 				? body
@@ -344,6 +488,7 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 						...body,
 					]),
 		);
+		if (typing) creating?.input.focus();
 	}
 
 	function highlightActive(): void {
@@ -439,6 +584,8 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 
 	space.addEventListener("change", () => {
 		options.setSpace(space.value);
+		creating = null;
+		newPageButton.hidden = space.value === "";
 		void runSearch();
 	});
 	search.addEventListener("input", () => {
