@@ -21,12 +21,24 @@ import { sourceModePlugin } from "@kalem-editor/plugin-source-mode";
 import { wordCountPlugin } from "@kalem-editor/plugin-word-count";
 import type { Ui } from "@kalem-editor/ui";
 import { labelsFor, mountUi } from "@kalem-editor/ui";
-import type { DocumentPayload, KalemBridge, Settings } from "../shared/bridge.js";
-import { confluenceToMarkdown } from "../shared/confluence.js";
+import type {
+	DocumentPayload,
+	ImageFile,
+	KalemBridge,
+	RemotePage,
+	Settings,
+} from "../shared/bridge.js";
+import {
+	confluenceToMarkdown,
+	markdownToStorage,
+	storageLosses,
+	storageToMarkdown,
+} from "../shared/confluence.js";
+import { fileUrl } from "../shared/confluence-common.js";
 import type { TextFormat } from "../shared/encoding.js";
 import { DEFAULT_FORMAT, formatLabel, willConvertToUtf8 } from "../shared/encoding.js";
 import type { Lang, Strings } from "../shared/i18n.js";
-import { format } from "../shared/i18n.js";
+import { format, lossLabel } from "../shared/i18n.js";
 import { IMAGE_EXTENSIONS, isEmbeddedImage, parseDataUrl, toDataUrl } from "../shared/images.js";
 import {
 	documentBaseUrl,
@@ -91,6 +103,10 @@ export class Session {
 	#images: ImageUploadPlugin | null = null;
 
 	#path: string | null = null;
+	/** The Confluence page this tab saves to; then `#path` is `null`. */
+	#remote: RemotePage | null = null;
+	/** Page content the Markdown could not hold; saving asks before dropping it. */
+	#losses: string[] = [];
 	/** What relative links resolve against: the path, or a package's unpacked text. */
 	#base: string | null = null;
 	#name = "";
@@ -146,6 +162,10 @@ export class Session {
 		return this.#name;
 	}
 
+	get remote(): RemotePage | null {
+		return this.#remote;
+	}
+
 	get format(): TextFormat {
 		return this.#format;
 	}
@@ -161,7 +181,7 @@ export class Session {
 	get status(): SaveStatus {
 		if (this.#saving) return "saving";
 		if (this.#dirty) return this.#saveFailed ? "error" : "unsaved";
-		return this.#path === null ? "new" : "saved";
+		return this.#path === null && this.#remote === null ? "new" : "saved";
 	}
 
 	/** The document with its table style comments; in source mode, the source text. */
@@ -213,6 +233,8 @@ export class Session {
 		notices.clear();
 		this.#saveFailed = false;
 		this.#path = null;
+		this.#remote = null;
+		this.#losses = [];
 		this.#base = null;
 		this.#name = t.untitled;
 		this.#format = DEFAULT_FORMAT;
@@ -267,8 +289,27 @@ export class Session {
 				notices.show({ id: "word", text: format(t.confluenceImported, confluence.name) });
 				break;
 			}
+			case "confluence-page": {
+				const { page, storage } = payload.content;
+				text = storageToMarkdown(storage);
+				this.#remote = page;
+				this.#name = page.title;
+				this.#losses = storageLosses(storage);
+				if (this.#losses.length > 0) {
+					notices.show({
+						id: "confluence-loss",
+						kind: "warning",
+						text: format(
+							t.confluenceLossNotice,
+							this.#losses.map((loss) => lossLabel(t, loss)).join(", "),
+						),
+					});
+				}
+				break;
+			}
 			case "draft": {
 				const { draft } = payload;
+				this.#remote = draft.remote ?? null;
 				text = draft.text;
 				this.#path = draft.path;
 				this.#base = draft.base ?? draft.path;
@@ -285,6 +326,7 @@ export class Session {
 				break;
 			case "moved": {
 				const { draft } = payload;
+				this.#remote = draft.remote ?? null;
 				text = draft.text;
 				this.#path = draft.path;
 				this.#base = draft.base ?? draft.path;
@@ -335,10 +377,13 @@ export class Session {
 		// An untitled document has no folder; it gets a base that resolves to nothing.
 		// The element is never removed or left without an href: Chromium reports
 		// both as a violation of the `base-uri` policy.
+		const scheme = this.#o.documentScheme;
 		const href =
-			this.#base === null
-				? `${this.#o.documentScheme}://local/`
-				: documentBaseUrl(this.#o.documentScheme, this.#base);
+			this.#remote !== null
+				? `${scheme}://confluence/${this.#remote.id}/`
+				: this.#base === null
+					? `${scheme}://local/`
+					: documentBaseUrl(scheme, this.#base);
 		const existing = document.querySelector("base");
 		if (existing !== null) {
 			existing.href = href;
@@ -504,7 +549,13 @@ export class Session {
 
 	/** Saves are serialized: autosave and Ctrl+S must not write concurrently. */
 	save(saveAs = false, kind?: "package"): Promise<boolean> {
-		const result = this.#saveQueue.then(() => this.#save(saveAs, kind));
+		return this.#enqueue(() =>
+			this.#remote !== null && !saveAs ? this.#saveRemote(false) : this.#save(saveAs, kind),
+		);
+	}
+
+	#enqueue(task: () => Promise<boolean>): Promise<boolean> {
+		const result = this.#saveQueue.then(task);
 		this.#saveQueue = result.catch(() => false);
 		return result;
 	}
@@ -534,6 +585,9 @@ export class Session {
 		try {
 			if (path !== this.#path) {
 				this.#path = path;
+				// Saved as a file: the tab no longer writes to Confluence.
+				this.#remote = null;
+				this.#losses = [];
 				this.#name = stripExtension(fileName(path));
 				// A package's links resolve inside it; the save result brings that base.
 				if (!isPackagePath(path)) {
@@ -541,7 +595,8 @@ export class Session {
 					this.#updateBase();
 				}
 			}
-			await this.#extractEmbeddedImages(editor, path);
+			const documentPath = path;
+			await this.#extractEmbeddedImages(editor, (image) => bridge.writeImage(documentPath, image));
 
 			const text = this.#text();
 			const target: TextFormat = willConvertToUtf8(this.#format)
@@ -577,11 +632,95 @@ export class Session {
 		}
 	}
 
+	/** Writes the tab to its Confluence page as a new version. */
+	async #saveRemote(overwrite: boolean): Promise<boolean> {
+		const { bridge, t, notices } = this.#o;
+		const editor = this.editor;
+		if (this.#source?.isSource() === true) this.#source.exit();
+		if ((this.#images?.pendingUploads().length ?? 0) > 0) {
+			notices.show({ id: "save", kind: "warning", text: t.uploadPending });
+			return false;
+		}
+		if (this.#remote === null || (!this.#dirty && !overwrite)) return true;
+
+		this.#saving = true;
+		this.#o.onStateChange();
+		try {
+			await this.#extractEmbeddedImages(editor, async (image) =>
+				fileUrl(await bridge.confluenceAttachImage(this.id, image)),
+			);
+			const remote = this.#remote;
+			if (this.#editor !== editor || remote === null) return false;
+			const text = this.#text();
+			const result = await bridge.confluenceSavePage(this.id, {
+				storage: markdownToStorage(text),
+				version: remote.version,
+				losses: this.#losses,
+				overwrite,
+			});
+			if (!result.ok) {
+				if (result.reason === "conflict") {
+					this.#saveFailed = true;
+					notices.show({
+						id: "save",
+						kind: "warning",
+						text: t.confluenceConflict,
+						actions: [
+							{ label: t.confluenceLoadTheirs, run: () => void this.reloadRemote() },
+							{
+								label: t.confluenceOverwrite,
+								run: () => void this.#enqueue(() => this.#saveRemote(true)),
+							},
+						],
+					});
+				}
+				return false;
+			}
+			this.#remote = result.page;
+			this.#name = result.page.title;
+			this.#losses = [];
+			this.#savedText = text;
+			this.#saveFailed = false;
+			this.#dirty = this.#text() !== text;
+			for (const id of ["save", "recovered", "confluence-loss"]) notices.dismiss(id);
+			return true;
+		} catch (error) {
+			this.#saveFailed = true;
+			notices.show({
+				id: "save",
+				kind: "error",
+				text: format(t.saveError, ipcErrorMessage(error)),
+			});
+			return false;
+		} finally {
+			this.#saving = false;
+			this.#report();
+			this.#o.onStateChange();
+		}
+	}
+
+	/** Replaces the tab's text with the page as it is on Confluence now. */
+	async reloadRemote(): Promise<void> {
+		const { bridge, t, notices } = this.#o;
+		try {
+			this.load({ kind: "confluence-page", content: await bridge.confluenceReloadPage(this.id) });
+		} catch (error) {
+			notices.show({
+				id: "save",
+				kind: "error",
+				text: format(t.confluenceRequestFailed, ipcErrorMessage(error)),
+			});
+		}
+	}
+
 	/**
 	 * Images added before the first save live in the document as `data:` URLs.
-	 * Once a path is known they are written next to it and relinked.
+	 * On save they are written next to the file (or attached to the page) and relinked.
 	 */
-	async #extractEmbeddedImages(editor: Editor, documentPath: string): Promise<void> {
+	async #extractEmbeddedImages(
+		editor: Editor,
+		write: (image: ImageFile) => Promise<string>,
+	): Promise<void> {
 		if (editor.isReadOnly()) return;
 		const snapshot = editor.getDocument();
 		const seen = new Set<string>();
@@ -594,7 +733,7 @@ export class Session {
 			if (data === null || ext === undefined) continue;
 
 			const alt = (imageAltAt(snapshot, index) ?? "").trim();
-			const relative = await this.#o.bridge.writeImage(documentPath, {
+			const relative = await write({
 				name: `${alt === "" ? "image" : alt}.${ext}`,
 				type: data.type,
 				bytes: data.bytes,

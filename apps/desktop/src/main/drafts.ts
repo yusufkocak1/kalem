@@ -1,6 +1,6 @@
 import { mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { Draft, DraftRequest } from "../shared/bridge.js";
+import type { Draft, DraftRequest, RemotePage } from "../shared/bridge.js";
 import { toTextFormat } from "../shared/encoding.js";
 
 // The id becomes a file name, so its shape is fixed.
@@ -10,6 +10,7 @@ function parseDraft(id: string, raw: unknown): Draft | null {
 	if (typeof raw !== "object" || raw === null) return null;
 	const value = raw as Record<string, unknown>;
 	if (typeof value.text !== "string") return null;
+	const remote = parseRemote(value.remote);
 	return {
 		id,
 		path: typeof value.path === "string" && value.path !== "" ? value.path : null,
@@ -17,6 +18,25 @@ function parseDraft(id: string, raw: unknown): Draft | null {
 		text: value.text,
 		format: toTextFormat(value.format),
 		time: typeof value.time === "number" ? value.time : 0,
+		...(remote === null ? {} : { remote }),
+	};
+}
+
+function parseRemote(raw: unknown): RemotePage | null {
+	if (typeof raw !== "object" || raw === null) return null;
+	const value = raw as Record<string, unknown>;
+	const text = (key: string): string =>
+		typeof value[key] === "string" ? (value[key] as string) : "";
+	if (text("site") === "" || !/^\d+$/.test(text("id")) || typeof value.version !== "number") {
+		return null;
+	}
+	return {
+		site: text("site"),
+		id: text("id"),
+		title: text("title"),
+		spaceKey: text("spaceKey"),
+		version: value.version,
+		webUrl: text("webUrl"),
 	};
 }
 
@@ -38,7 +58,7 @@ export class DraftStore {
 
 	async write(
 		id: string,
-		request: DraftRequest & { path: string | null },
+		request: DraftRequest & { path: string | null; remote?: RemotePage | null },
 		time: number,
 	): Promise<void> {
 		const file = this.#file(id);

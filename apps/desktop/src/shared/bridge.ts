@@ -113,6 +113,63 @@ export interface ConfluenceContent {
 	readonly text: string;
 }
 
+/** A Confluence page a tab is bound to: saving the tab updates the page. */
+export interface RemotePage {
+	/** The site's REST base, e.g. `https://acme.atlassian.net/wiki`. */
+	readonly site: string;
+	readonly id: string;
+	readonly title: string;
+	readonly spaceKey: string;
+	/** The page version the tab's text is based on. */
+	readonly version: number;
+	readonly webUrl: string;
+}
+
+export interface ConfluencePageContent {
+	readonly page: RemotePage;
+	/** Storage format (XHTML). */
+	readonly storage: string;
+}
+
+export interface ConfluenceAccount {
+	readonly site: string;
+	/** Empty for a personal access token (Server / Data Center). */
+	readonly username: string;
+	readonly cloud: boolean;
+}
+
+export interface ConfluenceLogin {
+	readonly site: string;
+	readonly username: string;
+	readonly token: string;
+}
+
+export interface ConfluenceSpace {
+	readonly key: string;
+	readonly name: string;
+}
+
+export interface ConfluencePageSummary {
+	readonly id: string;
+	readonly title: string;
+	readonly spaceName: string;
+	/** ISO date, when the server reports it. */
+	readonly modified: string | null;
+}
+
+export interface ConfluenceSaveRequest {
+	readonly storage: string;
+	readonly version: number;
+	/** Content of the page that has no Markdown equivalent; the user confirms losing it. */
+	readonly losses: readonly string[];
+	/** Save over a newer version on the server. */
+	readonly overwrite: boolean;
+}
+
+export type ConfluenceSaveResult =
+	| { readonly ok: true; readonly page: RemotePage }
+	| { readonly ok: false; readonly reason: "conflict" | "cancelled" };
+
 /** An unsaved document left over from a session that did not exit cleanly. */
 export interface Draft {
 	readonly id: string;
@@ -123,6 +180,7 @@ export interface Draft {
 	readonly time: number;
 	/** See `OpenedFile.base`. */
 	readonly base?: string;
+	readonly remote?: RemotePage;
 }
 
 export type DocumentPayload =
@@ -130,6 +188,7 @@ export type DocumentPayload =
 	| { readonly kind: "file"; readonly file: OpenedFile }
 	| { readonly kind: "word"; readonly word: WordContent }
 	| { readonly kind: "confluence"; readonly confluence: ConfluenceContent }
+	| { readonly kind: "confluence-page"; readonly content: ConfluencePageContent }
 	| { readonly kind: "draft"; readonly draft: Draft }
 	/** An empty document that saves to `path` without asking; the file appears on first save. */
 	| { readonly kind: "new-file"; readonly path: string; readonly name: string }
@@ -284,6 +343,7 @@ export const COMMANDS = [
 	"export-docx",
 	"export-confluence",
 	"export-confluence-wiki",
+	"confluence-open",
 	"quick-open",
 	"search-folder",
 	"version-history",
@@ -311,6 +371,23 @@ export interface KalemBridge {
 	openPath(path: string): Promise<void>;
 	importWord(): Promise<void>;
 	importConfluence(): Promise<void>;
+
+	confluenceAccount(): Promise<ConfluenceAccount | null>;
+	/** Checks the login against the site and remembers it; the token never comes back. */
+	confluenceConnect(login: ConfluenceLogin): Promise<ConfluenceAccount>;
+	confluenceDisconnect(): Promise<void>;
+	confluenceSpaces(): Promise<readonly ConfluenceSpace[]>;
+	/** Recently changed pages, filtered by title and space when given. */
+	confluenceSearch(
+		query: string,
+		spaceKey: string | null,
+	): Promise<readonly ConfluencePageSummary[]>;
+	/** Opens the page in a tab of this window. */
+	confluenceOpenPage(pageId: string): Promise<void>;
+	confluenceReloadPage(tabId: string): Promise<ConfluencePageContent>;
+	confluenceSavePage(tabId: string, request: ConfluenceSaveRequest): Promise<ConfluenceSaveResult>;
+	/** Attaches the image to the tab's page; resolves with the attachment's file name. */
+	confluenceAttachImage(tabId: string, image: ImageFile): Promise<string>;
 	/** `package` proposes a `.kmd`; otherwise Markdown (or the tab's current type) comes first. */
 	chooseSavePath(tabId: string, suggestedName: string, kind?: "package"): Promise<string | null>;
 	writeDocument(tabId: string, path: string, text: string, format: TextFormat): Promise<SaveResult>;
@@ -382,6 +459,15 @@ export const CHANNEL = {
 	openPath: "kalem:open-path",
 	importWord: "kalem:import-word",
 	importConfluence: "kalem:import-confluence",
+	confluenceAccount: "kalem:confluence-account",
+	confluenceConnect: "kalem:confluence-connect",
+	confluenceDisconnect: "kalem:confluence-disconnect",
+	confluenceSpaces: "kalem:confluence-spaces",
+	confluenceSearch: "kalem:confluence-search",
+	confluenceOpenPage: "kalem:confluence-open-page",
+	confluenceReloadPage: "kalem:confluence-reload-page",
+	confluenceSavePage: "kalem:confluence-save-page",
+	confluenceAttachImage: "kalem:confluence-attach-image",
 	chooseSavePath: "kalem:choose-save-path",
 	writeDocument: "kalem:write-document",
 	reloadDocument: "kalem:reload-document",

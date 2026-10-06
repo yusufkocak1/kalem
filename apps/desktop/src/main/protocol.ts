@@ -33,11 +33,36 @@ export function registerDocumentScheme(): void {
 	]);
 }
 
+/** Images of a Confluence page tab: `kalem-doc://confluence/<page id>/<file name>`. */
+export const CONFLUENCE_HOST = "confluence";
+
+export type AttachmentLoader = (pageId: string, name: string) => Promise<Response | null>;
+
+async function serveAttachment(url: URL, load: AttachmentLoader): Promise<Response> {
+	const match = /^\/(\d+)\/([^/]+)$/.exec(url.pathname);
+	if (match === null) return new Response(null, { status: 404 });
+	let name: string;
+	try {
+		name = decodeURIComponent(match[2] as string);
+	} catch {
+		return new Response(null, { status: 404 });
+	}
+	if (!SERVED_EXTENSIONS.has(extension(name))) return new Response(null, { status: 403 });
+	try {
+		const response = await load(match[1] as string, name);
+		return response ?? new Response(null, { status: 404 });
+	} catch {
+		return new Response(null, { status: 404 });
+	}
+}
+
 /** Must run after the app is ready. */
-export function handleDocumentScheme(): void {
+export function handleDocumentScheme(loadAttachment: AttachmentLoader): void {
 	protocol.handle(DOCUMENT_SCHEME, async (request) => {
 		if (request.method !== "GET") return new Response(null, { status: 405 });
 
+		const url = new URL(request.url);
+		if (url.hostname === CONFLUENCE_HOST) return serveAttachment(url, loadAttachment);
 		const path = urlPathToFilePath(new URL(request.url).pathname, process.platform === "win32");
 		if (path === null || !SERVED_EXTENSIONS.has(extension(path))) {
 			return new Response(null, { status: 403 });

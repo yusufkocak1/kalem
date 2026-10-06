@@ -1,7 +1,7 @@
 import { storageToMarkdown } from "./confluence-storage.js";
 import { wikiToMarkdown } from "./confluence-wiki.js";
 
-export { markdownToStorage } from "./confluence-storage.js";
+export { markdownToStorage, storageLosses, storageToMarkdown } from "./confluence-storage.js";
 export { markdownToWiki } from "./confluence-wiki.js";
 
 /**

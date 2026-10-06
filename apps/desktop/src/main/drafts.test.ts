@@ -44,6 +44,36 @@ describe("DraftStore", () => {
 		await store.delete(ID_A);
 	});
 
+	it("keeps the Confluence page a draft belongs to", async () => {
+		const remote = {
+			site: "https://acme.atlassian.net/wiki",
+			id: "42",
+			title: "Plan",
+			spaceKey: "DEV",
+			version: 3,
+			webUrl: "https://acme.atlassian.net/wiki/spaces/DEV/pages/42",
+		};
+		await store.write(
+			ID_A,
+			{ path: null, remote, name: "Plan", text: "x", format: DEFAULT_FORMAT },
+			1,
+		);
+		await store.write(
+			ID_B,
+			{
+				path: null,
+				remote: { ...remote, id: "../x" },
+				name: "y",
+				text: "y",
+				format: DEFAULT_FORMAT,
+			},
+			2,
+		);
+		const [a, b] = await store.list();
+		expect(a?.remote).toEqual(remote);
+		expect(b?.remote).toBeUndefined();
+	});
+
 	it("overwrites the draft of the same window and leaves no temp file", async () => {
 		const request = { path: null, name: "x", format: DEFAULT_FORMAT };
 		await store.write(ID_A, { ...request, text: "eski" }, 1);

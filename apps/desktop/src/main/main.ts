@@ -2,13 +2,23 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { app, BrowserWindow, dialog, globalShortcut, nativeTheme, session } from "electron";
+import {
+	app,
+	BrowserWindow,
+	dialog,
+	globalShortcut,
+	nativeTheme,
+	safeStorage,
+	session,
+} from "electron";
 import type { Draft, Settings } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format, pickLanguage, stringsFor } from "../shared/i18n.js";
 import { quickNoteName } from "../shared/notes.js";
 import { isEditablePath, isPackagePath, isWordPath } from "../shared/paths.js";
+import { confluenceClient } from "./confluence-ipc.js";
+import { ConfluenceStore } from "./confluence-store.js";
 import { DraftStore } from "./drafts.js";
 import { VersionStore } from "./history.js";
 import { registerIpc } from "./ipc.js";
@@ -55,6 +65,11 @@ function start(): void {
 	const store = new SettingsStore(join(app.getPath("userData"), "settings.json"));
 	const drafts = new DraftStore(join(app.getPath("userData"), "drafts"));
 	const packages = new PackageStore(join(app.getPath("userData"), "packages"));
+	const confluence = new ConfluenceStore(join(app.getPath("userData"), "confluence.json"), {
+		encrypt: (text) =>
+			safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(text) : null,
+		decrypt: (data) => safeStorage.decryptString(data),
+	});
 	// End-to-end tests keep every save as its own version.
 	const versionInterval = Number(process.env.KALEM_VERSION_INTERVAL);
 	const versions = new VersionStore(
@@ -361,7 +376,10 @@ function start(): void {
 		ready = true;
 
 		nativeTheme.themeSource = store.settings.theme;
-		handleDocumentScheme();
+		handleDocumentScheme(async (pageId, name) => {
+			const credentials = await confluence.get();
+			return credentials === null ? null : confluenceClient(credentials).attachment(pageId, name);
+		});
 		applySpellCheck();
 		installUserTasks();
 		registerIpc({
@@ -370,6 +388,7 @@ function start(): void {
 			drafts,
 			packages,
 			versions,
+			confluence,
 			strings: () => t,
 			language: () => language,
 			changeSettings,

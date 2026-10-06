@@ -128,6 +128,7 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 			accelerator: "CmdOrCtrl+Shift+O",
 			click: (_item, window) => void windows.showWordDialog(targetOf(ctx, window)),
 		},
+		{ label: t.confluenceOpen, click: send(ctx, "confluence-open") },
 		{
 			label: t.importConfluence,
 			click: (_item, window) => void windows.showConfluenceDialog(targetOf(ctx, window)),

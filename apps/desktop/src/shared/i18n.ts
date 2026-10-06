@@ -269,6 +269,43 @@ const en = {
 	wordPartial: "“{0}” was imported from Word, but some content has no Markdown equivalent: {1}",
 	wordImagesSkipped: "{0} image(s) in an unsupported format were skipped",
 	confluenceImported: "“{0}” was imported from Confluence. Save it to keep it as Markdown.",
+	confluenceOpen: "Open from Confluence…",
+	confluenceConnectTitle: "Connect to Confluence",
+	confluenceSite: "Site address",
+	confluenceUsername: "E-mail or user name",
+	confluenceToken: "API token or personal access token",
+	confluenceLoginHint:
+		"Confluence Cloud: your Atlassian e-mail and an API token (id.atlassian.com → Security → API tokens). Server / Data Center: leave the user name empty and use a personal access token. The token is stored encrypted on this computer.",
+	confluenceConnect: "Connect",
+	confluenceDisconnect: "Disconnect",
+	confluenceConnecting: "Connecting…",
+	confluenceConnectFailed: "Could not connect: {0}",
+	confluenceAllSpaces: "All spaces",
+	confluenceSearchPlaceholder: "Search pages by title",
+	confluenceLoading: "Loading…",
+	confluenceNoPages: "No pages found.",
+	confluenceRequestFailed: "Confluence request failed: {0}",
+	confluenceOpenFailed: "The Confluence page could not be opened",
+	confluenceNotConnected: "Not connected to Confluence.",
+	confluenceLossNotice:
+		"This page has content with no Markdown equivalent ({0}). Saving removes it from the page; earlier versions stay in the page history.",
+	confluenceLossConfirm: "Save to Confluence anyway?",
+	confluenceLossDetail:
+		"This content will be removed from the page:\n{0}\n\nThe current version stays in the page history.",
+	confluenceSaveAnyway: "Save to Confluence",
+	confluenceConflict: "The page was changed on Confluence after you opened it.",
+	confluenceLoadTheirs: "Load Confluence Version",
+	confluenceOverwrite: "Overwrite",
+	lossMacro: "“{0}” macro",
+	lossLayout: "page layout",
+	lossMention: "mentions",
+	lossPageLink: "links to pages",
+	lossInlineComment: "inline comments",
+	lossMergedCells: "merged table cells",
+	lossCellBlocks: "lists and paragraphs in table cells",
+	lossFormatting: "underline and other formatting",
+	lossImageSize: "image sizes",
+	lossDate: "dates",
 	saveError: "Could not save: {0}",
 	imageError: "Could not add the image: {0}",
 	uploadPending: "An image is still being added; save again when it finishes.",
@@ -557,6 +594,43 @@ const tr: Strings = {
 	wordPartial: "“{0}” Word'den içe aktarıldı, ancak bazı içeriğin Markdown karşılığı yok: {1}",
 	wordImagesSkipped: "desteklenmeyen biçimdeki {0} görsel atlandı",
 	confluenceImported: "“{0}” Confluence'tan içe aktarıldı. Markdown olarak kalması için kaydedin.",
+	confluenceOpen: "Confluence'tan Aç…",
+	confluenceConnectTitle: "Confluence'a Bağlan",
+	confluenceSite: "Site adresi",
+	confluenceUsername: "E-posta ya da kullanıcı adı",
+	confluenceToken: "API jetonu ya da kişisel erişim jetonu",
+	confluenceLoginHint:
+		"Confluence Cloud: Atlassian e-postanız ve bir API jetonu (id.atlassian.com → Güvenlik → API jetonları). Server / Data Center: kullanıcı adını boş bırakıp kişisel erişim jetonu girin. Jeton bu bilgisayarda şifreli saklanır.",
+	confluenceConnect: "Bağlan",
+	confluenceDisconnect: "Bağlantıyı Kes",
+	confluenceConnecting: "Bağlanıyor…",
+	confluenceConnectFailed: "Bağlanılamadı: {0}",
+	confluenceAllSpaces: "Tüm alanlar",
+	confluenceSearchPlaceholder: "Sayfaları başlığa göre ara",
+	confluenceLoading: "Yükleniyor…",
+	confluenceNoPages: "Sayfa bulunamadı.",
+	confluenceRequestFailed: "Confluence isteği başarısız: {0}",
+	confluenceOpenFailed: "Confluence sayfası açılamadı",
+	confluenceNotConnected: "Confluence'a bağlı değilsiniz.",
+	confluenceLossNotice:
+		"Bu sayfada Markdown karşılığı olmayan içerik var ({0}). Kaydetmek bunu sayfadan kaldırır; önceki sürümler sayfa geçmişinde kalır.",
+	confluenceLossConfirm: "Yine de Confluence'a kaydedilsin mi?",
+	confluenceLossDetail:
+		"Şu içerik sayfadan kaldırılacak:\n{0}\n\nŞimdiki sürüm sayfa geçmişinde kalır.",
+	confluenceSaveAnyway: "Confluence'a Kaydet",
+	confluenceConflict: "Sayfa siz açtıktan sonra Confluence'ta değiştirildi.",
+	confluenceLoadTheirs: "Confluence Sürümünü Yükle",
+	confluenceOverwrite: "Üzerine Yaz",
+	lossMacro: "“{0}” makrosu",
+	lossLayout: "sayfa düzeni",
+	lossMention: "bahsetmeler",
+	lossPageLink: "sayfa bağlantıları",
+	lossInlineComment: "satır içi yorumlar",
+	lossMergedCells: "birleştirilmiş tablo hücreleri",
+	lossCellBlocks: "tablo hücrelerindeki liste ve paragraflar",
+	lossFormatting: "altı çizili ve diğer biçimler",
+	lossImageSize: "görsel boyutları",
+	lossDate: "tarihler",
 	saveError: "Kaydedilemedi: {0}",
 	imageError: "Görsel eklenemedi: {0}",
 	uploadPending: "Görsel ekleme sürüyor; bitince yeniden kaydedin.",
@@ -583,6 +657,25 @@ export function pickLanguage(locale: string | null | undefined): Lang {
 }
 
 /** Fills `{0}`, `{1}` placeholders. */
+const LOSS_LABELS: Readonly<Record<string, keyof Strings>> = {
+	layout: "lossLayout",
+	mention: "lossMention",
+	"page-link": "lossPageLink",
+	"inline-comment": "lossInlineComment",
+	"merged-cells": "lossMergedCells",
+	"cell-blocks": "lossCellBlocks",
+	formatting: "lossFormatting",
+	"image-size": "lossImageSize",
+	date: "lossDate",
+};
+
+/** A readable name for a `storageLosses` code. */
+export function lossLabel(t: Strings, code: string): string {
+	if (code.startsWith("macro:")) return format(t.lossMacro, code.slice(6));
+	const key = LOSS_LABELS[code];
+	return key === undefined ? code : t[key];
+}
+
 export function format(text: string, ...values: readonly (string | number)[]): string {
 	return text.replace(/\{(\d+)\}/g, (raw, n: string) => {
 		const value = values[Number(n)];

@@ -269,6 +269,62 @@ export function storageToMarkdown(source: string): string {
 	return serialize(doc);
 }
 
+/** Macros that survive a trip through Markdown. */
+const KEPT_MACROS = new Set(["code", "noformat", "info", "note", "warning", "tip"]);
+/** Column widths and table styling are layout, not content worth a warning. */
+const TABLE_PARTS = new Set(["table", "colgroup", "col", "tbody", "thead", "tr", "td", "th"]);
+const STYLE_KEPT = /^\s*(text-decoration:\s*line-through|color:\s*[^;]+|text-align:\s*\w+);?\s*$/i;
+
+/**
+ * What a page would lose by being saved back from Markdown: `macro:<name>`,
+ * `layout`, `mention`, `page-link`, `inline-comment`, `merged-cells`,
+ * `cell-blocks`, `formatting`, `image-size`, `date`.
+ */
+export function storageLosses(source: string): string[] {
+	const found = new Set<string>();
+	const visit = (node: MarkupNode, inCell: boolean): void => {
+		if (node.kind === "text") return;
+		const { name, attrs } = node;
+		if (name === "ac:structured-macro" || name === "ac:macro") {
+			// kalem-locale-ok: macro names are ASCII
+			const macro = (attrs.get("ac:name") ?? "").toLowerCase();
+			if (!KEPT_MACROS.has(macro)) found.add(`macro:${macro}`);
+			if (inCell) found.add("cell-blocks");
+		} else if (name.startsWith("ac:layout")) found.add("layout");
+		else if (name === "ri:user") found.add("mention");
+		else if (name === "ri:page" || name === "ri:blog-post" || name === "ri:space") {
+			found.add("page-link");
+		} else if (name === "ac:inline-comment-marker") found.add("inline-comment");
+		else if (name === "ac:image" && (attrs.has("ac:width") || attrs.has("ac:height"))) {
+			found.add("image-size");
+		} else if (name === "time") found.add("date");
+		else if (["u", "sup", "sub", "ins", "small", "big"].includes(name)) found.add("formatting");
+		else if (
+			attrs.has("style") &&
+			!TABLE_PARTS.has(name) &&
+			!STYLE_KEPT.test(attrs.get("style") ?? "")
+		) {
+			found.add("formatting");
+		} else if (name === "td" || name === "th") {
+			if (Number(attrs.get("colspan") ?? 1) > 1 || Number(attrs.get("rowspan") ?? 1) > 1) {
+				found.add("merged-cells");
+			}
+			const blocks = childElements(node).filter((child) => CELL_BLOCKS.has(child.name));
+			const nested = childElements(node).some((child) =>
+				["ul", "ol", "table", "ac:task-list", "blockquote"].includes(child.name),
+			);
+			if (blocks.length > 1 || nested) found.add("cell-blocks");
+			for (const child of node.children) visit(child, true);
+			return;
+		} else if (inCell && ["ul", "ol", "pre", "table", "ac:task-list"].includes(name)) {
+			found.add("cell-blocks");
+		}
+		for (const child of node.children) visit(child, inCell);
+	};
+	visit(parseMarkup(source), false);
+	return [...found];
+}
+
 // --- Export -----------------------------------------------------------------
 
 function cdata(value: string): string {

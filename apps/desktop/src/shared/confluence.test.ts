@@ -4,6 +4,7 @@ import {
 	detectConfluenceFormat,
 	markdownToStorage,
 	markdownToWiki,
+	storageLosses,
 } from "./confluence.js";
 import { escapeWiki } from "./confluence-wiki.js";
 
@@ -74,6 +75,35 @@ describe("storage format import", () => {
 			"<!DOCTYPE html><html><head><title>T</title><style>p{}</style></head><body><h2>Bölüm</h2></body></html>",
 		);
 		expect(md.trim()).toBe("## Bölüm");
+	});
+});
+
+describe("storageLosses", () => {
+	it("finds nothing in content Markdown can hold", () => {
+		expect(
+			storageLosses(
+				'<h1>a</h1><p style="text-align: center;">b <span style="color: red;">c</span></p><table><colgroup><col style="width: 120px;" /></colgroup><tbody><tr><td><p>x</p></td></tr></tbody></table><ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[x]]></ac:plain-text-body></ac:structured-macro><ac:structured-macro ac:name="info"><ac:rich-text-body><p>i</p></ac:rich-text-body></ac:structured-macro>',
+			),
+		).toEqual([]);
+	});
+
+	it("lists macros, layouts, mentions, comments and table structure Markdown cannot hold", () => {
+		const losses = storageLosses(
+			'<ac:layout><ac:layout-section><ac:layout-cell><p><ac:link><ri:user ri:account-id="1" /></ac:link> <ac:inline-comment-marker ac:ref="x">yorum</ac:inline-comment-marker> <u>altı</u> <time datetime="2026-10-06" /></p><ac:structured-macro ac:name="toc" /><table><tbody><tr><td colspan="2"><p>a</p><p>b</p></td></tr></tbody></table><ac:image ac:width="200"><ri:attachment ri:filename="a.png" /></ac:image></ac:layout-cell></ac:layout-section></ac:layout>',
+		);
+		expect(losses.sort()).toEqual(
+			[
+				"layout",
+				"mention",
+				"inline-comment",
+				"formatting",
+				"date",
+				"macro:toc",
+				"merged-cells",
+				"cell-blocks",
+				"image-size",
+			].sort(),
+		);
 	});
 });
 

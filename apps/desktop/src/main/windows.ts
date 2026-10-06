@@ -5,9 +5,11 @@ import type { WebContents } from "electron";
 import { app, BrowserWindow, dialog, nativeTheme, screen, shell } from "electron";
 import type {
 	CloseChoice,
+	ConfluencePageContent,
 	DocumentPayload,
 	MovedTab,
 	OpenedFile,
+	RemotePage,
 	Settings,
 	TabDocument,
 	WindowState,
@@ -47,6 +49,8 @@ export interface DocumentTab {
 	dirty: boolean;
 	/** Last known mtime of the file on disk. */
 	modified: number | null;
+	/** The Confluence page the tab saves to, instead of a file. */
+	remote: RemotePage | null;
 }
 
 export interface AppWindow {
@@ -332,6 +336,7 @@ export class WindowManager {
 						format: moved.format,
 						time: tab.modified ?? 0,
 						...(tab.base === null ? {} : { base: tab.base }),
+						...(tab.remote === null ? {} : { remote: tab.remote }),
 					},
 				},
 			},
@@ -344,7 +349,13 @@ export class WindowManager {
 		const handover = moved.dirty
 			? drafts.write(
 					id,
-					{ name: tab.name, text: moved.text, format: moved.format, path: tab.path },
+					{
+						name: tab.name,
+						text: moved.text,
+						format: moved.format,
+						path: tab.path,
+						remote: tab.remote,
+					},
 					Date.now(),
 				)
 			: Promise.resolve();
@@ -417,6 +428,7 @@ export class WindowManager {
 		tab.path = path;
 		tab.base = base;
 		tab.modified = modified;
+		tab.remote = null;
 		tab.name = stripExtension(basename(path));
 		win.writable.add(pathKey(path));
 		this.#addRecentFile(path);
@@ -469,6 +481,7 @@ export class WindowManager {
 			name: t.untitled,
 			dirty: false,
 			modified: null,
+			remote: null,
 		};
 
 		switch (payload.kind) {
@@ -487,11 +500,16 @@ export class WindowManager {
 				tab.name = payload.confluence.name;
 				tab.dirty = true;
 				break;
+			case "confluence-page":
+				tab.name = payload.content.page.title;
+				tab.remote = payload.content.page;
+				break;
 			case "draft":
 				tab.path = payload.draft.path;
 				tab.base = payload.draft.base ?? null;
 				tab.name = payload.draft.name === "" ? t.untitled : payload.draft.name;
 				tab.dirty = true;
+				tab.remote = payload.draft.remote ?? null;
 				if (payload.draft.path !== null) win.writable.add(pathKey(payload.draft.path));
 				break;
 			case "new-file":
@@ -505,6 +523,7 @@ export class WindowManager {
 				tab.name = payload.draft.name === "" ? t.untitled : payload.draft.name;
 				tab.dirty = payload.dirty;
 				tab.modified = payload.draft.time === 0 ? null : payload.draft.time;
+				tab.remote = payload.draft.remote ?? null;
 				if (payload.draft.path !== null) win.writable.add(pathKey(payload.draft.path));
 				break;
 			case "welcome":
@@ -538,6 +557,29 @@ export class WindowManager {
 			win.pending = [...win.pending.filter((p) => p.tabId !== tab.id), document];
 		}
 		return tab;
+	}
+
+	/** A page that is already open is brought forward, not opened twice. */
+	openConfluencePage(content: ConfluencePageContent, preferred: AppWindow | undefined): void {
+		const { site, id } = content.page;
+		for (const win of this.all()) {
+			for (const tab of win.tabs.values()) {
+				if (tab.remote?.site !== site || tab.remote.id !== id) continue;
+				this.#activate(win, tab.id);
+				if (win.window.isMinimized()) win.window.restore();
+				win.window.focus();
+				return;
+			}
+		}
+		this.#place({ kind: "confluence-page", content }, preferred);
+	}
+
+	/** The page after a save or reload: its new version is what the next save builds on. */
+	setRemote(win: AppWindow, tabId: string, page: RemotePage): void {
+		const tab = win.tabs.get(tabId);
+		if (tab === undefined) return;
+		tab.remote = page;
+		tab.name = page.title;
 	}
 
 	#place(payload: DocumentPayload, preferred: AppWindow | undefined): void {

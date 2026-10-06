@@ -900,7 +900,8 @@ button {
 
 /* --- Quick open ------------------------------------------------------------ */
 
-.quick-open {
+.quick-open,
+.confluence-dialog {
 	width: min(560px, calc(100vw - 32px));
 	margin: 12vh auto auto;
 	padding: 8px;
@@ -911,7 +912,8 @@ button {
 	box-shadow: var(--app-shadow);
 }
 
-.quick-open::backdrop {
+.quick-open::backdrop,
+.confluence-dialog::backdrop {
 	background: rgb(0 0 0 / 18%);
 }
 
@@ -974,6 +976,127 @@ button {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+/* --- Confluence ------------------------------------------------------------ */
+
+.confluence-dialog {
+	width: min(640px, calc(100vw - 32px));
+}
+
+.confluence-login {
+	display: grid;
+	gap: 10px;
+	padding: 8px;
+}
+
+.confluence-login h2 {
+	margin: 0 0 4px;
+	font-size: 16px;
+}
+
+.confluence-field {
+	display: grid;
+	gap: 4px;
+	font-size: 12px;
+	color: var(--app-muted);
+}
+
+.confluence-field input,
+.confluence-space {
+	box-sizing: border-box;
+	padding: 7px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-surface);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 14px;
+}
+
+.confluence-hint {
+	margin: 0;
+	color: var(--app-muted);
+	font-size: 12px;
+	line-height: 1.45;
+}
+
+.confluence-error {
+	margin: 0;
+	color: var(--app-error);
+	font-size: 13px;
+}
+
+.confluence-error:empty,
+.confluence-login[hidden],
+.confluence-browser[hidden] {
+	display: none;
+}
+
+.confluence-actions {
+	display: flex;
+	justify-content: flex-end;
+}
+
+.confluence-primary {
+	padding: 7px 16px;
+	border: 0;
+	border-radius: 6px;
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+	font: inherit;
+	cursor: pointer;
+}
+
+.confluence-primary:disabled {
+	opacity: 0.6;
+	cursor: default;
+}
+
+.confluence-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 2px 4px 8px;
+	font-size: 12px;
+	color: var(--app-muted);
+}
+
+.confluence-site {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.confluence-link {
+	flex: none;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--app-accent);
+	font: inherit;
+	cursor: pointer;
+}
+
+.confluence-filters {
+	display: flex;
+	gap: 8px;
+}
+
+.confluence-filters .quick-open-input {
+	flex: 1;
+	min-width: 0;
+}
+
+.confluence-space {
+	flex: none;
+	max-width: 40%;
+}
+
+.confluence-dialog .quick-open-item {
+	cursor: pointer;
+}
+
 .desk-area {
 	display: flex;
 	flex: 1;

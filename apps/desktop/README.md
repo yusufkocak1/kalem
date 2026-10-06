@@ -208,6 +208,27 @@ verir.
 
 **Confluence**
 
+- **Dosya → Confluence'tan Aç** (ya da Ekle → İçe Aktar → **Confluence**):
+  bir Confluence sitesine bağlanır, sayfaları başlığa ve alana göre arar.
+  Seçilen sayfa bir sekmede açılır; **Kaydet** (`Ctrl+S`) sayfayı
+  Confluence'a yeni bir sürüm olarak yazar. Farklı Kaydet sayfayı yerel bir
+  Markdown dosyasına çevirir.
+  - **Confluence Cloud**: site adresi (`https://şirket.atlassian.net`),
+    Atlassian e-postası ve bir API jetonu (id.atlassian.com → Güvenlik →
+    API jetonları). **Server / Data Center**: site adresi ve kişisel erişim
+    jetonu; kullanıcı adı boş bırakılır (kullanıcı adı girilirse jeton parola
+    olarak gönderilir).
+  - Jeton işletim sisteminin şifrelemesiyle (`safeStorage`) saklanır,
+    arayüze hiç dönmez. Şifreleme yoksa yalnızca uygulama açıkken bellekte
+    tutulur.
+  - Sayfanın ekli görselleri editörde görünür. Sayfaya eklenen yeni
+    görseller kaydederken sayfaya ek olarak yüklenir.
+  - Siz açtıktan sonra sayfa Confluence'ta değiştiyse kaydetme durur;
+    **Confluence Sürümünü Yükle** ya da **Üzerine Yaz** seçilir.
+  - Sayfada Markdown karşılığı olmayan içerik varsa (makrolar, sayfa düzeni,
+    bahsetmeler, satır içi yorumlar, birleştirilmiş hücreler…) açılışta
+    uyarı çıkar ve ilk kayıttan önce onay istenir: kaydetmek bu içeriği
+    sayfadan kaldırır. Önceki sürüm Confluence'ın sayfa geçmişinde kalır.
 - **Dosya → Confluence'tan İçe Aktar** (ya da Ekle → İçe Aktar → Confluence
   Sayfası): Confluence'ın iki metin biçimini de okur, hangisi olduğunu
   içerikten anlar. **Depolama biçimi** (storage format; Confluence'ın kaynak
@@ -347,6 +368,10 @@ e2e/            Playwright ile gerçek uygulamayı süren testler
 - Word'deki birleştirilmiş tablo hücreleri boş hücrelere açılır; EMF/WMF
   görseller atlanır ve bildirilir. Dipnotlar `[^1]` ve belgenin sonunda
   `[^1]: …` paragrafları olarak gelir; sonnotlar `[^e1]` olarak.
+- Confluence sayfasında başlık değiştirilemez, yeni sayfa oluşturulamaz;
+  sayfaya görsel dışında dosya eklenemez. Sayfa sekmesi otomatik kaydetmede
+  Confluence'a yazılmaz (her kayıt bir sürüm olur), yalnızca kurtarma taslağı
+  tutulur.
 - Confluence'ta sayfaya, kullanıcıya ya da başka alana verilen bağlantıların
   Markdown'da adresi olmadığından yalnızca metinleri kalır. Durum (status),
   Jira gibi makrolar metne iner; içeriksiz diğer makrolar (içindekiler,

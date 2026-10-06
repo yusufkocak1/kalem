@@ -29,6 +29,8 @@ import {
 	stripExtension,
 	TEXT_EXTENSIONS,
 } from "../shared/paths.js";
+import { registerConfluenceIpc } from "./confluence-ipc.js";
+import type { ConfluenceStore } from "./confluence-store.js";
 import type { DocxImage } from "./docx.js";
 import { markdownToDocx } from "./docx.js";
 import type { DraftStore } from "./drafts.js";
@@ -49,6 +51,7 @@ export interface IpcContext {
 	readonly drafts: DraftStore;
 	readonly packages: PackageStore;
 	readonly versions: VersionStore;
+	readonly confluence: ConfluenceStore;
 	strings(): Strings;
 	language(): Lang;
 	changeSettings(patch: Partial<Settings>): void;
@@ -394,6 +397,7 @@ export function registerIpc(ctx: IpcContext): void {
 			tab.id,
 			{
 				path: tab.path,
+				remote: tab.remote,
 				name: typeof request.name === "string" ? request.name : tab.name,
 				text: request.text,
 				format: toTextFormat(request.format),
@@ -582,5 +586,15 @@ export function registerIpc(ctx: IpcContext): void {
 
 	on(CHANNEL.showFileMenu, (win, x, y) => {
 		if (typeof x === "number" && typeof y === "number") ctx.showFileMenu(win, x, y);
+	});
+
+	registerConfluenceIpc({
+		windows,
+		drafts: ctx.drafts,
+		confluence: ctx.confluence,
+		strings: ctx.strings,
+		senderOf,
+		tabOf,
+		toImageFile,
 	});
 }

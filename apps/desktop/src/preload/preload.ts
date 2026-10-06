@@ -24,6 +24,18 @@ const bridge: KalemBridge = {
 	openPath: (path) => ipcRenderer.invoke(CHANNEL.openPath, path),
 	importWord: () => ipcRenderer.invoke(CHANNEL.importWord),
 	importConfluence: () => ipcRenderer.invoke(CHANNEL.importConfluence),
+	confluenceAccount: () => ipcRenderer.invoke(CHANNEL.confluenceAccount),
+	confluenceConnect: (login) => ipcRenderer.invoke(CHANNEL.confluenceConnect, login),
+	confluenceDisconnect: () => ipcRenderer.invoke(CHANNEL.confluenceDisconnect),
+	confluenceSpaces: () => ipcRenderer.invoke(CHANNEL.confluenceSpaces),
+	confluenceSearch: (query, spaceKey) =>
+		ipcRenderer.invoke(CHANNEL.confluenceSearch, query, spaceKey),
+	confluenceOpenPage: (pageId) => ipcRenderer.invoke(CHANNEL.confluenceOpenPage, pageId),
+	confluenceReloadPage: (tabId) => ipcRenderer.invoke(CHANNEL.confluenceReloadPage, tabId),
+	confluenceSavePage: (tabId, request) =>
+		ipcRenderer.invoke(CHANNEL.confluenceSavePage, tabId, request),
+	confluenceAttachImage: (tabId, image) =>
+		ipcRenderer.invoke(CHANNEL.confluenceAttachImage, tabId, image),
 	chooseSavePath: (tabId, suggestedName, kind) =>
 		ipcRenderer.invoke(CHANNEL.chooseSavePath, tabId, suggestedName, kind),
 	writeDocument: (tabId, path, text, format) =>
