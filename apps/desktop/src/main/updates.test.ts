@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { CHECK_INTERVAL, checkDue, compareVersions, latestRelease } from "./updates.js";
+import {
+	CHECK_INTERVAL,
+	checkDue,
+	compareVersions,
+	latestRelease,
+	latestReleaseInFeed,
+} from "./updates.js";
 
 describe("compareVersions", () => {
 	it("compares numerically, part by part", () => {
@@ -50,5 +56,33 @@ describe("checkDue", () => {
 		expect(checkDue(1000, 1000 + CHECK_INTERVAL - 1)).toBe(false);
 		expect(checkDue(1000, 1000 + CHECK_INTERVAL)).toBe(true);
 		expect(checkDue(5000, 1000)).toBe(true);
+	});
+});
+
+describe("latestReleaseInFeed", () => {
+	const entry = (tag: string) =>
+		`<entry><id>tag:github.com,2008:Repository/1/${tag}</id>` +
+		`<link rel="alternate" type="text/html" href="https://github.com/yusufkocak1/kalem/releases/tag/${tag}"/>` +
+		`<title>${tag}</title></entry>`;
+
+	it("picks the newest desktop release in the Atom feed", () => {
+		const feed = `<?xml version="1.0"?><feed>${[
+			entry("v2.0.0"),
+			entry("desktop-v1.5.1"),
+			entry("desktop-v1.10.0"),
+			entry("desktop-vnext"),
+		].join("")}</feed>`;
+		expect(latestReleaseInFeed(feed)).toEqual({
+			version: "1.10.0",
+			tag: "desktop-v1.10.0",
+			page: "https://github.com/yusufkocak1/kalem/releases/tag/desktop-v1.10.0",
+			downloads: "https://github.com/yusufkocak1/kalem/releases/download/desktop-v1.10.0",
+			installable: false,
+		});
+	});
+
+	it("finds nothing in a feed without desktop releases", () => {
+		expect(latestReleaseInFeed(`<feed>${entry("v1.0.0")}</feed>`)).toBeNull();
+		expect(latestReleaseInFeed("")).toBeNull();
 	});
 });
