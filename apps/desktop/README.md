@@ -38,6 +38,8 @@ git tag desktop-v<sürüm> && git push origin desktop-v<sürüm>
 `package`'ı çalıştırır, `desktop-v<sürüm>` release'ini açar ve dört dosyayı
 ona ekler: iki exe, `latest.yml` ve `Kalem-Setup-<sürüm>.exe.blockmap`.
 Etiket `package.json`'daki sürümle uyuşmazsa hiçbir şey yayımlanmaz.
+Etiketi push etmek yerine iş akışı GitHub'dan da başlatılabilir (Actions →
+**Masaüstü yayını** → Run workflow → `main`); etiketi o zaman kendisi açar.
 `latest.yml` olmadan kurulu sürümler yeni sürümü kendileri kuramaz, yalnızca
 indirme sayfasını gösterir.
 
