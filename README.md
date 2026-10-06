@@ -66,7 +66,7 @@ with backslashes. A few rare patterns are still normalized — they're listed
 | You want to… | Package | min+gzip |
 |---|---|---|
 | **Display** Markdown (read-only) | `@kalem-editor/viewer` | 2.9 kB |
-| **Parse** Markdown (server, scripts) | `@kalem-editor/core` | 13.3 kB |
+| **Parse** Markdown (server, scripts) | `@kalem-editor/core` | 13.4 kB |
 | **Edit**, with your own UI | `@kalem-editor/editor` | 29.3 kB |
 | The full **Word-like** experience | `@kalem-editor/editor` + `@kalem-editor/ui` | 38.0 kB |
 | Drop it in with one `<script>` tag | `@kalem-editor/wc` (IIFE build) | 29.9 kB |

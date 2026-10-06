@@ -172,6 +172,10 @@ export function splitAtCaret(doc: Root, caret: Caret): EditResult | null {
 		return splitListItem(doc, caret, itemIndex, once, sonra);
 	}
 
+	// --- Tablo hücresi ---
+	// Hücre bölünemez; Enter, kelime işlemcilerdeki gibi hücrede yeni satıra geçer.
+	if (blok.type === "table" && caret.path.length === 2) return insertBreak(doc, caret);
+
 	// --- Alıntı içi ---
 	if (blok.type === "blockquote" && caret.path.length === 1) {
 		const index = caret.path[0] as number;

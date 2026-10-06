@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Link, List, ListItem, Table, TableRow } from "./ast.js";
 import { parseInline } from "./inline.js";
 import { parse } from "./parse.js";
+import { serialize } from "./serialize.js";
 
 const bloklar = (md: string) => parse(md).children;
 const tipler = (md: string) => bloklar(md).map((b) => b.type);
@@ -190,5 +191,48 @@ describe("otomatik bağlantı literali", () => {
 
 	it("satır içi bağlantının hedefi literal olmuyor", () => {
 		expect(parseInline("[a](https://b.com)").map(ozet)).toEqual(["link[text(a)]"]);
+	});
+});
+
+describe("çok satırlı tablo hücresi", () => {
+	const tablo = (hucre: string) => `| a | b |\n| --- | --- |\n| ${hucre} | z |\n`;
+
+	it("hücredeki <br> satır sonu oluyor", () => {
+		const t = tek(tablo("bir<br>iki<br/>üç")) as Table;
+		expect(ozet(t.children[1]?.children[0])).toBe(
+			"tableCell[text(bir), break, text(iki), break, text(üç)]",
+		);
+	});
+
+	it("biçimin içindeki <br> de satır sonu", () => {
+		const t = tek(tablo("**bir<br>iki**")) as Table;
+		expect(ozet(t.children[1]?.children[0])).toBe("tableCell[strong[text(bir), break, text(iki)]]");
+	});
+
+	it("hücre dışındaki <br> ham HTML olarak kalıyor", () => {
+		expect(ozet(tek("bir<br>iki\n"))).toBe("paragraph[text(bir), html(<br>), text(iki)]");
+	});
+
+	it("<br> yazılışı gidiş-dönüşte korunuyor", () => {
+		const md = tablo("bir<br/>iki<BR>üç");
+		expect(serialize(parse(md))).toBe(md);
+	});
+
+	it("yeni satır sonu hücreyi bölmeden <br> olarak yazılıyor", () => {
+		const doc = parse(tablo("x"));
+		const t = doc.children[0] as Table;
+		const satir = t.children[1] as TableRow;
+		const hucre = satir.children[0];
+		if (hucre === undefined) throw new Error("hücre yok");
+		hucre.children = [
+			{ type: "text", value: "bir" },
+			{ type: "break", syntax: { marker: "backslash" } },
+			{ type: "text", value: "iki" },
+		];
+		const yazilan = serialize(doc);
+		expect(yazilan).toContain("| bir<br>iki |");
+		expect(ozet((parse(yazilan).children[0] as Table).children[1]?.children[0])).toBe(
+			"tableCell[text(bir), break, text(iki)]",
+		);
 	});
 });

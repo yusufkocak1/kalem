@@ -57,12 +57,19 @@ describe("storage format import", () => {
 		expect(md).not.toContain("<ac:");
 	});
 
-	it("keeps tables rectangular and cells on one line", () => {
+	it("keeps tables rectangular and a cell's paragraphs as lines", () => {
 		const md = confluenceToMarkdown(
 			'<table><tbody><tr><th><p>A</p></th><th><p>B</p></th></tr><tr><td colspan="2"><p>bir</p><p>iki</p></td></tr></tbody></table>',
 		);
 		expect(md).toMatch(/\| A +\| B +\|/);
-		expect(md).toMatch(/\| bir iki +\| +\|/);
+		expect(md).toMatch(/\| bir<br>iki +\| +\|/);
+	});
+
+	it("writes a cell's list items as bulleted lines", () => {
+		const md = confluenceToMarkdown(
+			"<table><tbody><tr><th><p>A</p></th></tr><tr><td><p>Adımlar:</p><ul><li><p>bir</p></li><li>iki</li></ul></td></tr></tbody></table>",
+		);
+		expect(md).toContain("| Adımlar:<br>• bir<br>• iki |");
 	});
 
 	it("tolerates HTML entities and unclosed tags", () => {
@@ -79,6 +86,12 @@ describe("storage format import", () => {
 });
 
 describe("storageLosses", () => {
+	it("keeps a cell's paragraphs", () => {
+		expect(
+			storageLosses("<table><tbody><tr><td><p>a</p><p>b</p></td></tr></tbody></table>"),
+		).toEqual([]);
+	});
+
 	it("finds nothing in content Markdown can hold", () => {
 		expect(
 			storageLosses(
@@ -89,7 +102,7 @@ describe("storageLosses", () => {
 
 	it("lists macros, layouts, mentions, comments and table structure Markdown cannot hold", () => {
 		const losses = storageLosses(
-			'<ac:layout><ac:layout-section><ac:layout-cell><p><ac:link><ri:user ri:account-id="1" /></ac:link> <ac:inline-comment-marker ac:ref="x">yorum</ac:inline-comment-marker> <u>altı</u> <time datetime="2026-10-06" /></p><ac:structured-macro ac:name="toc" /><table><tbody><tr><td colspan="2"><p>a</p><p>b</p></td></tr></tbody></table><ac:image ac:width="200"><ri:attachment ri:filename="a.png" /></ac:image></ac:layout-cell></ac:layout-section></ac:layout>',
+			'<ac:layout><ac:layout-section><ac:layout-cell><p><ac:link><ri:user ri:account-id="1" /></ac:link> <ac:inline-comment-marker ac:ref="x">yorum</ac:inline-comment-marker> <u>altı</u> <time datetime="2026-10-06" /></p><ac:structured-macro ac:name="toc" /><table><tbody><tr><td colspan="2"><p>a</p><ul><li>b</li></ul></td></tr></tbody></table><ac:image ac:width="200"><ri:attachment ri:filename="a.png" /></ac:image></ac:layout-cell></ac:layout-section></ac:layout>',
 		);
 		expect(losses.sort()).toEqual(
 			[
@@ -108,6 +121,11 @@ describe("storageLosses", () => {
 });
 
 describe("storage format export", () => {
+	it("writes a cell's lines as line breaks", () => {
+		const xml = markdownToStorage("| A |\n| --- |\n| bir<br>iki |\n");
+		expect(xml).toContain("<td>bir<br />iki</td>");
+	});
+
 	it("writes XHTML with Confluence macros", () => {
 		const xml = markdownToStorage(
 			[

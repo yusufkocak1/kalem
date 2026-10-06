@@ -16,7 +16,7 @@ indirmezsiniz.
 | Ne yapmak istiyorsunuz | Paket | Boyut (min+gzip) |
 |---|---|---|
 | Markdown'ı **göstermek** (salt okunur) | `@kalem-editor/viewer` | 2,9 kB |
-| Markdown'ı **ayrıştırmak** (sunucuda, betikte) | `@kalem-editor/core` | 13,3 kB |
+| Markdown'ı **ayrıştırmak** (sunucuda, betikte) | `@kalem-editor/core` | 13,4 kB |
 | **Düzenlemek**, kendi arayüzünüzle | `@kalem-editor/editor` | 29,3 kB |
 | **Word benzeri** tam deneyim | `@kalem-editor/editor` + `@kalem-editor/ui` | 38,0 kB |
 

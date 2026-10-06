@@ -758,9 +758,36 @@ function makeRow(line: Line, columns: number, inline: InlineParser): TableRow {
 	const cells = splitRow(line.value);
 	const children: TableCell[] = [];
 	for (let c = 0; c < columns; c++) {
-		children.push({ type: "tableCell", children: inline(cells[c] ?? "") });
+		children.push({ type: "tableCell", children: cellInlines(cells[c] ?? "", inline) });
 	}
 	return { type: "tableRow", children, position: span(line, line) };
+}
+
+const BR = /^<br\s*\/?>$/i;
+
+/**
+ * Hücrenin satır içi içeriği; `<br>` gerçek satır sonu olur.
+ *
+ * GFM hücresi tek satır: hücre içindeki satır sonunun tek yazılışı `<br>`
+ * (GitHub da böyle gösterir). Ham HTML olarak kalsaydı editörde etiket
+ * metni görünür, hücrede yeni satıra geçmek de mümkün olmazdı.
+ */
+export function cellInlines(raw: string, inline: InlineParser): Inline[] {
+	return inline(raw).map(cellBreaks);
+}
+
+function cellBreaks(node: Inline): Inline {
+	if (node.type === "html" && BR.test(node.value)) {
+		const tag = node.value === "<br>" ? {} : { tag: node.value };
+		return {
+			type: "break",
+			syntax: { marker: "html", ...tag },
+			...(node.position === undefined ? {} : { position: node.position }),
+		};
+	}
+	return "children" in node
+		? ({ ...node, children: node.children.map(cellBreaks) } as Inline)
+		: node;
 }
 
 // ---------------------------------------------------------------------------

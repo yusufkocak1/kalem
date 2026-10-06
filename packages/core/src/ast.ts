@@ -160,11 +160,18 @@ export interface InlineCodeSyntax {
 	padded?: boolean;
 }
 
-/** Sert satır sonunun yazılışı: iki boşluk mu ters bölü mü. */
+/**
+ * Sert satır sonunun yazılışı: iki boşluk, ters bölü ya da `<br>`.
+ *
+ * `html` yalnızca tablo hücrelerinde oluşur: GFM hücresi tek satırdır,
+ * hücre içindeki satır sonu ancak `<br>` olarak yazılabilir.
+ */
 export interface BreakSyntax {
-	marker: "spaces" | "backslash";
+	marker: "spaces" | "backslash" | "html";
 	/** `spaces` için boşluk sayısı — ikiden fazlaysa. */
 	width?: number;
+	/** `html` için etiketin kaynaktaki yazılışı (`<br/>`, `<BR>`) — `<br>` değilse. */
+	tag?: string;
 }
 
 /**

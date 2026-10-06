@@ -88,6 +88,12 @@ describe("Enter — bölme", () => {
 	it("alıntı içinde Enter alıntıdan çıkarmıyor", () => {
 		expect(md(splitAtCaret(belge("> abcd\n"), imlec(0, [0], 2)))).toBe("> ab\n>\n> cd\n");
 	});
+
+	it("tablo hücresinde Enter hücrede yeni satıra geçiyor", () => {
+		const sonuc = splitAtCaret(belge("| a |\n| --- |\n| abcd |\n"), imlec(0, [1, 0], 2));
+		expect(md(sonuc)).toBe("| a |\n| --- |\n| ab<br>cd |\n");
+		expect(sonuc?.caret).toEqual(imlec(0, [1, 0], 3));
+	});
 });
 
 describe("Shift+Enter — satır sonu", () => {
