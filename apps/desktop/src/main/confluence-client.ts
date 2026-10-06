@@ -2,6 +2,7 @@ import type {
 	ConfluencePageContent,
 	ConfluencePageSummary,
 	ConfluenceSpace,
+	ConfluenceTreePage,
 	RemotePage,
 } from "../shared/bridge.js";
 
@@ -157,6 +158,63 @@ export class ConfluenceClient {
 		return spaces.sort((a, b) => a.name.localeCompare(b.name, "en"));
 	}
 
+	/** Cloud's v2 API takes a space's id, not its key. */
+	async #spaceId(spaceKey: string): Promise<string> {
+		const spaces = await this.#json(`/api/v2/spaces?keys=${encodeURIComponent(spaceKey)}`);
+		return asString(asJson(asArray(spaces.results)[0]).id);
+	}
+
+	/** A space's top-level pages, in Confluence's order. */
+	async rootPages(spaceKey: string): Promise<ConfluenceTreePage[]> {
+		if (this.cloud) {
+			const id = await this.#spaceId(spaceKey);
+			if (id === "") return [];
+			return this.#treeLevel(`/api/v2/spaces/${id}/pages?depth=root&limit=250`);
+		}
+		return this.#treeLevel(
+			`/rest/api/space/${encodeURIComponent(spaceKey)}/content/page?depth=root&limit=200&expand=children.page`,
+		);
+	}
+
+	/** A page's child pages, in Confluence's order. */
+	async childPages(id: string): Promise<ConfluenceTreePage[]> {
+		if (!/^\d+$/.test(id)) throw new Error("Invalid page id");
+		return this.#treeLevel(
+			this.cloud
+				? `/api/v2/pages/${id}/children?limit=250`
+				: `/rest/api/content/${id}/child/page?limit=200&expand=children.page`,
+		);
+	}
+
+	/**
+	 * One level of the page tree, following `next` links. Server reports
+	 * whether a page has children (`expand=children.page`); Cloud's v2 API
+	 * does not, so there it is left open.
+	 */
+	async #treeLevel(first: string): Promise<ConfluenceTreePage[]> {
+		const pages: ConfluenceTreePage[] = [];
+		let next: string | null = first;
+		// A level that long is better found by search than by scrolling.
+		for (let round = 0; next !== null && round < 10; round++) {
+			const body: Json = await this.#json(next);
+			for (const item of asArray(body.results)) {
+				const page = asJson(item);
+				const id = asString(page.id);
+				if (id === "") continue;
+				const children = asJson(asJson(page.children).page);
+				const size = typeof children.size === "number" ? children.size : null;
+				pages.push({
+					id,
+					title: asString(page.title),
+					hasChildren: this.cloud || size === null ? null : size > 0,
+				});
+			}
+			const link = asString(asJson(body._links).next);
+			next = link === "" ? null : this.#relative(link);
+		}
+		return pages;
+	}
+
 	/** `_links.next` is relative to the host on Cloud, to the site on Server. */
 	#relative(link: string): string {
 		if (/^https?:/i.test(link)) return link;
@@ -221,6 +279,49 @@ export class ConfluenceClient {
 
 	#webUrl(webui: string): string {
 		return webui === "" ? this.site : `${this.site}${webui}`;
+	}
+
+	/**
+	 * Creates an empty page at the top of the space or under `parentId`; returns its id.
+	 * A title already used in the space surfaces as a 400 `ConfluenceError`.
+	 */
+	async create(spaceKey: string, parentId: string | null, title: string): Promise<string> {
+		if (parentId !== null && !/^\d+$/.test(parentId)) throw new Error("Invalid page id");
+		const storage = "<p></p>";
+		const init = (body: unknown): RequestInit => ({
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(body),
+		});
+		let body: Json;
+		if (this.cloud) {
+			const spaceId = await this.#spaceId(spaceKey);
+			if (spaceId === "") throw new Error(`Unknown space: ${spaceKey}`);
+			body = await this.#json(
+				"/api/v2/pages",
+				init({
+					spaceId,
+					status: "current",
+					title,
+					...(parentId === null ? {} : { parentId }),
+					body: { representation: "storage", value: storage },
+				}),
+			);
+		} else {
+			body = await this.#json(
+				"/rest/api/content",
+				init({
+					type: "page",
+					title,
+					space: { key: spaceKey },
+					...(parentId === null ? {} : { ancestors: [{ id: parentId }] }),
+					body: { storage: { value: storage, representation: "storage" } },
+				}),
+			);
+		}
+		const id = asString(body.id);
+		if (!/^\d+$/.test(id)) throw new Error("Confluence did not return the new page");
+		return id;
 	}
 
 	/** Writes a new version; a version conflict surfaces as a 409 `ConfluenceError`. */

@@ -46,6 +46,8 @@ export interface Settings {
 	readonly sidePane: SidePane;
 	/** The space the Confluence pane lists; empty for all spaces. */
 	readonly confluenceSpace: string;
+	/** Starred Confluence pages, shown at the top of the Confluence pane. */
+	readonly confluenceFavorites: readonly ConfluenceFavorite[];
 	/** Look for a new release once a day (a request to GitHub). */
 	readonly checkUpdates: boolean;
 	/** A notification-area icon and the system-wide quick note shortcut; the app stays there when its windows close. */
@@ -68,6 +70,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	pageNumbers: false,
 	sidePane: "outline",
 	confluenceSpace: "",
+	confluenceFavorites: [],
 	checkUpdates: true,
 	tray: false,
 };
@@ -150,6 +153,33 @@ export interface ConfluenceLogin {
 export interface ConfluenceSpace {
 	readonly key: string;
 	readonly name: string;
+}
+
+/** A page in the space's page tree. */
+export interface ConfluenceTreePage {
+	readonly id: string;
+	readonly title: string;
+	/** `null` when the server does not say (Cloud): the page may be expanded to find out. */
+	readonly hasChildren: boolean | null;
+}
+
+/** Where a level of the page tree hangs: a space's top-level pages or a page's children. */
+export type ConfluenceTreeParent =
+	| { readonly space: string; readonly page?: undefined }
+	| { readonly page: string; readonly space?: undefined };
+
+export interface ConfluenceNewPage {
+	readonly space: string;
+	/** The parent page; `null` for a top-level page. */
+	readonly parent: string | null;
+	readonly title: string;
+}
+
+/** A page the user starred; kept per site in the settings. */
+export interface ConfluenceFavorite {
+	readonly site: string;
+	readonly id: string;
+	readonly title: string;
 }
 
 export interface ConfluencePageSummary {
@@ -380,6 +410,10 @@ export interface KalemBridge {
 	confluenceConnect(login: ConfluenceLogin): Promise<ConfluenceAccount>;
 	confluenceDisconnect(): Promise<void>;
 	confluenceSpaces(): Promise<readonly ConfluenceSpace[]>;
+	/** One level of a space's page tree. */
+	confluenceTree(parent: ConfluenceTreeParent): Promise<readonly ConfluenceTreePage[]>;
+	/** Creates an empty page (under `parent`, or at the top of the space) and opens it in a tab. */
+	confluenceCreatePage(request: ConfluenceNewPage): Promise<ConfluenceTreePage>;
 	/** Recently changed pages, filtered by title and space when given. */
 	confluenceSearch(
 		query: string,
@@ -466,6 +500,8 @@ export const CHANNEL = {
 	confluenceConnect: "kalem:confluence-connect",
 	confluenceDisconnect: "kalem:confluence-disconnect",
 	confluenceSpaces: "kalem:confluence-spaces",
+	confluenceTree: "kalem:confluence-tree",
+	confluenceCreatePage: "kalem:confluence-create-page",
 	confluenceSearch: "kalem:confluence-search",
 	confluenceOpenPage: "kalem:confluence-open-page",
 	confluenceReloadPage: "kalem:confluence-reload-page",

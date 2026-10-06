@@ -107,6 +107,86 @@ describe("ConfluenceClient", () => {
 		expect(client.bearer).toBe(false);
 	});
 
+	it("lists a Server space's page tree a level at a time", async () => {
+		const { fetch, calls } = fakeFetch([
+			[
+				"/rest/api/space/DEV/content/page",
+				{
+					results: [
+						{ id: "1", title: "Ana", children: { page: { size: 2 } } },
+						{ id: "2", title: "Yaprak", children: { page: { size: 0 } } },
+					],
+				},
+			],
+			["/rest/api/content/1/child/page", { results: [{ id: "3", title: "Alt" }] }],
+		]);
+		const client = new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "", token: "pat" },
+			fetch,
+		);
+		expect(await client.rootPages("DEV")).toEqual([
+			{ id: "1", title: "Ana", hasChildren: true },
+			{ id: "2", title: "Yaprak", hasChildren: false },
+		]);
+		expect(calls[0]?.url).toBe(
+			"https://wiki.example.com/rest/api/space/DEV/content/page?depth=root&limit=200&expand=children.page",
+		);
+		// Without the expansion the server says nothing: unknown, not a leaf.
+		expect(await client.childPages("1")).toEqual([{ id: "3", title: "Alt", hasChildren: null }]);
+		await expect(client.childPages("1/../2")).rejects.toThrow("Invalid page id");
+	});
+
+	it("lists a Cloud space's page tree through the v2 API", async () => {
+		const { fetch, calls } = fakeFetch([
+			["/api/v2/spaces?keys=DEV", { results: [{ id: "77", key: "DEV" }] }],
+			["/api/v2/spaces/77/pages", { results: [{ id: "1", title: "Ana" }] }],
+			["/api/v2/pages/1/children", { results: [{ id: "3", title: "Alt" }] }],
+		]);
+		const client = new ConfluenceClient(
+			{ site: "acme.atlassian.net", username: "a@b.c", token: "tok" },
+			fetch,
+		);
+		expect(await client.rootPages("DEV")).toEqual([{ id: "1", title: "Ana", hasChildren: null }]);
+		expect(calls[1]?.url).toBe(
+			"https://acme.atlassian.net/wiki/api/v2/spaces/77/pages?depth=root&limit=250",
+		);
+		expect(await client.childPages("1")).toEqual([{ id: "3", title: "Alt", hasChildren: null }]);
+	});
+
+	it("creates a page under a parent on Server and at the top of a Cloud space", async () => {
+		const server = fakeFetch([["/rest/api/content", { id: "43" }]]);
+		const id = await new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "", token: "pat" },
+			server.fetch,
+		).create("DEV", "41", "Yeni");
+		expect(id).toBe("43");
+		expect(server.calls[0]?.init?.method).toBe("POST");
+		expect(JSON.parse(String(server.calls[0]?.init?.body))).toEqual({
+			type: "page",
+			title: "Yeni",
+			space: { key: "DEV" },
+			ancestors: [{ id: "41" }],
+			body: { storage: { value: "<p></p>", representation: "storage" } },
+		});
+
+		const cloud = fakeFetch([
+			["/api/v2/spaces?keys=DEV", { results: [{ id: "77" }] }],
+			["/api/v2/pages", { id: "99" }],
+		]);
+		const client = new ConfluenceClient(
+			{ site: "acme.atlassian.net", username: "a@b.c", token: "tok" },
+			cloud.fetch,
+		);
+		expect(await client.create("DEV", null, "Kök")).toBe("99");
+		expect(JSON.parse(String(cloud.calls[1]?.init?.body))).toEqual({
+			spaceId: "77",
+			status: "current",
+			title: "Kök",
+			body: { representation: "storage", value: "<p></p>" },
+		});
+		await expect(client.create("DEV", "../1", "x")).rejects.toThrow("Invalid page id");
+	});
+
 	it("searches pages with CQL", async () => {
 		const { fetch, calls } = fakeFetch([
 			[

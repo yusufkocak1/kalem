@@ -94,6 +94,29 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 
 	ipcMain.handle(CHANNEL.confluenceSpaces, async () => (await connected()).spaces());
 
+	ipcMain.handle(CHANNEL.confluenceTree, async (_event, raw: unknown) => {
+		const parent = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+		const client = await connected();
+		return typeof parent.page === "string"
+			? client.childPages(parent.page)
+			: client.rootPages(text(parent.space, "space"));
+	});
+
+	ipcMain.handle(CHANNEL.confluenceCreatePage, async (event, raw: unknown) => {
+		const win = senderOf(event);
+		const request = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+		const title = text(request.title, "title").trim().slice(0, 255);
+		if (title === "") throw new Error("Missing title");
+		const client = await connected();
+		const id = await client.create(
+			text(request.space, "space"),
+			typeof request.parent === "string" ? request.parent : null,
+			title,
+		);
+		windows.openConfluencePage(await client.page(id), win);
+		return { id, title, hasChildren: false };
+	});
+
 	ipcMain.handle(CHANNEL.confluenceSearch, async (_event, query: unknown, spaceKey: unknown) =>
 		(await connected()).search(
 			typeof query === "string" ? query.slice(0, 200) : "",
