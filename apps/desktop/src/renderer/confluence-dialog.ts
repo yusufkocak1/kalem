@@ -7,6 +7,8 @@ export interface ConfluenceDialogOptions {
 	readonly t: Strings;
 	readonly lang: string;
 	readonly bridge: KalemBridge;
+	/** After a login or a disconnect. */
+	onAccountChange?(): void;
 }
 
 const SEARCH_DELAY = 250;
@@ -202,6 +204,7 @@ export function createConfluenceDialog(options: ConfluenceDialogOptions): {
 			.confluenceConnect({ site: site.value, username: username.value, token: token.value })
 			.then((account) => {
 				token.value = "";
+				options.onAccountChange?.();
 				return showBrowser(account);
 			})
 			.catch((error: unknown) => {
@@ -214,7 +217,10 @@ export function createConfluenceDialog(options: ConfluenceDialogOptions): {
 	});
 
 	disconnect.addEventListener("click", () => {
-		void bridge.confluenceDisconnect().then(() => showLogin(null));
+		void bridge.confluenceDisconnect().then(() => {
+			options.onAccountChange?.();
+			showLogin(null);
+		});
 	});
 
 	query.addEventListener("input", () => {

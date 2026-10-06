@@ -29,6 +29,7 @@ const en = {
 	searchFolder: "Search in Folder…",
 	outlineTab: "Headings",
 	filesTab: "Files",
+	confluenceTab: "Confluence",
 	noFolder: "Open a folder, or save the document, to see the files next to it.",
 	folderSearch: "Search in files",
 	folderEmpty: "No documents in this folder.",
@@ -287,6 +288,7 @@ const en = {
 	confluenceRequestFailed: "Confluence request failed: {0}",
 	confluenceOpenFailed: "The Confluence page could not be opened",
 	confluenceNotConnected: "Not connected to Confluence.",
+	confluencePickSpace: "Space",
 	confluenceLossNotice:
 		"This page has content with no Markdown equivalent ({0}). Saving removes it from the page; earlier versions stay in the page history.",
 	confluenceLossConfirm: "Save to Confluence anyway?",
@@ -352,6 +354,7 @@ const tr: Strings = {
 	searchFolder: "Klasörde Ara…",
 	outlineTab: "Başlıklar",
 	filesTab: "Dosyalar",
+	confluenceTab: "Confluence",
 	noFolder: "Yanındaki dosyaları görmek için bir klasör açın ya da belgeyi kaydedin.",
 	folderSearch: "Dosyalarda ara",
 	folderEmpty: "Bu klasörde belge yok.",
@@ -612,6 +615,7 @@ const tr: Strings = {
 	confluenceRequestFailed: "Confluence isteği başarısız: {0}",
 	confluenceOpenFailed: "Confluence sayfası açılamadı",
 	confluenceNotConnected: "Confluence'a bağlı değilsiniz.",
+	confluencePickSpace: "Alan",
 	confluenceLossNotice:
 		"Bu sayfada Markdown karşılığı olmayan içerik var ({0}). Kaydetmek bunu sayfadan kaldırır; önceki sürümler sayfa geçmişinde kalır.",
 	confluenceLossConfirm: "Yine de Confluence'a kaydedilsin mi?",

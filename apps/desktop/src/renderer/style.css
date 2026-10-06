@@ -739,7 +739,8 @@ button {
 	color: var(--app-accent);
 }
 
-.files-pane {
+.files-pane,
+.confluence-pane {
 	display: flex;
 	flex: 1;
 	flex-direction: column;
@@ -747,18 +748,21 @@ button {
 }
 
 .files-pane[hidden],
+.confluence-pane[hidden],
 .navigation-content[hidden] {
 	display: none;
 }
 
-.files-toolbar {
+.files-toolbar,
+.confluence-pane-toolbar {
 	display: flex;
 	align-items: center;
 	gap: 2px;
 	padding: 0 6px 4px 12px;
 }
 
-.files-title {
+.files-title,
+.confluence-pane-title {
 	flex: 1;
 	min-width: 0;
 	overflow: hidden;
@@ -769,7 +773,8 @@ button {
 	white-space: nowrap;
 }
 
-.files-search {
+.files-search,
+.confluence-pane-search {
 	margin: 0 8px 6px;
 	padding: 5px 8px;
 	border: 1px solid var(--app-border);
@@ -779,28 +784,33 @@ button {
 	font: inherit;
 }
 
-.files-search:focus {
+.files-search:focus,
+.confluence-pane-search:focus {
 	outline: 2px solid var(--app-accent);
 	outline-offset: -1px;
 }
 
-.files-message {
+.files-message,
+.confluence-pane-message {
 	margin: 4px 12px 8px;
 	color: var(--app-muted);
 	font-size: 12px;
 }
 
-.files-message[hidden] {
+.files-message[hidden],
+.confluence-pane-message[hidden] {
 	display: none;
 }
 
-.files-list {
+.files-list,
+.confluence-pane-list {
 	flex: 1;
 	padding: 0 6px 12px;
 	overflow-y: auto;
 }
 
-.files-item {
+.files-item,
+.confluence-page-item {
 	display: flex;
 	align-items: center;
 	gap: 5px;
@@ -814,17 +824,20 @@ button {
 	text-align: start;
 }
 
-.files-item:hover {
+.files-item:hover,
+.confluence-page-item:hover {
 	background: var(--app-hover);
 }
 
-.files-item[aria-current="page"] {
+.files-item[aria-current="page"],
+.confluence-page-item[aria-current="page"] {
 	background: var(--app-pressed);
 	color: var(--app-accent);
 	font-weight: 600;
 }
 
-.files-item .icon {
+.files-item .icon,
+.confluence-page-item .icon {
 	flex: none;
 	width: 15px;
 	height: 15px;
@@ -838,7 +851,8 @@ button {
 	font-size: 10px;
 }
 
-.files-name {
+.files-name,
+.confluence-page-title {
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -1506,4 +1520,51 @@ pre[data-preview="error"]::after {
 	pre[data-preview="ready"]::after {
 		filter: none;
 	}
+}
+
+/* --- Confluence pane --------------------------------------------------- */
+
+.confluence-pane-space {
+	margin: 0 8px 6px;
+	padding: 4px 6px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+}
+
+.confluence-pane-space:focus {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -1px;
+}
+
+.confluence-pane-connect {
+	align-self: flex-start;
+	margin: 0 12px 8px;
+}
+
+.confluence-page-item {
+	align-items: flex-start;
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+
+.confluence-page-item .icon {
+	margin-top: 2px;
+}
+
+.confluence-page-text {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.confluence-page-meta {
+	overflow: hidden;
+	color: var(--app-muted);
+	font-size: 11px;
+	font-weight: 400;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }

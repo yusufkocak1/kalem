@@ -1,5 +1,12 @@
 /** Desktop releases are the ones tagged `desktop-v<version>`; the repository has other tags too. */
 export const RELEASES_URL = "https://api.github.com/repos/yusufkocak1/kalem/releases?per_page=30";
+/**
+ * The same releases as an Atom feed on github.com. The API allows 60
+ * anonymous requests an hour per IP, which a shared office network uses up
+ * and then answers 403; the feed has no such limit but lists no assets.
+ */
+export const RELEASES_FEED_URL = "https://github.com/yusufkocak1/kalem/releases.atom";
+const REPO_URL = "https://github.com/yusufkocak1/kalem";
 const TAG_PREFIX = "desktop-v";
 
 export interface Release {
@@ -54,12 +61,33 @@ export function latestRelease(listing: unknown): Release | null {
 		best = {
 			version,
 			tag,
-			page:
-				typeof release.html_url === "string"
-					? release.html_url
-					: "https://github.com/yusufkocak1/kalem/releases",
-			downloads: `https://github.com/yusufkocak1/kalem/releases/download/${tag}`,
+			page: typeof release.html_url === "string" ? release.html_url : `${REPO_URL}/releases`,
+			downloads: `${REPO_URL}/releases/download/${tag}`,
 			installable,
+		};
+	}
+	return best;
+}
+
+/**
+ * The newest desktop release in the Atom feed. The feed leaves out drafts
+ * but not pre-releases, and says nothing about assets: `installable` is
+ * false until the caller finds the release's `latest.yml`.
+ */
+export function latestReleaseInFeed(feed: string): Release | null {
+	let best: Release | null = null;
+	for (const match of feed.matchAll(/\/releases\/tag\/([^"'<>\s]+)/g)) {
+		const tag = decodeURIComponent(match[1] as string);
+		if (!tag.startsWith(TAG_PREFIX)) continue;
+		const version = tag.slice(TAG_PREFIX.length);
+		if (parts(version) === null) continue;
+		if (best !== null && compareVersions(version, best.version) <= 0) continue;
+		best = {
+			version,
+			tag,
+			page: `${REPO_URL}/releases/tag/${tag}`,
+			downloads: `${REPO_URL}/releases/download/${tag}`,
+			installable: false,
 		};
 	}
 	return best;

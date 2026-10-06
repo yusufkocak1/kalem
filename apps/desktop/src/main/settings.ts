@@ -82,7 +82,9 @@ export function parseStoredState(raw: unknown): StoredState {
 				? (s.margins as PageMargins)
 				: d.margins,
 			pageNumbers: asBoolean(s.pageNumbers, d.pageNumbers),
-			sidePane: s.sidePane === "files" ? "files" : "outline",
+			sidePane: s.sidePane === "files" || s.sidePane === "confluence" ? s.sidePane : "outline",
+			confluenceSpace:
+				typeof s.confluenceSpace === "string" ? s.confluenceSpace.slice(0, 255) : d.confluenceSpace,
 			checkUpdates: asBoolean(s.checkUpdates, d.checkUpdates),
 			tray: asBoolean(s.tray, d.tray),
 		},

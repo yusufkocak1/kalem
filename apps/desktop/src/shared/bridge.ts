@@ -44,13 +44,15 @@ export interface Settings {
 	readonly pageNumbers: boolean;
 	/** What the side pane shows. */
 	readonly sidePane: SidePane;
+	/** The space the Confluence pane lists; empty for all spaces. */
+	readonly confluenceSpace: string;
 	/** Look for a new release once a day (a request to GitHub). */
 	readonly checkUpdates: boolean;
 	/** A notification-area icon and the system-wide quick note shortcut; the app stays there when its windows close. */
 	readonly tray: boolean;
 }
 
-export type SidePane = "outline" | "files";
+export type SidePane = "outline" | "files" | "confluence";
 
 export const DEFAULT_SETTINGS: Settings = {
 	theme: "system",
@@ -65,6 +67,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	margins: "normal",
 	pageNumbers: false,
 	sidePane: "outline",
+	confluenceSpace: "",
 	checkUpdates: true,
 	tray: false,
 };
