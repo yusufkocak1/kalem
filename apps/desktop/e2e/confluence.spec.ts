@@ -19,6 +19,7 @@ async function fakeConfluence() {
 	};
 	const saves: { version: number; storage: string }[] = [];
 	const auth: string[] = [];
+	const searches: string[] = [];
 
 	const json = (res: ServerResponse, body: unknown, status = 200) => {
 		res.writeHead(status, { "Content-Type": "application/json" });
@@ -38,6 +39,7 @@ async function fakeConfluence() {
 		if (url.pathname === "/rest/api/space")
 			return json(res, { results: [{ key: "DEV", name: "Geliştirme" }] });
 		if (url.pathname === "/rest/api/search") {
+			searches.push(url.searchParams.get("cql") ?? "");
 			return json(res, {
 				results: [
 					{
@@ -84,6 +86,7 @@ async function fakeConfluence() {
 		page,
 		saves,
 		auth,
+		searches,
 		close: () => {
 			server.closeAllConnections();
 			server.close();
@@ -146,6 +149,43 @@ test("edits a Confluence page and saves it back as a new version", async () => {
 
 	expect(confluence.auth.every((header) => header === `Bearer ${TOKEN}`)).toBe(true);
 	expect(await readFile(join(userData, "confluence.json"), "utf8")).not.toContain(TOKEN);
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("lists a space's pages in the side pane and opens one", async () => {
+	const confluence = await fakeConfluence();
+	cleanup.push(confluence.close);
+	const { app, page, userData, errors } = await launch();
+
+	await page.getByRole("tab", { name: "Confluence" }).click();
+	const pane = page.locator(".confluence-pane");
+	await expect(pane).toContainText("Not connected to Confluence.");
+	await pane.getByRole("button", { name: "Connect" }).click();
+
+	const dialog = page.locator(".confluence-dialog");
+	await dialog.locator('input[type="url"]').fill(confluence.site);
+	await dialog.locator('input[type="password"]').fill(TOKEN);
+	await dialog.getByRole("button", { name: "Connect" }).click();
+	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
+	await page.keyboard.press("Escape");
+	await expect(dialog).not.toBeVisible();
+
+	const item = pane.locator(".confluence-page-item", { hasText: "Sprint Planı" });
+	await expect(item).toBeVisible();
+	await pane.locator("select").selectOption("DEV");
+	await expect.poll(() => confluence.searches.at(-1)).toContain('space="DEV"');
+	// Listing one space, the items leave the space name out.
+	await expect(item).not.toContainText("Geliştirme");
+
+	await item.click();
+	await expect(page.locator("#editor h1").first()).toHaveText("Sprint Planı");
+	await expect(item).toHaveAttribute("aria-current", "page");
+
+	// The space is the default from now on.
+	await expect
+		.poll(async () => JSON.parse(await readFile(join(userData, "settings.json"), "utf8")))
+		.toMatchObject({ settings: { sidePane: "confluence", confluenceSpace: "DEV" } });
 	expect(errors).toEqual([]);
 	await app.close();
 });

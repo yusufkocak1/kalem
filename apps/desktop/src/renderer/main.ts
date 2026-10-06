@@ -9,6 +9,7 @@ import { isEditablePath, isWordPath } from "../shared/paths.js";
 import { withColumnWidth } from "../shared/table-style.js";
 import { changeCase, collapseSpaces, nextCase } from "../shared/text-case.js";
 import { createConfluenceDialog } from "./confluence-dialog.js";
+import { createConfluencePane } from "./confluence-pane.js";
 import { createDocumentTools } from "./document-tools.js";
 import { el, isTextFieldFocused } from "./dom.js";
 import type { TableContext, TableEdit } from "./edits.js";
@@ -77,7 +78,23 @@ const versionHistory = createVersionHistory({ t, lang: startup.language });
 const previews: Previews = new Previews(() => {
 	for (const tab of tabs.values()) previews.decorate(tab.canvas);
 });
-const confluenceDialog = createConfluenceDialog({ t, lang: startup.language, bridge });
+const confluenceDialog = createConfluenceDialog({
+	t,
+	lang: startup.language,
+	bridge,
+	onAccountChange: () => {
+		if (settings.navigation && settings.sidePane === "confluence") void confluencePane.refresh();
+	},
+});
+const confluencePane = createConfluencePane({
+	t,
+	lang: startup.language,
+	bridge,
+	space: () => settings.confluenceSpace,
+	setSpace: (key) => updateSettings({ confluenceSpace: key }),
+	activePage: () => session?.remote?.id ?? null,
+	connect: () => void confluenceDialog.show(),
+});
 const quickOpen = createQuickOpen({
 	t,
 	lang: startup.language,
@@ -94,7 +111,11 @@ function sidePaneTab(pane: SidePane, label: string): HTMLButtonElement {
 	button.addEventListener("click", () => updateSettings({ sidePane: pane }));
 	return button;
 }
-const sidePaneTabs = [sidePaneTab("outline", t.outlineTab), sidePaneTab("files", t.filesTab)];
+const sidePaneTabs = [
+	sidePaneTab("outline", t.outlineTab),
+	sidePaneTab("files", t.filesTab),
+	sidePaneTab("confluence", t.confluenceTab),
+];
 const navigation = el("nav", {
 	class: "navigation kalem-theme",
 	attrs: { "aria-label": t.navigation },
@@ -108,6 +129,7 @@ const navigation = el("nav", {
 		}),
 		outlineArea,
 		filesPane.element,
+		confluencePane.element,
 	],
 });
 
@@ -212,6 +234,7 @@ const STATUS_TEXT = {
 function refreshFiles(): void {
 	if (filesPane.workspace()?.opened === true) filesPane.highlightActive();
 	else void filesPane.refresh();
+	confluencePane.highlightActive();
 }
 
 /** Opens a document picked in the files pane; from search results, its matches are shown. */
@@ -386,6 +409,7 @@ function applySettings(): void {
 	navigation.hidden = !settings.navigation;
 	outlineArea.hidden = settings.sidePane !== "outline";
 	filesPane.element.hidden = settings.sidePane !== "files";
+	confluencePane.element.hidden = settings.sidePane !== "confluence";
 	for (const tab of sidePaneTabs) {
 		tab.setAttribute("aria-selected", String(tab.dataset.pane === settings.sidePane));
 	}
@@ -394,7 +418,11 @@ function applySettings(): void {
 }
 
 function updateSettings(patch: Partial<Settings>): void {
+	const confluenceShown = settings.navigation && settings.sidePane === "confluence";
 	settings = { ...settings, ...patch };
+	if (!confluenceShown && settings.navigation && settings.sidePane === "confluence") {
+		void confluencePane.refresh();
+	}
 	applySettings();
 	scheduleRibbonUpdate();
 	bridge.updateSettings(patch);
@@ -602,6 +630,7 @@ const commands: Record<Command, () => void> = {
 // The ribbon reads editor state as soon as it is built, so the documents come first.
 applySettings();
 for (const document of startup.documents) openDocument(document);
+if (settings.navigation && settings.sidePane === "confluence") void confluencePane.refresh();
 
 const ribbon = createAppRibbon(ribbonHost, saveStatus, {
 	t,
@@ -657,7 +686,11 @@ window.addEventListener("focus", () => {
 });
 
 bridge.onSettings((next) => {
+	const confluenceShown = settings.navigation && settings.sidePane === "confluence";
 	settings = next;
+	if (!confluenceShown && settings.navigation && settings.sidePane === "confluence") {
+		void confluencePane.refresh();
+	}
 	applySettings();
 	scheduleRibbonUpdate();
 });
