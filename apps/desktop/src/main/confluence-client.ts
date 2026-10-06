@@ -61,7 +61,8 @@ const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : [
 export class ConfluenceClient {
 	readonly site: string;
 	readonly cloud: boolean;
-	readonly #auth: string;
+	#auth: string;
+	#token: string;
 	readonly #fetch: Fetch;
 
 	constructor(credentials: ConfluenceCredentials, fetchImpl: Fetch) {
@@ -71,7 +72,13 @@ export class ConfluenceClient {
 			credentials.username === ""
 				? `Bearer ${credentials.token}`
 				: `Basic ${Buffer.from(`${credentials.username}:${credentials.token}`).toString("base64")}`;
+		this.#token = credentials.token;
 		this.#fetch = fetchImpl;
+	}
+
+	/** True when requests carry the token alone (a Server / Data Center personal access token). */
+	get bearer(): boolean {
+		return this.#auth.startsWith("Bearer ");
 	}
 
 	async #request(path: string, init: RequestInit = {}): Promise<Response> {
@@ -107,7 +114,29 @@ export class ConfluenceClient {
 
 	/** Fails when the site or the login is wrong. */
 	async verify(): Promise<void> {
-		await this.#json(this.cloud ? "/api/v2/spaces?limit=1" : "/rest/api/space?limit=1");
+		const path = this.cloud ? "/api/v2/spaces?limit=1" : "/rest/api/space?limit=1";
+		try {
+			await this.#json(path);
+		} catch (error) {
+			// Server / Data Center rejects a personal access token sent with a
+			// user name; retry it as a bearer token before giving up.
+			if (
+				this.cloud ||
+				this.bearer ||
+				!(error instanceof ConfluenceError) ||
+				error.status !== 401
+			) {
+				throw error;
+			}
+			const basic = this.#auth;
+			this.#auth = `Bearer ${this.#token}`;
+			try {
+				await this.#json(path);
+			} catch {
+				this.#auth = basic;
+				throw error;
+			}
+		}
 	}
 
 	async spaces(): Promise<ConfluenceSpace[]> {

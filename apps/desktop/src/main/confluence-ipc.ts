@@ -85,8 +85,9 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 		if (credentials.site === "" || credentials.token === "") throw new Error("Missing login");
 		const client = confluenceClient(credentials);
 		await client.verify();
-		await ctx.confluence.set({ ...credentials, site: client.site });
-		return account(client, credentials.username);
+		const username = client.bearer ? "" : credentials.username;
+		await ctx.confluence.set({ ...credentials, username, site: client.site });
+		return account(client, username);
 	});
 
 	ipcMain.handle(CHANNEL.confluenceDisconnect, () => ctx.confluence.clear());

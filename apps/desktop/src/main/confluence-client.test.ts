@@ -73,6 +73,40 @@ describe("ConfluenceClient", () => {
 		expect((error as Error).message).toBe("HTTP 401: Unauthorized");
 	});
 
+	it("retries a Server login that was given a user name as a bearer token", async () => {
+		const calls: Call[] = [];
+		const fetch: Fetch = async (url, init) => {
+			calls.push({ url, init });
+			const auth = header({ url, init }, "Authorization");
+			return auth === "Bearer pat"
+				? new Response(JSON.stringify({ results: [] }))
+				: new Response("{}", { status: 401 });
+		};
+		const client = new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "jdoe", token: "pat" },
+			fetch,
+		);
+		expect(client.bearer).toBe(false);
+		await client.verify();
+		expect(client.bearer).toBe(true);
+		expect(calls.map((call) => header(call, "Authorization"))).toEqual([
+			`Basic ${Buffer.from("jdoe:pat").toString("base64")}`,
+			"Bearer pat",
+		]);
+	});
+
+	it("keeps the first 401 when the bearer retry fails too", async () => {
+		const { fetch, calls } = fakeFetch([["/rest/api/space", { message: "Bad login" }, 401]]);
+		const client = new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "jdoe", token: "wrong" },
+			fetch,
+		);
+		const error = await client.verify().catch((e: unknown) => e);
+		expect((error as Error).message).toBe("HTTP 401: Bad login");
+		expect(calls).toHaveLength(2);
+		expect(client.bearer).toBe(false);
+	});
+
 	it("searches pages with CQL", async () => {
 		const { fetch, calls } = fakeFetch([
 			[
