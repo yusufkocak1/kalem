@@ -9,7 +9,14 @@ import { describe, expect, it } from "vitest";
 import { regionsOf } from "./regions.js";
 import { replaceAll, replaceOne } from "./replace.js";
 import type { SearchOptions } from "./search.js";
-import { createIndex, findMatches, nextFrom, previousFrom } from "./search.js";
+import {
+	createIndex,
+	findMatches,
+	nextFrom,
+	previousFrom,
+	replacementFor,
+	unescapeExtended,
+} from "./search.js";
 
 /** Belgedeki eşleşmelerin metinleri — testi okunur kılan kısayol. */
 function bul(md: string, query: string, options: SearchOptions = {}, locale = "tr"): string[] {
@@ -20,12 +27,14 @@ function bul(md: string, query: string, options: SearchOptions = {}, locale = "t
 	);
 }
 
-/** Değiştirilmiş belgenin Markdown çıktısı. */
+/** Değiştirilmiş belgenin Markdown çıktısı; değiştirme metni moda göre çözülüyor. */
 function degistir(md: string, query: string, value: string, options: SearchOptions = {}): string {
 	const doc = parse(md);
 	const index = createIndex(doc, "tr");
 	const matches = findMatches(index, query, options);
-	const sonuc = replaceAll(doc, index.regions, matches, value);
+	const sonuc = replaceAll(doc, index.regions, matches, (m) =>
+		replacementFor(index, m, query, value, options),
+	);
 	return sonuc === null ? serialize(doc) : serialize(sonuc.doc);
 }
 
@@ -333,5 +342,75 @@ describe("100 sayfalık belge", () => {
 		const sonuc = replaceAll(doc, index.regions, matches, "köpek");
 		expect(sonuc).not.toBeNull();
 		expect(performance.now() - bas).toBeLessThan(3000);
+	});
+});
+
+describe("genişletilmiş mod", () => {
+	it("kaçışları çözüyor", () => {
+		expect(unescapeExtended("a\\tb\\nc\\x41\\u00e7\\\\d\\q")).toBe("a\tb\nc" + "A" + "ç\\dq");
+	});
+
+	it("paragraf içindeki satır sonunu \\n ile buluyor", () => {
+		expect(bul("bir\\\niki\n", "bir\\niki", { mode: "extended" })).toEqual(["bir\niki"]);
+		// Normal modda aynı sorgu düz metin.
+		expect(bul("bir\\\niki\n", "bir\\niki")).toEqual([]);
+	});
+
+	it("değiştirmedeki \\n satır sonu oluyor", () => {
+		expect(degistir("bir, iki\n", ", ", "\\n", { mode: "extended" })).toBe("bir\\\niki\n");
+	});
+});
+
+describe("düzenli ifade modu", () => {
+	it("deseni buluyor", () => {
+		expect(bul("a1 b22 c333\n", "\\d+", { mode: "regex" })).toEqual(["1", "22", "333"]);
+	});
+
+	it("varsayılan olarak büyük/küçük harfe duyarsız, istenince duyarlı", () => {
+		expect(bul("Kedi kedi\n", "kedi", { mode: "regex" })).toEqual(["Kedi", "kedi"]);
+		expect(bul("Kedi kedi\n", "kedi", { mode: "regex", caseSensitive: true })).toEqual(["kedi"]);
+	});
+
+	it("^ ve $ her paragrafta", () => {
+		expect(bul("bir iki\n\nüç dört\n", "^\\S+", { mode: "regex" })).toEqual(["bir", "üç"]);
+	});
+
+	it("boş eşleşmede takılmıyor", () => {
+		expect(bul("abc\n", "x*", { mode: "regex" })).toEqual([]);
+	});
+
+	it("tam kelime seçeneği desene de uygulanıyor", () => {
+		expect(bul("kedi kediler\n", "kedi\\w*", { mode: "regex", wholeWord: true })).toEqual([
+			"kedi",
+			"kediler",
+		]);
+		expect(bul("kedi kediler\n", "kedi", { mode: "regex", wholeWord: true })).toEqual(["kedi"]);
+	});
+
+	it("geçersiz desende hata fırlatıyor", () => {
+		expect(() => bul("a\n", "(a", { mode: "regex" })).toThrow(SyntaxError);
+	});
+
+	it("gruplarla değiştiriyor", () => {
+		expect(degistir("Ad: Ali, Soyad: Veli\n", "(\\w+): (\\w+)", "$2=$1", { mode: "regex" })).toBe(
+			"Ali=Ad, Veli=Soyad\n",
+		);
+		expect(
+			degistir("2026-10-06\n", "(?<y>\\d+)-(?<a>\\d+)-(?<g>\\d+)", "$<g>.$<a>.$<y>", {
+				mode: "regex",
+			}),
+		).toBe("06.10.2026\n");
+	});
+
+	it("geriye bakan desen eşleşmenin solunu görüyor", () => {
+		expect(
+			degistir("fiyat: 10 TL, adet: 10\n", "(?<=fiyat: )\\d+", "($&)", { mode: "regex" }),
+		).toBe("fiyat: (10) TL, adet: 10\n");
+	});
+
+	it("biçimi koruyor ve görseli silmiyor", () => {
+		expect(degistir("**kedi** ![g](g.png) kedi\n", "k(e)di", "k$1$1di", { mode: "regex" })).toBe(
+			"**keedi** ![g](g.png) keedi\n",
+		);
 	});
 });

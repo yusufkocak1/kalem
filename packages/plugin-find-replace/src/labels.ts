@@ -32,6 +32,20 @@ export interface FindLabels {
 	readonly results: (total: number) => string;
 	/** Salt okunur belgede değiştirme denendiğinde. */
 	readonly readOnly: string;
+	/**
+	 * Arama modları ve diğer seçenekler. Sonradan eklendiler; verilmezse
+	 * İngilizce metin kullanılıyor (kendi sözlüğünü veren uygulama bozulmasın).
+	 */
+	/** Mod seçicinin adı. */
+	readonly mode?: string;
+	readonly modeNormal?: string;
+	readonly modeExtended?: string;
+	readonly modeRegex?: string;
+	readonly wrapAround?: string;
+	/** Geçersiz düzenli ifade. */
+	readonly invalidPattern?: string;
+	/** Başa sarma kapalıyken belgenin sonuna (ya da başına) gelindi. */
+	readonly endReached?: string;
 }
 
 export const enFindLabels: FindLabels = {
@@ -50,6 +64,13 @@ export const enFindLabels: FindLabels = {
 	limited: (total) => `${total}+`,
 	results: (total) => (total === 1 ? "1 result" : `${total} results`),
 	readOnly: "This document is read-only",
+	mode: "Search mode",
+	modeNormal: "Normal",
+	modeExtended: "Extended (\\n, \\t, \\x…)",
+	modeRegex: "Regular expression",
+	wrapAround: "Wrap around",
+	invalidPattern: "Invalid expression",
+	endReached: "Reached the end",
 };
 
 export const trFindLabels: FindLabels = {
@@ -68,6 +89,13 @@ export const trFindLabels: FindLabels = {
 	limited: (total) => `${total}+`,
 	results: (total) => `${total} sonuç`,
 	readOnly: "Bu belge salt okunur",
+	mode: "Arama modu",
+	modeNormal: "Normal",
+	modeExtended: "Genişletilmiş (\\n, \\t, \\x…)",
+	modeRegex: "Düzenli ifade",
+	wrapAround: "Başa sar",
+	invalidPattern: "Geçersiz ifade",
+	endReached: "Sona ulaşıldı",
 };
 
 /** Belge diline göre sözlük; yalnızca dil koduna bakılıyor, bölgeye değil. */

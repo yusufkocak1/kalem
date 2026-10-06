@@ -200,8 +200,11 @@ export function replaceInRegion(
 	const children = (hedef as { children?: readonly Inline[] }).children;
 	if (!Array.isArray(children)) return null;
 
+	// Yeni metindeki satır sonu `break` düğümü olmalı; yerinde değişim onu
+	// metnin içine gömerdi.
 	const yeni =
-		yerindeDegistir(children, from, to, value) ?? spliceKoruyarak(children, from, to, value);
+		(value.includes(SATIR_SONU) ? null : yerindeDegistir(children, from, to, value)) ??
+		spliceKoruyarak(children, from, to, value);
 	return {
 		doc: replaceAt(doc, yol(region), { ...(hedef as object), children: yeni } as never),
 		caret: caretAt(region, from + value.length),
@@ -295,7 +298,10 @@ function spliceKoruyarak(
 		(node) => node.type === "image" || node.type === "imageReference",
 	);
 	const ortadaki: Inline[] = [...korunan];
-	if (value !== "") ortadaki.push({ type: "text", value });
+	for (const [i, satir] of value.split(SATIR_SONU).entries()) {
+		if (i > 0) ortadaki.push({ type: "break" });
+		if (satir !== "") ortadaki.push({ type: "text", value: satir });
+	}
 	return normalizeInline([
 		...sliceInline(children, 0, from),
 		...ortadaki,

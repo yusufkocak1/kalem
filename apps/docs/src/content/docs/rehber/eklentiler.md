@@ -33,7 +33,7 @@ ve görev listesi. **Boş dizi vermek onları kapatıyor** — çekirdek
 | Paket | Ne yapıyor | Boyut (gzip) |
 |---|---|---|
 | `@kalem-editor/plugin-code-highlight` | Kod bloğu vurgulama, 8 dil | 3,7 kB |
-| `@kalem-editor/plugin-find-replace` | Ctrl+F / Ctrl+H | 4,4 kB |
+| `@kalem-editor/plugin-find-replace` | Ctrl+F / Ctrl+H | 5,3 kB |
 | `@kalem-editor/plugin-image-upload` | Sürükle-bırak / yapıştır görsel yükleme | 2,9 kB |
 | `@kalem-editor/plugin-outline` | İçindekiler paneli | 1,9 kB |
 | `@kalem-editor/plugin-word-count` | Kelime sayacı ve okuma süresi | 1,4 kB |
@@ -96,6 +96,19 @@ Tablo hücreleri de aranıyor ve değiştiriliyor; değişen satır dışındaki
 satırlar ve sütun hizası olduğu gibi kalıyor. Satır içi görseller aramada
 tek bir yer tutucu karakter sayılıyor: `a![](x.png)b` içinde `ab` bulunmuyor,
 çünkü ekranda aralarında bir görsel var.
+
+Paneldeki **arama modu** Notepad++'takiyle aynı üç seçenek:
+
+- **Normal** — yazılan metin aynen aranıyor (varsayılan).
+- **Genişletilmiş** — `\n`, `\t`, `\xHH`, `\uHHHH` kaçışları çözülüyor;
+  paragraf içindeki satır sonu `\n` ile bulunuyor, değiştirmedeki `\n`
+  satır sonu ekliyor.
+- **Düzenli ifade** — JavaScript deseni; değiştirmede `$1`, `$&`,
+  `$<ad>` kullanılabiliyor. `^` ve `$` her paragrafın başı ve sonu.
+  Buradaki büyük/küçük harf katlaması dilden bağımsız (`i` bayrağı):
+  `ı` ile `I` eşleşmiyor, gerekirse `[ıI]` yazın.
+
+**Başa sar** kapatılınca sonraki/önceki belgenin sonunda (başında) duruyor.
 
 ### Görsel yükleme
 
