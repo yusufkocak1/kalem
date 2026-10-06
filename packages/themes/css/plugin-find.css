@@ -97,8 +97,25 @@
 
 .kalem-find-options {
 	display: flex;
-	gap: 12px;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px 12px;
+	max-width: 46ch;
 	color: var(--kalem-fg-muted);
+}
+
+.kalem-find-mode {
+	font: inherit;
+	padding: 2px 4px;
+	color: var(--kalem-fg);
+	background: var(--kalem-bg-subtle);
+	border: 1px solid var(--kalem-border);
+	border-radius: 6px;
+}
+
+.kalem-find-mode:focus-visible {
+	outline: 2px solid var(--kalem-accent);
+	outline-offset: 1px;
 }
 
 .kalem-find-option {

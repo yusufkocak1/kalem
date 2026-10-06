@@ -243,3 +243,45 @@ test("tablo hücrelerinde boyuyor ve değiştiriyor, hizayı koruyor", async ({ 
 		"| Hayvan | Ses   |\n| ------ | ----- |\n| fare   | miyav |\n| inek   | mö    |\n",
 	);
 });
+
+test("düzenli ifade modu gruplarla değiştiriyor", async ({ page }) => {
+	await yaz(page, "Ad: Ali, Soyad: Veli\n");
+	await page.keyboard.press("Control+h");
+	await panel(page).getByRole("combobox", { name: "Arama modu" }).selectOption("regex");
+	await bulKutusu(page).fill("(\\w+): (\\w+)");
+	await expect(sayac(page)).toHaveText("1 / 2");
+	await degistirKutusu(page).fill("$2=$1");
+	await panel(page).getByRole("button", { name: "Tümünü değiştir" }).click();
+	expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("Ali=Ad, Veli=Soyad\n");
+});
+
+test("geçersiz düzenli ifadeyi söylüyor", async ({ page }) => {
+	await page.keyboard.press("Control+f");
+	await panel(page).getByRole("combobox", { name: "Arama modu" }).selectOption("regex");
+	await bulKutusu(page).fill("(gölge|yer");
+	await expect(sayac(page)).toHaveText("Geçersiz ifade");
+	await bulKutusu(page).fill("(gölge|yer)");
+	await expect(sayac(page)).toHaveText("1 / 2");
+});
+
+test("genişletilmiş mod satır sonu ekliyor", async ({ page }) => {
+	await yaz(page, "bir, iki\n");
+	await page.keyboard.press("Control+h");
+	await panel(page).getByRole("combobox", { name: "Arama modu" }).selectOption("extended");
+	await bulKutusu(page).fill(", ");
+	await degistirKutusu(page).fill("\\n");
+	await panel(page).getByRole("button", { name: "Tümünü değiştir" }).click();
+	expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("bir\\\niki\n");
+});
+
+test("başa sarma kapalıyken sonda duruyor", async ({ page }) => {
+	await page.keyboard.press("Control+f");
+	await bulKutusu(page).fill("ışık");
+	await panel(page).getByLabel("Başa sar").uncheck();
+	await expect(sayac(page)).toHaveText("1 / 2");
+	await bulKutusu(page).press("Enter");
+	await expect(sayac(page)).toHaveText("2 / 2");
+	await bulKutusu(page).press("Enter");
+	await expect(sayac(page)).toHaveText("Sona ulaşıldı");
+	expect(await page.evaluate(() => window.kalem.aramaEklentisi.currentIndex())).toBe(1);
+});

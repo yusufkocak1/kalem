@@ -27,5 +27,13 @@ export { findReplacePlugin } from "./plugin.js";
 export type { Region } from "./regions.js";
 export { caretAt, regionsOf, replaceInRegion } from "./regions.js";
 export { replaceAll, replaceOne } from "./replace.js";
-export type { Match, SearchIndex, SearchOptions } from "./search.js";
-export { createIndex, findMatches, nextFrom, previousFrom } from "./search.js";
+export type { Match, SearchIndex, SearchMode, SearchOptions } from "./search.js";
+export {
+	compilePattern,
+	createIndex,
+	findMatches,
+	nextFrom,
+	previousFrom,
+	replacementFor,
+	unescapeExtended,
+} from "./search.js";

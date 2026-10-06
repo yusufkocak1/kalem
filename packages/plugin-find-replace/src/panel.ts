@@ -25,6 +25,8 @@
  * olduğu görsel bir bilgi değil, aramanın **sonucu**.
  */
 import type { FindLabels } from "./labels.js";
+import { enFindLabels } from "./labels.js";
+import type { SearchMode } from "./search.js";
 
 export interface PanelOptions {
 	readonly prefix: string;
@@ -44,12 +46,16 @@ export interface Panel {
 	isOpen(): boolean;
 	/** Sayaç metnini günceller. `total` 0 ise "sonuç yok". */
 	setStatus(current: number, total: number, limited: boolean): void;
+	/** Sayacın yerine bir uyarı ("geçersiz ifade", "sona ulaşıldı"). */
+	setMessage(text: string): void;
 	/** Değiştirme düğmelerini kapatır (salt okunur belge). */
 	setReadOnly(readOnly: boolean): void;
 	query(): string;
 	replacement(): string;
 	caseSensitive(): boolean;
 	wholeWord(): boolean;
+	mode(): SearchMode;
+	wrapAround(): boolean;
 	/** Panel editörün üst-sağ köşesine hizalanıyor. */
 	reposition(): void;
 	destroy(): void;
@@ -94,7 +100,24 @@ export function createPanel(anchor: HTMLElement, options: PanelOptions): Panel {
 	secenekler.className = `${p}find-options`;
 	const duyarli = onayKutusu(doc, p, l.caseSensitive);
 	const tamKelime = onayKutusu(doc, p, l.wholeWord);
-	secenekler.append(duyarli.label, tamKelime.label);
+	const basaSar = onayKutusu(doc, p, l.wrapAround ?? (enFindLabels.wrapAround as string));
+	basaSar.input.checked = true;
+	// Notepad++'taki "Arama modu" grubu; üç radyo düğmesi panele sığmıyor.
+	const mod = doc.createElement("select");
+	mod.className = `${p}find-mode`;
+	for (const [deger, metin] of [
+		["normal", l.modeNormal ?? enFindLabels.modeNormal],
+		["extended", l.modeExtended ?? enFindLabels.modeExtended],
+		["regex", l.modeRegex ?? enFindLabels.modeRegex],
+	] as const) {
+		const secenek = doc.createElement("option");
+		secenek.value = deger;
+		secenek.textContent = metin as string;
+		mod.append(secenek);
+	}
+	mod.setAttribute("aria-label", (l.mode ?? enFindLabels.mode) as string);
+	mod.title = mod.getAttribute("aria-label") as string;
+	secenekler.append(duyarli.label, tamKelime.label, basaSar.label, mod);
 
 	kok.append(bulSatiri, degistirSatiri, secenekler);
 	doc.body.append(kok);
@@ -153,6 +176,8 @@ export function createPanel(anchor: HTMLElement, options: PanelOptions): Panel {
 	degistirHepsi.addEventListener("click", options.onReplaceAll);
 	duyarli.input.addEventListener("change", options.onOptionsChange);
 	tamKelime.input.addEventListener("change", options.onOptionsChange);
+	basaSar.input.addEventListener("change", options.onOptionsChange);
+	mod.addEventListener("change", options.onOptionsChange);
 
 	const yenidenKonumla = (): void => {
 		if (acik) konumla();
@@ -191,6 +216,10 @@ export function createPanel(anchor: HTMLElement, options: PanelOptions): Panel {
 			sayac.textContent = `${current + 1} / ${toplam}`;
 		},
 
+		setMessage(text) {
+			sayac.textContent = text;
+		},
+
 		setReadOnly(readOnly) {
 			degistirBir.disabled = readOnly;
 			degistirHepsi.disabled = readOnly;
@@ -203,6 +232,8 @@ export function createPanel(anchor: HTMLElement, options: PanelOptions): Panel {
 		replacement: () => degistirGirdi.value,
 		caseSensitive: () => duyarli.input.checked,
 		wholeWord: () => tamKelime.input.checked,
+		mode: () => mod.value as SearchMode,
+		wrapAround: () => basaSar.input.checked,
 		reposition: konumla,
 
 		destroy() {

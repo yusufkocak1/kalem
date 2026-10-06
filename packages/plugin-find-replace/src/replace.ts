@@ -36,15 +36,24 @@ export function replaceOne(
 	doc: Root,
 	regions: readonly Region[],
 	match: Match,
-	value: string,
+	value: string | ((match: Match) => string),
 ): EditResult | null {
 	const region = regions[match.regionIndex];
 	if (region === undefined) return null;
-	return replaceInRegion(doc, region, match.from, match.to, value);
+	return replaceInRegion(
+		doc,
+		region,
+		match.from,
+		match.to,
+		typeof value === "string" ? value : value(match),
+	);
 }
 
 /**
  * Bütün eşleşmeleri değiştirir.
+ *
+ * `value` bir fonksiyonsa her eşleşmenin kendi metni (düzenli ifadede
+ * `$1` gibi gruplar eşleşmeden eşleşmeye değişiyor).
  *
  * Eşleşme yoksa `null` — çağıran "değişiklik olmadı" ile "boş belge
  * üretildi"yi ayırabilsin.
@@ -53,16 +62,17 @@ export function replaceAll(
 	doc: Root,
 	regions: readonly Region[],
 	matches: readonly Match[],
-	value: string,
+	value: string | ((match: Match) => string),
 ): EditResult | null {
 	if (matches.length === 0) return null;
+	const metni = (match: Match): string => (typeof value === "string" ? value : value(match));
 
 	let sonuc = doc;
 	for (let i = matches.length - 1; i >= 0; i--) {
 		const match = matches[i] as Match;
 		const region = regions[match.regionIndex];
 		if (region === undefined) continue;
-		const adim = replaceInRegion(sonuc, region, match.from, match.to, value);
+		const adim = replaceInRegion(sonuc, region, match.from, match.to, metni(match));
 		if (adim === null) continue;
 		sonuc = adim.doc;
 	}
@@ -75,6 +85,6 @@ export function replaceAll(
 	const region = regions[ilk.regionIndex];
 	return {
 		doc: sonuc,
-		caret: region === undefined ? null : caretAt(region, ilk.from + value.length),
+		caret: region === undefined ? null : caretAt(region, ilk.from + metni(ilk).length),
 	};
 }

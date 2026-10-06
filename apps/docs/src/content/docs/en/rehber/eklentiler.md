@@ -33,7 +33,7 @@ call `defaultPlugins()` and put it at the start of your own list.
 | Package | What it does | Size (gzip) |
 |---|---|---|
 | `@kalem-editor/plugin-code-highlight` | Code block highlighting, 8 languages | 3.7 kB |
-| `@kalem-editor/plugin-find-replace` | Ctrl+F / Ctrl+H | 4.4 kB |
+| `@kalem-editor/plugin-find-replace` | Ctrl+F / Ctrl+H | 5.3 kB |
 | `@kalem-editor/plugin-image-upload` | Drag-and-drop / paste image upload | 2.9 kB |
 | `@kalem-editor/plugin-outline` | Table of contents panel | 1.9 kB |
 | `@kalem-editor/plugin-word-count` | Word count and reading time | 1.4 kB |
@@ -97,6 +97,20 @@ Table cells are searched and replaced too; rows other than the changed one,
 and the column alignment, stay as they are. An inline image counts as a
 single placeholder character in search: `ab` isn't found in `a![](x.png)b`,
 because there's an image between them on screen.
+
+The panel's **search mode** has the same three options as Notepad++:
+
+- **Normal** — the text is searched as typed (default).
+- **Extended** — `\n`, `\t`, `\xHH`, `\uHHHH` escapes are decoded; a line
+  break inside a paragraph is found with `\n`, and `\n` in the
+  replacement inserts one.
+- **Regular expression** — a JavaScript pattern; the replacement can use
+  `$1`, `$&`, `$<name>`. `^` and `$` match at the start and end of each
+  paragraph. Case folding here is language-independent (the `i` flag):
+  `ı` doesn't match `I`; write `[ıI]` if you need it.
+
+With **Wrap around** off, next/previous stops at the end (start) of the
+document.
 
 ### Image upload
 

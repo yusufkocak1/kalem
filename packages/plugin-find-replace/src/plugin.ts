@@ -30,8 +30,8 @@ import type { FindLabels } from "./labels.js";
 import { labelsFor } from "./labels.js";
 import { createPanel } from "./panel.js";
 import { replaceAll, replaceOne } from "./replace.js";
-import type { Match, SearchIndex } from "./search.js";
-import { createIndex, findMatches, nextFrom } from "./search.js";
+import type { Match, SearchIndex, SearchOptions } from "./search.js";
+import { createIndex, findMatches, nextFrom, replacementFor } from "./search.js";
 
 export interface FindReplaceOptions {
 	/** Arayüz metinleri; verilmezse belgenin `lang`'ine göre seçiliyor. */
@@ -65,6 +65,9 @@ export function findReplacePlugin(options: FindReplaceOptions = {}): FindReplace
 	let matches: readonly Match[] = [];
 	let current = -1;
 	let locale = "en";
+	let labels: FindLabels | null = null;
+	/** Sayacın yerine gösterilen uyarı; bir sonraki çizimde siliniyor. */
+	let uyari = "";
 
 	/** Belge değişti: dizin bayat. */
 	function gecersizle(): void {
@@ -89,11 +92,13 @@ export function findReplacePlugin(options: FindReplaceOptions = {}): FindReplace
 		if (idx === null || panel === null) return;
 
 		const oncekiKonum = current >= 0 ? matches[current] : undefined;
-		matches = findMatches(idx, panel.query(), {
-			caseSensitive: panel.caseSensitive(),
-			wholeWord: panel.wholeWord(),
-			limit,
-		});
+		try {
+			matches = findMatches(idx, panel.query(), aramaSecenekleri());
+		} catch {
+			// Yazılmakta olan bir desen çoğu an geçersiz (`(a`); hata değil, durum.
+			matches = [];
+			uyari = labels?.invalidPattern ?? "Invalid expression";
+		}
 
 		if (matches.length === 0) current = -1;
 		else if (koru && oncekiKonum !== undefined) {
@@ -119,9 +124,20 @@ export function findReplacePlugin(options: FindReplaceOptions = {}): FindReplace
 		return bolgeIndex < 0 ? nextFrom(matches, 0, 0) : nextFrom(matches, bolgeIndex, caret.offset);
 	}
 
+	function aramaSecenekleri(): SearchOptions {
+		return {
+			mode: panel?.mode() ?? "normal",
+			caseSensitive: panel?.caseSensitive() === true,
+			wholeWord: panel?.wholeWord() === true,
+			limit,
+		};
+	}
+
 	function ciz(): void {
 		if (panel === null || decorator === null) return;
 		panel.setStatus(Math.max(current, 0), matches.length, matches.length >= limit);
+		if (uyari !== "") panel.setMessage(uyari);
+		uyari = "";
 		decorator.paint(matches, current);
 		const hedef = current >= 0 ? matches[current] : undefined;
 		if (hedef !== undefined) decorator.reveal(hedef);
@@ -129,6 +145,11 @@ export function findReplacePlugin(options: FindReplaceOptions = {}): FindReplace
 
 	function git(yon: 1 | -1): void {
 		if (matches.length === 0) return;
+		const sinirda = yon === 1 ? current === matches.length - 1 : current === 0;
+		if (sinirda && panel?.wrapAround() === false) {
+			panel.setMessage(labels?.endReached ?? "Reached the end");
+			return;
+		}
 		current = (current + yon + matches.length) % matches.length;
 		ciz();
 	}
@@ -137,7 +158,11 @@ export function findReplacePlugin(options: FindReplaceOptions = {}): FindReplace
 		if (ctx === null || panel === null || ctx.isReadOnly()) return;
 		const idx = dizin();
 		if (idx === null || matches.length === 0) return;
-		const value = panel.replacement();
+		const query = panel.query();
+		const replacement = panel.replacement();
+		const secenekler = aramaSecenekleri();
+		const value = (match: Match): string =>
+			replacementFor(idx, match, query, replacement, secenekler);
 
 		const sonuc = hepsi
 			? replaceAll(ctx.getDocument(), idx.regions, matches, value)
@@ -209,7 +234,8 @@ export function findReplacePlugin(options: FindReplaceOptions = {}): FindReplace
 			ctx = context;
 			const belgeDili = context.getLang();
 			locale = options.locale ?? belgeDili;
-			const labels = options.labels ?? labelsFor(belgeDili);
+			const etiketler = options.labels ?? labelsFor(belgeDili);
+			labels = etiketler;
 
 			decorator = createDecorator(context.element, (i) => {
 				const blok = context.getDocument().children[i];
@@ -218,7 +244,7 @@ export function findReplacePlugin(options: FindReplaceOptions = {}): FindReplace
 
 			panel = createPanel(context.element, {
 				prefix: p,
-				labels,
+				labels: etiketler,
 				onQueryChange: () => tazele(false),
 				onOptionsChange: () => tazele(false),
 				onNext: () => git(1),

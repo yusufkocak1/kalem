@@ -145,7 +145,7 @@
   {
     "name": "@kalem-editor/plugin-find-replace",
     "path": "packages/plugin-find-replace/dist/index.js",
-    "limit": "5 kB",
+    "limit": "5.5 kB",
     "gzip": true,
     "import": "{ findReplacePlugin }",
     "ignore": ["@kalem-editor/core", "@kalem-editor/editor"]
