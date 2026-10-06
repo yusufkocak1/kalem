@@ -129,10 +129,16 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 			click: (_item, window) => void windows.showWordDialog(targetOf(ctx, window)),
 		},
 		{
+			label: t.importConfluence,
+			click: (_item, window) => void windows.showConfluenceDialog(targetOf(ctx, window)),
+		},
+		{
 			label: t.export,
 			submenu: [
 				{ label: t.exportHtml, click: send(ctx, "export-html") },
 				{ label: t.exportDocx, click: send(ctx, "export-docx") },
+				{ label: t.exportConfluence, click: send(ctx, "export-confluence") },
+				{ label: t.exportConfluenceWiki, click: send(ctx, "export-confluence-wiki") },
 				{ label: t.exportPdf, click: withWindow(ctx, (win) => ctx.exportPdf(win)) },
 			],
 		},

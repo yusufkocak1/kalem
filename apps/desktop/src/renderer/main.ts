@@ -557,6 +557,8 @@ const commands: Record<Command, () => void> = {
 	"zoom-reset": () => setZoom(100),
 	"export-html": () => void tools.exportHtml(),
 	"export-docx": () => void tools.exportDocx(),
+	"export-confluence": () => void tools.exportConfluence("storage"),
+	"export-confluence-wiki": () => void tools.exportConfluence("wiki"),
 	"format-code": tools.formatCode,
 	"format-all-code": tools.formatAllCode,
 	"quick-open": () => void quickOpen.show(),

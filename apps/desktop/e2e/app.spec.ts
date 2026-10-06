@@ -750,6 +750,43 @@ test("exports the document as HTML and PDF", async () => {
 	await discardAndClose(app);
 });
 
+test("imports a Confluence page and exports it in both Confluence formats", async () => {
+	const folder = await tempDir("confluence");
+	const page = join(folder, "Sprint Planı.xml");
+	const storage = join(folder, "plan.xml");
+	const wiki = join(folder, "plan.txt");
+	await writeFile(
+		page,
+		'<h1>Sprint Planı</h1><p>Hedef: <strong>sürüm</strong></p><ac:structured-macro ac:name="code"><ac:parameter ac:name="language">js</ac:parameter><ac:plain-text-body><![CDATA[run();]]></ac:plain-text-body></ac:structured-macro><ac:task-list><ac:task><ac:task-id>1</ac:task-id><ac:task-status>complete</ac:task-status><ac:task-body>Tasarım</ac:task-body></ac:task></ac:task-list>',
+	);
+
+	const { app, page: window, errors } = await launch();
+	await stubOpenDialog(app, [page]);
+	await clickMenu(app, "File", "Import from Confluence…");
+	await expect(window.locator("#editor h1").first()).toHaveText("Sprint Planı");
+	await expect(window.locator(".notice")).toContainText("imported from Confluence");
+	expect(await windowTitle(app)).toBe("● Sprint Planı – Kalem");
+
+	await stubSaveDialog(app, storage);
+	await clickMenu(app, "File", "Export", "Confluence (storage format)…");
+	await expect
+		.poll(() => readFile(storage, "utf8").catch(() => ""))
+		.toContain("<h1>Sprint Planı</h1>");
+	const xml = await readFile(storage, "utf8");
+	expect(xml).toContain('<ac:parameter ac:name="language">js</ac:parameter>');
+	expect(xml).toContain("<ac:task-status>complete</ac:task-status>");
+
+	await stubSaveDialog(app, wiki);
+	await clickMenu(app, "File", "Export", "Confluence (wiki markup)…");
+	await expect.poll(() => readFile(wiki, "utf8").catch(() => "")).toContain("h1. Sprint Planı");
+	expect(await readFile(wiki, "utf8")).toContain(
+		"Hedef: *sürüm*\n\n{code:language=js}\nrun();\n{code}",
+	);
+
+	expect(errors).toEqual([]);
+	await discardAndClose(app);
+});
+
 test("exports the document to Word with its images", async () => {
 	const folder = await tempDir("docx");
 	const path = join(folder, "rapor.md");

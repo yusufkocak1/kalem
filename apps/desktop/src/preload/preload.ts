@@ -23,6 +23,7 @@ const bridge: KalemBridge = {
 	showOpenDialog: () => ipcRenderer.invoke(CHANNEL.showOpenDialog),
 	openPath: (path) => ipcRenderer.invoke(CHANNEL.openPath, path),
 	importWord: () => ipcRenderer.invoke(CHANNEL.importWord),
+	importConfluence: () => ipcRenderer.invoke(CHANNEL.importConfluence),
 	chooseSavePath: (tabId, suggestedName, kind) =>
 		ipcRenderer.invoke(CHANNEL.chooseSavePath, tabId, suggestedName, kind),
 	writeDocument: (tabId, path, text, format) =>
@@ -46,6 +47,8 @@ const bridge: KalemBridge = {
 	writeHtml: (suggestedName, html) => ipcRenderer.invoke(CHANNEL.writeHtml, suggestedName, html),
 	writeDocx: (tabId, suggestedName, markdown) =>
 		ipcRenderer.invoke(CHANNEL.writeDocx, tabId, suggestedName, markdown),
+	writeConfluence: (suggestedName, text, format) =>
+		ipcRenderer.invoke(CHANNEL.writeConfluence, suggestedName, text, format),
 
 	updateSettings: (patch) => ipcRenderer.send(CHANNEL.updateSettings, patch),
 	clipboard: (action) => ipcRenderer.send(CHANNEL.clipboard, action),

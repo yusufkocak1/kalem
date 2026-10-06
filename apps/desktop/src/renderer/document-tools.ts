@@ -6,6 +6,8 @@ import tokensCss from "@kalem-editor/themes/tokens.css?inline";
 import viewerCss from "@kalem-editor/themes/viewer.css?inline";
 import type { KalemBridge } from "../shared/bridge.js";
 import { formatAllCodeBlocks, formatCodeBlock } from "../shared/code-blocks.js";
+import type { ConfluenceFormat } from "../shared/confluence.js";
+import { markdownToStorage, markdownToWiki } from "../shared/confluence.js";
 import { buildHtmlDocument, codeBlocks } from "../shared/html-export.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
@@ -34,6 +36,7 @@ export interface DocumentTools {
 	formatAllCode(): void;
 	exportHtml(): Promise<void>;
 	exportDocx(): Promise<void>;
+	exportConfluence(format: ConfluenceFormat): Promise<void>;
 }
 
 /** Code formatting and exports of the active document. */
@@ -157,6 +160,20 @@ export function createDocumentTools(ctx: DocumentToolsContext): DocumentTools {
 		}
 	}
 
+	async function exportConfluence(target: ConfluenceFormat): Promise<void> {
+		const markdown = ctx.session().styledMarkdown();
+		const text = target === "storage" ? markdownToStorage(markdown) : markdownToWiki(markdown);
+		try {
+			await ctx.bridge.writeConfluence(ctx.session().name, text, target);
+		} catch (error) {
+			ctx.session().notices.show({
+				id: "export",
+				kind: "error",
+				text: `${t.exportFailed}: ${error instanceof Error ? error.message : String(error)}`,
+			});
+		}
+	}
+
 	async function exportHtml(): Promise<void> {
 		const markdown = ctx.session().styledMarkdown();
 		// Diagrams and formulas go into the file rendered.
@@ -192,5 +209,6 @@ export function createDocumentTools(ctx: DocumentToolsContext): DocumentTools {
 		formatAllCode,
 		exportHtml,
 		exportDocx,
+		exportConfluence,
 	};
 }

@@ -457,6 +457,13 @@ export function createAppRibbon(
 							shortcut: `${MOD}+Shift+O`,
 							run: () => void ctx.bridge.importWord(),
 						},
+						{
+							id: "import-confluence",
+							label: t.confluencePage,
+							icon: "confluence",
+							showLabel: true,
+							run: () => void ctx.bridge.importConfluence(),
+						},
 					],
 				},
 			],

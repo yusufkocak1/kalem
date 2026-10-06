@@ -206,6 +206,28 @@ verir.
   içe aktarma ile aynı dönüştürücüyü kullanır.
 - Eski `.doc` biçimi desteklenmez; Word'de `.docx` olarak kaydedilmelidir.
 
+**Confluence**
+
+- **Dosya → Confluence'tan İçe Aktar** (ya da Ekle → İçe Aktar → Confluence
+  Sayfası): Confluence'ın iki metin biçimini de okur, hangisi olduğunu
+  içerikten anlar. **Depolama biçimi** (storage format; Confluence'ın kaynak
+  düzenleyicisinde ve REST API'sinde görünen XHTML, `.xml`/`.xhtml`/`.html`)
+  ve eski **wiki biçimlendirmesi** (`h1.`, `*kalın*`, `{code}`; `.txt`/`.wiki`).
+  Confluence'ın dışa aktardığı HTML sayfası da açılır.
+- **Dosya → Dışa Aktar → Confluence (depolama biçimi)** ya da **Confluence
+  (wiki biçimlendirmesi)**: başlıklar, kalın/italik/üstü çizili, satır içi
+  kod, bağlantılar, görseller, listeler, görev listeleri, tablolar, alıntılar,
+  renkli metin ve kod blokları karşılıklarına çevrilir.
+- Kod blokları `code` makrosu olur, dil adı Confluence'ınkine çevrilir
+  (`javascript` ↔ `js`, `python` ↔ `py`…). Görev listeleri depolama
+  biçiminde Confluence görevleri, wiki'de `(/)` / `( )` ile başlayan
+  maddeler olur.
+- Markdown'da panel yok: **info/note/warning/tip** panelleri simgesiyle
+  (ℹ️ 📝 ⚠️ 💡) başlayan alıntılara dönüşür, panel başlığı kalın ilk satır
+  olur. Böyle başlayan bir alıntı dışa aktarılırken yeniden panel olur.
+- Göreli görseller ve dosya bağlantıları Confluence ekine (`ri:attachment`)
+  çevrilir; dosyaların sayfaya ayrıca eklenmesi gerekir.
+
 **Düzenleme**
 
 - Şerit: Giriş / Ekle / Görünüm sekmeleri, stil galerisi, hızlı erişim.
@@ -325,6 +347,11 @@ e2e/            Playwright ile gerçek uygulamayı süren testler
 - Word'deki birleştirilmiş tablo hücreleri boş hücrelere açılır; EMF/WMF
   görseller atlanır ve bildirilir. Dipnotlar `[^1]` ve belgenin sonunda
   `[^1]: …` paragrafları olarak gelir; sonnotlar `[^e1]` olarak.
+- Confluence'ta sayfaya, kullanıcıya ya da başka alana verilen bağlantıların
+  Markdown'da adresi olmadığından yalnızca metinleri kalır. Durum (status),
+  Jira gibi makrolar metne iner; içeriksiz diğer makrolar (içindekiler,
+  çapa…) atlanır. Birleştirilmiş tablo hücreleri boş hücrelere açılır; altı
+  çizili, üst/alt simge biçimi düşer.
 - Dipnotlar editörde yazıldığı gibi görünür (çekirdekte dipnot söz dizimi
   yok); gerçek dipnota yalnızca Word ve HTML dışa aktarmada dönüşür. PDF ve
   yazdırmada metin olarak kalırlar. Tek kelimelik bir dipnotun referansı

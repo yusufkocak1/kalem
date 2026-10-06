@@ -1,3 +1,4 @@
+import type { ConfluenceFormat } from "./confluence.js";
 import type { TextFormat } from "./encoding.js";
 import type { Lang } from "./i18n.js";
 
@@ -105,6 +106,13 @@ export interface WordContent {
 	readonly skippedImages: number;
 }
 
+export interface ConfluenceContent {
+	/** File name without extension; the suggested document name. */
+	readonly name: string;
+	/** Storage format or wiki markup, as read from the file. */
+	readonly text: string;
+}
+
 /** An unsaved document left over from a session that did not exit cleanly. */
 export interface Draft {
 	readonly id: string;
@@ -121,6 +129,7 @@ export type DocumentPayload =
 	| { readonly kind: "empty" }
 	| { readonly kind: "file"; readonly file: OpenedFile }
 	| { readonly kind: "word"; readonly word: WordContent }
+	| { readonly kind: "confluence"; readonly confluence: ConfluenceContent }
 	| { readonly kind: "draft"; readonly draft: Draft }
 	/** An empty document that saves to `path` without asking; the file appears on first save. */
 	| { readonly kind: "new-file"; readonly path: string; readonly name: string }
@@ -273,6 +282,8 @@ export const COMMANDS = [
 	"zoom-reset",
 	"export-html",
 	"export-docx",
+	"export-confluence",
+	"export-confluence-wiki",
 	"quick-open",
 	"search-folder",
 	"version-history",
@@ -299,6 +310,7 @@ export interface KalemBridge {
 	showOpenDialog(): Promise<void>;
 	openPath(path: string): Promise<void>;
 	importWord(): Promise<void>;
+	importConfluence(): Promise<void>;
 	/** `package` proposes a `.kmd`; otherwise Markdown (or the tab's current type) comes first. */
 	chooseSavePath(tabId: string, suggestedName: string, kind?: "package"): Promise<string | null>;
 	writeDocument(tabId: string, path: string, text: string, format: TextFormat): Promise<SaveResult>;
@@ -325,6 +337,7 @@ export interface KalemBridge {
 	writeHtml(suggestedName: string, html: string): Promise<boolean>;
 	/** Converts the tab's Markdown to Word; images resolve against the tab's document. */
 	writeDocx(tabId: string, suggestedName: string, markdown: string): Promise<boolean>;
+	writeConfluence(suggestedName: string, text: string, format: ConfluenceFormat): Promise<boolean>;
 
 	updateSettings(patch: Partial<Settings>): void;
 	clipboard(action: "cut" | "copy" | "paste"): void;
@@ -368,6 +381,7 @@ export const CHANNEL = {
 	showOpenDialog: "kalem:show-open-dialog",
 	openPath: "kalem:open-path",
 	importWord: "kalem:import-word",
+	importConfluence: "kalem:import-confluence",
 	chooseSavePath: "kalem:choose-save-path",
 	writeDocument: "kalem:write-document",
 	reloadDocument: "kalem:reload-document",
@@ -384,6 +398,7 @@ export const CHANNEL = {
 	deleteDraft: "kalem:delete-draft",
 	writeHtml: "kalem:write-html",
 	writeDocx: "kalem:write-docx",
+	writeConfluence: "kalem:write-confluence",
 	updateSettings: "kalem:update-settings",
 	clipboard: "kalem:clipboard",
 	openLink: "kalem:open-link",

@@ -17,6 +17,7 @@ import type { LegacyEncoding } from "../shared/encoding.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import {
+	CONFLUENCE_EXTENSIONS,
 	isEditablePath,
 	isPackagePath,
 	isWordPath,
@@ -482,6 +483,10 @@ export class WindowManager {
 				tab.name = payload.word.name;
 				tab.dirty = true;
 				break;
+			case "confluence":
+				tab.name = payload.confluence.name;
+				tab.dirty = true;
+				break;
 			case "draft":
 				tab.path = payload.draft.path;
 				tab.base = payload.draft.base ?? null;
@@ -658,6 +663,24 @@ export class WindowManager {
 		}
 	}
 
+	async importConfluence(path: string, preferred?: AppWindow): Promise<void> {
+		try {
+			const { text } = await readDocument(path, this.#legacyEncoding());
+			this.#place(
+				{ kind: "confluence", confluence: { name: stripExtension(basename(path)), text } },
+				preferred,
+			);
+		} catch (error) {
+			this.#showError(
+				preferred,
+				this.#options.strings().confluenceImportFailed,
+				`${path}
+
+${errorMessage(error)}`,
+			);
+		}
+	}
+
 	async showDialog(
 		win: AppWindow | undefined,
 		options: Electron.OpenDialogOptions,
@@ -698,6 +721,23 @@ export class WindowManager {
 		});
 		const path = paths[0];
 		if (path !== undefined) await this.importWord(path, win);
+	}
+
+	async showConfluenceDialog(win: AppWindow | undefined): Promise<void> {
+		const t = this.#options.strings();
+		const { storage, wiki } = CONFLUENCE_EXTENSIONS;
+		const paths = await this.showDialog(win, {
+			defaultPath: this.defaultFolder(win),
+			properties: ["openFile"],
+			filters: [
+				{ name: t.confluencePages, extensions: [...storage, ...wiki] },
+				{ name: t.confluenceStorage, extensions: [...storage] },
+				{ name: t.confluenceWiki, extensions: [...wiki] },
+				{ name: t.allFiles, extensions: ["*"] },
+			],
+		});
+		const path = paths[0];
+		if (path !== undefined) await this.importConfluence(path, win);
 	}
 
 	defaultFolder(win: AppWindow | undefined): string {

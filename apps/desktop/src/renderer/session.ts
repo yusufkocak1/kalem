@@ -22,6 +22,7 @@ import { wordCountPlugin } from "@kalem-editor/plugin-word-count";
 import type { Ui } from "@kalem-editor/ui";
 import { labelsFor, mountUi } from "@kalem-editor/ui";
 import type { DocumentPayload, KalemBridge, Settings } from "../shared/bridge.js";
+import { confluenceToMarkdown } from "../shared/confluence.js";
 import type { TextFormat } from "../shared/encoding.js";
 import { DEFAULT_FORMAT, formatLabel, willConvertToUtf8 } from "../shared/encoding.js";
 import type { Lang, Strings } from "../shared/i18n.js";
@@ -258,6 +259,14 @@ export class Session {
 				);
 				break;
 			}
+			case "confluence": {
+				const { confluence } = payload;
+				text = confluenceToMarkdown(confluence.text);
+				this.#name = confluence.name;
+				clean = false;
+				notices.show({ id: "word", text: format(t.confluenceImported, confluence.name) });
+				break;
+			}
 			case "draft": {
 				const { draft } = payload;
 				text = draft.text;
@@ -310,7 +319,7 @@ export class Session {
 		this.editor.focus();
 
 		// An imported document exists nowhere on disk until it is edited or saved.
-		if (payload.kind === "word") void this.#writeDraft(text);
+		if (payload.kind === "word" || payload.kind === "confluence") void this.#writeDraft(text);
 	}
 
 	/**

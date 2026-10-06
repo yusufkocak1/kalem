@@ -163,6 +163,9 @@ export function registerIpc(ctx: IpcContext): void {
 	});
 
 	ipcMain.handle(CHANNEL.importWord, (event) => windows.showWordDialog(senderOf(event)));
+	ipcMain.handle(CHANNEL.importConfluence, (event) =>
+		windows.showConfluenceDialog(senderOf(event)),
+	);
 
 	ipcMain.handle(
 		CHANNEL.chooseSavePath,
@@ -419,6 +422,28 @@ export function registerIpc(ctx: IpcContext): void {
 		await writeFile(result.filePath, html, "utf8");
 		return true;
 	});
+
+	ipcMain.handle(
+		CHANNEL.writeConfluence,
+		async (event, suggestedName: unknown, text: unknown, format: unknown) => {
+			const win = senderOf(event);
+			if (typeof text !== "string" || (format !== "storage" && format !== "wiki")) {
+				throw new Error("Invalid export request");
+			}
+			const t = ctx.strings();
+			const name = toFileName(typeof suggestedName === "string" ? suggestedName : "", t.untitled);
+			const extensions = format === "storage" ? ["xml", "xhtml"] : ["txt", "wiki"];
+			const result = await dialog.showSaveDialog(win.window, {
+				defaultPath: join(windows.defaultFolder(win), `${name}.${extensions[0]}`),
+				filters: [
+					{ name: format === "storage" ? t.confluenceStorage : t.confluenceWiki, extensions },
+				],
+			});
+			if (result.canceled || result.filePath === "") return false;
+			await writeFile(result.filePath, text, "utf8");
+			return true;
+		},
+	);
 
 	/** Images of a Word export: embedded, or files next to the document. Never fetched from the web. */
 	const docxImage = async (base: string | null, url: string): Promise<DocxImage | null> => {

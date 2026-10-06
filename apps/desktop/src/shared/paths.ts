@@ -19,6 +19,11 @@ export function extension(path: string): string {
 export const MARKDOWN_EXTENSIONS: readonly string[] = ["md", "markdown"];
 export const TEXT_EXTENSIONS: readonly string[] = ["txt"];
 /** Zipped TextBundles: Kalem's own `.kmd` and the standard `.textpack`. */
+/** Files the Confluence import offers: storage format (XHTML) and wiki markup. */
+export const CONFLUENCE_EXTENSIONS = {
+	storage: ["xml", "xhtml", "html", "htm"],
+	wiki: ["txt", "wiki", "confluence"],
+} as const;
 export const PACKAGE_EXTENSIONS: readonly string[] = ["kmd", "textpack"];
 
 export function isPackagePath(path: string): boolean {
