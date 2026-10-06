@@ -27,11 +27,19 @@ Hazır Windows sürümleri [GitHub Releases](https://github.com/yusufkocak1/kale
 sayfasında: kurulum paketi (`Kalem-Setup-<sürüm>.exe`) ve taşınabilir exe
 (`Kalem-<sürüm>.exe`). Exe'ler depoda tutulmuyor.
 
-Yeni sürüm: `package.json`'daki `version` artırılır, `package` çalıştırılır,
-`desktop-v<sürüm>` etiketiyle bir release açılıp `release/` klasöründen
-dört dosya ona eklenir: iki exe, `latest.yml` ve
-`Kalem-Setup-<sürüm>.exe.blockmap`. `latest.yml` olmadan kurulu sürümler
-yeni sürümü kendileri kuramaz, yalnızca indirme sayfasını gösterir.
+Yeni sürüm: `package.json`'daki `version` artırılıp `main`'e alınır, sonra
+aynı sürümün etiketi push edilir:
+
+```sh
+git tag desktop-v<sürüm> && git push origin desktop-v<sürüm>
+```
+
+**Masaüstü yayını** iş akışı (`.github/workflows/masaustu.yml`) Windows'ta
+`package`'ı çalıştırır, `desktop-v<sürüm>` release'ini açar ve dört dosyayı
+ona ekler: iki exe, `latest.yml` ve `Kalem-Setup-<sürüm>.exe.blockmap`.
+Etiket `package.json`'daki sürümle uyuşmazsa hiçbir şey yayımlanmaz.
+`latest.yml` olmadan kurulu sürümler yeni sürümü kendileri kuramaz, yalnızca
+indirme sayfasını gösterir.
 
 ## Güncellemeler
 

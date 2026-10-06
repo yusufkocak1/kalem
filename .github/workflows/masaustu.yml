@@ -1,0 +1,96 @@
+name: Masaüstü yayını
+
+# Kalem Masaüstü'nün Windows sürümü.
+#
+# `desktop-v<sürüm>` etiketi push edilince Windows'ta kurulum paketi ve
+# taşınabilir exe derleniyor, aynı adlı bir GitHub release'i açılıp dört
+# dosya ona ekleniyor: iki exe, `latest.yml` ve kurulum paketinin
+# `.blockmap`'i. Kurulu uygulamalar güncellemeyi bu release'ten alıyor
+# (apps/desktop/src/main/updater.ts).
+#
+# Etiket, `apps/desktop/package.json`'daki sürümle aynı olmalı; değilse iş
+# hiçbir şey yayımlamadan duruyor. Elle yeniden çalıştırmak için: Actions →
+# "Masaüstü yayını" → Run workflow → "Use workflow from" kısmından etiketi
+# seçin.
+#
+# Release önce taslak olarak açılıp dosyalar eklendikten sonra
+# yayımlanıyor: uygulama taslakları görmüyor, yani hiçbir kullanıcı
+# `latest.yml`'ı henüz olmayan bir sürüme yönlendirilmiyor.
+
+on:
+  push:
+    tags: ["desktop-v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: masaustu-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows paketi ve release
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Sürüm notu bir önceki masaüstü etiketinden bu yana yazılıyor.
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Etiket ve sürüm denetimi
+        id: surum
+        run: |
+          ETIKET="${GITHUB_REF_NAME}"
+          case "$ETIKET" in
+            desktop-v*) ;;
+            *) echo "::error::Bir desktop-v* etiketinden çalıştırılmalı (şu an: $ETIKET)"; exit 1 ;;
+          esac
+          SURUM=$(node -p "require('./apps/desktop/package.json').version")
+          if [ "desktop-v$SURUM" != "$ETIKET" ]; then
+            echo "::error::Etiket $ETIKET ama apps/desktop/package.json sürümü $SURUM"
+            exit 1
+          fi
+          echo "surum=$SURUM" >> "$GITHUB_OUTPUT"
+
+      # Masaüstü uygulaması paketlerin derlenmiş çıktısını kullanıyor.
+      - name: Paketleri derle
+        run: pnpm build
+
+      - name: Windows paketi
+        working-directory: apps/desktop
+        # electron-builder CI'da etiketi görünce kendisi yayımlamaya
+        # çalışıyor; release'i aşağıdaki adım açıyor.
+        run: pnpm package --win --publish never
+
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SURUM: ${{ steps.surum.outputs.surum }}
+        run: |
+          ETIKET="desktop-v$SURUM"
+          if gh release view "$ETIKET" > /dev/null 2>&1; then
+            echo "::error::$ETIKET release'i zaten var; dosyaları elle değiştirin ya da önce silin."
+            exit 1
+          fi
+          DIZIN=apps/desktop/release
+          ONCEKI=$(git tag --list 'desktop-v*' --sort=-v:refname | grep -vx "$ETIKET" | head -n 1)
+          gh release create "$ETIKET" \
+            --draft \
+            --title "Kalem Masaüstü $SURUM" \
+            --generate-notes ${ONCEKI:+--notes-start-tag "$ONCEKI"} \
+            "$DIZIN/Kalem-Setup-$SURUM.exe" \
+            "$DIZIN/Kalem-Setup-$SURUM.exe.blockmap" \
+            "$DIZIN/Kalem-$SURUM.exe" \
+            "$DIZIN/latest.yml"
+          gh release edit "$ETIKET" --draft=false
