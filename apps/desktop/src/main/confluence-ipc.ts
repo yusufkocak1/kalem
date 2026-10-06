@@ -94,6 +94,14 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 
 	ipcMain.handle(CHANNEL.confluenceSpaces, async () => (await connected()).spaces());
 
+	ipcMain.handle(CHANNEL.confluenceTree, async (_event, raw: unknown) => {
+		const parent = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+		const client = await connected();
+		return typeof parent.page === "string"
+			? client.childPages(parent.page)
+			: client.rootPages(text(parent.space, "space"));
+	});
+
 	ipcMain.handle(CHANNEL.confluenceSearch, async (_event, query: unknown, spaceKey: unknown) =>
 		(await connected()).search(
 			typeof query === "string" ? query.slice(0, 200) : "",

@@ -2,6 +2,7 @@ import type {
 	ConfluencePageContent,
 	ConfluencePageSummary,
 	ConfluenceSpace,
+	ConfluenceTreePage,
 	RemotePage,
 } from "../shared/bridge.js";
 
@@ -155,6 +156,58 @@ export class ConfluenceClient {
 			next = link === "" ? null : this.#relative(link);
 		}
 		return spaces.sort((a, b) => a.name.localeCompare(b.name, "en"));
+	}
+
+	/** A space's top-level pages, in Confluence's order. */
+	async rootPages(spaceKey: string): Promise<ConfluenceTreePage[]> {
+		if (this.cloud) {
+			const spaces = await this.#json(`/api/v2/spaces?keys=${encodeURIComponent(spaceKey)}`);
+			const id = asString(asJson(asArray(spaces.results)[0]).id);
+			if (id === "") return [];
+			return this.#treeLevel(`/api/v2/spaces/${id}/pages?depth=root&limit=250`);
+		}
+		return this.#treeLevel(
+			`/rest/api/space/${encodeURIComponent(spaceKey)}/content/page?depth=root&limit=200&expand=children.page`,
+		);
+	}
+
+	/** A page's child pages, in Confluence's order. */
+	async childPages(id: string): Promise<ConfluenceTreePage[]> {
+		if (!/^\d+$/.test(id)) throw new Error("Invalid page id");
+		return this.#treeLevel(
+			this.cloud
+				? `/api/v2/pages/${id}/children?limit=250`
+				: `/rest/api/content/${id}/child/page?limit=200&expand=children.page`,
+		);
+	}
+
+	/**
+	 * One level of the page tree, following `next` links. Server reports
+	 * whether a page has children (`expand=children.page`); Cloud's v2 API
+	 * does not, so there it is left open.
+	 */
+	async #treeLevel(first: string): Promise<ConfluenceTreePage[]> {
+		const pages: ConfluenceTreePage[] = [];
+		let next: string | null = first;
+		// A level that long is better found by search than by scrolling.
+		for (let round = 0; next !== null && round < 10; round++) {
+			const body: Json = await this.#json(next);
+			for (const item of asArray(body.results)) {
+				const page = asJson(item);
+				const id = asString(page.id);
+				if (id === "") continue;
+				const children = asJson(asJson(page.children).page);
+				const size = typeof children.size === "number" ? children.size : null;
+				pages.push({
+					id,
+					title: asString(page.title),
+					hasChildren: this.cloud || size === null ? null : size > 0,
+				});
+			}
+			const link = asString(asJson(body._links).next);
+			next = link === "" ? null : this.#relative(link);
+		}
+		return pages;
 	}
 
 	/** `_links.next` is relative to the host on Cloud, to the site on Server. */

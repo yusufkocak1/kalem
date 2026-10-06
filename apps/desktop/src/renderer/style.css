@@ -1545,13 +1545,83 @@ pre[data-preview="error"]::after {
 }
 
 .confluence-page-item {
-	align-items: flex-start;
-	padding-top: 5px;
-	padding-bottom: 5px;
+	gap: 0;
+	padding: 0 2px 0 calc(var(--depth, 0) * 14px);
 }
 
-.confluence-page-item .icon {
+.confluence-twisty {
+	flex: none;
+	width: 18px;
+	align-self: stretch;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--app-muted);
+	font: inherit;
+	font-size: 10px;
+	cursor: pointer;
+}
+
+.confluence-row-main {
+	display: flex;
+	flex: 1;
+	align-items: flex-start;
+	gap: 5px;
+	min-width: 0;
+	padding: 4px 4px 4px 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: start;
+	cursor: pointer;
+}
+
+.confluence-row-main .icon {
+	flex: none;
+	width: 15px;
+	height: 15px;
 	margin-top: 2px;
+	color: var(--app-muted);
+}
+
+.confluence-star {
+	flex: none;
+	align-self: center;
+	opacity: 0;
+}
+
+.confluence-star .icon {
+	width: 14px;
+	height: 14px;
+}
+
+.confluence-page-item:hover .confluence-star,
+.confluence-star:focus-visible {
+	opacity: 1;
+}
+
+.confluence-star[aria-pressed="true"] {
+	color: var(--app-accent);
+	opacity: 1;
+}
+
+.confluence-star[aria-pressed="true"] path {
+	fill: currentColor;
+}
+
+.confluence-section {
+	padding: 8px 8px 2px;
+	color: var(--app-muted);
+	font-size: 11px;
+	font-weight: 600;
+}
+
+.confluence-tree-note {
+	margin: 2px 0;
+	padding-left: calc(18px + var(--depth, 0) * 14px);
+	color: var(--app-muted);
+	font-size: 12px;
 }
 
 .confluence-page-text {

@@ -147,7 +147,8 @@ test("imports a Word document and writes its images next to the Markdown file", 
 	expect(markdown).toContain("- Maliyet sabit kaldı\n  - Kira\n  - Personel\n");
 	expect(markdown).toContain("1. Bütçe gözden geçirilecek\n2. Ekip bilgilendirilecek\n");
 	expect(markdown).toContain("> Ölçmediğin şeyi yönetemezsin.");
-	expect(markdown).toContain("| Kalem | Tutar |\n| --- | --- |\n| Gelir | 120 (tahmini) |");
+	// The cell's two paragraphs stay two lines.
+	expect(markdown).toContain("| Kalem | Tutar |\n| --- | --- |\n| Gelir | 120<br>(tahmini) |");
 	expect(markdown).toContain("Son paragraf: a < b & c.");
 	expect(markdown).not.toContain("data:image");
 

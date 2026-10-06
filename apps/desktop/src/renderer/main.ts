@@ -92,6 +92,8 @@ const confluencePane = createConfluencePane({
 	bridge,
 	space: () => settings.confluenceSpace,
 	setSpace: (key) => updateSettings({ confluenceSpace: key }),
+	favorites: () => settings.confluenceFavorites,
+	setFavorites: (favorites) => updateSettings({ confluenceFavorites: favorites }),
 	activePage: () => session?.remote?.id ?? null,
 	connect: () => void confluenceDialog.show(),
 });
@@ -687,7 +689,10 @@ window.addEventListener("focus", () => {
 
 bridge.onSettings((next) => {
 	const confluenceShown = settings.navigation && settings.sidePane === "confluence";
+	const favoritesChanged =
+		JSON.stringify(next.confluenceFavorites) !== JSON.stringify(settings.confluenceFavorites);
 	settings = next;
+	if (favoritesChanged) confluencePane.render();
 	if (!confluenceShown && settings.navigation && settings.sidePane === "confluence") {
 		void confluencePane.refresh();
 	}

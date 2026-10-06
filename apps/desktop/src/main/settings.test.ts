@@ -50,6 +50,30 @@ describe("parseStoredState", () => {
 		expect(settings.spellCheck).toBe(false);
 	});
 
+	it("keeps well-formed Confluence favorites once each", () => {
+		const favorite = { site: "https://wiki.example.com", id: "42", title: "Plan" };
+		const state = parseStoredState({
+			settings: {
+				confluenceFavorites: [
+					favorite,
+					favorite,
+					{ ...favorite, site: "https://other.example.com" },
+					{ site: "https://wiki.example.com", id: "../x", title: "bad" },
+					{ site: "https://wiki.example.com", id: "7" },
+					"junk",
+				],
+			},
+		});
+		expect(state.settings.confluenceFavorites).toEqual([
+			favorite,
+			{ ...favorite, site: "https://other.example.com" },
+			{ site: "https://wiki.example.com", id: "7", title: "" },
+		]);
+		expect(
+			parseStoredState({ settings: { confluenceFavorites: "x" } }).settings.confluenceFavorites,
+		).toEqual([]);
+	});
+
 	it("deduplicates and caps the recent list", () => {
 		const many = Array.from({ length: 40 }, (_, i) => `C:\\${i}.md`);
 		const { recentFiles } = parseStoredState({ recentFiles: ["a.md", "a.md", 7, "", ...many] });

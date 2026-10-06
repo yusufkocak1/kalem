@@ -1,6 +1,12 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import type { PageMargins, PageSize, Settings, Theme } from "../shared/bridge.js";
+import type {
+	ConfluenceFavorite,
+	PageMargins,
+	PageSize,
+	Settings,
+	Theme,
+} from "../shared/bridge.js";
 import { clampZoom, DEFAULT_SETTINGS, PAGE_MARGINS, PAGE_SIZES } from "../shared/bridge.js";
 import type { Lang } from "../shared/i18n.js";
 
@@ -85,6 +91,7 @@ export function parseStoredState(raw: unknown): StoredState {
 			sidePane: s.sidePane === "files" || s.sidePane === "confluence" ? s.sidePane : "outline",
 			confluenceSpace:
 				typeof s.confluenceSpace === "string" ? s.confluenceSpace.slice(0, 255) : d.confluenceSpace,
+			confluenceFavorites: parseFavorites(s.confluenceFavorites),
 			checkUpdates: asBoolean(s.checkUpdates, d.checkUpdates),
 			tray: asBoolean(s.tray, d.tray),
 		},
@@ -94,6 +101,24 @@ export function parseStoredState(raw: unknown): StoredState {
 		workspace: typeof root.workspace === "string" && root.workspace !== "" ? root.workspace : null,
 		lastUpdateCheck: asNumber(root.lastUpdateCheck),
 	};
+}
+
+const MAX_FAVORITES = 200;
+
+function parseFavorites(value: unknown): ConfluenceFavorite[] {
+	if (!Array.isArray(value)) return [];
+	const seen = new Set<string>();
+	return value
+		.flatMap((item): ConfluenceFavorite[] => {
+			if (typeof item !== "object" || item === null) return [];
+			const { site, id, title } = item as Record<string, unknown>;
+			if (typeof site !== "string" || typeof id !== "string" || !/^\d+$/.test(id)) return [];
+			const key = `${site}\n${id}`;
+			if (seen.has(key)) return [];
+			seen.add(key);
+			return [{ site, id, title: typeof title === "string" ? title.slice(0, 500) : "" }];
+		})
+		.slice(0, MAX_FAVORITES);
 }
 
 export class SettingsStore {

@@ -107,6 +107,52 @@ describe("ConfluenceClient", () => {
 		expect(client.bearer).toBe(false);
 	});
 
+	it("lists a Server space's page tree a level at a time", async () => {
+		const { fetch, calls } = fakeFetch([
+			[
+				"/rest/api/space/DEV/content/page",
+				{
+					results: [
+						{ id: "1", title: "Ana", children: { page: { size: 2 } } },
+						{ id: "2", title: "Yaprak", children: { page: { size: 0 } } },
+					],
+				},
+			],
+			["/rest/api/content/1/child/page", { results: [{ id: "3", title: "Alt" }] }],
+		]);
+		const client = new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "", token: "pat" },
+			fetch,
+		);
+		expect(await client.rootPages("DEV")).toEqual([
+			{ id: "1", title: "Ana", hasChildren: true },
+			{ id: "2", title: "Yaprak", hasChildren: false },
+		]);
+		expect(calls[0]?.url).toBe(
+			"https://wiki.example.com/rest/api/space/DEV/content/page?depth=root&limit=200&expand=children.page",
+		);
+		// Without the expansion the server says nothing: unknown, not a leaf.
+		expect(await client.childPages("1")).toEqual([{ id: "3", title: "Alt", hasChildren: null }]);
+		await expect(client.childPages("1/../2")).rejects.toThrow("Invalid page id");
+	});
+
+	it("lists a Cloud space's page tree through the v2 API", async () => {
+		const { fetch, calls } = fakeFetch([
+			["/api/v2/spaces?keys=DEV", { results: [{ id: "77", key: "DEV" }] }],
+			["/api/v2/spaces/77/pages", { results: [{ id: "1", title: "Ana" }] }],
+			["/api/v2/pages/1/children", { results: [{ id: "3", title: "Alt" }] }],
+		]);
+		const client = new ConfluenceClient(
+			{ site: "acme.atlassian.net", username: "a@b.c", token: "tok" },
+			fetch,
+		);
+		expect(await client.rootPages("DEV")).toEqual([{ id: "1", title: "Ana", hasChildren: null }]);
+		expect(calls[1]?.url).toBe(
+			"https://acme.atlassian.net/wiki/api/v2/spaces/77/pages?depth=root&limit=250",
+		);
+		expect(await client.childPages("1")).toEqual([{ id: "3", title: "Alt", hasChildren: null }]);
+	});
+
 	it("searches pages with CQL", async () => {
 		const { fetch, calls } = fakeFetch([
 			[

@@ -38,6 +38,16 @@ async function fakeConfluence() {
 			return json(res, { message: "Unauthorized" }, 401);
 		if (url.pathname === "/rest/api/space")
 			return json(res, { results: [{ key: "DEV", name: "Geliştirme" }] });
+		if (url.pathname === "/rest/api/space/DEV/content/page") {
+			return json(res, {
+				results: [{ id: "41", title: "Ana Sayfa", children: { page: { size: 1 } } }],
+			});
+		}
+		if (url.pathname === "/rest/api/content/41/child/page") {
+			return json(res, {
+				results: [{ id: "42", title: page.title, children: { page: { size: 0 } } }],
+			});
+		}
 		if (url.pathname === "/rest/api/search") {
 			searches.push(url.searchParams.get("cql") ?? "");
 			return json(res, {
@@ -153,7 +163,7 @@ test("edits a Confluence page and saves it back as a new version", async () => {
 	await app.close();
 });
 
-test("lists a space's pages in the side pane and opens one", async () => {
+test("browses a space's page tree in the side pane and stars a page", async () => {
 	const confluence = await fakeConfluence();
 	cleanup.push(confluence.close);
 	const { app, page, userData, errors } = await launch();
@@ -171,21 +181,50 @@ test("lists a space's pages in the side pane and opens one", async () => {
 	await page.keyboard.press("Escape");
 	await expect(dialog).not.toBeVisible();
 
-	const item = pane.locator(".confluence-page-item", { hasText: "Sprint Planı" });
-	await expect(item).toBeVisible();
+	// All spaces: each space is a branch.
+	const spaceRow = pane.locator('[data-space="Geliştirme"]');
+	await spaceRow.locator(".confluence-row-main").click();
+	const root = pane.locator('[data-page="41"]');
+	await expect(root).toHaveAttribute("aria-expanded", "false");
+	await root.locator(".confluence-twisty").click();
+	const child = pane.locator('[data-page="42"]');
+	await expect(child).toContainText("Sprint Planı");
+	// The server said it has no children: a leaf.
+	await expect(child).not.toHaveAttribute("aria-expanded");
+
+	// One space: its top-level pages are the roots; the choice is the default from now on.
 	await pane.locator("select").selectOption("DEV");
-	await expect.poll(() => confluence.searches.at(-1)).toContain('space="DEV"');
-	// Listing one space, the items leave the space name out.
-	await expect(item).not.toContainText("Geliştirme");
+	await expect(pane.locator(".confluence-page-item").first()).toHaveAttribute("data-page", "41");
 
-	await item.click();
+	await child.locator(".confluence-row-main").click();
 	await expect(page.locator("#editor h1").first()).toHaveText("Sprint Planı");
-	await expect(item).toHaveAttribute("aria-current", "page");
+	await expect(child).toHaveAttribute("aria-current", "page");
 
-	// The space is the default from now on.
+	// Starring puts the page on top, in its own section.
+	await child.getByRole("button", { name: "Add to favorites" }).click();
+	await expect(pane.locator(".confluence-section").first()).toHaveText("Favorites");
+	const favorite = pane.locator(".confluence-page-item").first();
+	await expect(favorite).toHaveAttribute("data-page", "42");
+	await expect(favorite.locator(".confluence-star")).toHaveAttribute("aria-pressed", "true");
+
+	// Search replaces the tree with results.
+	await pane.locator(".confluence-pane-search").fill("Sprint");
+	await expect.poll(() => confluence.searches.at(-1)).toContain('title~"Sprint*"');
+	await expect(pane.locator('[data-page="41"]')).toHaveCount(0);
+
 	await expect
 		.poll(async () => JSON.parse(await readFile(join(userData, "settings.json"), "utf8")))
-		.toMatchObject({ settings: { sidePane: "confluence", confluenceSpace: "DEV" } });
+		.toMatchObject({
+			settings: {
+				sidePane: "confluence",
+				confluenceSpace: "DEV",
+				confluenceFavorites: [{ site: confluence.site, id: "42", title: "Sprint Planı" }],
+			},
+		});
+
+	// Unstarring from the favorites section takes it off.
+	await favorite.locator(".confluence-star").click();
+	await expect(pane.locator(".confluence-section")).toHaveCount(0);
 	expect(errors).toEqual([]);
 	await app.close();
 });
