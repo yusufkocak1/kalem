@@ -42,7 +42,7 @@ import type {
 	TableRow,
 	ThematicBreak,
 } from "./ast.js";
-import { splitRow } from "./blocks.js";
+import { cellInlines, splitRow } from "./blocks.js";
 import { colorOfOpenTag, colorOpenTag, sanitizeColor } from "./color.js";
 import { parseInline } from "./inline.js";
 
@@ -491,7 +491,8 @@ function table(node: Table, o: Resolved): string {
 function ayniSatir(satir: string, row: TableRow): boolean {
 	const hucreler = splitRow(satir);
 	return row.children.every(
-		(cell, c) => hucreAnahtari(parseInline(hucreler[c] ?? "")) === hucreAnahtari(cell.children),
+		(cell, c) =>
+			hucreAnahtari(cellInlines(hucreler[c] ?? "", parseInline)) === hucreAnahtari(cell.children),
 	);
 }
 
@@ -531,6 +532,25 @@ function boruyaGoreBol(metin: string): string[] {
 
 const ATLANAN = new Set(["position", "id", "syntax"]);
 
+/**
+ * Hücredeki satır sonu `<br>` olarak yazılır.
+ *
+ * Ters bölü ya da iki boşluk gerçek bir satır sonu üretir ve GFM tablo
+ * satırını ikiye böler: ikinci yarısı tablonun dışına düşer, sonraki
+ * açılışta hücrenin içeriği kaybolmuş olur.
+ */
+function hucreSatirSonu(node: Inline): Inline {
+	if (node.type === "break") {
+		return {
+			type: "html",
+			value: node.syntax?.marker === "html" ? (node.syntax.tag ?? "<br>") : "<br>",
+		};
+	}
+	return "children" in node
+		? ({ ...node, children: node.children.map(hucreSatirSonu) } as Inline)
+		: node;
+}
+
 function hucreAnahtari(nodes: readonly Inline[]): string {
 	return JSON.stringify(nodes, (k, v: unknown) => (ATLANAN.has(k) ? undefined : v));
 }
@@ -546,7 +566,9 @@ function hucreAnahtari(nodes: readonly Inline[]): string {
  */
 function tabloSatiri(row: TableRow, o: Resolved, ornek?: string): string {
 	// Hücre içindeki boru ayraç sanılmasın.
-	const icerik = row.children.map((cell) => boruKacir(inlines(cell.children, o)));
+	const icerik = row.children.map((cell) =>
+		boruKacir(inlines(cell.children.map(hucreSatirSonu), o)),
+	);
 	if (ornek === undefined) return `| ${icerik.join(" | ")} |`;
 
 	const govde = ornek.trim();

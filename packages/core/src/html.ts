@@ -379,12 +379,57 @@ function tableFrom(node: HtmlNode, o: FromHtmlOptions): Block {
 			.filter((c) => c.nodeType === ELEMENT && (tagOf(c) === "TD" || tagOf(c) === "TH"))
 			.map((cell) => ({
 				type: "tableCell" as const,
-				children: trimInlines(collectInlines(childrenOf(cell), o)),
+				children: cellFrom(cell, o),
 			})),
 	}));
 
 	const columns = children[0]?.children.length ?? 0;
 	return { type: "table", align: Array.from({ length: columns }, () => null), children };
+}
+
+/** Hücrede satır ayıran öğeler. */
+const CELL_LINES = new Set(["P", "DIV", "LI", "H1", "H2", "H3", "H4", "H5", "H6", "PRE"]);
+/** Satırlarını kendi öğelerinde taşıyan sarmalayıcılar. */
+const CELL_WRAPPERS = new Set(["UL", "OL", "BLOCKQUOTE"]);
+
+/**
+ * Hücrenin içeriği; paragrafları ve liste maddeleri ayrı satırlarda.
+ *
+ * Markdown hücresinde blok olamaz. Paragraflar bitişik yazılırsa
+ * kelimeler birleşir ("BirinciIkinci"); her biri `<br>` ile ayrılmış bir
+ * satır oluyor, liste maddelerinin önüne `• ` konuyor.
+ */
+function cellFrom(cell: HtmlNode, o: FromHtmlOptions): Inline[] {
+	const lines: Inline[][] = [];
+	let pending: Inline[] = [];
+	/** Sıradaki satır bir liste maddesinin ilki; `<li><p>…</p></li>` tek madde imi alır. */
+	let bullet = false;
+	const flush = (): void => {
+		const line = trimInlines(mergeText(pending));
+		pending = [];
+		if (line.length === 0) return;
+		lines.push(bullet ? mergeText([{ type: "text", value: "• " }, ...line]) : line);
+		bullet = false;
+	};
+	const walk = (nodes: readonly HtmlNode[]): void => {
+		for (const node of nodes) {
+			const tag = node.nodeType === ELEMENT ? tagOf(node) : "";
+			if (CELL_WRAPPERS.has(tag)) {
+				flush();
+				walk(childrenOf(node));
+			} else if (CELL_LINES.has(tag)) {
+				flush();
+				if (tag === "LI") bullet = true;
+				walk(childrenOf(node));
+				flush();
+			} else {
+				pending.push(...toInlines(node, o));
+			}
+		}
+	};
+	walk(childrenOf(cell));
+	flush();
+	return lines.flatMap((line, i) => (i === 0 ? line : [{ type: "break" } as Inline, ...line]));
 }
 
 // ---------------------------------------------------------------------------

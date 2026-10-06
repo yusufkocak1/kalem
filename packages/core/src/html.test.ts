@@ -457,3 +457,21 @@ describe("çift işaretleme", () => {
 		expect(md(root)).toBe("__*metin*__");
 	});
 });
+
+describe("tablo hücresindeki bloklar", () => {
+	const tablo = (hucre: HtmlNode[]) =>
+		e("BODY", [e("TABLE", [e("TR", [e("TD", [t("a")])]), e("TR", [e("TD", hucre)])])]);
+
+	it("paragraflar ayrı satırlar oluyor", () => {
+		expect(md(tablo([e("P", [t("bir")]), e("P", [t("iki")])]))).toContain("| bir<br>iki |");
+	});
+
+	it("liste maddeleri madde imiyle ayrı satırlar oluyor", () => {
+		const liste = e("UL", [e("LI", [e("P", [t("bir")])]), e("LI", [t("iki")])]);
+		expect(md(tablo([e("P", [t("Adımlar:")]), liste]))).toContain("| Adımlar:<br>• bir<br>• iki |");
+	});
+
+	it("tek satırlık hücre değişmiyor", () => {
+		expect(md(tablo([t("bir "), e("B", [t("iki")])]))).toContain("| bir **iki** |");
+	});
+});

@@ -109,7 +109,7 @@ since the project's first day, and they have their own self-tests
 
 | Package | min+gzip |
 |---|---|
-| `@kalem-editor/core` | 13.3 kB |
+| `@kalem-editor/core` | 13.4 kB |
 | `@kalem-editor/viewer` | 2.9 kB |
 | `@kalem-editor/editor` (core included) | 29.3 kB |
 | `@kalem-editor/editor` + `@kalem-editor/ui` | 38.0 kB |

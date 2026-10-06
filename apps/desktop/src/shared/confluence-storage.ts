@@ -74,8 +74,6 @@ const EMOTICONS: Readonly<Record<string, string>> = {
 	"broken-heart": "💔",
 };
 
-const CELL_BLOCKS = new Set(["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li", "pre"]);
-
 interface ImportState {
 	/** Languages of the code macros, in document order. */
 	readonly languages: (string | null)[];
@@ -184,14 +182,9 @@ function link(node: MarkupElement, state: ImportState): HtmlNode[] {
 	return href === null ? [element("span", body)] : [element("a", body, { href })];
 }
 
-/** A table cell is one line in Markdown: its paragraphs run on with a space. */
+/** The cell's paragraphs and list items become lines of the Markdown cell (`<br>`). */
 function cell(node: MarkupElement, state: ImportState): HtmlNode {
-	const children = node.children.flatMap((child): HtmlNode[] =>
-		child.kind === "element" && CELL_BLOCKS.has(child.name)
-			? [element("span", convertAll(child.children, state)), text(" ")]
-			: convert(child, state),
-	);
-	return element(node.name, children);
+	return element(node.name, convertAll(node.children, state));
 }
 
 /** GFM tables have no merged cells: a spanned cell is followed by empty ones. */
@@ -309,11 +302,11 @@ export function storageLosses(source: string): string[] {
 			if (Number(attrs.get("colspan") ?? 1) > 1 || Number(attrs.get("rowspan") ?? 1) > 1) {
 				found.add("merged-cells");
 			}
-			const blocks = childElements(node).filter((child) => CELL_BLOCKS.has(child.name));
+			// Paragraphs come back as lines; lists, code and nested tables do not.
 			const nested = childElements(node).some((child) =>
-				["ul", "ol", "table", "ac:task-list", "blockquote"].includes(child.name),
+				["ul", "ol", "table", "ac:task-list", "blockquote", "pre"].includes(child.name),
 			);
-			if (blocks.length > 1 || nested) found.add("cell-blocks");
+			if (nested) found.add("cell-blocks");
 			for (const child of node.children) visit(child, true);
 			return;
 		} else if (inCell && ["ul", "ol", "pre", "table", "ac:task-list"].includes(name)) {

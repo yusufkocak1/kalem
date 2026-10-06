@@ -108,7 +108,7 @@ The form submits Markdown, like a `<textarea>` would. No build step.
 
 | Package | What it does | min+gzip |
 |---|---|---|
-| `@kalem-editor/core` | Parse and serialize, no DOM | 13.3 kB |
+| `@kalem-editor/core` | Parse and serialize, no DOM | 13.4 kB |
 | `@kalem-editor/viewer` | Render to DOM or to a string (SSR) | 2.9 kB |
 | `@kalem-editor/editor` | The block engine | 29.3 kB |
 | `@kalem-editor/editor` + `@kalem-editor/ui` | The Word-like experience | 38.0 kB |
