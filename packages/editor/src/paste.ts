@@ -32,7 +32,7 @@
  * ikisinin arasındaki tek makul yer.
  */
 import type { Block, Inline, Paragraph, Root } from "@kalem-editor/core";
-import { parse } from "@kalem-editor/core";
+import { nodeAtPath, parse, replaceAt } from "@kalem-editor/core";
 import { fromHtml } from "@kalem-editor/core/html";
 import type { Caret, EditResult } from "./block-edit.js";
 import { komsulukTazele } from "./block-edit.js";
@@ -201,6 +201,7 @@ export function insertFragment(doc: Root, caret: Caret, fragment: Root): EditRes
 
 	const blok = doc.children[caret.blockIndex];
 	if (blok === undefined) return null;
+	if (caret.path.length > 0) return icineYapistir(doc, caret, fragment);
 	const mevcut = inlineOf(blok);
 
 	// Metin taşımayan bloğa (yatay çizgi, kod) satır içi yapıştırma yok;
@@ -323,6 +324,67 @@ export function insertFragment(doc: Root, caret: Caret, fragment: Root): EditRes
 			offset: sonOfset,
 		},
 	};
+}
+
+/**
+ * İç içe bir taşıyıcıya (tablo hücresi, liste maddesi, alıntı paragrafı)
+ * yapıştırma: parça imlecin olduğu yere **satır içi** giriyor.
+ *
+ * Eskiden üst bloğa bakılıyordu; tablo metin taşımadığı için parça
+ * tablonun **altına** blok olarak ekleniyordu ve kullanıcı hücreye
+ * yapıştırdığı değeri belgenin başka bir yerinde buluyordu. Hücre blok
+ * tutamıyor; çok bloklu parçanın her bloğu ayrı bir satır (sert satır
+ * sonu) oluyor, liste maddeleri `• ` ile. Liste maddesi ve alıntıda da
+ * aynısı: imlecin yerinden kaçmamak, yapıyı korumaktan önemli.
+ */
+function icineYapistir(doc: Root, caret: Caret, fragment: Root): EditResult | null {
+	const yol = [caret.blockIndex, ...caret.path];
+	const hedef = nodeAtPath(doc, yol) as { children?: readonly Inline[] } | undefined;
+	if (hedef === undefined || !Array.isArray(hedef.children)) return null;
+
+	const satirlar = fragment.children.flatMap((b) => satirlarOf(b as Block));
+	const eklenen: Inline[] = satirlar.flatMap((satir, i) =>
+		i === 0 ? satir : [{ type: "break" } as Inline, ...satir],
+	);
+	if (eklenen.length === 0) return null;
+
+	const yeni = spliceInline(hedef.children, caret.offset, caret.offset, eklenen);
+	return {
+		doc: replaceAt(doc, yol, { ...(hedef as object), children: yeni } as never),
+		caret: { ...caret, offset: caret.offset + listLength(eklenen) },
+	};
+}
+
+/** Bir bloğun satır içi satırları; kaplar kendi bloklarına iniyor. */
+function satirlarOf(blok: Block): Inline[][] {
+	const satirIci = inlineOf(blok);
+	if (satirIci !== null) return satirIci.length === 0 ? [] : [[...satirIci]];
+	switch (blok.type) {
+		case "code":
+		case "html":
+			return blok.value === ""
+				? []
+				: blok.value.split("\n").map((v): Inline[] => [{ type: "text", value: v }]);
+		case "list":
+			return blok.children.flatMap((madde) =>
+				madde.children.flatMap((b, i) =>
+					satirlarOf(b).map((satir, j): Inline[] =>
+						i === 0 && j === 0 ? [{ type: "text", value: "• " }, ...satir] : satir,
+					),
+				),
+			);
+		case "blockquote":
+			return blok.children.flatMap((b) => satirlarOf(b));
+		case "table":
+			// Satır başına bir satır, hücreler ` | ` ile.
+			return blok.children.map((row) =>
+				row.children.flatMap((cell, i): Inline[] =>
+					i === 0 ? [...cell.children] : [{ type: "text", value: " | " }, ...cell.children],
+				),
+			);
+		default:
+			return [];
+	}
 }
 
 /** Bloğun türünü ve kimliğini koruyup içeriğini değiştirir. */

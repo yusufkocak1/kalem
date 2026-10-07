@@ -1356,6 +1356,21 @@ test.describe("yapıştırma", () => {
 		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("abcdXY\n");
 	});
 
+	test("tablo hücresine yapıştırılan değer hücrede kalıyor", async ({ page }) => {
+		await page.evaluate(() =>
+			window.kalem.editor.setValue("| a | b |\n| --- | --- |\n| xy | z |\n\nsonra\n"),
+		);
+		await page.locator("#editor td", { hasText: "xy" }).click();
+		await page.keyboard.press("End");
+		await yapistir(page, { html: "<span>42</span>", text: "42" });
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe(
+			"| a | b |\n| --- | --- |\n| xy42 | z |\n\nsonra\n",
+		);
+		// İmleç yapıştırılanın sonunda: yazmaya hücrede devam ediliyor.
+		await page.keyboard.type("!");
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toContain("| xy42! | z |");
+	});
+
 	test("Markdown metni yapısıyla geliyor", async ({ page }) => {
 		await page.evaluate(() => window.kalem.editor.setValue("\n"));
 		await page.locator("#editor > [data-kalem-id]").first().click();
