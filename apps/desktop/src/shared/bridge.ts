@@ -214,6 +214,8 @@ export interface Draft {
 	/** See `OpenedFile.base`. */
 	readonly base?: string;
 	readonly remote?: RemotePage;
+	/** The page's storage the text was made from; unchanged parts are written back from it. */
+	readonly storage?: string;
 }
 
 export type DocumentPayload =

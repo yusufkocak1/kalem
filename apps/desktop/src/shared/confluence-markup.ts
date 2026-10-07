@@ -11,6 +11,9 @@ export interface MarkupElement {
 	readonly name: string;
 	readonly attrs: ReadonlyMap<string, string>;
 	readonly children: MarkupNode[];
+	/** Where the element starts and ends in the source; the end is set once it closes. */
+	readonly start: number;
+	end: number;
 }
 
 export interface MarkupText {
@@ -90,7 +93,14 @@ function appendText(parent: MarkupElement, value: string): void {
 }
 
 export function parseMarkup(source: string): MarkupElement {
-	const root: MarkupElement = { kind: "element", name: "#root", attrs: new Map(), children: [] };
+	const root: MarkupElement = {
+		kind: "element",
+		name: "#root",
+		attrs: new Map(),
+		children: [],
+		start: 0,
+		end: source.length,
+	};
 	const stack: MarkupElement[] = [root];
 	const top = (): MarkupElement => stack[stack.length - 1] as MarkupElement;
 	let i = 0;
@@ -135,16 +145,25 @@ export function parseMarkup(source: string): MarkupElement {
 		if (tag[1] === "/") {
 			let index = stack.length - 1;
 			while (index > 0 && stack[index]?.name !== name) index--;
-			if (index > 0) stack.length = index;
+			if (index > 0) {
+				// Elements left open inside end where the closing tag starts.
+				for (const open of stack.slice(index + 1)) open.end = lt;
+				(stack[index] as MarkupElement).end = i;
+				stack.length = index;
+			}
 			continue;
 		}
 
-		if (SELF_CLOSING_SIBLINGS.has(name) && top().name === name) stack.pop();
+		if (SELF_CLOSING_SIBLINGS.has(name) && top().name === name) {
+			(stack.pop() as MarkupElement).end = lt;
+		}
 		const element: MarkupElement = {
 			kind: "element",
 			name,
 			attrs: attributes(tag[3] ?? ""),
 			children: [],
+			start: lt,
+			end: i,
 		};
 		top().children.push(element);
 		if (tag[4] === "/" || VOID.has(name)) continue;
@@ -152,10 +171,12 @@ export function parseMarkup(source: string): MarkupElement {
 			const close = skipTo(`</${name}`, i);
 			appendText(element, source.slice(i, close));
 			i = skipTo(">", close) + 1;
+			element.end = Math.min(i, source.length);
 			continue;
 		}
 		stack.push(element);
 	}
+	for (const open of stack.slice(1)) open.end = source.length;
 	return root;
 }
 

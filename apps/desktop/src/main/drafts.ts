@@ -19,6 +19,7 @@ function parseDraft(id: string, raw: unknown): Draft | null {
 		format: toTextFormat(value.format),
 		time: typeof value.time === "number" ? value.time : 0,
 		...(remote === null ? {} : { remote }),
+		...(remote !== null && typeof value.storage === "string" ? { storage: value.storage } : {}),
 	};
 }
 
@@ -58,7 +59,11 @@ export class DraftStore {
 
 	async write(
 		id: string,
-		request: DraftRequest & { path: string | null; remote?: RemotePage | null },
+		request: DraftRequest & {
+			path: string | null;
+			remote?: RemotePage | null;
+			storage?: string | null;
+		},
 		time: number,
 	): Promise<void> {
 		const file = this.#file(id);

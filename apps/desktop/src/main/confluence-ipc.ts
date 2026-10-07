@@ -134,7 +134,7 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 		const win = senderOf(event);
 		const { client, tab, page } = await remoteOf(win, tabId);
 		const content = await client.page(page.id);
-		windows.setRemote(win, tab.id, content.page);
+		windows.setRemote(win, tab.id, content.page, content.storage);
 		return content;
 	});
 
@@ -177,7 +177,7 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 				base = { ...page, version: (await client.page(page.id)).page.version };
 			try {
 				const saved = await client.update(base, storage);
-				windows.setRemote(win, tab.id, saved);
+				windows.setRemote(win, tab.id, saved, storage);
 				await ctx.drafts.delete(tab.id).catch(() => {});
 				return { ok: true, page: saved };
 			} catch (error) {
