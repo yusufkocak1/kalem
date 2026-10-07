@@ -285,3 +285,23 @@ test("başa sarma kapalıyken sonda duruyor", async ({ page }) => {
 	await expect(sayac(page)).toHaveText("Sona ulaşıldı");
 	expect(await page.evaluate(() => window.kalem.aramaEklentisi.currentIndex())).toBe(1);
 });
+
+test("kapatınca görünüm yerinde kalıyor ve eşleşme seçili", async ({ page }) => {
+	const dolgu = Array.from({ length: 80 }, (_, i) => `Paragraf ${i}.`).join("\n\n");
+	await yaz(page, `${dolgu}\n\nAranan hedef burada.\n`);
+	// Belgeye tıklanmadan, imleç yokken arama: eskiden kapanış başa kaydırıyordu.
+	await page.evaluate(() => window.kalem.aramaEklentisi.open("find"));
+	await bulKutusu(page).fill("hedef");
+	await expect(sayac(page)).toHaveText("1 / 1");
+	const hedef = page.locator("#editor p", { hasText: "Aranan hedef" });
+	await expect(hedef).toBeInViewport();
+	const once = await hedef.evaluate((el) => el.getBoundingClientRect().top);
+
+	await bulKutusu(page).press("Escape");
+	await expect(panel(page)).toBeHidden();
+	expect(await hedef.evaluate((el) => el.getBoundingClientRect().top)).toBe(once);
+	expect(await page.evaluate(() => document.getSelection()?.toString())).toBe("hedef");
+	// Yazmaya eşleşmenin yerinden devam ediliyor.
+	await page.keyboard.type("X");
+	expect(await page.evaluate(() => window.kalem.editor.getValue())).toContain("Aranan X burada.");
+});
