@@ -1146,9 +1146,14 @@ button {
 	white-space: pre-wrap;
 }
 
-/* A column with a fixed width wraps its text instead of growing. */
-#editor > table th,
-#editor > table td {
+/*
+ * A column with a fixed width wraps its text instead of growing. Only those:
+ * on every cell it let the browser shrink columns to one letter, so a wide
+ * table was squeezed into the page with its words broken ("Ad|ım"). A table
+ * wider than the page now keeps its words and scrolls sideways in its box.
+ */
+#editor > table th[style*="width"],
+#editor > table td[style*="width"] {
 	overflow-wrap: anywhere;
 }
 
