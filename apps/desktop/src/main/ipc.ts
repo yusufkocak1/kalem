@@ -398,6 +398,7 @@ export function registerIpc(ctx: IpcContext): void {
 			{
 				path: tab.path,
 				remote: tab.remote,
+				storage: tab.storage,
 				name: typeof request.name === "string" ? request.name : tab.name,
 				text: request.text,
 				format: toTextFormat(request.format),

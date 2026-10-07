@@ -298,7 +298,10 @@ const en = {
 	confluencePageTitle: "Page title",
 	confluenceCreateFailed: "The page could not be created: {0}",
 	confluenceLossNotice:
-		"This page has content with no Markdown equivalent ({0}). Saving removes it from the page; earlier versions stay in the page history.",
+		"Parts of this page have content with no Markdown equivalent ({0}). Parts you do not edit are saved back as they are; editing one of those parts removes that content from it.",
+	confluenceLocked: "🔒 {0} — edit it in Confluence",
+	confluenceLockedHint:
+		"This Confluence macro is kept as it is. You can move or delete it; its content is edited in Confluence.",
 	confluenceLossConfirm: "Save to Confluence anyway?",
 	confluenceLossDetail:
 		"This content will be removed from the page:\n{0}\n\nThe current version stays in the page history.",
@@ -633,7 +636,10 @@ const tr: Strings = {
 	confluencePageTitle: "Sayfa başlığı",
 	confluenceCreateFailed: "Sayfa oluşturulamadı: {0}",
 	confluenceLossNotice:
-		"Bu sayfada Markdown karşılığı olmayan içerik var ({0}). Kaydetmek bunu sayfadan kaldırır; önceki sürümler sayfa geçmişinde kalır.",
+		"Sayfanın bazı bölümlerinde Markdown karşılığı olmayan içerik var ({0}). Düzenlemediğiniz bölümler olduğu gibi kaydedilir; bu bölümlerden birini düzenlerseniz o içerik oradan kalkar.",
+	confluenceLocked: "🔒 {0} — Confluence'ta düzenlenir",
+	confluenceLockedHint:
+		"Bu Confluence makrosu olduğu gibi korunuyor. Taşıyabilir ya da silebilirsiniz; içeriği Confluence'ta düzenlenir.",
 	confluenceLossConfirm: "Yine de Confluence'a kaydedilsin mi?",
 	confluenceLossDetail:
 		"Şu içerik sayfadan kaldırılacak:\n{0}\n\nŞimdiki sürüm sayfa geçmişinde kalır.",

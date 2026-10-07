@@ -263,7 +263,7 @@ export function storageToMarkdown(source: string): string {
 }
 
 /** Macros that survive a trip through Markdown. */
-const KEPT_MACROS = new Set(["code", "noformat", "info", "note", "warning", "tip"]);
+export const KEPT_MACROS = new Set(["code", "noformat", "info", "note", "warning", "tip"]);
 /** Column widths and table styling are layout, not content worth a warning. */
 const TABLE_PARTS = new Set(["table", "colgroup", "col", "tbody", "thead", "tr", "td", "th"]);
 const STYLE_KEPT = /^\s*(text-decoration:\s*line-through|color:\s*[^;]+|text-align:\s*\w+);?\s*$/i;

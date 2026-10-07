@@ -28,13 +28,9 @@ import type {
 	RemotePage,
 	Settings,
 } from "../shared/bridge.js";
-import {
-	confluenceToMarkdown,
-	markdownToStorage,
-	storageLosses,
-	storageToMarkdown,
-} from "../shared/confluence.js";
+import { confluenceToMarkdown } from "../shared/confluence.js";
 import { fileUrl } from "../shared/confluence-common.js";
+import { exportPage, importPage } from "../shared/confluence-sync.js";
 import type { TextFormat } from "../shared/encoding.js";
 import { DEFAULT_FORMAT, formatLabel, willConvertToUtf8 } from "../shared/encoding.js";
 import type { Lang, Strings } from "../shared/i18n.js";
@@ -56,6 +52,7 @@ import {
 	isPlain,
 	renderStyledHtml,
 } from "../shared/table-style.js";
+import { decorateLocked } from "./confluence-locked.js";
 import { insertLink, insertTable } from "./edits.js";
 import type { Notices } from "./notices.js";
 import type { Previews } from "./previews.js";
@@ -107,6 +104,11 @@ export class Session {
 	#remote: RemotePage | null = null;
 	/** Page content the Markdown could not hold; saving asks before dropping it. */
 	#losses: string[] = [];
+	/**
+	 * The page's storage the text was made from: on save, parts the user did
+	 * not change are written back from it as they were (`confluence-sync.ts`).
+	 */
+	#storage: string | null = null;
 	/** What relative links resolve against: the path, or a package's unpacked text. */
 	#base: string | null = null;
 	#name = "";
@@ -235,6 +237,7 @@ export class Session {
 		this.#path = null;
 		this.#remote = null;
 		this.#losses = [];
+		this.#storage = null;
 		this.#base = null;
 		this.#name = t.untitled;
 		this.#format = DEFAULT_FORMAT;
@@ -291,10 +294,12 @@ export class Session {
 			}
 			case "confluence-page": {
 				const { page, storage } = payload.content;
-				text = storageToMarkdown(storage);
+				const imported = importPage(storage);
+				text = imported.markdown;
 				this.#remote = page;
+				this.#storage = storage;
 				this.#name = page.title;
-				this.#losses = storageLosses(storage);
+				this.#losses = imported.losses;
 				if (this.#losses.length > 0) {
 					notices.show({
 						id: "confluence-loss",
@@ -310,6 +315,7 @@ export class Session {
 			case "draft": {
 				const { draft } = payload;
 				this.#remote = draft.remote ?? null;
+				this.#storage = this.#remote === null ? null : (draft.storage ?? null);
 				text = draft.text;
 				this.#path = draft.path;
 				this.#base = draft.base ?? draft.path;
@@ -327,6 +333,7 @@ export class Session {
 			case "moved": {
 				const { draft } = payload;
 				this.#remote = draft.remote ?? null;
+				this.#storage = this.#remote === null ? null : (draft.storage ?? null);
 				text = draft.text;
 				this.#path = draft.path;
 				this.#base = draft.base ?? draft.path;
@@ -350,6 +357,7 @@ export class Session {
 		this.#tables.reset(this.editor.getDocument(), extracted.styles);
 		this.#tables.decorate(this.editor);
 		this.#o.previews.decorate(this.#o.canvas);
+		decorateLocked(this.#o.canvas, this.#o.t);
 		// The baseline is what the editor serializes, not the file text: a file
 		// that does not round-trip byte for byte must not open as "modified".
 		this.#savedText = clean ? this.#text() : null;
@@ -523,6 +531,7 @@ export class Session {
 		this.#tables.reconcile(editor.getDocument());
 		this.#tables.decorate(editor);
 		this.#o.previews.decorate(this.#o.canvas);
+		decorateLocked(this.#o.canvas, this.#o.t);
 		this.#refreshDirty(this.#tables.isEmpty ? value : this.#text());
 		this.#o.onEditorChange();
 	}
@@ -588,6 +597,7 @@ export class Session {
 				// Saved as a file: the tab no longer writes to Confluence.
 				this.#remote = null;
 				this.#losses = [];
+				this.#storage = null;
 				this.#name = stripExtension(fileName(path));
 				// A package's links resolve inside it; the save result brings that base.
 				if (!isPackagePath(path)) {
@@ -652,10 +662,11 @@ export class Session {
 			const remote = this.#remote;
 			if (this.#editor !== editor || remote === null) return false;
 			const text = this.#text();
+			const exported = exportPage(text, this.#storage);
 			const result = await bridge.confluenceSavePage(this.id, {
-				storage: markdownToStorage(text),
+				storage: exported.storage,
 				version: remote.version,
-				losses: this.#losses,
+				losses: exported.losses,
 				overwrite,
 			});
 			if (!result.ok) {
@@ -677,6 +688,7 @@ export class Session {
 				return false;
 			}
 			this.#remote = result.page;
+			this.#storage = exported.storage;
 			this.#name = result.page.title;
 			this.#losses = [];
 			this.#savedText = text;

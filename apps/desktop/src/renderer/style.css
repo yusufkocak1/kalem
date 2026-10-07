@@ -1680,3 +1680,36 @@ pre[data-preview="error"]::after {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+
+/* --- Locked Confluence macros (confluence-locked.ts) ------------------- */
+
+pre[data-confluence-locked] {
+	position: relative;
+	min-height: 2.4em;
+	border: 1px dashed var(--app-border);
+	background: var(--app-raised);
+	cursor: default;
+	user-select: none;
+}
+
+/* The placeholder comment is the model; the box shows what it stands for. */
+pre[data-confluence-locked] > code {
+	visibility: hidden;
+}
+
+pre[data-confluence-locked]::before {
+	content: attr(data-confluence-locked);
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	padding: 0 12px;
+	color: var(--app-muted);
+	font:
+		13px / 1.4 system-ui,
+		"Segoe UI",
+		sans-serif;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}

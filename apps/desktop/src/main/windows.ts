@@ -51,6 +51,8 @@ export interface DocumentTab {
 	modified: number | null;
 	/** The Confluence page the tab saves to, instead of a file. */
 	remote: RemotePage | null;
+	/** The page's storage the tab's text was made from (see `confluence-sync.ts`). */
+	storage: string | null;
 }
 
 export interface AppWindow {
@@ -337,6 +339,7 @@ export class WindowManager {
 						time: tab.modified ?? 0,
 						...(tab.base === null ? {} : { base: tab.base }),
 						...(tab.remote === null ? {} : { remote: tab.remote }),
+						...(tab.storage === null ? {} : { storage: tab.storage }),
 					},
 				},
 			},
@@ -355,6 +358,7 @@ export class WindowManager {
 						format: moved.format,
 						path: tab.path,
 						remote: tab.remote,
+						storage: tab.storage,
 					},
 					Date.now(),
 				)
@@ -429,6 +433,7 @@ export class WindowManager {
 		tab.base = base;
 		tab.modified = modified;
 		tab.remote = null;
+		tab.storage = null;
 		tab.name = stripExtension(basename(path));
 		win.writable.add(pathKey(path));
 		this.#addRecentFile(path);
@@ -482,6 +487,7 @@ export class WindowManager {
 			dirty: false,
 			modified: null,
 			remote: null,
+			storage: null,
 		};
 
 		switch (payload.kind) {
@@ -503,6 +509,7 @@ export class WindowManager {
 			case "confluence-page":
 				tab.name = payload.content.page.title;
 				tab.remote = payload.content.page;
+				tab.storage = payload.content.storage;
 				break;
 			case "draft":
 				tab.path = payload.draft.path;
@@ -510,6 +517,7 @@ export class WindowManager {
 				tab.name = payload.draft.name === "" ? t.untitled : payload.draft.name;
 				tab.dirty = true;
 				tab.remote = payload.draft.remote ?? null;
+				tab.storage = tab.remote === null ? null : (payload.draft.storage ?? null);
 				if (payload.draft.path !== null) win.writable.add(pathKey(payload.draft.path));
 				break;
 			case "new-file":
@@ -524,6 +532,7 @@ export class WindowManager {
 				tab.dirty = payload.dirty;
 				tab.modified = payload.draft.time === 0 ? null : payload.draft.time;
 				tab.remote = payload.draft.remote ?? null;
+				tab.storage = tab.remote === null ? null : (payload.draft.storage ?? null);
 				if (payload.draft.path !== null) win.writable.add(pathKey(payload.draft.path));
 				break;
 			case "welcome":
@@ -574,11 +583,12 @@ export class WindowManager {
 		this.#place({ kind: "confluence-page", content }, preferred);
 	}
 
-	/** The page after a save or reload: its new version is what the next save builds on. */
-	setRemote(win: AppWindow, tabId: string, page: RemotePage): void {
+	/** The page after a save or reload: its new version and storage are what the next save builds on. */
+	setRemote(win: AppWindow, tabId: string, page: RemotePage, storage: string): void {
 		const tab = win.tabs.get(tabId);
 		if (tab === undefined) return;
 		tab.remote = page;
+		tab.storage = storage;
 		tab.name = page.title;
 	}
 

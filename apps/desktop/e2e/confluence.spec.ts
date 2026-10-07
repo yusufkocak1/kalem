@@ -294,3 +294,43 @@ test("adds a child page from the tree and opens it", async () => {
 	expect(errors).toEqual([]);
 	await app.close();
 });
+
+test("saves an edit without rewriting the parts that were not edited", async () => {
+	const confluence = await fakeConfluence();
+	cleanup.push(confluence.close);
+	const table =
+		'<table><tbody><tr><th>Ad</th><th>Not</th></tr><tr><td colspan="2" style="background-color: #fffae6;"><p>birleşik</p></td></tr></tbody></table>';
+	const jira =
+		'<ac:structured-macro ac:name="jira"><ac:parameter ac:name="key">ABC-12</ac:parameter></ac:structured-macro>';
+	confluence.page.storage = `<h1>Sprint Planı</h1>${table}${jira}<p>Hedef</p>`;
+	const { app, page, errors } = await launch();
+
+	await clickMenu(app, "File", "Open from Confluence…");
+	const dialog = page.locator(".confluence-dialog");
+	await dialog.locator('input[type="url"]').fill(confluence.site);
+	await dialog.locator('input[type="password"]').fill(TOKEN);
+	await dialog.getByRole("button", { name: "Connect" }).click();
+	await dialog.locator(".quick-open-item", { hasText: "Sprint Planı" }).click();
+	await expect(dialog).not.toBeVisible();
+
+	// The macro is a locked box, not text to edit.
+	const box = page.locator("#editor pre[data-confluence-locked]");
+	await expect(box).toHaveAttribute("data-confluence-locked", "🔒 jira — edit it in Confluence");
+	await expect(box).toHaveAttribute("contenteditable", "false");
+	// The merged cells are in a part nobody has edited yet: a notice, no loss yet.
+	await expect(page.locator(".notice", { hasText: "Parts you do not edit" })).toBeVisible();
+
+	await page.locator("#editor p", { hasText: "Hedef" }).click();
+	await page.keyboard.press("End");
+	await page.keyboard.type(" eklendi");
+	await page.locator('[data-command="save"]').click();
+	await expect(page.locator(".save-status")).toHaveText("Saved");
+
+	// No loss dialog: the edited paragraph lost nothing. The table and the macro went back byte for byte.
+	expect(confluence.saves).toHaveLength(1);
+	expect(confluence.saves[0]?.storage).toBe(
+		`<h1>Sprint Planı</h1>${table}${jira}<p>Hedef eklendi</p>`,
+	);
+	expect(errors).toEqual([]);
+	await app.close();
+});

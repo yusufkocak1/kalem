@@ -55,7 +55,14 @@ describe("DraftStore", () => {
 		};
 		await store.write(
 			ID_A,
-			{ path: null, remote, name: "Plan", text: "x", format: DEFAULT_FORMAT },
+			{
+				path: null,
+				remote,
+				storage: "<p>x</p>",
+				name: "Plan",
+				text: "x",
+				format: DEFAULT_FORMAT,
+			},
 			1,
 		);
 		await store.write(
@@ -63,6 +70,7 @@ describe("DraftStore", () => {
 			{
 				path: null,
 				remote: { ...remote, id: "../x" },
+				storage: "<p>y</p>",
 				name: "y",
 				text: "y",
 				format: DEFAULT_FORMAT,
@@ -71,7 +79,10 @@ describe("DraftStore", () => {
 		);
 		const [a, b] = await store.list();
 		expect(a?.remote).toEqual(remote);
+		// The storage the text was made from comes back with it: unchanged parts are saved from it.
+		expect(a?.storage).toBe("<p>x</p>");
 		expect(b?.remote).toBeUndefined();
+		expect(b?.storage).toBeUndefined();
 	});
 
 	it("overwrites the draft of the same window and leaves no temp file", async () => {
