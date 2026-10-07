@@ -77,6 +77,49 @@ const EMOTICONS: Readonly<Record<string, string>> = {
 interface ImportState {
 	/** Languages of the code macros, in document order. */
 	readonly languages: (string | null)[];
+	/** The source the elements' ranges point into. */
+	readonly source: string;
+	/** Inline atoms become kept links (see `atomKind`) instead of plain text. */
+	readonly atoms: boolean;
+}
+
+/** FNV-1a of the text: the same key for the same XML on every import. */
+export function hash(text: string): string {
+	let h = 0x811c9dc5;
+	for (let i = 0; i < text.length; i++) {
+		h ^= text.charCodeAt(i);
+		h = Math.imul(h, 0x01000193);
+	}
+	return (h >>> 0).toString(16).padStart(8, "0");
+}
+
+/** The link target of a kept inline atom; its XML is written back in its place. */
+export const ATOM_PREFIX = "#confluence-keep-";
+
+export type AtomKind = "mention" | "page-link" | "date" | "macro";
+
+/**
+ * Inline pieces Markdown has no form for but that sit in running text: a
+ * mention, a link to another page, a date, an inline macro without a body
+ * (status, Jira issue, anchor…). They are kept as they are when the
+ * paragraph around them is edited.
+ */
+export function atomKind(node: MarkupElement): AtomKind | null {
+	if (node.name === "time") return "date";
+	if (node.name === "ac:link") {
+		if (childElements(node, "ri:user").length > 0) return "mention";
+		const target = childElements(node).some((child) =>
+			["ri:page", "ri:blog-post", "ri:space"].includes(child.name),
+		);
+		return target ? "page-link" : null;
+	}
+	if (node.name === "ac:structured-macro" || node.name === "ac:macro") {
+		// kalem-locale-ok: macro names are ASCII
+		const name = (node.attrs.get("ac:name") ?? "").toLowerCase();
+		if (KEPT_MACROS.has(name) || panelKind(name) !== null || name === "expand") return null;
+		return childElements(node, "ac:rich-text-body").length === 0 ? "macro" : null;
+	}
+	return null;
 }
 
 function parameters(macro: MarkupElement): Map<string, string> {
@@ -197,8 +240,30 @@ function row(node: MarkupElement, state: ImportState): HtmlNode {
 	return element("tr", cells);
 }
 
+/** A kept atom: a link whose target names its XML, showing what the atom shows. */
+function atom(node: MarkupElement, state: ImportState): HtmlNode[] {
+	const shown = plain(node, state).replace(/\s+/g, " ").trim();
+	// kalem-locale-ok: macro names are ASCII
+	const label =
+		shown !== "" ? shown : `⟨${(node.attrs.get("ac:name") ?? node.name).toLowerCase()}⟩`;
+	const href = ATOM_PREFIX + hash(state.source.slice(node.start, node.end));
+	return [element("a", [text(label)], { href })];
+}
+
+/** What the element reads as when it is not kept. */
+function plain(node: MarkupElement, state: ImportState): string {
+	return convertElement(node, { ...state, atoms: false })
+		.map((child) => child.textContent ?? "")
+		.join("");
+}
+
 function convert(node: MarkupNode, state: ImportState): HtmlNode[] {
 	if (node.kind === "text") return [text(node.value)];
+	if (state.atoms && atomKind(node) !== null) return atom(node, state);
+	return convertElement(node, state);
+}
+
+function convertElement(node: MarkupElement, state: ImportState): HtmlNode[] {
 	const { name } = node;
 	switch (name) {
 		case "ac:structured-macro":
@@ -246,9 +311,13 @@ function codeBlocks(doc: Root): Code[] {
 	return found;
 }
 
-/** Converts Confluence storage format (or Confluence's exported HTML) to Markdown. */
-export function storageToMarkdown(source: string): string {
-	const state: ImportState = { languages: [] };
+/**
+ * Converts Confluence storage format (or Confluence's exported HTML) to Markdown.
+ * With `atoms`, inline atoms become kept links (`ATOM_PREFIX`); `markdownToStorage`
+ * writes their XML back when it is given them.
+ */
+export function storageToMarkdown(source: string, options: { atoms?: boolean } = {}): string {
+	const state: ImportState = { languages: [], source, atoms: options.atoms === true };
 	const root = parseMarkup(source);
 	const body = childElements(root, "html")[0]?.children.find(
 		(child): child is MarkupElement => child.kind === "element" && child.name === "body",
@@ -273,10 +342,12 @@ const STYLE_KEPT = /^\s*(text-decoration:\s*line-through|color:\s*[^;]+|text-ali
  * `layout`, `mention`, `page-link`, `inline-comment`, `merged-cells`,
  * `cell-blocks`, `formatting`, `image-size`, `date`.
  */
-export function storageLosses(source: string): string[] {
+export function storageLosses(source: string, options: { atoms?: boolean } = {}): string[] {
 	const found = new Set<string>();
 	const visit = (node: MarkupNode, inCell: boolean): void => {
 		if (node.kind === "text") return;
+		// Kept atoms lose nothing, nor does anything inside them.
+		if (options.atoms === true && atomKind(node) !== null) return;
 		const { name, attrs } = node;
 		if (name === "ac:structured-macro" || name === "ac:macro") {
 			// kalem-locale-ok: macro names are ASCII
@@ -326,10 +397,12 @@ function cdata(value: string): string {
 
 class StorageWriter {
 	#definitions: Map<string, Definition>;
+	#atoms: ReadonlyMap<string, string>;
 	#taskId = 0;
 
-	constructor(doc: Root) {
+	constructor(doc: Root, atoms: ReadonlyMap<string, string>) {
 		this.#definitions = definitionsOf(doc);
+		this.#atoms = atoms;
 	}
 
 	blocks(blocks: readonly (Block | { type: string })[]): string {
@@ -432,6 +505,10 @@ class StorageWriter {
 	}
 
 	link(url: string, title: string | null, children: readonly Inline[]): string {
+		if (url.startsWith(ATOM_PREFIX)) {
+			// A kept atom goes back as it was; one this page never had is its text.
+			return this.#atoms.get(url) ?? this.inlines(children);
+		}
 		const file = attachmentName(url);
 		if (file !== null && /\.[a-z0-9]+$/i.test(file) && !/\.(md|markdown|html?)$/i.test(file)) {
 			return `<ac:link><ri:attachment ri:filename="${escapeHtml(file)}" /><ac:link-body>${this.inlines(children)}</ac:link-body></ac:link>`;
@@ -480,10 +557,16 @@ class StorageWriter {
 	}
 }
 
-/** Converts Markdown (with Kalem's table style comments) to Confluence storage format. */
-export function markdownToStorage(markdown: string): string {
+/**
+ * Converts Markdown (with Kalem's table style comments) to Confluence storage format.
+ * `atoms` maps kept atom links to their XML.
+ */
+export function markdownToStorage(
+	markdown: string,
+	atoms: ReadonlyMap<string, string> = new Map(),
+): string {
 	const doc = parse(extractTableStyles(markdown).markdown);
-	const writer = new StorageWriter(doc);
+	const writer = new StorageWriter(doc, atoms);
 	return writer.blocks(
 		doc.children.filter((block) => block.type !== "yaml" && block.type !== "toml"),
 	);
