@@ -33,7 +33,7 @@ ve görev listesi. **Boş dizi vermek onları kapatıyor** — çekirdek
 | Paket | Ne yapıyor | Boyut (gzip) |
 |---|---|---|
 | `@kalem-editor/plugin-code-highlight` | Kod bloğu vurgulama, 8 dil | 3,7 kB |
-| `@kalem-editor/plugin-find-replace` | Ctrl+F / Ctrl+H | 5,3 kB |
+| `@kalem-editor/plugin-find-replace` | Ctrl+F / Ctrl+H | 5,4 kB |
 | `@kalem-editor/plugin-image-upload` | Sürükle-bırak / yapıştır görsel yükleme | 2,9 kB |
 | `@kalem-editor/plugin-outline` | İçindekiler paneli | 1,9 kB |
 | `@kalem-editor/plugin-word-count` | Kelime sayacı ve okuma süresi | 1,4 kB |

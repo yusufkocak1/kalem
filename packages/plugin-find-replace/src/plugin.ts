@@ -195,36 +195,46 @@ export function findReplacePlugin(options: FindReplaceOptions = {}): FindReplace
 	}
 
 	function kapat(): void {
+		const hedef = current >= 0 ? matches[current] : undefined;
 		panel?.close();
 		decorator?.clear();
 		matches = [];
 		current = -1;
-		odakla();
+		odakla(hedef);
 	}
 
 	/**
-	 * Odağı editöre, kullanıcının bıraktığı yere geri veriyor.
+	 * Odağı editöre veriyor: geçerli eşleşme varsa onu **seçerek**, yoksa
+	 * kullanıcının bıraktığı yere.
 	 *
 	 * Kökün kendisi odaklanabilir değil — her blok kendi
-	 * `contenteditable` elemanı (F2-05). Panel açılırken imleç modelde
-	 * duruyor; kapanışta o konum DOM'a geri yazılıyor, yoksa kullanıcı
-	 * Escape'e basınca belgenin başına düşerdi.
+	 * `contenteditable` elemanı (F2-05). Kapanışta görünüm kıpırdamamalı:
+	 * kullanıcı aradığı yere gelmiş ve orada çalışmak istiyor (tarayıcı ve
+	 * Word araması da eşleşmeyi seçili bırakıyor). Odak bu yüzden
+	 * `preventScroll` ile veriliyor; düz `focus()` sayfayı imlecin eski
+	 * yerine, belgeye hiç tıklanmamışsa da belgenin **başına** kaydırıyordu.
 	 */
-	function odakla(): void {
+	function odakla(hedef?: Match): void {
 		if (ctx === null) return;
 		const caret = ctx.getCaret();
-		const id = caret === null ? null : (ctx.getDocument().children[caret.blockIndex]?.id ?? null);
+		const yer =
+			hedef !== undefined
+				? { blockIndex: hedef.blockIndex, path: hedef.path, from: hedef.from, to: hedef.to }
+				: caret === null
+					? null
+					: { ...caret, from: caret.offset, to: caret.offset };
+		const id = yer === null ? null : (ctx.getDocument().children[yer.blockIndex]?.id ?? null);
 		const blok = id === null ? null : blockElementOf(ctx.element, id);
-		const holder = blok === null || caret === null ? null : holderIn(blok, caret.path);
+		const holder = blok === null || yer === null ? null : holderIn(blok, yer.path);
 
-		if (blok !== null && holder !== null && caret !== null) {
-			blok.focus();
-			selectRange(holder, caret.offset, caret.offset);
+		if (blok !== null && holder !== null && yer !== null) {
+			blok.focus({ preventScroll: true });
+			selectRange(holder, yer.from, yer.to);
 			return;
 		}
 
 		const ilk = ctx.element.firstElementChild;
-		if (ilk instanceof HTMLElement && ilk.isContentEditable) ilk.focus();
+		if (ilk instanceof HTMLElement && ilk.isContentEditable) ilk.focus({ preventScroll: true });
 	}
 
 	return {
