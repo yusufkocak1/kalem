@@ -174,3 +174,37 @@ describe("belgeye yerleştirme", () => {
 		}
 	});
 });
+
+describe("insertFragment — iç içe taşıyıcılar", () => {
+	const yerde = (blockIndex: number, path: number[], offset: number): Caret => ({
+		blockIndex,
+		path,
+		offset,
+	});
+	const TABLO = "| a | b |\n| --- | --- |\n| xy | z |\n\nsonra\n";
+	const md = (sonuc: ReturnType<typeof insertFragment>) =>
+		sonuc === null ? "<null>" : serialize(sonuc.doc);
+
+	it("hücreye yapıştırılan değer hücrede, imlecin yerinde kalıyor", () => {
+		const sonuc = insertFragment(belge(TABLO), yerde(0, [1, 0], 1), parse("42"));
+		expect(md(sonuc)).toBe("| a | b |\n| --- | --- |\n| x42y | z |\n\nsonra\n");
+		expect(sonuc?.caret).toEqual(yerde(0, [1, 0], 3));
+	});
+
+	it("çok paragraflı parça hücrede satırlara bölünüyor", () => {
+		const sonuc = insertFragment(belge(TABLO), yerde(0, [1, 1], 1), parse("bir\n\n- iki\n- üç\n"));
+		expect(md(sonuc)).toBe("| a | b |\n| --- | --- |\n| xy | zbir<br>• iki<br>• üç |\n\nsonra\n");
+	});
+
+	it("liste maddesine yapıştırma maddede kalıyor", () => {
+		expect(md(insertFragment(belge("- ab\n- cd\n"), yerde(0, [1, 0], 1), parse("X")))).toBe(
+			"- ab\n- cXd\n",
+		);
+	});
+
+	it("alıntıya yapıştırma alıntıda kalıyor", () => {
+		expect(md(insertFragment(belge("> ab\n"), yerde(0, [0], 2), parse("**X**")))).toBe(
+			"> ab**X**\n",
+		);
+	});
+});
