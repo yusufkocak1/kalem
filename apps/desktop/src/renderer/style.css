@@ -1718,3 +1718,18 @@ pre[data-confluence-locked]::before {
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
+
+/* Kept inline atoms: mentions, page links, dates, inline macros. */
+#editor a[href^="#confluence-keep-"] {
+	padding: 0 0.3em;
+	border-radius: 0.3em;
+	background: color-mix(in srgb, var(--kalem-accent) 12%, transparent);
+	color: var(--kalem-accent);
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+#editor a[href^="#confluence-keep-"]::before {
+	content: "🔒 ";
+	font-size: 0.75em;
+}

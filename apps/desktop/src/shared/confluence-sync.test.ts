@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { markdownToStorage, storageToMarkdown } from "./confluence-storage.js";
 import { exportPage, importPage, lockedLabel, segmentsOf } from "./confluence-sync.js";
 
 const TABLE =
@@ -39,9 +40,9 @@ describe("importPage", () => {
 		expect(lockedLabel("<!-- başka -->")).toBeNull();
 	});
 
-	it("reports what editing could lose, but not the locked macros", () => {
+	it("reports what editing could lose, but not locked macros or inline atoms", () => {
 		const { losses } = importPage(PAGE);
-		expect(losses.sort()).toEqual(["mention", "merged-cells"]);
+		expect(losses).toEqual(["merged-cells"]);
 	});
 });
 
@@ -66,13 +67,22 @@ describe("exportPage", () => {
 		expect(losses).toEqual([]);
 	});
 
-	it("warns only about the part that is rewritten", () => {
+	it("keeps a mention when the paragraph around it is edited", () => {
 		const { markdown } = importPage(PAGE);
 		const edited = markdown.replace("Sorumlu:", "Sorumlu kişi:");
 		const { storage, losses } = exportPage(edited, PAGE);
-		expect(losses).toEqual(["mention"]);
+		expect(losses).toEqual([]);
+		expect(storage).toContain(
+			'<p>Sorumlu kişi: <ac:link><ri:user ri:userkey="u1" /></ac:link></p>',
+		);
 		expect(storage).toContain(TABLE);
 		expect(storage).toContain(JIRA);
+	});
+
+	it("warns about the merged cells only when that table is edited", () => {
+		const { markdown } = importPage(PAGE);
+		const { losses } = exportPage(markdown.replace("birleşik", "birleşik hücre"), PAGE);
+		expect(losses).toEqual(["merged-cells"]);
 	});
 
 	it("keeps a locked macro where it is moved, and drops it when deleted", () => {
@@ -108,5 +118,55 @@ describe("exportPage", () => {
 
 	it("is a plain conversion without a base", () => {
 		expect(exportPage("# a\n\nb\n", null).storage).toBe("<h1>a</h1><p>b</p>");
+	});
+});
+
+describe("inline atoms", () => {
+	const LINK =
+		'<ac:link><ri:page ri:content-title="Kurulum" ri:space-key="DEV" /><ac:plain-text-link-body><![CDATA[kurulum sayfası]]></ac:plain-text-link-body></ac:link>';
+	const DATE = '<time datetime="2026-10-06" />';
+	const STATUS =
+		'<ac:structured-macro ac:name="status"><ac:parameter ac:name="colour">Green</ac:parameter><ac:parameter ac:name="title">TAMAM</ac:parameter></ac:structured-macro>';
+	const MENTION_LINK = '<ac:link><ri:user ri:userkey="u1" /></ac:link>';
+	const ATOMS = `<p>Bkz. ${LINK}, son tarih ${DATE}, durum ${STATUS}.</p><p>Sorumlu: ${MENTION_LINK}</p>`;
+
+	it("shows them as kept links with what they read as", () => {
+		const { markdown, losses } = importPage(ATOMS);
+		expect(markdown).toMatch(/\[kurulum sayfası\]\(#confluence-keep-[0-9a-f]{8}\)/);
+		expect(markdown).toMatch(/\[2026-10-06\]\(#confluence-keep-[0-9a-f]{8}\)/);
+		expect(markdown).toMatch(/\[TAMAM\]\(#confluence-keep-[0-9a-f]{8}\)/);
+		expect(markdown).toMatch(/\[@u1\]\(#confluence-keep-[0-9a-f]{8}\)/);
+		expect(losses).toEqual([]);
+	});
+
+	it("writes them back as they were when the text around them changes", () => {
+		const { markdown } = importPage(ATOMS);
+		const { storage, losses } = exportPage(markdown.replace("Bkz.", "Ayrıntı için bkz."), ATOMS);
+		expect(storage).toBe(
+			`<p>Ayrıntı için bkz. ${LINK}, son tarih ${DATE}, durum ${STATUS}.</p><p>Sorumlu: ${MENTION_LINK}</p>`,
+		);
+		expect(losses).toEqual([]);
+	});
+
+	it("keeps an atom moved to another paragraph and drops a deleted one", () => {
+		const { markdown } = importPage(ATOMS);
+		const status = /\[TAMAM\]\(#confluence-keep-[0-9a-f]{8}\)/.exec(markdown)?.[0] as string;
+		const moved = markdown
+			.replace(`, durum ${status}`, "")
+			.replace("Sorumlu:", `${status} Sorumlu:`);
+		const { storage } = exportPage(moved, ATOMS);
+		expect(storage).toContain(`<p>${STATUS} Sorumlu: ${MENTION_LINK}</p>`);
+		expect(storage.match(/ac:name="status"/g)).toHaveLength(1);
+
+		const date = /\[2026-10-06\]\(#confluence-keep-[0-9a-f]{8}\)/.exec(markdown)?.[0] as string;
+		expect(exportPage(markdown.replace(`, son tarih ${date}`, ""), ATOMS).storage).not.toContain(
+			"<time",
+		);
+	});
+
+	it("stays plain text outside the page sync", () => {
+		expect(storageToMarkdown(ATOMS)).not.toContain("confluence-keep");
+		// A link to an atom the page does not have is its text.
+		expect(markdownToStorage("[x](#confluence-keep-00000000)\n")).toBe("<p>x</p>");
 	});
 });

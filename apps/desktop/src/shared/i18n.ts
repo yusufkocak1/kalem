@@ -300,6 +300,8 @@ const en = {
 	confluenceLossNotice:
 		"Parts of this page have content with no Markdown equivalent ({0}). Parts you do not edit are saved back as they are; editing one of those parts removes that content from it.",
 	confluenceLocked: "🔒 {0} — edit it in Confluence",
+	confluenceAtomHint:
+		"Kept from Confluence (mention, page link, date or macro). It is saved back as it was; change it in Confluence.",
 	confluenceLockedHint:
 		"This Confluence macro is kept as it is. You can move or delete it; its content is edited in Confluence.",
 	confluenceLossConfirm: "Save to Confluence anyway?",
@@ -638,6 +640,8 @@ const tr: Strings = {
 	confluenceLossNotice:
 		"Sayfanın bazı bölümlerinde Markdown karşılığı olmayan içerik var ({0}). Düzenlemediğiniz bölümler olduğu gibi kaydedilir; bu bölümlerden birini düzenlerseniz o içerik oradan kalkar.",
 	confluenceLocked: "🔒 {0} — Confluence'ta düzenlenir",
+	confluenceAtomHint:
+		"Confluence'tan korunuyor (bahsetme, sayfa bağlantısı, tarih ya da makro). Olduğu gibi geri kaydedilir; Confluence'ta değiştirin.",
 	confluenceLockedHint:
 		"Bu Confluence makrosu olduğu gibi korunuyor. Taşıyabilir ya da silebilirsiniz; içeriği Confluence'ta düzenlenir.",
 	confluenceLossConfirm: "Yine de Confluence'a kaydedilsin mi?",

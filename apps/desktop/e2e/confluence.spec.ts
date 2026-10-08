@@ -334,3 +334,39 @@ test("saves an edit without rewriting the parts that were not edited", async () 
 	expect(errors).toEqual([]);
 	await app.close();
 });
+
+test("keeps mentions and inline macros in a paragraph that is edited", async () => {
+	const confluence = await fakeConfluence();
+	cleanup.push(confluence.close);
+	const mention = '<ac:link><ri:user ri:userkey="u1" /></ac:link>';
+	const status =
+		'<ac:structured-macro ac:name="status"><ac:parameter ac:name="title">TAMAM</ac:parameter></ac:structured-macro>';
+	confluence.page.storage = `<h1>Sprint Planı</h1><p>Sorumlu ${mention}, durum ${status}</p>`;
+	const { app, page, errors } = await launch();
+
+	await clickMenu(app, "File", "Open from Confluence…");
+	const dialog = page.locator(".confluence-dialog");
+	await dialog.locator('input[type="url"]').fill(confluence.site);
+	await dialog.locator('input[type="password"]').fill(TOKEN);
+	await dialog.getByRole("button", { name: "Connect" }).click();
+	await dialog.locator(".quick-open-item", { hasText: "Sprint Planı" }).click();
+	await expect(dialog).not.toBeVisible();
+
+	const atoms = page.locator('#editor a[href^="#confluence-keep-"]');
+	await expect(atoms).toHaveText(["@u1", "TAMAM"]);
+	await expect(atoms.first()).toHaveAttribute("title", /saved back as it was/);
+	// Nothing in this page is lost by editing it.
+	await expect(page.locator(".notice")).toHaveCount(0);
+
+	await page.locator("#editor p").first().click();
+	await page.keyboard.press("Home");
+	await page.keyboard.type("Yeni ");
+	await page.locator('[data-command="save"]').click();
+	await expect(page.locator(".save-status")).toHaveText("Saved");
+
+	expect(confluence.saves[0]?.storage).toBe(
+		`<h1>Sprint Planı</h1><p>Yeni Sorumlu ${mention}, durum ${status}</p>`,
+	);
+	expect(errors).toEqual([]);
+	await app.close();
+});

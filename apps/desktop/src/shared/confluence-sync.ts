@@ -18,9 +18,12 @@
  * page as opened, or as last saved), so it needs no state beyond that string.
  */
 import { parse } from "@kalem-editor/core";
-import type { MarkupElement } from "./confluence-markup.js";
+import type { MarkupElement, MarkupNode } from "./confluence-markup.js";
 import { parseMarkup } from "./confluence-markup.js";
 import {
+	ATOM_PREFIX,
+	atomKind,
+	hash,
 	KEPT_MACROS,
 	markdownToStorage,
 	storageLosses,
@@ -40,16 +43,6 @@ const KEEP = /^<!-- confluence:keep ([0-9a-f]{8}) ([^\n]*?) -->$/;
 /** The locked placeholder's label (the macro name); `null` for any other text. */
 export function lockedLabel(text: string): string | null {
 	return KEEP.exec(text.trim())?.[2] ?? null;
-}
-
-/** FNV-1a: the placeholder's key, the same for the same XML on every import. */
-function hash(text: string): string {
-	let h = 0x811c9dc5;
-	for (let i = 0; i < text.length; i++) {
-		h ^= text.charCodeAt(i);
-		h = Math.imul(h, 0x01000193);
-	}
-	return (h >>> 0).toString(16).padStart(8, "0");
 }
 
 function macroName(element: MarkupElement): string | null {
@@ -91,7 +84,7 @@ export function segmentsOf(storage: string): PageSegment[] {
 			pending = "";
 			continue;
 		}
-		const markdown = storageToMarkdown(xml).trim();
+		const markdown = storageToMarkdown(xml, { atoms: true }).trim();
 		if (markdown === "") {
 			pending += xml;
 			continue;
@@ -129,7 +122,23 @@ export function importPage(storage: string): ImportedPage {
 }
 
 function lossesOf(segments: readonly PageSegment[]): string[] {
-	return [...new Set(segments.flatMap((segment) => storageLosses(segment.xml)))];
+	return [...new Set(segments.flatMap((segment) => storageLosses(segment.xml, { atoms: true })))];
+}
+
+/** The page's inline atoms (mentions, page links, dates, inline macros) by their kept link. */
+export function atomsOf(storage: string): Map<string, string> {
+	const atoms = new Map<string, string>();
+	const visit = (node: MarkupNode): void => {
+		if (node.kind === "text") return;
+		if (node.name !== "#root" && atomKind(node) !== null) {
+			const xml = storage.slice(node.start, node.end);
+			atoms.set(ATOM_PREFIX + hash(xml), xml);
+			return;
+		}
+		for (const child of node.children) visit(child);
+	};
+	visit(parseMarkup(storage));
+	return atoms;
 }
 
 /** Top-level blocks as their Markdown source; Kalem's table style comments are not content. */
@@ -199,8 +208,9 @@ export function exportPage(markdown: string, base: string | null): ExportedPage 
 			? []
 			: blockTexts(segment.markdown).map((text) => ({ text, segment: index })),
 	);
+	const atoms = base === null ? new Map<string, string>() : atomsOf(base);
 	if (segments.length === 0 || original.length * current.length > MAX_PAIRS) {
-		return { storage: markdownToStorage(markdown), losses: lossesOf(segments) };
+		return { storage: markdownToStorage(markdown, atoms), losses: lossesOf(segments) };
 	}
 
 	// A part is kept when all its blocks are matched, in order, to consecutive blocks.
@@ -226,7 +236,7 @@ export function exportPage(markdown: string, base: string | null): ExportedPage 
 	const used = new Set<number>();
 	let run: string[] = [];
 	const flush = (): void => {
-		if (run.length > 0) pieces.push(markdownToStorage(run.join("\n\n")));
+		if (run.length > 0) pieces.push(markdownToStorage(run.join("\n\n"), atoms));
 		run = [];
 	};
 	for (let j = 0; j < current.length; j++) {
