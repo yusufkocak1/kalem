@@ -370,3 +370,42 @@ test("keeps mentions and inline macros in a paragraph that is edited", async () 
 	expect(errors).toEqual([]);
 	await app.close();
 });
+
+test("edits a column of a page layout and keeps the layout", async () => {
+	const confluence = await fakeConfluence();
+	cleanup.push(confluence.close);
+	const layout =
+		'<ac:layout><ac:layout-section ac:type="two_equal"><ac:layout-cell><p>Sol sütun</p></ac:layout-cell><ac:layout-cell><p>Hedef</p></ac:layout-cell></ac:layout-section></ac:layout>';
+	confluence.page.storage = `<h1>Sprint Planı</h1>${layout}`;
+	const { app, page, errors } = await launch();
+
+	await clickMenu(app, "File", "Open from Confluence…");
+	const dialog = page.locator(".confluence-dialog");
+	await dialog.locator('input[type="url"]').fill(confluence.site);
+	await dialog.locator('input[type="password"]').fill(TOKEN);
+	await dialog.getByRole("button", { name: "Connect" }).click();
+	await dialog.locator(".quick-open-item", { hasText: "Sprint Planı" }).click();
+	await expect(dialog).not.toBeVisible();
+
+	const markers = page.locator('#editor pre[data-confluence-kind="layout"]');
+	await expect(markers).toHaveCount(3);
+	await expect(markers.nth(1)).toHaveAttribute(
+		"data-confluence-locked",
+		"▥ Section 1 · column 2 of 2",
+	);
+	await expect(markers.nth(2)).toHaveAttribute("data-confluence-locked", "▥ End of columns");
+	// A layout is no longer something saving would lose.
+	await expect(page.locator(".notice")).toHaveCount(0);
+
+	await page.locator("#editor p", { hasText: "Hedef" }).click();
+	await page.keyboard.press("End");
+	await page.keyboard.type(" eklendi");
+	await page.locator('[data-command="save"]').click();
+	await expect(page.locator(".save-status")).toHaveText("Saved");
+
+	expect(confluence.saves[0]?.storage).toBe(
+		`<h1>Sprint Planı</h1>${layout.replace("<p>Hedef</p>", "<p>Hedef eklendi</p>")}`,
+	);
+	expect(errors).toEqual([]);
+	await app.close();
+});

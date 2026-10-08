@@ -300,6 +300,10 @@ const en = {
 	confluenceLossNotice:
 		"Parts of this page have content with no Markdown equivalent ({0}). Parts you do not edit are saved back as they are; editing one of those parts removes that content from it.",
 	confluenceLocked: "🔒 {0} — edit it in Confluence",
+	confluenceLayoutColumn: "▥ Section {0} · column {1} of {2}",
+	confluenceLayoutEnd: "▥ End of columns",
+	confluenceLayoutHint:
+		"Where a column of the Confluence page layout starts. What follows, up to the next marker, is in this column.",
 	confluenceAtomHint:
 		"Kept from Confluence (mention, page link, date or macro). It is saved back as it was; change it in Confluence.",
 	confluenceLockedHint:
@@ -640,6 +644,10 @@ const tr: Strings = {
 	confluenceLossNotice:
 		"Sayfanın bazı bölümlerinde Markdown karşılığı olmayan içerik var ({0}). Düzenlemediğiniz bölümler olduğu gibi kaydedilir; bu bölümlerden birini düzenlerseniz o içerik oradan kalkar.",
 	confluenceLocked: "🔒 {0} — Confluence'ta düzenlenir",
+	confluenceLayoutColumn: "▥ Bölüm {0} · sütun {1}/{2}",
+	confluenceLayoutEnd: "▥ Sütunların sonu",
+	confluenceLayoutHint:
+		"Confluence sayfa düzeninde bir sütunun başladığı yer. Bir sonraki işarete kadar olan içerik bu sütundadır.",
 	confluenceAtomHint:
 		"Confluence'tan korunuyor (bahsetme, sayfa bağlantısı, tarih ya da makro). Olduğu gibi geri kaydedilir; Confluence'ta değiştirin.",
 	confluenceLockedHint:

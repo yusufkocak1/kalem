@@ -1733,3 +1733,20 @@ pre[data-confluence-locked]::before {
 	content: "🔒 ";
 	font-size: 0.75em;
 }
+
+/* Layout column markers: a divider with a label, quieter than a macro box. */
+pre[data-confluence-kind="layout"] {
+	min-height: 1.6em;
+	margin-top: 1.4em;
+	border: 0;
+	border-top: 1px dashed var(--app-border);
+	border-radius: 0;
+	background: none;
+}
+
+pre[data-confluence-kind="layout"]::before {
+	padding: 0;
+	align-items: flex-end;
+	font-size: 11px;
+	letter-spacing: 0.02em;
+}
