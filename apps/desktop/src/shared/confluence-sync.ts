@@ -14,12 +14,17 @@
  * the editor shows as a box. The box can be moved or deleted; its XML is
  * written back wherever it ends up.
  *
+ * A multi-column layout (`ac:layout`) is flattened: each column starts with
+ * a locked marker and the layout ends with one. Everything between markers
+ * is edited like the rest of the page; on save the markers become the
+ * layout's sections and cells again, with their original tags.
+ *
  * Everything here works from the storage the tab's text was made from (the
  * page as opened, or as last saved), so it needs no state beyond that string.
  */
 import { parse } from "@kalem-editor/core";
 import type { MarkupElement, MarkupNode } from "./confluence-markup.js";
-import { parseMarkup } from "./confluence-markup.js";
+import { childElements, parseMarkup } from "./confluence-markup.js";
 import {
 	ATOM_PREFIX,
 	atomKind,
@@ -36,6 +41,43 @@ export interface PageSegment {
 	readonly markdown: string;
 	/** A placeholder whose XML is kept as is wherever the placeholder goes. */
 	readonly locked: boolean;
+	/** A layout marker: where a column starts, or where the layout ends. */
+	readonly layout?: LayoutMark;
+}
+
+/** The tags around one column of a layout, as they were in the source. */
+interface LayoutMark {
+	readonly end: boolean;
+	/** Which layout of the page; markers of one layout share it. */
+	readonly key: string;
+	readonly section: number;
+	readonly layoutOpen: string;
+	readonly layoutClose: string;
+	readonly sectionOpen: string;
+	readonly sectionClose: string;
+	readonly cellOpen: string;
+	readonly cellClose: string;
+}
+
+const LAYOUT = /^<!-- confluence:layout ([0-9a-f]{8}) s(\d+) c(\d+)\/(\d+) ([\w-]*) -->$/;
+const LAYOUT_END = /^<!-- confluence:layout-end ([0-9a-f]{8}) -->$/;
+
+export type LayoutLabel =
+	| { readonly end: false; readonly section: number; readonly cell: number; readonly cells: number }
+	| { readonly end: true };
+
+/** What a layout marker stands for; `null` for any other text. */
+export function layoutLabel(text: string): LayoutLabel | null {
+	const trimmed = text.trim();
+	if (LAYOUT_END.test(trimmed)) return { end: true };
+	const match = LAYOUT.exec(trimmed);
+	if (match === null) return null;
+	return {
+		end: false,
+		section: Number(match[2]),
+		cell: Number(match[3]),
+		cells: Number(match[4]),
+	};
 }
 
 const KEEP = /^<!-- confluence:keep ([0-9a-f]{8}) ([^\n]*?) -->$/;
@@ -51,32 +93,71 @@ function macroName(element: MarkupElement): string | null {
 	return (element.attrs.get("ac:name") ?? "").toLowerCase();
 }
 
-/** The page's top-level parts, in order; parts that read as nothing join the next one. */
-export function segmentsOf(storage: string): PageSegment[] {
-	const root = parseMarkup(storage);
-	const raw: { xml: string; element: MarkupElement | null }[] = [];
-	let at = 0;
-	for (const child of root.children) {
+interface Part {
+	xml: string;
+	readonly element: MarkupElement | null;
+}
+
+/** The parts of `nodes` in `[from, to)`: elements, and text between them that is not blank. */
+function partsOf(storage: string, nodes: readonly MarkupNode[], from: number, to: number): Part[] {
+	const parts: Part[] = [];
+	let at = from;
+	for (const child of nodes) {
 		if (child.kind !== "element") continue;
 		// Blank space between parts goes with the next one: an untouched page is written back as it was.
 		const gap = storage.slice(at, child.start);
 		const blank = gap.trim() === "";
-		if (!blank) raw.push({ xml: gap, element: null });
-		raw.push({ xml: (blank ? gap : "") + storage.slice(child.start, child.end), element: child });
+		if (!blank) parts.push({ xml: gap, element: null });
+		parts.push({ xml: (blank ? gap : "") + storage.slice(child.start, child.end), element: child });
 		at = child.end;
 	}
-	const tail = storage.slice(at);
-	const last = raw[raw.length - 1];
-	if (tail.trim() !== "") raw.push({ xml: tail, element: null });
+	const tail = storage.slice(at, to);
+	const last = parts[parts.length - 1];
+	if (tail.trim() !== "") parts.push({ xml: tail, element: null });
 	else if (last !== undefined) last.xml += tail;
+	return parts;
+}
 
-	const segments: PageSegment[] = [];
+/** Where the element's opening tag ends. */
+function openEnd(storage: string, element: MarkupElement): number {
+	const end = storage.indexOf(">", element.start);
+	return end === -1 || end >= element.end ? element.end : end + 1;
+}
+
+/** Where the element's content ends: before its closing tag, when it has one. */
+function innerEnd(storage: string, element: MarkupElement): number {
+	const close = `</${element.name}>`;
+	const at = element.end - close.length;
+	// kalem-locale-ok: tag names are ASCII
+	return at >= openEnd(storage, element) && storage.slice(at, element.end).toLowerCase() === close
+		? at
+		: element.end;
+}
+
+interface Collecting {
+	readonly storage: string;
+	readonly out: PageSegment[];
+	layouts: number;
+}
+
+/**
+ * Turns parts into segments; a part that reads as nothing joins the next one.
+ * Returns what is left over at the end (nothing to join).
+ */
+function collect(parts: readonly Part[], state: Collecting): string {
+	const { out } = state;
 	let pending = "";
-	for (const { xml, element } of raw) {
+	for (const { xml, element } of parts) {
+		if (element?.name === "ac:layout" && childElements(element, "ac:layout-section").length > 0) {
+			const prefix = pending + xml.slice(0, xml.length - (element.end - element.start));
+			pending = "";
+			layout(element, prefix, state);
+			continue;
+		}
 		const name = element === null ? null : macroName(element);
 		if (name !== null && name !== "" && !KEPT_MACROS.has(name)) {
 			const full = pending + xml;
-			segments.push({
+			out.push({
 				xml: full,
 				markdown: `<!-- confluence:keep ${hash(full)} ${name.replace(/-->|\s+/g, " ").trim()} -->`,
 				locked: true,
@@ -89,16 +170,86 @@ export function segmentsOf(storage: string): PageSegment[] {
 			pending += xml;
 			continue;
 		}
-		segments.push({ xml: pending + xml, markdown, locked: false });
+		out.push({ xml: pending + xml, markdown, locked: false });
 		pending = "";
 	}
-	if (pending !== "") {
+	return pending;
+}
+
+/** A layout as a marker before each column and one after the last; the columns' content in between. */
+function layout(element: MarkupElement, prefix: string, state: Collecting): void {
+	const { storage, out } = state;
+	const key = hash(`${state.layouts++}:${storage.slice(element.start, element.end)}`);
+	const layoutOpen = prefix + storage.slice(element.start, openEnd(storage, element));
+	const marks: { -readonly [K in keyof LayoutMark]: LayoutMark[K] }[] = [];
+	let previous = openEnd(storage, element);
+	for (const [s, section] of childElements(element, "ac:layout-section").entries()) {
+		const sectionOpen = storage.slice(previous, openEnd(storage, section));
+		const cells = childElements(section, "ac:layout-cell");
+		const type = (section.attrs.get("ac:type") ?? "").replace(/[^\w-]/g, "");
+		const first = marks.length;
+		let cellStart = openEnd(storage, section);
+		for (const [c, cell] of cells.entries()) {
+			const mark = {
+				end: false,
+				key,
+				section: s,
+				layoutOpen,
+				layoutClose: "",
+				sectionOpen,
+				sectionClose: "",
+				cellOpen: storage.slice(cellStart, openEnd(storage, cell)),
+				cellClose: "",
+			};
+			marks.push(mark);
+			out.push({
+				xml: "",
+				markdown: `<!-- confluence:layout ${key} s${s + 1} c${c + 1}/${cells.length} ${type} -->`,
+				locked: true,
+				layout: mark,
+			});
+			const inner = innerEnd(storage, cell);
+			const left = collect(partsOf(storage, cell.children, openEnd(storage, cell), inner), state);
+			mark.cellClose = left + storage.slice(inner, cell.end);
+			cellStart = cell.end;
+		}
+		const sectionClose = storage.slice(cellStart, section.end);
+		for (const mark of marks.slice(first)) mark.sectionClose = sectionClose;
+		previous = section.end;
+	}
+	const layoutClose = storage.slice(previous, element.end);
+	for (const mark of marks) mark.layoutClose = layoutClose;
+	const ending = {
+		...(marks[0] as LayoutMark),
+		end: true,
+	};
+	out.push({
+		xml: "",
+		markdown: `<!-- confluence:layout-end ${key} -->`,
+		locked: true,
+		layout: ending,
+	});
+}
+
+/** The page's parts, in order; parts that read as nothing join the next one. */
+export function segmentsOf(storage: string): PageSegment[] {
+	const root = parseMarkup(storage);
+	const segments: PageSegment[] = [];
+	const left = collect(partsOf(storage, root.children, 0, storage.length), {
+		storage,
+		out: segments,
+		layouts: 0,
+	});
+	if (left !== "") {
 		const last = segments.pop();
 		segments.push(
 			last === undefined
-				? { xml: pending, markdown: "", locked: false }
-				: { ...last, xml: last.xml + pending },
+				? { xml: left, markdown: "", locked: false }
+				: last.layout === undefined
+					? { ...last, xml: last.xml + left }
+					: last,
 		);
+		if (last?.layout !== undefined) segments.push({ xml: left, markdown: "", locked: false });
 	}
 	return segments.filter((segment) => segment.markdown !== "" || segment.xml.trim() !== "");
 }
@@ -228,8 +379,10 @@ export function exportPage(markdown: string, base: string | null): ExportedPage 
 		if (blocks.every((block, k) => matched.get(block) === first + k)) keptAt.set(first, index);
 	}
 	const locked = new Map<string, string>();
+	const marks = new Map<string, LayoutMark>();
 	for (const segment of segments) {
-		if (segment.locked) locked.set(segment.markdown, segment.xml);
+		if (segment.layout !== undefined) marks.set(segment.markdown, segment.layout);
+		else if (segment.locked) locked.set(segment.markdown, segment.xml);
 	}
 
 	const pieces: string[] = [];
@@ -239,8 +392,34 @@ export function exportPage(markdown: string, base: string | null): ExportedPage 
 		if (run.length > 0) pieces.push(markdownToStorage(run.join("\n\n"), atoms));
 		run = [];
 	};
+	// The layout, section and column the text is in now, by the marker that opened them.
+	let open: LayoutMark | null = null;
+	const close = (): void => {
+		if (open === null) return;
+		pieces.push(open.cellClose, open.sectionClose, open.layoutClose);
+		open = null;
+	};
 	for (let j = 0; j < current.length; j++) {
 		const text = current[j] as string;
+		const mark = marks.get(text);
+		if (mark !== undefined) {
+			flush();
+			const was: LayoutMark | null = open;
+			if (mark.end) {
+				if (was?.key === mark.key) close();
+				continue;
+			}
+			if (was !== null && was.key === mark.key && was.section === mark.section) {
+				pieces.push(was.cellClose, mark.cellOpen);
+			} else if (was !== null && was.key === mark.key) {
+				pieces.push(was.cellClose, was.sectionClose, mark.sectionOpen, mark.cellOpen);
+			} else {
+				close();
+				pieces.push(mark.layoutOpen, mark.sectionOpen, mark.cellOpen);
+			}
+			open = mark;
+			continue;
+		}
 		const kept = keptAt.get(j);
 		if (kept !== undefined) {
 			flush();
@@ -259,6 +438,7 @@ export function exportPage(markdown: string, base: string | null): ExportedPage 
 		run.push(text);
 	}
 	flush();
+	close();
 
 	// Locked parts are written back or were deleted on purpose; neither loses anything.
 	const rewritten = segments.filter((segment, index) => !segment.locked && !used.has(index));

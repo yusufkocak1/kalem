@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { markdownToStorage, storageToMarkdown } from "./confluence-storage.js";
-import { exportPage, importPage, lockedLabel, segmentsOf } from "./confluence-sync.js";
+import { exportPage, importPage, layoutLabel, lockedLabel, segmentsOf } from "./confluence-sync.js";
 
 const TABLE =
 	'<table class="wrapped"><colgroup><col style="width: 140px;" /><col style="width: 300px;" /></colgroup><tbody><tr><th>Ad</th><th>Not</th></tr><tr><td colspan="2" style="background-color: #fffae6;"><p>birleşik</p></td></tr></tbody></table>';
@@ -168,5 +168,79 @@ describe("inline atoms", () => {
 		expect(storageToMarkdown(ATOMS)).not.toContain("confluence-keep");
 		// A link to an atom the page does not have is its text.
 		expect(markdownToStorage("[x](#confluence-keep-00000000)\n")).toBe("<p>x</p>");
+	});
+});
+
+describe("layouts", () => {
+	const LAYOUT =
+		'<ac:layout><ac:layout-section ac:type="two_equal"><ac:layout-cell><p>Sol</p></ac:layout-cell><ac:layout-cell><p>Sağ</p><ac:structured-macro ac:name="jira"><ac:parameter ac:name="key">A-1</ac:parameter></ac:structured-macro></ac:layout-cell></ac:layout-section><ac:layout-section ac:type="single"><ac:layout-cell><p>Alt</p></ac:layout-cell></ac:layout-section></ac:layout><p>Dışarı</p>';
+	const blocks = (markdown: string) => markdown.trim().split("\n\n");
+
+	it("shows each column after a marker and the layout's end", () => {
+		const { markdown, losses } = importPage(LAYOUT);
+		const parts = blocks(markdown);
+		expect(parts.map((part) => layoutLabel(part))).toEqual([
+			{ end: false, section: 1, cell: 1, cells: 2 },
+			null,
+			{ end: false, section: 1, cell: 2, cells: 2 },
+			null,
+			null,
+			{ end: false, section: 2, cell: 1, cells: 1 },
+			null,
+			{ end: true },
+			null,
+		]);
+		expect(parts[1]).toBe("Sol");
+		expect(lockedLabel(parts[4] as string)).toBe("jira");
+		expect(losses).toEqual([]);
+	});
+
+	it("writes an untouched layout back as it was", () => {
+		const { markdown } = importPage(LAYOUT);
+		expect(exportPage(markdown, LAYOUT)).toEqual({ storage: LAYOUT, losses: [] });
+	});
+
+	it("keeps formatting whitespace between the layout's tags", () => {
+		const page = `<ac:layout>\n  <ac:layout-section ac:type="single">\n    <ac:layout-cell>\n      <p>a</p>\n    </ac:layout-cell>\n  </ac:layout-section>\n</ac:layout>\n<p>b</p>`;
+		const { markdown } = importPage(page);
+		expect(exportPage(markdown, page).storage).toBe(page);
+		expect(exportPage(markdown.replace("\n\nb", "\n\nb!"), page).storage).toBe(
+			page.replace("\n<p>b</p>", "<p>b!</p>"),
+		);
+	});
+
+	it("rewrites only the edited paragraph inside a column", () => {
+		const { markdown } = importPage(LAYOUT);
+		const { storage, losses } = exportPage(markdown.replace("Sağ", "Sağ sütun"), LAYOUT);
+		expect(storage).toBe(LAYOUT.replace("<p>Sağ</p>", "<p>Sağ sütun</p>"));
+		expect(losses).toEqual([]);
+	});
+
+	it("puts added blocks in the column they are typed in", () => {
+		const { markdown } = importPage(LAYOUT);
+		const { storage } = exportPage(markdown.replace("Sol", "Sol\n\n- yeni"), LAYOUT);
+		expect(storage).toContain("<ac:layout-cell><p>Sol</p><ul><li>yeni</li></ul></ac:layout-cell>");
+	});
+
+	it("moves a block to another column across the marker", () => {
+		const { markdown } = importPage(LAYOUT);
+		const parts = blocks(markdown);
+		// "Alt" moves from the second section to the end of the left column.
+		const moved = [parts[0], parts[1], "Alt", ...parts.slice(2, 6), ...parts.slice(7)].join("\n\n");
+		const { storage } = exportPage(moved, LAYOUT);
+		expect(storage).toContain("<ac:layout-cell><p>Sol</p><p>Alt</p></ac:layout-cell>");
+		expect(storage).toContain(
+			'<ac:layout-section ac:type="single"><ac:layout-cell></ac:layout-cell></ac:layout-section>',
+		);
+	});
+
+	it("still closes the layout when its end marker was deleted", () => {
+		const { markdown } = importPage(LAYOUT);
+		const parts = blocks(markdown).filter((part) => layoutLabel(part)?.end !== true);
+		const { storage } = exportPage(parts.join("\n\n"), LAYOUT);
+		// What followed the layout is now in its last column, and the tags still pair up.
+		expect(
+			storage.endsWith("<p>Alt</p><p>Dışarı</p></ac:layout-cell></ac:layout-section></ac:layout>"),
+		).toBe(true);
 	});
 });
