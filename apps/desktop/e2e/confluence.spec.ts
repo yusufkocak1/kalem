@@ -5,7 +5,7 @@ import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { PNG_1X1 } from "../src/main/sample-docx.test-helper.js";
-import { clickMenu, launch } from "./launch.js";
+import { clickMenu, launch, recordMessageBoxes } from "./launch.js";
 
 const TOKEN = "pat-secret-123";
 
@@ -58,6 +58,15 @@ async function fakeConfluence() {
 			const id = String(43 + created.length);
 			created.push({ id, title: request.title, body: request });
 			return json(res, { id });
+		}
+		if (url.pathname === "/rest/api/content/41" && req.method === "GET") {
+			return json(res, {
+				title: "Ana Sayfa",
+				version: { number: 3 },
+				body: { storage: { value: "<p>Hoş geldiniz</p>" } },
+				space: { key: "DEV" },
+				_links: { webui: "/display/DEV/Ana" },
+			});
 		}
 		const made = created.find((item) => url.pathname === `/rest/api/content/${item.id}`);
 		if (made !== undefined && req.method === "GET") {
@@ -160,8 +169,18 @@ test("edits a Confluence page and saves it back as a new version", async () => {
 	await page.keyboard.press("End");
 	await page.keyboard.type(" eklendi");
 	await expect(page.locator(".save-status")).toHaveText("Unsaved");
+
+	// Every save asks first: saying no writes nothing.
+	let asked = await recordMessageBoxes(app, 1);
+	await page.locator('[data-command="save"]').click();
+	await expect.poll(asked).toEqual(["Update the page on Confluence?"]);
+	await expect(page.locator(".save-status")).toHaveText("Unsaved");
+	expect(confluence.saves).toHaveLength(0);
+
+	asked = await recordMessageBoxes(app, 0);
 	await page.locator('[data-command="save"]').click();
 	await expect(page.locator(".save-status")).toHaveText("Saved");
+	expect(await asked()).toEqual(["Update the page on Confluence?"]);
 	expect(confluence.saves).toHaveLength(1);
 	expect(confluence.saves[0]?.version).toBe(2);
 	expect(confluence.saves[0]?.storage).toContain("<p>Hedef eklendi</p>");
@@ -176,6 +195,8 @@ test("edits a Confluence page and saves it back as a new version", async () => {
 	expect(confluence.saves).toHaveLength(1);
 	await notice.getByRole("button", { name: "Overwrite" }).click();
 	await expect(page.locator(".save-status")).toHaveText("Saved");
+	// Overwriting was already a choice: no second question for it.
+	expect(await asked()).toHaveLength(2);
 	expect(confluence.saves[1]?.version).toBe(6);
 	expect(confluence.saves[1]?.storage).toContain("Hedef eklendi tekrar");
 
@@ -221,6 +242,17 @@ test("browses a space's page tree in the side pane and stars a page", async () =
 	await child.locator(".confluence-row-main").click();
 	await expect(page.locator("#editor h1").first()).toHaveText("Sprint Planı");
 	await expect(child).toHaveAttribute("aria-current", "page");
+
+	// Another page opens in a tab of its own; an open page is switched to, not opened twice.
+	const tabs = page.locator(".doc-tab");
+	await root.locator(".confluence-row-main").click();
+	await expect(tabs).toHaveCount(2);
+	await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
+	await expect(page.locator("#editor p").first()).toHaveText("Hoş geldiniz");
+	await child.locator(".confluence-row-main").click();
+	await expect(tabs.nth(0)).toHaveAttribute("aria-selected", "true");
+	await expect(tabs).toHaveCount(2);
+	await expect(page.locator("#editor h1").first()).toHaveText("Sprint Planı");
 
 	// Starring puts the page on top, in its own section.
 	await child.getByRole("button", { name: "Add to favorites" }).click();
@@ -323,10 +355,13 @@ test("saves an edit without rewriting the parts that were not edited", async () 
 	await page.locator("#editor p", { hasText: "Hedef" }).click();
 	await page.keyboard.press("End");
 	await page.keyboard.type(" eklendi");
+	const asked = await recordMessageBoxes(app, 0);
 	await page.locator('[data-command="save"]').click();
 	await expect(page.locator(".save-status")).toHaveText("Saved");
 
-	// No loss dialog: the edited paragraph lost nothing. The table and the macro went back byte for byte.
+	// Only the save question, no loss dialog: the edited paragraph lost nothing.
+	// The table and the macro went back byte for byte.
+	expect(await asked()).toEqual(["Update the page on Confluence?"]);
 	expect(confluence.saves).toHaveLength(1);
 	expect(confluence.saves[0]?.storage).toBe(
 		`<h1>Sprint Planı</h1>${table}${jira}<p>Hedef eklendi</p>`,
@@ -361,9 +396,11 @@ test("keeps mentions and inline macros in a paragraph that is edited", async () 
 	await page.locator("#editor p").first().click();
 	await page.keyboard.press("Home");
 	await page.keyboard.type("Yeni ");
+	const asked = await recordMessageBoxes(app, 0);
 	await page.locator('[data-command="save"]').click();
 	await expect(page.locator(".save-status")).toHaveText("Saved");
 
+	expect(await asked()).toEqual(["Update the page on Confluence?"]);
 	expect(confluence.saves[0]?.storage).toBe(
 		`<h1>Sprint Planı</h1><p>Yeni Sorumlu ${mention}, durum ${status}</p>`,
 	);
@@ -400,9 +437,11 @@ test("edits a column of a page layout and keeps the layout", async () => {
 	await page.locator("#editor p", { hasText: "Hedef" }).click();
 	await page.keyboard.press("End");
 	await page.keyboard.type(" eklendi");
+	const asked = await recordMessageBoxes(app, 0);
 	await page.locator('[data-command="save"]').click();
 	await expect(page.locator(".save-status")).toHaveText("Saved");
 
+	expect(await asked()).toEqual(["Update the page on Confluence?"]);
 	expect(confluence.saves[0]?.storage).toBe(
 		`<h1>Sprint Planı</h1>${layout.replace("<p>Hedef</p>", "<p>Hedef eklendi</p>")}`,
 	);

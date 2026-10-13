@@ -95,6 +95,22 @@ export async function stubMessageBox(app: ElectronApplication, response: number)
 	}, response);
 }
 
+/** Answers every message box with the given button index and returns the messages asked so far. */
+export async function recordMessageBoxes(
+	app: ElectronApplication,
+	response: number,
+): Promise<() => Promise<string[]>> {
+	await app.evaluate(({ dialog }, index) => {
+		const asked: string[] = [];
+		(globalThis as { messageBoxes?: string[] }).messageBoxes = asked;
+		dialog.showMessageBox = (async (...args: unknown[]) => {
+			asked.push((args.at(-1) as { message: string }).message);
+			return { response: index, checkboxChecked: false };
+		}) as typeof dialog.showMessageBox;
+	}, response);
+	return () => app.evaluate(() => (globalThis as { messageBoxes?: string[] }).messageBoxes ?? []);
+}
+
 /** Clicks an application menu item by its label path, e.g. `["File", "Save As…"]`. */
 export async function clickMenu(app: ElectronApplication, ...labels: string[]): Promise<void> {
 	await app.evaluate(({ Menu, BrowserWindow }, path) => {
