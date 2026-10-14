@@ -17,6 +17,7 @@ import {
 	definitionsOf,
 	fileUrl,
 	fromConfluenceLanguage,
+	linkedAttachment,
 	PANEL_ICONS,
 	panelKind,
 	quotePanel,
@@ -509,8 +510,8 @@ class StorageWriter {
 			// A kept atom goes back as it was; one this page never had is its text.
 			return this.#atoms.get(url) ?? this.inlines(children);
 		}
-		const file = attachmentName(url);
-		if (file !== null && /\.[a-z0-9]+$/i.test(file) && !/\.(md|markdown|html?)$/i.test(file)) {
+		const file = linkedAttachment(url);
+		if (file !== null) {
 			return `<ac:link><ri:attachment ri:filename="${escapeHtml(file)}" /><ac:link-body>${this.inlines(children)}</ac:link-body></ac:link>`;
 		}
 		const titleAttr = title === null ? "" : ` title="${escapeHtml(title)}"`;

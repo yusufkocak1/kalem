@@ -4,10 +4,12 @@ import type { Caret, EditResult } from "@kalem-editor/editor";
 import { indentItem, outdentItem, toggleList } from "@kalem-editor/editor";
 import type { Command, KalemBridge, Settings, SidePane, TabDocument } from "../shared/bridge.js";
 import { clampZoom, MAX_ZOOM, MIN_ZOOM, pageRule, ZOOM_STEP } from "../shared/bridge.js";
+import { linkedAttachment } from "../shared/confluence-common.js";
 import { format, stringsFor } from "../shared/i18n.js";
 import { isEditablePath, isWordPath } from "../shared/paths.js";
 import { withColumnWidth } from "../shared/table-style.js";
 import { changeCase, collapseSpaces, nextCase } from "../shared/text-case.js";
+import { createAttachmentCard } from "./attachment-card.js";
 import { createAttachmentsDialog, linkedAttachments } from "./confluence-attachments.js";
 import { createConfluenceDialog } from "./confluence-dialog.js";
 import { createConfluencePane } from "./confluence-pane.js";
@@ -628,27 +630,7 @@ const commands: Record<Command, () => void> = {
 			},
 		});
 	},
-	"confluence-attachments": () => {
-		const tab = session;
-		const page = tab.remote;
-		if (page === null) {
-			tab.notices.show({ id: "edit", kind: "warning", text: t.confluenceAttachmentsNeedPage });
-			return;
-		}
-		void attachmentsDialog.show({
-			title: page.title,
-			list: () => bridge.confluenceAttachments(tab.id),
-			upload: (paths) => bridge.confluenceUploadFiles(tab.id, paths),
-			open: (name) => bridge.confluenceOpenAttachment(tab.id, name),
-			download: (name) => bridge.confluenceDownloadAttachment(tab.id, name),
-			remove: (file, used) =>
-				bridge.confluenceDeleteAttachment(tab.id, { id: file.id, name: file.name, used }),
-			insert: (upload) => session === tab && tab.insertAttachment(upload),
-			linked: () => linkedAttachments(tab.editor.getDocument()),
-			// Relative to the document's base, which is this page's attachments.
-			preview: (name) => encodeURIComponent(name),
-		});
-	},
+	"confluence-attachments": () => showAttachments(),
 	"search-folder": () => {
 		if (!settings.navigation || settings.sidePane !== "files") {
 			updateSettings({ navigation: true, sidePane: "files" });
@@ -760,6 +742,73 @@ window.addEventListener("drop", (event) => event.preventDefault());
 
 // --- Links ------------------------------------------------------------------
 
+// --- Confluence attachments -------------------------------------------------
+
+/** The attachments dialog for the active Confluence page, optionally filtered to one name. */
+function showAttachments(filter = ""): void {
+	const tab = session;
+	const page = tab.remote;
+	if (page === null) {
+		tab.notices.show({ id: "edit", kind: "warning", text: t.confluenceAttachmentsNeedPage });
+		return;
+	}
+	void attachmentsDialog.show(
+		{
+			title: page.title,
+			list: () => bridge.confluenceAttachments(tab.id),
+			upload: (paths) => bridge.confluenceUploadFiles(tab.id, paths),
+			open: (name) => bridge.confluenceOpenAttachment(tab.id, name),
+			download: (name) => bridge.confluenceDownloadAttachment(tab.id, name),
+			remove: (file, used) =>
+				bridge.confluenceDeleteAttachment(tab.id, { id: file.id, name: file.name, used }),
+			insert: (upload) => session === tab && tab.insertAttachment(upload),
+			linked: () => linkedAttachments(tab.editor.getDocument()),
+			// Relative to the document's base, which is this page's attachments.
+			preview: (name) => encodeURIComponent(name),
+		},
+		filter,
+	);
+}
+
+/** Runs an attachment request for the active page; a failure becomes a notice. */
+function attachmentRequest(run: (tabId: string) => Promise<string | undefined>): void {
+	const tab = session;
+	run(tab.id).then(
+		(text) => {
+			if (text !== undefined) tab.notices.show({ id: "attach", text });
+		},
+		(error: unknown) =>
+			tab.notices.show({
+				id: "attach",
+				kind: "error",
+				text: format(t.confluenceRequestFailed, ipcErrorMessage(error)),
+			}),
+	);
+}
+
+const openAttachment = (name: string): void =>
+	attachmentRequest(async (tabId) => {
+		await bridge.confluenceOpenAttachment(tabId, name);
+		return undefined;
+	});
+
+/** A link in a Confluence page to one of its attachments. */
+const attachmentOf = (link: HTMLAnchorElement): string | null =>
+	session.remote === null ? null : linkedAttachment(link.getAttribute("href") ?? "");
+
+createAttachmentCard({
+	t,
+	host: deskArea,
+	attachmentOf,
+	open: openAttachment,
+	download: (name) =>
+		attachmentRequest(async (tabId) => {
+			const path = await bridge.confluenceDownloadAttachment(tabId, name);
+			return path === null ? undefined : format(t.confluenceAttachmentSaved, path);
+		}),
+	manage: (name) => showAttachments(name),
+});
+
 // Ctrl+click (or any click while read only) follows a link instead of editing it.
 deskArea.addEventListener(
 	"click",
@@ -769,6 +818,12 @@ deskArea.addEventListener(
 		if (!(event.ctrlKey || event.metaKey) && !session.editor.isReadOnly()) return;
 		event.preventDefault();
 		event.stopPropagation();
+		// A Confluence page's attachment opens in the system's app for it.
+		const attachment = attachmentOf(link);
+		if (attachment !== null) {
+			openAttachment(attachment);
+			return;
+		}
 		const href = link.getAttribute("href");
 		if (href !== null && href !== "") bridge.openLink(href);
 	},

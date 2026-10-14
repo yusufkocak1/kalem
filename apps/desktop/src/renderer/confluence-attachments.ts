@@ -50,7 +50,8 @@ const IMAGE = /^(png|jpe?g|gif|webp|avif|svg)$/;
 
 /** Lists, uploads, opens, downloads and deletes the files attached to a Confluence page. */
 export function createAttachmentsDialog(options: AttachmentsOptions): {
-	show(source: AttachmentSource): Promise<void>;
+	/** `filter` starts the list filtered, e.g. to the attachment a link points to. */
+	show(source: AttachmentSource, filter?: string): Promise<void>;
 } {
 	const { t } = options;
 	const dateFormat = new Intl.DateTimeFormat(options.lang, { dateStyle: "medium" });
@@ -277,10 +278,10 @@ export function createAttachmentsDialog(options: AttachmentsOptions): {
 	});
 
 	return {
-		async show(next) {
+		async show(next, initial = "") {
 			source = next;
 			files = [];
-			filter.value = "";
+			filter.value = initial;
 			title.textContent = format(t.confluenceAttachmentsTitle, next.title);
 			list.replaceChildren();
 			say(t.confluenceAttachmentsLoading);
