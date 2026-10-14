@@ -433,6 +433,14 @@ export function createAppRibbon(
 					items: [
 						command("image", t.image, "image", { showLabel: true }),
 						command("attach-file", t.attachFile, "attach", { showLabel: true }),
+						{
+							id: "confluence-attachments",
+							label: t.confluenceAttachments,
+							icon: "attachments",
+							showLabel: true,
+							run: ctx.commands["confluence-attachments"],
+							enabled: () => ctx.session().remote !== null,
+						},
 						tablePicker,
 						command("link", t.link, "link", { showLabel: true, shortcut: `${MOD}+K` }),
 					],

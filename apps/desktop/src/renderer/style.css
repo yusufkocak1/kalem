@@ -1367,6 +1367,187 @@ button {
 	}
 }
 
+/* --- Confluence attachments ------------------------------------------------ */
+
+.attachments {
+	display: none;
+	flex-direction: column;
+	gap: 10px;
+	box-sizing: border-box;
+	width: min(760px, calc(100vw - 48px));
+	height: min(600px, calc(100vh - 64px));
+	padding: 16px;
+	border: 1px solid var(--app-border);
+	border-radius: 10px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: var(--app-shadow);
+}
+
+.attachments[open] {
+	display: flex;
+}
+
+.attachments::backdrop {
+	background: rgb(0 0 0 / 18%);
+}
+
+.attachments.dropping {
+	outline: 2px dashed var(--app-accent);
+	outline-offset: -6px;
+}
+
+.attachments-title {
+	margin: 0;
+	overflow: hidden;
+	font-size: 15px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.attachments-toolbar {
+	display: flex;
+	gap: 8px;
+}
+
+.attachments-filter {
+	flex: 1;
+	min-width: 0;
+	padding: 6px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-page);
+	color: var(--app-text);
+	font: inherit;
+}
+
+.attachments-message {
+	margin: 0;
+	color: var(--app-muted);
+	overflow-wrap: anywhere;
+}
+
+.attachments-message[hidden] {
+	display: none;
+}
+
+.attachments-list {
+	flex: 1;
+	min-height: 0;
+	margin: 0;
+	padding: 0;
+	overflow-y: auto;
+	list-style: none;
+}
+
+.attachments[aria-busy="true"] .attachments-list {
+	opacity: 0.6;
+}
+
+.attachments-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 6px 8px;
+	border-radius: 6px;
+}
+
+.attachments-item:hover,
+.attachments-item:focus-within {
+	background: var(--app-hover);
+}
+
+.attachments-thumb {
+	display: flex;
+	flex: none;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	width: 40px;
+	height: 40px;
+	overflow: hidden;
+	border: 1px solid var(--app-border);
+	border-radius: 4px;
+	background: var(--app-page);
+	color: var(--app-muted);
+}
+
+.attachments-thumb img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.attachments-thumb .icon {
+	width: 18px;
+	height: 18px;
+}
+
+.attachments-ext {
+	font-size: 9px;
+	font-weight: 600;
+	text-transform: uppercase;
+}
+
+.attachments-text {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.attachments-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.attachments-meta {
+	color: var(--app-muted);
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+}
+
+.attachments-used {
+	margin-inline-start: 8px;
+	padding: 0 6px;
+	border-radius: 8px;
+	background: var(--app-pressed);
+	color: var(--app-accent);
+}
+
+.attachments-buttons {
+	display: flex;
+	flex: none;
+	gap: 4px;
+}
+
+.attachments-button {
+	padding: 4px 8px;
+	border: 1px solid transparent;
+	border-radius: 5px;
+	background: none;
+	color: var(--app-text);
+	font: inherit;
+	font-size: 12px;
+}
+
+.attachments-button:hover {
+	border-color: var(--app-border);
+	background: var(--app-raised);
+}
+
+.attachments-button:focus-visible,
+.attachments-filter:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -1px;
+}
+
+.attachments-actions {
+	display: flex;
+	justify-content: flex-end;
+}
+
 /* --- Version history ------------------------------------------------------- */
 
 .versions {

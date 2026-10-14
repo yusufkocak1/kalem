@@ -52,12 +52,23 @@ export function insertDivider(doc: Root, caret: Caret): EditResult {
 	return { doc: result.doc, caret: { blockIndex: result.index + 1, path: [], offset: 0 } };
 }
 
-/** Inserts a link at the caret; without a caret it goes into a new paragraph at the end. */
-export function insertLink(doc: Root, caret: Caret | null, text: string, url: string): EditResult {
+/**
+ * Inserts a link at the caret, or the image itself when `image` is set;
+ * without a caret it goes into a new paragraph at the end.
+ */
+export function insertLink(
+	doc: Root,
+	caret: Caret | null,
+	text: string,
+	url: string,
+	image = false,
+): EditResult {
 	const paragraph = {
 		type: "paragraph",
 		children: [
-			{ type: "link", url, title: null, children: [{ type: "text", value: text }] },
+			image
+				? { type: "image", url, alt: text, title: null }
+				: { type: "link", url, title: null, children: [{ type: "text", value: text }] },
 			// Keeps consecutive links, and the text typed next, apart.
 			{ type: "text", value: " " },
 		],

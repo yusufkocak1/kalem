@@ -129,6 +129,7 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 			click: (_item, window) => void windows.showWordDialog(targetOf(ctx, window)),
 		},
 		{ label: t.confluenceOpen, click: send(ctx, "confluence-open") },
+		{ label: t.confluenceAttachmentsMenu, click: send(ctx, "confluence-attachments") },
 		{
 			label: t.importConfluence,
 			click: (_item, window) => void windows.showConfluenceDialog(targetOf(ctx, window)),

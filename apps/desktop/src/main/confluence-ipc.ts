@@ -1,20 +1,32 @@
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { basename, join } from "node:path";
 import type { IpcMainInvokeEvent } from "electron";
-import { dialog, ipcMain, net } from "electron";
+import { app, dialog, ipcMain, net, shell } from "electron";
 import type {
 	ConfluenceAccount,
 	ConfluenceSaveResult,
+	ConfluenceUpload,
 	ImageFile,
 	RemotePage,
 } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
+import { fileUrl } from "../shared/confluence-common.js";
 import type { Strings } from "../shared/i18n.js";
 import { format, lossLabel } from "../shared/i18n.js";
 import { IMAGE_EXTENSIONS } from "../shared/images.js";
+import {
+	freeName,
+	isRunnable,
+	localFileName,
+	MAX_UPLOAD_MB,
+	mediaTypeOf,
+} from "./confluence-attachments.js";
 import type { ConfluenceCredentials } from "./confluence-client.js";
 import { ConfluenceClient, ConfluenceError } from "./confluence-client.js";
 import type { ConfluenceStore } from "./confluence-store.js";
 import type { DraftStore } from "./drafts.js";
 import type { AppWindow, DocumentTab, WindowManager } from "./windows.js";
+import { errorMessage } from "./windows.js";
 
 export interface ConfluenceIpcContext {
 	readonly windows: WindowManager;
@@ -217,4 +229,132 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 		await client.attach(page.id, name, image.type, image.bytes);
 		return name;
 	});
+	// --- Attachments ----------------------------------------------------------
+
+	ipcMain.handle(CHANNEL.confluenceAttachments, async (event, tabId: unknown) => {
+		const { client, page } = await remoteOf(senderOf(event), tabId);
+		return client.attachments(page.id);
+	});
+
+	/**
+	 * Uploads files to the tab's page; without paths the user picks them. A
+	 * name the page already has is a new version of that attachment or a
+	 * second file under a free name, as the user chooses. One bad file does
+	 * not stop the rest.
+	 */
+	ipcMain.handle(
+		CHANNEL.confluenceUploadFiles,
+		async (event, tabId: unknown, raw: unknown): Promise<ConfluenceUpload[]> => {
+			const win = senderOf(event);
+			const { client, page } = await remoteOf(win, tabId);
+			const t = ctx.strings();
+			const paths = Array.isArray(raw)
+				? raw.filter((path): path is string => typeof path === "string")
+				: await windows.showDialog(win, {
+						defaultPath: windows.defaultFolder(win),
+						properties: ["openFile", "multiSelections"],
+						filters: [{ name: t.allFiles, extensions: ["*"] }],
+					});
+			if (paths.length === 0) return [];
+
+			const taken = new Set((await client.attachments(page.id)).map((file) => file.name));
+			const uploads: ConfluenceUpload[] = [];
+			for (const path of paths) {
+				let name = basename(path);
+				if (taken.has(name)) {
+					const { response } = await dialog.showMessageBox(win.window, {
+						type: "question",
+						message: format(t.confluenceAttachmentExists, name),
+						detail: t.confluenceAttachmentExistsDetail,
+						buttons: [t.confluenceUploadNewVersion, t.confluenceKeepBoth, t.skip],
+						defaultId: 0,
+						cancelId: 2,
+					});
+					if (response === 2) continue;
+					if (response === 1) name = freeName(name, taken);
+				}
+				try {
+					if ((await stat(path)).size > MAX_UPLOAD_MB * 1024 * 1024) {
+						throw new Error(format(t.confluenceAttachmentTooLarge, MAX_UPLOAD_MB));
+					}
+					const type = mediaTypeOf(name);
+					await client.attach(page.id, name, type, await readFile(path));
+					taken.add(name);
+					uploads.push({ name, url: fileUrl(name), image: type.startsWith("image/") });
+				} catch (error) {
+					await dialog.showMessageBox(win.window, {
+						type: "error",
+						message: t.confluenceUploadFailed,
+						detail: `${path}\n\n${errorMessage(error)}`,
+					});
+				}
+			}
+			return uploads;
+		},
+	);
+
+	const download = async (client: ConfluenceClient, page: RemotePage, name: string) => {
+		const response = await client.attachment(page.id, name);
+		if (response === null) throw new Error(ctx.strings().confluenceAttachmentMissing);
+		return new Uint8Array(await response.arrayBuffer());
+	};
+
+	/** Opens a copy in the app the system uses for that kind of file. */
+	ipcMain.handle(CHANNEL.confluenceOpenAttachment, async (event, tabId: unknown, raw: unknown) => {
+		const { client, page } = await remoteOf(senderOf(event), tabId);
+		const name = text(raw, "attachment name");
+		if (isRunnable(name)) throw new Error(ctx.strings().confluenceAttachmentRisky);
+		const folder = join(app.getPath("temp"), "kalem-confluence", page.id);
+		await mkdir(folder, { recursive: true });
+		const path = join(folder, localFileName(name));
+		await writeFile(path, await download(client, page, name));
+		const failure = await shell.openPath(path);
+		if (failure !== "") throw new Error(failure);
+	});
+
+	/** Resolves with the path it was saved to, `null` when the user cancelled. */
+	ipcMain.handle(
+		CHANNEL.confluenceDownloadAttachment,
+		async (event, tabId: unknown, raw: unknown): Promise<string | null> => {
+			const win = senderOf(event);
+			const { client, page } = await remoteOf(win, tabId);
+			const name = text(raw, "attachment name");
+			const result = await dialog.showSaveDialog(win.window, {
+				defaultPath: join(app.getPath("downloads"), localFileName(name)),
+			});
+			if (result.canceled || result.filePath === "") return null;
+			await writeFile(result.filePath, await download(client, page, name));
+			return result.filePath;
+		},
+	);
+
+	/** Asks first; resolves with whether the attachment was deleted. */
+	ipcMain.handle(
+		CHANNEL.confluenceDeleteAttachment,
+		async (event, tabId: unknown, raw: unknown): Promise<boolean> => {
+			const win = senderOf(event);
+			const { client } = await remoteOf(win, tabId);
+			const request = (typeof raw === "object" && raw !== null ? raw : {}) as Record<
+				string,
+				unknown
+			>;
+			const id = text(request.id, "attachment id");
+			const name = text(request.name, "attachment name");
+			const t = ctx.strings();
+			const { response } = await dialog.showMessageBox(win.window, {
+				type: "warning",
+				message: format(t.confluenceDeleteConfirm, name),
+				detail:
+					request.used === true
+						? `${t.confluenceDeleteUsed}\n\n${t.confluenceDeleteDetail}`
+						: t.confluenceDeleteDetail,
+				buttons: [t.confluenceAttachmentDelete, t.cancel],
+				defaultId: 1,
+				cancelId: 1,
+			});
+			if (response !== 0) return false;
+			await client.deleteAttachment(id);
+			return true;
+		},
+	);
 }

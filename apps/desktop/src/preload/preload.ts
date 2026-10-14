@@ -38,6 +38,15 @@ const bridge: KalemBridge = {
 		ipcRenderer.invoke(CHANNEL.confluenceSavePage, tabId, request),
 	confluenceAttachImage: (tabId, image) =>
 		ipcRenderer.invoke(CHANNEL.confluenceAttachImage, tabId, image),
+	confluenceAttachments: (tabId) => ipcRenderer.invoke(CHANNEL.confluenceAttachments, tabId),
+	confluenceUploadFiles: (tabId, paths) =>
+		ipcRenderer.invoke(CHANNEL.confluenceUploadFiles, tabId, paths),
+	confluenceOpenAttachment: (tabId, name) =>
+		ipcRenderer.invoke(CHANNEL.confluenceOpenAttachment, tabId, name),
+	confluenceDownloadAttachment: (tabId, name) =>
+		ipcRenderer.invoke(CHANNEL.confluenceDownloadAttachment, tabId, name),
+	confluenceDeleteAttachment: (tabId, attachment) =>
+		ipcRenderer.invoke(CHANNEL.confluenceDeleteAttachment, tabId, attachment),
 	chooseSavePath: (tabId, suggestedName, kind) =>
 		ipcRenderer.invoke(CHANNEL.chooseSavePath, tabId, suggestedName, kind),
 	writeDocument: (tabId, path, text, format) =>
