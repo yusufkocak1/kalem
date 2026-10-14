@@ -143,3 +143,15 @@ export function attachmentName(url: string): string | null {
 	} catch {}
 	return decoded.split("/").pop() || null;
 }
+
+/**
+ * The attachment a link points to: a relative file with an extension.
+ * Relative Markdown and HTML files are pages, not attachments.
+ */
+export function linkedAttachment(url: string): string | null {
+	const file = attachmentName(url);
+	if (file === null || !/\.[a-z0-9]+$/i.test(file) || /\.(md|markdown|html?)$/i.test(file)) {
+		return null;
+	}
+	return file;
+}

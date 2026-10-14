@@ -592,3 +592,64 @@ test("manages the attachments of a page", async () => {
 	expect(errors).toEqual([]);
 	await app.close();
 });
+
+test("opens an attachment from its link in the page", async () => {
+	const confluence = await fakeConfluence();
+	cleanup.push(confluence.close);
+	confluence.page.storage =
+		'<p>Loglar:</p><p><ac:link><ri:attachment ri:filename="Troya Logları.txt" /><ac:link-body>Troya Logları.txt</ac:link-body></ac:link></p>';
+	confluence.attachments.push({
+		id: "att2",
+		name: "Troya Logları.txt",
+		type: "text/plain",
+		version: 1,
+		bytes: Buffer.from("log satırı"),
+	});
+	const { app, page, errors } = await launch();
+	const folder = await tempDir("kalem-attachment-link-");
+
+	await clickMenu(app, "File", "Open from Confluence…");
+	const connect = page.locator(".confluence-dialog");
+	await connect.locator('input[type="url"]').fill(confluence.site);
+	await connect.locator('input[type="password"]').fill(TOKEN);
+	await connect.getByRole("button", { name: "Connect" }).click();
+	await connect.locator(".quick-open-item", { hasText: "Sprint Planı" }).click();
+	const link = page.locator("#editor a", { hasText: "Troya Logları.txt" });
+	await expect(link).toBeVisible();
+
+	// Hovering the link offers the attachment.
+	const card = page.locator(".attachment-card");
+	await link.hover();
+	await expect(card).toBeVisible();
+	await expect(card.locator(".attachment-card-name")).toHaveText("Troya Logları.txt");
+	const saved = join(folder, "log.txt");
+	await stubSaveDialog(app, saved);
+	await card.getByRole("button", { name: "Download…" }).click();
+	await expect(card).toBeHidden();
+	await expect(page.locator(".notice", { hasText: `Saved to ${saved}` })).toBeVisible();
+	expect(await readFile(saved, "utf8")).toBe("log satırı");
+
+	// Attachments… opens the dialog on that file.
+	await page.locator("#editor p", { hasText: "Loglar:" }).hover();
+	await expect(card).toBeHidden();
+	await link.hover();
+	await card.getByRole("button", { name: "Attachments…" }).click();
+	const dialog = page.locator(".attachments");
+	await expect(dialog.locator(".attachments-filter")).toHaveValue("Troya Logları.txt");
+	await expect(dialog.locator(".attachments-item")).toHaveCount(1);
+	await dialog.getByRole("button", { name: "Close" }).click();
+
+	// Ctrl+click opens it in the system's app.
+	await app.evaluate(({ shell }) => {
+		shell.openPath = async (path: string) => {
+			(globalThis as { opened?: string }).opened = path;
+			return "";
+		};
+	});
+	await link.click({ modifiers: ["Control"] });
+	const opened = () => app.evaluate(() => (globalThis as { opened?: string }).opened ?? "");
+	await expect.poll(opened).toMatch(/Troya Logları\.txt$/);
+	expect(await readFile(await opened(), "utf8")).toBe("log satırı");
+	expect(errors).toEqual([]);
+	await app.close();
+});
