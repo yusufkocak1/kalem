@@ -1,4 +1,5 @@
 import type {
+	ConfluenceAttachment,
 	ConfluencePageContent,
 	ConfluencePageSummary,
 	ConfluenceSpace,
@@ -366,6 +367,48 @@ export class ConfluenceClient {
 			method: "PUT",
 			headers: { "X-Atlassian-Token": "no-check" },
 			body: form,
+		});
+	}
+
+	/** The page's attachments, newest first as Confluence lists them. */
+	async attachments(pageId: string): Promise<ConfluenceAttachment[]> {
+		if (!/^\d+$/.test(pageId)) throw new Error("Invalid page id");
+		const files: ConfluenceAttachment[] = [];
+		let next: string | null = this.cloud
+			? `/api/v2/pages/${pageId}/attachments?limit=250`
+			: `/rest/api/content/${pageId}/child/attachment?limit=200&expand=version`;
+		for (let round = 0; next !== null && round < 10; round++) {
+			const body: Json = await this.#json(next);
+			for (const item of asArray(body.results)) {
+				const file = asJson(item);
+				const id = asString(file.id);
+				if (id === "") continue;
+				const version = asJson(file.version);
+				const extensions = asJson(file.extensions);
+				const size = this.cloud ? file.fileSize : extensions.fileSize;
+				const when = Date.parse(asString(this.cloud ? version.createdAt : version.when));
+				files.push({
+					id,
+					name: asString(file.title),
+					size: typeof size === "number" ? size : null,
+					mediaType: asString(this.cloud ? file.mediaType : extensions.mediaType),
+					modified: Number.isNaN(when) ? null : when,
+					author: this.cloud ? "" : asString(asJson(version.by).displayName),
+					version: typeof version.number === "number" ? version.number : 1,
+				});
+			}
+			const link = asString(asJson(body._links).next);
+			next = link === "" ? null : this.#relative(link);
+		}
+		return files;
+	}
+
+	/** Moves the attachment to the space's trash, from where an admin can restore it. */
+	async deleteAttachment(id: string): Promise<void> {
+		if (!/^(att)?\d+$/.test(id)) throw new Error("Invalid attachment id");
+		await this.#request(this.cloud ? `/api/v2/attachments/${id}` : `/rest/api/content/${id}`, {
+			method: "DELETE",
+			headers: { "X-Atlassian-Token": "no-check" },
 		});
 	}
 

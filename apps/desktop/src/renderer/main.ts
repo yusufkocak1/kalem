@@ -8,6 +8,7 @@ import { format, stringsFor } from "../shared/i18n.js";
 import { isEditablePath, isWordPath } from "../shared/paths.js";
 import { withColumnWidth } from "../shared/table-style.js";
 import { changeCase, collapseSpaces, nextCase } from "../shared/text-case.js";
+import { createAttachmentsDialog, linkedAttachments } from "./confluence-attachments.js";
 import { createConfluenceDialog } from "./confluence-dialog.js";
 import { createConfluencePane } from "./confluence-pane.js";
 import { createDocumentTools } from "./document-tools.js";
@@ -20,7 +21,7 @@ import { createNotices } from "./notices.js";
 import { Previews } from "./previews.js";
 import { createQuickOpen } from "./quick-open.js";
 import { createAppRibbon } from "./ribbon-layout.js";
-import { Session } from "./session.js";
+import { ipcErrorMessage, Session } from "./session.js";
 import { enableColumnResize } from "./table-styles.js";
 import { createTabStrip } from "./tabs.js";
 import { createVersionHistory } from "./version-history.js";
@@ -75,6 +76,12 @@ const filesPane = createFilesPane({
 	open: (path, query) => void openFromFolder(path, query),
 });
 const versionHistory = createVersionHistory({ t, lang: startup.language });
+const attachmentsDialog = createAttachmentsDialog({
+	t,
+	lang: startup.language,
+	pathForFile: (file) => bridge.pathForFile(file),
+	errorText: ipcErrorMessage,
+});
 const previews: Previews = new Previews(() => {
 	for (const tab of tabs.values()) previews.decorate(tab.canvas);
 });
@@ -621,6 +628,27 @@ const commands: Record<Command, () => void> = {
 			},
 		});
 	},
+	"confluence-attachments": () => {
+		const tab = session;
+		const page = tab.remote;
+		if (page === null) {
+			tab.notices.show({ id: "edit", kind: "warning", text: t.confluenceAttachmentsNeedPage });
+			return;
+		}
+		void attachmentsDialog.show({
+			title: page.title,
+			list: () => bridge.confluenceAttachments(tab.id),
+			upload: (paths) => bridge.confluenceUploadFiles(tab.id, paths),
+			open: (name) => bridge.confluenceOpenAttachment(tab.id, name),
+			download: (name) => bridge.confluenceDownloadAttachment(tab.id, name),
+			remove: (file, used) =>
+				bridge.confluenceDeleteAttachment(tab.id, { id: file.id, name: file.name, used }),
+			insert: (upload) => session === tab && tab.insertAttachment(upload),
+			linked: () => linkedAttachments(tab.editor.getDocument()),
+			// Relative to the document's base, which is this page's attachments.
+			preview: (name) => encodeURIComponent(name),
+		});
+	},
 	"search-folder": () => {
 		if (!settings.navigation || settings.sidePane !== "files") {
 			updateSettings({ navigation: true, sidePane: "files" });
@@ -708,6 +736,8 @@ bridge.onSettings((next) => {
 window.addEventListener(
 	"drop",
 	(event) => {
+		// The attachments dialog uploads what is dropped on it.
+		if (event.target instanceof Element && event.target.closest(".attachments") !== null) return;
 		const files = Array.from(event.dataTransfer?.files ?? [])
 			.map((file) => ({ path: bridge.pathForFile(file), image: file.type.startsWith("image/") }))
 			.filter((file) => file.path !== "");

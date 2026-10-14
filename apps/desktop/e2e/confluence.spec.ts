@@ -1,11 +1,18 @@
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { PNG_1X1 } from "../src/main/sample-docx.test-helper.js";
-import { clickMenu, launch, recordMessageBoxes } from "./launch.js";
+import {
+	clickMenu,
+	launch,
+	recordMessageBoxes,
+	stubOpenDialog,
+	stubSaveDialog,
+	tempDir,
+} from "./launch.js";
 
 const TOKEN = "pat-secret-123";
 
@@ -20,6 +27,10 @@ async function fakeConfluence() {
 	const saves: { version: number; storage: string }[] = [];
 	const auth: string[] = [];
 	const searches: string[] = [];
+	/** Page 42's attachments. */
+	const attachments = [
+		{ id: "att1", name: "logo.png", type: "image/png", version: 1, bytes: Buffer.from(PNG_1X1) },
+	];
 	/** Pages made through the API, under page 41. */
 	const created: { id: string; title: string; body: unknown }[] = [];
 
@@ -27,11 +38,12 @@ async function fakeConfluence() {
 		res.writeHead(status, { "Content-Type": "application/json" });
 		res.end(JSON.stringify(body));
 	};
-	const body = async (req: IncomingMessage): Promise<string> => {
+	const raw = async (req: IncomingMessage): Promise<Buffer> => {
 		const chunks: Buffer[] = [];
 		for await (const chunk of req) chunks.push(chunk as Buffer);
-		return Buffer.concat(chunks).toString("utf8");
+		return Buffer.concat(chunks);
 	};
+	const body = async (req: IncomingMessage): Promise<string> => (await raw(req)).toString("utf8");
 
 	const server = createServer(async (req, res) => {
 		auth.push(req.headers.authorization ?? "");
@@ -108,14 +120,53 @@ async function fakeConfluence() {
 			saves.push({ version: page.version, storage: page.storage });
 			return json(res, { version: { number: page.version } });
 		}
+		if (url.pathname === "/rest/api/content/42/child/attachment" && req.method === "PUT") {
+			const form = await new Response(new Uint8Array(await raw(req)), {
+				headers: { "Content-Type": req.headers["content-type"] ?? "" },
+			}).formData();
+			const file = form.get("file") as File;
+			const bytes = Buffer.from(await file.arrayBuffer());
+			const known = attachments.find((item) => item.name === file.name);
+			if (known === undefined) {
+				const id = `att${attachments.length + 1}`;
+				attachments.push({ id, name: file.name, type: file.type, version: 1, bytes });
+			} else {
+				Object.assign(known, { bytes, version: known.version + 1 });
+			}
+			return json(res, { results: [] });
+		}
 		if (url.pathname === "/rest/api/content/42/child/attachment") {
+			const name = url.searchParams.get("filename");
 			return json(res, {
-				results: [{ _links: { download: "/download/attachments/42/logo.png" } }],
+				results: attachments
+					.filter((item) => name === null || item.name === name)
+					.map((item) => ({
+						id: item.id,
+						title: item.name,
+						extensions: { mediaType: item.type, fileSize: item.bytes.length },
+						version: {
+							number: item.version,
+							when: "2026-10-01T10:00:00.000Z",
+							by: { displayName: "Ayşe Yılmaz" },
+						},
+						_links: { download: `/download/attachments/42/${encodeURIComponent(item.name)}` },
+					})),
 			});
 		}
-		if (url.pathname === "/download/attachments/42/logo.png") {
-			res.writeHead(200, { "Content-Type": "image/png" });
-			return res.end(PNG_1X1);
+		const attachment = attachments.find(
+			(item) => url.pathname === `/download/attachments/42/${encodeURIComponent(item.name)}`,
+		);
+		if (attachment !== undefined) {
+			res.writeHead(200, { "Content-Type": attachment.type });
+			return res.end(attachment.bytes);
+		}
+		const deleted = attachments.findIndex(
+			(item) => url.pathname === `/rest/api/content/${item.id}`,
+		);
+		if (deleted !== -1 && req.method === "DELETE") {
+			attachments.splice(deleted, 1);
+			res.writeHead(204);
+			return res.end();
 		}
 		json(res, { message: "Not found" }, 404);
 	});
@@ -125,6 +176,7 @@ async function fakeConfluence() {
 		site,
 		page,
 		saves,
+		attachments,
 		auth,
 		searches,
 		created,
@@ -445,6 +497,98 @@ test("edits a column of a page layout and keeps the layout", async () => {
 	expect(confluence.saves[0]?.storage).toBe(
 		`<h1>Sprint Planı</h1>${layout.replace("<p>Hedef</p>", "<p>Hedef eklendi</p>")}`,
 	);
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("manages the attachments of a page", async () => {
+	const confluence = await fakeConfluence();
+	cleanup.push(confluence.close);
+	const { app, page, errors } = await launch();
+	const folder = await tempDir("kalem-attachments-");
+	const report = join(folder, "rapor.pdf");
+	await writeFile(report, "%PDF-1.4 rapor");
+
+	await clickMenu(app, "File", "Open from Confluence…");
+	const connect = page.locator(".confluence-dialog");
+	await connect.locator('input[type="url"]').fill(confluence.site);
+	await connect.locator('input[type="password"]').fill(TOKEN);
+	await connect.getByRole("button", { name: "Connect" }).click();
+	await connect.locator(".quick-open-item", { hasText: "Sprint Planı" }).click();
+	await expect(page.locator("#editor h1").first()).toHaveText("Sprint Planı");
+
+	await clickMenu(app, "File", "Confluence Attachments…");
+	const dialog = page.locator(".attachments");
+	await expect(dialog.locator(".attachments-title")).toHaveText("Attachments of “Sprint Planı”");
+	const logo = dialog.locator('[data-name="logo.png"]');
+	// The page shows the image: it is marked, with a preview and who uploaded it.
+	await expect(logo.locator(".attachments-used")).toHaveText("On the page");
+	await expect(logo.locator(".attachments-meta")).toContainText("Ayşe Yılmaz");
+	await expect
+		.poll(() => logo.locator("img").evaluate((img: HTMLImageElement) => img.naturalWidth))
+		.toBe(1);
+
+	// Upload a file; the same name again is kept under a free name.
+	await stubOpenDialog(app, [report]);
+	await dialog.getByRole("button", { name: "Upload Files…" }).click();
+	const pdf = dialog.locator('[data-name="rapor.pdf"]');
+	await expect(pdf).toContainText("version 1");
+	await expect(pdf.locator(".attachments-used")).toHaveCount(0);
+	expect(confluence.attachments.at(-1)).toMatchObject({ type: "application/pdf" });
+	let asked = await recordMessageBoxes(app, 1);
+	await dialog.getByRole("button", { name: "Upload Files…" }).click();
+	await expect(dialog.locator('[data-name="rapor-2.pdf"]')).toBeVisible();
+	expect(await asked()).toEqual(["“rapor.pdf” is already attached to this page."]);
+
+	// Download a copy, and open one with the system's app.
+	const saved = join(folder, "kopya.pdf");
+	await stubSaveDialog(app, saved);
+	await pdf.getByRole("button", { name: "Download…" }).click();
+	await expect(dialog.locator(".attachments-message")).toHaveText(`Saved to ${saved}`);
+	expect(await readFile(saved, "utf8")).toBe("%PDF-1.4 rapor");
+	await app.evaluate(({ shell }) => {
+		shell.openPath = async (path: string) => {
+			(globalThis as { opened?: string }).opened = path;
+			return "";
+		};
+	});
+	await pdf.getByRole("button", { name: "Open" }).click();
+	const opened = () => app.evaluate(() => (globalThis as { opened?: string }).opened ?? "");
+	await expect.poll(opened).toMatch(/rapor\.pdf$/);
+	expect(await readFile(await opened(), "utf8")).toBe("%PDF-1.4 rapor");
+
+	// Delete asks first.
+	asked = await recordMessageBoxes(app, 0);
+	await dialog.locator('[data-name="rapor-2.pdf"]').getByRole("button", { name: "Delete" }).click();
+	await expect(dialog.locator('[data-name="rapor-2.pdf"]')).toHaveCount(0);
+	expect(await asked()).toEqual(["Delete “rapor-2.pdf” from the page?"]);
+	expect(confluence.attachments.map((item) => item.name)).toEqual(["logo.png", "rapor.pdf"]);
+
+	// Insert links it in the page, which saves it as an attachment link.
+	await dialog.getByRole("button", { name: "Close" }).click();
+	await page.locator("#editor p", { hasText: "Hedef" }).click();
+	await page.keyboard.press("End");
+	await clickMenu(app, "File", "Confluence Attachments…");
+	await pdf.getByRole("button", { name: "Insert" }).click();
+	await expect(dialog).not.toBeVisible();
+	await expect(page.locator("#editor a", { hasText: "rapor.pdf" })).toBeVisible();
+	await page.locator('[data-command="save"]').click();
+	await expect(page.locator(".save-status")).toHaveText("Saved");
+	expect(confluence.saves[0]?.storage).toContain(
+		'<ac:link><ri:attachment ri:filename="rapor.pdf" /><ac:link-body>rapor.pdf</ac:link-body></ac:link>',
+	);
+
+	await clickMenu(app, "File", "Confluence Attachments…");
+	await expect(pdf.locator(".attachments-used")).toHaveText("On the page");
+	await dialog.getByRole("button", { name: "Close" }).click();
+
+	// Attach File on a Confluence page uploads to the page too.
+	const notes = join(folder, "notlar.txt");
+	await writeFile(notes, "not");
+	await stubOpenDialog(app, [notes]);
+	await clickMenu(app, "Insert", "Attach File…");
+	await expect(page.locator("#editor a", { hasText: "notlar.txt" })).toBeVisible();
+	expect(confluence.attachments.map((item) => item.name)).toContain("notlar.txt");
 	expect(errors).toEqual([]);
 	await app.close();
 });

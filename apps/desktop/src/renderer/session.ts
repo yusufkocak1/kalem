@@ -1,6 +1,6 @@
 import type { Root } from "@kalem-editor/core";
 import { parse, serialize } from "@kalem-editor/core";
-import type { ClipboardPayload, PasteInput } from "@kalem-editor/editor";
+import type { Caret, ClipboardPayload, PasteInput } from "@kalem-editor/editor";
 import { Editor } from "@kalem-editor/editor";
 import { autosavePlugin } from "@kalem-editor/plugin-autosave";
 import { codeHighlightPlugin } from "@kalem-editor/plugin-code-highlight";
@@ -85,7 +85,7 @@ export interface SessionOptions {
 const MAX_UPLOAD_SIZE = 32 * 1024 * 1024;
 const AUTOSAVE_DELAY = 1500;
 
-function ipcErrorMessage(error: unknown): string {
+export function ipcErrorMessage(error: unknown): string {
 	const message = error instanceof Error ? error.message : String(error);
 	return message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "");
 }
@@ -824,7 +824,7 @@ export class Session {
 	/**
 	 * Copies files next to the document and links them. Without `paths` the
 	 * user picks the files. An unsaved document has no folder to copy into,
-	 * so it is saved first.
+	 * so it is saved first. A Confluence page uploads them as its attachments.
 	 */
 	async attachFiles(paths?: readonly string[]): Promise<void> {
 		const { bridge, t, notices } = this.#o;
@@ -835,6 +835,20 @@ export class Session {
 		}
 
 		const caretBefore = editor.getCaret();
+		if (this.#remote !== null) {
+			// A Confluence page keeps its files as attachments of the page.
+			try {
+				const uploads = await bridge.confluenceUploadFiles(this.id, paths);
+				for (const upload of uploads) this.insertAttachment(upload, caretBefore);
+			} catch (error) {
+				notices.show({
+					id: "attach",
+					kind: "error",
+					text: `${t.confluenceUploadFailed}: ${ipcErrorMessage(error)}`,
+				});
+			}
+			return;
+		}
 		if (this.#path === null) await this.save();
 		const documentPath = this.#path;
 		if (documentPath === null || this.#editor !== editor) {
@@ -860,6 +874,22 @@ export class Session {
 				text: `${t.attachFailed}: ${ipcErrorMessage(error)}`,
 			});
 		}
+	}
+
+	/** Links a page attachment at the caret, or shows it when it is an image; `false` when read only. */
+	insertAttachment(
+		attachment: { readonly name: string; readonly url: string; readonly image: boolean },
+		fallback: Caret | null = null,
+	): boolean {
+		const editor = this.editor;
+		if (editor.isReadOnly()) {
+			this.#o.notices.show({ id: "edit", kind: "warning", text: this.#o.t.readOnlyBlocked });
+			return false;
+		}
+		const caret = editor.getCaret() ?? fallback;
+		const { name, url, image } = attachment;
+		editor.applyEdit(insertLink(editor.getDocument(), caret, name, url, image));
+		return true;
 	}
 
 	// --- External changes ---------------------------------------------------

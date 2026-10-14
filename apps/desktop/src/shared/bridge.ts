@@ -131,6 +131,28 @@ export interface RemotePage {
 	readonly webUrl: string;
 }
 
+/** A file attached to a Confluence page. */
+export interface ConfluenceAttachment {
+	readonly id: string;
+	readonly name: string;
+	/** Bytes; `null` when Confluence did not say. */
+	readonly size: number | null;
+	readonly mediaType: string;
+	/** When this version was uploaded (ms), `null` when unknown. */
+	readonly modified: number | null;
+	/** Who uploaded this version; empty on Cloud, which only gives an account id. */
+	readonly author: string;
+	readonly version: number;
+}
+
+/** A file uploaded to the page, ready to be linked. */
+export interface ConfluenceUpload {
+	readonly name: string;
+	/** Markdown URL of the attachment. */
+	readonly url: string;
+	readonly image: boolean;
+}
+
 export interface ConfluencePageContent {
 	readonly page: RemotePage;
 	/** Storage format (XHTML). */
@@ -382,6 +404,7 @@ export const COMMANDS = [
 	"quick-open",
 	"search-folder",
 	"version-history",
+	"confluence-attachments",
 	"move-tab",
 	"case-upper",
 	"case-lower",
@@ -427,6 +450,22 @@ export interface KalemBridge {
 	confluenceSavePage(tabId: string, request: ConfluenceSaveRequest): Promise<ConfluenceSaveResult>;
 	/** Attaches the image to the tab's page; resolves with the attachment's file name. */
 	confluenceAttachImage(tabId: string, image: ImageFile): Promise<string>;
+	/** The files attached to the tab's page. */
+	confluenceAttachments(tabId: string): Promise<readonly ConfluenceAttachment[]>;
+	/** Uploads files to the tab's page; without paths the user picks them. */
+	confluenceUploadFiles(
+		tabId: string,
+		paths?: readonly string[],
+	): Promise<readonly ConfluenceUpload[]>;
+	/** Opens a copy of the attachment in the system's app for it. */
+	confluenceOpenAttachment(tabId: string, name: string): Promise<void>;
+	/** Saves the attachment where the user picks; resolves with that path, `null` if cancelled. */
+	confluenceDownloadAttachment(tabId: string, name: string): Promise<string | null>;
+	/** Asks, then deletes; `used` tells the question that the page links to it. */
+	confluenceDeleteAttachment(
+		tabId: string,
+		attachment: { readonly id: string; readonly name: string; readonly used: boolean },
+	): Promise<boolean>;
 	/** `package` proposes a `.kmd`; otherwise Markdown (or the tab's current type) comes first. */
 	chooseSavePath(tabId: string, suggestedName: string, kind?: "package"): Promise<string | null>;
 	writeDocument(tabId: string, path: string, text: string, format: TextFormat): Promise<SaveResult>;
@@ -509,6 +548,11 @@ export const CHANNEL = {
 	confluenceReloadPage: "kalem:confluence-reload-page",
 	confluenceSavePage: "kalem:confluence-save-page",
 	confluenceAttachImage: "kalem:confluence-attach-image",
+	confluenceAttachments: "kalem:confluence-attachments",
+	confluenceUploadFiles: "kalem:confluence-upload-files",
+	confluenceOpenAttachment: "kalem:confluence-open-attachment",
+	confluenceDownloadAttachment: "kalem:confluence-download-attachment",
+	confluenceDeleteAttachment: "kalem:confluence-delete-attachment",
 	chooseSavePath: "kalem:choose-save-path",
 	writeDocument: "kalem:write-document",
 	reloadDocument: "kalem:reload-document",

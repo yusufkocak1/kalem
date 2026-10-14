@@ -333,6 +333,122 @@ describe("ConfluenceClient", () => {
 		);
 		await expect(client.page("../admin")).rejects.toThrow(/Invalid page id/);
 	});
+	it("lists a page's attachments from Server and follows next links", async () => {
+		const { fetch, calls } = fakeFetch([
+			[
+				"start=1",
+				{
+					results: [
+						{
+							id: "att2",
+							title: "notlar.txt",
+							extensions: { mediaType: "text/plain" },
+							version: { number: 1 },
+						},
+					],
+				},
+			],
+			[
+				"/child/attachment",
+				{
+					results: [
+						{
+							id: "att1",
+							title: "rapor.pdf",
+							extensions: { mediaType: "application/pdf", fileSize: 2048 },
+							version: {
+								number: 3,
+								when: "2026-10-01T10:00:00.000Z",
+								by: { displayName: "Yusuf Koçak" },
+							},
+						},
+					],
+					_links: { next: "/rest/api/content/42/child/attachment?limit=200&start=1" },
+				},
+			],
+		]);
+		const client = new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "", token: "pat" },
+			fetch,
+		);
+		expect(await client.attachments("42")).toEqual([
+			{
+				id: "att1",
+				name: "rapor.pdf",
+				size: 2048,
+				mediaType: "application/pdf",
+				modified: Date.parse("2026-10-01T10:00:00.000Z"),
+				author: "Yusuf Koçak",
+				version: 3,
+			},
+			{
+				id: "att2",
+				name: "notlar.txt",
+				size: null,
+				mediaType: "text/plain",
+				modified: null,
+				author: "",
+				version: 1,
+			},
+		]);
+		expect(calls[0]?.url).toBe(
+			"https://wiki.example.com/rest/api/content/42/child/attachment?limit=200&expand=version",
+		);
+		await expect(client.attachments("42/../1")).rejects.toThrow("Invalid page id");
+	});
+
+	it("lists attachments from Cloud's v2 API", async () => {
+		const { fetch, calls } = fakeFetch([
+			[
+				"/attachments",
+				{
+					results: [
+						{
+							id: "att7",
+							title: "logo.png",
+							mediaType: "image/png",
+							fileSize: 10,
+							version: { number: 2, createdAt: "2026-10-02T08:00:00.000Z", authorId: "abc" },
+						},
+					],
+				},
+			],
+		]);
+		const client = new ConfluenceClient(
+			{ site: "acme.atlassian.net", username: "a@b.c", token: "tok" },
+			fetch,
+		);
+		const [file] = await client.attachments("42");
+		expect(calls[0]?.url).toBe(
+			"https://acme.atlassian.net/wiki/api/v2/pages/42/attachments?limit=250",
+		);
+		expect(file).toMatchObject({
+			id: "att7",
+			size: 10,
+			mediaType: "image/png",
+			author: "",
+			version: 2,
+		});
+	});
+
+	it("deletes an attachment", async () => {
+		const server = fakeFetch([["/rest/api/content/att5", ""]]);
+		await new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "", token: "pat" },
+			server.fetch,
+		).deleteAttachment("att5");
+		expect(server.calls[0]?.url).toBe("https://wiki.example.com/rest/api/content/att5");
+		expect(server.calls[0]?.init?.method).toBe("DELETE");
+
+		const cloud = fakeFetch([["/api/v2/attachments/att5", ""]]);
+		const client = new ConfluenceClient(
+			{ site: "acme.atlassian.net", username: "a@b.c", token: "tok" },
+			cloud.fetch,
+		);
+		await client.deleteAttachment("att5");
+		expect(cloud.calls[0]?.url).toBe("https://acme.atlassian.net/wiki/api/v2/attachments/att5");
+		await expect(client.deleteAttachment("../spaces")).rejects.toThrow("Invalid attachment id");
+	});
 });
 
 describe("ConfluenceStore", () => {
