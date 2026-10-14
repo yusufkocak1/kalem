@@ -152,8 +152,8 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 				? request.losses.filter((loss): loss is string => typeof loss === "string")
 				: [];
 
+			const t = ctx.strings();
 			if (losses.length > 0) {
-				const t = ctx.strings();
 				const { response } = await dialog.showMessageBox(win.window, {
 					type: "warning",
 					message: t.confluenceLossConfirm,
@@ -163,6 +163,18 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 					),
 					buttons: [t.confluenceSaveAnyway, t.cancel],
 					defaultId: 1,
+					cancelId: 1,
+				});
+				if (response !== 0) return { ok: false, reason: "cancelled" };
+			} else if (request.overwrite !== true) {
+				// Every save is a new version on the shared page, so it is confirmed first.
+				// Overwriting after a conflict was already a deliberate choice; losses have their own question.
+				const { response } = await dialog.showMessageBox(win.window, {
+					type: "question",
+					message: t.confluenceSaveConfirm,
+					detail: format(t.confluenceSaveDetail, page.title, page.spaceKey),
+					buttons: [t.confluenceSaveAnyway, t.cancel],
+					defaultId: 0,
 					cancelId: 1,
 				});
 				if (response !== 0) return { ok: false, reason: "cancelled" };

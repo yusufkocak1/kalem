@@ -312,6 +312,9 @@ const en = {
 	confluenceLossDetail:
 		"This content will be removed from the page:\n{0}\n\nThe current version stays in the page history.",
 	confluenceSaveAnyway: "Save to Confluence",
+	confluenceSaveConfirm: "Update the page on Confluence?",
+	confluenceSaveDetail:
+		"“{0}” in the {1} space will be updated with your changes as a new version. The current version stays in the page history.",
 	confluenceConflict: "The page was changed on Confluence after you opened it.",
 	confluenceLoadTheirs: "Load Confluence Version",
 	confluenceOverwrite: "Overwrite",
@@ -656,6 +659,9 @@ const tr: Strings = {
 	confluenceLossDetail:
 		"Şu içerik sayfadan kaldırılacak:\n{0}\n\nŞimdiki sürüm sayfa geçmişinde kalır.",
 	confluenceSaveAnyway: "Confluence'a Kaydet",
+	confluenceSaveConfirm: "Sayfa Confluence'ta güncellensin mi?",
+	confluenceSaveDetail:
+		"{1} alanındaki “{0}” sayfası değişikliklerinizle yeni bir sürüm olarak güncellenecek. Şimdiki sürüm sayfa geçmişinde kalır.",
 	confluenceConflict: "Sayfa siz açtıktan sonra Confluence'ta değiştirildi.",
 	confluenceLoadTheirs: "Confluence Sürümünü Yükle",
 	confluenceOverwrite: "Üzerine Yaz",

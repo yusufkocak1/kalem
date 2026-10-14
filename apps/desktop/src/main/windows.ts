@@ -547,11 +547,17 @@ export class WindowManager {
 	/**
 	 * Adds a document to the window. It takes over the active tab when that
 	 * tab is untitled and untouched, so opening a file right after starting
-	 * the app does not leave an empty tab behind.
+	 * the app does not leave an empty tab behind. A Confluence page has no
+	 * path but is not blank: it keeps its tab.
 	 */
 	addTab(win: AppWindow, payload: DocumentPayload, reuseBlank = true): DocumentTab {
 		const active = this.activeTab(win);
-		const reuse = reuseBlank && active !== undefined && active.path === null && !active.dirty;
+		const reuse =
+			reuseBlank &&
+			active !== undefined &&
+			active.path === null &&
+			active.remote === null &&
+			!active.dirty;
 		const document: TabDocument = { tabId: reuse ? active.id : randomUUID(), payload };
 
 		const tab = this.#tabFor(win, document);
