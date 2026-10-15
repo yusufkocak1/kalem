@@ -1,4 +1,5 @@
 import type {
+	ArrowKind,
 	ColorName,
 	Diagram,
 	DiagramEdge,
@@ -8,6 +9,7 @@ import type {
 	SvgNode,
 } from "../shared/diagram.js";
 import {
+	ARROWS,
 	bounds,
 	COLORS,
 	DEFAULT_SIZE,
@@ -24,6 +26,20 @@ import {
 	serializeDiagram,
 	snap,
 } from "../shared/diagram.js";
+import type { AlignMode, Box, Guide } from "../shared/diagram-edit.js";
+import {
+	alignmentGuides,
+	alignNodes,
+	boxOf,
+	copyItems,
+	decisionLabel,
+	distributeNodes,
+	layoutDiagram,
+	moveNodes,
+	nodesInBox,
+	pasteItems,
+	removeItems,
+} from "../shared/diagram-edit.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import { el } from "./dom.js";
@@ -35,6 +51,8 @@ const MAX_ZOOM = 3;
 const DRAG_START = 3;
 /** Space left between a selected shape and one added below it. */
 const GAP = 60;
+/** How close, on screen, a side must come to another shape's to snap to it. */
+const GUIDE_SNAP = 6;
 
 export interface DiagramEditRequest {
 	/** `null` for a new diagram. */
@@ -51,13 +69,23 @@ export interface DiagramEditor {
 	readonly isOpen: boolean;
 }
 
-type Selection = { readonly kind: "node" | "edge"; readonly id: string } | null;
-
 type Drag =
 	| { kind: "pan"; startX: number; startY: number; viewX: number; viewY: number }
-	| { kind: "move"; id: string; start: Point; origin: Point; moved: boolean }
+	| {
+			kind: "move";
+			ids: ReadonlySet<string>;
+			start: Point;
+			origin: Diagram;
+			moved: boolean;
+			/** A plain click on a shape of a larger selection selects just that shape. */
+			only: string | null;
+	  }
 	| { kind: "resize"; id: string; start: Point; origin: { w: number; h: number }; moved: boolean }
-	| { kind: "connect"; from: string; pointer: Point; over: string | null };
+	| { kind: "connect"; from: string; pointer: Point; over: string | null }
+	| { kind: "marquee"; start: Point; current: Point; base: ReadonlySet<string> };
+
+/** Copied shapes, kept while the app runs so they can be pasted into another diagram too. */
+let clipboard: Diagram | null = null;
 
 function build(node: SvgNode): Element {
 	const element = document.createElementNS(SVG_NS, node.tag);
@@ -73,6 +101,26 @@ function svgEl(tag: string, attrs: Record<string, string | number>): SVGElement 
 	return element;
 }
 
+/** A small stroked icon for a toolbar button. */
+function glyph(paths: readonly string[]): SVGElement {
+	const icon = svgEl("svg", {
+		viewBox: "0 0 24 24",
+		class: "diagram-glyph",
+		"aria-hidden": "true",
+	});
+	for (const d of paths) icon.append(svgEl("path", { d }));
+	return icon;
+}
+
+const ALIGN_GLYPHS: Record<AlignMode, readonly string[]> = {
+	left: ["M4 3v18", "M7 6h12v4H7z", "M7 14h7v4H7z"],
+	center: ["M12 3v18", "M5 6h14v4H5z", "M8 14h8v4H8z"],
+	right: ["M20 3v18", "M5 6h12v4H5z", "M10 14h7v4h-7z"],
+	top: ["M3 4h18", "M6 7h4v12H6z", "M14 7h4v7h-4z"],
+	middle: ["M3 12h18", "M6 5h4v14H6z", "M14 8h4v8h-4z"],
+	bottom: ["M3 20h18", "M6 5h4v12H6z", "M14 10h4v7h-4z"],
+};
+
 /** The small drawing of a shape on its palette button. */
 function shapePreview(shape: ShapeKind): Element {
 	const preview = svgEl("svg", {
@@ -80,16 +128,34 @@ function shapePreview(shape: ShapeKind): Element {
 		class: "diagram-shape-preview",
 		"aria-hidden": "true",
 	});
-	const node: DiagramNode = {
-		id: "p",
-		shape,
-		x: 0,
-		y: 0,
-		w: 120,
-		h: 70,
-		text: "",
-		color: "default",
-	};
+	// The bounding box of every preview is 120×70; the circle stays round.
+	const node: DiagramNode =
+		shape === "circle"
+			? { id: "p", shape, x: 30, y: 5, w: 60, h: 60, text: "", color: "default" }
+			: {
+					id: "p",
+					shape,
+					x: 0,
+					y: 0,
+					w: 120,
+					h: 70,
+					text: shape === "text" ? "Aa" : "",
+					color: "default",
+				};
+	if (shape === "text") {
+		// Text has no outline; a large letter stands for it.
+		const letter = svgEl("text", {
+			x: 60,
+			y: 50,
+			"text-anchor": "middle",
+			"font-size": 44,
+			"font-family": "Georgia, serif",
+			fill: "#334155",
+		});
+		letter.textContent = "T";
+		preview.append(letter);
+		return preview;
+	}
 	for (const child of diagramContent({ nodes: [node], edges: [] }).slice(1))
 		preview.append(build(child));
 	return preview;
@@ -104,6 +170,9 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 		io: t.diagramIo,
 		document: t.diagramDocument,
 		database: t.diagramDatabase,
+		subprocess: t.diagramSubprocess,
+		circle: t.diagramCircle,
+		text: t.diagramTextShape,
 	};
 	const colorLabels: Record<ColorName, string> = {
 		default: t.diagramColorDefault,
@@ -114,23 +183,37 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 		purple: t.diagramColorPurple,
 		gray: t.diagramColorGray,
 	};
+	const alignLabels: Record<AlignMode, string> = {
+		left: t.diagramAlignLeft,
+		center: t.diagramAlignCenter,
+		right: t.diagramAlignRight,
+		top: t.diagramAlignTop,
+		middle: t.diagramAlignMiddle,
+		bottom: t.diagramAlignBottom,
+	};
+	const arrowLabels: Record<ArrowKind, string> = {
+		end: t.diagramArrowEnd,
+		both: t.diagramArrowBoth,
+		none: t.diagramArrowNone,
+	};
+	const arrowGlyphs: Record<ArrowKind, string> = { end: "→", both: "↔", none: "—" };
 
 	// --- Elements ------------------------------------------------------------
 
 	const toolButton = (
 		label: string,
-		text: string,
+		content: string | Element,
 		run: () => void,
 		shortcut?: string,
 	): HTMLButtonElement => {
 		const button = el("button", {
 			class: "diagram-tool",
-			text,
 			attrs: {
 				type: "button",
 				title: shortcut === undefined ? label : `${label} (${shortcut})`,
 				"aria-label": label,
 			},
+			children: [content],
 		});
 		button.addEventListener("click", run);
 		return button;
@@ -167,9 +250,34 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 		attrs: { role: "group", "aria-label": t.diagramColor },
 		children: swatches,
 	});
+	const arrowButton = toolButton(t.diagramArrow, "→", () => cycleArrow());
 	const dashedButton = toolButton(t.diagramDashed, "┄", () => toggleDashed());
 	dashedButton.setAttribute("aria-pressed", "false");
+	const edgeGroup = el("div", { class: "diagram-group", children: [arrowButton, dashedButton] });
 	const deleteButton = toolButton(t.diagramDelete, "🗑", () => deleteSelection(), "Delete");
+	const alignButtons = (Object.keys(ALIGN_GLYPHS) as AlignMode[]).map((mode) =>
+		toolButton(alignLabels[mode], glyph(ALIGN_GLYPHS[mode]), () => align(mode)),
+	);
+	const spreadX = toolButton(
+		t.diagramDistributeX,
+		glyph(["M4 3v18", "M20 3v18", "M10 7h4v10h-4z"]),
+		() => distribute("x"),
+	);
+	const spreadY = toolButton(
+		t.diagramDistributeY,
+		glyph(["M3 4h18", "M3 20h18", "M7 10h10v4H7z"]),
+		() => distribute("y"),
+	);
+	const alignGroup = el("div", {
+		class: "diagram-group",
+		attrs: { role: "group", "aria-label": t.diagramAlign },
+		children: [...alignButtons, spreadX, spreadY],
+	});
+	const layoutButton = toolButton(
+		t.diagramLayout,
+		glyph(["M9 3h6v4H9z", "M3 17h6v4H3z", "M15 17h6v4h-6z", "M12 7v5", "M6 17v-5h12v5"]),
+		() => layout(),
+	);
 	const zoomLabel = el("button", {
 		class: "diagram-tool diagram-zoom",
 		text: "100%",
@@ -194,8 +302,10 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 			el("div", { class: "diagram-group", children: [undoButton, redoButton] }),
 			el("div", {
 				class: "diagram-group diagram-selection",
-				children: [colorGroup, dashedButton, deleteButton],
+				children: [colorGroup, edgeGroup, deleteButton],
 			}),
+			alignGroup,
+			el("div", { class: "diagram-group", children: [layoutButton] }),
 			el("div", {
 				class: "diagram-group",
 				children: [
@@ -213,7 +323,7 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 
 	const palette = el("div", {
 		class: "diagram-palette",
-		attrs: { role: "toolbar", "aria-orientation": "vertical", "aria-label": t.diagramShapes },
+		attrs: { role: "toolbar", "aria-label": t.diagramShapes },
 		children: [
 			...SHAPES.map((shape) => {
 				const item = el("button", {
@@ -285,19 +395,37 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 	let initial = "";
 	let undoStack: Diagram[] = [];
 	let redoStack: Diagram[] = [];
-	let selection: Selection = null;
+	let nodesSelected = new Set<string>();
+	let edgesSelected = new Set<string>();
 	let hover: string | null = null;
 	let view = { x: 0, y: 0, zoom: 1 };
 	let drag: Drag | null = null;
+	let guides: Guide[] = [];
+	let spaceDown = false;
+	let pasteCount = 0;
 	let editing: { kind: "node" | "edge"; id: string } | null = null;
 	let request: DiagramEditRequest | null = null;
 	let saving = false;
 
 	const nodeById = (id: string): DiagramNode | undefined =>
 		diagram.nodes.find((node) => node.id === id);
+	const edgeById = (id: string): DiagramEdge | undefined =>
+		diagram.edges.find((edge) => edge.id === id);
+
+	function select(nodes: Iterable<string> = [], edges: Iterable<string> = []): void {
+		nodesSelected = new Set(nodes);
+		edgesSelected = new Set(edges);
+	}
+
+	/** The one selected shape, when exactly one shape and nothing else is selected. */
+	function onlyNode(): DiagramNode | undefined {
+		if (nodesSelected.size !== 1 || edgesSelected.size !== 0) return undefined;
+		return nodeById([...nodesSelected][0] as string);
+	}
 
 	/** Records the current diagram for undo, then replaces it. */
 	function change(next: Diagram): void {
+		if (next === diagram) return;
 		undoStack.push(diagram);
 		if (undoStack.length > 200) undoStack.shift();
 		redoStack = [];
@@ -324,20 +452,23 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 	}
 
 	function dropMissingSelection(): void {
-		if (selection === null) return;
-		const list: readonly { id: string }[] =
-			selection.kind === "node" ? diagram.nodes : diagram.edges;
-		if (!list.some((item) => item.id === selection?.id)) selection = null;
+		select(
+			[...nodesSelected].filter((id) => nodeById(id) !== undefined),
+			[...edgesSelected].filter((id) => edgeById(id) !== undefined),
+		);
 	}
 
-	const updateNode = (id: string, patch: Partial<DiagramNode>): Diagram => ({
+	const updateNodes = (ids: ReadonlySet<string>, patch: Partial<DiagramNode>): Diagram => ({
 		...diagram,
-		nodes: diagram.nodes.map((node) => (node.id === id ? { ...node, ...patch } : node)),
+		nodes: diagram.nodes.map((node) => (ids.has(node.id) ? { ...node, ...patch } : node)),
 	});
 
-	const updateEdge = (id: string, patch: Partial<DiagramEdge>): Diagram => ({
+	const updateEdges = (
+		ids: ReadonlySet<string>,
+		patch: (edge: DiagramEdge) => Partial<DiagramEdge>,
+	): Diagram => ({
 		...diagram,
-		edges: diagram.edges.map((edge) => (edge.id === id ? { ...edge, ...patch } : edge)),
+		edges: diagram.edges.map((edge) => (ids.has(edge.id) ? { ...edge, ...patch(edge) } : edge)),
 	});
 
 	// --- Editing operations ---------------------------------------------------
@@ -357,17 +488,26 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 			y: snap(center.y - size.h / 2),
 			w: size.w,
 			h: size.h,
-			text: shapeLabels[shape],
+			text: shape === "circle" ? "" : shapeLabels[shape],
 			color: "default",
 		};
 	}
+
+	const newEdge = (from: string, to: string, within: Diagram): DiagramEdge => ({
+		id: nextId(within, "e"),
+		from,
+		to,
+		text: decisionLabel(within, from, t.diagramYes, t.diagramNo),
+		dashed: false,
+		arrow: "end",
+	});
 
 	/**
 	 * A shape from the palette: below the selected shape and connected to it,
 	 * so a flow is built by clicking; otherwise in the middle of the view.
 	 */
 	function addShape(shape: ShapeKind): void {
-		const selected = selection?.kind === "node" ? nodeById(selection.id) : undefined;
+		const selected = onlyNode();
 		if (selected === undefined) {
 			let center = viewCenter();
 			// Clicked again: the next one does not land exactly on the last one.
@@ -384,70 +524,106 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 			return;
 		}
 		const size = DEFAULT_SIZE[shape];
+		// A decision's second way out goes beside the first, not on top of it.
+		const out = diagram.edges.filter((edge) => edge.from === selected.id).length;
 		const node = placeNode(shape, {
-			x: selected.x + selected.w / 2,
+			x: selected.x + selected.w / 2 + out * (size.w + 2 * GRID),
 			y: selected.y + selected.h + GAP + size.h / 2,
 		});
 		const withNode = { ...diagram, nodes: [...diagram.nodes, node] };
-		change({
-			...withNode,
-			edges: [
-				...diagram.edges,
-				{ id: nextId(withNode, "e"), from: selected.id, to: node.id, text: "", dashed: false },
-			],
-		});
-		selection = { kind: "node", id: node.id };
+		change({ ...withNode, edges: [...diagram.edges, newEdge(selected.id, node.id, withNode)] });
+		select([node.id]);
 		render();
 	}
 
 	function insertNode(node: DiagramNode): void {
 		change({ ...diagram, nodes: [...diagram.nodes, node] });
-		selection = { kind: "node", id: node.id };
+		select([node.id]);
 		render();
 	}
 
 	function connect(from: string, to: string): void {
 		if (from === to || diagram.edges.some((edge) => edge.from === from && edge.to === to)) return;
-		const id = nextId(diagram, "e");
-		change({ ...diagram, edges: [...diagram.edges, { id, from, to, text: "", dashed: false }] });
-		selection = { kind: "edge", id };
+		const edge = newEdge(from, to, diagram);
+		change({ ...diagram, edges: [...diagram.edges, edge] });
+		select([], [edge.id]);
 		render();
 	}
 
 	function deleteSelection(): void {
-		if (selection === null) return;
-		const { kind, id } = selection;
-		selection = null;
-		if (kind === "node") {
-			change({
-				nodes: diagram.nodes.filter((node) => node.id !== id),
-				edges: diagram.edges.filter((edge) => edge.from !== id && edge.to !== id),
-			});
-		} else {
-			change({ ...diagram, edges: diagram.edges.filter((edge) => edge.id !== id) });
-		}
+		if (nodesSelected.size + edgesSelected.size === 0) return;
+		const next = removeItems(diagram, nodesSelected, edgesSelected);
+		select();
+		change(next);
+	}
+
+	function copySelection(): boolean {
+		if (nodesSelected.size === 0) return false;
+		clipboard = copyItems(diagram, nodesSelected);
+		pasteCount = 0;
+		return true;
+	}
+
+	function paste(items: Diagram | null = clipboard): void {
+		if (items === null || items.nodes.length === 0) return;
+		pasteCount++;
+		const step = 2 * GRID * pasteCount;
+		const pasted = pasteItems(diagram, items, { x: step, y: step });
+		change(pasted.diagram);
+		select(pasted.ids);
+		render();
 	}
 
 	function duplicateSelection(): void {
-		const node = selection?.kind === "node" ? nodeById(selection.id) : undefined;
-		if (node === undefined) return;
-		insertNode({ ...node, id: nextId(diagram, "n"), x: node.x + 2 * GRID, y: node.y + 2 * GRID });
+		if (nodesSelected.size === 0) return;
+		const items = copyItems(diagram, nodesSelected);
+		const pasted = pasteItems(diagram, items, { x: 2 * GRID, y: 2 * GRID });
+		change(pasted.diagram);
+		select(pasted.ids);
+		render();
+	}
+
+	function selectAll(): void {
+		select(
+			diagram.nodes.map((node) => node.id),
+			diagram.edges.map((edge) => edge.id),
+		);
+		render();
 	}
 
 	function setColor(color: ColorName): void {
-		if (selection?.kind !== "node") return;
-		change(updateNode(selection.id, { color }));
+		if (nodesSelected.size > 0) change(updateNodes(nodesSelected, { color }));
 	}
 
 	function toggleDashed(): void {
-		if (selection?.kind !== "edge") return;
-		const edge = diagram.edges.find((item) => item.id === selection?.id);
-		if (edge !== undefined) change(updateEdge(edge.id, { dashed: !edge.dashed }));
+		if (edgesSelected.size === 0) return;
+		const dashed = ![...edgesSelected].every((id) => edgeById(id)?.dashed === true);
+		change(updateEdges(edgesSelected, () => ({ dashed })));
+	}
+
+	/** End → both ends → none → end, for every selected connector. */
+	function cycleArrow(): void {
+		const first = edgeById([...edgesSelected][0] ?? "");
+		if (first === undefined) return;
+		const arrow = ARROWS[(ARROWS.indexOf(first.arrow) + 1) % ARROWS.length] as ArrowKind;
+		change(updateEdges(edgesSelected, () => ({ arrow })));
+	}
+
+	function align(mode: AlignMode): void {
+		change(alignNodes(diagram, nodesSelected, mode));
+	}
+
+	function distribute(axis: "x" | "y"): void {
+		change(distributeNodes(diagram, nodesSelected, axis));
+	}
+
+	function layout(): void {
+		change(layoutDiagram(diagram));
+		fit();
 	}
 
 	function nudge(dx: number, dy: number): void {
-		const node = selection?.kind === "node" ? nodeById(selection.id) : undefined;
-		if (node !== undefined) change(updateNode(node.id, { x: node.x + dx, y: node.y + dy }));
+		if (nodesSelected.size > 0) change(moveNodes(diagram, nodesSelected, dx, dy));
 	}
 
 	// --- View ------------------------------------------------------------------
@@ -507,23 +683,37 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 
 	function render(): void {
 		content.replaceChildren(...diagramContent(diagram, true).map(build));
-		if (selection?.kind === "edge")
-			content.querySelector(`[data-edge="${CSS.escape(selection.id)}"]`)?.classList.add("selected");
+		for (const id of edgesSelected) {
+			for (const part of content.querySelectorAll(`[data-edge="${CSS.escape(id)}"]`)) {
+				part.classList.add("selected");
+			}
+		}
 		renderOverlay();
 
 		undoButton.disabled = undoStack.length === 0;
 		redoButton.disabled = redoStack.length === 0;
-		const node = selection?.kind === "node" ? nodeById(selection.id) : undefined;
-		const edge =
-			selection?.kind === "edge"
-				? diagram.edges.find((item) => item.id === selection?.id)
-				: undefined;
-		colorGroup.hidden = node === undefined;
-		for (const swatch of swatches)
-			swatch.setAttribute("aria-pressed", String(swatch.dataset.color === node?.color));
-		dashedButton.hidden = edge === undefined;
-		dashedButton.setAttribute("aria-pressed", String(edge?.dashed === true));
-		deleteButton.disabled = selection === null;
+		const nodes = [...nodesSelected].map(nodeById).filter((node) => node !== undefined);
+		const edges = [...edgesSelected].map(edgeById).filter((edge) => edge !== undefined);
+		colorGroup.hidden = nodes.length === 0;
+		const color = nodes.every((node) => node.color === nodes[0]?.color)
+			? nodes[0]?.color
+			: undefined;
+		for (const swatch of swatches) {
+			swatch.setAttribute("aria-pressed", String(swatch.dataset.color === color));
+		}
+		edgeGroup.hidden = edges.length === 0;
+		const arrow = edges[0]?.arrow ?? "end";
+		arrowButton.replaceChildren(arrowGlyphs[arrow]);
+		arrowButton.title = `${t.diagramArrow}: ${arrowLabels[arrow]}`;
+		dashedButton.setAttribute(
+			"aria-pressed",
+			String(edges.length > 0 && edges.every((edge) => edge.dashed)),
+		);
+		alignGroup.hidden = nodes.length < 2;
+		spreadX.disabled = nodes.length < 3;
+		spreadY.disabled = nodes.length < 3;
+		layoutButton.disabled = diagram.nodes.length < 2;
+		deleteButton.disabled = nodes.length + edges.length === 0;
 		saveButton.disabled = saving || diagram.nodes.length === 0;
 		status.textContent = diagram.nodes.length === 0 ? t.diagramEmpty : "";
 		status.hidden = status.textContent === "";
@@ -532,31 +722,37 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 	function renderOverlay(): void {
 		const parts: SVGElement[] = [];
 		const handle = 8 / view.zoom;
-		const selected = selection?.kind === "node" ? nodeById(selection.id) : undefined;
-		if (selected !== undefined) {
+		for (const id of nodesSelected) {
+			const node = nodeById(id);
+			if (node === undefined) continue;
 			parts.push(
 				svgEl("rect", {
-					x: selected.x - 4,
-					y: selected.y - 4,
-					width: selected.w + 8,
-					height: selected.h + 8,
+					x: node.x - 4,
+					y: node.y - 4,
+					width: node.w + 8,
+					height: node.h + 8,
 					class: "diagram-selected",
-				}),
-				svgEl("rect", {
-					x: selected.x + selected.w - handle / 2,
-					y: selected.y + selected.h - handle / 2,
-					width: handle,
-					height: handle,
-					class: "diagram-handle",
-					"data-handle": selected.id,
 				}),
 			);
 		}
-		// Connection points on the shape under the pointer and the selected one.
+		const single = onlyNode();
+		if (single !== undefined) {
+			parts.push(
+				svgEl("rect", {
+					x: single.x + single.w - handle / 2,
+					y: single.y + single.h - handle / 2,
+					width: handle,
+					height: handle,
+					class: "diagram-handle",
+					"data-handle": single.id,
+				}),
+			);
+		}
+		// Connection points on the shape under the pointer and the one selected.
 		const ported = new Set(
-			[hover, selected?.id].filter((id): id is string => id !== null && id !== undefined),
+			[hover, single?.id].filter((id): id is string => id !== null && id !== undefined),
 		);
-		if (drag?.kind === "connect") ported.clear();
+		if (drag !== null) ported.clear();
 		for (const id of ported) {
 			const node = nodeById(id);
 			if (node === undefined) continue;
@@ -577,6 +773,21 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 				);
 			}
 		}
+		for (const guide of guides) {
+			parts.push(svgEl("line", { ...guide, class: "diagram-guide" }));
+		}
+		if (drag?.kind === "marquee") {
+			const { start, current } = drag;
+			parts.push(
+				svgEl("rect", {
+					x: Math.min(start.x, current.x),
+					y: Math.min(start.y, current.y),
+					width: Math.abs(current.x - start.x),
+					height: Math.abs(current.y - start.y),
+					class: "diagram-marquee",
+				}),
+			);
+		}
 		if (drag?.kind === "connect") {
 			const from = nodeById(drag.from);
 			const over = drag.over === null ? undefined : nodeById(drag.over);
@@ -592,16 +803,13 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 				);
 			}
 			if (from !== undefined) {
-				const start =
-					over === undefined
-						? { x: from.x + from.w / 2, y: from.y + from.h / 2 }
-						: edgeRoute(from, over).points[0];
-				const end =
-					over === undefined ? drag.pointer : (edgeRoute(from, over).points.at(-1) as Point);
+				const route = over === undefined ? null : edgeRoute(from, over);
+				const start = route?.points[0] ?? { x: from.x + from.w / 2, y: from.y + from.h / 2 };
+				const end = route?.points.at(-1) ?? drag.pointer;
 				parts.push(
 					svgEl("line", {
-						x1: start?.x ?? 0,
-						y1: start?.y ?? 0,
+						x1: start.x,
+						y1: start.y,
 						x2: end.x,
 						y2: end.y,
 						class: "diagram-pending",
@@ -616,13 +824,13 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 
 	function placeTextEdit(): void {
 		if (editing === null) return;
-		let box: { x: number; y: number; w: number; h: number };
+		let box: Box;
 		if (editing.kind === "node") {
 			const node = nodeById(editing.id);
 			if (node === undefined) return;
 			box = { x: node.x, y: node.y, w: node.w, h: node.h };
 		} else {
-			const edge = diagram.edges.find((item) => item.id === editing?.id);
+			const edge = edgeById(editing.id);
 			const from = edge === undefined ? undefined : nodeById(edge.from);
 			const to = edge === undefined ? undefined : nodeById(edge.to);
 			if (from === undefined || to === undefined) return;
@@ -637,10 +845,11 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 	}
 
 	function editText(kind: "node" | "edge", id: string): void {
-		const item = kind === "node" ? nodeById(id) : diagram.edges.find((edge) => edge.id === id);
+		const item = kind === "node" ? nodeById(id) : edgeById(id);
 		if (item === undefined) return;
 		editing = { kind, id };
-		selection = { kind, id };
+		if (kind === "node") select([id]);
+		else select([], [id]);
 		render();
 		textEdit.value = item.text;
 		textEdit.hidden = false;
@@ -655,9 +864,10 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 		editing = null;
 		textEdit.hidden = true;
 		const text = textEdit.value.replace(/\s+$/, "");
-		const item = kind === "node" ? nodeById(id) : diagram.edges.find((edge) => edge.id === id);
+		const item = kind === "node" ? nodeById(id) : edgeById(id);
 		if (keep && item !== undefined && item.text !== text) {
-			change(kind === "node" ? updateNode(id, { text }) : updateEdge(id, { text }));
+			const ids = new Set([id]);
+			change(kind === "node" ? updateNodes(ids, { text }) : updateEdges(ids, () => ({ text })));
 		}
 		canvas.focus();
 	}
@@ -699,16 +909,32 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 		return double;
 	}
 
+	const startPan = (event: PointerEvent): Drag => ({
+		kind: "pan",
+		startX: event.clientX,
+		startY: event.clientY,
+		viewX: view.x,
+		viewY: view.y,
+	});
+
 	canvas.addEventListener("pointerdown", (event) => {
 		if (event.button !== 0 && event.button !== 1) return;
 		if (editing !== null) finishText(true);
 		canvas.focus();
+		canvas.setPointerCapture(event.pointerId);
+		// The middle button, or the left one with Space held, moves the view.
+		if (event.button === 1 || spaceDown) {
+			event.preventDefault();
+			drag = startPan(event);
+			return;
+		}
 		const point = toWorld(event.clientX, event.clientY);
 		const handle = hit(event.target, "data-handle");
 		const port = hit(event.target, "data-port");
 		const node = hit(event.target, "data-node");
 		const edge = hit(event.target, "data-edge");
-		if (event.button === 0 && handle === null && port === null) {
+		const additive = event.shiftKey || event.ctrlKey || event.metaKey;
+		if (handle === null && port === null && !additive) {
 			const key = node !== null ? `n:${node}` : edge !== null ? `e:${edge}` : "canvas";
 			if (isDoublePress(event, key)) {
 				event.preventDefault();
@@ -724,7 +950,7 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 				return;
 			}
 		}
-		if (event.button === 0 && handle !== null) {
+		if (handle !== null) {
 			const target = nodeById(handle);
 			if (target !== undefined) {
 				drag = {
@@ -735,32 +961,44 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 					moved: false,
 				};
 			}
-		} else if (event.button === 0 && port !== null) {
+		} else if (port !== null) {
 			drag = { kind: "connect", from: port, pointer: point, over: null };
-		} else if (event.button === 0 && node !== null) {
-			const target = nodeById(node);
-			selection = { kind: "node", id: node };
-			if (target !== undefined)
+		} else if (node !== null) {
+			if (additive) {
+				// Shift or Ctrl adds the shape to the selection, or takes it out.
+				const next = new Set(nodesSelected);
+				if (next.has(node)) next.delete(node);
+				else next.add(node);
+				select(next, edgesSelected);
+			} else if (!nodesSelected.has(node)) {
+				select([node]);
+			}
+			// Pressing a selected shape moves everything selected.
+			if (nodesSelected.has(node)) {
 				drag = {
 					kind: "move",
-					id: node,
+					ids: new Set(nodesSelected),
 					start: point,
-					origin: { x: target.x, y: target.y },
+					origin: diagram,
 					moved: false,
+					only: !additive && nodesSelected.size + edgesSelected.size > 1 ? node : null,
 				};
-		} else if (event.button === 0 && edge !== null) {
-			selection = { kind: "edge", id: edge };
+			}
+		} else if (edge !== null) {
+			if (additive) {
+				const next = new Set(edgesSelected);
+				if (next.has(edge)) next.delete(edge);
+				else next.add(edge);
+				select(nodesSelected, next);
+			} else {
+				select([], [edge]);
+			}
 		} else {
-			if (event.button === 0) selection = null;
-			drag = {
-				kind: "pan",
-				startX: event.clientX,
-				startY: event.clientY,
-				viewX: view.x,
-				viewY: view.y,
-			};
+			// The empty canvas: a box selects the shapes inside it.
+			const base = additive ? new Set(nodesSelected) : new Set<string>();
+			if (!additive) select();
+			drag = { kind: "marquee", start: point, current: point, base };
 		}
-		canvas.setPointerCapture(event.pointerId);
 		render();
 	});
 
@@ -789,11 +1027,28 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 				if (!drag.moved && Math.hypot(dx, dy) * view.zoom < DRAG_START) return;
 				if (!drag.moved) {
 					// One undo step for the whole move.
-					undoStack.push(diagram);
+					undoStack.push(drag.origin);
 					redoStack = [];
 					drag.moved = true;
 				}
-				diagram = updateNode(drag.id, { x: snap(drag.origin.x + dx), y: snap(drag.origin.y + dy) });
+				const moving = drag.origin.nodes.filter(
+					(node) => drag?.kind === "move" && drag.ids.has(node.id),
+				);
+				const box = boxOf(moving);
+				// On the grid, unless a side or middle lines up with another shape.
+				let sx = snap(box.x + dx) - box.x;
+				let sy = snap(box.y + dy) - box.y;
+				const others = drag.origin.nodes.filter(
+					(node) => drag?.kind === "move" && !drag.ids.has(node.id),
+				);
+				const free = { ...box, x: box.x + dx, y: box.y + dy };
+				const lined = event.altKey
+					? { dx: 0, dy: 0, guides: [] }
+					: alignmentGuides(free, others, GUIDE_SNAP / view.zoom);
+				if (lined.guides.some((guide) => guide.x1 === guide.x2)) sx = dx + lined.dx;
+				if (lined.guides.some((guide) => guide.y1 === guide.y2)) sy = dy + lined.dy;
+				guides = lined.guides;
+				diagram = moveNodes(drag.origin, drag.ids, Math.round(sx), Math.round(sy));
 				render();
 				return;
 			}
@@ -808,7 +1063,7 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 					redoStack = [];
 					drag.moved = true;
 				}
-				diagram = updateNode(drag.id, { w, h });
+				diagram = updateNodes(new Set([drag.id]), { w, h });
 				render();
 				return;
 			}
@@ -820,14 +1075,30 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 				renderOverlay();
 				return;
 			}
+			case "marquee": {
+				drag = { ...drag, current: point };
+				const inside = nodesInBox(diagram, {
+					x: drag.start.x,
+					y: drag.start.y,
+					w: point.x - drag.start.x,
+					h: point.y - drag.start.y,
+				});
+				select([...drag.base, ...inside]);
+				render();
+				return;
+			}
 		}
 	});
 
 	const endDrag = (): void => {
 		const ended = drag;
 		drag = null;
+		guides = [];
 		if (ended?.kind === "connect" && ended.over !== null) connect(ended.from, ended.over);
-		else render();
+		else {
+			if (ended?.kind === "move" && !ended.moved && ended.only !== null) select([ended.only]);
+			render();
+		}
 	};
 	canvas.addEventListener("pointerup", endDrag);
 	canvas.addEventListener("pointercancel", endDrag);
@@ -843,7 +1114,10 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 					y: event.clientY - box.top,
 				});
 			} else {
-				view = { ...view, x: view.x - event.deltaX, y: view.y - event.deltaY };
+				// Shift turns the wheel sideways.
+				const dx = event.shiftKey ? event.deltaY : event.deltaX;
+				const dy = event.shiftKey ? 0 : event.deltaY;
+				view = { ...view, x: view.x - dx, y: view.y - dy };
 				applyView();
 			}
 		},
@@ -874,15 +1148,37 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 		if (mod && key === "s") {
 			event.preventDefault();
 			void save();
-		} else if (inField) {
 			return;
-		} else if (mod && key === "z") {
+		}
+		if (inField) return;
+		// Space held: the left button moves the view.
+		if (event.key === " ") {
+			if (event.target instanceof HTMLButtonElement) return;
+			event.preventDefault();
+			spaceDown = true;
+			canvas.classList.add("panning");
+			return;
+		}
+		if (mod && key === "z") {
 			event.preventDefault();
 			if (event.shiftKey) redo();
 			else undo();
 		} else if (mod && key === "y") {
 			event.preventDefault();
 			redo();
+		} else if (mod && key === "a") {
+			event.preventDefault();
+			selectAll();
+		} else if (mod && key === "c") {
+			if (copySelection()) event.preventDefault();
+		} else if (mod && key === "x") {
+			if (copySelection()) {
+				event.preventDefault();
+				deleteSelection();
+			}
+		} else if (mod && key === "v") {
+			event.preventDefault();
+			paste();
 		} else if (mod && key === "d") {
 			event.preventDefault();
 			duplicateSelection();
@@ -890,10 +1186,17 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 			event.preventDefault();
 			deleteSelection();
 		} else if (event.key === "Enter" || event.key === "F2") {
-			if (selection === null) return;
-			event.preventDefault();
-			editText(selection.kind, selection.id);
-		} else if (event.key.startsWith("Arrow") && selection?.kind === "node") {
+			const single = onlyNode();
+			const edge =
+				nodesSelected.size === 0 && edgesSelected.size === 1 ? [...edgesSelected][0] : undefined;
+			if (single !== undefined) {
+				event.preventDefault();
+				editText("node", single.id);
+			} else if (edge !== undefined) {
+				event.preventDefault();
+				editText("edge", edge);
+			}
+		} else if (event.key.startsWith("Arrow") && nodesSelected.size > 0) {
 			event.preventDefault();
 			const step = event.shiftKey ? 1 : GRID;
 			const [dx, dy] = {
@@ -905,12 +1208,17 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 			nudge(dx as number, dy as number);
 		}
 	});
+	dialog.addEventListener("keyup", (event) => {
+		if (event.key !== " ") return;
+		spaceDown = false;
+		canvas.classList.remove("panning");
+	});
 
 	// Escape: leaves the selection first, then the panel (asking when there are changes).
 	dialog.addEventListener("cancel", (event) => {
 		event.preventDefault();
-		if (selection !== null) {
-			selection = null;
+		if (nodesSelected.size + edgesSelected.size > 0) {
+			select();
 			render();
 			return;
 		}
@@ -964,9 +1272,12 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 			initial = serializeDiagram(diagram);
 			undoStack = [];
 			redoStack = [];
-			selection = null;
+			select();
 			hover = null;
 			drag = null;
+			guides = [];
+			spaceDown = false;
+			pasteCount = 0;
 			editing = null;
 			textEdit.hidden = true;
 			title.value = next.title;

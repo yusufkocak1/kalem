@@ -24,7 +24,17 @@ export function isDiagramPicture(name: string): boolean {
 		.endsWith(DIAGRAM_SUFFIX);
 }
 
-export const SHAPES = ["terminal", "process", "decision", "io", "document", "database"] as const;
+export const SHAPES = [
+	"terminal",
+	"process",
+	"decision",
+	"io",
+	"document",
+	"database",
+	"subprocess",
+	"circle",
+	"text",
+] as const;
 export type ShapeKind = (typeof SHAPES)[number];
 
 export const COLORS = {
@@ -49,12 +59,17 @@ export interface DiagramNode {
 	readonly color: ColorName;
 }
 
+export const ARROWS = ["end", "both", "none"] as const;
+/** Where a connector has arrowheads. */
+export type ArrowKind = (typeof ARROWS)[number];
+
 export interface DiagramEdge {
 	readonly id: string;
 	readonly from: string;
 	readonly to: string;
 	readonly text: string;
 	readonly dashed: boolean;
+	readonly arrow: ArrowKind;
 }
 
 export interface Diagram {
@@ -81,6 +96,9 @@ export const DEFAULT_SIZE: Readonly<Record<ShapeKind, { w: number; h: number }>>
 	io: { w: 170, h: 70 },
 	document: { w: 160, h: 80 },
 	database: { w: 120, h: 90 },
+	subprocess: { w: 170, h: 70 },
+	circle: { w: 60, h: 60 },
+	text: { w: 160, h: 40 },
 };
 
 export const FONT_SIZE = 14;
@@ -155,7 +173,8 @@ export function parseDiagram(text: string): Diagram | null {
 		const to = str(raw.to);
 		if (id === "" || ids.has(id) || !ids.has(from) || !ids.has(to) || from === to) continue;
 		ids.add(id);
-		edges.push({ id, from, to, text: str(raw.text), dashed: raw.dashed === true });
+		const arrow = ARROWS.includes(raw.arrow as ArrowKind) ? (raw.arrow as ArrowKind) : "end";
+		edges.push({ id, from, to, text: str(raw.text), dashed: raw.dashed === true, arrow });
 	}
 	return { nodes, edges };
 }
@@ -184,7 +203,20 @@ function anchor(node: DiagramNode, side: Side): Point {
  */
 export function edgeRoute(from: DiagramNode, to: DiagramNode): { points: Point[]; label: Point } {
 	const vertical = to.y >= from.y + from.h + GRID || from.y >= to.y + to.h + GRID;
+	const across = to.x + to.w / 2 - (from.x + from.w / 2);
 	let points: Point[];
+	if (vertical && from.shape === "decision" && Math.abs(across) > from.w / 2) {
+		// A decision's branch to one side leaves from that corner of the diamond, so
+		// it does not share the way down with the branch below.
+		const down = to.y > from.y;
+		const a = anchor(from, across > 0 ? "right" : "left");
+		const b = anchor(to, down ? "top" : "bottom");
+		points = [a, { x: b.x, y: a.y }, b];
+		// On the longer leg: a short one leaves the label on the diamond's corner.
+		return Math.abs(b.x - a.x) >= Math.abs(b.y - a.y)
+			? { points, label: { x: (a.x + b.x) / 2, y: a.y } }
+			: { points, label: { x: b.x, y: (a.y + b.y) / 2 } };
+	}
 	if (vertical) {
 		const down = to.y > from.y;
 		const a = anchor(from, down ? "bottom" : "top");
@@ -243,11 +275,19 @@ function textWidth(node: DiagramNode): number {
 			return node.w - 2 * skew(node) - 12;
 		case "terminal":
 			return node.w - node.h * 0.5;
+		case "subprocess":
+			return node.w - 2 * SIDE_BAR - 12;
+		case "circle":
+			return node.w * 0.75;
+		case "text":
+			return node.w - 4;
 		default:
 			return node.w - 16;
 	}
 }
 
+/** Inset of the inner lines of a subprocess. */
+const SIDE_BAR = 12;
 const skew = (node: DiagramNode): number => Math.min(24, node.w * 0.15);
 const cap = (node: DiagramNode): number => Math.min(12, node.h * 0.15);
 
@@ -307,7 +347,11 @@ const svg = (
 
 const round = (value: number): number => Math.round(value * 100) / 100;
 
-function outline(node: DiagramNode, attrs: Record<string, string | number>): SvgNode[] {
+function outline(
+	node: DiagramNode,
+	attrs: Record<string, string | number>,
+	interactive: boolean,
+): SvgNode[] {
 	const { x, y, w, h } = node;
 	switch (node.shape) {
 		case "process":
@@ -339,6 +383,20 @@ function outline(node: DiagramNode, attrs: Record<string, string | number>): Svg
 				}),
 			];
 		}
+		case "subprocess":
+			return [
+				svg("rect", { x, y, width: w, height: h, ...attrs }),
+				svg("path", {
+					d: `M${x + SIDE_BAR} ${y}V${y + h}M${x + w - SIDE_BAR} ${y}V${y + h}`,
+					...attrs,
+					fill: "none",
+				}),
+			];
+		case "circle":
+			return [svg("ellipse", { cx: x + w / 2, cy: y + h / 2, rx: w / 2, ry: h / 2, ...attrs })];
+		case "text":
+			// Only text; in the editor a clear box keeps it easy to grab.
+			return interactive ? [svg("rect", { x, y, width: w, height: h, fill: "transparent" })] : [];
 		case "database": {
 			const c = cap(node);
 			const r = w / 2;
@@ -382,7 +440,7 @@ function nodeElement(node: DiagramNode, interactive: boolean): SvgNode {
 	const centerY =
 		node.shape === "database" ? node.y + node.h / 2 + cap(node) / 2 : node.y + node.h / 2;
 	return svg("g", interactive ? { "data-node": node.id, class: "kd-node" } : {}, [
-		...outline(node, { fill: color.fill, stroke: color.stroke, "stroke-width": 1.5 }),
+		...outline(node, { fill: color.fill, stroke: color.stroke, "stroke-width": 1.5 }, interactive),
 		...(lines.length === 0 ? [] : [textBlock(lines, node.x + node.w / 2, centerY)]),
 	]);
 }
@@ -393,7 +451,7 @@ function edgeElement(
 	to: DiagramNode,
 	interactive: boolean,
 ): SvgNode {
-	const { points, label } = edgeRoute(from, to);
+	const { points } = edgeRoute(from, to);
 	const d = points
 		.map((point, index) => `${index === 0 ? "M" : "L"}${round(point.x)} ${round(point.y)}`)
 		.join("");
@@ -409,25 +467,35 @@ function edgeElement(
 			fill: "none",
 			stroke: EDGE_COLOR,
 			"stroke-width": 1.5,
-			"marker-end": "url(#kd-arrow)",
+			...(edge.arrow === "none" ? {} : { "marker-end": "url(#kd-arrow)" }),
+			...(edge.arrow === "both" ? { "marker-start": "url(#kd-arrow)" } : {}),
 			...(edge.dashed ? { "stroke-dasharray": "6 4" } : {}),
 		}),
 	);
-	if (edge.text !== "") {
-		const size = labelSize(edge.text);
-		children.push(
-			svg("rect", {
-				x: round(label.x - size.w / 2),
-				y: round(label.y - size.h / 2),
-				width: round(size.w),
-				height: round(size.h),
-				rx: 3,
-				fill: "#ffffff",
-			}),
-			textBlock(edge.text.split("\n"), label.x, label.y),
-		);
-	}
 	return svg("g", interactive ? { "data-edge": edge.id, class: "kd-edge" } : {}, children);
+}
+
+/** A connector's text on a white box; drawn after every line, so no line crosses it. */
+function edgeLabel(
+	edge: DiagramEdge,
+	from: DiagramNode,
+	to: DiagramNode,
+	interactive: boolean,
+): SvgNode | null {
+	if (edge.text === "") return null;
+	const { label } = edgeRoute(from, to);
+	const size = labelSize(edge.text);
+	return svg("g", interactive ? { "data-edge": edge.id, class: "kd-label" } : {}, [
+		svg("rect", {
+			x: round(label.x - size.w / 2),
+			y: round(label.y - size.h / 2),
+			width: round(size.w),
+			height: round(size.h),
+			rx: 3,
+			fill: "#ffffff",
+		}),
+		textBlock(edge.text.split("\n"), label.x, label.y),
+	]);
 }
 
 const ARROW = svg("defs", {}, [
@@ -451,13 +519,21 @@ const ARROW = svg("defs", {}, [
 export function diagramContent(diagram: Diagram, interactive = false): SvgNode[] {
 	const byId = new Map(diagram.nodes.map((node) => [node.id, node]));
 	const edges: SvgNode[] = [];
+	const labels: SvgNode[] = [];
 	for (const edge of diagram.edges) {
 		const from = byId.get(edge.from);
 		const to = byId.get(edge.to);
-		if (from !== undefined && to !== undefined)
-			edges.push(edgeElement(edge, from, to, interactive));
+		if (from === undefined || to === undefined) continue;
+		edges.push(edgeElement(edge, from, to, interactive));
+		const label = edgeLabel(edge, from, to, interactive);
+		if (label !== null) labels.push(label);
 	}
-	return [ARROW, ...edges, ...diagram.nodes.map((node) => nodeElement(node, interactive))];
+	return [
+		ARROW,
+		...edges,
+		...labels,
+		...diagram.nodes.map((node) => nodeElement(node, interactive)),
+	];
 }
 
 export const PADDING = 20;

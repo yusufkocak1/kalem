@@ -27,7 +27,7 @@ describe("diagram data", () => {
 	it("round-trips and repairs what it cannot use", () => {
 		const diagram: Diagram = {
 			nodes: [node("n1", 0, 0, { text: "Başla", shape: "terminal" }), node("n2", 0, 200)],
-			edges: [{ id: "e1", from: "n1", to: "n2", text: "evet", dashed: true }],
+			edges: [{ id: "e1", from: "n1", to: "n2", text: "evet", dashed: true, arrow: "end" }],
 		};
 		expect(parseDiagram(serializeDiagram(diagram))).toEqual(diagram);
 
@@ -84,6 +84,19 @@ describe("diagram geometry", () => {
 		expect(edgeRoute(node("b", 0, 200), a).points[0]).toEqual({ x: 80, y: 200 });
 	});
 
+	it("takes a decision's branch to one side out of that corner", () => {
+		const decision = node("d", 0, 0, { shape: "decision", h: 100 });
+		const route = edgeRoute(decision, node("b", 300, 200));
+		expect(route.points).toEqual([
+			{ x: 160, y: 50 },
+			{ x: 380, y: 50 },
+			{ x: 380, y: 200 },
+		]);
+		expect(route.label).toEqual({ x: 270, y: 50 });
+		// Straight below it still goes down.
+		expect(edgeRoute(decision, node("c", 0, 200)).points).toHaveLength(2);
+	});
+
 	it("wraps text to the shape", () => {
 		expect(wrapLines("Müşteri kaydı var mı?", 80)).toEqual(["Müşteri", "kaydı var", "mı?"]);
 		expect(wrapLines("bir\niki", 500)).toEqual(["bir", "iki"]);
@@ -93,7 +106,16 @@ describe("diagram geometry", () => {
 	it("covers the shapes and the edge labels", () => {
 		const diagram: Diagram = {
 			nodes: [node("a", 0, 0), node("b", 300, 0)],
-			edges: [{ id: "e", from: "a", to: "b", text: "çok uzun bir etiket metni", dashed: false }],
+			edges: [
+				{
+					id: "e",
+					from: "a",
+					to: "b",
+					text: "çok uzun bir etiket metni",
+					dashed: false,
+					arrow: "end",
+				},
+			],
 		};
 		expect(bounds(diagram)).toEqual({ x: 0, y: 0, w: 460, h: 70 });
 		expect(bounds({ nodes: [], edges: [] })).toEqual({ x: 0, y: 0, w: 200, h: 100 });
@@ -107,7 +129,7 @@ describe("diagram drawing", () => {
 				node("a", 0, 0, { text: 'A < B & "C"', shape: "decision", color: "blue" }),
 				node("b", 0, 200),
 			],
-			edges: [{ id: "e", from: "a", to: "b", text: "evet", dashed: false }],
+			edges: [{ id: "e", from: "a", to: "b", text: "evet", dashed: false, arrow: "end" }],
 		});
 		expect([width, height]).toEqual([200, 310]);
 		const markup = svgMarkup(svg);
