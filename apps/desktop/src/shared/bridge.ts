@@ -145,6 +145,17 @@ export interface ConfluenceAttachment {
 	readonly version: number;
 }
 
+/** A diagram's PNG (its data inside), new or replacing an existing file. */
+export interface DiagramWrite {
+	readonly bytes: Uint8Array;
+	/** For a new diagram. */
+	readonly title?: string;
+	/** The document's URL of the diagram being replaced. */
+	readonly url?: string;
+	/** The attachment being replaced, on a Confluence page. */
+	readonly name?: string;
+}
+
 /** A file uploaded to the page, ready to be linked. */
 export interface ConfluenceUpload {
 	readonly name: string;
@@ -368,6 +379,7 @@ export const COMMANDS = [
 	"replace",
 	"image",
 	"attach-file",
+	"diagram",
 	"table",
 	"link",
 	"divider",
@@ -450,6 +462,11 @@ export interface KalemBridge {
 	confluenceSavePage(tabId: string, request: ConfluenceSaveRequest): Promise<ConfluenceSaveResult>;
 	/** Attaches the image to the tab's page; resolves with the attachment's file name. */
 	confluenceAttachImage(tabId: string, image: ImageFile): Promise<string>;
+	/**
+	 * Uploads a diagram to the tab's page: a new attachment named after
+	 * `title`, or a new version of `name`.
+	 */
+	confluenceWriteDiagram(tabId: string, diagram: DiagramWrite): Promise<ConfluenceUpload>;
 	/** The files attached to the tab's page. */
 	confluenceAttachments(tabId: string): Promise<readonly ConfluenceAttachment[]>;
 	/** Uploads files to the tab's page; without paths the user picks them. */
@@ -483,6 +500,11 @@ export interface KalemBridge {
 	pickImages(): Promise<readonly ImageFile[]>;
 	/** Lets the user pick files and copies them next to the document. */
 	pickAttachments(documentPath: string): Promise<readonly Attachment[]>;
+	/**
+	 * Writes a diagram next to the document (or into its package): a new file
+	 * named after `title`, or over the one at `url`. Resolves with its URL.
+	 */
+	writeDiagram(documentPath: string, diagram: DiagramWrite): Promise<string>;
 	/** Copies the given files (dropped onto the window) next to the document. */
 	attachPaths(documentPath: string, paths: readonly string[]): Promise<readonly Attachment[]>;
 
@@ -549,6 +571,8 @@ export const CHANNEL = {
 	confluenceSavePage: "kalem:confluence-save-page",
 	confluenceAttachImage: "kalem:confluence-attach-image",
 	confluenceAttachments: "kalem:confluence-attachments",
+	confluenceWriteDiagram: "kalem:confluence-write-diagram",
+	writeDiagram: "kalem:write-diagram",
 	confluenceUploadFiles: "kalem:confluence-upload-files",
 	confluenceOpenAttachment: "kalem:confluence-open-attachment",
 	confluenceDownloadAttachment: "kalem:confluence-download-attachment",

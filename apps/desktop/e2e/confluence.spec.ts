@@ -5,6 +5,8 @@ import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { PNG_1X1 } from "../src/main/sample-docx.test-helper.js";
+import { parseDiagram } from "../src/shared/diagram.js";
+import { readPngText } from "../src/shared/png-text.js";
 import {
 	clickMenu,
 	launch,
@@ -650,6 +652,61 @@ test("opens an attachment from its link in the page", async () => {
 	const opened = () => app.evaluate(() => (globalThis as { opened?: string }).opened ?? "");
 	await expect.poll(opened).toMatch(/Troya Logları\.txt$/);
 	expect(await readFile(await opened(), "utf8")).toBe("log satırı");
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("draws a diagram on a Confluence page as an attachment", async () => {
+	const confluence = await fakeConfluence();
+	cleanup.push(confluence.close);
+	const { app, page, errors } = await launch();
+
+	await clickMenu(app, "File", "Open from Confluence…");
+	const connect = page.locator(".confluence-dialog");
+	await connect.locator('input[type="url"]').fill(confluence.site);
+	await connect.locator('input[type="password"]').fill(TOKEN);
+	await connect.getByRole("button", { name: "Connect" }).click();
+	await connect.locator(".quick-open-item", { hasText: "Sprint Planı" }).click();
+	await page.locator("#editor p", { hasText: "Hedef" }).click();
+	await page.keyboard.press("End");
+
+	const editor = page.locator(".diagram-editor");
+	await clickMenu(app, "Insert", "Diagram…");
+	await editor.locator('[data-shape="terminal"]').click();
+	await editor.getByRole("textbox", { name: "Diagram name" }).fill("Akış");
+	await editor.getByRole("button", { name: "Save", exact: true }).click();
+	await expect(editor).toBeHidden();
+
+	const uploaded = () => confluence.attachments.find((item) => item.name === "Akış.diagram.png");
+	expect(uploaded()).toMatchObject({ type: "image/png", version: 1 });
+	const nodes = () => {
+		const text = readPngText(new Uint8Array(uploaded()?.bytes ?? []), "kalem-diagram");
+		return text === null ? null : parseDiagram(text)?.nodes.length;
+	};
+	expect(nodes()).toBe(1);
+	const image = page.locator('#editor img[alt="Akış"]');
+	await expect(image).toHaveAttribute("src", "Akış.diagram.png");
+	await expect
+		.poll(() => image.evaluate((img: HTMLImageElement) => img.naturalWidth))
+		.toBeGreaterThan(100);
+
+	const asked = await recordMessageBoxes(app, 0);
+	await page.locator('[data-command="save"]').click();
+	await expect(page.locator(".save-status")).toHaveText("Saved");
+	expect(await asked()).toEqual(["Update the page on Confluence?"]);
+	expect(confluence.saves[0]?.storage).toContain(
+		'<p>Hedef</p><p><ac:image ac:alt="Akış"><ri:attachment ri:filename="Akış.diagram.png" /></ac:image></p>',
+	);
+
+	// Editing it again uploads a new version of the same attachment.
+	await image.dblclick();
+	await expect(editor).toBeVisible();
+	await expect(editor.locator(".kd-node")).toHaveCount(1);
+	await editor.locator('[data-shape="process"]').click();
+	await editor.getByRole("button", { name: "Save", exact: true }).click();
+	await expect(editor).toBeHidden();
+	expect(uploaded()?.version).toBe(2);
+	expect(nodes()).toBe(2);
 	expect(errors).toEqual([]);
 	await app.close();
 });

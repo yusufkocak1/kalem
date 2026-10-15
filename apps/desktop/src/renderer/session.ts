@@ -53,7 +53,7 @@ import {
 	renderStyledHtml,
 } from "../shared/table-style.js";
 import { decorateLocked } from "./confluence-locked.js";
-import { insertLink, insertTable } from "./edits.js";
+import { insertImageBlock, insertLink, insertTable } from "./edits.js";
 import type { Notices } from "./notices.js";
 import type { Previews } from "./previews.js";
 import { TableStyles } from "./table-styles.js";
@@ -874,6 +874,28 @@ export class Session {
 				text: `${t.attachFailed}: ${ipcErrorMessage(error)}`,
 			});
 		}
+	}
+
+	/**
+	 * A file inside the package changed without the text changing (an edited
+	 * diagram): the package needs saving to keep it.
+	 */
+	markAssetsChanged(): void {
+		this.#savedText = null;
+		this.#refreshDirty(this.#text());
+	}
+
+	/** Puts a diagram's picture below the caret's block; `false` when read only. */
+	insertDiagram(alt: string, url: string, fallback: Caret | null = null): boolean {
+		const editor = this.editor;
+		if (editor.isReadOnly()) {
+			this.#o.notices.show({ id: "edit", kind: "warning", text: this.#o.t.readOnlyBlocked });
+			return false;
+		}
+		editor.applyEdit(
+			insertImageBlock(editor.getDocument(), editor.getCaret() ?? fallback, alt, url),
+		);
+		return true;
 	}
 
 	/** Links a page attachment at the caret, or shows it when it is an image; `false` when read only. */

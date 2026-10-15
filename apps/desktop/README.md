@@ -259,6 +259,30 @@ verir.
 - Göreli görseller ve dosya bağlantıları Confluence ekine (`ri:attachment`)
   çevrilir; dosyaların sayfaya ayrıca eklenmesi gerekir.
 
+**Diyagramlar**
+
+- **Ekle → Diyagram** akış diyagramı düzenleyicisini ayrı bir panelde açar:
+  soldaki şekiller (Başla/Bitir, Adım, Karar, Girdi/Çıktı, Belge,
+  Veritabanı) kanvasa sürüklenir ya da tıklanır — bir şekil seçiliyken
+  tıklanan yenisi altına, ona bağlı olarak eklenir. Şekillerin kenarındaki
+  noktalardan sürükleyerek ok çizilir; şekle ya da oka çift tıklayınca
+  yazılır (Shift+Enter yeni satır). Taşıma, köşeden boyutlandırma, renk,
+  kesikli ok, geri al/yinele (Ctrl+Z / Ctrl+Y), çoğaltma (Ctrl+D),
+  yakınlaştırma (Ctrl+tekerlek) ve kaydırma (boş kanvası sürükleyerek).
+- Diyagram **tek bir dosyadır: `<ad>.diagram.png`**. Her yerde açılan
+  sıradan bir PNG resmi; diyagramın verisi (şekiller, oklar, yazılar) aynı
+  dosyanın içinde, PNG'nin bir metin bölümünde (`iTXt`, `kalem-diagram`)
+  saklanır. Resim ile veri birbirinden kopamaz.
+  - `.md` belgesinde dosya `<belge>.assets/` klasörüne yazılır; belge
+    kaydedilmemişse önce kaydedilir.
+  - `.kmd` paketinde dosya paketin `assets/` klasörüne girer; düzenlenen
+    bir diyagram paketi kaydedilmemiş yapar.
+  - Confluence sayfasında dosya sayfaya **ek olarak yüklenir** ve sayfada
+    resim olarak görünür; her düzenleme o ekin yeni sürümü olur.
+- Diyagram resminin üzerine gelince çıkan **✎ Diyagramı Düzenle** düğmesi ya
+  da resme çift tıklamak düzenleyiciyi verisiyle açar; kaydetmek aynı dosyayı
+  yeniler.
+
 **Düzenleme**
 
 - Şerit: Giriş / Ekle / Görünüm sekmeleri, stil galerisi, hızlı erişim.

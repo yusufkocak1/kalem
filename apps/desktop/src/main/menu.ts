@@ -280,6 +280,7 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 			submenu: [
 				{ label: `${t.image}…`, click: send(ctx, "image") },
 				{ label: `${t.attachFile}…`, click: send(ctx, "attach-file") },
+				{ label: t.diagramInsert, click: send(ctx, "diagram") },
 				{ label: t.table, click: send(ctx, "table") },
 				{ label: `${t.link}…`, ...editorShortcut("CmdOrCtrl+K"), click: send(ctx, "link") },
 				{ type: "separator" },

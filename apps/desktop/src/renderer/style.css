@@ -1612,6 +1612,278 @@ button {
 	outline-offset: -1px;
 }
 
+/* --- Diagram editor ---------------------------------------------------------- */
+
+.diagram-editor {
+	display: none;
+	flex-direction: column;
+	box-sizing: border-box;
+	width: calc(100vw - 32px);
+	max-width: none;
+	height: calc(100vh - 32px);
+	max-height: none;
+	padding: 0;
+	overflow: hidden;
+	border: 1px solid var(--app-border);
+	border-radius: 10px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: var(--app-shadow);
+}
+
+.diagram-editor[open] {
+	display: flex;
+}
+
+.diagram-editor::backdrop {
+	background: rgb(0 0 0 / 25%);
+}
+
+.diagram-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--app-border);
+}
+
+.diagram-title {
+	width: 220px;
+	min-width: 0;
+	padding: 5px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-page);
+	color: var(--app-text);
+	font: inherit;
+}
+
+.diagram-group {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.diagram-group[hidden] {
+	display: none;
+}
+
+.diagram-tool {
+	min-width: 30px;
+	height: 30px;
+	padding: 0 6px;
+	border: 1px solid transparent;
+	border-radius: 6px;
+	background: none;
+	color: var(--app-text);
+	font: inherit;
+	font-size: 16px;
+}
+
+.diagram-tool:hover:not(:disabled) {
+	border-color: var(--app-border);
+	background: var(--app-hover);
+}
+
+.diagram-tool:disabled {
+	opacity: 0.4;
+}
+
+.diagram-tool[aria-pressed="true"] {
+	background: var(--app-pressed);
+	color: var(--app-accent);
+}
+
+.diagram-zoom {
+	min-width: 52px;
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+}
+
+.diagram-swatch {
+	width: 20px;
+	height: 20px;
+	margin: 0 1px;
+	padding: 0;
+	border: 2px solid;
+	border-radius: 50%;
+}
+
+.diagram-swatch[aria-pressed="true"] {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 1px;
+}
+
+.diagram-spacer {
+	flex: 1;
+}
+
+.diagram-body {
+	display: flex;
+	flex: 1;
+	min-height: 0;
+}
+
+.diagram-palette {
+	display: flex;
+	flex: none;
+	flex-direction: column;
+	gap: 6px;
+	width: 140px;
+	padding: 10px;
+	overflow-y: auto;
+	border-right: 1px solid var(--app-border);
+}
+
+.diagram-shape {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	padding: 6px 4px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-page);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 12px;
+	cursor: grab;
+}
+
+.diagram-shape:hover {
+	border-color: var(--app-accent);
+}
+
+.diagram-shape-preview {
+	width: 64px;
+	height: 40px;
+}
+
+.diagram-help {
+	margin: 6px 0 0;
+	color: var(--app-muted);
+	font-size: 11px;
+	line-height: 1.4;
+}
+
+.diagram-viewport {
+	position: relative;
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	/* The picture that goes into the document is drawn on white. */
+	background: #ffffff;
+}
+
+.diagram-canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+	outline: none;
+	touch-action: none;
+	user-select: none;
+}
+
+.diagram-canvas .kd-node {
+	cursor: move;
+}
+
+.diagram-canvas .kd-edge {
+	cursor: pointer;
+}
+
+.diagram-canvas .kd-edge.selected path[marker-end] {
+	stroke: #2563eb;
+	stroke-width: 2.5;
+}
+
+.diagram-selected,
+.diagram-target,
+.diagram-pending {
+	fill: none;
+	pointer-events: none;
+	vector-effect: non-scaling-stroke;
+}
+
+.diagram-selected {
+	stroke: #2563eb;
+	stroke-dasharray: 4 3;
+}
+
+.diagram-target {
+	stroke: #16a34a;
+	stroke-width: 2;
+}
+
+.diagram-pending {
+	stroke: #2563eb;
+	stroke-width: 1.5;
+	stroke-dasharray: 5 4;
+}
+
+.diagram-handle {
+	fill: #ffffff;
+	stroke: #2563eb;
+	vector-effect: non-scaling-stroke;
+	cursor: nwse-resize;
+}
+
+.diagram-port {
+	fill: #2563eb;
+	stroke: #ffffff;
+	vector-effect: non-scaling-stroke;
+	cursor: crosshair;
+}
+
+.diagram-text-edit {
+	position: absolute;
+	z-index: 2;
+	box-sizing: border-box;
+	padding: 4px;
+	resize: none;
+	border: 2px solid #2563eb;
+	border-radius: 4px;
+	background: rgb(255 255 255 / 95%);
+	color: #0f172a;
+	font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+	line-height: 1.3;
+	text-align: center;
+	outline: none;
+}
+
+.diagram-status {
+	position: absolute;
+	top: 40%;
+	left: 50%;
+	margin: 0;
+	color: #64748b;
+	transform: translateX(-50%);
+	pointer-events: none;
+}
+
+.diagram-status[hidden] {
+	display: none;
+}
+
+/* Over a diagram image in the document. */
+.diagram-edit-button {
+	position: fixed;
+	z-index: 40;
+	padding: 4px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: var(--app-shadow);
+	font: inherit;
+	font-size: 12px;
+}
+
+.diagram-edit-button:hover {
+	background: var(--app-hover);
+}
+
 /* --- Version history ------------------------------------------------------- */
 
 .versions {

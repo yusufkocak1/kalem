@@ -4,15 +4,19 @@ import type { Caret, EditResult } from "@kalem-editor/editor";
 import { indentItem, outdentItem, toggleList } from "@kalem-editor/editor";
 import type { Command, KalemBridge, Settings, SidePane, TabDocument } from "../shared/bridge.js";
 import { clampZoom, MAX_ZOOM, MIN_ZOOM, pageRule, ZOOM_STEP } from "../shared/bridge.js";
-import { linkedAttachment } from "../shared/confluence-common.js";
+import { attachmentName, linkedAttachment } from "../shared/confluence-common.js";
+import { DIAGRAM_SUFFIX } from "../shared/diagram.js";
 import { format, stringsFor } from "../shared/i18n.js";
-import { isEditablePath, isWordPath } from "../shared/paths.js";
+import { isEditablePath, isPackagePath, isWordPath } from "../shared/paths.js";
 import { withColumnWidth } from "../shared/table-style.js";
 import { changeCase, collapseSpaces, nextCase } from "../shared/text-case.js";
 import { createAttachmentCard } from "./attachment-card.js";
 import { createAttachmentsDialog, linkedAttachments } from "./confluence-attachments.js";
 import { createConfluenceDialog } from "./confluence-dialog.js";
 import { createConfluencePane } from "./confluence-pane.js";
+import { createDiagramButton, isDiagramImage } from "./diagram-button.js";
+import { createDiagramEditor } from "./diagram-editor.js";
+import { diagramFromImage, diagramToPng } from "./diagram-image.js";
 import { createDocumentTools } from "./document-tools.js";
 import { el, isTextFieldFocused } from "./dom.js";
 import type { TableContext, TableEdit } from "./edits.js";
@@ -564,6 +568,7 @@ const commands: Record<Command, () => void> = {
 	replace: () => session.find?.open("replace"),
 	image: () => void session.insertImages(),
 	"attach-file": () => void session.attachFiles(),
+	diagram: () => newDiagram(),
 	table: () => edit((doc, caret) => insertTable(doc, caret, 3, 3)),
 	link: () => {
 		if (canEdit()) session.ui?.linkPopover?.open();
@@ -741,6 +746,99 @@ window.addEventListener("dragover", (event) => {
 window.addEventListener("drop", (event) => event.preventDefault());
 
 // --- Links ------------------------------------------------------------------
+
+// --- Diagrams -----------------------------------------------------------------
+
+const diagramEditor = createDiagramEditor(t);
+
+/** Draws a new diagram and puts its picture at the caret. */
+function newDiagram(): void {
+	const tab = session;
+	if (tab.editor.isReadOnly()) {
+		tab.notices.show({ id: "edit", kind: "warning", text: t.readOnlyBlocked });
+		return;
+	}
+	const caret = tab.editor.getCaret();
+	diagramEditor.open({
+		diagram: null,
+		title: t.diagramDefaultName,
+		titleEditable: true,
+		async save(diagram, title) {
+			const name = title === "" ? t.diagramDefaultName : title;
+			const bytes = await diagramToPng(diagram);
+			let url: string;
+			if (tab.remote !== null) {
+				url = (await bridge.confluenceWriteDiagram(tab.id, { bytes, title: name })).url;
+			} else {
+				// Its file goes next to the document, so the document needs a place first.
+				if (tab.path === null) await tab.save();
+				if (tab.path === null) throw new Error(t.diagramNeedsSave);
+				url = await bridge.writeDiagram(tab.path, { bytes, title: name });
+			}
+			tab.insertDiagram(name, url, caret);
+			return true;
+		},
+	});
+}
+
+/** Opens the diagram an image of the document was drawn from; saving rewrites that file. */
+async function editDiagram(image: HTMLImageElement): Promise<void> {
+	const tab = session;
+	const url = image.getAttribute("src") ?? "";
+	const fail = (text: string): void => tab.notices.show({ id: "diagram", kind: "warning", text });
+	let diagram: Awaited<ReturnType<typeof diagramFromImage>>;
+	try {
+		diagram = await diagramFromImage(image.src);
+	} catch (error) {
+		fail(format(t.diagramLoadFailed, ipcErrorMessage(error)));
+		return;
+	}
+	if (diagram === null) {
+		fail(t.diagramNotEditable);
+		return;
+	}
+	const file = attachmentName(url) ?? url;
+	diagramEditor.open({
+		diagram,
+		title: file.slice(0, file.length - DIAGRAM_SUFFIX.length) || file,
+		titleEditable: false,
+		async save(next) {
+			const bytes = await diagramToPng(next);
+			if (tab.remote !== null) {
+				await bridge.confluenceWriteDiagram(tab.id, { bytes, name: file });
+			} else {
+				if (tab.path === null) throw new Error(t.diagramNeedsSave);
+				await bridge.writeDiagram(tab.path, { bytes, url });
+				// Inside a package the file only reaches the package when it is saved.
+				if (isPackagePath(tab.path)) tab.markAssetsChanged();
+			}
+			// The file is served uncached: setting the source again loads the new drawing.
+			for (const shown of document.querySelectorAll<HTMLImageElement>("#editor img")) {
+				if (shown.getAttribute("src") !== url) continue;
+				const source = shown.src;
+				shown.removeAttribute("src");
+				shown.src = source;
+			}
+			return true;
+		},
+	});
+}
+
+createDiagramButton({
+	host: deskArea,
+	label: t.diagramEdit,
+	edit: (image) => void editDiagram(image),
+});
+deskArea.addEventListener(
+	"dblclick",
+	(event) => {
+		if (!isDiagramImage(event.target)) return;
+		event.preventDefault();
+		event.stopPropagation();
+		void editDiagram(event.target);
+	},
+	true,
+);
 
 // --- Confluence attachments -------------------------------------------------
 

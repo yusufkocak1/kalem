@@ -1,5 +1,6 @@
 import { pathToFileURL } from "node:url";
 import { net, protocol } from "electron";
+import { DIAGRAM_SUFFIX } from "../shared/diagram.js";
 import { extension, urlPathToFilePath } from "../shared/paths.js";
 
 /**
@@ -28,7 +29,13 @@ export function registerDocumentScheme(): void {
 	protocol.registerSchemesAsPrivileged([
 		{
 			scheme: DOCUMENT_SCHEME,
-			privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
+			privileges: {
+				standard: true,
+				secure: true,
+				supportFetchAPI: true,
+				stream: true,
+				corsEnabled: true,
+			},
 		},
 	]);
 }
@@ -56,21 +63,41 @@ async function serveAttachment(url: URL, load: AttachmentLoader): Promise<Respon
 	}
 }
 
+/**
+ * A diagram is rewritten in place when it is edited; kept in the image
+ * cache, the document would go on showing the old drawing. The diagram
+ * editor reads its data back with `fetch`, from the app's own page.
+ */
+function uncached(url: URL, response: Response): Response {
+	if (!url.pathname.toLowerCase().endsWith(DIAGRAM_SUFFIX) || !response.ok) return response; // kalem-locale-ok: URL paths
+	const headers = new Headers(response.headers);
+	headers.set("Cache-Control", "no-store");
+	headers.set("Access-Control-Allow-Origin", "*");
+	return new Response(response.body, { status: response.status, headers });
+}
+
 /** Must run after the app is ready. */
 export function handleDocumentScheme(loadAttachment: AttachmentLoader): void {
 	protocol.handle(DOCUMENT_SCHEME, async (request) => {
-		if (request.method !== "GET") return new Response(null, { status: 405 });
-
 		const url = new URL(request.url);
-		if (url.hostname === CONFLUENCE_HOST) return serveAttachment(url, loadAttachment);
-		const path = urlPathToFilePath(new URL(request.url).pathname, process.platform === "win32");
-		if (path === null || !SERVED_EXTENSIONS.has(extension(path))) {
-			return new Response(null, { status: 403 });
-		}
-		try {
-			return await net.fetch(pathToFileURL(path).href);
-		} catch {
-			return new Response(null, { status: 404 });
-		}
+		return uncached(url, await serve(request, url, loadAttachment));
 	});
+}
+
+async function serve(
+	request: Request,
+	url: URL,
+	loadAttachment: AttachmentLoader,
+): Promise<Response> {
+	if (request.method !== "GET") return new Response(null, { status: 405 });
+	if (url.hostname === CONFLUENCE_HOST) return serveAttachment(url, loadAttachment);
+	const path = urlPathToFilePath(url.pathname, process.platform === "win32");
+	if (path === null || !SERVED_EXTENSIONS.has(extension(path))) {
+		return new Response(null, { status: 403 });
+	}
+	try {
+		return await net.fetch(pathToFileURL(path).href);
+	} catch {
+		return new Response(null, { status: 404 });
+	}
 }

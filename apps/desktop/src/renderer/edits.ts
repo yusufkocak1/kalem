@@ -52,6 +52,25 @@ export function insertDivider(doc: Root, caret: Caret): EditResult {
 	return { doc: result.doc, caret: { blockIndex: result.index + 1, path: [], offset: 0 } };
 }
 
+/** A picture in a paragraph of its own, below the caret's block (or in its place when that is empty). */
+export function insertImageBlock(
+	doc: Root,
+	caret: Caret | null,
+	alt: string,
+	url: string,
+): EditResult {
+	const block = {
+		type: "paragraph",
+		children: [{ type: "image", url, alt, title: null }],
+	} as Block;
+	const result = insertBlocks(
+		doc,
+		caret ?? { blockIndex: doc.children.length - 1, path: [], offset: 0 },
+		[block],
+	);
+	return { doc: result.doc, caret: { blockIndex: result.index + 1, path: [], offset: 0 } };
+}
+
 /**
  * Inserts a link at the caret, or the image itself when `image` is set;
  * without a caret it goes into a new paragraph at the end.
