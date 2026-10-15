@@ -1,5 +1,6 @@
 import { pathToFileURL } from "node:url";
 import { net, protocol } from "electron";
+import { DIAGRAM_DATA_SUFFIX, DIAGRAM_SUFFIX } from "../shared/diagram.js";
 import { extension, urlPathToFilePath } from "../shared/paths.js";
 
 /**
@@ -28,9 +29,21 @@ export function registerDocumentScheme(): void {
 	protocol.registerSchemesAsPrivileged([
 		{
 			scheme: DOCUMENT_SCHEME,
-			privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
+			privileges: {
+				standard: true,
+				secure: true,
+				supportFetchAPI: true,
+				stream: true,
+				corsEnabled: true,
+			},
 		},
 	]);
+}
+
+/** Images and other displayable files, and the data files the diagram editor reads. */
+function served(name: string): boolean {
+	// kalem-locale-ok: file extensions are ASCII
+	return SERVED_EXTENSIONS.has(extension(name)) || name.toLowerCase().endsWith(DIAGRAM_DATA_SUFFIX);
 }
 
 /** Images of a Confluence page tab: `kalem-doc://confluence/<page id>/<file name>`. */
@@ -47,7 +60,7 @@ async function serveAttachment(url: URL, load: AttachmentLoader): Promise<Respon
 	} catch {
 		return new Response(null, { status: 404 });
 	}
-	if (!SERVED_EXTENSIONS.has(extension(name))) return new Response(null, { status: 403 });
+	if (!served(name)) return new Response(null, { status: 403 });
 	try {
 		const response = await load(match[1] as string, name);
 		return response ?? new Response(null, { status: 404 });
@@ -56,21 +69,45 @@ async function serveAttachment(url: URL, load: AttachmentLoader): Promise<Respon
 	}
 }
 
+/**
+ * A diagram is rewritten in place when it is edited; kept in the image
+ * cache, the document would go on showing the old drawing. The diagram
+ * editor reads its data back with `fetch`, from the app's own page.
+ */
+function uncached(url: URL, response: Response): Response {
+	// kalem-locale-ok: URL paths
+	const path = url.pathname.toLowerCase();
+	if (!(path.endsWith(DIAGRAM_SUFFIX) || path.endsWith(DIAGRAM_DATA_SUFFIX)) || !response.ok) {
+		return response;
+	}
+	const headers = new Headers(response.headers);
+	headers.set("Cache-Control", "no-store");
+	headers.set("Access-Control-Allow-Origin", "*");
+	return new Response(response.body, { status: response.status, headers });
+}
+
 /** Must run after the app is ready. */
 export function handleDocumentScheme(loadAttachment: AttachmentLoader): void {
 	protocol.handle(DOCUMENT_SCHEME, async (request) => {
-		if (request.method !== "GET") return new Response(null, { status: 405 });
-
 		const url = new URL(request.url);
-		if (url.hostname === CONFLUENCE_HOST) return serveAttachment(url, loadAttachment);
-		const path = urlPathToFilePath(new URL(request.url).pathname, process.platform === "win32");
-		if (path === null || !SERVED_EXTENSIONS.has(extension(path))) {
-			return new Response(null, { status: 403 });
-		}
-		try {
-			return await net.fetch(pathToFileURL(path).href);
-		} catch {
-			return new Response(null, { status: 404 });
-		}
+		return uncached(url, await serve(request, url, loadAttachment));
 	});
+}
+
+async function serve(
+	request: Request,
+	url: URL,
+	loadAttachment: AttachmentLoader,
+): Promise<Response> {
+	if (request.method !== "GET") return new Response(null, { status: 405 });
+	if (url.hostname === CONFLUENCE_HOST) return serveAttachment(url, loadAttachment);
+	const path = urlPathToFilePath(url.pathname, process.platform === "win32");
+	if (path === null || !served(path)) {
+		return new Response(null, { status: 403 });
+	}
+	try {
+		return await net.fetch(pathToFileURL(path).href);
+	} catch {
+		return new Response(null, { status: 404 });
+	}
 }

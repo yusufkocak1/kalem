@@ -3,6 +3,7 @@ import { copyFile, mkdir, readdir, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import type { Node, Root } from "@kalem-editor/core";
 import { parse, serialize } from "@kalem-editor/core";
+import { isDiagramPicture } from "../shared/diagram.js";
 import {
 	fileNameKey,
 	relativeUrl,
@@ -10,6 +11,7 @@ import {
 	safeExtension,
 	uniqueFileName,
 } from "../shared/images.js";
+import { copyDiagramInto } from "./diagram-files.js";
 import { pathKey } from "./path-key.js";
 
 interface UrlNode {
@@ -106,7 +108,12 @@ export async function relocateLinks(
 			url = urlFrom(target, file);
 		} else {
 			const key = pathKey(file);
-			const copied = copies.get(key) ?? (await copyInto(join(target, assetsFolder), file));
+			// A diagram goes with its data file and keeps a diagram's name.
+			const copied =
+				copies.get(key) ??
+				(isDiagramPicture(file)
+					? await copyDiagramInto(join(target, assetsFolder), file)
+					: await copyInto(join(target, assetsFolder), file));
 			copies.set(key, copied);
 			url = relativeUrl(assetsFolder, copied);
 		}

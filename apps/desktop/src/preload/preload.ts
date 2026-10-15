@@ -39,6 +39,10 @@ const bridge: KalemBridge = {
 	confluenceAttachImage: (tabId, image) =>
 		ipcRenderer.invoke(CHANNEL.confluenceAttachImage, tabId, image),
 	confluenceAttachments: (tabId) => ipcRenderer.invoke(CHANNEL.confluenceAttachments, tabId),
+	confluenceWriteDiagram: (tabId, diagram) =>
+		ipcRenderer.invoke(CHANNEL.confluenceWriteDiagram, tabId, diagram),
+	writeDiagram: (documentPath, diagram) =>
+		ipcRenderer.invoke(CHANNEL.writeDiagram, documentPath, diagram),
 	confluenceUploadFiles: (tabId, paths) =>
 		ipcRenderer.invoke(CHANNEL.confluenceUploadFiles, tabId, paths),
 	confluenceOpenAttachment: (tabId, name) =>

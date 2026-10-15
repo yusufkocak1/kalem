@@ -11,9 +11,10 @@ import type {
 } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
 import { fileUrl } from "../shared/confluence-common.js";
+import { diagramDataName } from "../shared/diagram.js";
 import type { Strings } from "../shared/i18n.js";
 import { format, lossLabel } from "../shared/i18n.js";
-import { IMAGE_EXTENSIONS } from "../shared/images.js";
+import { fileNameKey, IMAGE_EXTENSIONS } from "../shared/images.js";
 import {
 	freeName,
 	isRunnable,
@@ -24,6 +25,7 @@ import {
 import type { ConfluenceCredentials } from "./confluence-client.js";
 import { ConfluenceClient, ConfluenceError } from "./confluence-client.js";
 import type { ConfluenceStore } from "./confluence-store.js";
+import { checkDiagramBytes, checkDiagramData, diagramFileName } from "./diagram-files.js";
 import type { DraftStore } from "./drafts.js";
 import type { AppWindow, DocumentTab, WindowManager } from "./windows.js";
 import { errorMessage } from "./windows.js";
@@ -229,6 +231,41 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 		await client.attach(page.id, name, image.type, image.bytes);
 		return name;
 	});
+	// --- Diagrams --------------------------------------------------------------
+
+	/** A new diagram becomes an attachment; an edited one a new version of its attachment. */
+	ipcMain.handle(
+		CHANNEL.confluenceWriteDiagram,
+		async (event, tabId: unknown, raw: unknown): Promise<ConfluenceUpload> => {
+			const { client, page } = await remoteOf(senderOf(event), tabId);
+			const request = (typeof raw === "object" && raw !== null ? raw : {}) as Record<
+				string,
+				unknown
+			>;
+			const bytes = checkDiagramBytes(request.bytes);
+			const data = checkDiagramData(request.data);
+			let name: string;
+			if (typeof request.name === "string") {
+				name = request.name;
+				if (!/\.png$/i.test(name) || /[\\/]/.test(name)) throw new Error("Invalid diagram name");
+			} else {
+				const taken = new Set(
+					(await client.attachments(page.id)).map((file) => fileNameKey(file.name)),
+				);
+				name = diagramFileName(typeof request.title === "string" ? request.title : "", taken);
+			}
+			// The data first: a picture without it could not be edited again.
+			await client.attach(
+				page.id,
+				diagramDataName(name),
+				"application/json",
+				new TextEncoder().encode(data),
+			);
+			await client.attach(page.id, name, "image/png", bytes);
+			return { name, url: fileUrl(name), image: true };
+		},
+	);
+
 	// --- Attachments ----------------------------------------------------------
 
 	ipcMain.handle(CHANNEL.confluenceAttachments, async (event, tabId: unknown) => {

@@ -31,6 +31,13 @@ import {
 } from "../shared/paths.js";
 import { registerConfluenceIpc } from "./confluence-ipc.js";
 import type { ConfluenceStore } from "./confluence-store.js";
+import {
+	checkDiagramBytes,
+	checkDiagramData,
+	diagramPath,
+	writeDiagram,
+	writeNewDiagram,
+} from "./diagram-files.js";
 import type { DocxImage } from "./docx.js";
 import { markdownToDocx } from "./docx.js";
 import type { DraftStore } from "./drafts.js";
@@ -313,6 +320,23 @@ export function registerIpc(ctx: IpcContext): void {
 	ipcMain.handle(CHANNEL.writeImage, async (event, documentPath: unknown, raw: unknown) => {
 		const target = await assetsTarget(writableDocument(senderOf(event), documentPath));
 		return writeImage(target.contentPath, toImageFile(raw), target.folderName);
+	});
+
+	/**
+	 * A new diagram (picture and data file) goes into the assets folder; an
+	 * edited one replaces both.
+	 */
+	ipcMain.handle(CHANNEL.writeDiagram, async (event, documentPath: unknown, raw: unknown) => {
+		const target = await assetsTarget(writableDocument(senderOf(event), documentPath));
+		const request = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+		const bytes = checkDiagramBytes(request.bytes);
+		const data = checkDiagramData(request.data);
+		if (typeof request.url === "string") {
+			await writeDiagram(diagramPath(target.contentPath, request.url), bytes, data);
+			return request.url;
+		}
+		const title = typeof request.title === "string" ? request.title : "";
+		return writeNewDiagram(target.contentPath, target.folderName, title, bytes, data);
 	});
 
 	ipcMain.handle(CHANNEL.pickImages, async (event): Promise<ImageFile[]> => {
