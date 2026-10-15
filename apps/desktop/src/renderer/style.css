@@ -1726,11 +1726,12 @@ button {
 }
 
 .diagram-palette {
-	display: flex;
+	display: grid;
 	flex: none;
-	flex-direction: column;
+	grid-template-columns: 1fr 1fr;
+	align-content: start;
 	gap: 6px;
-	width: 140px;
+	width: 190px;
 	padding: 10px;
 	overflow-y: auto;
 	border-right: 1px solid var(--app-border);
@@ -1756,11 +1757,18 @@ button {
 }
 
 .diagram-shape-preview {
-	width: 64px;
-	height: 40px;
+	width: 54px;
+	height: 34px;
+}
+
+.diagram-shape span {
+	font-size: 11px;
+	line-height: 1.2;
+	text-align: center;
 }
 
 .diagram-help {
+	grid-column: 1 / -1;
 	margin: 6px 0 0;
 	color: var(--app-muted);
 	font-size: 11px;
@@ -1789,8 +1797,14 @@ button {
 	cursor: move;
 }
 
-.diagram-canvas .kd-edge {
+.diagram-canvas .kd-edge,
+.diagram-canvas .kd-label {
 	cursor: pointer;
+}
+
+.diagram-canvas .kd-label.selected rect {
+	stroke: #2563eb;
+	vector-effect: non-scaling-stroke;
 }
 
 .diagram-canvas .kd-edge.selected path[marker-end] {
@@ -1820,6 +1834,37 @@ button {
 	stroke: #2563eb;
 	stroke-width: 1.5;
 	stroke-dasharray: 5 4;
+}
+
+.diagram-guide,
+.diagram-marquee {
+	pointer-events: none;
+	vector-effect: non-scaling-stroke;
+}
+
+.diagram-guide {
+	stroke: #db2777;
+	stroke-dasharray: 4 3;
+}
+
+.diagram-marquee {
+	fill: rgb(37 99 235 / 8%);
+	stroke: #2563eb;
+	stroke-dasharray: 3 3;
+}
+
+.diagram-canvas.panning,
+.diagram-canvas.panning .kd-node {
+	cursor: grab;
+}
+
+.diagram-glyph {
+	width: 18px;
+	height: 18px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.6;
+	vertical-align: middle;
 }
 
 .diagram-handle {

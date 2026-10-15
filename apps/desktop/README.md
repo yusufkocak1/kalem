@@ -263,12 +263,27 @@ verir.
 
 - **Ekle → Diyagram** akış diyagramı düzenleyicisini ayrı bir panelde açar:
   soldaki şekiller (Başla/Bitir, Adım, Karar, Girdi/Çıktı, Belge,
-  Veritabanı) kanvasa sürüklenir ya da tıklanır — bir şekil seçiliyken
-  tıklanan yenisi altına, ona bağlı olarak eklenir. Şekillerin kenarındaki
-  noktalardan sürükleyerek ok çizilir; şekle ya da oka çift tıklayınca
-  yazılır (Shift+Enter yeni satır). Taşıma, köşeden boyutlandırma, renk,
-  kesikli ok, geri al/yinele (Ctrl+Z / Ctrl+Y), çoğaltma (Ctrl+D),
-  yakınlaştırma (Ctrl+tekerlek) ve kaydırma (boş kanvası sürükleyerek).
+  Veritabanı, Alt süreç, Bağlayıcı, Metin) kanvasa sürüklenir ya da
+  tıklanır — bir şekil seçiliyken tıklanan yenisi altına, ona bağlı olarak
+  eklenir. Şekillerin kenarındaki noktalardan sürükleyerek ok çizilir; şekle
+  ya da oka çift tıklayınca yazılır (Shift+Enter yeni satır). Bir kararın
+  ilk çıkışı **Evet**, ikincisi **Hayır** etiketini kendiliğinden alır; yana
+  giden dal elmasın köşesinden çıkar.
+  - **Seçim:** tıklama, Shift/Ctrl+tıklama (seçime ekler/çıkarır), boş
+    kanvasta sürükleyerek seçim kutusu, Ctrl+A. Seçilenler birlikte taşınır,
+    silinir, renklendirilir, ok tuşlarıyla kaydırılır.
+  - **Kopyala / kes / yapıştır / çoğalt** (Ctrl+C / X / V / D): aradaki
+    oklarla birlikte; başka bir diyagrama da yapıştırılır.
+  - **Hizalama:** birden fazla şekil seçiliyken sola/ortaya/sağa,
+    üste/ortaya/alta hizalama ve yatay/dikey eşit aralıkla dizme. Taşırken
+    başka bir şeklin kenarı ya da ortasıyla hizalanınca kılavuz çizgisi
+    çıkar ve şekil oraya oturur (Alt basılıyken kılavuz yok).
+  - **Otomatik yerleşim:** akışı yukarıdan aşağıya katmanlara dizer; geri
+    dönen oklar düzeni bozmaz.
+  - Oklar: tek uç / çift uç / uçsuz, düz ya da kesikli. Taşıma, köşeden
+    boyutlandırma, geri al/yinele (Ctrl+Z / Ctrl+Y), yakınlaştırma
+    (Ctrl+tekerlek); görünüm tekerlek, orta tuş ya da Boşluk+sürükle ile
+    kaydırılır.
 - Her diyagram **iki dosyadır**: belgede görünen resim `<ad>.diagram.png`
   (her yerde açılan sıradan bir PNG) ve diyagramın verisi (şekiller, oklar,
   yazılar, konumlar) `<ad>.diagram.json`. Düzenleyici veriyi JSON'dan okur.

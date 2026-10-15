@@ -184,3 +184,111 @@ test("keeps a package's diagram inside the package", async () => {
 	expect(errors).toEqual([]);
 	await app.close();
 });
+
+test("selects, aligns, copies and lays out shapes", async () => {
+	const folder = await tempDir("kalem-diagram-tools-");
+	const doc = join(folder, "akis.md");
+	await writeFile(doc, "# Akış\n");
+	const { app, page, errors } = await launch({ args: [doc] });
+	await clickMenu(app, "Insert", "Diagram…");
+	const editor = page.locator(".diagram-editor");
+	const canvas = editor.locator(".diagram-canvas");
+	const nodes = canvas.locator(".kd-node");
+	const selected = canvas.locator(".diagram-selected");
+	const box = async (id: string) => {
+		const found = await canvas.locator(`[data-node="${id}"]`).boundingBox();
+		if (found === null) throw new Error(`${id} is not laid out`);
+		return found;
+	};
+
+	// A decision's ways out are labelled yes, then no.
+	await editor.locator('[data-shape="terminal"]').click();
+	await editor.locator('[data-shape="decision"]').click();
+	await editor.locator('[data-shape="process"]').click();
+	await canvas.locator('[data-node="n2"]').click();
+	await editor.locator('[data-shape="document"]').click();
+	await expect(nodes).toHaveCount(4);
+	await expect(canvas.locator(".kd-label tspan")).toHaveText(["Yes", "No"]);
+
+	// A box drawn on the empty canvas selects the shapes inside it.
+	const left = await box("n3");
+	const right = await box("n4");
+	await page.mouse.move(left.x - 20, left.y - 20);
+	await page.mouse.down();
+	await page.mouse.move(right.x + right.width + 20, right.y + right.height + 20, { steps: 5 });
+	await page.mouse.up();
+	await expect(selected).toHaveCount(2);
+	// The shape's own geometry, in diagram units.
+	const shapeBox = (id: string) =>
+		canvas.locator(`[data-node="${id}"] > :first-child`).evaluate((shape: SVGGraphicsElement) => {
+			const { x, y, width, height } = shape.getBBox();
+			return { x, y, width, height };
+		});
+	await editor.getByRole("button", { name: "Align left" }).click();
+	expect((await shapeBox("n3")).x).toBe((await shapeBox("n4")).x);
+	// They now overlap; undo puts them back side by side.
+	await page.keyboard.press("Control+z");
+	expect((await shapeBox("n3")).x).toBeLessThan((await shapeBox("n4")).x);
+
+	// Copy and paste; the copies are what is selected then.
+	await page.keyboard.press("Control+c");
+	await page.keyboard.press("Control+v");
+	await expect(nodes).toHaveCount(6);
+	await expect(selected).toHaveCount(2);
+	await page.keyboard.press("Delete");
+	await expect(nodes).toHaveCount(4);
+
+	// Arrowheads on both ends of a connector.
+	await canvas.locator('[data-edge="e2"] tspan').click();
+	await editor.getByRole("button", { name: "Arrowheads" }).click();
+	await expect(canvas.locator('[data-edge="e2"] path[marker-start]')).toHaveCount(1);
+
+	// Laid out top-down: one row per step, the two ways out side by side.
+	await editor.getByRole("button", { name: "Arrange the flow top-down" }).click();
+	const [b1, b2, b3, b4] = [
+		await shapeBox("n1"),
+		await shapeBox("n2"),
+		await shapeBox("n3"),
+		await shapeBox("n4"),
+	];
+	expect(b1.y).toBeLessThan(b2.y);
+	expect(b2.y).toBeLessThan(b3.y);
+	// Centred on the row (the document's wavy edge makes its box a little shorter).
+	expect(Math.abs(b3.y + b3.height / 2 - (b4.y + b4.height / 2))).toBeLessThan(10);
+	expect(b3.x).toBeLessThan(b4.x);
+
+	await page.keyboard.press("Control+a");
+	await expect(selected).toHaveCount(4);
+	// A plain click on one of them selects just that one.
+	await canvas.locator('[data-node="n3"]').click();
+	await expect(selected).toHaveCount(1);
+	await page.keyboard.press("Escape");
+	await expect(selected).toHaveCount(0);
+
+	// Moved near another shape's middle, a guide shows and the shape lines up with it.
+	const start = await box("n1");
+	await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(start.x + start.width / 2 + 34, start.y + start.height / 2, { steps: 4 });
+	await page.mouse.move(start.x + start.width / 2 + 4, start.y + start.height / 2, { steps: 4 });
+	await expect(canvas.locator(".diagram-guide")).not.toHaveCount(0);
+	await page.mouse.up();
+	await expect(canvas.locator(".diagram-guide")).toHaveCount(0);
+	const moved = await shapeBox("n1");
+	const decision = await shapeBox("n2");
+	expect(moved.x + moved.width / 2).toBe(decision.x + decision.width / 2);
+
+	await editor.getByRole("button", { name: "Save", exact: true }).click();
+	await expect(editor).toBeHidden();
+	const saved = await diagramIn(join(folder, "akis.assets", "Diagram.diagram.png"));
+	expect(saved?.nodes).toHaveLength(4);
+	expect(saved?.edges.map((edge) => [edge.text, edge.arrow])).toEqual([
+		["", "end"],
+		["Yes", "both"],
+		["No", "end"],
+	]);
+	await page.locator('[data-command="save"]').click();
+	await expect(page.locator(".save-status")).toHaveText("Saved");
+	expect(errors).toEqual([]);
+	await app.close();
+});
