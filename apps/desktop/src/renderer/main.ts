@@ -5,7 +5,7 @@ import { indentItem, outdentItem, toggleList } from "@kalem-editor/editor";
 import type { Command, KalemBridge, Settings, SidePane, TabDocument } from "../shared/bridge.js";
 import { clampZoom, MAX_ZOOM, MIN_ZOOM, pageRule, ZOOM_STEP } from "../shared/bridge.js";
 import { attachmentName, linkedAttachment } from "../shared/confluence-common.js";
-import { DIAGRAM_SUFFIX } from "../shared/diagram.js";
+import { DIAGRAM_SUFFIX, serializeDiagram } from "../shared/diagram.js";
 import { format, stringsFor } from "../shared/i18n.js";
 import { isEditablePath, isPackagePath, isWordPath } from "../shared/paths.js";
 import { withColumnWidth } from "../shared/table-style.js";
@@ -766,14 +766,15 @@ function newDiagram(): void {
 		async save(diagram, title) {
 			const name = title === "" ? t.diagramDefaultName : title;
 			const bytes = await diagramToPng(diagram);
+			const data = serializeDiagram(diagram);
 			let url: string;
 			if (tab.remote !== null) {
-				url = (await bridge.confluenceWriteDiagram(tab.id, { bytes, title: name })).url;
+				url = (await bridge.confluenceWriteDiagram(tab.id, { bytes, data, title: name })).url;
 			} else {
 				// Its file goes next to the document, so the document needs a place first.
 				if (tab.path === null) await tab.save();
 				if (tab.path === null) throw new Error(t.diagramNeedsSave);
-				url = await bridge.writeDiagram(tab.path, { bytes, title: name });
+				url = await bridge.writeDiagram(tab.path, { bytes, data, title: name });
 			}
 			tab.insertDiagram(name, url, caret);
 			return true;
@@ -804,24 +805,38 @@ async function editDiagram(image: HTMLImageElement): Promise<void> {
 		titleEditable: false,
 		async save(next) {
 			const bytes = await diagramToPng(next);
+			const data = serializeDiagram(next);
 			if (tab.remote !== null) {
-				await bridge.confluenceWriteDiagram(tab.id, { bytes, name: file });
+				await bridge.confluenceWriteDiagram(tab.id, { bytes, data, name: file });
 			} else {
 				if (tab.path === null) throw new Error(t.diagramNeedsSave);
-				await bridge.writeDiagram(tab.path, { bytes, url });
+				await bridge.writeDiagram(tab.path, { bytes, data, url });
 				// Inside a package the file only reaches the package when it is saved.
 				if (isPackagePath(tab.path)) tab.markAssetsChanged();
 			}
-			// The file is served uncached: setting the source again loads the new drawing.
-			for (const shown of document.querySelectorAll<HTMLImageElement>("#editor img")) {
-				if (shown.getAttribute("src") !== url) continue;
-				const source = shown.src;
-				shown.removeAttribute("src");
-				shown.src = source;
-			}
+			await showNewDrawing(url);
 			return true;
 		},
 	});
+}
+
+/**
+ * Makes the document's pictures of a rewritten diagram show the new drawing.
+ * Chromium reuses an image URL within the page whatever its cache headers;
+ * fetching the URL again replaces that entry, so setting the source again
+ * then loads the file as it is now.
+ */
+async function showNewDrawing(url: string): Promise<void> {
+	const shown = [...document.querySelectorAll<HTMLImageElement>("#editor img")].filter(
+		(image) => image.getAttribute("src") === url,
+	);
+	const source = shown[0]?.src;
+	if (source === undefined) return;
+	await fetch(source, { cache: "no-store" }).catch(() => {});
+	for (const image of shown) {
+		image.removeAttribute("src");
+		image.src = source;
+	}
 }
 
 createDiagramButton({

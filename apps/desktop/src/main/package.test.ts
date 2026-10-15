@@ -100,6 +100,23 @@ describe("pack", () => {
 	});
 });
 
+describe("pack with diagrams", () => {
+	it("takes a linked diagram's data file along", async () => {
+		const folder = join(root, "work-diagram");
+		await mkdir(join(folder, "assets"), { recursive: true });
+		await writeFile(join(folder, "assets", "Akış.diagram.png"), PNG_1X1);
+		await writeFile(join(folder, "assets", "Akış.diagram.json"), "{}");
+		const text = "![Akış](assets/Ak%C4%B1%C5%9F.diagram.png)\n";
+		await writeFile(join(folder, "text.md"), text);
+		expect(await entries(await pack(folder, "text.md", text))).toEqual([
+			"assets/Akış.diagram.json",
+			"assets/Akış.diagram.png",
+			"info.json",
+			"text.md",
+		]);
+	});
+});
+
 describe("relocateLinks", () => {
 	beforeEach(async () => {
 		await mkdir(join(root, "old", "notes.assets"), { recursive: true });
@@ -121,6 +138,23 @@ describe("relocateLinks", () => {
 			"![a](copy.assets/a-b.png)\n\n[pdf](../shared.pdf#p2) [web](https://x.y) [top](#top)\n",
 		);
 		expect(await readdir(join(root, "new", "copy.assets"))).toEqual(["a-b.png"]);
+	});
+
+	it("moves a diagram with its data file and keeps it a diagram", async () => {
+		await writeFile(join(root, "old", "notes.assets", "Akış.diagram.png"), PNG_1X1);
+		await writeFile(join(root, "old", "notes.assets", "Akış.diagram.json"), "{}");
+		const result = await relocateLinks(
+			"![Akış](notes.assets/Ak%C4%B1%C5%9F.diagram.png)\n",
+			join(root, "old", "notes.md"),
+			join(root, "new", "text.md"),
+			"assets",
+			true,
+		);
+		expect(result.text).toBe("![Akış](assets/Ak%C4%B1%C5%9F.diagram.png)\n");
+		expect((await readdir(join(root, "new", "assets"))).sort()).toEqual([
+			"Akış.diagram.json",
+			"Akış.diagram.png",
+		]);
 	});
 
 	it("copies everything into a contained destination", async () => {

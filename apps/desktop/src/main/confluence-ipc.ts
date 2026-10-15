@@ -11,6 +11,7 @@ import type {
 } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
 import { fileUrl } from "../shared/confluence-common.js";
+import { diagramDataName } from "../shared/diagram.js";
 import type { Strings } from "../shared/i18n.js";
 import { format, lossLabel } from "../shared/i18n.js";
 import { fileNameKey, IMAGE_EXTENSIONS } from "../shared/images.js";
@@ -24,7 +25,7 @@ import {
 import type { ConfluenceCredentials } from "./confluence-client.js";
 import { ConfluenceClient, ConfluenceError } from "./confluence-client.js";
 import type { ConfluenceStore } from "./confluence-store.js";
-import { checkDiagramBytes, diagramFileName } from "./diagram-files.js";
+import { checkDiagramBytes, checkDiagramData, diagramFileName } from "./diagram-files.js";
 import type { DraftStore } from "./drafts.js";
 import type { AppWindow, DocumentTab, WindowManager } from "./windows.js";
 import { errorMessage } from "./windows.js";
@@ -242,6 +243,7 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 				unknown
 			>;
 			const bytes = checkDiagramBytes(request.bytes);
+			const data = checkDiagramData(request.data);
 			let name: string;
 			if (typeof request.name === "string") {
 				name = request.name;
@@ -252,6 +254,13 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 				);
 				name = diagramFileName(typeof request.title === "string" ? request.title : "", taken);
 			}
+			// The data first: a picture without it could not be edited again.
+			await client.attach(
+				page.id,
+				diagramDataName(name),
+				"application/json",
+				new TextEncoder().encode(data),
+			);
 			await client.attach(page.id, name, "image/png", bytes);
 			return { name, url: fileUrl(name), image: true };
 		},

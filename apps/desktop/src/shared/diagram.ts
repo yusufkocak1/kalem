@@ -8,6 +8,21 @@
 export const DIAGRAM_KEYWORD = "kalem-diagram";
 /** Diagram files end in this, so the editor can offer to edit them. */
 export const DIAGRAM_SUFFIX = ".diagram.png";
+/** The diagram's data, next to its picture: `<name>.diagram.json`. */
+export const DIAGRAM_DATA_SUFFIX = ".diagram.json";
+
+/** The data file's name or URL for a diagram picture's (a query or fragment is dropped). */
+export function diagramDataName(picture: string): string {
+	return `${picture.replace(/[?#].*$/, "").replace(/\.png$/i, "")}.json`;
+}
+
+export function isDiagramPicture(name: string): boolean {
+	// kalem-locale-ok: file extensions are ASCII
+	return name
+		.replace(/[?#].*$/, "")
+		.toLowerCase()
+		.endsWith(DIAGRAM_SUFFIX);
+}
 
 export const SHAPES = ["terminal", "process", "decision", "io", "document", "database"] as const;
 export type ShapeKind = (typeof SHAPES)[number];
@@ -86,8 +101,9 @@ export function nextId(diagram: Diagram, prefix: "n" | "e"): string {
 	for (let n = 1; ; n++) if (!used.has(`${prefix}${n}`)) return `${prefix}${n}`;
 }
 
-export function serializeDiagram(diagram: Diagram): string {
-	return JSON.stringify({ format: DIAGRAM_KEYWORD, version: 1, ...diagram });
+/** The diagram's data file; indented, so it reads and diffs well. */
+export function serializeDiagram(diagram: Diagram, indent = 2): string {
+	return `${JSON.stringify({ format: DIAGRAM_KEYWORD, version: 1, ...diagram }, null, indent)}\n`;
 }
 
 const isObject = (value: unknown): value is Record<string, unknown> =>

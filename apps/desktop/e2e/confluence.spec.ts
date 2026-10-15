@@ -677,12 +677,13 @@ test("draws a diagram on a Confluence page as an attachment", async () => {
 	await editor.getByRole("button", { name: "Save", exact: true }).click();
 	await expect(editor).toBeHidden();
 
+	// Two attachments: the picture and its JSON.
 	const uploaded = () => confluence.attachments.find((item) => item.name === "Akış.diagram.png");
+	const data = () => confluence.attachments.find((item) => item.name === "Akış.diagram.json");
 	expect(uploaded()).toMatchObject({ type: "image/png", version: 1 });
-	const nodes = () => {
-		const text = readPngText(new Uint8Array(uploaded()?.bytes ?? []), "kalem-diagram");
-		return text === null ? null : parseDiagram(text)?.nodes.length;
-	};
+	expect(data()).toMatchObject({ type: "application/json", version: 1 });
+	expect(readPngText(new Uint8Array(uploaded()?.bytes ?? []), "kalem-diagram")).not.toBeNull();
+	const nodes = () => parseDiagram(data()?.bytes.toString("utf8") ?? "")?.nodes.length;
 	expect(nodes()).toBe(1);
 	const image = page.locator('#editor img[alt="Akış"]');
 	await expect(image).toHaveAttribute("src", "Akış.diagram.png");
@@ -706,6 +707,7 @@ test("draws a diagram on a Confluence page as an attachment", async () => {
 	await editor.getByRole("button", { name: "Save", exact: true }).click();
 	await expect(editor).toBeHidden();
 	expect(uploaded()?.version).toBe(2);
+	expect(data()?.version).toBe(2);
 	expect(nodes()).toBe(2);
 	expect(errors).toEqual([]);
 	await app.close();

@@ -1,12 +1,10 @@
-import { DIAGRAM_SUFFIX } from "../shared/diagram.js";
+import { isDiagramPicture } from "../shared/diagram.js";
 import { el } from "./dom.js";
 
 /** A diagram image in the document: its file name ends in `.diagram.png`. */
 export function isDiagramImage(target: EventTarget | null): target is HTMLImageElement {
 	if (!(target instanceof HTMLImageElement)) return false;
-	const src = (target.getAttribute("src") ?? "").replace(/[?#].*$/, "");
-	// kalem-locale-ok: file extensions are ASCII
-	return src.toLowerCase().endsWith(DIAGRAM_SUFFIX);
+	return isDiagramPicture(target.getAttribute("src") ?? "");
 }
 
 /** An "Edit Diagram" button over the diagram image under the pointer. */

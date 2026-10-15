@@ -6,10 +6,9 @@ import { parseDiagram } from "../src/shared/diagram.js";
 import { readPngText } from "../src/shared/png-text.js";
 import { clickMenu, launch, stubSaveDialog, tempDir } from "./launch.js";
 
-const diagramIn = async (path: string) => {
-	const text = readPngText(new Uint8Array(await readFile(path)), "kalem-diagram");
-	return text === null ? null : parseDiagram(text);
-};
+/** The diagram in the data file next to a picture. */
+const diagramIn = async (picture: string) =>
+	parseDiagram(await readFile(picture.replace(/\.png$/, ".json"), "utf8"));
 
 test("draws a flow diagram into a Markdown file and edits it again", async () => {
 	const folder = await tempDir("kalem-diagram-");
@@ -96,12 +95,20 @@ test("draws a flow diagram into a Markdown file and edits it again", async () =>
 		"Giriş\n\n![Sipariş akışı](notlar.assets/Sipari%C5%9F-ak%C4%B1%C5%9F%C4%B1.diagram.png)",
 	);
 
-	// The button over the picture opens it again; saving rewrites the same file.
+	// The picture also carries a copy of the data, for when the JSON gets lost.
+	expect(readPngText(new Uint8Array(await readFile(file)), "kalem-diagram")).toContain(
+		"Kayıt var mı?",
+	);
+
+	// The button over the picture opens it again, from its JSON file.
+	const json = file.replace(/\.png$/, ".json");
+	await writeFile(json, (await readFile(json, "utf8")).replace("Start / End", "Başla"));
 	const height = await image.evaluate((img: HTMLImageElement) => img.naturalHeight);
 	await image.hover();
 	await page.getByRole("button", { name: "✎ Edit Diagram" }).click();
 	await expect(editor).toBeVisible();
 	await expect(nodes).toHaveCount(3);
+	await expect(canvas.locator('[data-node="n1"]')).toContainText("Başla");
 	await expect(editor.getByRole("textbox", { name: "Diagram name" })).toBeDisabled();
 	await canvas.locator('[data-node="n3"]').click();
 	await page.keyboard.press("Delete");
@@ -155,11 +162,12 @@ test("keeps a package's diagram inside the package", async () => {
 	await page.locator('[data-command="save"]').click();
 	await expect(page.locator(".save-status")).toHaveText("Saved");
 
+	// The picture and its JSON are both in the package.
 	const packed = async () => {
 		const zip = await JSZip.loadAsync(await readFile(path));
-		const png = await zip.file("assets/Diagram.diagram.png")?.async("uint8array");
-		const text = png === undefined ? null : readPngText(png, "kalem-diagram");
-		return text === null ? null : parseDiagram(text)?.nodes.length;
+		expect(zip.file("assets/Diagram.diagram.png")).not.toBeNull();
+		const text = await zip.file("assets/Diagram.diagram.json")?.async("string");
+		return text === undefined ? null : parseDiagram(text)?.nodes.length;
 	};
 	expect(await packed()).toBe(1);
 

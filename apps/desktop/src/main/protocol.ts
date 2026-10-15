@@ -1,6 +1,6 @@
 import { pathToFileURL } from "node:url";
 import { net, protocol } from "electron";
-import { DIAGRAM_SUFFIX } from "../shared/diagram.js";
+import { DIAGRAM_DATA_SUFFIX, DIAGRAM_SUFFIX } from "../shared/diagram.js";
 import { extension, urlPathToFilePath } from "../shared/paths.js";
 
 /**
@@ -40,6 +40,12 @@ export function registerDocumentScheme(): void {
 	]);
 }
 
+/** Images and other displayable files, and the data files the diagram editor reads. */
+function served(name: string): boolean {
+	// kalem-locale-ok: file extensions are ASCII
+	return SERVED_EXTENSIONS.has(extension(name)) || name.toLowerCase().endsWith(DIAGRAM_DATA_SUFFIX);
+}
+
 /** Images of a Confluence page tab: `kalem-doc://confluence/<page id>/<file name>`. */
 export const CONFLUENCE_HOST = "confluence";
 
@@ -54,7 +60,7 @@ async function serveAttachment(url: URL, load: AttachmentLoader): Promise<Respon
 	} catch {
 		return new Response(null, { status: 404 });
 	}
-	if (!SERVED_EXTENSIONS.has(extension(name))) return new Response(null, { status: 403 });
+	if (!served(name)) return new Response(null, { status: 403 });
 	try {
 		const response = await load(match[1] as string, name);
 		return response ?? new Response(null, { status: 404 });
@@ -69,7 +75,11 @@ async function serveAttachment(url: URL, load: AttachmentLoader): Promise<Respon
  * editor reads its data back with `fetch`, from the app's own page.
  */
 function uncached(url: URL, response: Response): Response {
-	if (!url.pathname.toLowerCase().endsWith(DIAGRAM_SUFFIX) || !response.ok) return response; // kalem-locale-ok: URL paths
+	// kalem-locale-ok: URL paths
+	const path = url.pathname.toLowerCase();
+	if (!(path.endsWith(DIAGRAM_SUFFIX) || path.endsWith(DIAGRAM_DATA_SUFFIX)) || !response.ok) {
+		return response;
+	}
 	const headers = new Headers(response.headers);
 	headers.set("Cache-Control", "no-store");
 	headers.set("Access-Control-Allow-Origin", "*");
@@ -92,7 +102,7 @@ async function serve(
 	if (request.method !== "GET") return new Response(null, { status: 405 });
 	if (url.hostname === CONFLUENCE_HOST) return serveAttachment(url, loadAttachment);
 	const path = urlPathToFilePath(url.pathname, process.platform === "win32");
-	if (path === null || !SERVED_EXTENSIONS.has(extension(path))) {
+	if (path === null || !served(path)) {
 		return new Response(null, { status: 403 });
 	}
 	try {

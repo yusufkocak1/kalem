@@ -145,9 +145,11 @@ export interface ConfluenceAttachment {
 	readonly version: number;
 }
 
-/** A diagram's PNG (its data inside), new or replacing an existing file. */
+/** A diagram's PNG and its data file, new or replacing existing files. */
 export interface DiagramWrite {
 	readonly bytes: Uint8Array;
+	/** The diagram's data, written to `<name>.diagram.json` next to the picture. */
+	readonly data: string;
 	/** For a new diagram. */
 	readonly title?: string;
 	/** The document's URL of the diagram being replaced. */

@@ -4,6 +4,7 @@ import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { parse } from "@kalem-editor/core";
 import JSZip from "jszip";
 import type { OpenedFile } from "../shared/bridge.js";
+import { diagramDataName, isDiagramPicture } from "../shared/diagram.js";
 import type { LegacyEncoding, TextFormat } from "../shared/encoding.js";
 import { decodeBytes, encodeText } from "../shared/encoding.js";
 import { MAX_DOCUMENT_SIZE, writeAtomic } from "./files.js";
@@ -138,6 +139,16 @@ export async function pack(folder: string, textName: string, text: string): Prom
 		}
 		added.add(name);
 		zip.file(name, await readFile(file), { compression: STORED.test(name) ? "STORE" : "DEFLATE" });
+		// A diagram's data file is not linked, but the diagram cannot be edited without it.
+		if (isDiagramPicture(name)) {
+			const data = diagramDataName(name);
+			try {
+				if (!added.has(data)) zip.file(data, await readFile(diagramDataName(file)));
+				added.add(data);
+			} catch {
+				// An old diagram without a data file keeps its data in the picture.
+			}
+		}
 	}
 	return zip.generateAsync({
 		type: "uint8array",

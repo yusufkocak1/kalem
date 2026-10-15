@@ -1,7 +1,9 @@
 import type { Diagram } from "../shared/diagram.js";
 import {
 	DIAGRAM_KEYWORD,
+	diagramDataName,
 	diagramSvg,
+	isDiagramPicture,
 	parseDiagram,
 	serializeDiagram,
 	svgMarkup,
@@ -33,11 +35,20 @@ export async function diagramToPng(diagram: Diagram): Promise<Uint8Array> {
 	const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
 	if (blob === null) throw new Error("The diagram could not be drawn");
 	const png = new Uint8Array(await blob.arrayBuffer());
-	return withPngText(png, DIAGRAM_KEYWORD, serializeDiagram(diagram));
+	return withPngText(png, DIAGRAM_KEYWORD, serializeDiagram(diagram, 0));
 }
 
-/** The diagram kept in an image, `null` when the image is not a Kalem diagram. */
+/**
+ * The diagram a picture was drawn from: its data file next to it
+ * (`<name>.diagram.json`), or the copy inside the picture when that file is
+ * missing. `null` when the picture is not a Kalem diagram.
+ */
 export async function diagramFromImage(src: string): Promise<Diagram | null> {
+	if (isDiagramPicture(src)) {
+		const data = await fetch(diagramDataName(src), { cache: "no-store" }).catch(() => null);
+		const diagram = data?.ok === true ? parseDiagram(await data.text()) : null;
+		if (diagram !== null) return diagram;
+	}
 	const response = await fetch(src, { cache: "no-store" });
 	if (!response.ok) throw new Error(`HTTP ${response.status}`);
 	const text = readPngText(new Uint8Array(await response.arrayBuffer()), DIAGRAM_KEYWORD);

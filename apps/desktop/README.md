@@ -269,16 +269,18 @@ verir.
   yazılır (Shift+Enter yeni satır). Taşıma, köşeden boyutlandırma, renk,
   kesikli ok, geri al/yinele (Ctrl+Z / Ctrl+Y), çoğaltma (Ctrl+D),
   yakınlaştırma (Ctrl+tekerlek) ve kaydırma (boş kanvası sürükleyerek).
-- Diyagram **tek bir dosyadır: `<ad>.diagram.png`**. Her yerde açılan
-  sıradan bir PNG resmi; diyagramın verisi (şekiller, oklar, yazılar) aynı
-  dosyanın içinde, PNG'nin bir metin bölümünde (`iTXt`, `kalem-diagram`)
-  saklanır. Resim ile veri birbirinden kopamaz.
-  - `.md` belgesinde dosya `<belge>.assets/` klasörüne yazılır; belge
-    kaydedilmemişse önce kaydedilir.
-  - `.kmd` paketinde dosya paketin `assets/` klasörüne girer; düzenlenen
-    bir diyagram paketi kaydedilmemiş yapar.
-  - Confluence sayfasında dosya sayfaya **ek olarak yüklenir** ve sayfada
-    resim olarak görünür; her düzenleme o ekin yeni sürümü olur.
+- Her diyagram **iki dosyadır**: belgede görünen resim `<ad>.diagram.png`
+  (her yerde açılan sıradan bir PNG) ve diyagramın verisi (şekiller, oklar,
+  yazılar, konumlar) `<ad>.diagram.json`. Düzenleyici veriyi JSON'dan okur.
+  JSON kaybolursa diye verinin bir kopyası PNG'nin içinde de (`iTXt`,
+  `kalem-diagram`) durur; JSON yoksa oradan açılır.
+  - `.md` belgesinde iki dosya da `<belge>.assets/` klasörüne yazılır; belge
+    kaydedilmemişse önce kaydedilir. Belge başka bir yere kaydedilince ya da
+    pakete çevrilince JSON da resimle birlikte taşınır.
+  - `.kmd` paketinde iki dosya da paketin `assets/` klasörüne girer;
+    düzenlenen bir diyagram paketi kaydedilmemiş yapar.
+  - Confluence sayfasında iki dosya da sayfaya **ek olarak yüklenir**; sayfada
+    resim görünür. Her düzenleme iki ekin de yeni sürümü olur.
 - Diyagram resminin üzerine gelince çıkan **✎ Diyagramı Düzenle** düğmesi ya
   da resme çift tıklamak düzenleyiciyi verisiyle açar; kaydetmek aynı dosyayı
   yeniler.
