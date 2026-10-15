@@ -458,6 +458,46 @@ export class Editor {
 		return this.#element;
 	}
 
+	/**
+	 * Kaynak taşıyıcısının **dışına** düşen metni içine taşır.
+	 *
+	 * Boş bir `<code>` satır kutusu üretmediği için tarayıcı imleci onun
+	 * içine koyamıyor: ``` kuralıyla ya da menüden açılan boş bir kod
+	 * bloğuna yazılan harfler `<pre>`'nin doğrudan çocuğu oluyordu.
+	 * `readCode` yalnızca `<code>`'u okuduğundan model yazılanı hiç
+	 * görmüyordu; ekranda duran kod kaydedilmiyor, yapıştırma da onu
+	 * siliyordu. Düğümler kopyalanmadan taşınıyor ve imleç aynı düğümde
+	 * aynı yerde tutuluyor.
+	 */
+	#absorbStraySource(blockElement: HTMLElement): void {
+		const kaynaklar = holders(blockElement, CODE_ATTR);
+		if (kaynaklar.length !== 1 || holders(blockElement, PATH_ATTR).length > 0) return;
+		const holder = kaynaklar[0] as HTMLElement;
+		const kap = holder.parentElement;
+		if (kap === null || !blockElement.contains(kap)) return;
+
+		const once: Node[] = [];
+		const sonra: Node[] = [];
+		let gecti = false;
+		for (const cocuk of Array.from(kap.childNodes)) {
+			if (cocuk === holder) gecti = true;
+			else if (cocuk.nodeType === Node.TEXT_NODE || cocuk.nodeName === "BR") {
+				(gecti ? sonra : once).push(cocuk);
+			}
+		}
+		if (once.length === 0 && sonra.length === 0) return;
+
+		const selection = this.#element.ownerDocument.getSelection();
+		const range = selection !== null && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+		const imlec = range === null ? null : { node: range.endContainer, offset: range.endOffset };
+		const tasinan = imlec !== null && (once.includes(imlec.node) || sonra.includes(imlec.node));
+
+		holder.prepend(...once);
+		holder.append(...sonra);
+		if (tasinan && imlec !== null && selection !== null)
+			selection.collapse(imlec.node, imlec.offset);
+	}
+
 	/** İmlecin model konumu; seçim tek bir taşıyıcıda değilse `null`. */
 	getCaret(): Caret | null {
 		return this.#caret();
@@ -1851,6 +1891,7 @@ export class Editor {
 	#syncFromDom(blockElement: HTMLElement): void {
 		const blockIndex = this.#indexOf(blockElement);
 		if (blockIndex < 0) return;
+		this.#absorbStraySource(blockElement);
 
 		let doc = this.#doc;
 		let degisti = false;

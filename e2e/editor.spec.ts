@@ -958,6 +958,18 @@ test.describe("giriş kuralları", () => {
 		await expect(page.locator("#cikti")).toContainText("#");
 	});
 
+	/** Boş `<code>`'a yazılan harfler `<pre>`'ye düşüyor ve modele girmiyordu. */
+	test("kuralla açılan kod bloğuna yazılan metin modele giriyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("\n"));
+		await page.locator("#editor > [data-kalem-id]").first().click();
+		await page.keyboard.type("```");
+		await expect(page.locator("#editor > pre")).toHaveCount(1);
+		await page.keyboard.type("let x");
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("```\nlet x\n```\n");
+		await page.keyboard.type(" = 1");
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("```\nlet x = 1\n```\n");
+	});
+
 	test("kod bloğu içinde kural çalışmıyor", async ({ page }) => {
 		await page.evaluate(() => window.kalem.editor.setValue("```\nx\n```\n"));
 		await page.locator("#editor > pre").click();
@@ -1400,6 +1412,15 @@ test.describe("yapıştırma", () => {
 		await page.locator("#editor > pre").click();
 		await yapistir(page, { text: "a\nb" });
 		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("```\na\nb\n```\n");
+	});
+
+	test("elle yazılan kod bloğuna yapıştırılan metin koda giriyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("\n"));
+		await page.locator("#editor > [data-kalem-id]").first().click();
+		await page.keyboard.type("```");
+		await page.keyboard.type("bir");
+		await yapistir(page, { text: "\niki" });
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("```\nbir\niki\n```\n");
 	});
 
 	test("kod bloğunda seçili metin yapıştırılanla değişiyor", async ({ page }) => {
