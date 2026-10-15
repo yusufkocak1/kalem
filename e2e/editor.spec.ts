@@ -1395,6 +1395,13 @@ test.describe("yapıştırma", () => {
 		);
 	});
 
+	test("boş kod bloğuna yapıştırılan metin koda giriyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("```\n```\n"));
+		await page.locator("#editor > pre").click();
+		await yapistir(page, { text: "a\nb" });
+		expect(await page.evaluate(() => window.kalem.editor.getValue())).toBe("```\na\nb\n```\n");
+	});
+
 	test("kod bloğunda seçili metin yapıştırılanla değişiyor", async ({ page }) => {
 		await page.evaluate(() => window.kalem.editor.setValue("```\nbir\n```\n"));
 		await page.locator("#editor > pre").click();
