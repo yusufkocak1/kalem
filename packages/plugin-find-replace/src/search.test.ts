@@ -402,6 +402,16 @@ describe("düzenli ifade modu", () => {
 		).toBe("06.10.2026\n");
 	});
 
+	it("özel kalıpları String.replace gibi dolduruyor", () => {
+		const r = (value: string) => degistir("a-b c-d\n", "(\\w)-(\\w)", value, { mode: "regex" });
+		expect(r("$$")).toBe("$ $\n");
+		expect(r("($&)")).toBe("(a-b) (c-d)\n");
+		expect(r("$12")).toBe("a2 c2\n");
+		expect(r("$3$0")).toBe("$3$0 $3$0\n");
+		expect(r("$<yok>")).toBe("$<yok> $<yok>\n");
+		expect(degistir("ab\n", "b", "($`/$')", { mode: "regex" })).toBe("a(a/)\n");
+	});
+
 	it("geriye bakan desen eşleşmenin solunu görüyor", () => {
 		expect(
 			degistir("fiyat: 10 TL, adet: 10\n", "(?<=fiyat: )\\d+", "($&)", { mode: "regex" }),

@@ -145,7 +145,7 @@
   {
     "name": "@kalem-editor/plugin-find-replace",
     "path": "packages/plugin-find-replace/dist/index.js",
-    "limit": "5.5 kB",
+    "limit": "6 kB",
     "gzip": true,
     "import": "{ findReplacePlugin }",
     "ignore": ["@kalem-editor/core", "@kalem-editor/editor"]
@@ -209,7 +209,7 @@
   {
     "name": "@kalem-editor/wc — <script> ile düşen tam paket (çekirdek + editör dâhil)",
     "path": "packages/wc/dist/kalem-editor.iife.js",
-    "limit": "30 kB",
+    "limit": "34 kB",
     "gzip": true
   }
 ]

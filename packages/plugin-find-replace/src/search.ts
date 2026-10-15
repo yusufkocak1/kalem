@@ -209,8 +209,32 @@ export function replacementFor(
 	const metin = index.regions[match.regionIndex]?.text ?? "";
 	const desen = compilePattern(query, options.caseSensitive === true, true);
 	desen.lastIndex = match.from;
-	const sonuc = metin.replace(desen, replacement);
-	return sonuc.slice(match.from, sonuc.length - (metin.length - match.to));
+	// `String.replace` kullanılmıyor: JavaScriptCore (Safari) yapışkan
+	// desende `lastIndex`'i orada yok sayıp baştan arıyor ve ikinci
+	// eşleşmenin yerine ilkinin değiştirilmiş hâlini koyuyordu. `exec`
+	// her motorda `lastIndex`'ten başlıyor; kalıbı biz dolduruyoruz.
+	const bulunan = desen.exec(metin);
+	return bulunan === null ? replacement : expandReplacement(replacement, bulunan, metin);
+}
+
+/** `String.replace`'in kalıbı: `$$`, `$&`, `` $` ``, `$'`, `$1`–`$99`, `$<ad>`. */
+function expandReplacement(kalip: string, m: RegExpExecArray, metin: string): string {
+	return kalip.replace(/\$([$&`']|(\d)(\d?)|<([^>]*)>)/g, (tum, r, d1, d2, ad) => {
+		if (ad !== undefined) return m.groups ? (m.groups[ad] ?? "") : tum;
+		if (d1 === undefined) {
+			const son = m.index + m[0].length;
+			return r === "$"
+				? r
+				: r === "&"
+					? m[0]
+					: r === "`"
+						? metin.slice(0, m.index)
+						: metin.slice(son);
+		}
+		// `$12` ama 12. grup yok: `$1` ve ardından düz "2".
+		if (+r > 0 && +r < m.length) return m[+r] ?? "";
+		return +d1 > 0 && +d1 < m.length ? (m[+d1] ?? "") + d2 : tum;
+	});
 }
 
 /**
