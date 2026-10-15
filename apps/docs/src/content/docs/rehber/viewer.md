@@ -5,7 +5,7 @@ description: Markdown'ı DOM'a veya HTML dizesine çizin — düzenleme kodu ind
 
 `@kalem-editor/viewer` Markdown'ı **gösteriyor**, düzenlemiyor. 2,9 kB (min+gzip)
 ve düzenleme motorundan tamamen bağımsız: bir blog, bir yorum listesi ya da
-bir e-posta önizlemesi için editörün 29 kB'ını indirmenize gerek yok.
+bir e-posta önizlemesi için editörün 31 kB'ını indirmenize gerek yok.
 
 İki çıkış var ve **aynı sonucu** veriyorlar:
 

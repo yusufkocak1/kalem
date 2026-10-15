@@ -5,7 +5,7 @@ description: Render Markdown to the DOM or to an HTML string — without downloa
 
 `@kalem-editor/viewer` **displays** Markdown; it doesn't edit it. 2.9 kB (min+gzip)
 and completely independent of the editing engine: for a blog, a comment
-list or an email preview you don't need to download the editor's 29 kB.
+list or an email preview you don't need to download the editor's 31 kB.
 
 There are two outputs, and they give **the same result**:
 
