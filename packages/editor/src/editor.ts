@@ -458,6 +458,46 @@ export class Editor {
 		return this.#element;
 	}
 
+	/**
+	 * Kaynak taşıyıcısının **dışına** düşen metni içine taşır.
+	 *
+	 * Boş bir `<code>` satır kutusu üretmediği için tarayıcı imleci onun
+	 * içine koyamıyor: ``` kuralıyla ya da menüden açılan boş bir kod
+	 * bloğuna yazılan harfler `<pre>`'nin doğrudan çocuğu oluyordu.
+	 * `readCode` yalnızca `<code>`'u okuduğundan model yazılanı hiç
+	 * görmüyordu; ekranda duran kod kaydedilmiyor, yapıştırma da onu
+	 * siliyordu. Düğümler kopyalanmadan taşınıyor ve imleç aynı düğümde
+	 * aynı yerde tutuluyor.
+	 */
+	#absorbStraySource(blockElement: HTMLElement): void {
+		const kaynaklar = holders(blockElement, CODE_ATTR);
+		if (kaynaklar.length !== 1 || holders(blockElement, PATH_ATTR).length > 0) return;
+		const holder = kaynaklar[0] as HTMLElement;
+		const kap = holder.parentElement;
+		if (kap === null || !blockElement.contains(kap)) return;
+
+		const once: Node[] = [];
+		const sonra: Node[] = [];
+		let gecti = false;
+		for (const cocuk of Array.from(kap.childNodes)) {
+			if (cocuk === holder) gecti = true;
+			else if (cocuk.nodeType === Node.TEXT_NODE || cocuk.nodeName === "BR") {
+				(gecti ? sonra : once).push(cocuk);
+			}
+		}
+		if (once.length === 0 && sonra.length === 0) return;
+
+		const selection = this.#element.ownerDocument.getSelection();
+		const range = selection !== null && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+		const imlec = range === null ? null : { node: range.endContainer, offset: range.endOffset };
+		const tasinan = imlec !== null && (once.includes(imlec.node) || sonra.includes(imlec.node));
+
+		holder.prepend(...once);
+		holder.append(...sonra);
+		if (tasinan && imlec !== null && selection !== null)
+			selection.collapse(imlec.node, imlec.offset);
+	}
+
 	/** İmlecin model konumu; seçim tek bir taşıyıcıda değilse `null`. */
 	getCaret(): Caret | null {
 		return this.#caret();
@@ -1684,9 +1724,29 @@ export class Editor {
 	#sourceHolder(): HTMLElement | null {
 		const selection = this.#element.ownerDocument.getSelection();
 		if (selection === null || selection.rangeCount === 0) return null;
-		const node = selection.getRangeAt(0).startContainer;
+		return this.#sourceHolderAt(selection.getRangeAt(0).startContainer);
+	}
+
+	/**
+	 * Bir DOM noktasının kaynak taşıyıcısı.
+	 *
+	 * İmleç her zaman `<code>` içinde durmuyor: **boş** bir kod bloğunda
+	 * `<code>`'un metin düğümü yok ve tarayıcı imleci dıştaki `<pre>`'ye
+	 * koyuyor. Yalnızca `closest` bakılınca taşıyıcı bulunamıyor, yapıştırma
+	 * ve Enter sessizce hiçbir şey yapmıyordu. Nokta, tek bir kaynak
+	 * taşıyıcısını saran (ve satır içi taşıyıcı içermeyen) bir blok
+	 * elemanındaysa o taşıyıcı sayılıyor.
+	 */
+	#sourceHolderAt(node: Node): HTMLElement | null {
 		const element = node instanceof Element ? node : node.parentElement;
-		const holder = element?.closest(`[${CODE_ATTR}]`);
+		if (element === null) return null;
+		let holder = element.closest(`[${CODE_ATTR}]`);
+		if (holder === null && element.closest(`[${ID_ATTR}]`) !== null) {
+			const icindekiler = element.querySelectorAll(`[${CODE_ATTR}]`);
+			if (icindekiler.length === 1 && element.querySelector(`[${PATH_ATTR}]`) === null) {
+				holder = icindekiler[0] as Element;
+			}
+		}
 		return holder instanceof HTMLElement && this.#element.contains(holder) ? holder : null;
 	}
 
@@ -1694,7 +1754,9 @@ export class Editor {
 		const holder = this.#sourceHolder();
 		if (holder === null) return false;
 		const selection = this.#element.ownerDocument.getSelection();
-		return selection !== null && holder.contains(selection.getRangeAt(0).endContainer);
+		return (
+			selection !== null && this.#sourceHolderAt(selection.getRangeAt(0).endContainer) === holder
+		);
 	}
 
 	#insertIntoSource(metin: string): void {
@@ -1714,8 +1776,8 @@ export class Editor {
 		const dugum = nodeAt(this.#doc.children[blockIndex], path) as { value?: string } | undefined;
 		if (dugum?.value === undefined) return;
 
-		const bas = offsetOf(holder, range.startContainer, range.startOffset);
-		const bit = offsetOf(holder, range.endContainer, range.endOffset);
+		const bas = sourceOffset(holder, range.startContainer, range.startOffset);
+		const bit = sourceOffset(holder, range.endContainer, range.endOffset);
 		const deger = dugum.value.slice(0, bas) + metin + dugum.value.slice(bit);
 
 		const doc = replaceAt(this.#doc, [blockIndex, ...path], { ...dugum, value: deger } as never);
@@ -1829,6 +1891,7 @@ export class Editor {
 	#syncFromDom(blockElement: HTMLElement): void {
 		const blockIndex = this.#indexOf(blockElement);
 		if (blockIndex < 0) return;
+		this.#absorbStraySource(blockElement);
 
 		let doc = this.#doc;
 		let degisti = false;
@@ -1876,6 +1939,19 @@ export class Editor {
 // ---------------------------------------------------------------------------
 // Yardımcılar
 // ---------------------------------------------------------------------------
+
+/**
+ * Bir DOM noktasının kaynak taşıyıcısı içindeki ofseti.
+ *
+ * Nokta taşıyıcının dışındaysa (imleç `<pre>`'de) taşıyıcının önündeyse
+ * başı, arkasındaysa sonu sayılıyor.
+ */
+function sourceOffset(holder: HTMLElement, node: Node, offset: number): number {
+	if (holder.contains(node)) return offsetOf(holder, node, offset);
+	const aralik = holder.ownerDocument.createRange();
+	aralik.selectNodeContents(holder);
+	return aralik.comparePoint(node, offset) > 0 ? contentLength(holder) : 0;
+}
 
 /**
  * Kaynak bloğuna eklenen satır sonu.
