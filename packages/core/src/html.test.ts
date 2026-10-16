@@ -471,6 +471,14 @@ describe("tablo hücresindeki bloklar", () => {
 		expect(md(tablo([e("P", [t("Adımlar:")]), liste]))).toContain("| Adımlar:<br>• bir<br>• iki |");
 	});
 
+	it("görev maddeleri onay durumunu koruyor", () => {
+		const liste = e("UL", [
+			e("LI", [e("INPUT", [], { type: "checkbox", checked: "" }), t(" bitti")]),
+			e("LI", [e("INPUT", [], { type: "checkbox" }), t(" kaldı")]),
+		]);
+		expect(md(tablo([liste]))).toContain("| ☑ bitti<br>☐ kaldı |");
+	});
+
 	it("tek satırlık hücre değişmiyor", () => {
 		expect(md(tablo([t("bir "), e("B", [t("iki")])]))).toContain("| bir **iki** |");
 	});

@@ -57,6 +57,21 @@ describe("storage format import", () => {
 		expect(md).not.toContain("<ac:");
 	});
 
+	it("keeps a task's checkbox in a table cell", () => {
+		const md = confluenceToMarkdown(
+			"<table><tbody><tr><th><p>A</p></th></tr><tr><td><ac:task-list><ac:task><ac:task-id>1</ac:task-id><ac:task-status>complete</ac:task-status><ac:task-body>bitti</ac:task-body></ac:task><ac:task><ac:task-id>2</ac:task-id><ac:task-status>incomplete</ac:task-status><ac:task-body>kaldı</ac:task-body></ac:task></ac:task-list></td></tr></tbody></table>",
+		);
+		expect(md).toContain("| ☑ bitti<br>☐ kaldı |");
+	});
+
+	it("reads the tasks of an exported HTML page", () => {
+		const md = confluenceToMarkdown(
+			'<html><body><ul class="inline-task-list"><li data-inline-task-id="1" class="checked"><span>bitti</span></li><li data-inline-task-id="2">kaldı</li></ul></body></html>',
+		);
+		expect(md).toContain("- [x] bitti");
+		expect(md).toContain("- [ ] kaldı");
+	});
+
 	it("keeps tables rectangular and a cell's paragraphs as lines", () => {
 		const md = confluenceToMarkdown(
 			'<table><tbody><tr><th><p>A</p></th><th><p>B</p></th></tr><tr><td colspan="2"><p>bir</p><p>iki</p></td></tr></tbody></table>',
