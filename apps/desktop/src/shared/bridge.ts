@@ -1,6 +1,8 @@
+import type { ClaudeEvent } from "./claude.js";
 import type { ConfluenceFormat } from "./confluence.js";
 import type { TextFormat } from "./encoding.js";
 import type { Lang } from "./i18n.js";
+import type { AssistantConfig, AssistantUpdate, ProviderId } from "./providers.js";
 
 export type Theme = "system" | "light" | "dark";
 
@@ -52,6 +54,12 @@ export interface Settings {
 	readonly checkUpdates: boolean;
 	/** A notification-area icon and the system-wide quick note shortcut; the app stays there when its windows close. */
 	readonly tray: boolean;
+	/** The Claude assistant's panel, at the right of the document. */
+	readonly assistant: boolean;
+	/** Share the active document with Claude along with each question. */
+	readonly assistantDocument: boolean;
+	/** The Claude Code CLI the user picked; empty to look for it. */
+	readonly claudePath: string;
 }
 
 export type SidePane = "outline" | "files" | "confluence";
@@ -73,6 +81,9 @@ export const DEFAULT_SETTINGS: Settings = {
 	confluenceFavorites: [],
 	checkUpdates: true,
 	tray: false,
+	assistant: false,
+	assistantDocument: true,
+	claudePath: "",
 };
 
 /** The `@page` rule printing and PDF export lay the document out with. */
@@ -361,6 +372,34 @@ export interface Attachment {
 	readonly url: string;
 }
 
+/** Whether the Claude Code CLI was found on this computer. */
+export type ClaudeStatus =
+	| { readonly found: true; readonly path: string; readonly version: string }
+	| { readonly found: false };
+
+/** Whether the assistant can be asked, with the service it uses. */
+export interface AssistantStatus {
+	readonly provider: ProviderId;
+	readonly ready: boolean;
+	/** Under the panel's title: the CLI's version, or the service and its model. */
+	readonly label: string;
+	/** The CLI's path or the service's address. */
+	readonly detail: string;
+	/** What keeps it from being ready: the CLI is not installed, or the service is not set up. */
+	readonly missing: "cli" | "setup" | null;
+}
+
+/** One question to the assistant; the reply comes through `onAssistantEvent`. */
+export interface AssistantRequest {
+	/** The chat the reply belongs to. */
+	readonly chatId: string;
+	readonly prompt: string;
+	/** The conversation to continue; `null` starts one. */
+	readonly sessionId: string | null;
+	/** The active tab: a new conversation runs in its document's folder. */
+	readonly tabId: string | null;
+}
+
 export interface DraftRequest {
 	readonly name: string;
 	readonly text: string;
@@ -429,6 +468,7 @@ export const COMMANDS = [
 	"collapse-spaces",
 	"format-code",
 	"format-all-code",
+	"assistant",
 ] as const;
 
 export type Command = (typeof COMMANDS)[number];
@@ -551,6 +591,24 @@ export interface KalemBridge {
 	readVersion(tabId: string, id: string): Promise<string>;
 	/** The open folder changed, in this window or another. */
 	onWorkspaceChange(handler: () => void): () => void;
+
+	/** The service in use and whether it can be asked; `refresh` looks for the CLI again. */
+	assistantStatus(refresh?: boolean): Promise<AssistantStatus>;
+	assistantConfig(): Promise<AssistantConfig>;
+	/** Changes a service's settings and makes it the one in use. */
+	assistantConfigure(update: AssistantUpdate): Promise<AssistantStatus>;
+	/** The models a service offers; without `key`, the kept one is used. */
+	assistantModels(request: {
+		readonly provider: ProviderId;
+		readonly baseUrl: string;
+		readonly key?: string;
+	}): Promise<readonly string[]>;
+	/** Lets the user pick the Claude Code CLI's program. */
+	claudeLocate(): Promise<AssistantStatus>;
+	/** Asks the assistant; resolves when the reply has ended. */
+	assistantAsk(request: AssistantRequest): Promise<void>;
+	assistantStop(chatId: string): Promise<void>;
+	onAssistantEvent(handler: (chatId: string, event: ClaudeEvent) => void): () => void;
 }
 
 export const CHANNEL = {
@@ -618,4 +676,12 @@ export const CHANNEL = {
 	workspaceChange: "kalem:workspace-change",
 	listVersions: "kalem:list-versions",
 	readVersion: "kalem:read-version",
+	assistantStatus: "kalem:assistant-status",
+	assistantConfig: "kalem:assistant-config",
+	assistantConfigure: "kalem:assistant-configure",
+	assistantModels: "kalem:assistant-models",
+	claudeLocate: "kalem:claude-locate",
+	assistantAsk: "kalem:assistant-ask",
+	assistantStop: "kalem:assistant-stop",
+	assistantEvent: "kalem:assistant-event",
 } as const;

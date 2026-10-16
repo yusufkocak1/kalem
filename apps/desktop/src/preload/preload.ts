@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { Command, KalemBridge, Settings, TabDocument } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
+import type { ClaudeEvent } from "../shared/claude.js";
 
 function listen<Args extends unknown[]>(
 	channel: string,
@@ -101,6 +102,14 @@ const bridge: KalemBridge = {
 	onWorkspaceChange: (handler) => listen<[]>(CHANNEL.workspaceChange, handler),
 	listVersions: (tabId) => ipcRenderer.invoke(CHANNEL.listVersions, tabId),
 	readVersion: (tabId, id) => ipcRenderer.invoke(CHANNEL.readVersion, tabId, id),
+	assistantStatus: (refresh) => ipcRenderer.invoke(CHANNEL.assistantStatus, refresh === true),
+	assistantConfig: () => ipcRenderer.invoke(CHANNEL.assistantConfig),
+	assistantConfigure: (update) => ipcRenderer.invoke(CHANNEL.assistantConfigure, update),
+	assistantModels: (request) => ipcRenderer.invoke(CHANNEL.assistantModels, request),
+	claudeLocate: () => ipcRenderer.invoke(CHANNEL.claudeLocate),
+	assistantAsk: (request) => ipcRenderer.invoke(CHANNEL.assistantAsk, request),
+	assistantStop: (chatId) => ipcRenderer.invoke(CHANNEL.assistantStop, chatId),
+	onAssistantEvent: (handler) => listen<[string, ClaudeEvent]>(CHANNEL.assistantEvent, handler),
 };
 
 contextBridge.exposeInMainWorld("kalem", bridge);

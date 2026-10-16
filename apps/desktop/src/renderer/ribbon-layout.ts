@@ -491,6 +491,17 @@ export function createAppRibbon(
 							() => ctx.updateSettings({ navigation: !ctx.settings().navigation }),
 						),
 						{
+							...toggle(
+								"assistant",
+								t.assistantPane,
+								"assistant",
+								() => ctx.settings().assistant,
+								ctx.commands.assistant,
+								false,
+							),
+							shortcut: `${MOD}+Shift+L`,
+						},
+						{
 							...toggle("source", t.markdownSource, "source", ctx.inSource, ctx.commands.source),
 							shortcut: `${MOD}+Shift+M`,
 						},

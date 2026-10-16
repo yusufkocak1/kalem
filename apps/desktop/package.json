@@ -1,7 +1,7 @@
 {
   "name": "kalem-desktop",
   "private": true,
-  "version": "1.15.1",
+  "version": "1.16.0",
   "type": "module",
   "description": "Kalem Desktop — a Word-like Markdown editor built with Electron",
   "author": "Yusuf Koçak",
@@ -17,6 +17,7 @@
     "package:dir": "pnpm build && electron-builder --dir --config electron-builder.yml"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
     "@kalem-editor/core": "workspace:^",
     "@kalem-editor/editor": "workspace:^",
     "@kalem-editor/plugin-autosave": "workspace:^",

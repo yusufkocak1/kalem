@@ -342,6 +342,13 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 					click: () => ctx.changeSettings({ navigation: !settings.navigation }),
 				},
 				{
+					label: t.assistantPane,
+					type: "checkbox",
+					checked: settings.assistant,
+					accelerator: "CmdOrCtrl+Shift+L",
+					click: send(ctx, "assistant"),
+				},
+				{
 					label: t.markdownSource,
 					...editorShortcut("CmdOrCtrl+Shift+M"),
 					click: send(ctx, "source"),
