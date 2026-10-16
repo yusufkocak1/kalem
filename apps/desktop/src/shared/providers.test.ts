@@ -17,12 +17,16 @@ describe("services", () => {
 		const t = stringsFor("tr");
 		for (const id of PROVIDERS) {
 			expect(providerLabel(t, id)).not.toBe("");
-			if (id !== "claude-code" && id !== "custom")
+			if (id !== "claude-code" && id !== "copilot" && id !== "custom")
 				expect(checkBaseUrl(PROVIDER_INFO[id].baseUrl)).toBe(PROVIDER_INFO[id].baseUrl);
 		}
 		expect(providerLabel(t, "claude-code")).toBe("Claude Code (bu bilgisayar)");
 		expect(PROVIDER_INFO.anthropic.defaultModel).toBe("claude-opus-5-5");
 		expect(PROVIDER_INFO.ollama.needsKey).toBe(false);
+		expect(providerLabel(t, "copilot")).toBe("GitHub Copilot (bu bilgisayar)");
+		expect(PROVIDER_INFO["github-models"].modelsUrl).toBe(
+			"https://models.github.ai/catalog/models",
+		);
 	});
 
 	it("takes only http(s) addresses, without a trailing slash", () => {
@@ -101,5 +105,10 @@ describe("errors and models", () => {
 		]);
 		expect(modelIds({ models: [{ name: "llama3" }] })).toEqual(["llama3"]);
 		expect(modelIds({})).toEqual([]);
+		// GitHub Models' catalog.
+		expect(modelIds([{ id: "openai/gpt-4.1" }, { id: "meta/llama" }])).toEqual([
+			"meta/llama",
+			"openai/gpt-4.1",
+		]);
 	});
 });

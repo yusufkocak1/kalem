@@ -2,7 +2,7 @@ import type { AssistantStatus, KalemBridge } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type { AssistantConfig, ProviderId } from "../shared/providers.js";
-import { PROVIDER_INFO, PROVIDERS, providerLabel } from "../shared/providers.js";
+import { isCli, PROVIDER_INFO, PROVIDERS, providerLabel } from "../shared/providers.js";
 import { el } from "./dom.js";
 
 export interface AssistantSettingsOptions {
@@ -122,12 +122,16 @@ export function createAssistantSettings(options: AssistantSettingsOptions): Assi
 		const id = selected();
 		const info = PROVIDER_INFO[id];
 		const connection = config?.connections[id];
-		const cli = info.protocol === "cli";
+		const cli = isCli(info);
 		forgetKey = false;
 		cliNote.hidden = !cli;
+		cliNote.textContent = id === "copilot" ? t.copilotCliNote : t.assistantCliNote;
 		urlField.hidden = cli;
 		keyField.hidden = cli;
-		modelField.hidden = cli;
+		// Copilot can be asked for a model of its own; Claude Code uses the one it is set to.
+		modelField.hidden = id === "claude-code";
+		fetchModels.hidden = cli;
+		model.placeholder = cli ? t.copilotModelPlaceholder : t.assistantModelPlaceholder;
 		baseUrl.value = connection?.baseUrl ?? info.baseUrl;
 		baseUrl.placeholder = info.baseUrl || "https://…/v1";
 		model.value = connection?.model ?? info.defaultModel;

@@ -403,3 +403,184 @@ test("opens and closes the assistant from its button at the right edge", async (
 	await expect(pane).toBeHidden();
 	await app.close();
 });
+
+/** A stand-in for the GitHub Copilot CLI: plain text on standard output, as `copilot -s` writes it. */
+async function fakeCopilot(
+	folder: string,
+): Promise<{ path: string; calls: () => Promise<Call[]> }> {
+	const log = join(folder, "copilot-calls.jsonl");
+	const script = join(folder, "fake-copilot.cjs");
+	await writeFile(
+		script,
+		`const fs = require("node:fs");
+const args = process.argv.slice(2);
+if (args.includes("--version")) {
+	console.log("9.9.9-copilot");
+	process.exit(0);
+}
+let prompt = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => (prompt += chunk));
+process.stdin.on("end", () => {
+	fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args, prompt, cwd: process.cwd() }) + "\\n");
+	const reply = ${JSON.stringify(REPLY)};
+	let i = 0;
+	const next = () => {
+		if (i >= reply.length) return;
+		process.stdout.write(reply.slice(i, i + 11));
+		i += 11;
+		setTimeout(next, 2);
+	};
+	next();
+});
+`,
+	);
+	let path: string;
+	if (process.platform === "win32") {
+		path = join(folder, "copilot.cmd");
+		await writeFile(path, `@ECHO off\r\nnode "%dp0%\\fake-copilot.cjs" %*\r\n`);
+	} else {
+		path = join(folder, "copilot");
+		await writeFile(path, `#!/usr/bin/env node\nrequire(${JSON.stringify(script)});\n`);
+		await chmod(path, 0o755);
+	}
+	return {
+		path,
+		calls: async () =>
+			(await readFile(log, "utf8").catch(() => ""))
+				.split("\n")
+				.filter((line) => line !== "")
+				.map((line) => JSON.parse(line) as Call),
+	};
+}
+
+test("asks GitHub Copilot, keeps several chats and picks the last one up after a restart", async () => {
+	const folder = await tempDir("assistant-copilot");
+	const doc = join(folder, "rapor.md");
+	await writeFile(doc, "# Rapor\n");
+	const copilot = await fakeCopilot(folder);
+	const env = { KALEM_COPILOT: copilot.path, KALEM_CLAUDE: join(folder, "nothing-here") };
+	const first = await launch({ args: [doc], settings: { assistant: true }, env });
+	let { page } = first;
+	let pane = page.locator(".assistant");
+
+	await pane.getByRole("button", { name: "Connection settings" }).click();
+	const form = pane.locator(".assistant-settings");
+	await form.getByLabel("Service").selectOption("copilot");
+	await expect(form.getByLabel("API key")).toBeHidden();
+	await expect(form).toContainText("GitHub Copilot CLI");
+	await form.getByRole("button", { name: "Save" }).click();
+	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9-copilot");
+
+	const input = () => pane.locator(".assistant-input");
+	await input().fill("Raporu çiz");
+	await input().press("Enter");
+	await expect(pane.locator(".assistant-assistant .assistant-diagram figcaption")).toHaveText(
+		"Onay akışı",
+	);
+	await expect(pane.getByRole("button", { name: "Insert", exact: true })).toBeVisible();
+
+	// The instructions go with the first question; the session id we chose continues it.
+	const [ask1] = await copilot.calls();
+	expect(ask1?.args.slice(0, 3)).toEqual(["-s", "--stream", "on"]);
+	expect(ask1?.args.join(" ")).toContain("--deny-tool shell --deny-tool write");
+	const session = ask1?.args[ask1.args.indexOf("--session-id") + 1];
+	expect(session).toMatch(/^[0-9a-f-]{36}$/);
+	expect(ask1?.prompt.startsWith("<instructions>\n")).toBe(true);
+	expect(ask1?.prompt).toContain('<document name="rapor.md">');
+	expect(ask1?.cwd).toBe(folder);
+	await input().fill("Kısalt");
+	await input().press("Enter");
+	await expect(pane.getByRole("button", { name: "Insert", exact: true })).toHaveCount(2);
+	const ask2 = (await copilot.calls())[1];
+	expect(ask2?.args[ask2.args.indexOf("--session-id") + 1]).toBe(session);
+	expect(ask2?.prompt.startsWith("<instructions>")).toBe(false);
+
+	// A second chat; the first stays in the list and comes back as it was.
+	await pane.getByRole("button", { name: "New chat" }).first().click();
+	await expect(pane.locator(".assistant-message")).toHaveCount(0);
+	await input().fill("Başka bir soru");
+	await input().press("Enter");
+	await expect(pane.getByRole("button", { name: "Insert", exact: true })).toHaveCount(1);
+	const ask3 = (await copilot.calls())[2];
+	expect(ask3?.args[ask3.args.indexOf("--session-id") + 1]).not.toBe(session);
+
+	await pane.getByRole("button", { name: "Chats" }).click();
+	const rows = pane.locator(".assistant-history-row");
+	await expect(rows).toHaveCount(2);
+	await expect(rows.nth(0)).toContainText("Başka bir soru");
+	await expect(rows.nth(1)).toContainText("Raporu çiz");
+	await expect(rows.nth(1)).toContainText("4 messages");
+	await rows.nth(1).locator(".assistant-history-open").click();
+	await expect(pane.locator(".assistant-user")).toHaveText([/Raporu çiz/, /Kısalt/]);
+	await input().fill("Devam");
+	await input().press("Enter");
+	await expect(pane.getByRole("button", { name: "Insert", exact: true })).toHaveCount(3);
+	const ask4 = (await copilot.calls())[3];
+	expect(ask4?.args[ask4.args.indexOf("--session-id") + 1]).toBe(session);
+	await first.app.close();
+
+	// After a restart the most recent chat is back, with the others in the list.
+	const second = await launch({ userData: first.userData, args: [doc], env });
+	page = second.page;
+	pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-user")).toHaveText([/Raporu çiz/, /Kısalt/, /Devam/]);
+	await expect(pane.locator(".assistant-diagram")).toHaveCount(3);
+	await input().fill("Yeniden başladım");
+	await input().press("Enter");
+	await expect(pane.getByRole("button", { name: "Insert", exact: true })).toHaveCount(4);
+	const ask5 = (await copilot.calls())[4];
+	expect(ask5?.args[ask5.args.indexOf("--session-id") + 1]).toBe(session);
+	expect(ask5?.cwd).toBe(folder);
+	await pane.getByRole("button", { name: "Chats" }).click();
+	await expect(pane.locator(".assistant-history-row")).toHaveCount(2);
+
+	// A chat can be deleted.
+	page.once("dialog", (dialog) => void dialog.accept());
+	await pane.getByRole("button", { name: "Delete “Başka bir soru”" }).click();
+	await expect(pane.locator(".assistant-history-row")).toHaveCount(1);
+	expect([...first.errors, ...second.errors]).toEqual([]);
+	await second.app.close();
+});
+
+test("resizes the assistant by dragging its edge, and keeps the width", async () => {
+	const folder = await tempDir("assistant-resize");
+	const first = await launch({
+		settings: { assistant: true },
+		env: { KALEM_CLAUDE: join(folder, "nothing-here") },
+	});
+	const pane = first.page.locator(".assistant");
+	await expect(pane).toBeVisible();
+	const before = (await pane.boundingBox())?.width ?? 0;
+	expect(Math.round(before)).toBe(380);
+
+	const handle = pane.locator(".assistant-resizer");
+	const box = await handle.boundingBox();
+	if (box === null) throw new Error("no resize handle");
+	const y = box.y + box.height / 2;
+	await first.page.mouse.move(box.x + box.width / 2, y);
+	await first.page.mouse.down();
+	await first.page.mouse.move(box.x + box.width / 2 - 120, y, { steps: 5 });
+	await first.page.mouse.up();
+	const width = async (): Promise<number> => Math.round((await pane.boundingBox())?.width ?? 0);
+	await expect.poll(async () => Math.abs((await width()) - 500)).toBeLessThanOrEqual(1);
+	const dragged = await width();
+
+	// The keyboard too: left widens, right narrows.
+	await handle.focus();
+	await first.page.keyboard.press("ArrowRight");
+	await expect.poll(width).toBe(dragged - 20);
+	await expect(handle).toHaveAttribute("aria-valuenow", String(dragged - 20));
+	await first.app.close();
+
+	const second = await launch({
+		userData: first.userData,
+		env: { KALEM_CLAUDE: join(folder, "nothing-here") },
+	});
+	await expect
+		.poll(async () =>
+			Math.round((await second.page.locator(".assistant").boundingBox())?.width ?? 0),
+		)
+		.toBe(dragged - 20);
+	await second.app.close();
+});

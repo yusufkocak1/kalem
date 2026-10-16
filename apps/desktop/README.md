@@ -317,14 +317,18 @@ verir.
 
 - Pencerenin sağ kenarında her zaman duran **✦ Asistan** düğmesi,
   **Görünüm → Yapay Zekâ Asistanı** ya da `Ctrl+Shift+L` belgenin sağında bir
-  sohbet paneli açar (düğmeye yeniden basmak kapatır). Paneldeki ⚙ (**Bağlantı ayarları**) asistanın hangi
+  sohbet paneli açar (düğmeye yeniden basmak kapatır). Panelin sol kenarı
+  sürüklenerek genişletilip daraltılır (odaktayken ok tuşları da çalışır,
+  çift tıklamak varsayılan genişliğe döndürür); genişlik hatırlanır. Paneldeki ⚙ (**Bağlantı ayarları**) asistanın hangi
   hizmeti kullanacağını seçer:
 
   | Hizmet | Nasıl bağlanır |
   |---|---|
   | **Claude Code (bu bilgisayar)** — varsayılan | Kurulu `claude` komutu, kendi oturumuyla; anahtar gerekmez |
+  | **GitHub Copilot (bu bilgisayar)** | Kurulu GitHub Copilot CLI (`copilot`), Copilot aboneliği ve kendi oturumuyla; anahtar gerekmez, model isteğe bağlı |
   | **Anthropic (Claude API)** | API anahtarı; resmi Anthropic SDK'sıyla, varsayılan model `claude-opus-5-5` |
   | **OpenAI**, **Google Gemini**, **OpenRouter** | API anahtarı; OpenAI uyumlu Chat Completions API'si |
+  | **GitHub Models** | `models:read` yetkili GitHub kişisel erişim jetonu; model adları `openai/gpt-4.1` gibi |
   | **Ollama**, **LM Studio** | Bu bilgisayarda çalışan yerel model; anahtar gerekmez |
   | **Diğer (OpenAI uyumlu)** | Herhangi bir `…/v1` adresi (Groq, Mistral, DeepSeek, şirket içi sunucu…) |
 
@@ -336,6 +340,19 @@ verir.
   ayarları geçerlidir). API'ler sohbeti hatırlamadığı için önceki mesajlar
   (en çok 40) her soruyla yeniden gönderilir; hizmet ya da model
   değişince yeni sohbet başlar.
+- **Sohbetler:** başlıktaki 💬 düğmesi sohbet listesini açar. Her soru
+  kendi sohbetinde kalır; listeden eski bir sohbete dönülür, **Yeni sohbet**
+  yenisini başlatır, ✕ siler. Bir sohbet yanıt beklerken başkasına
+  geçilebilir. Sohbetler `%APPDATA%\kalem-desktop\assistant-chats.json`
+  içinde saklanır (en çok 100; soruyla giden belge saklanmaz) ve uygulama
+  açılınca en son sohbet geri gelir. Claude Code ve Copilot sohbetleri
+  kendi oturumlarıyla, API sohbetleri saklanan mesajlarla sürer.
+- **GitHub Copilot** seçiliyken uygulama `copilot`'ı aynı yerlerde (ayrıca
+  WinGet bağlantı klasöründe) arar; `KALEM_COPILOT` ortam değişkeni
+  verilirse yalnızca o dosya denenir. Copilot'a sistem talimatı
+  verilemediği için Kalem tanıtımı sohbetin ilk sorusuyla gider; araçlardan
+  komut çalıştırma ve dosya yazma kapalıdır (`--deny-tool shell`,
+  `--deny-tool write`).
 - **Claude Code** seçiliyken uygulama `claude`'u kendisi arar. Yoksa panel
   kurulumu anlatır (`npm install -g @anthropic-ai/claude-code`, sonra
   terminalde bir kez `claude` ile oturum açmak) ve API anahtarıyla bir

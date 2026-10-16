@@ -127,10 +127,13 @@ let lastSelection = "";
 
 const assistant = createAssistantPane({
 	t,
+	lang: startup.language,
 	bridge,
 	previews,
 	shareDocument: () => settings.assistantDocument,
 	setShareDocument: (share) => updateSettings({ assistantDocument: share }),
+	width: () => settings.assistantWidth,
+	setWidth: (width) => updateSettings({ assistantWidth: width }),
 	context: () => assistantContext(),
 	selection: () => lastSelection,
 	insert: (text) => insertReply(text),

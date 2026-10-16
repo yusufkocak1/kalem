@@ -768,6 +768,7 @@ button {
 /* --- Claude assistant ------------------------------------------------------ */
 
 .assistant {
+	position: relative;
 	display: flex;
 	flex: none;
 	flex-direction: column;
@@ -778,6 +779,7 @@ button {
 }
 
 .assistant[hidden],
+.assistant-history[hidden],
 .assistant-log[hidden],
 .assistant-empty[hidden],
 .assistant-missing[hidden],
@@ -1175,6 +1177,102 @@ button {
 
 .assistant-send.busy {
 	background: var(--app-error);
+}
+
+/* Dragging the panel's left edge sets its width. */
+.assistant-resizer {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: -3px;
+	z-index: 2;
+	width: 6px;
+	cursor: col-resize;
+	touch-action: none;
+}
+
+.assistant-resizer:hover,
+.assistant-resizer:focus-visible,
+.assistant.resizing .assistant-resizer {
+	background: var(--app-accent);
+	opacity: 0.5;
+	outline: none;
+}
+
+.assistant.resizing {
+	user-select: none;
+}
+
+.assistant-history {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: 10px;
+	padding: 14px 12px;
+	overflow-y: auto;
+}
+
+.assistant-history-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.assistant-history-header .assistant-empty-title {
+	margin: 0;
+}
+
+.assistant-history-list {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.assistant-history-row {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+.assistant-history-open {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	padding: 7px 9px;
+	border: 1px solid transparent;
+	border-radius: 7px;
+	background: none;
+	color: var(--app-text);
+	font: inherit;
+	text-align: start;
+	cursor: pointer;
+}
+
+.assistant-history-open:hover {
+	background: var(--app-hover);
+}
+
+.assistant-history-open[aria-current="true"] {
+	border-color: var(--app-border);
+	background: var(--app-raised);
+}
+
+.assistant-history-title {
+	overflow: hidden;
+	font-weight: 600;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.assistant-history-meta {
+	color: var(--app-muted);
+	font-size: 11px;
 }
 
 .assistant-settings {

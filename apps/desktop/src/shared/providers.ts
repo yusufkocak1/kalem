@@ -1,16 +1,19 @@
 /**
- * The services the assistant can talk to: the Claude Code CLI on this
- * computer, the Anthropic API, and any service with an OpenAI-compatible
- * Chat Completions API (OpenAI, Google Gemini, OpenRouter, Ollama, LM
- * Studio, or another address). Pure: the main process makes the requests.
+ * The services the assistant can talk to: the Claude Code and GitHub
+ * Copilot CLIs on this computer, the Anthropic API, and any service with an
+ * OpenAI-compatible Chat Completions API (OpenAI, Google Gemini, GitHub
+ * Models, OpenRouter, Ollama, LM Studio, or another address). Pure: the
+ * main process makes the requests.
  */
 import type { Strings } from "./i18n.js";
 
 export const PROVIDERS = [
 	"claude-code",
+	"copilot",
 	"anthropic",
 	"openai",
 	"gemini",
+	"github-models",
 	"openrouter",
 	"ollama",
 	"lmstudio",
@@ -20,8 +23,8 @@ export type ProviderId = (typeof PROVIDERS)[number];
 
 export interface ProviderInfo {
 	readonly id: ProviderId;
-	/** How it is asked: the CLI, the Anthropic Messages API, or Chat Completions. */
-	readonly protocol: "cli" | "anthropic" | "openai";
+	/** How it is asked: a CLI on this computer, the Anthropic Messages API, or Chat Completions. */
+	readonly protocol: "claude-cli" | "copilot-cli" | "anthropic" | "openai";
 	/** Brand name; `null` for the two named in the interface's language. */
 	readonly name: string | null;
 	readonly baseUrl: string;
@@ -29,12 +32,27 @@ export interface ProviderInfo {
 	readonly needsKey: boolean;
 	/** Where to get a key. */
 	readonly keyUrl: string | null;
+	/** Where its models are listed, when not at `<baseUrl>/models`. */
+	readonly modelsUrl?: string;
 }
+
+/** Whether the service is a program on this computer rather than an API. */
+export const isCli = (info: ProviderInfo): boolean =>
+	info.protocol === "claude-cli" || info.protocol === "copilot-cli";
 
 export const PROVIDER_INFO: Readonly<Record<ProviderId, ProviderInfo>> = {
 	"claude-code": {
 		id: "claude-code",
-		protocol: "cli",
+		protocol: "claude-cli",
+		name: null,
+		baseUrl: "",
+		defaultModel: "",
+		needsKey: false,
+		keyUrl: null,
+	},
+	copilot: {
+		id: "copilot",
+		protocol: "copilot-cli",
 		name: null,
 		baseUrl: "",
 		defaultModel: "",
@@ -67,6 +85,16 @@ export const PROVIDER_INFO: Readonly<Record<ProviderId, ProviderInfo>> = {
 		defaultModel: "",
 		needsKey: true,
 		keyUrl: "https://aistudio.google.com/apikey",
+	},
+	"github-models": {
+		id: "github-models",
+		protocol: "openai",
+		name: "GitHub Models",
+		baseUrl: "https://models.github.ai/inference",
+		defaultModel: "openai/gpt-4.1",
+		needsKey: true,
+		keyUrl: "https://github.com/settings/personal-access-tokens/new",
+		modelsUrl: "https://models.github.ai/catalog/models",
 	},
 	openrouter: {
 		id: "openrouter",
@@ -109,6 +137,7 @@ export const PROVIDER_INFO: Readonly<Record<ProviderId, ProviderInfo>> = {
 /** The service's name as the interface shows it. */
 export function providerLabel(t: Strings, id: ProviderId): string {
 	if (id === "claude-code") return t.providerClaudeCode;
+	if (id === "copilot") return t.providerCopilot;
 	if (id === "custom") return t.providerCustom;
 	return PROVIDER_INFO[id].name ?? id;
 }
@@ -269,9 +298,10 @@ export function httpErrorMessage(status: number, body: string): string {
 	return detail === "" ? `HTTP ${status}` : `HTTP ${status}: ${detail}`;
 }
 
-/** Model ids from a `/models` answer (OpenAI-compatible and Anthropic both use `data[].id`). */
+/** Model ids from a `/models` answer (OpenAI-compatible and Anthropic both use `data[].id`), or a catalog list. */
 export function modelIds(json: unknown): string[] {
-	const list = isRecord(json) ? (json.data ?? json.models) : undefined;
+	// GitHub Models' catalog is a bare array.
+	const list = Array.isArray(json) ? json : isRecord(json) ? (json.data ?? json.models) : undefined;
 	if (!Array.isArray(list)) return [];
 	const ids = list
 		.map((item) => (isRecord(item) ? (item.id ?? item.name) : item))

@@ -1,8 +1,8 @@
 /**
- * The Claude Code CLI as one of the assistant's services: finds it on this
- * computer and runs one question at a time through it (`claude -p …
- * --output-format stream-json`), passing the reply on as it comes. The CLI
- * brings its own login, so Kalem keeps no key for it.
+ * The assistant's services that are programs on this computer: the Claude
+ * Code CLI (`claude`) and the GitHub Copilot CLI (`copilot`). Finds them
+ * and runs one question at a time, passing the reply on as it comes. Each
+ * brings its own login, so Kalem keeps no key for them.
  */
 import type { ChildProcess } from "node:child_process";
 import { execFile, spawn } from "node:child_process";
@@ -10,34 +10,41 @@ import { readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, join } from "node:path";
 import type { WebContents } from "electron";
-import type { ClaudeStatus } from "../shared/bridge.js";
 import type { ClaudeEvent } from "../shared/claude.js";
 import { ClaudeStreamReader, LineSplitter } from "../shared/claude.js";
-import type { SettingsStore } from "./settings.js";
 import { errorMessage } from "./windows.js";
 
-/** How to start the CLI: the program, and arguments that come before Claude's own. */
-export interface ClaudeLaunch {
+export type CliProgram = "claude" | "copilot";
+
+/** Whether a CLI was found, and where. */
+export type CliStatus =
+	| { readonly found: true; readonly path: string; readonly version: string }
+	| { readonly found: false };
+
+/** How to start a CLI: the program, and arguments that come before its own. */
+export interface CliLaunch {
 	readonly command: string;
 	readonly prefix: readonly string[];
-	/** The file the user knows as `claude`. */
+	/** The file the user knows as `claude` or `copilot`. */
 	readonly path: string;
 }
 
 /**
- * Where `claude` may be, most likely first: `PATH`, then
- * the places its installers use. A GUI app on macOS does not get the shell's
- * `PATH`, so those places matter there.
+ * Where a CLI may be, most likely first: `PATH`, then the places its
+ * installers use. A GUI app on macOS does not get the shell's `PATH`, so
+ * those places matter there.
  */
-export function claudeCandidates(
+export function cliCandidates(
+	program: CliProgram,
 	platform: NodeJS.Platform,
 	env: Readonly<Record<string, string | undefined>>,
 	home: string,
 ): string[] {
 	// An override is the only place looked at (tests rely on this).
-	if (env.KALEM_CLAUDE) return [env.KALEM_CLAUDE];
+	const override = program === "claude" ? env.KALEM_CLAUDE : env.KALEM_COPILOT;
+	if (override) return [override];
 	const windows = platform === "win32";
-	const names = windows ? ["claude.exe", "claude.cmd"] : ["claude"];
+	const names = windows ? [`${program}.exe`, `${program}.cmd`] : [program];
 	const join_ = windows
 		? (dir: string, name: string) => `${dir.replace(/[\\/]+$/, "")}\\${name}`
 		: join;
@@ -45,13 +52,19 @@ export function claudeCandidates(
 		.split(windows ? ";" : delimiter)
 		.filter((dir) => dir !== "");
 	if (windows) {
-		dirs.push(`${home}\\.local\\bin`, `${home}\\.claude\\local`);
+		dirs.push(`${home}\\.local\\bin`, `${home}\\.${program}\\local`);
 		if (env.APPDATA) dirs.push(`${env.APPDATA}\\npm`);
-		if (env.LOCALAPPDATA) dirs.push(`${env.LOCALAPPDATA}\\Programs\\claude`);
+		if (env.LOCALAPPDATA) {
+			dirs.push(
+				`${env.LOCALAPPDATA}\\Programs\\${program}`,
+				// WinGet puts its command-line programs' links here.
+				`${env.LOCALAPPDATA}\\Microsoft\\WinGet\\Links`,
+			);
+		}
 	} else {
 		dirs.push(
 			join(home, ".local", "bin"),
-			join(home, ".claude", "local"),
+			join(home, `.${program}`, "local"),
 			join(home, ".npm-global", "bin"),
 			join(home, ".bun", "bin"),
 			"/opt/homebrew/bin",
@@ -82,7 +95,7 @@ async function isFile(path: string): Promise<boolean> {
 	}
 }
 
-async function launchFor(path: string): Promise<ClaudeLaunch | null> {
+async function launchFor(path: string): Promise<CliLaunch | null> {
 	if (!(await isFile(path))) return null;
 	if (!/\.(cmd|bat)$/i.test(path)) return { command: path, prefix: [], path };
 	const script = shimScript(path, await readFile(path, "utf8").catch(() => ""));
@@ -93,7 +106,7 @@ async function launchFor(path: string): Promise<ClaudeLaunch | null> {
 }
 
 /** `PATH` with the CLI's own folder and the usual ones, for a CLI that starts `node`. */
-function environment(launch: ClaudeLaunch): NodeJS.ProcessEnv {
+function environment(launch: CliLaunch): NodeJS.ProcessEnv {
 	const extra = [dirname(launch.path)];
 	if (process.platform !== "win32") extra.push("/opt/homebrew/bin", "/usr/local/bin");
 	const key =
@@ -105,7 +118,7 @@ function environment(launch: ClaudeLaunch): NodeJS.ProcessEnv {
 	return { ...process.env, [key]: path };
 }
 
-function version(launch: ClaudeLaunch): Promise<string> {
+function version(launch: CliLaunch): Promise<string> {
 	return new Promise((resolve, reject) => {
 		execFile(
 			launch.command,
@@ -119,27 +132,30 @@ function version(launch: ClaudeLaunch): Promise<string> {
 	});
 }
 
-/** The Claude Code CLI found on this computer (or picked by the user). */
-export class ClaudeCli {
-	readonly #store: SettingsStore;
-	#found: { launch: ClaudeLaunch; version: string } | null = null;
+/** A CLI found on this computer (or picked by the user). */
+export class LocalCli {
+	readonly program: CliProgram;
+	readonly #configured: () => string;
+	#found: { launch: CliLaunch; version: string } | null = null;
 
-	constructor(store: SettingsStore) {
-		this.#store = store;
+	/** `configured` is the program the user picked; empty to look for it. */
+	constructor(program: CliProgram, configured: () => string) {
+		this.program = program;
+		this.#configured = configured;
 	}
 
-	get launch(): ClaudeLaunch | null {
+	get launch(): CliLaunch | null {
 		return this.#found?.launch ?? null;
 	}
 
-	status(): ClaudeStatus {
+	status(): CliStatus {
 		const found = this.#found;
 		return found === null
 			? { found: false }
 			: { found: true, path: found.launch.path, version: found.version };
 	}
 
-	/** Whether the file starts Claude Code; it is then the one used. */
+	/** Whether the file starts the CLI; it is then the one used. */
 	async check(path: string): Promise<boolean> {
 		const launch = await launchFor(path);
 		if (launch === null) return false;
@@ -152,23 +168,79 @@ export class ClaudeCli {
 	}
 
 	/** Looks for the CLI where the user put it, then where it is usually installed. */
-	async locate(): Promise<ClaudeStatus> {
+	async locate(): Promise<CliStatus> {
 		this.#found = null;
-		const configured = this.#store.settings.claudePath;
+		const configured = this.#configured();
 		if (configured !== "" && (await this.check(configured))) return this.status();
-		for (const path of claudeCandidates(process.platform, process.env, homedir())) {
+		for (const path of cliCandidates(this.program, process.platform, process.env, homedir())) {
 			if (await this.check(path)) return this.status();
 		}
 		return this.status();
 	}
 }
 
-/** Runs one question; resolves once the CLI has exited, whatever happened. */
-export function runClaude(
-	launch: ClaudeLaunch,
+/** Turns a CLI's output into the reply's events. */
+export interface OutputReader {
+	push(chunk: string): ClaudeEvent[];
+	end(): ClaudeEvent[];
+	/** Whether the output itself said the turn ended (with `done` or `error`). */
+	readonly finished: boolean;
+	/** Whether any of the reply's text came. */
+	readonly answered: boolean;
+}
+
+/** Claude Code's `stream-json` lines. */
+export function claudeOutput(): OutputReader {
+	const reader = new ClaudeStreamReader();
+	const lines = new LineSplitter();
+	let answered = false;
+	const feed = (input: readonly string[]): ClaudeEvent[] =>
+		input
+			.flatMap((line) => reader.feed(line))
+			.map((event) => {
+				if (event.kind === "text") answered = true;
+				return event;
+			});
+	return {
+		push: (chunk) => feed(lines.push(chunk)),
+		end: () => feed(lines.end()),
+		get finished() {
+			return reader.finished;
+		},
+		get answered() {
+			return answered;
+		},
+	};
+}
+
+/** Plain text, as `copilot -s` writes its answer. */
+export function textOutput(): OutputReader {
+	let answered = false;
+	return {
+		push(chunk) {
+			if (chunk === "") return [];
+			answered = true;
+			return [{ kind: "text", text: chunk }];
+		},
+		end: () => [],
+		finished: false,
+		get answered() {
+			return answered;
+		},
+	};
+}
+
+/**
+ * Runs one question, with the question on standard input; resolves once
+ * the CLI has exited, whatever happened. A CLI whose output does not say
+ * when it ends has answered when it exits without an error.
+ */
+export function runCli(
+	launch: CliLaunch,
 	cwd: string,
 	args: readonly string[],
 	prompt: string,
+	output: OutputReader,
 	send: (event: ClaudeEvent) => void,
 	sender: WebContents,
 	started: (child: ChildProcess) => void,
@@ -193,20 +265,16 @@ export function runClaude(
 		};
 		sender.once("destroyed", stop);
 
-		const reader = new ClaudeStreamReader();
-		const lines = new LineSplitter();
 		let failed = false;
 		let stderr = "";
-		const handle = (line: string): void => {
-			for (const claudeEvent of reader.feed(line)) {
-				if (claudeEvent.kind === "error") failed = true;
-				send(claudeEvent);
+		const pass = (events: readonly ClaudeEvent[]): void => {
+			for (const event of events) {
+				if (event.kind === "error") failed = true;
+				send(event);
 			}
 		};
 		child.stdout?.setEncoding("utf8");
-		child.stdout?.on("data", (chunk: string) => {
-			for (const line of lines.push(chunk)) handle(line);
-		});
+		child.stdout?.on("data", (chunk: string) => pass(output.push(chunk)));
 		child.stderr?.setEncoding("utf8");
 		child.stderr?.on("data", (chunk: string) => {
 			stderr = (stderr + chunk).slice(-4000);
@@ -217,10 +285,10 @@ export function runClaude(
 		});
 		child.on("close", (code, signal) => {
 			sender.removeListener("destroyed", stop);
-			for (const line of lines.end()) handle(line);
-			if (!reader.finished && !failed) {
-				// Stopped by the user, or the CLI failed before it could answer.
-				if (signal !== null) send({ kind: "done" });
+			pass(output.end());
+			if (!output.finished && !failed) {
+				// Stopped by the user, or done, or failed before it could answer.
+				if (signal !== null || (code === 0 && output.answered)) send({ kind: "done" });
 				else {
 					const message = stderr.trim() || `${basename(launch.path)} exited with code ${code}`;
 					send({ kind: "error", message });
