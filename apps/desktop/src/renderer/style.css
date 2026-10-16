@@ -1078,6 +1078,7 @@ button {
 }
 
 .assistant-composer {
+	position: relative;
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
@@ -1266,6 +1267,96 @@ button {
 .assistant-history-title {
 	overflow: hidden;
 	font-weight: 600;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.assistant-model {
+	max-width: 50%;
+	padding: 2px 4px;
+	border: 1px solid var(--app-border);
+	border-radius: 5px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 12px;
+}
+
+.assistant-model[hidden],
+.assistant-recent[hidden] {
+	display: none;
+}
+
+.assistant-reply-model {
+	color: var(--app-muted);
+	font-size: 11px;
+}
+
+.assistant-recent {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-top: 18px;
+}
+
+.assistant-recent-title {
+	margin: 0;
+	color: var(--app-muted);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.assistant-recent .assistant-link {
+	align-self: flex-start;
+}
+
+/* The slash commands, above the input. */
+.assistant-commands {
+	position: absolute;
+	right: 10px;
+	bottom: calc(100% - 4px);
+	left: 10px;
+	z-index: 3;
+	max-height: 320px;
+	margin: 0;
+	padding: 4px;
+	overflow-y: auto;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	box-shadow: var(--app-shadow);
+	list-style: none;
+}
+
+.assistant-commands[hidden] {
+	display: none;
+}
+
+.assistant-command {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	padding: 5px 8px;
+	border-radius: 5px;
+	cursor: pointer;
+}
+
+.assistant-command[aria-selected="true"] {
+	background: var(--app-pressed);
+}
+
+.assistant-command-name {
+	flex: none;
+	font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--app-accent);
+}
+
+.assistant-command-label {
+	overflow: hidden;
+	color: var(--app-muted);
+	font-size: 12px;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }

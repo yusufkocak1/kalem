@@ -347,6 +347,23 @@ verir.
   içinde saklanır (en çok 100; soruyla giden belge saklanmaz) ve uygulama
   açılınca en son sohbet geri gelir. Claude Code ve Copilot sohbetleri
   kendi oturumlarıyla, API sohbetleri saklanan mesajlarla sürer.
+- **Model seçimi:** soru kutusunun üstündeki seçici etkin hizmetin
+  modellerini listeler (API'lerde hizmetin kendi listesi; Claude Code'da
+  varsayılan, `opus`, `sonnet`, `haiku`; **Başka model…** ayarları açar).
+  Model değiştirmek sohbeti bölmez, sonraki soru aynı sohbette yeni modelle
+  gider. Her yanıtın altında onu hangi modelin verdiği yazar ve bu bilgi
+  sohbetle birlikte saklanır. Boş bir sohbette **Son sohbetler** listesi
+  önceki sohbetlere tek tıkla döner.
+- **Komutlar:** kutuya `/` yazınca komut listesi açılır; yazdıkça hem
+  komut adına hem Türkçe adına göre süzülür (`/kayd` → `/save`), ok
+  tuşları ve Enter/Tab ile seçilir. Asistan komutları (`/new`, `/chats`,
+  `/model <ad>`, `/settings`, `/share`, `/stop`, `/help`), hazır sorular
+  (`/summarize`, `/diagram <ne çizilecek>`, `/improve`, `/to-table`) ve
+  uygulama komutları (`/save`, `/save-as`, `/export-docx`, `/export-html`,
+  `/export-confluence`, `/history`, `/find`, `/replace`, `/table`,
+  `/new-diagram`, `/image`, `/source`, `/focus`, `/read-only`, `/open`,
+  `/search`, `/format-code`). Uygulama komutları belgede imlecin son
+  bulunduğu yerde çalışır.
 - **GitHub Copilot** seçiliyken uygulama `copilot`'ı aynı yerlerde (ayrıca
   WinGet bağlantı klasöründe) arar; `KALEM_COPILOT` ortam değişkeni
   verilirse yalnızca o dosya denenir. Copilot'a sistem talimatı

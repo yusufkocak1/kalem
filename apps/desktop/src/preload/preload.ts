@@ -105,6 +105,7 @@ const bridge: KalemBridge = {
 	assistantStatus: (refresh) => ipcRenderer.invoke(CHANNEL.assistantStatus, refresh === true),
 	assistantConfig: () => ipcRenderer.invoke(CHANNEL.assistantConfig),
 	assistantConfigure: (update) => ipcRenderer.invoke(CHANNEL.assistantConfigure, update),
+	assistantSetModel: (model) => ipcRenderer.invoke(CHANNEL.assistantSetModel, model),
 	assistantModels: (request) => ipcRenderer.invoke(CHANNEL.assistantModels, request),
 	assistantLocate: () => ipcRenderer.invoke(CHANNEL.assistantLocate),
 	assistantChats: () => ipcRenderer.invoke(CHANNEL.assistantChats),

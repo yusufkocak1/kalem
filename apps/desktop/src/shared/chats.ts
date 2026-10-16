@@ -13,6 +13,8 @@ export interface StoredMessage {
 	readonly error: string | null;
 	/** What went with a question: the document, the selection. */
 	readonly notes: readonly string[];
+	/** The model that answered; empty when the service chose. */
+	readonly model?: string;
 }
 
 export interface StoredChat {
@@ -71,6 +73,9 @@ export function parseChat(raw: unknown): StoredChat | null {
 						.filter((note): note is string => typeof note === "string")
 						.slice(0, 5)
 						.map((note) => note.slice(0, 300)),
+					...(typeof message.model === "string" && message.model !== ""
+						? { model: message.model.slice(0, 200) }
+						: {}),
 				},
 			];
 		});

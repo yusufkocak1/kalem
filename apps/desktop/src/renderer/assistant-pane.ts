@@ -1,6 +1,6 @@
 import { parse } from "@kalem-editor/core";
 import { renderToDOM } from "@kalem-editor/viewer";
-import type { AssistantStatus, KalemBridge } from "../shared/bridge.js";
+import type { AssistantStatus, Command, KalemBridge } from "../shared/bridge.js";
 import { clampAssistantWidth, DEFAULT_SETTINGS, MIN_ASSISTANT_WIDTH } from "../shared/bridge.js";
 import type { ChatSummary, StoredChat, StoredMessage } from "../shared/chats.js";
 import { chatTitle, historyOf } from "../shared/chats.js";
@@ -10,7 +10,9 @@ import { diagramSvg, svgMarkup } from "../shared/diagram.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type { ProviderId } from "../shared/providers.js";
-import { isCli, PROVIDER_INFO, providerLabel } from "../shared/providers.js";
+import { isCli, PROVIDER_INFO, providerLabel, SUGGESTED_MODELS } from "../shared/providers.js";
+import type { SlashEntry } from "../shared/slash.js";
+import { findSlash, matchSlash, slashQuery } from "../shared/slash.js";
 import { createAssistantSettings } from "./assistant-settings.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
@@ -45,6 +47,8 @@ export interface AssistantHost {
 	hasDiagram(src: string): boolean;
 	updateDiagram(src: string, diagram: ReplyDiagram): Promise<void>;
 	openLink(href: string): void;
+	/** Runs one of the app's commands (save, export, insert a table…) on the active document. */
+	runCommand(command: Command): void;
 	close(): void;
 	errorText(error: unknown): string;
 }
@@ -64,6 +68,8 @@ interface Message {
 	error: string | null;
 	done: boolean;
 	readonly notes: readonly string[];
+	/** The model that answered; empty when the service chose. */
+	readonly model?: string;
 }
 
 /** A conversation, shown or not; a reply keeps coming in while another chat is shown. */
@@ -221,6 +227,39 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		attrs: { type: "button", title: t.assistantSend, "aria-label": t.assistantSend },
 		children: [icon("send")],
 	});
+	const modelSelect = el("select", {
+		class: "assistant-model",
+		attrs: { "aria-label": t.assistantModel, title: t.assistantModel },
+	});
+	const MORE_MODELS = "\u0000more";
+	modelSelect.addEventListener("change", async () => {
+		const picked = modelSelect.value;
+		if (picked === MORE_MODELS) {
+			renderModels();
+			void setView("settings");
+			return;
+		}
+		await setModel(picked);
+	});
+
+	async function setModel(model: string): Promise<void> {
+		modelSelect.disabled = true;
+		try {
+			status = await bridge.assistantSetModel(model);
+		} catch (error) {
+			showNotice(format(t.assistantActionFailed, host.errorText(error)));
+		} finally {
+			modelSelect.disabled = false;
+			render();
+		}
+	}
+	const menu = el("ul", {
+		class: "assistant-commands",
+		attrs: { id: "assistant-commands", role: "listbox", hidden: "", "aria-label": t.slashCommands },
+	});
+	input.setAttribute("aria-autocomplete", "list");
+	input.setAttribute("aria-controls", menu.id);
+	input.setAttribute("aria-expanded", "false");
 	const composer = el("div", {
 		class: "assistant-composer",
 		children: [
@@ -228,10 +267,12 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				class: "assistant-context",
 				children: [
 					el("label", { class: "assistant-share", children: [share, t.assistantShareDocument] }),
+					modelSelect,
 					selectionChip,
 				],
 			}),
 			el("div", { class: "assistant-input-row", children: [input, sendButton] }),
+			menu,
 		],
 	});
 
@@ -283,10 +324,32 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		if (href !== null && href !== "") host.openLink(href);
 	});
 
+	input.addEventListener("input", () => updateMenu());
+	input.addEventListener("blur", () => setTimeout(() => hideMenu(), 150));
 	input.addEventListener("keydown", (event) => {
+		if (!menu.hidden && menuItems.length > 0) {
+			const move = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
+			if (move !== 0) {
+				event.preventDefault();
+				menuIndex = (menuIndex + move + menuItems.length) % menuItems.length;
+				renderMenu();
+				return;
+			}
+			if ((event.key === "Enter" && !event.shiftKey && !event.isComposing) || event.key === "Tab") {
+				event.preventDefault();
+				const picked = menuItems[menuIndex];
+				if (picked !== undefined) pick(picked);
+				return;
+			}
+			if (event.key === "Escape") {
+				event.preventDefault();
+				hideMenu();
+				return;
+			}
+		}
 		if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
 			event.preventDefault();
-			void send();
+			if (!runTyped()) void send();
 		} else if (event.key === "Escape" && active.reply !== null) {
 			event.preventDefault();
 			void bridge.assistantStop(active.id);
@@ -294,8 +357,181 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	});
 	sendButton.addEventListener("click", () => {
 		if (active.reply !== null) void bridge.assistantStop(active.id);
-		else void send();
+		else if (!runTyped()) void send();
 	});
+
+	// --- Commands ------------------------------------------------------------------
+
+	interface ChatCommand extends SlashEntry {
+		/** What the argument is, for a command that takes one. */
+		readonly argument?: string;
+		run(arg: string): void;
+	}
+
+	/** Puts a question in the input and sends it, as if typed. */
+	const ask = (question: string): void => {
+		input.value = question;
+		void send();
+	};
+	const app = (name: string, command: Command, label: string): ChatCommand => ({
+		name,
+		label: label.replace(/…$/, ""),
+		run: () => host.runCommand(command),
+	});
+	const exportLabel = (label: string): string => `${t.export}: ${label}`;
+
+	const commands: readonly ChatCommand[] = [
+		{ name: "new", label: t.assistantNewChat, run: () => startChat() },
+		{ name: "chats", label: t.assistantChats, run: () => void setView("history") },
+		{
+			name: "model",
+			label: t.slashModel,
+			argument: t.assistantModel,
+			run(arg) {
+				if (arg !== "") void setModel(arg);
+				else {
+					modelSelect.focus();
+					modelSelect.showPicker?.();
+				}
+			},
+		},
+		{ name: "settings", label: t.assistantSettings, run: () => void setView("settings") },
+		{
+			name: "share",
+			label: t.slashShare,
+			run() {
+				host.setShareDocument(!host.shareDocument());
+				render();
+			},
+		},
+		{ name: "stop", label: t.assistantStop, run: () => void bridge.assistantStop(active.id) },
+		{
+			name: "help",
+			label: t.slashHelp,
+			run() {
+				input.value = "/";
+				updateMenu();
+			},
+		},
+		{
+			name: "summarize",
+			label: t.assistantSuggestSummary,
+			run: () => ask(t.assistantSuggestSummary),
+		},
+		{
+			name: "diagram",
+			label: t.slashDiagram,
+			argument: t.slashDiagramArgument,
+			run: (arg) => ask(arg === "" ? t.assistantSuggestDiagram : format(t.slashDiagramPrompt, arg)),
+		},
+		{
+			name: "improve",
+			label: t.assistantSuggestImprove,
+			run: () => ask(t.assistantSuggestImprove),
+		},
+		{ name: "to-table", label: t.assistantSuggestTable, run: () => ask(t.assistantSuggestTable) },
+		app("save", "save", t.save),
+		app("save-as", "save-as", t.saveAs),
+		app("export-docx", "export-docx", exportLabel(t.exportDocx)),
+		app("export-html", "export-html", exportLabel(t.exportHtml)),
+		app("export-confluence", "export-confluence", exportLabel(t.exportConfluence)),
+		app("history", "version-history", t.versionHistory),
+		app("find", "find", t.find),
+		app("replace", "replace", t.replace),
+		app("table", "table", t.insertTable),
+		app("new-diagram", "diagram", t.diagramInsert),
+		app("image", "image", t.image),
+		app("source", "source", t.markdownSource),
+		app("focus", "focus", t.focusMode),
+		app("read-only", "read-only", t.readOnly),
+		app("open", "quick-open", t.quickOpen),
+		app("search", "search-folder", t.searchFolder),
+		app("format-code", "format-all-code", t.formatAllCode),
+	];
+
+	let menuItems: ChatCommand[] = [];
+	let menuIndex = 0;
+
+	function updateMenu(): void {
+		const query = slashQuery(input.value);
+		if (query === null || query.complete) {
+			hideMenu();
+			return;
+		}
+		menuItems = matchSlash(commands, query.name, host.lang);
+		menuIndex = 0;
+		if (menuItems.length === 0) {
+			hideMenu();
+			return;
+		}
+		menu.hidden = false;
+		input.setAttribute("aria-expanded", "true");
+		renderMenu();
+	}
+
+	function renderMenu(): void {
+		menu.replaceChildren(
+			...menuItems.map((command, index) => {
+				const item = el("li", {
+					class: "assistant-command",
+					attrs: {
+						id: `assistant-command-${index}`,
+						role: "option",
+						"aria-selected": String(index === menuIndex),
+					},
+					children: [
+						el("span", {
+							class: "assistant-command-name",
+							text: `/${command.name}${command.argument === undefined ? "" : ` <${command.argument}>`}`,
+						}),
+						el("span", { class: "assistant-command-label", text: command.label }),
+					],
+				});
+				// Before the input loses focus, so the click is not lost with the menu.
+				item.addEventListener("mousedown", (event) => {
+					event.preventDefault();
+					pick(command);
+				});
+				return item;
+			}),
+		);
+		input.setAttribute("aria-activedescendant", `assistant-command-${menuIndex}`);
+		menu.children[menuIndex]?.scrollIntoView({ block: "nearest" });
+	}
+
+	function hideMenu(): void {
+		menu.hidden = true;
+		menuItems = [];
+		input.setAttribute("aria-expanded", "false");
+		input.removeAttribute("aria-activedescendant");
+	}
+
+	/** A command picked in the menu: one with an argument waits for it, the others run. */
+	function pick(command: ChatCommand): void {
+		hideMenu();
+		if (command.argument !== undefined) {
+			input.value = `/${command.name} `;
+			input.focus();
+			return;
+		}
+		input.value = "";
+		command.run("");
+	}
+
+	/** Runs the command typed in the input; `false` when the input is not a command. */
+	function runTyped(): boolean {
+		const query = slashQuery(input.value);
+		if (query === null) return false;
+		const command = findSlash(commands, query.name, host.lang);
+		if (command === undefined) {
+			showNotice(format(t.slashUnknown, query.name));
+			return true;
+		}
+		input.value = "";
+		hideMenu();
+		command.run(query.arg);
+		return true;
+	}
 
 	// --- Width ---------------------------------------------------------------------
 
@@ -367,7 +603,76 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			el("p", { class: "assistant-empty-title", text: t.assistantWelcome }),
 			el("p", { class: "assistant-empty-hint", text: t.assistantWelcomeHint }),
 			el("div", { class: "assistant-suggestions", children: suggestions }),
+			recent,
 		);
+	}
+
+	/** The last chats, under the suggestions of an empty one, so earlier chats are a click away. */
+	const recent = el("div", { class: "assistant-recent", attrs: { hidden: "" } });
+	const RECENT = 5;
+
+	async function refreshRecent(): Promise<void> {
+		const list = (await bridge.assistantChats().catch(() => [])).filter(
+			(summary) => summary.id !== active.id,
+		);
+		recent.hidden = list.length === 0;
+		if (list.length === 0) return;
+		const all = button(t.assistantAllChats, { class: "assistant-link", icon: "chats" });
+		all.addEventListener("click", () => void setView("history"));
+		recent.replaceChildren(
+			el("p", { class: "assistant-recent-title", text: t.assistantRecentChats }),
+			el("ul", {
+				class: "assistant-history-list",
+				children: list.slice(0, RECENT).map((summary) => {
+					const open = el("button", {
+						class: "assistant-history-open",
+						attrs: { type: "button" },
+						children: [
+							el("span", {
+								class: "assistant-history-title",
+								text: summary.title || t.assistantUntitledChat,
+							}),
+							el("span", {
+								class: "assistant-history-meta",
+								text: `${dateFormat.format(summary.updated)} · ${providerLabel(t, summary.provider)}`,
+							}),
+						],
+					});
+					open.addEventListener("click", () => void openChat(summary.id));
+					return el("li", { class: "assistant-history-row", children: [open] });
+				}),
+			}),
+			all,
+		);
+	}
+
+	// --- Models --------------------------------------------------------------------
+
+	/** The models offered for each service, asked for once. */
+	const modelLists = new Map<ProviderId, readonly string[]>();
+
+	/** Fills the model picker from the service's list (fetched once), the model in use first. */
+	function renderModels(): void {
+		if (status === null) return;
+		const provider = status.provider;
+		const cli = isCli(PROVIDER_INFO[provider]);
+		const listed = modelLists.get(provider) ?? SUGGESTED_MODELS[provider] ?? [];
+		const names = [...new Set([...(status.model === "" ? [] : [status.model]), ...listed])];
+		modelSelect.replaceChildren(
+			...(cli ? [el("option", { text: t.assistantDefaultModel, attrs: { value: "" } })] : []),
+			...names.map((name) => el("option", { text: name, attrs: { value: name } })),
+			el("option", { text: t.assistantMoreModels, attrs: { value: MORE_MODELS } }),
+		);
+		modelSelect.value = status.model;
+		if (modelLists.has(provider) || cli || !status.ready) return;
+		modelLists.set(provider, []);
+		void bridge
+			.assistantModels({ provider, baseUrl: "" })
+			.then((found) => {
+				modelLists.set(provider, found);
+				if (status?.provider === provider) renderModels();
+			})
+			.catch(() => {});
 	}
 
 	function renderMissing(): void {
@@ -442,6 +747,11 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		sendButton.setAttribute("aria-label", sendButton.title);
 		sendButton.classList.toggle("busy", busy);
 		newChat.disabled = active.messages.length === 0;
+		modelSelect.hidden = !ready;
+		if (ready && modelSelect.dataset.for !== `${status?.provider}\u0000${status?.model}`) {
+			modelSelect.dataset.for = `${status?.provider}\u0000${status?.model}`;
+			renderModels();
+		}
 	}
 
 	async function setView(next: typeof view): Promise<void> {
@@ -537,6 +847,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			active = blankChat();
 			chats.set(active.id, active);
 		}
+		void refreshRecent();
 		showChat();
 		void setView("chat");
 	}
@@ -550,6 +861,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				error: message.error,
 				done: true,
 				notes: message.notes,
+				...(message.model === undefined ? {} : { model: message.model }),
 			})),
 			sharedText: null,
 			reply: null,
@@ -594,11 +906,12 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 	function save(chat: Chat): void {
 		if (chat.messages.length === 0) return;
-		const messages: StoredMessage[] = chat.messages.map(({ role, text, error, notes }) => ({
+		const messages: StoredMessage[] = chat.messages.map(({ role, text, error, notes, model }) => ({
 			role,
 			text,
 			error,
 			notes,
+			...(model === undefined || model === "" ? {} : { model }),
 		}));
 		const stored: StoredChat = {
 			id: chat.id,
@@ -673,6 +986,9 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		}
 		if (message.done && message.error === null && message.text.trim() !== "") {
 			nodes.push(replyActions(message));
+		}
+		if (message.model !== undefined && message.model !== "") {
+			nodes.push(el("div", { class: "assistant-reply-model", text: message.model }));
 		}
 		view.body.replaceChildren(...nodes);
 		if (follow) log.scrollTop = log.scrollHeight;
@@ -805,7 +1121,14 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			chat.folder = null;
 			chat.sharedText = null;
 		}
-		const reply: Message = { role: "assistant", text: "", error: null, done: false, notes: [] };
+		const reply: Message = {
+			role: "assistant",
+			text: "",
+			error: null,
+			done: false,
+			notes: [],
+			model: status.model,
+		};
 		chat.reply = reply;
 		input.value = "";
 		render();
@@ -894,6 +1217,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	/** The most recent chat comes back when the panel first shows. */
 	async function restore(): Promise<void> {
 		restored = true;
+		void refreshRecent();
 		const [latest] = await bridge.assistantChats().catch(() => []);
 		if (latest !== undefined && active.messages.length === 0) await openChat(latest.id);
 	}

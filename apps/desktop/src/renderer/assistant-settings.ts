@@ -10,7 +10,7 @@ export interface AssistantSettingsOptions {
 	readonly bridge: KalemBridge;
 	openLink(href: string): void;
 	errorText(error: unknown): string;
-	/** Closed: with the new status when saved (`changed` when the service or model is new), `null` when cancelled. */
+	/** Closed: with the new status when saved (`changed` when the service is new), `null` when cancelled. */
 	done(status: AssistantStatus | null, changed: boolean): void;
 }
 
@@ -128,10 +128,13 @@ export function createAssistantSettings(options: AssistantSettingsOptions): Assi
 		cliNote.textContent = id === "copilot" ? t.copilotCliNote : t.assistantCliNote;
 		urlField.hidden = cli;
 		keyField.hidden = cli;
-		// Copilot can be asked for a model of its own; Claude Code uses the one it is set to.
-		modelField.hidden = id === "claude-code";
 		fetchModels.hidden = cli;
-		model.placeholder = cli ? t.copilotModelPlaceholder : t.assistantModelPlaceholder;
+		model.placeholder =
+			id === "copilot"
+				? t.copilotModelPlaceholder
+				: id === "claude-code"
+					? t.claudeModelPlaceholder
+					: t.assistantModelPlaceholder;
 		baseUrl.value = connection?.baseUrl ?? info.baseUrl;
 		baseUrl.placeholder = info.baseUrl || "https://…/v1";
 		model.value = connection?.model ?? info.defaultModel;
@@ -193,10 +196,7 @@ export function createAssistantSettings(options: AssistantSettingsOptions): Assi
 
 	save.addEventListener("click", async () => {
 		const id = selected();
-		const before =
-			config === null
-				? null
-				: { provider: config.provider, model: config.connections[config.provider].model };
+		const before = config?.provider;
 		save.disabled = true;
 		error.hidden = true;
 		try {
@@ -207,7 +207,7 @@ export function createAssistantSettings(options: AssistantSettingsOptions): Assi
 				...(forgetKey ? { key: null } : key.value.trim() === "" ? {} : { key: key.value }),
 			});
 			key.value = "";
-			options.done(status, before?.provider !== id || before.model !== model.value.trim());
+			options.done(status, before !== id);
 		} catch (failure) {
 			error.textContent = format(t.assistantActionFailed, options.errorText(failure));
 			error.hidden = false;

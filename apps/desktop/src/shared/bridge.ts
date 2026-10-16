@@ -390,6 +390,8 @@ export interface Attachment {
 /** Whether the assistant can be asked, with the service it uses. */
 export interface AssistantStatus {
 	readonly provider: ProviderId;
+	/** The model in use; empty when a CLI chooses. */
+	readonly model: string;
 	readonly ready: boolean;
 	/** Under the panel's title: the CLI's version, or the service and its model. */
 	readonly label: string;
@@ -609,6 +611,8 @@ export interface KalemBridge {
 	/** The service in use and whether it can be asked; `refresh` looks for the CLI again. */
 	assistantStatus(refresh?: boolean): Promise<AssistantStatus>;
 	assistantConfig(): Promise<AssistantConfig>;
+	/** Changes the model of the service in use; a chat goes on with it. */
+	assistantSetModel(model: string): Promise<AssistantStatus>;
 	/** Changes a service's settings and makes it the one in use. */
 	assistantConfigure(update: AssistantUpdate): Promise<AssistantStatus>;
 	/** The models a service offers; without `key`, the kept one is used. */
@@ -698,6 +702,7 @@ export const CHANNEL = {
 	assistantStatus: "kalem:assistant-status",
 	assistantConfig: "kalem:assistant-config",
 	assistantConfigure: "kalem:assistant-configure",
+	assistantSetModel: "kalem:assistant-set-model",
 	assistantModels: "kalem:assistant-models",
 	assistantLocate: "kalem:assistant-locate",
 	assistantChats: "kalem:assistant-chats",

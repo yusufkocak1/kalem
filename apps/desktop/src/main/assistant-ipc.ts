@@ -104,17 +104,32 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 			await locate(program, refresh);
 			const found = clis[program].status();
 			if (!found.found) {
-				return { provider, ready: false, label: t.assistantNotFound, detail: "", missing: "cli" };
+				return {
+					provider,
+					model: connection.model,
+					ready: false,
+					label: t.assistantNotFound,
+					detail: "",
+					missing: "cli",
+				};
 			}
 			const label =
 				connection.model === "" ? found.version : `${found.version} · ${connection.model}`;
-			return { provider, ready: true, label, detail: found.path, missing: null };
+			return {
+				provider,
+				model: connection.model,
+				ready: true,
+				label,
+				detail: found.path,
+				missing: null,
+			};
 		}
 		const info = PROVIDER_INFO[provider];
 		const ready =
 			connection.baseUrl !== "" && connection.model !== "" && (!info.needsKey || key !== null);
 		return {
 			provider,
+			model: connection.model,
 			ready,
 			label: ready ? `${providerLabel(t, provider)} · ${connection.model}` : t.assistantNotSetUp,
 			detail: connection.baseUrl,
@@ -142,15 +157,22 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 		return status(isCli(info));
 	});
 
+	ipcMain.handle(CHANNEL.assistantSetModel, async (_event, model: unknown) => {
+		if (typeof model !== "string") throw new Error("Invalid model");
+		await ctx.assistant.setModel(model.trim().slice(0, 200));
+		return status();
+	});
+
 	ipcMain.handle(CHANNEL.assistantModels, async (_event, raw: unknown) => {
 		const request = record(raw);
 		if (!isProvider(request.provider) || isCli(PROVIDER_INFO[request.provider])) return [];
 		const provider = request.provider;
 		const info = PROVIDER_INFO[provider];
+		// Without an address, the one the user set for the service.
 		const baseUrl = checkBaseUrl(
 			typeof request.baseUrl === "string" && request.baseUrl.trim() !== ""
 				? request.baseUrl
-				: info.baseUrl,
+				: (await ctx.assistant.config()).connections[provider].baseUrl || info.baseUrl,
 		);
 		const key =
 			typeof request.key === "string" && request.key.trim() !== ""
@@ -255,7 +277,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 			let args: string[];
 			let question = prompt;
 			if (program === "claude") {
-				args = claudeArgs({ sessionId, systemPrompt: systemPrompt(t) });
+				args = claudeArgs({ sessionId, systemPrompt: systemPrompt(t), model: connection.model });
 			} else {
 				// Copilot takes the conversation's id from us, and its instructions with the first question.
 				const id = sessionId ?? randomUUID();

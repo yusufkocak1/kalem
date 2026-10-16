@@ -52,6 +52,14 @@ describe("assistant settings", () => {
 		);
 		expect(await again.key("openai")).toBe("sk-secret");
 		expect((await again.config()).connections.openai).toMatchObject({ model: "m2", hasKey: true });
+		// Picking a model changes only the service in use.
+		await again.update("openai", { baseUrl: "https://api.openai.com/v1", model: "m2" }, undefined);
+		await again.setModel("m3");
+		expect((await again.active()).connection).toEqual({
+			baseUrl: "https://api.openai.com/v1",
+			model: "m3",
+		});
+		expect(await again.key("openai")).toBe("sk-secret");
 		await again.update("openai", { baseUrl: "https://api.openai.com/v1", model: "m2" }, null);
 		expect(await new AssistantStore(file, box).key("openai")).toBeNull();
 	});
