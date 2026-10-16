@@ -4,7 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@10.18.2",
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "scripts": {
     "build": "pnpm -r --filter=@kalem-editor/* --filter=!@kalem-editor/docs build",

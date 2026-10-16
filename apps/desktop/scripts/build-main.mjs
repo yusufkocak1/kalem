@@ -12,7 +12,7 @@ const shared = {
 	platform: "node",
 	// Sandboxed preload scripts cannot be ES modules; main uses the same format.
 	format: "cjs",
-	target: "node22",
+	target: "node24",
 	external: ["electron"],
 	sourcemap: true,
 	legalComments: "none",

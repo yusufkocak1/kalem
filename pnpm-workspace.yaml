@@ -16,7 +16,7 @@ catalog:
   '@playwright/test': ^1.63.0
   '@size-limit/preset-small-lib': ^13.0.3
   '@sveltejs/vite-plugin-svelte': ^6.2.4
-  '@types/node': ^22.10.2
+  '@types/node': ^24.0.0
   '@types/react': 19.3.0
   '@types/react-dom': 19.3.0
   '@vitejs/plugin-react': ^5.1.0

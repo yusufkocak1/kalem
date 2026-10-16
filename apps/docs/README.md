@@ -11,8 +11,8 @@ pnpm docs:build    # dist/ + Pagefind arama indeksi
 pnpm guard:docs    # örneklerdeki API adları gerçekten var mı
 ```
 
-> Astro 7 **Node 22.12+** istiyor; deponun geri kalanı Node 20'de de
-> koşuyor. Bu yüzden site CI'da kendi işinde (`dokuman`) derleniyor.
+> Depo genelinde olduğu gibi site de **Node 24+** istiyor. Site CI'da
+> kendi işinde (`dokuman`) derleniyor.
 
 ## Neden Starlight?
 
