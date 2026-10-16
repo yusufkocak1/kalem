@@ -1,23 +1,34 @@
 /**
  * The assistant's requests from the windows: which service it uses and how
- * that is set up, and the questions, sent to the Claude Code CLI or to a
- * service's API. An API keeps no conversation, so the messages of each
- * chat are kept here and sent again with every question.
+ * that is set up, the kept chats, and the questions, sent to a CLI on this
+ * computer (Claude Code, GitHub Copilot) or to a service's API. An API
+ * keeps no conversation, so the messages of each chat are kept here and
+ * sent again with every question.
  */
 import { randomUUID } from "node:crypto";
+import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname } from "node:path";
 import type { IpcMainInvokeEvent } from "electron";
 import { dialog, ipcMain } from "electron";
 import type { AssistantStatus } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
+import { parseChat } from "../shared/chats.js";
 import type { ClaudeEvent } from "../shared/claude.js";
-import { claudeArgs, systemPrompt } from "../shared/claude.js";
+import { claudeArgs, copilotArgs, systemPrompt, withInstructions } from "../shared/claude.js";
 import type { Strings } from "../shared/i18n.js";
-import type { ChatMessage } from "../shared/providers.js";
-import { checkBaseUrl, isProvider, PROVIDER_INFO, providerLabel } from "../shared/providers.js";
+import type { ChatMessage, ProviderId } from "../shared/providers.js";
+import {
+	checkBaseUrl,
+	isCli,
+	isProvider,
+	PROVIDER_INFO,
+	providerLabel,
+} from "../shared/providers.js";
+import type { ChatStore } from "./assistant-chats.js";
 import type { AssistantStore } from "./assistant-store.js";
-import { ClaudeCli, runClaude } from "./claude.js";
+import type { CliProgram } from "./cli.js";
+import { claudeOutput, LocalCli, runCli, textOutput } from "./cli.js";
 import { askApi, listModels } from "./llm.js";
 import type { SettingsStore } from "./settings.js";
 import type { AppWindow } from "./windows.js";
@@ -26,27 +37,61 @@ import { errorMessage } from "./windows.js";
 export interface AssistantIpcContext {
 	readonly store: SettingsStore;
 	readonly assistant: AssistantStore;
+	readonly chats: ChatStore;
 	strings(): Strings;
 	senderOf(event: IpcMainInvokeEvent): AppWindow;
 }
 
 /** How many past messages of a chat an API is sent again; older ones are dropped. */
 const MAX_HISTORY = 40;
+const MAX_HISTORY_TEXT = 100_000;
 
 const record = (raw: unknown): Record<string, unknown> =>
 	typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : {};
 
+const programOf = (provider: ProviderId): CliProgram | null =>
+	provider === "claude-code" ? "claude" : provider === "copilot" ? "copilot" : null;
+
+async function isFolder(path: unknown): Promise<boolean> {
+	if (typeof path !== "string" || path === "") return false;
+	try {
+		return (await stat(path)).isDirectory();
+	} catch {
+		return false;
+	}
+}
+
+/** A chat's messages sent by the window: taking turns from a question, each cut to size. */
+function sentHistory(raw: unknown): ChatMessage[] {
+	const history: ChatMessage[] = [];
+	for (const item of Array.isArray(raw) ? raw : []) {
+		const { role, content } = record(item);
+		const expected = history.length % 2 === 0 ? "user" : "assistant";
+		if (role !== expected || typeof content !== "string") break;
+		history.push({ role: expected, content: content.slice(0, MAX_HISTORY_TEXT) });
+	}
+	if (history.length % 2 === 1) history.pop();
+	return history.slice(-MAX_HISTORY);
+}
+
 export function registerAssistantIpc(ctx: AssistantIpcContext): void {
-	const cli = new ClaudeCli(ctx.store);
-	/** The search for the CLI; shared, so a second request does not find it missing half-way. */
-	let locating: Promise<unknown> | null = null;
-	const locate = (again = false): Promise<unknown> => {
-		if (locating === null || again) locating = cli.locate();
-		return locating;
+	const clis: Record<CliProgram, LocalCli> = {
+		claude: new LocalCli("claude", () => ctx.store.settings.claudePath),
+		copilot: new LocalCli("copilot", () => ctx.store.settings.copilotPath),
+	};
+	/** Each search for a CLI; shared, so a second request does not find it missing half-way. */
+	const locating = new Map<CliProgram, Promise<unknown>>();
+	const locate = (program: CliProgram, again = false): Promise<unknown> => {
+		let search = locating.get(program);
+		if (search === undefined || again) {
+			search = clis[program].locate();
+			locating.set(program, search);
+		}
+		return search;
 	};
 	/** Running questions by window and chat; each can be stopped. */
 	const running = new Map<string, () => void>();
-	/** The folder each Claude Code conversation ran in. */
+	/** The folder each CLI conversation ran in. */
 	const folders = new Map<string, string>();
 	/** Each API conversation's messages. */
 	const histories = new Map<string, ChatMessage[]>();
@@ -54,12 +99,16 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 	const status = async (refresh = false): Promise<AssistantStatus> => {
 		const t = ctx.strings();
 		const { provider, connection, key } = await ctx.assistant.active();
-		if (provider === "claude-code") {
-			await locate(refresh);
-			const found = cli.status();
-			return found.found
-				? { provider, ready: true, label: found.version, detail: found.path, missing: null }
-				: { provider, ready: false, label: t.assistantNotFound, detail: "", missing: "cli" };
+		const program = programOf(provider);
+		if (program !== null) {
+			await locate(program, refresh);
+			const found = clis[program].status();
+			if (!found.found) {
+				return { provider, ready: false, label: t.assistantNotFound, detail: "", missing: "cli" };
+			}
+			const label =
+				connection.model === "" ? found.version : `${found.version} · ${connection.model}`;
+			return { provider, ready: true, label, detail: found.path, missing: null };
 		}
 		const info = PROVIDER_INFO[provider];
 		const ready =
@@ -81,59 +130,76 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 		const update = record(raw);
 		if (!isProvider(update.provider)) throw new Error("Unknown service");
 		const provider = update.provider;
+		const info = PROVIDER_INFO[provider];
 		const model = typeof update.model === "string" ? update.model.trim().slice(0, 200) : "";
 		const baseUrl =
-			provider === "claude-code" ||
-			typeof update.baseUrl !== "string" ||
-			update.baseUrl.trim() === ""
-				? PROVIDER_INFO[provider].baseUrl
+			isCli(info) || typeof update.baseUrl !== "string" || update.baseUrl.trim() === ""
+				? info.baseUrl
 				: checkBaseUrl(update.baseUrl);
 		const key =
 			update.key === null ? null : typeof update.key === "string" ? update.key.trim() : undefined;
 		await ctx.assistant.update(provider, { baseUrl, model }, key);
-		return status(provider === "claude-code");
+		return status(isCli(info));
 	});
 
 	ipcMain.handle(CHANNEL.assistantModels, async (_event, raw: unknown) => {
 		const request = record(raw);
-		if (!isProvider(request.provider) || request.provider === "claude-code") return [];
+		if (!isProvider(request.provider) || isCli(PROVIDER_INFO[request.provider])) return [];
 		const provider = request.provider;
+		const info = PROVIDER_INFO[provider];
 		const baseUrl = checkBaseUrl(
 			typeof request.baseUrl === "string" && request.baseUrl.trim() !== ""
 				? request.baseUrl
-				: PROVIDER_INFO[provider].baseUrl,
+				: info.baseUrl,
 		);
 		const key =
 			typeof request.key === "string" && request.key.trim() !== ""
 				? request.key.trim()
 				: await ctx.assistant.key(provider);
-		return listModels(PROVIDER_INFO[provider], { baseUrl, model: "" }, key);
+		return listModels(info, { baseUrl, model: "" }, key);
 	});
 
-	ipcMain.handle(CHANNEL.claudeLocate, async (event) => {
+	ipcMain.handle(CHANNEL.assistantLocate, async (event) => {
 		const win = ctx.senderOf(event);
 		const t = ctx.strings();
+		const program = programOf((await ctx.assistant.active()).provider);
+		if (program === null) return status();
 		const result = await dialog.showOpenDialog(win.window, {
-			title: t.claudeLocateTitle,
+			title: program === "claude" ? t.claudeLocateTitle : t.copilotLocateTitle,
 			properties: ["openFile", "dontAddToRecent"],
 			...(process.platform === "win32"
-				? { filters: [{ name: "Claude Code", extensions: ["exe", "cmd"] }] }
+				? { filters: [{ name: program, extensions: ["exe", "cmd"] }] }
 				: {}),
 		});
 		const path = result.filePaths[0];
 		if (!result.canceled && path !== undefined) {
-			await locate();
-			if (await cli.check(path)) {
-				ctx.store.updateSettings({ claudePath: path });
+			await locate(program);
+			if (await clis[program].check(path)) {
+				ctx.store.updateSettings(
+					program === "claude" ? { claudePath: path } : { copilotPath: path },
+				);
 			} else {
 				await dialog.showMessageBox(win.window, {
 					type: "warning",
-					message: t.claudeLocateFailed,
+					message: program === "claude" ? t.claudeLocateFailed : t.copilotLocateFailed,
 					detail: path,
 				});
 			}
 		}
 		return status();
+	});
+
+	ipcMain.handle(CHANNEL.assistantChats, () => ctx.chats.list());
+	ipcMain.handle(CHANNEL.assistantChat, (_event, id: unknown) =>
+		typeof id === "string" ? ctx.chats.get(id) : null,
+	);
+	ipcMain.handle(CHANNEL.assistantSaveChat, async (_event, raw: unknown) => {
+		const chat = parseChat(raw);
+		if (chat === null) throw new Error("Invalid chat");
+		await ctx.chats.put(chat);
+	});
+	ipcMain.handle(CHANNEL.assistantDeleteChat, async (_event, id: unknown) => {
+		if (typeof id === "string") await ctx.chats.delete(id);
 	});
 
 	ipcMain.handle(CHANNEL.assistantAsk, async (event, raw: unknown) => {
@@ -152,49 +218,70 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 		running.get(runKey)?.();
 		const t = ctx.strings();
 		const { provider, connection, key } = await ctx.assistant.active();
+		const forward = (assistantEvent: ClaudeEvent): void => {
+			if (!sender.isDestroyed()) sender.send(CHANNEL.assistantEvent, chatId, assistantEvent);
+		};
 
-		if (provider === "claude-code") {
+		const program = programOf(provider);
+		if (program !== null) {
 			const tab = typeof request.tabId === "string" ? win.tabs.get(request.tabId) : undefined;
-			// Claude Code keeps a conversation with the folder it ran in, and resumes
-			// it only from there; a new one runs next to the active document.
+			// A CLI keeps a conversation with the folder it ran in, and resumes it
+			// only from there; a new one runs next to the active document.
+			const remembered =
+				sessionId === null
+					? undefined
+					: (folders.get(sessionId) ??
+						((await isFolder(request.folder)) ? (request.folder as string) : undefined));
 			const folder =
-				(sessionId === null ? undefined : folders.get(sessionId)) ??
+				remembered ??
 				(tab !== undefined && tab.path !== null && tab.remote === null
 					? dirname(tab.path)
 					: homedir());
-			const send = (claudeEvent: ClaudeEvent): void => {
-				if (claudeEvent.kind === "session") folders.set(claudeEvent.id, folder);
-				if (!sender.isDestroyed()) sender.send(CHANNEL.assistantEvent, chatId, claudeEvent);
+			const send = (cliEvent: ClaudeEvent): void => {
+				if (cliEvent.kind === "session") {
+					folders.set(cliEvent.id, folder);
+					forward({ ...cliEvent, folder });
+				} else forward(cliEvent);
 			};
-			await locate();
-			const launch = cli.launch;
+			await locate(program);
+			const launch = clis[program].launch;
 			if (launch === null) {
-				send({ kind: "error", message: t.claudeNotFound });
+				send({
+					kind: "error",
+					message: program === "claude" ? t.claudeNotFound : t.copilotNotFound,
+				});
 				return;
 			}
-			const args = claudeArgs({ sessionId, systemPrompt: systemPrompt(t) });
-			await runClaude(launch, folder, args, prompt, send, sender, (child) => {
+			let args: string[];
+			let question = prompt;
+			if (program === "claude") {
+				args = claudeArgs({ sessionId, systemPrompt: systemPrompt(t) });
+			} else {
+				// Copilot takes the conversation's id from us, and its instructions with the first question.
+				const id = sessionId ?? randomUUID();
+				if (sessionId === null) question = withInstructions(systemPrompt(t), prompt);
+				send({ kind: "session", id });
+				args = copilotArgs({ sessionId: id, model: connection.model });
+			}
+			const output = program === "claude" ? claudeOutput() : textOutput();
+			await runCli(launch, folder, args, question, output, send, sender, (child) => {
 				running.set(runKey, () => child.kill());
 			});
 			running.delete(runKey);
 			return;
 		}
 
-		const send = (assistantEvent: ClaudeEvent): void => {
-			if (!sender.isDestroyed()) sender.send(CHANNEL.assistantEvent, chatId, assistantEvent);
-		};
 		const info = PROVIDER_INFO[provider];
 		if (connection.model === "" || (info.needsKey && key === null)) {
-			send({ kind: "error", message: t.assistantNotSetUp });
+			forward({ kind: "error", message: t.assistantNotSetUp });
 			return;
 		}
-		// A conversation is continued only with the service it was started with.
-		const id = sessionId !== null && histories.has(sessionId) ? sessionId : randomUUID();
-		send({ kind: "session", id });
-		const messages: ChatMessage[] = [
-			...(histories.get(id) ?? []),
-			{ role: "user", content: prompt },
-		];
+		// A chat this run has not seen (kept from an earlier run) brings its messages along.
+		const known = sessionId === null ? undefined : histories.get(sessionId);
+		const id = sessionId ?? randomUUID();
+		const before = known ?? (sessionId === null ? [] : sentHistory(request.history));
+		forward({ kind: "session", id });
+		const messages: ChatMessage[] = [...before, { role: "user", content: prompt }];
 		const controller = new AbortController();
 		running.set(runKey, () => controller.abort());
 		const stop = (): void => controller.abort();
@@ -210,22 +297,21 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 				signal: controller.signal,
 				text: (chunk) => {
 					reply += chunk;
-					send({ kind: "text", text: chunk });
+					forward({ kind: "text", text: chunk });
 				},
 			});
-			send({ kind: "done" });
+			forward({ kind: "done" });
 		} catch (error) {
-			send({ kind: "error", message: errorMessage(error) });
+			forward({ kind: "error", message: errorMessage(error) });
 		} finally {
 			sender.removeListener("destroyed", stop);
 			running.delete(runKey);
 		}
 		// What was said stays, a stopped reply as far as it got; a question without
 		// an answer is left out, so the messages keep taking turns.
-		if (reply !== "") {
-			const answered: ChatMessage[] = [...messages, { role: "assistant", content: reply }];
-			histories.set(id, answered.slice(-MAX_HISTORY));
-		}
+		const answered: ChatMessage[] =
+			reply === "" ? before : [...messages, { role: "assistant", content: reply }];
+		histories.set(id, answered.slice(-MAX_HISTORY));
 	});
 
 	ipcMain.handle(CHANNEL.assistantStop, (event, chatId: unknown) => {

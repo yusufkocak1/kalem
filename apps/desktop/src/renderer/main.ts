@@ -127,10 +127,13 @@ let lastSelection = "";
 
 const assistant = createAssistantPane({
 	t,
+	lang: startup.language,
 	bridge,
 	previews,
 	shareDocument: () => settings.assistantDocument,
 	setShareDocument: (share) => updateSettings({ assistantDocument: share }),
+	width: () => settings.assistantWidth,
+	setWidth: (width) => updateSettings({ assistantWidth: width }),
 	context: () => assistantContext(),
 	selection: () => lastSelection,
 	insert: (text) => insertReply(text),
@@ -143,6 +146,31 @@ const assistant = createAssistantPane({
 	close: () => updateSettings({ assistant: false }),
 	errorText: ipcErrorMessage,
 });
+
+// Always at the right edge, so the assistant is never hard to find.
+const assistantToggle = el("button", {
+	class: "assistant-rail-button",
+	attrs: {
+		type: "button",
+		title: `${t.assistantPane} (${startup.platform === "darwin" ? "Cmd" : "Ctrl"}+Shift+L)`,
+		"aria-label": t.assistantPane,
+		"aria-controls": "assistant-pane",
+	},
+	children: [
+		icon("assistant"),
+		el("span", { class: "assistant-rail-label", text: t.assistantTitle }),
+	],
+});
+assistantToggle.addEventListener("click", () => {
+	if (settings.assistant) {
+		updateSettings({ assistant: false });
+		session.editor.focus();
+	} else {
+		updateSettings({ assistant: true });
+		assistant.focus();
+	}
+});
+const assistantRail = el("div", { class: "assistant-rail", children: [assistantToggle] });
 
 function sidePaneTab(pane: SidePane, label: string): HTMLButtonElement {
 	const button = el("button", {
@@ -223,7 +251,7 @@ app.append(
 	ribbonHost,
 	tabStrip.element,
 	noticeArea,
-	el("div", { class: "body", children: [navigation, deskArea, assistant.element] }),
+	el("div", { class: "body", children: [navigation, deskArea, assistant.element, assistantRail] }),
 	statusBar,
 	exitFocus,
 );
@@ -452,6 +480,7 @@ function applySettings(): void {
 	app.toggleAttribute("data-full-width", settings.fullWidth);
 	navigation.hidden = !settings.navigation;
 	assistant.element.hidden = !settings.assistant;
+	assistantToggle.setAttribute("aria-expanded", String(settings.assistant));
 	if (settings.assistant) assistant.show();
 	outlineArea.hidden = settings.sidePane !== "outline";
 	filesPane.element.hidden = settings.sidePane !== "files";

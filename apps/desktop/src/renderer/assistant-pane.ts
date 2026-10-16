@@ -1,11 +1,16 @@
 import { parse } from "@kalem-editor/core";
 import { renderToDOM } from "@kalem-editor/viewer";
 import type { AssistantStatus, KalemBridge } from "../shared/bridge.js";
+import { clampAssistantWidth, DEFAULT_SETTINGS, MIN_ASSISTANT_WIDTH } from "../shared/bridge.js";
+import type { ChatSummary, StoredChat, StoredMessage } from "../shared/chats.js";
+import { chatTitle, historyOf } from "../shared/chats.js";
 import type { ClaudeEvent, ContextDiagram, ReplyDiagram, ReplyPart } from "../shared/claude.js";
 import { composePrompt, splitReply } from "../shared/claude.js";
 import { diagramSvg, svgMarkup } from "../shared/diagram.js";
-import type { Strings } from "../shared/i18n.js";
+import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
+import type { ProviderId } from "../shared/providers.js";
+import { isCli, PROVIDER_INFO, providerLabel } from "../shared/providers.js";
 import { createAssistantSettings } from "./assistant-settings.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
@@ -21,10 +26,14 @@ export interface AssistantContext {
 
 export interface AssistantHost {
 	readonly t: Strings;
+	readonly lang: Lang;
 	readonly bridge: KalemBridge;
 	readonly previews: Previews;
 	shareDocument(): boolean;
 	setShareDocument(share: boolean): void;
+	/** The panel's width; `setWidth` keeps it. */
+	width(): number;
+	setWidth(width: number): void;
 	context(): Promise<AssistantContext>;
 	/** The text last selected in the document; empty when none. */
 	selection(): string;
@@ -42,7 +51,7 @@ export interface AssistantHost {
 
 export interface AssistantPane {
 	readonly element: HTMLElement;
-	/** Looks for Claude when shown for the first time. */
+	/** Looks for the service, and picks up the last chat, when shown for the first time. */
 	show(): void;
 	focus(): void;
 	/** The document's selection changed. */
@@ -54,11 +63,38 @@ interface Message {
 	text: string;
 	error: string | null;
 	done: boolean;
-	readonly element: HTMLElement;
-	readonly body: HTMLElement;
+	readonly notes: readonly string[];
 }
 
-const INSTALL_URL = "https://docs.anthropic.com/en/docs/claude-code/setup";
+/** A conversation, shown or not; a reply keeps coming in while another chat is shown. */
+interface Chat {
+	readonly id: string;
+	title: string;
+	provider: ProviderId;
+	sessionId: string | null;
+	folder: string | null;
+	readonly created: number;
+	updated: number;
+	readonly messages: Message[];
+	/** The document text the service was last given in this chat, in this run. */
+	sharedText: string | null;
+	/** The reply coming in, and what ends the wait for it. */
+	reply: Message | null;
+	ended: (() => void) | null;
+}
+
+const INSTALL: Readonly<Record<"claude-code" | "copilot", { command: string; url: string }>> = {
+	"claude-code": {
+		command: "npm install -g @anthropic-ai/claude-code",
+		url: "https://docs.anthropic.com/en/docs/claude-code/setup",
+	},
+	copilot: {
+		command: "npm install -g @github/copilot",
+		url: "https://docs.github.com/copilot/how-tos/set-up/install-copilot-cli",
+	},
+};
+
+const WIDTH_STEP = 20;
 
 function button(
 	label: string,
@@ -71,43 +107,63 @@ function button(
 	});
 }
 
+function iconButton(name: Parameters<typeof icon>[0], label: string): HTMLButtonElement {
+	return el("button", {
+		class: "icon-button",
+		attrs: { type: "button", title: label, "aria-label": label },
+		children: [icon(name)],
+	});
+}
+
 export function createAssistantPane(host: AssistantHost): AssistantPane {
 	const { t, bridge } = host;
 
 	let status: AssistantStatus | null = null;
-	let chatId = crypto.randomUUID();
-	let sessionId: string | null = null;
-	/** The document text Claude was last given in this chat. */
-	let sharedText: string | null = null;
-	let busy = false;
-	let messages: Message[] = [];
+	/** The chats opened in this run, by id. */
+	const chats = new Map<string, Chat>();
+	let active: Chat = blankChat();
+	chats.set(active.id, active);
+	let view: "chat" | "settings" | "history" = "chat";
+	let restored = false;
 	/** A selection the user took off the next question. */
 	let droppedSelection: string | null = null;
+	/** The shown chat's messages and their elements. */
+	const shown = new Map<Message, { element: HTMLElement; body: HTMLElement }>();
+
+	function blankChat(): Chat {
+		const now = Date.now();
+		return {
+			id: crypto.randomUUID(),
+			title: "",
+			provider: status?.provider ?? "claude-code",
+			sessionId: null,
+			folder: null,
+			created: now,
+			updated: now,
+			messages: [],
+			sharedText: null,
+			reply: null,
+			ended: null,
+		};
+	}
 
 	// --- Shell ---------------------------------------------------------------
 
 	const subtitle = el("span", { class: "assistant-subtitle" });
-	const newChat = el("button", {
-		class: "icon-button",
-		attrs: { type: "button", title: t.assistantNewChat, "aria-label": t.assistantNewChat },
-		children: [icon("new")],
-	});
-	const close = el("button", {
-		class: "icon-button",
-		attrs: { type: "button", title: t.assistantClose, "aria-label": t.assistantClose },
-		children: [icon("close")],
-	});
-	const settingsButton = el("button", {
-		class: "icon-button",
-		attrs: { type: "button", title: t.assistantSettings, "aria-label": t.assistantSettings },
-		children: [icon("settings")],
-	});
-	settingsButton.addEventListener("click", () => {
-		if (settings.element.hidden) void openSettings();
-		else closeSettings();
-	});
+	const historyButton = iconButton("chats", t.assistantChats);
+	const newChat = iconButton("new", t.assistantNewChat);
+	const settingsButton = iconButton("settings", t.assistantSettings);
+	const close = iconButton("close", t.assistantClose);
+	historyButton.addEventListener(
+		"click",
+		() => void setView(view === "history" ? "chat" : "history"),
+	);
+	newChat.addEventListener("click", () => startChat());
+	settingsButton.addEventListener(
+		"click",
+		() => void setView(view === "settings" ? "chat" : "settings"),
+	);
 	close.addEventListener("click", () => host.close());
-	newChat.addEventListener("click", () => reset());
 
 	const log = el("div", {
 		class: "assistant-log",
@@ -115,6 +171,10 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	});
 	const empty = el("div", { class: "assistant-empty" });
 	const missing = el("div", { class: "assistant-missing", attrs: { hidden: "" } });
+	const history = el("div", {
+		class: "assistant-history",
+		attrs: { hidden: "", "aria-label": t.assistantChats },
+	});
 	const settings = createAssistantSettings({
 		t,
 		bridge,
@@ -122,9 +182,10 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		errorText: host.errorText,
 		done(next, changed) {
 			if (next !== null) status = next;
-			// Another service does not know what was said so far.
-			if (changed) reset();
-			closeSettings();
+			// Another service does not know what was said so far: it gets a chat of its own.
+			if (changed && active.messages.length > 0) startChat();
+			else if (changed) active.provider = status?.provider ?? active.provider;
+			void setView("chat");
 		},
 	});
 
@@ -174,10 +235,23 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		],
 	});
 
+	const resizer = el("div", {
+		class: "assistant-resizer",
+		attrs: {
+			role: "separator",
+			tabindex: "0",
+			"aria-orientation": "vertical",
+			"aria-label": t.assistantResize,
+			title: t.assistantResize,
+			"aria-valuemin": String(MIN_ASSISTANT_WIDTH),
+		},
+	});
+
 	const element = el("aside", {
 		class: "assistant kalem-theme",
-		attrs: { "aria-label": t.assistantPane },
+		attrs: { id: "assistant-pane", "aria-label": t.assistantPane },
 		children: [
+			resizer,
 			el("div", {
 				class: "assistant-header",
 				children: [
@@ -187,13 +261,14 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					}),
 					el("div", {
 						class: "assistant-header-actions",
-						children: [newChat, settingsButton, close],
+						children: [historyButton, newChat, settingsButton, close],
 					}),
 				],
 			}),
 			log,
 			empty,
 			missing,
+			history,
 			settings.element,
 			composer,
 		],
@@ -212,17 +287,63 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
 			event.preventDefault();
 			void send();
-		} else if (event.key === "Escape" && busy) {
+		} else if (event.key === "Escape" && active.reply !== null) {
 			event.preventDefault();
-			void stop();
+			void bridge.assistantStop(active.id);
 		}
 	});
 	sendButton.addEventListener("click", () => {
-		if (busy) void stop();
+		if (active.reply !== null) void bridge.assistantStop(active.id);
 		else void send();
 	});
 
-	// --- Empty and not-found states ----------------------------------------------
+	// --- Width ---------------------------------------------------------------------
+
+	/** At most what leaves the document some room. */
+	const widest = (): number => Math.max(MIN_ASSISTANT_WIDTH, window.innerWidth - 360);
+	const fit = (width: number): number => Math.min(widest(), clampAssistantWidth(width));
+
+	function showWidth(width: number): void {
+		element.style.width = `${width}px`;
+		resizer.setAttribute("aria-valuenow", String(width));
+		resizer.setAttribute("aria-valuemax", String(widest()));
+	}
+
+	resizer.addEventListener("pointerdown", (event) => {
+		if (event.button !== 0) return;
+		event.preventDefault();
+		resizer.setPointerCapture(event.pointerId);
+		const right = element.getBoundingClientRect().right;
+		let width = host.width();
+		element.classList.add("resizing");
+		const move = (moved: PointerEvent): void => {
+			width = fit(right - moved.clientX);
+			showWidth(width);
+		};
+		const up = (): void => {
+			resizer.removeEventListener("pointermove", move);
+			resizer.removeEventListener("pointerup", up);
+			resizer.removeEventListener("pointercancel", up);
+			element.classList.remove("resizing");
+			host.setWidth(width);
+		};
+		resizer.addEventListener("pointermove", move);
+		resizer.addEventListener("pointerup", up);
+		resizer.addEventListener("pointercancel", up);
+	});
+	resizer.addEventListener("keydown", (event) => {
+		const step =
+			event.key === "ArrowLeft" ? WIDTH_STEP : event.key === "ArrowRight" ? -WIDTH_STEP : 0;
+		if (step === 0) return;
+		event.preventDefault();
+		host.setWidth(fit(host.width() + step));
+	});
+	resizer.addEventListener("dblclick", () => host.setWidth(fit(DEFAULT_SETTINGS.assistantWidth)));
+	window.addEventListener("resize", () => {
+		if (!element.hidden) showWidth(fit(host.width()));
+	});
+
+	// --- States --------------------------------------------------------------------
 
 	function renderEmpty(): void {
 		const suggestions = [
@@ -251,7 +372,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 	function renderMissing(): void {
 		const setUp = button(t.assistantSetUp, { class: "assistant-primary" });
-		setUp.addEventListener("click", () => void openSettings());
+		setUp.addEventListener("click", () => void setView("settings"));
 		if (status?.missing === "setup") {
 			missing.replaceChildren(
 				el("p", { class: "assistant-empty-title", text: t.assistantSetupTitle }),
@@ -260,72 +381,83 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			);
 			return;
 		}
-		const install = button(t.assistantInstall, { class: "assistant-link" });
-		install.addEventListener("click", () => host.openLink(INSTALL_URL));
+		const copilot = status?.provider === "copilot";
+		const install = INSTALL[copilot ? "copilot" : "claude-code"];
+		const guide = button(t.assistantInstall, { class: "assistant-link" });
+		guide.addEventListener("click", () => host.openLink(install.url));
 		const locate = button(t.assistantLocate);
 		locate.addEventListener("click", async () => {
-			status = await bridge.claudeLocate();
-			renderState();
+			status = await bridge.assistantLocate();
+			render();
 		});
 		const retry = button(t.assistantRetry);
 		retry.addEventListener("click", async () => {
 			retry.disabled = true;
 			status = await bridge.assistantStatus(true);
 			retry.disabled = false;
-			renderState();
+			render();
 		});
 		const useApi = button(t.assistantUseApi);
-		useApi.addEventListener("click", () => void openSettings());
+		useApi.addEventListener("click", () => void setView("settings"));
 		missing.replaceChildren(
-			el("p", { class: "assistant-empty-title", text: t.assistantMissing }),
-			el("p", { class: "assistant-empty-hint", text: t.assistantMissingHint }),
-			el("code", { class: "assistant-command", text: "npm install -g @anthropic-ai/claude-code" }),
-			el("p", { class: "assistant-empty-hint", text: t.assistantMissingLogin }),
-			el("div", { class: "assistant-missing-actions", children: [install, locate, retry] }),
+			el("p", {
+				class: "assistant-empty-title",
+				text: copilot ? t.copilotMissing : t.assistantMissing,
+			}),
+			el("p", {
+				class: "assistant-empty-hint",
+				text: copilot ? t.copilotMissingHint : t.assistantMissingHint,
+			}),
+			el("code", { class: "assistant-command", text: install.command }),
+			el("p", {
+				class: "assistant-empty-hint",
+				text: copilot ? t.copilotMissingLogin : t.assistantMissingLogin,
+			}),
+			el("div", { class: "assistant-missing-actions", children: [guide, locate, retry] }),
 			el("p", { class: "assistant-empty-hint", text: t.assistantOrApi }),
 			el("div", { class: "assistant-missing-actions", children: [useApi] }),
 		);
 	}
 
-	function renderState(): void {
+	function render(): void {
 		const ready = status?.ready === true;
-		const editing = !settings.element.hidden;
-		missing.hidden = status === null || ready || editing;
+		const busy = active.reply !== null;
+		const chatting = view === "chat";
+		missing.hidden = status === null || ready || !chatting;
 		if (!missing.hidden) renderMissing();
-		empty.hidden = !ready || messages.length > 0 || editing;
-		log.hidden = messages.length === 0 || editing;
-		composer.hidden = editing;
+		empty.hidden = !ready || active.messages.length > 0 || !chatting;
+		log.hidden = active.messages.length === 0 || !chatting;
+		history.hidden = view !== "history";
+		settings.element.hidden = view !== "settings";
+		composer.hidden = !chatting;
 		input.disabled = !ready;
 		sendButton.disabled = !ready && !busy;
 		share.checked = host.shareDocument();
 		subtitle.textContent = status === null ? t.assistantLooking : status.label;
 		subtitle.title = status?.detail ?? "";
-		settingsButton.setAttribute("aria-pressed", String(editing));
+		settingsButton.setAttribute("aria-pressed", String(view === "settings"));
+		historyButton.setAttribute("aria-pressed", String(view === "history"));
 		sendButton.replaceChildren(icon(busy ? "stop" : "send"));
 		sendButton.title = busy ? t.assistantStop : t.assistantSend;
 		sendButton.setAttribute("aria-label", sendButton.title);
 		sendButton.classList.toggle("busy", busy);
-		newChat.disabled = messages.length === 0;
+		newChat.disabled = active.messages.length === 0;
 	}
 
-	async function openSettings(): Promise<void> {
-		settings.element.hidden = false;
-		renderState();
-		await settings.show();
-	}
-
-	function closeSettings(): void {
-		settings.element.hidden = true;
-		renderState();
-		if (status?.ready === true) input.focus();
+	async function setView(next: typeof view): Promise<void> {
+		view = next;
+		render();
+		if (next === "settings") await settings.show();
+		else if (next === "history") await renderHistory();
+		else if (status?.ready === true) input.focus();
 	}
 
 	function refreshSelection(): void {
 		const selection = host.selection().trim();
 		if (droppedSelection !== null && droppedSelection.trim() !== selection) droppedSelection = null;
-		const shown = selection !== "" && droppedSelection === null;
-		selectionChip.hidden = !shown;
-		if (!shown) return;
+		const visible = selection !== "" && droppedSelection === null;
+		selectionChip.hidden = !visible;
+		if (!visible) return;
 		const preview = selection.replace(/\s+/g, " ");
 		selectionText.textContent = format(
 			t.assistantSelection,
@@ -334,25 +466,179 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		selectionChip.title = selection.slice(0, 1000);
 	}
 
+	// --- Chats ---------------------------------------------------------------------
+
+	const dateFormat = new Intl.DateTimeFormat(host.lang, {
+		dateStyle: "medium",
+		timeStyle: "short",
+	});
+
+	async function renderHistory(): Promise<void> {
+		let list: readonly ChatSummary[];
+		try {
+			list = await bridge.assistantChats();
+		} catch (error) {
+			history.replaceChildren(
+				el("p", {
+					class: "assistant-error",
+					text: format(t.assistantActionFailed, host.errorText(error)),
+				}),
+			);
+			return;
+		}
+		if (view !== "history") return;
+		const start = button(t.assistantNewChat, { class: "assistant-primary", icon: "new" });
+		start.addEventListener("click", () => startChat());
+		const rows = list.map((summary) => {
+			const running = chats.get(summary.id)?.reply != null;
+			const open = el("button", {
+				class: "assistant-history-open",
+				attrs: { type: "button", ...(summary.id === active.id ? { "aria-current": "true" } : {}) },
+				children: [
+					el("span", {
+						class: "assistant-history-title",
+						text: summary.title || t.assistantUntitledChat,
+					}),
+					el("span", {
+						class: "assistant-history-meta",
+						text: [
+							dateFormat.format(summary.updated),
+							providerLabel(t, summary.provider),
+							format(t.assistantMessageCount, summary.count),
+							...(running ? [t.assistantRunning] : []),
+						].join(" · "),
+					}),
+				],
+			});
+			open.addEventListener("click", () => void openChat(summary.id));
+			const remove = iconButton(
+				"close",
+				format(t.assistantDeleteChat, summary.title || t.assistantUntitledChat),
+			);
+			remove.addEventListener("click", () => void deleteChat(summary));
+			return el("li", { class: "assistant-history-row", children: [open, remove] });
+		});
+		history.replaceChildren(
+			el("div", {
+				class: "assistant-history-header",
+				children: [el("p", { class: "assistant-empty-title", text: t.assistantChats }), start],
+			}),
+			rows.length === 0
+				? el("p", { class: "assistant-empty-hint", text: t.assistantNoChats })
+				: el("ul", { class: "assistant-history-list", children: rows }),
+		);
+	}
+
+	/** A new, empty chat; the current one stays in the list. */
+	function startChat(): void {
+		if (active.messages.length === 0 && active.reply === null) {
+			active.provider = status?.provider ?? active.provider;
+		} else {
+			active = blankChat();
+			chats.set(active.id, active);
+		}
+		showChat();
+		void setView("chat");
+	}
+
+	function fromStored(stored: StoredChat): Chat {
+		return {
+			...stored,
+			messages: stored.messages.map((message) => ({
+				role: message.role,
+				text: message.text,
+				error: message.error,
+				done: true,
+				notes: message.notes,
+			})),
+			sharedText: null,
+			reply: null,
+			ended: null,
+		};
+	}
+
+	async function openChat(id: string): Promise<void> {
+		let chat = chats.get(id);
+		if (chat === undefined) {
+			const stored = await bridge.assistantChat(id);
+			if (stored === null) return;
+			chat = fromStored(stored);
+			chats.set(id, chat);
+		}
+		// An empty chat left behind is not kept.
+		if (active !== chat && active.messages.length === 0) chats.delete(active.id);
+		active = chat;
+		showChat();
+		void setView("chat");
+	}
+
+	async function deleteChat(summary: ChatSummary): Promise<void> {
+		if (
+			!window.confirm(
+				format(t.assistantDeleteChatConfirm, summary.title || t.assistantUntitledChat),
+			)
+		) {
+			return;
+		}
+		const chat = chats.get(summary.id);
+		if (chat?.reply != null) void bridge.assistantStop(chat.id);
+		chats.delete(summary.id);
+		await bridge.assistantDeleteChat(summary.id);
+		if (active.id === summary.id) {
+			active = blankChat();
+			chats.set(active.id, active);
+			showChat();
+		}
+		await renderHistory();
+	}
+
+	function save(chat: Chat): void {
+		if (chat.messages.length === 0) return;
+		const messages: StoredMessage[] = chat.messages.map(({ role, text, error, notes }) => ({
+			role,
+			text,
+			error,
+			notes,
+		}));
+		const stored: StoredChat = {
+			id: chat.id,
+			title: chat.title,
+			provider: chat.provider,
+			sessionId: chat.sessionId,
+			folder: chat.folder,
+			created: chat.created,
+			updated: chat.updated,
+			messages,
+		};
+		bridge.assistantSaveChat(stored).catch(() => {});
+	}
+
 	// --- Messages ------------------------------------------------------------------
 
-	function addMessage(role: Message["role"], text: string, notes: readonly string[] = []): Message {
+	/** Shows the active chat from its messages. */
+	function showChat(): void {
+		shown.clear();
+		log.replaceChildren();
+		for (const message of active.messages) appendMessage(message);
+		log.scrollTop = log.scrollHeight;
+		render();
+	}
+
+	function appendMessage(message: Message): void {
 		const body = el("div", { class: "assistant-body" });
 		const element = el("div", {
-			class: `assistant-message assistant-${role}`,
+			class: `assistant-message assistant-${message.role}`,
 			children: [
-				...(notes.length === 0
+				...(message.notes.length === 0
 					? []
-					: [el("div", { class: "assistant-notes", text: notes.join(" · ") })]),
+					: [el("div", { class: "assistant-notes", text: message.notes.join(" · ") })]),
 				body,
 			],
 		});
-		const message: Message = { role, text, error: null, done: role === "user", element, body };
-		messages.push(message);
+		shown.set(message, { element, body });
 		log.append(element);
-		if (role === "user") body.textContent = text;
-		renderState();
-		return message;
+		if (message.role === "user") body.textContent = message.text;
+		else renderReply(message);
 	}
 
 	let renderQueued: Message | null = null;
@@ -370,6 +656,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	}
 
 	function renderReply(message: Message): void {
+		const view = shown.get(message);
+		if (view === undefined) return;
 		const follow = nearBottom();
 		// While a reply streams in, a finished diagram already shows; an open one is still text.
 		const parts: ReplyPart[] = message.text === "" ? [] : splitReply(message.text);
@@ -386,7 +674,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		if (message.done && message.error === null && message.text.trim() !== "") {
 			nodes.push(replyActions(message));
 		}
-		message.body.replaceChildren(...nodes);
+		view.body.replaceChildren(...nodes);
 		if (follow) log.scrollTop = log.scrollHeight;
 	}
 
@@ -481,38 +769,46 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 	// --- Asking --------------------------------------------------------------------
 
-	let current: Message | null = null;
-	/** Called when the reply in progress has ended (its last event, not the request, says so). */
-	let ended: (() => void) | null = null;
-
 	bridge.onAssistantEvent((id, event: ClaudeEvent) => {
-		if (id !== chatId || current === null) return;
-		const message = current;
+		const chat = chats.get(id);
+		const reply = chat?.reply;
+		if (chat === undefined || reply == null) return;
 		switch (event.kind) {
 			case "session":
-				sessionId = event.id;
+				chat.sessionId = event.id;
+				if (event.folder !== undefined) chat.folder = event.folder;
 				return;
 			case "text":
-				message.text += event.text;
-				scheduleRender(message);
+				reply.text += event.text;
+				if (chat === active) scheduleRender(reply);
 				return;
 			case "error":
-				message.error = event.message;
-				scheduleRender(message);
-				ended?.();
+				reply.error = event.message;
+				if (chat === active) scheduleRender(reply);
+				chat.ended?.();
 				return;
 			case "done":
-				ended?.();
+				chat.ended?.();
 				return;
 		}
 	});
 
 	async function send(): Promise<void> {
+		const chat = active;
 		const question = input.value.trim();
-		if (question === "" || busy || status?.ready !== true) return;
-		busy = true;
+		if (question === "" || chat.reply !== null || status?.ready !== true) return;
+		const provider = status.provider;
+		// A chat picked up with another service goes on there as a new conversation.
+		if (chat.provider !== provider) {
+			chat.provider = provider;
+			chat.sessionId = null;
+			chat.folder = null;
+			chat.sharedText = null;
+		}
+		const reply: Message = { role: "assistant", text: "", error: null, done: false, notes: [] };
+		chat.reply = reply;
 		input.value = "";
-		renderState();
+		render();
 
 		const notes: string[] = [];
 		let prompt: string;
@@ -522,7 +818,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			tabId = context.tabId;
 			const selection = droppedSelection === null ? host.selection() : "";
 			const sharing = host.shareDocument();
-			const unchanged = sharing && sessionId !== null && sharedText === context.text;
+			const unchanged = sharing && chat.sessionId !== null && chat.sharedText === context.text;
 			if (sharing) notes.push(format(t.assistantSharedDocument, context.name));
 			if (selection.trim() !== "") notes.push(t.assistantSharedSelection);
 			prompt = composePrompt({
@@ -533,81 +829,94 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				documentUnchanged: unchanged,
 				selection,
 			});
-			if (sharing) sharedText = context.text;
+			if (sharing) chat.sharedText = context.text;
 		} catch (error) {
-			busy = false;
+			chat.reply = null;
 			input.value = question;
-			renderState();
+			render();
 			showNotice(format(t.assistantActionFailed, host.errorText(error)));
 			return;
 		}
 
-		addMessage("user", question, notes);
-		const reply = addMessage("assistant", "");
-		current = reply;
-		renderReply(reply);
+		// What an API is sent again when this run has not seen the chat (picked up from disk).
+		const earlier = isCli(PROVIDER_INFO[provider]) ? [] : historyOf(chat.messages);
+		const asked: Message = { role: "user", text: question, error: null, done: true, notes };
+		chat.messages.push(asked, reply);
+		if (chat.title === "") chat.title = chatTitle(question);
+		chat.updated = Date.now();
+		if (chat === active) {
+			appendMessage(asked);
+			appendMessage(reply);
+			log.scrollTop = log.scrollHeight;
+			render();
+		}
 		// The reply's events and the request's own answer travel separately and
 		// may arrive in either order: the reply has ended with its last event.
 		const ask = async (session: string | null): Promise<void> => {
 			const last = new Promise<void>((resolve) => {
-				ended = resolve;
+				chat.ended = resolve;
 			});
 			try {
-				await bridge.assistantAsk({ chatId, prompt, sessionId: session, tabId });
+				await bridge.assistantAsk({
+					chatId: chat.id,
+					prompt,
+					sessionId: session,
+					tabId,
+					folder: chat.folder,
+					history: earlier,
+				});
 				await Promise.race([last, new Promise((resolve) => setTimeout(resolve, 5000))]);
 			} catch (error) {
 				reply.error = host.errorText(error);
 			} finally {
-				ended = null;
+				chat.ended = null;
 			}
 		};
-		await ask(sessionId);
-		// A conversation Claude Code no longer has (cleared, or another computer): start again.
+		await ask(chat.sessionId);
+		// A conversation the CLI no longer has (cleared, or another computer): start again.
 		if (reply.text === "" && reply.error !== null && /no conversation found/i.test(reply.error)) {
-			sessionId = null;
+			chat.sessionId = null;
 			reply.error = null;
 			await ask(null);
 		}
-		if (current === reply) current = null;
+		chat.reply = null;
 		reply.done = true;
-		busy = false;
-		renderReply(reply);
-		renderState();
-		input.focus();
+		chat.updated = Date.now();
+		save(chat);
+		if (chat === active) {
+			renderReply(reply);
+			render();
+			input.focus();
+		}
+		if (view === "history") void renderHistory();
 	}
 
-	async function stop(): Promise<void> {
-		await bridge.assistantStop(chatId);
-	}
-
-	function reset(): void {
-		if (busy) void bridge.assistantStop(chatId);
-		chatId = crypto.randomUUID();
-		sessionId = null;
-		sharedText = null;
-		current = null;
-		busy = false;
-		messages = [];
-		log.replaceChildren();
-		renderState();
-		input.focus();
+	/** The most recent chat comes back when the panel first shows. */
+	async function restore(): Promise<void> {
+		restored = true;
+		const [latest] = await bridge.assistantChats().catch(() => []);
+		if (latest !== undefined && active.messages.length === 0) await openChat(latest.id);
 	}
 
 	renderEmpty();
-	renderState();
+	render();
 
 	return {
 		element,
 		show() {
-			renderState();
+			showWidth(fit(host.width()));
+			render();
 			refreshSelection();
+			if (!restored) void restore();
 			if (status !== null) return;
 			void bridge.assistantStatus().then((found) => {
 				status = found;
-				renderState();
+				if (active.messages.length === 0) active.provider = found.provider;
+				render();
 			});
 		},
 		focus() {
+			if (view !== "chat") void setView("chat");
 			input.focus();
 		},
 		refreshSelection,

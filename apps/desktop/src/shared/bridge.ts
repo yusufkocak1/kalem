@@ -1,8 +1,9 @@
+import type { ChatSummary, StoredChat } from "./chats.js";
 import type { ClaudeEvent } from "./claude.js";
 import type { ConfluenceFormat } from "./confluence.js";
 import type { TextFormat } from "./encoding.js";
 import type { Lang } from "./i18n.js";
-import type { AssistantConfig, AssistantUpdate, ProviderId } from "./providers.js";
+import type { AssistantConfig, AssistantUpdate, ChatMessage, ProviderId } from "./providers.js";
 
 export type Theme = "system" | "light" | "dark";
 
@@ -60,6 +61,10 @@ export interface Settings {
 	readonly assistantDocument: boolean;
 	/** The Claude Code CLI the user picked; empty to look for it. */
 	readonly claudePath: string;
+	/** The GitHub Copilot CLI the user picked; empty to look for it. */
+	readonly copilotPath: string;
+	/** The assistant panel's width in pixels. */
+	readonly assistantWidth: number;
 }
 
 export type SidePane = "outline" | "files" | "confluence";
@@ -84,7 +89,17 @@ export const DEFAULT_SETTINGS: Settings = {
 	assistant: false,
 	assistantDocument: true,
 	claudePath: "",
+	copilotPath: "",
+	assistantWidth: 380,
 };
+
+export const MIN_ASSISTANT_WIDTH = 280;
+export const MAX_ASSISTANT_WIDTH = 1200;
+
+export function clampAssistantWidth(value: number): number {
+	if (!Number.isFinite(value)) return DEFAULT_SETTINGS.assistantWidth;
+	return Math.round(Math.min(MAX_ASSISTANT_WIDTH, Math.max(MIN_ASSISTANT_WIDTH, value)));
+}
 
 /** The `@page` rule printing and PDF export lay the document out with. */
 export function pageRule(settings: Settings): string {
@@ -372,11 +387,6 @@ export interface Attachment {
 	readonly url: string;
 }
 
-/** Whether the Claude Code CLI was found on this computer. */
-export type ClaudeStatus =
-	| { readonly found: true; readonly path: string; readonly version: string }
-	| { readonly found: false };
-
 /** Whether the assistant can be asked, with the service it uses. */
 export interface AssistantStatus {
 	readonly provider: ProviderId;
@@ -398,6 +408,10 @@ export interface AssistantRequest {
 	readonly sessionId: string | null;
 	/** The active tab: a new conversation runs in its document's folder. */
 	readonly tabId: string | null;
+	/** The folder a CLI conversation ran in, as the chat remembers it. */
+	readonly folder: string | null;
+	/** The chat so far, for an API that has not seen it in this run. */
+	readonly history: readonly ChatMessage[];
 }
 
 export interface DraftRequest {
@@ -603,8 +617,13 @@ export interface KalemBridge {
 		readonly baseUrl: string;
 		readonly key?: string;
 	}): Promise<readonly string[]>;
-	/** Lets the user pick the Claude Code CLI's program. */
-	claudeLocate(): Promise<AssistantStatus>;
+	/** Lets the user pick the program of the CLI in use. */
+	assistantLocate(): Promise<AssistantStatus>;
+	/** The kept chats, newest first. */
+	assistantChats(): Promise<readonly ChatSummary[]>;
+	assistantChat(id: string): Promise<StoredChat | null>;
+	assistantSaveChat(chat: StoredChat): Promise<void>;
+	assistantDeleteChat(id: string): Promise<void>;
 	/** Asks the assistant; resolves when the reply has ended. */
 	assistantAsk(request: AssistantRequest): Promise<void>;
 	assistantStop(chatId: string): Promise<void>;
@@ -680,7 +699,11 @@ export const CHANNEL = {
 	assistantConfig: "kalem:assistant-config",
 	assistantConfigure: "kalem:assistant-configure",
 	assistantModels: "kalem:assistant-models",
-	claudeLocate: "kalem:claude-locate",
+	assistantLocate: "kalem:assistant-locate",
+	assistantChats: "kalem:assistant-chats",
+	assistantChat: "kalem:assistant-chat",
+	assistantSaveChat: "kalem:assistant-save-chat",
+	assistantDeleteChat: "kalem:assistant-delete-chat",
 	assistantAsk: "kalem:assistant-ask",
 	assistantStop: "kalem:assistant-stop",
 	assistantEvent: "kalem:assistant-event",

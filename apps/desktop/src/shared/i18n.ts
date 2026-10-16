@@ -517,10 +517,30 @@ const en = {
 	assistantSetupHint: "Pick a service and its model, and enter an API key if it needs one.",
 	assistantSetUp: "Set Up…",
 	assistantOrApi:
-		"Or connect to a service with an API key (Anthropic, OpenAI, Gemini, OpenRouter) or a local model (Ollama, LM Studio):",
+		"Or use GitHub Copilot, a service with an API key (Anthropic, OpenAI, Gemini, GitHub Models, OpenRouter) or a local model (Ollama, LM Studio):",
 	assistantUseApi: "Connect a Service…",
 	providerClaudeCode: "Claude Code (this computer)",
 	providerCustom: "Other (OpenAI-compatible)",
+	providerCopilot: "GitHub Copilot (this computer)",
+	copilotLocateTitle: "Where is the GitHub Copilot CLI (copilot)?",
+	copilotLocateFailed: "This file does not start the GitHub Copilot CLI.",
+	copilotNotFound: "The GitHub Copilot CLI was not found on this computer.",
+	copilotMissing: "The GitHub Copilot CLI was not found on this computer",
+	copilotMissingHint:
+		"The assistant can use the GitHub Copilot CLI with your Copilot subscription and its own sign-in. Install it, for example:",
+	copilotMissingLogin:
+		"Then run “copilot” once in a terminal and sign in with /login. If it is installed somewhere unusual, pick its program.",
+	copilotCliNote:
+		"Uses the GitHub Copilot CLI installed on this computer, with your Copilot subscription and its own sign-in; no key is needed here.",
+	copilotModelPlaceholder: "Copilot's default model (or a model name)",
+	assistantChats: "Chats",
+	assistantNoChats: "No chats yet. Questions you ask are kept here.",
+	assistantUntitledChat: "New chat",
+	assistantMessageCount: "{0} messages",
+	assistantRunning: "answering…",
+	assistantDeleteChat: "Delete “{0}”",
+	assistantDeleteChatConfirm: "Delete the chat “{0}”?",
+	assistantResize: "Drag to resize the assistant (arrow keys too; double-click for the default)",
 } as const;
 
 export type Strings = { readonly [K in keyof typeof en]: string };
@@ -1045,10 +1065,31 @@ const tr: Strings = {
 	assistantSetupHint: "Bir hizmet ve modelini seçin; gerekiyorsa API anahtarını girin.",
 	assistantSetUp: "Bağlantıyı Ayarla…",
 	assistantOrApi:
-		"Ya da API anahtarıyla bir hizmete (Anthropic, OpenAI, Gemini, OpenRouter) veya yerel bir modele (Ollama, LM Studio) bağlanın:",
+		"Ya da GitHub Copilot'ı, API anahtarıyla bir hizmeti (Anthropic, OpenAI, Gemini, GitHub Models, OpenRouter) veya yerel bir modeli (Ollama, LM Studio) kullanın:",
 	assistantUseApi: "Hizmet Bağla…",
 	providerClaudeCode: "Claude Code (bu bilgisayar)",
 	providerCustom: "Diğer (OpenAI uyumlu)",
+	providerCopilot: "GitHub Copilot (bu bilgisayar)",
+	copilotLocateTitle: "GitHub Copilot CLI (copilot) nerede?",
+	copilotLocateFailed: "Bu dosya GitHub Copilot CLI'ı başlatmıyor.",
+	copilotNotFound: "Bu bilgisayarda GitHub Copilot CLI bulunamadı.",
+	copilotMissing: "Bu bilgisayarda GitHub Copilot CLI bulunamadı",
+	copilotMissingHint:
+		"Asistan, GitHub Copilot CLI'ı Copilot aboneliğiniz ve kendi oturumuyla kullanabilir. Kurmak için, örneğin:",
+	copilotMissingLogin:
+		"Sonra bir terminalde bir kez “copilot” çalıştırıp /login ile oturum açın. Alışılmadık bir yere kuruluysa programını gösterin.",
+	copilotCliNote:
+		"Bu bilgisayarda kurulu GitHub Copilot CLI'ı Copilot aboneliğinizle ve kendi oturumuyla kullanır; burada anahtar gerekmez.",
+	copilotModelPlaceholder: "Copilot'ın varsayılan modeli (ya da bir model adı)",
+	assistantChats: "Sohbetler",
+	assistantNoChats: "Henüz sohbet yok. Sorduklarınız burada saklanır.",
+	assistantUntitledChat: "Yeni sohbet",
+	assistantMessageCount: "{0} mesaj",
+	assistantRunning: "yanıtlıyor…",
+	assistantDeleteChat: "“{0}” sohbetini sil",
+	assistantDeleteChatConfirm: "“{0}” sohbeti silinsin mi?",
+	assistantResize:
+		"Asistanın genişliğini sürükleyerek ayarlayın (ok tuşları da çalışır; varsayılan için çift tıklayın)",
 };
 
 export function stringsFor(lang: Lang): Strings {

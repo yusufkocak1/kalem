@@ -4,6 +4,7 @@ import {
 	ClaudeStreamReader,
 	claudeArgs,
 	composePrompt,
+	copilotArgs,
 	DIAGRAM_FENCE,
 	diagramForPrompt,
 	diagramFromReply,
@@ -11,6 +12,7 @@ import {
 	SYSTEM_PROMPT,
 	splitReply,
 	systemPrompt,
+	withInstructions,
 } from "./claude.js";
 import { ancestors, SHAPES } from "./diagram.js";
 import { stringsFor } from "./i18n.js";
@@ -61,6 +63,26 @@ describe("CLI arguments", () => {
 	it("resumes a conversation", () => {
 		const args = claudeArgs({ sessionId: "abc-123" });
 		expect(args.slice(-2)).toEqual(["--resume", "abc-123"]);
+	});
+});
+
+describe("Copilot CLI arguments", () => {
+	it("writes only the answer, may not run commands or write files, and keeps the session", () => {
+		const args = copilotArgs({ sessionId: "s-1", model: "" });
+		expect(args.slice(0, 3)).toEqual(["-s", "--stream", "on"]);
+		expect(args.join(" ")).toContain("--deny-tool shell --deny-tool write");
+		expect(args.slice(-2)).toEqual(["--session-id", "s-1"]);
+		expect(args).not.toContain("-p");
+		expect(copilotArgs({ sessionId: "s-1", model: "gpt-5" }).slice(-2)).toEqual([
+			"--model",
+			"gpt-5",
+		]);
+	});
+
+	it("puts the instructions before a conversation's first question", () => {
+		expect(withInstructions("KURALLAR", "Soru")).toBe(
+			"<instructions>\nKURALLAR\n</instructions>\n\nSoru",
+		);
 	});
 });
 

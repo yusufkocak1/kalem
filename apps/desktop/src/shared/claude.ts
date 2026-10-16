@@ -191,9 +191,41 @@ export function claudeArgs(options: {
 	];
 }
 
+/** What the Copilot CLI may not do: run commands or change files. */
+export const COPILOT_DENIED_TOOLS = ["shell", "write"] as const;
+
+/**
+ * Arguments for one question to the GitHub Copilot CLI; the question goes
+ * to standard input. `-s` writes only the answer, as it comes. The same
+ * session id starts a conversation and continues it.
+ */
+export function copilotArgs(options: {
+	readonly sessionId: string;
+	readonly model: string;
+}): string[] {
+	return [
+		"-s",
+		"--stream",
+		"on",
+		// Required without a terminal to ask in; the denied tools stay denied.
+		"--allow-all-tools",
+		...COPILOT_DENIED_TOOLS.flatMap((tool) => ["--deny-tool", tool]),
+		"--no-ask-user",
+		"--no-auto-update",
+		"--session-id",
+		options.sessionId,
+		...(options.model === "" ? [] : ["--model", options.model]),
+	];
+}
+
+/** The Copilot CLI takes no system prompt: a conversation's first question carries the instructions. */
+export function withInstructions(system: string, question: string): string {
+	return `<instructions>\n${system}\n</instructions>\n\n${question}`;
+}
+
 export type ClaudeEvent =
-	/** The conversation's id; the next question resumes it. */
-	| { readonly kind: "session"; readonly id: string }
+	/** The conversation's id, and for a CLI the folder it runs in; the next question resumes it. */
+	| { readonly kind: "session"; readonly id: string; readonly folder?: string }
 	/** More of the reply. */
 	| { readonly kind: "text"; readonly text: string }
 	| { readonly kind: "done" }

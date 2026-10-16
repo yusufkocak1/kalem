@@ -7,7 +7,13 @@ import type {
 	Settings,
 	Theme,
 } from "../shared/bridge.js";
-import { clampZoom, DEFAULT_SETTINGS, PAGE_MARGINS, PAGE_SIZES } from "../shared/bridge.js";
+import {
+	clampAssistantWidth,
+	clampZoom,
+	DEFAULT_SETTINGS,
+	PAGE_MARGINS,
+	PAGE_SIZES,
+} from "../shared/bridge.js";
 import type { Lang } from "../shared/i18n.js";
 
 export const MAX_RECENT_FILES = 12;
@@ -97,6 +103,8 @@ export function parseStoredState(raw: unknown): StoredState {
 			assistant: asBoolean(s.assistant, d.assistant),
 			assistantDocument: asBoolean(s.assistantDocument, d.assistantDocument),
 			claudePath: typeof s.claudePath === "string" ? s.claudePath.slice(0, 4096) : d.claudePath,
+			copilotPath: typeof s.copilotPath === "string" ? s.copilotPath.slice(0, 4096) : d.copilotPath,
+			assistantWidth: clampAssistantWidth(asNumber(s.assistantWidth) ?? d.assistantWidth),
 		},
 		recentFiles: [...new Set(recentFiles)].slice(0, MAX_RECENT_FILES),
 		window: parseBounds(root.window),

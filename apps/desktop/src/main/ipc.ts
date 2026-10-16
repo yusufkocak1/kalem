@@ -29,6 +29,7 @@ import {
 	stripExtension,
 	TEXT_EXTENSIONS,
 } from "../shared/paths.js";
+import type { ChatStore } from "./assistant-chats.js";
 import { registerAssistantIpc } from "./assistant-ipc.js";
 import type { AssistantStore } from "./assistant-store.js";
 import { registerConfluenceIpc } from "./confluence-ipc.js";
@@ -62,6 +63,7 @@ export interface IpcContext {
 	readonly versions: VersionStore;
 	readonly confluence: ConfluenceStore;
 	readonly assistant: AssistantStore;
+	readonly chats: ChatStore;
 	strings(): Strings;
 	language(): Lang;
 	changeSettings(patch: Partial<Settings>): void;
@@ -629,6 +631,7 @@ export function registerIpc(ctx: IpcContext): void {
 	registerAssistantIpc({
 		store: ctx.store,
 		assistant: ctx.assistant,
+		chats: ctx.chats,
 		strings: ctx.strings,
 		senderOf,
 	});

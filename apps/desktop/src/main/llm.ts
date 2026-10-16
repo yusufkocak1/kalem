@@ -139,7 +139,7 @@ export async function listModels(
 			throw anthropicError(error);
 		}
 	}
-	const response = await net.fetch(`${connection.baseUrl}/models`, {
+	const response = await net.fetch(provider.modelsUrl ?? `${connection.baseUrl}/models`, {
 		headers: key ? { authorization: `Bearer ${key}` } : {},
 	});
 	const body = await response.text();
