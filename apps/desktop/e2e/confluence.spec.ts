@@ -709,6 +709,16 @@ test("draws a diagram on a Confluence page as an attachment", async () => {
 	expect(uploaded()?.version).toBe(2);
 	expect(data()?.version).toBe(2);
 	expect(nodes()).toBe(2);
+
+	// And again: every edit is a new version.
+	await expect(image).toHaveAttribute("src", "Akış.diagram.png");
+	await image.dblclick();
+	await expect(editor).toBeVisible();
+	await editor.locator('[data-shape="decision"]').click();
+	await editor.getByRole("button", { name: "Save", exact: true }).click();
+	await expect(editor).toBeHidden();
+	expect(uploaded()?.version).toBe(3);
+	expect(nodes()).toBe(3);
 	expect(errors).toEqual([]);
 	await app.close();
 });
