@@ -4,6 +4,7 @@ import type {
 	Diagram,
 	DiagramEdge,
 	DiagramNode,
+	Direction,
 	Point,
 	ShapeKind,
 	SvgNode,
@@ -12,16 +13,20 @@ import {
 	ARROWS,
 	bounds,
 	COLORS,
+	connectionAllowed,
 	DEFAULT_SIZE,
+	DIRECTIONS,
 	diagramContent,
 	edgeRoute,
 	emptyDiagram,
 	FONT_SIZE,
 	GRID,
+	liftEdges,
 	MIN_HEIGHT,
 	MIN_WIDTH,
 	nextId,
 	PADDING,
+	routeEdges,
 	SHAPES,
 	serializeDiagram,
 	snap,
@@ -34,11 +39,16 @@ import {
 	copyItems,
 	decisionLabel,
 	distributeNodes,
+	fitGroups,
+	groupNodes,
 	layoutDiagram,
 	moveNodes,
 	nodesInBox,
 	pasteItems,
 	removeItems,
+	settleGroups,
+	ungroup,
+	withContents,
 } from "../shared/diagram-edit.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
@@ -53,6 +63,10 @@ const DRAG_START = 3;
 const GAP = 60;
 /** How close, on screen, a side must come to another shape's to snap to it. */
 const GUIDE_SNAP = 6;
+/** A group's name band: a double-click there edits the name, below it adds a step. */
+const GROUP_TITLE = 32;
+/** How long a hint (a refused connection) stays on the canvas. */
+const HINT_TIME = 4000;
 
 export interface DiagramEditRequest {
 	/** `null` for a new diagram. */
@@ -81,7 +95,14 @@ type Drag =
 			only: string | null;
 	  }
 	| { kind: "resize"; id: string; start: Point; origin: { w: number; h: number }; moved: boolean }
-	| { kind: "connect"; from: string; pointer: Point; over: string | null }
+	| {
+			kind: "connect";
+			from: string;
+			pointer: Point;
+			over: string | null;
+			/** The shape under the pointer is in a group the connection may not enter. */
+			blocked: boolean;
+	  }
 	| { kind: "marquee"; start: Point; current: Point; base: ReadonlySet<string> };
 
 /** Copied shapes, kept while the app runs so they can be pasted into another diagram too. */
@@ -128,20 +149,22 @@ function shapePreview(shape: ShapeKind): Element {
 		class: "diagram-shape-preview",
 		"aria-hidden": "true",
 	});
-	// The bounding box of every preview is 120×70; the circle stays round.
+	// The bounding box of every preview is 120×70; the circle stays round, the multiplexer tall.
 	const node: DiagramNode =
 		shape === "circle"
 			? { id: "p", shape, x: 30, y: 5, w: 60, h: 60, text: "", color: "default" }
-			: {
-					id: "p",
-					shape,
-					x: 0,
-					y: 0,
-					w: 120,
-					h: 70,
-					text: shape === "text" ? "Aa" : "",
-					color: "default",
-				};
+			: shape === "mux"
+				? { id: "p", shape, x: 38, y: 0, w: 44, h: 70, text: "", color: "default" }
+				: {
+						id: "p",
+						shape,
+						x: 0,
+						y: 0,
+						w: 120,
+						h: 70,
+						text: shape === "text" ? "Aa" : "",
+						color: "default",
+					};
 	if (shape === "text") {
 		// Text has no outline; a large letter stands for it.
 		const letter = svgEl("text", {
@@ -173,6 +196,8 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 		subprocess: t.diagramSubprocess,
 		circle: t.diagramCircle,
 		text: t.diagramTextShape,
+		mux: t.diagramMux,
+		group: t.diagramGroup,
 	};
 	const colorLabels: Record<ColorName, string> = {
 		default: t.diagramColorDefault,
@@ -273,6 +298,19 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 		attrs: { role: "group", "aria-label": t.diagramAlign },
 		children: [...alignButtons, spreadX, spreadY],
 	});
+	const groupButton = toolButton(
+		t.diagramGroupSelection,
+		glyph(["M3 3h18v18H3z", "M7 9h5v4H7z", "M13 13h4v4h-4z"]),
+		() => groupSelection(),
+		"Ctrl+G",
+	);
+	const ungroupButton = toolButton(
+		t.diagramUngroup,
+		glyph(["M3 3h18v18H3z", "M7 9h5v4H7z", "M13 13h4v4h-4z", "M3 21 21 3"]),
+		() => ungroupSelection(),
+		"Ctrl+Shift+G",
+	);
+	const rotateButton = toolButton(t.diagramRotate, "⟳", () => rotateMux());
 	const layoutButton = toolButton(
 		t.diagramLayout,
 		glyph(["M9 3h6v4H9z", "M3 17h6v4H3z", "M15 17h6v4h-6z", "M12 7v5", "M6 17v-5h12v5"]),
@@ -302,7 +340,7 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 			el("div", { class: "diagram-group", children: [undoButton, redoButton] }),
 			el("div", {
 				class: "diagram-group diagram-selection",
-				children: [colorGroup, edgeGroup, deleteButton],
+				children: [colorGroup, edgeGroup, rotateButton, groupButton, ungroupButton, deleteButton],
 			}),
 			alignGroup,
 			el("div", { class: "diagram-group", children: [layoutButton] }),
@@ -404,6 +442,8 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 	let spaceDown = false;
 	let pasteCount = 0;
 	let editing: { kind: "node" | "edge"; id: string } | null = null;
+	let hint = "";
+	let hintTimer: ReturnType<typeof setTimeout> | undefined;
 	let request: DiagramEditRequest | null = null;
 	let saving = false;
 
@@ -488,7 +528,7 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 			y: snap(center.y - size.h / 2),
 			w: size.w,
 			h: size.h,
-			text: shape === "circle" ? "" : shapeLabels[shape],
+			text: shape === "circle" ? "" : shape === "mux" ? "MUX" : shapeLabels[shape],
 			color: "default",
 		};
 	}
@@ -530,20 +570,45 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 			x: selected.x + selected.w / 2 + out * (size.w + 2 * GRID),
 			y: selected.y + selected.h + GAP + size.h / 2,
 		});
-		const withNode = { ...diagram, nodes: [...diagram.nodes, node] };
-		change({ ...withNode, edges: [...diagram.edges, newEdge(selected.id, node.id, withNode)] });
+		// Next to it in the same group, which grows to hold it.
+		const placed = selected.parent === undefined ? node : { ...node, parent: selected.parent };
+		const withNode = { ...diagram, nodes: [...diagram.nodes, placed] };
+		change(
+			liftEdges(
+				fitGroups({
+					...withNode,
+					edges: [...diagram.edges, newEdge(selected.id, node.id, withNode)],
+				}),
+			),
+		);
 		select([node.id]);
 		render();
 	}
 
+	/** A new shape goes into the group it is put in. */
 	function insertNode(node: DiagramNode): void {
-		change({ ...diagram, nodes: [...diagram.nodes, node] });
+		change(settleGroups({ ...diagram, nodes: [...diagram.nodes, node] }, [node.id]));
 		select([node.id]);
+		render();
+	}
+
+	/** A message on the canvas for a few seconds. */
+	function showHint(text: string): void {
+		hint = text;
+		clearTimeout(hintTimer);
+		hintTimer = setTimeout(() => {
+			hint = "";
+			render();
+		}, HINT_TIME);
 		render();
 	}
 
 	function connect(from: string, to: string): void {
 		if (from === to || diagram.edges.some((edge) => edge.from === from && edge.to === to)) return;
+		if (!connectionAllowed(diagram, from, to)) {
+			showHint(t.diagramConnectBlocked);
+			return;
+		}
 		const edge = newEdge(from, to, diagram);
 		change({ ...diagram, edges: [...diagram.edges, edge] });
 		select([], [edge.id]);
@@ -569,7 +634,7 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 		pasteCount++;
 		const step = 2 * GRID * pasteCount;
 		const pasted = pasteItems(diagram, items, { x: step, y: step });
-		change(pasted.diagram);
+		change(settleGroups(pasted.diagram, pasted.ids));
 		select(pasted.ids);
 		render();
 	}
@@ -578,7 +643,7 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 		if (nodesSelected.size === 0) return;
 		const items = copyItems(diagram, nodesSelected);
 		const pasted = pasteItems(diagram, items, { x: 2 * GRID, y: 2 * GRID });
-		change(pasted.diagram);
+		change(settleGroups(pasted.diagram, pasted.ids));
 		select(pasted.ids);
 		render();
 	}
@@ -623,7 +688,49 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 	}
 
 	function nudge(dx: number, dy: number): void {
-		if (nodesSelected.size > 0) change(moveNodes(diagram, nodesSelected, dx, dy));
+		if (nodesSelected.size > 0)
+			change(settleGroups(moveNodes(diagram, nodesSelected, dx, dy), nodesSelected));
+	}
+
+	function groupSelection(): void {
+		const grouped = groupNodes(diagram, nodesSelected, t.diagramGroup);
+		if (grouped === null) return;
+		change(grouped.diagram);
+		select([grouped.id]);
+		render();
+	}
+
+	function ungroupSelection(): void {
+		const groups = [...nodesSelected].filter((id) => nodeById(id)?.shape === "group");
+		if (groups.length === 0) return;
+		const contents = diagram.nodes.filter(
+			(node) => node.parent !== undefined && groups.includes(node.parent),
+		);
+		change(groups.reduce(ungroup, diagram));
+		select(contents.map((node) => node.id));
+		render();
+	}
+
+	/** Turns each selected multiplexer a quarter, around its middle. */
+	function rotateMux(): void {
+		const muxes = new Set([...nodesSelected].filter((id) => nodeById(id)?.shape === "mux"));
+		if (muxes.size === 0) return;
+		change({
+			...diagram,
+			nodes: diagram.nodes.map((node) => {
+				if (!muxes.has(node.id)) return node;
+				const at = DIRECTIONS.indexOf(node.direction ?? "right");
+				const direction = DIRECTIONS[(at + 1) % DIRECTIONS.length] as Direction;
+				return {
+					...node,
+					direction,
+					x: snap(node.x + node.w / 2 - node.h / 2),
+					y: snap(node.y + node.h / 2 - node.w / 2),
+					w: node.h,
+					h: node.w,
+				};
+			}),
+		});
 	}
 
 	// --- View ------------------------------------------------------------------
@@ -713,9 +820,13 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 		spreadX.disabled = nodes.length < 3;
 		spreadY.disabled = nodes.length < 3;
 		layoutButton.disabled = diagram.nodes.length < 2;
+		rotateButton.hidden = !nodes.some((node) => node.shape === "mux");
+		groupButton.hidden = nodes.length === 0;
+		ungroupButton.hidden = !nodes.some((node) => node.shape === "group");
 		deleteButton.disabled = nodes.length + edges.length === 0;
 		saveButton.disabled = saving || diagram.nodes.length === 0;
-		status.textContent = diagram.nodes.length === 0 ? t.diagramEmpty : "";
+		status.textContent = hint !== "" ? hint : diagram.nodes.length === 0 ? t.diagramEmpty : "";
+		status.classList.toggle("hint", hint !== "");
 		status.hidden = status.textContent === "";
 	}
 
@@ -798,7 +909,7 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 						y: over.y - 4,
 						width: over.w + 8,
 						height: over.h + 8,
-						class: "diagram-target",
+						class: drag.blocked ? "diagram-target blocked" : "diagram-target",
 					}),
 				);
 			}
@@ -828,13 +939,14 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 		if (editing.kind === "node") {
 			const node = nodeById(editing.id);
 			if (node === undefined) return;
-			box = { x: node.x, y: node.y, w: node.w, h: node.h };
+			box =
+				node.shape === "group"
+					? { x: node.x, y: node.y, w: node.w, h: GROUP_TITLE }
+					: { x: node.x, y: node.y, w: node.w, h: node.h };
 		} else {
-			const edge = edgeById(editing.id);
-			const from = edge === undefined ? undefined : nodeById(edge.from);
-			const to = edge === undefined ? undefined : nodeById(edge.to);
-			if (from === undefined || to === undefined) return;
-			const { label } = edgeRoute(from, to);
+			const route = routeEdges(diagram).get(editing.id);
+			if (route === undefined) return;
+			const { label } = route;
 			box = { x: label.x - 80, y: label.y - 18, w: 160, h: 36 };
 		}
 		textEdit.style.left = `${box.x * view.zoom + view.x}px`;
@@ -939,7 +1051,13 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 			if (isDoublePress(event, key)) {
 				event.preventDefault();
 				drag = null;
-				if (node !== null) editText("node", node);
+				const group = node === null ? undefined : nodeById(node);
+				if (group?.shape === "group" && point.y > group.y + GROUP_TITLE) {
+					// Inside a group, below its name: a new step in the group.
+					const added = { ...placeNode("process", point), text: "" };
+					insertNode(added);
+					editText("node", added.id);
+				} else if (node !== null) editText("node", node);
 				else if (edge !== null) editText("edge", edge);
 				else {
 					// On the empty canvas: a new step there.
@@ -962,7 +1080,7 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 				};
 			}
 		} else if (port !== null) {
-			drag = { kind: "connect", from: port, pointer: point, over: null };
+			drag = { kind: "connect", from: port, pointer: point, over: null, blocked: false };
 		} else if (node !== null) {
 			if (additive) {
 				// Shift or Ctrl adds the shape to the selection, or takes it out.
@@ -1031,15 +1149,24 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 					redoStack = [];
 					drag.moved = true;
 				}
-				const moving = drag.origin.nodes.filter(
-					(node) => drag?.kind === "move" && drag.ids.has(node.id),
-				);
+				const carried = withContents(drag.origin, drag.ids);
+				const moving = drag.origin.nodes.filter((node) => carried.has(node.id));
 				const box = boxOf(moving);
 				// On the grid, unless a side or middle lines up with another shape.
 				let sx = snap(box.x + dx) - box.x;
 				let sy = snap(box.y + dy) - box.y;
+				// Not the groups it is in either: lining up with their border would trap it there.
+				const around = new Set(
+					[...drag.ids].flatMap((id) => {
+						const parent =
+							drag?.kind === "move"
+								? drag.origin.nodes.find((item) => item.id === id)?.parent
+								: undefined;
+						return parent === undefined ? [] : [parent];
+					}),
+				);
 				const others = drag.origin.nodes.filter(
-					(node) => drag?.kind === "move" && !drag.ids.has(node.id),
+					(node) => !carried.has(node.id) && !around.has(node.id),
 				);
 				const free = { ...box, x: box.x + dx, y: box.y + dy };
 				const lined = event.altKey
@@ -1071,7 +1198,13 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 				// The element under the pointer, not the one capturing it.
 				const under = document.elementFromPoint(event.clientX, event.clientY);
 				const over = hit(under, "data-node");
-				drag = { ...drag, pointer: point, over: over === drag.from ? null : over };
+				const target = over === drag.from ? null : over;
+				drag = {
+					...drag,
+					pointer: point,
+					over: target,
+					blocked: target !== null && !connectionAllowed(diagram, drag.from, target),
+				};
 				renderOverlay();
 				return;
 			}
@@ -1097,6 +1230,15 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 		if (ended?.kind === "connect" && ended.over !== null) connect(ended.from, ended.over);
 		else {
 			if (ended?.kind === "move" && !ended.moved && ended.only !== null) select([ended.only]);
+			// Where a shape was dropped decides its group (part of the same undo step).
+			if (ended?.kind === "move" && ended.moved) diagram = settleGroups(diagram, ended.ids);
+			if (ended?.kind === "resize" && ended.moved) {
+				const resized = nodeById(ended.id);
+				diagram = settleGroups(
+					diagram,
+					resized?.shape === "group" ? diagram.nodes.map((node) => node.id) : [ended.id],
+				);
+			}
 			render();
 		}
 	};
@@ -1166,6 +1308,10 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 		} else if (mod && key === "y") {
 			event.preventDefault();
 			redo();
+		} else if (mod && key === "g") {
+			event.preventDefault();
+			if (event.shiftKey) ungroupSelection();
+			else groupSelection();
 		} else if (mod && key === "a") {
 			event.preventDefault();
 			selectAll();

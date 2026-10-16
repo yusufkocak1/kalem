@@ -263,7 +263,7 @@ verir.
 
 - **Ekle → Diyagram** akış diyagramı düzenleyicisini ayrı bir panelde açar:
   soldaki şekiller (Başla/Bitir, Adım, Karar, Girdi/Çıktı, Belge,
-  Veritabanı, Alt süreç, Bağlayıcı, Metin) kanvasa sürüklenir ya da
+  Veritabanı, Alt süreç, Bağlayıcı, Metin, Çoklayıcı, Grup) kanvasa sürüklenir ya da
   tıklanır — bir şekil seçiliyken tıklanan yenisi altına, ona bağlı olarak
   eklenir. Şekillerin kenarındaki noktalardan sürükleyerek ok çizilir; şekle
   ya da oka çift tıklayınca yazılır (Shift+Enter yeni satır). Bir kararın
@@ -279,7 +279,20 @@ verir.
     başka bir şeklin kenarı ya da ortasıyla hizalanınca kılavuz çizgisi
     çıkar ve şekil oraya oturur (Alt basılıyken kılavuz yok).
   - **Otomatik yerleşim:** akışı yukarıdan aşağıya katmanlara dizer; geri
-    dönen oklar düzeni bozmaz.
+    dönen oklar düzeni bozmaz. Gruplar tek bir şekil gibi yerleşir, içleri
+    korunur.
+  - **Gruplar:** paletteki **Grup** bir kap çizer (ör. "Backend servisi").
+    İçine bırakılan şekil o grubun olur; Ctrl+G seçilenleri yeni bir gruba
+    alır, Ctrl+Shift+G grubu çözer. Grup taşınınca, kopyalanınca ya da
+    silinince içindekiler de gelir; grup içindekileri sığacak kadar büyür.
+    Grubun içindeki şekiller birbirine, grubun kendisi de içindekilere
+    bağlanabilir (kenarından içeri çizgi); **dışarıdan içerideki bir şekle
+    bağlanılamaz** — dışarısı gruba bağlanır. Dışarıya bağlı bir şekil gruba
+    taşınırsa o bağlantı gruba aktarılır. Grubun gövdesine çift tıklamak
+    içine yeni bir adım ekler, başlığına çift tıklamak adını değiştirir.
+  - **Çoklayıcı (MUX):** gelen oklar uzun kenarında, kaynaklarının sırasına
+    göre aralıklı girer; çıkış kısa kenardan çıkar. **Döndür** ile dört yöne
+    çevrilir.
   - Oklar: tek uç / çift uç / uçsuz, düz ya da kesikli. Taşıma, köşeden
     boyutlandırma, geri al/yinele (Ctrl+Z / Ctrl+Y), yakınlaştırma
     (Ctrl+tekerlek); görünüm tekerlek, orta tuş ya da Boşluk+sürükle ile

@@ -1,16 +1,27 @@
 import { describe, expect, it } from "vitest";
 import type { Diagram, DiagramEdge, DiagramNode } from "./diagram.js";
-import { parseDiagram, serializeDiagram } from "./diagram.js";
+import {
+	connectionAllowed,
+	liftEdges,
+	parseDiagram,
+	routeEdges,
+	serializeDiagram,
+} from "./diagram.js";
 import {
 	alignmentGuides,
 	alignNodes,
 	copyItems,
 	decisionLabel,
 	distributeNodes,
+	fitGroups,
+	groupNodes,
 	layoutDiagram,
+	moveNodes,
 	nodesInBox,
 	pasteItems,
+	placeInGroups,
 	removeItems,
+	ungroup,
 } from "./diagram-edit.js";
 
 const node = (id: string, x: number, y: number, extra: Partial<DiagramNode> = {}): DiagramNode => ({
@@ -149,5 +160,175 @@ describe("diagram editing", () => {
 		expect(parseDiagram(serializeDiagram(diagram))).toEqual(diagram);
 		const old = serializeDiagram(diagram).replace('"arrow": "both"', '"arrow": "sideways"');
 		expect(parseDiagram(old)?.edges[0]?.arrow).toBe("end");
+	});
+});
+
+describe("diagram groups", () => {
+	// Frontend outside; a backend group with two steps inside it.
+	const backend = (): Diagram => ({
+		nodes: [
+			node("front", 0, 100),
+			node("api", 300, 0, { shape: "group", w: 400, h: 300, text: "Backend" }),
+			node("auth", 340, 60, { parent: "api" }),
+			node("db", 340, 200, { parent: "api" }),
+		],
+		edges: [],
+	});
+
+	it("only lets shapes in the same group, or a group and its contents, connect", () => {
+		const diagram = backend();
+		expect(connectionAllowed(diagram, "auth", "db")).toBe(true);
+		expect(connectionAllowed(diagram, "api", "auth")).toBe(true);
+		expect(connectionAllowed(diagram, "front", "api")).toBe(true);
+		expect(connectionAllowed(diagram, "front", "auth")).toBe(false);
+		expect(connectionAllowed(diagram, "db", "front")).toBe(false);
+	});
+
+	it("moves a connector across a group's border up to the group", () => {
+		const diagram = {
+			...backend(),
+			edges: [edge("e1", "front", "auth"), edge("e2", "auth", "db"), edge("e3", "front", "db")],
+		};
+		// The second one from outside would duplicate the first once lifted.
+		expect(liftEdges(diagram).edges.map((item) => [item.id, item.from, item.to])).toEqual([
+			["e1", "front", "api"],
+			["e2", "auth", "db"],
+		]);
+	});
+
+	it("puts a shape in the group it is dropped in, and out of it again", () => {
+		let diagram: Diagram = {
+			...backend(),
+			nodes: [
+				...backend().nodes,
+				node("inner", 360, 40, { shape: "group", w: 300, h: 120 }),
+				node("loose", 600, 250),
+			],
+		};
+		diagram = placeInGroups(diagram, ["loose", "auth"]);
+		expect(diagram.nodes.find((item) => item.id === "loose")?.parent).toBe("api");
+		// The smallest group around it wins.
+		expect(diagram.nodes.find((item) => item.id === "auth")?.parent).toBe("inner");
+		diagram = placeInGroups(moveNodes(diagram, new Set(["loose"]), 600, 0), ["loose"]);
+		expect(diagram.nodes.find((item) => item.id === "loose")?.parent).toBeUndefined();
+	});
+
+	it("grows a group around what is inside it", () => {
+		const diagram = moveNodes(backend(), new Set(["db"]), 0, 200);
+		const api = fitGroups(diagram).nodes.find((item) => item.id === "api");
+		expect(api).toMatchObject({ x: 300, y: 0, w: 400, h: 470 });
+	});
+
+	it("moves, copies and deletes a group with what is inside it", () => {
+		const diagram = { ...backend(), edges: [edge("e1", "auth", "db")] };
+		const moved = moveNodes(diagram, new Set(["api"]), 10, 20);
+		expect(at(moved, "db")).toEqual({ x: 350, y: 220 });
+		expect(at(moved, "front")).toEqual({ x: 0, y: 100 });
+
+		const pasted = pasteItems(diagram, copyItems(diagram, new Set(["api"])), { x: 0, y: 400 });
+		expect(pasted.diagram.nodes.slice(4).map((item) => [item.id, item.parent])).toEqual([
+			["n1", undefined],
+			["n2", "n1"],
+			["n3", "n1"],
+		]);
+		expect(pasted.diagram.edges.at(-1)).toMatchObject({ from: "n2", to: "n3" });
+
+		const left = removeItems(diagram, new Set(["api"]), new Set());
+		expect(left.nodes.map((item) => item.id)).toEqual(["front"]);
+		expect(left.edges).toEqual([]);
+	});
+
+	it("groups selected shapes and takes the group away again", () => {
+		const diagram: Diagram = {
+			nodes: [node("front", 0, 0), node("a", 300, 0), node("b", 300, 100)],
+			edges: [edge("e1", "front", "a"), edge("e2", "a", "b")],
+		};
+		const grouped = groupNodes(diagram, new Set(["a", "b"]), "Servis");
+		if (grouped === null) throw new Error("not grouped");
+		const group = grouped.diagram.nodes.find((item) => item.id === grouped.id);
+		expect(group).toMatchObject({ shape: "group", text: "Servis", x: 280, y: -40, w: 140, h: 210 });
+		expect(grouped.diagram.nodes.filter((item) => item.parent === grouped.id)).toHaveLength(2);
+		// The connector from outside now ends at the group.
+		expect(grouped.diagram.edges[0]).toMatchObject({ from: "front", to: grouped.id });
+
+		const back = ungroup(grouped.diagram, grouped.id);
+		expect(back.nodes.map((item) => [item.id, item.parent])).toEqual([
+			["front", undefined],
+			["a", undefined],
+			["b", undefined],
+		]);
+		expect(back.edges.map((item) => item.id)).toEqual(["e2"]);
+	});
+
+	it("lays a group out as one shape and keeps its contents in place inside it", () => {
+		const diagram = { ...backend(), edges: [edge("e1", "front", "api"), edge("e2", "auth", "db")] };
+		const laid = layoutDiagram(diagram);
+		const api = at(laid, "api");
+		expect(at(laid, "front")?.y).toBe(0);
+		expect(api?.y).toBe(110);
+		expect(at(laid, "auth")).toEqual({ x: (api?.x ?? 0) + 40, y: (api?.y ?? 0) + 60 });
+		expect(at(laid, "db")).toEqual({ x: (api?.x ?? 0) + 40, y: (api?.y ?? 0) + 200 });
+	});
+
+	it("keeps groups and multiplexers in the file and drops a parent that is not a group", () => {
+		const diagram: Diagram = {
+			nodes: [
+				...backend().nodes,
+				node("mux", 800, 0, { shape: "mux", w: 60, h: 120, direction: "down" }),
+			],
+			edges: [edge("e1", "auth", "db")],
+		};
+		expect(parseDiagram(serializeDiagram(diagram))).toEqual(diagram);
+		const broken = serializeDiagram(diagram)
+			.replace('"parent": "api"', '"parent": "front"')
+			.replace('"direction": "down"', '"direction": "sideways"');
+		const parsed = parseDiagram(broken);
+		expect(parsed?.nodes.find((item) => item.id === "auth")?.parent).toBeUndefined();
+		expect(parsed?.nodes.find((item) => item.id === "mux")?.direction).toBeUndefined();
+		// auth left the group, so its connector to db went up to the group.
+		expect(parsed?.edges[0]).toMatchObject({ from: "auth", to: "api" });
+	});
+});
+
+describe("multiplexer and group routes", () => {
+	it("spreads a multiplexer's inputs along its long side, in the order of their sources", () => {
+		const diagram: Diagram = {
+			nodes: [
+				node("low", 0, 200),
+				node("high", 0, 0),
+				node("mux", 300, 40, { shape: "mux", w: 60, h: 120 }),
+				node("out", 500, 75),
+			],
+			edges: [edge("e1", "low", "mux"), edge("e2", "high", "mux"), edge("e3", "mux", "out")],
+		};
+		const routes = routeEdges(diagram);
+		// The upper source comes in at the upper third, the lower at the lower third.
+		expect(routes.get("e2")?.points.at(-1)).toEqual({ x: 300, y: 80 });
+		expect(routes.get("e1")?.points.at(-1)).toEqual({ x: 300, y: 120 });
+		// The output leaves the middle of the short side.
+		expect(routes.get("e3")?.points[0]).toEqual({ x: 360, y: 100 });
+
+		const down = routeEdges({
+			...diagram,
+			nodes: diagram.nodes.map((item) =>
+				item.id === "mux" ? { ...item, direction: "down" as const, w: 120, h: 60 } : item,
+			),
+		});
+		expect(down.get("e2")?.points.at(-1)).toMatchObject({ y: 40 });
+		expect(down.get("e3")?.points[0]).toEqual({ x: 360, y: 100 });
+	});
+
+	it("draws a group's connector to a shape inside it from the nearest border", () => {
+		const diagram: Diagram = {
+			nodes: [
+				node("api", 0, 0, { shape: "group", w: 400, h: 300 }),
+				node("auth", 40, 60, { parent: "api" }),
+			],
+			edges: [edge("e1", "api", "auth")],
+		};
+		expect(routeEdges(diagram).get("e1")?.points).toEqual([
+			{ x: 0, y: 85 },
+			{ x: 40, y: 85 },
+		]);
 	});
 });

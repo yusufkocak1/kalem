@@ -292,3 +292,122 @@ test("selects, aligns, copies and lays out shapes", async () => {
 	expect(errors).toEqual([]);
 	await app.close();
 });
+
+test("keeps a group's steps reachable only from inside it, with a multiplexer", async () => {
+	const folder = await tempDir("kalem-diagram-groups-");
+	const doc = join(folder, "mimari.md");
+	await writeFile(doc, "# Mimari\n");
+	const { app, page, errors } = await launch({ args: [doc] });
+	await clickMenu(app, "Insert", "Diagram…");
+	const editor = page.locator(".diagram-editor");
+	const canvas = editor.locator(".diagram-canvas");
+	const edges = canvas.locator(".kd-edge");
+	const box = async (id: string) => {
+		const found = await canvas.locator(`[data-node="${id}"]`).boundingBox();
+		if (found === null) throw new Error(`${id} is not laid out`);
+		return found;
+	};
+	const shapeBox = (id: string) =>
+		canvas.locator(`[data-node="${id}"] > :first-child`).evaluate((shape: SVGGraphicsElement) => {
+			const { x, y } = shape.getBBox();
+			return { x, y };
+		});
+	const drop = async (shape: string, x: number, y: number) => {
+		const area = await canvas.boundingBox();
+		if (area === null) throw new Error("no canvas");
+		await editor
+			.locator(`[data-shape="${shape}"]`)
+			.dragTo(canvas, { targetPosition: { x: x - area.x, y: y - area.y } });
+	};
+	/** Drags from one of a shape's connection points (top, right, bottom, left) to a point. */
+	const connect = async (from: string, port: number, x: number, y: number) => {
+		await canvas.locator(`[data-node="${from}"]`).click({ position: { x: 8, y: 8 } });
+		const dot = await canvas.locator(`.diagram-port[data-port="${from}"]`).nth(port).boundingBox();
+		if (dot === null) throw new Error(`${from} shows no connection points`);
+		await page.mouse.move(dot.x + dot.width / 2, dot.y + dot.height / 2);
+		await page.mouse.down();
+		await page.mouse.move(x, y, { steps: 5 });
+		await page.mouse.up();
+	};
+
+	// The frontend on the left, the backend group on the right.
+	const area = await canvas.boundingBox();
+	if (area === null) throw new Error("no canvas");
+	await drop("process", area.x + 120, area.y + 250);
+	await drop("group", area.x + 560, area.y + 260);
+	const group = await box("n2");
+	// Two steps, a multiplexer and the step after it, dropped inside the group.
+	await drop("process", group.x + 110, group.y + 80);
+	await drop("process", group.x + 110, group.y + 200);
+	await drop("mux", group.x + 250, group.y + 140);
+	await drop("process", group.x + 340, group.y + 140);
+	await expect(canvas.locator(".kd-node")).toHaveCount(6);
+	await expect(canvas.locator(".kd-group")).toHaveText("Group");
+
+	// From outside, a step in the group cannot be reached: the connection is refused.
+	const step = await box("n3");
+	await connect("n1", 1, step.x + step.width / 2, step.y + step.height / 2);
+	await expect(editor.locator(".diagram-status.hint")).toContainText(
+		"only be connected from inside",
+	);
+	await expect(edges).toHaveCount(0);
+	// The group itself can be: by its name band.
+	const backend = await box("n2");
+	await connect("n1", 1, backend.x + 60, backend.y + 12);
+	await expect(edges).toHaveCount(1);
+	// The group's border feeds the steps inside it, which feed the multiplexer.
+	await connect("n2", 3, step.x + step.width / 2, step.y + step.height / 2);
+	const second = await box("n4");
+	await connect("n2", 3, second.x + second.width / 2, second.y + second.height / 2);
+	const mux = await box("n5");
+	await connect("n3", 1, mux.x + mux.width / 2, mux.y + mux.height / 2);
+	await connect("n4", 1, mux.x + mux.width / 2, mux.y + mux.height / 2);
+	const last = await box("n6");
+	await connect("n5", 1, last.x + last.width / 2, last.y + last.height / 2);
+	await expect(edges).toHaveCount(6);
+	// The two inputs come into the multiplexer's long side at different heights.
+	const ends = await canvas
+		.locator(".kd-edge path[marker-end]")
+		.evaluateAll((paths) => paths.map((path) => (path.getAttribute("d") ?? "").split("L").at(-1)));
+	const muxLeft = (await shapeBox("n5")).x;
+	const inputs = ends.filter((end) => end?.startsWith(`${muxLeft} `));
+	expect(new Set(inputs).size).toBe(2);
+
+	// Moving the group by its name takes everything inside along.
+	const before = await shapeBox("n3");
+	await page.mouse.move(backend.x + 200, backend.y + 12);
+	await page.mouse.down();
+	await page.mouse.move(backend.x + 260, backend.y + 72, { steps: 5 });
+	await page.mouse.up();
+	const after = await shapeBox("n3");
+	expect([after.x - before.x, after.y - before.y]).toEqual([60, 60]);
+
+	// The multiplexer turns a quarter.
+	await canvas.locator('[data-node="n5"]').click();
+	await editor.getByRole("button", { name: "Rotate" }).click();
+
+	await editor.getByRole("button", { name: "Save", exact: true }).click();
+	await expect(editor).toBeHidden();
+	const saved = await diagramIn(join(folder, "mimari.assets", "Diagram.diagram.png"));
+	expect(saved?.nodes.map((node) => [node.id, node.shape, node.parent])).toEqual([
+		["n1", "process", undefined],
+		["n2", "group", undefined],
+		["n3", "process", "n2"],
+		["n4", "process", "n2"],
+		["n5", "mux", "n2"],
+		["n6", "process", "n2"],
+	]);
+	expect(saved?.nodes[4]?.direction).toBe("down");
+	expect(saved?.edges.map((edge) => `${edge.from}>${edge.to}`)).toEqual([
+		"n1>n2",
+		"n2>n3",
+		"n2>n4",
+		"n3>n5",
+		"n4>n5",
+		"n5>n6",
+	]);
+	await page.locator('[data-command="save"]').click();
+	await expect(page.locator(".save-status")).toHaveText("Saved");
+	expect(errors).toEqual([]);
+	await app.close();
+});
