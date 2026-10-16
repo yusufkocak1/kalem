@@ -315,8 +315,9 @@ verir.
 
 **Yapay Zekâ Asistanı**
 
-- **Görünüm → Yapay Zekâ Asistanı** (`Ctrl+Shift+L`) belgenin sağında bir
-  sohbet paneli açar. Paneldeki ⚙ (**Bağlantı ayarları**) asistanın hangi
+- Pencerenin sağ kenarında her zaman duran **✦ Asistan** düğmesi,
+  **Görünüm → Yapay Zekâ Asistanı** ya da `Ctrl+Shift+L` belgenin sağında bir
+  sohbet paneli açar (düğmeye yeniden basmak kapatır). Paneldeki ⚙ (**Bağlantı ayarları**) asistanın hangi
   hizmeti kullanacağını seçer:
 
   | Hizmet | Nasıl bağlanır |

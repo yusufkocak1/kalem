@@ -176,7 +176,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 	const element = el("aside", {
 		class: "assistant kalem-theme",
-		attrs: { "aria-label": t.assistantPane },
+		attrs: { id: "assistant-pane", "aria-label": t.assistantPane },
 		children: [
 			el("div", {
 				class: "assistant-header",

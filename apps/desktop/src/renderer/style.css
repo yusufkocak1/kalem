@@ -712,6 +712,59 @@ button {
 	overflow-y: auto;
 }
 
+/* --- Assistant rail: the assistant's button at the right edge ------------- */
+
+.assistant-rail {
+	display: flex;
+	flex: none;
+	flex-direction: column;
+	align-items: center;
+	width: 34px;
+	padding-top: 8px;
+	border-left: 1px solid var(--app-border);
+	background: var(--app-surface);
+}
+
+.assistant-rail-button {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 4px;
+	border: 0;
+	border-radius: 6px;
+	background: none;
+	color: var(--app-muted);
+	font: inherit;
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.assistant-rail-button:hover {
+	background: var(--app-hover);
+	color: var(--app-accent);
+}
+
+.assistant-rail-button[aria-expanded="true"] {
+	background: var(--app-pressed);
+	color: var(--app-accent);
+}
+
+.assistant-rail-button:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -2px;
+}
+
+.assistant-rail-button .icon {
+	color: var(--app-accent);
+}
+
+.assistant-rail-label {
+	writing-mode: vertical-rl;
+	letter-spacing: 0.02em;
+}
+
 /* --- Claude assistant ------------------------------------------------------ */
 
 .assistant {
@@ -1749,6 +1802,7 @@ button {
 .app[data-focus] .tabstrip,
 .app[data-focus] .navigation,
 .app[data-focus] .assistant,
+.app[data-focus] .assistant-rail,
 .app[data-focus] .statusbar {
 	display: none;
 }
@@ -1797,6 +1851,7 @@ button {
 	.notices,
 	.navigation,
 	.assistant,
+	.assistant-rail,
 	.statusbar,
 	.focus-exit,
 	.table-picker,

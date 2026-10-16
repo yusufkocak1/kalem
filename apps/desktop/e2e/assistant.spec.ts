@@ -380,3 +380,26 @@ test("asks for setup when an API service has no key yet", async () => {
 	await expect(pane.locator(".assistant-input")).toBeDisabled();
 	await app.close();
 });
+
+test("opens and closes the assistant from its button at the right edge", async () => {
+	const folder = await tempDir("assistant-rail");
+	const { app, page } = await launch({ env: { KALEM_CLAUDE: join(folder, "nothing-here") } });
+	const pane = page.locator(".assistant");
+	const toggle = page.locator(".assistant-rail").getByRole("button", { name: "AI Assistant" });
+	await expect(pane).toBeHidden();
+	await expect(toggle).toBeVisible();
+	await expect(toggle).toHaveAttribute("aria-expanded", "false");
+	await expect(toggle).toHaveText("Assistant");
+
+	await toggle.click();
+	await expect(pane).toBeVisible();
+	await expect(toggle).toHaveAttribute("aria-expanded", "true");
+	// The panel opens between the document and the button.
+	const paneBox = await pane.boundingBox();
+	const toggleBox = await toggle.boundingBox();
+	expect((paneBox?.x ?? 0) + (paneBox?.width ?? 0)).toBeLessThanOrEqual(toggleBox?.x ?? 0);
+
+	await toggle.click();
+	await expect(pane).toBeHidden();
+	await app.close();
+});
