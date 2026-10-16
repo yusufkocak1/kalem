@@ -397,19 +397,20 @@ const CELL_WRAPPERS = new Set(["UL", "OL", "BLOCKQUOTE"]);
  *
  * Markdown hücresinde blok olamaz. Paragraflar bitişik yazılırsa
  * kelimeler birleşir ("BirinciIkinci"); her biri `<br>` ile ayrılmış bir
- * satır oluyor, liste maddelerinin önüne `• ` konuyor.
+ * satır oluyor, liste maddelerinin önüne `• `, görev maddelerinin önüne
+ * durumlarına göre `☑ ` ya da `☐ ` konuyor.
  */
 function cellFrom(cell: HtmlNode, o: FromHtmlOptions): Inline[] {
 	const lines: Inline[][] = [];
 	let pending: Inline[] = [];
-	/** Sıradaki satır bir liste maddesinin ilki; `<li><p>…</p></li>` tek madde imi alır. */
-	let bullet = false;
+	/** Sıradaki satırın imi; `<li><p>…</p></li>` tek madde imi alır. */
+	let bullet: string | null = null;
 	const flush = (): void => {
 		const line = trimInlines(mergeText(pending));
 		pending = [];
 		if (line.length === 0) return;
-		lines.push(bullet ? mergeText([{ type: "text", value: "• " }, ...line]) : line);
-		bullet = false;
+		lines.push(bullet === null ? line : mergeText([{ type: "text", value: bullet }, ...line]));
+		bullet = null;
 	};
 	const walk = (nodes: readonly HtmlNode[]): void => {
 		for (const node of nodes) {
@@ -419,7 +420,10 @@ function cellFrom(cell: HtmlNode, o: FromHtmlOptions): Inline[] {
 				walk(childrenOf(node));
 			} else if (CELL_LINES.has(tag)) {
 				flush();
-				if (tag === "LI") bullet = true;
+				if (tag === "LI") {
+					const checked = checkedState(node);
+					bullet = checked === null ? "• " : checked ? "☑ " : "☐ ";
+				}
 				walk(childrenOf(node));
 				flush();
 			} else {

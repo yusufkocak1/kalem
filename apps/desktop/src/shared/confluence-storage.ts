@@ -185,6 +185,17 @@ function task(node: MarkupElement, state: ImportState): HtmlNode {
 	return element("li", [checkbox, ...(body === undefined ? [] : convertAll(body.children, state))]);
 }
 
+/** A task in Confluence's exported HTML: `<li data-inline-task-id class="checked">`. */
+function exportedTask(node: MarkupElement, state: ImportState): HtmlNode {
+	const checked = (node.attrs.get("class") ?? "").split(/\s+/).includes("checked");
+	const checkbox = element(
+		"input",
+		[],
+		checked ? { type: "checkbox", checked: "" } : { type: "checkbox" },
+	);
+	return element("li", [checkbox, ...convertAll(node.children, state)]);
+}
+
 function image(node: MarkupElement): HtmlNode[] {
 	const url = childElements(node, "ri:url")[0]?.attrs.get("ri:value");
 	const file = childElements(node, "ri:attachment")[0]?.attrs.get("ri:filename");
@@ -295,6 +306,9 @@ function convertElement(node: MarkupElement, state: ImportState): HtmlNode[] {
 			return [text(node.attrs.get("datetime") ?? textOf(node))];
 		case "tr":
 			return [row(node, state)];
+		case "li":
+			if (node.attrs.has("data-inline-task-id")) return [exportedTask(node, state)];
+			return [element(name, convertAll(node.children, state), Object.fromEntries(node.attrs))];
 		default:
 			if (name.startsWith("ri:")) return [];
 			if (name.startsWith("ac:")) return [element("div", convertAll(node.children, state))];
