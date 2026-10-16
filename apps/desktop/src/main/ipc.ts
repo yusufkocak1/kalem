@@ -29,6 +29,7 @@ import {
 	stripExtension,
 	TEXT_EXTENSIONS,
 } from "../shared/paths.js";
+import { registerClaudeIpc } from "./claude.js";
 import { registerConfluenceIpc } from "./confluence-ipc.js";
 import type { ConfluenceStore } from "./confluence-store.js";
 import {
@@ -622,4 +623,6 @@ export function registerIpc(ctx: IpcContext): void {
 		tabOf,
 		toImageFile,
 	});
+
+	registerClaudeIpc({ store: ctx.store, strings: ctx.strings, senderOf });
 }

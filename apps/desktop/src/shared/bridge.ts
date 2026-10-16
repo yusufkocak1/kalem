@@ -1,3 +1,4 @@
+import type { ClaudeEvent } from "./claude.js";
 import type { ConfluenceFormat } from "./confluence.js";
 import type { TextFormat } from "./encoding.js";
 import type { Lang } from "./i18n.js";
@@ -52,6 +53,12 @@ export interface Settings {
 	readonly checkUpdates: boolean;
 	/** A notification-area icon and the system-wide quick note shortcut; the app stays there when its windows close. */
 	readonly tray: boolean;
+	/** The Claude assistant's panel, at the right of the document. */
+	readonly assistant: boolean;
+	/** Share the active document with Claude along with each question. */
+	readonly assistantDocument: boolean;
+	/** The Claude Code CLI the user picked; empty to look for it. */
+	readonly claudePath: string;
 }
 
 export type SidePane = "outline" | "files" | "confluence";
@@ -73,6 +80,9 @@ export const DEFAULT_SETTINGS: Settings = {
 	confluenceFavorites: [],
 	checkUpdates: true,
 	tray: false,
+	assistant: false,
+	assistantDocument: true,
+	claudePath: "",
 };
 
 /** The `@page` rule printing and PDF export lay the document out with. */
@@ -361,6 +371,22 @@ export interface Attachment {
 	readonly url: string;
 }
 
+/** Whether the Claude Code CLI was found on this computer. */
+export type ClaudeStatus =
+	| { readonly found: true; readonly path: string; readonly version: string }
+	| { readonly found: false };
+
+/** One question to Claude; the reply comes through `onClaudeEvent`. */
+export interface ClaudeRequest {
+	/** The chat the reply belongs to. */
+	readonly chatId: string;
+	readonly prompt: string;
+	/** The conversation to continue; `null` starts one. */
+	readonly sessionId: string | null;
+	/** The active tab: a new conversation runs in its document's folder. */
+	readonly tabId: string | null;
+}
+
 export interface DraftRequest {
 	readonly name: string;
 	readonly text: string;
@@ -429,6 +455,7 @@ export const COMMANDS = [
 	"collapse-spaces",
 	"format-code",
 	"format-all-code",
+	"assistant",
 ] as const;
 
 export type Command = (typeof COMMANDS)[number];
@@ -551,6 +578,15 @@ export interface KalemBridge {
 	readVersion(tabId: string, id: string): Promise<string>;
 	/** The open folder changed, in this window or another. */
 	onWorkspaceChange(handler: () => void): () => void;
+
+	/** Looks for the Claude Code CLI (again, with `refresh`). */
+	claudeStatus(refresh?: boolean): Promise<ClaudeStatus>;
+	/** Lets the user pick the CLI's program. */
+	claudeLocate(): Promise<ClaudeStatus>;
+	/** Asks Claude; resolves when the reply has ended. */
+	claudeAsk(request: ClaudeRequest): Promise<void>;
+	claudeStop(chatId: string): Promise<void>;
+	onClaudeEvent(handler: (chatId: string, event: ClaudeEvent) => void): () => void;
 }
 
 export const CHANNEL = {
@@ -618,4 +654,9 @@ export const CHANNEL = {
 	workspaceChange: "kalem:workspace-change",
 	listVersions: "kalem:list-versions",
 	readVersion: "kalem:read-version",
+	claudeStatus: "kalem:claude-status",
+	claudeLocate: "kalem:claude-locate",
+	claudeAsk: "kalem:claude-ask",
+	claudeStop: "kalem:claude-stop",
+	claudeEvent: "kalem:claude-event",
 } as const;

@@ -1,7 +1,7 @@
 import type { Root } from "@kalem-editor/core";
 import { parse, serialize } from "@kalem-editor/core";
-import type { Caret, ClipboardPayload, PasteInput } from "@kalem-editor/editor";
-import { Editor } from "@kalem-editor/editor";
+import type { Caret, ClipboardPayload, EditResult, PasteInput } from "@kalem-editor/editor";
+import { Editor, insertFragment } from "@kalem-editor/editor";
 import { autosavePlugin } from "@kalem-editor/plugin-autosave";
 import { codeHighlightPlugin } from "@kalem-editor/plugin-code-highlight";
 import type { FindReplacePlugin } from "@kalem-editor/plugin-find-replace";
@@ -226,6 +226,34 @@ export class Session {
 		const replaced = editor.applyEdit({ doc: parse(extracted.markdown), caret: null });
 		this.#tables.expectPaste(null);
 		return replaced;
+	}
+
+	/**
+	 * Puts Markdown (table style comments included) at `caret`, or at the end
+	 * when there is none or it no longer fits the document. Resolves with the
+	 * caret after it; `null` when nothing was inserted.
+	 */
+	insertMarkdown(markdown: string, caret: Caret | null): Caret | null {
+		const editor = this.editor;
+		if (editor.isReadOnly() || this.#source?.isSource() === true) return null;
+		const extracted = extractTableStyles(markdown);
+		const fragment = parse(extracted.markdown);
+		if (fragment.children.length === 0) return null;
+		const doc = editor.getDocument();
+		let result: EditResult | null = null;
+		try {
+			result = caret === null ? null : insertFragment(doc, caret, fragment);
+		} catch {
+			// The caret was in a part of the document that has since changed.
+		}
+		result ??= {
+			doc: { ...doc, children: [...doc.children, ...fragment.children] as Root["children"] },
+			caret: null,
+		};
+		this.#tables.expectPaste(extracted.styles);
+		const inserted = editor.applyEdit(result);
+		this.#tables.expectPaste(null);
+		return inserted ? (result.caret ?? editor.getCaret()) : null;
 	}
 
 	// --- Loading ------------------------------------------------------------

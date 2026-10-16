@@ -13,6 +13,8 @@ export interface LaunchOptions {
 	readonly args?: readonly string[];
 	readonly settings?: Record<string, unknown>;
 	readonly welcomed?: boolean;
+	/** Extra environment variables for the app. */
+	readonly env?: Record<string, string>;
 }
 
 export interface Launched {
@@ -50,6 +52,7 @@ export async function launch(options: LaunchOptions = {}): Promise<Launched> {
 			KALEM_USER_DATA_DIR: userData,
 			KALEM_DEV_URL: "",
 			KALEM_VERSION_INTERVAL: "0",
+			...options.env,
 		},
 		// Playwright forces a light colour scheme by default, which would hide the app's own theme.
 		colorScheme: null,

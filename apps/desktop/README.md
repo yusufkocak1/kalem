@@ -313,6 +313,50 @@ verir.
   da resme çift tıklamak düzenleyiciyi verisiyle açar; kaydetmek aynı dosyayı
   yeniler.
 
+**Claude Asistanı**
+
+- **Görünüm → Claude Asistanı** (`Ctrl+Shift+L`) belgenin sağında bir sohbet
+  paneli açar. Asistan bu bilgisayarda kurulu **Claude Code**'u (`claude`
+  komutu) kendi oturumuyla kullanır; Kalem hiçbir anahtar saklamaz ve ağa
+  kendisi bağlanmaz. Claude Code yoksa panel kurulumu anlatır
+  (`npm install -g @anthropic-ai/claude-code`, sonra terminalde bir kez
+  `claude` ile oturum açmak); alışılmadık bir yere kuruluysa **Konumu Seç…**
+  ile programı gösterilir. Aranan yerler: `PATH`, `~/.local/bin`,
+  `~/.claude/local`, `/opt/homebrew/bin`, `/usr/local/bin`, Windows'ta
+  `%APPDATA%\npm`. `KALEM_CLAUDE` ortam değişkeni verilirse yalnızca o
+  dosya denenir.
+- **Belgeyi paylaş** açıkken her soruyla birlikte belgenin Markdown'ı,
+  belgedeki Kalem diyagramlarının verisi ve belgede seçili metin gider
+  (seçim, giriş kutusunun üstündeki etiketten çıkarılabilir). Belge önceki
+  sorudan beri değişmediyse yeniden gönderilmez. Sohbet sürer (`--resume`);
+  **Yeni sohbet** baştan başlar. Yanıt geldikçe görünür; **Durdur** ya da
+  `Esc` keser.
+- Claude'a sistem talimatıyla Kalem tanıtılır (`src/shared/claude.ts`):
+  - Kalem'in gösterdiği Markdown: GFM tabloları, görev listeleri, dipnotlar,
+    renkli metin (`<span style="color:…">`), `mermaid` ve `math` blokları.
+  - **Kalem diyagramlarının biçimi:** şekiller (Başla/Bitir, Adım, Karar,
+    Girdi/Çıktı, Belge, Veritabanı, Alt süreç, Bağlayıcı, Metin, Çoklayıcı,
+    Grup), renkler, ok etiketleri, kesikli/çift uçlu oklar, gruplar ve
+    gruba bağlanma kuralı. Claude diyagramı ` ```kalem-diagram ` bloğunda
+    JSON olarak yazar; koordinat vermesi gerekmez, Kalem yukarıdan aşağıya
+    yerleştirir ve grupları içeriklerine göre boyutlar.
+  - **Uygulamanın kabiliyetleri:** dışa/içe aktarma, Confluence, sürüm
+    geçmişi, paketler, tablo rengi ve sütun genişliği yorumu
+    (`<!-- kalem:table … -->`), kod biçimlendirme, görünüm seçenekleri…
+    Menü ve düğme adları arayüzün dilindeki metinlerden alınır; Claude
+    "nasıl yaparım" sorularına ekranda görünen yolu söyler
+    (ör. "Dosya" → "Dışa Aktar" → "PDF").
+- Yanıtın altında **Belgeye Ekle** yanıtı imlecin olduğu yere koyar
+  (diyagramlar resim + JSON olarak `<belge>.assets/` klasörüne, Confluence
+  sayfasında ek olarak yazılır; tablo stil yorumları uygulanır) ve
+  **Kopyala**. Diyagram kartında **Diyagramı Ekle**, **Düzenleyicide Aç**
+  (diyagram düzenleyicisinde açar, kaydedince eklenir) ve Claude belgedeki
+  bir diyagramı değiştirdiyse **Belgede Güncelle** (aynı dosyayı yeniler).
+  Mermaid blokları panelde önizlenir.
+- Claude Code dosya değiştiren ve komut çalıştıran araçlar kapalı olarak
+  (`--disallowedTools Bash Edit Write MultiEdit NotebookEdit`) çalıştırılır;
+  yeni bir sohbet etkin belgenin klasöründe başlar.
+
 **Düzenleme**
 
 - Şerit: Giriş / Ekle / Görünüm sekmeleri, stil galerisi, hızlı erişim.

@@ -4,12 +4,16 @@ import type { Caret, EditResult } from "@kalem-editor/editor";
 import { indentItem, outdentItem, toggleList } from "@kalem-editor/editor";
 import type { Command, KalemBridge, Settings, SidePane, TabDocument } from "../shared/bridge.js";
 import { clampZoom, MAX_ZOOM, MIN_ZOOM, pageRule, ZOOM_STEP } from "../shared/bridge.js";
+import type { ContextDiagram, ReplyDiagram } from "../shared/claude.js";
+import { splitReply } from "../shared/claude.js";
 import { attachmentName, linkedAttachment } from "../shared/confluence-common.js";
+import type { Diagram } from "../shared/diagram.js";
 import { DIAGRAM_SUFFIX, serializeDiagram } from "../shared/diagram.js";
 import { format, stringsFor } from "../shared/i18n.js";
 import { isEditablePath, isPackagePath, isWordPath } from "../shared/paths.js";
 import { withColumnWidth } from "../shared/table-style.js";
 import { changeCase, collapseSpaces, nextCase } from "../shared/text-case.js";
+import { createAssistantPane } from "./assistant-pane.js";
 import { createAttachmentCard } from "./attachment-card.js";
 import { createAttachmentsDialog, linkedAttachments } from "./confluence-attachments.js";
 import { createConfluenceDialog } from "./confluence-dialog.js";
@@ -117,6 +121,29 @@ const quickOpen = createQuickOpen({
 	open: (path) => void bridge.openPath(path),
 });
 
+/** Where the caret last was in each tab's document, and the text last selected in it. */
+const lastCarets = new WeakMap<Session, Caret>();
+let lastSelection = "";
+
+const assistant = createAssistantPane({
+	t,
+	bridge,
+	previews,
+	shareDocument: () => settings.assistantDocument,
+	setShareDocument: (share) => updateSettings({ assistantDocument: share }),
+	context: () => assistantContext(),
+	selection: () => lastSelection,
+	insert: (text) => insertReply(text),
+	insertDiagram: (diagram) => insertReplyDiagram(diagram),
+	openDiagram: (diagram) =>
+		newDiagram(diagram.diagram, diagram.title, lastCarets.get(session) ?? null),
+	hasDiagram: (src) => diagramImages(canvas).some((image) => image.getAttribute("src") === src),
+	updateDiagram: (src, diagram) => rewriteDiagram(session, src, diagram.diagram),
+	openLink: (href) => bridge.openLink(href),
+	close: () => updateSettings({ assistant: false }),
+	errorText: ipcErrorMessage,
+});
+
 function sidePaneTab(pane: SidePane, label: string): HTMLButtonElement {
 	const button = el("button", {
 		class: "side-pane-tab",
@@ -196,7 +223,7 @@ app.append(
 	ribbonHost,
 	tabStrip.element,
 	noticeArea,
-	el("div", { class: "body", children: [navigation, deskArea] }),
+	el("div", { class: "body", children: [navigation, deskArea, assistant.element] }),
 	statusBar,
 	exitFocus,
 );
@@ -343,6 +370,8 @@ function activateTab(id: string): void {
 	}
 	session = tab.session;
 	canvas = tab.canvas;
+	lastSelection = "";
+	assistant.refreshSelection();
 	for (const view of tab.views) view.hidden = false;
 	session.activate();
 
@@ -422,6 +451,8 @@ function applySettings(): void {
 	app.style.setProperty("--zoom", String(settings.zoom / 100));
 	app.toggleAttribute("data-full-width", settings.fullWidth);
 	navigation.hidden = !settings.navigation;
+	assistant.element.hidden = !settings.assistant;
+	if (settings.assistant) assistant.show();
 	outlineArea.hidden = settings.sidePane !== "outline";
 	filesPane.element.hidden = settings.sidePane !== "files";
 	confluencePane.element.hidden = settings.sidePane !== "confluence";
@@ -622,6 +653,7 @@ const commands: Record<Command, () => void> = {
 			return changeCase(text, nextCase(text, lang), lang);
 		}),
 	"collapse-spaces": () => rewriteText(collapseSpaces),
+	assistant: () => toggleAssistant(),
 	"version-history": () => {
 		const tab = session;
 		void versionHistory.show({
@@ -751,32 +783,55 @@ window.addEventListener("drop", (event) => event.preventDefault());
 
 const diagramEditor = createDiagramEditor(t);
 
-/** Draws a new diagram and puts its picture at the caret. */
-function newDiagram(): void {
+/**
+ * Writes a new diagram's picture and data next to the document (or to its
+ * Confluence page); resolves with the picture's URL for the document.
+ */
+async function storeDiagram(tab: Session, diagram: Diagram, name: string): Promise<string> {
+	const bytes = await diagramToPng(diagram);
+	const data = serializeDiagram(diagram);
+	if (tab.remote !== null) {
+		return (await bridge.confluenceWriteDiagram(tab.id, { bytes, data, title: name })).url;
+	}
+	// Its file goes next to the document, so the document needs a place first.
+	if (tab.path === null) await tab.save();
+	if (tab.path === null) throw new Error(t.diagramNeedsSave);
+	return bridge.writeDiagram(tab.path, { bytes, data, title: name });
+}
+
+/** Writes over the files of the document's diagram at `url`, and shows the new drawing. */
+async function rewriteDiagram(tab: Session, url: string, next: Diagram): Promise<void> {
+	const bytes = await diagramToPng(next);
+	const data = serializeDiagram(next);
+	if (tab.remote !== null) {
+		await bridge.confluenceWriteDiagram(tab.id, { bytes, data, name: attachmentName(url) ?? url });
+	} else {
+		if (tab.path === null) throw new Error(t.diagramNeedsSave);
+		await bridge.writeDiagram(tab.path, { bytes, data, url });
+		// Inside a package the file only reaches the package when it is saved.
+		if (isPackagePath(tab.path)) tab.markAssetsChanged();
+	}
+	await showNewDrawing(url);
+}
+
+/** Draws a new diagram (from `initial`, when given) and puts its picture at the caret. */
+function newDiagram(
+	initial: Diagram | null = null,
+	title = "",
+	at: Caret | null = session.editor.getCaret(),
+): void {
 	const tab = session;
 	if (tab.editor.isReadOnly()) {
 		tab.notices.show({ id: "edit", kind: "warning", text: t.readOnlyBlocked });
 		return;
 	}
-	const caret = tab.editor.getCaret();
 	diagramEditor.open({
-		diagram: null,
-		title: t.diagramDefaultName,
+		diagram: initial,
+		title: title === "" ? t.diagramDefaultName : title,
 		titleEditable: true,
-		async save(diagram, title) {
-			const name = title === "" ? t.diagramDefaultName : title;
-			const bytes = await diagramToPng(diagram);
-			const data = serializeDiagram(diagram);
-			let url: string;
-			if (tab.remote !== null) {
-				url = (await bridge.confluenceWriteDiagram(tab.id, { bytes, data, title: name })).url;
-			} else {
-				// Its file goes next to the document, so the document needs a place first.
-				if (tab.path === null) await tab.save();
-				if (tab.path === null) throw new Error(t.diagramNeedsSave);
-				url = await bridge.writeDiagram(tab.path, { bytes, data, title: name });
-			}
-			tab.insertDiagram(name, url, caret);
+		async save(diagram, name) {
+			const chosen = name === "" ? t.diagramDefaultName : name;
+			tab.insertDiagram(chosen, await storeDiagram(tab, diagram, chosen), at);
 			return true;
 		},
 	});
@@ -804,17 +859,7 @@ async function editDiagram(image: HTMLImageElement): Promise<void> {
 		title: file.slice(0, file.length - DIAGRAM_SUFFIX.length) || file,
 		titleEditable: false,
 		async save(next) {
-			const bytes = await diagramToPng(next);
-			const data = serializeDiagram(next);
-			if (tab.remote !== null) {
-				await bridge.confluenceWriteDiagram(tab.id, { bytes, data, name: file });
-			} else {
-				if (tab.path === null) throw new Error(t.diagramNeedsSave);
-				await bridge.writeDiagram(tab.path, { bytes, data, url });
-				// Inside a package the file only reaches the package when it is saved.
-				if (isPackagePath(tab.path)) tab.markAssetsChanged();
-			}
-			await showNewDrawing(url);
+			await rewriteDiagram(tab, url, next);
 			return true;
 		},
 	});
@@ -856,6 +901,90 @@ deskArea.addEventListener(
 	},
 	true,
 );
+
+// --- Claude assistant ---------------------------------------------------------
+
+// Typing in the assistant moves the selection out of the document; what was
+// selected there, and where its caret was, are kept for the next question.
+document.addEventListener("selectionchange", () => {
+	const selection = document.getSelection();
+	const anchor = selection?.anchorNode ?? null;
+	if (selection === null || anchor === null || !canvas.contains(anchor)) return;
+	const caret = session.editor.getCaret();
+	if (caret !== null) lastCarets.set(session, caret);
+	const text = selection.isCollapsed ? "" : selection.toString();
+	if (text !== lastSelection) {
+		lastSelection = text;
+		assistant.refreshSelection();
+	}
+});
+
+function toggleAssistant(): void {
+	if (!settings.assistant) {
+		updateSettings({ assistant: true });
+		assistant.focus();
+	} else if (!assistant.element.contains(document.activeElement)) {
+		assistant.focus();
+	} else {
+		updateSettings({ assistant: false });
+		session.editor.focus();
+	}
+}
+
+function diagramImages(root: HTMLElement): HTMLImageElement[] {
+	return [...root.querySelectorAll("img")].filter((image) => isDiagramImage(image));
+}
+
+const MAX_CONTEXT_DIAGRAMS = 10;
+
+async function assistantContext() {
+	const tab = session;
+	const diagrams: ContextDiagram[] = [];
+	const seen = new Set<string>();
+	for (const image of diagramImages(canvas)) {
+		const src = image.getAttribute("src") ?? "";
+		if (seen.has(src) || diagrams.length >= MAX_CONTEXT_DIAGRAMS) continue;
+		seen.add(src);
+		const diagram = await diagramFromImage(image.src).catch(() => null);
+		if (diagram !== null) diagrams.push({ src, diagram });
+	}
+	// The file's own name, with its extension, tells Claude what kind of text it is.
+	const name = tab.path?.split(/[\\/]/).pop() ?? tab.name;
+	return { tabId: tab.id, name, text: tab.styledMarkdown(), diagrams };
+}
+
+function editableTab(): Session {
+	const tab = session;
+	if (tab.editor.isReadOnly()) throw new Error(t.readOnlyBlocked);
+	if (inSource()) throw new Error(t.assistantSourceMode);
+	return tab;
+}
+
+/** A reply's Markdown at the caret, each of its Kalem diagrams drawn as a picture. */
+async function insertReply(text: string): Promise<void> {
+	const tab = editableTab();
+	let markdown = "";
+	for (const part of splitReply(text)) {
+		if (part.kind === "markdown") {
+			markdown += part.text;
+			continue;
+		}
+		const name = part.title === "" ? t.diagramDefaultName : part.title;
+		// The URL comes percent-encoded, so it needs no brackets.
+		const url = await storeDiagram(tab, part.diagram, name);
+		markdown += `\n\n![${name.replace(/[[\]\\]/g, "\\$&")}](${url})\n\n`;
+	}
+	if (session !== tab) throw new Error(t.assistantTabChanged);
+	const caret = tab.insertMarkdown(markdown, lastCarets.get(tab) ?? tab.editor.getCaret());
+	if (caret !== null) lastCarets.set(tab, caret);
+}
+
+async function insertReplyDiagram(diagram: ReplyDiagram): Promise<void> {
+	const tab = editableTab();
+	const name = diagram.title === "" ? t.diagramDefaultName : diagram.title;
+	const url = await storeDiagram(tab, diagram.diagram, name);
+	tab.insertDiagram(name, url, lastCarets.get(tab) ?? null);
+}
 
 // --- Confluence attachments -------------------------------------------------
 
