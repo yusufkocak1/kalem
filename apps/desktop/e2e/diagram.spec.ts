@@ -121,6 +121,22 @@ test("draws a flow diagram into a Markdown file and edits it again", async () =>
 	await expect
 		.poll(() => image.evaluate((img: HTMLImageElement) => img.naturalHeight))
 		.toBeLessThan(height);
+	// The picture keeps the document's own address, so it can be edited again, and again.
+	const url = "notlar.assets/Sipari%C5%9F-ak%C4%B1%C5%9F%C4%B1.diagram.png";
+	await expect(image).toHaveAttribute("src", url);
+	for (const count of [3, 4]) {
+		await image.dblclick();
+		await expect(editor).toBeVisible();
+		await editor.locator('[data-shape="process"]').click();
+		await editor.getByRole("button", { name: "Save", exact: true }).click();
+		await expect(editor).toBeHidden();
+		expect((await diagramIn(file))?.nodes).toHaveLength(count);
+		await expect(image).toHaveAttribute("src", url);
+	}
+	await expect(page.locator(".notice")).toHaveCount(0);
+	await page.locator('[data-command="save"]').click();
+	await expect(page.locator(".save-status")).toHaveText("Saved");
+	expect(await readFile(doc, "utf8")).not.toContain("kalem-doc:");
 	expect(errors).toEqual([]);
 	await app.close();
 });

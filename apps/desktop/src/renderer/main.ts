@@ -834,8 +834,10 @@ async function showNewDrawing(url: string): Promise<void> {
 	if (source === undefined) return;
 	await fetch(source, { cache: "no-store" }).catch(() => {});
 	for (const image of shown) {
+		// The document's own (relative) URL goes back, not the resolved one: the
+		// next edit finds the diagram's file by it.
 		image.removeAttribute("src");
-		image.src = source;
+		image.setAttribute("src", url);
 	}
 }
 
