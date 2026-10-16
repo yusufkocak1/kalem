@@ -29,7 +29,8 @@ import {
 	stripExtension,
 	TEXT_EXTENSIONS,
 } from "../shared/paths.js";
-import { registerClaudeIpc } from "./claude.js";
+import { registerAssistantIpc } from "./assistant-ipc.js";
+import type { AssistantStore } from "./assistant-store.js";
 import { registerConfluenceIpc } from "./confluence-ipc.js";
 import type { ConfluenceStore } from "./confluence-store.js";
 import {
@@ -60,6 +61,7 @@ export interface IpcContext {
 	readonly packages: PackageStore;
 	readonly versions: VersionStore;
 	readonly confluence: ConfluenceStore;
+	readonly assistant: AssistantStore;
 	strings(): Strings;
 	language(): Lang;
 	changeSettings(patch: Partial<Settings>): void;
@@ -624,5 +626,10 @@ export function registerIpc(ctx: IpcContext): void {
 		toImageFile,
 	});
 
-	registerClaudeIpc({ store: ctx.store, strings: ctx.strings, senderOf });
+	registerAssistantIpc({
+		store: ctx.store,
+		assistant: ctx.assistant,
+		strings: ctx.strings,
+		senderOf,
+	});
 }

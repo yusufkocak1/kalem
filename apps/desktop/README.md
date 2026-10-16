@@ -313,14 +313,32 @@ verir.
   da resme çift tıklamak düzenleyiciyi verisiyle açar; kaydetmek aynı dosyayı
   yeniler.
 
-**Claude Asistanı**
+**Yapay Zekâ Asistanı**
 
-- **Görünüm → Claude Asistanı** (`Ctrl+Shift+L`) belgenin sağında bir sohbet
-  paneli açar. Asistan bu bilgisayarda kurulu **Claude Code**'u (`claude`
-  komutu) kendi oturumuyla kullanır; Kalem hiçbir anahtar saklamaz ve ağa
-  kendisi bağlanmaz. Claude Code yoksa panel kurulumu anlatır
-  (`npm install -g @anthropic-ai/claude-code`, sonra terminalde bir kez
-  `claude` ile oturum açmak); alışılmadık bir yere kuruluysa **Konumu Seç…**
+- **Görünüm → Yapay Zekâ Asistanı** (`Ctrl+Shift+L`) belgenin sağında bir
+  sohbet paneli açar. Paneldeki ⚙ (**Bağlantı ayarları**) asistanın hangi
+  hizmeti kullanacağını seçer:
+
+  | Hizmet | Nasıl bağlanır |
+  |---|---|
+  | **Claude Code (bu bilgisayar)** — varsayılan | Kurulu `claude` komutu, kendi oturumuyla; anahtar gerekmez |
+  | **Anthropic (Claude API)** | API anahtarı; resmi Anthropic SDK'sıyla, varsayılan model `claude-opus-5-5` |
+  | **OpenAI**, **Google Gemini**, **OpenRouter** | API anahtarı; OpenAI uyumlu Chat Completions API'si |
+  | **Ollama**, **LM Studio** | Bu bilgisayarda çalışan yerel model; anahtar gerekmez |
+  | **Diğer (OpenAI uyumlu)** | Herhangi bir `…/v1` adresi (Groq, Mistral, DeepSeek, şirket içi sunucu…) |
+
+  Her hizmetin adresi değiştirilebilir; **Modelleri getir** hizmetin
+  sunduğu modelleri listeler. Anahtarlar işletim sisteminin şifrelemesiyle
+  (`safeStorage`) `%APPDATA%\kalem-desktop\assistant.json` içinde saklanır,
+  arayüze hiç dönmez; şifreleme yoksa yalnızca uygulama açıkken bellekte
+  tutulur. İstekler Electron'un ağ katmanından gider (sistem vekil sunucusu
+  ayarları geçerlidir). API'ler sohbeti hatırlamadığı için önceki mesajlar
+  (en çok 40) her soruyla yeniden gönderilir; hizmet ya da model
+  değişince yeni sohbet başlar.
+- **Claude Code** seçiliyken uygulama `claude`'u kendisi arar. Yoksa panel
+  kurulumu anlatır (`npm install -g @anthropic-ai/claude-code`, sonra
+  terminalde bir kez `claude` ile oturum açmak) ve API anahtarıyla bir
+  hizmete bağlanmayı önerir; alışılmadık bir yere kuruluysa **Konumu Seç…**
   ile programı gösterilir. Aranan yerler: `PATH`, `~/.local/bin`,
   `~/.claude/local`, `/opt/homebrew/bin`, `/usr/local/bin`, Windows'ta
   `%APPDATA%\npm`. `KALEM_CLAUDE` ortam değişkeni verilirse yalnızca o
@@ -328,29 +346,30 @@ verir.
 - **Belgeyi paylaş** açıkken her soruyla birlikte belgenin Markdown'ı,
   belgedeki Kalem diyagramlarının verisi ve belgede seçili metin gider
   (seçim, giriş kutusunun üstündeki etiketten çıkarılabilir). Belge önceki
-  sorudan beri değişmediyse yeniden gönderilmez. Sohbet sürer (`--resume`);
+  sorudan beri değişmediyse yeniden gönderilmez. Sohbet sürer (Claude Code'da `--resume`, API'lerde geçmiş yeniden gönderilir);
   **Yeni sohbet** baştan başlar. Yanıt geldikçe görünür; **Durdur** ya da
   `Esc` keser.
-- Claude'a sistem talimatıyla Kalem tanıtılır (`src/shared/claude.ts`):
+- Modele, hangi hizmet olursa olsun, sistem talimatıyla Kalem tanıtılır
+  (`src/shared/claude.ts`):
   - Kalem'in gösterdiği Markdown: GFM tabloları, görev listeleri, dipnotlar,
     renkli metin (`<span style="color:…">`), `mermaid` ve `math` blokları.
   - **Kalem diyagramlarının biçimi:** şekiller (Başla/Bitir, Adım, Karar,
     Girdi/Çıktı, Belge, Veritabanı, Alt süreç, Bağlayıcı, Metin, Çoklayıcı,
     Grup), renkler, ok etiketleri, kesikli/çift uçlu oklar, gruplar ve
-    gruba bağlanma kuralı. Claude diyagramı ` ```kalem-diagram ` bloğunda
+    gruba bağlanma kuralı. Model diyagramı ` ```kalem-diagram ` bloğunda
     JSON olarak yazar; koordinat vermesi gerekmez, Kalem yukarıdan aşağıya
     yerleştirir ve grupları içeriklerine göre boyutlar.
   - **Uygulamanın kabiliyetleri:** dışa/içe aktarma, Confluence, sürüm
     geçmişi, paketler, tablo rengi ve sütun genişliği yorumu
     (`<!-- kalem:table … -->`), kod biçimlendirme, görünüm seçenekleri…
-    Menü ve düğme adları arayüzün dilindeki metinlerden alınır; Claude
+    Menü ve düğme adları arayüzün dilindeki metinlerden alınır; model
     "nasıl yaparım" sorularına ekranda görünen yolu söyler
     (ör. "Dosya" → "Dışa Aktar" → "PDF").
 - Yanıtın altında **Belgeye Ekle** yanıtı imlecin olduğu yere koyar
   (diyagramlar resim + JSON olarak `<belge>.assets/` klasörüne, Confluence
   sayfasında ek olarak yazılır; tablo stil yorumları uygulanır) ve
   **Kopyala**. Diyagram kartında **Diyagramı Ekle**, **Düzenleyicide Aç**
-  (diyagram düzenleyicisinde açar, kaydedince eklenir) ve Claude belgedeki
+  (diyagram düzenleyicisinde açar, kaydedince eklenir) ve model belgedeki
   bir diyagramı değiştirdiyse **Belgede Güncelle** (aynı dosyayı yeniler).
   Mermaid blokları panelde önizlenir.
 - Claude Code dosya değiştiren ve komut çalıştıran araçlar kapalı olarak

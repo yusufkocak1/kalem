@@ -1,11 +1,12 @@
 import { parse } from "@kalem-editor/core";
 import { renderToDOM } from "@kalem-editor/viewer";
-import type { ClaudeStatus, KalemBridge } from "../shared/bridge.js";
+import type { AssistantStatus, KalemBridge } from "../shared/bridge.js";
 import type { ClaudeEvent, ContextDiagram, ReplyDiagram, ReplyPart } from "../shared/claude.js";
 import { composePrompt, splitReply } from "../shared/claude.js";
 import { diagramSvg, svgMarkup } from "../shared/diagram.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
+import { createAssistantSettings } from "./assistant-settings.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import type { Previews } from "./previews.js";
@@ -73,7 +74,7 @@ function button(
 export function createAssistantPane(host: AssistantHost): AssistantPane {
 	const { t, bridge } = host;
 
-	let status: ClaudeStatus | null = null;
+	let status: AssistantStatus | null = null;
 	let chatId = crypto.randomUUID();
 	let sessionId: string | null = null;
 	/** The document text Claude was last given in this chat. */
@@ -96,6 +97,15 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		attrs: { type: "button", title: t.assistantClose, "aria-label": t.assistantClose },
 		children: [icon("close")],
 	});
+	const settingsButton = el("button", {
+		class: "icon-button",
+		attrs: { type: "button", title: t.assistantSettings, "aria-label": t.assistantSettings },
+		children: [icon("settings")],
+	});
+	settingsButton.addEventListener("click", () => {
+		if (settings.element.hidden) void openSettings();
+		else closeSettings();
+	});
 	close.addEventListener("click", () => host.close());
 	newChat.addEventListener("click", () => reset());
 
@@ -105,6 +115,18 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	});
 	const empty = el("div", { class: "assistant-empty" });
 	const missing = el("div", { class: "assistant-missing", attrs: { hidden: "" } });
+	const settings = createAssistantSettings({
+		t,
+		bridge,
+		openLink: (href) => host.openLink(href),
+		errorText: host.errorText,
+		done(next, changed) {
+			if (next !== null) status = next;
+			// Another service does not know what was said so far.
+			if (changed) reset();
+			closeSettings();
+		},
+	});
 
 	const share = el("input", { attrs: { type: "checkbox" } });
 	share.addEventListener("change", () => host.setShareDocument(share.checked));
@@ -161,14 +183,18 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				children: [
 					el("div", {
 						class: "assistant-title",
-						children: [icon("assistant"), el("h2", { text: "Claude" }), subtitle],
+						children: [icon("assistant"), el("h2", { text: t.assistantTitle }), subtitle],
 					}),
-					el("div", { class: "assistant-header-actions", children: [newChat, close] }),
+					el("div", {
+						class: "assistant-header-actions",
+						children: [newChat, settingsButton, close],
+					}),
 				],
 			}),
 			log,
 			empty,
 			missing,
+			settings.element,
 			composer,
 		],
 	});
@@ -224,6 +250,16 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	}
 
 	function renderMissing(): void {
+		const setUp = button(t.assistantSetUp, { class: "assistant-primary" });
+		setUp.addEventListener("click", () => void openSettings());
+		if (status?.missing === "setup") {
+			missing.replaceChildren(
+				el("p", { class: "assistant-empty-title", text: t.assistantSetupTitle }),
+				el("p", { class: "assistant-empty-hint", text: t.assistantSetupHint }),
+				el("div", { class: "assistant-missing-actions", children: [setUp] }),
+			);
+			return;
+		}
 		const install = button(t.assistantInstall, { class: "assistant-link" });
 		install.addEventListener("click", () => host.openLink(INSTALL_URL));
 		const locate = button(t.assistantLocate);
@@ -234,35 +270,54 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		const retry = button(t.assistantRetry);
 		retry.addEventListener("click", async () => {
 			retry.disabled = true;
-			status = await bridge.claudeStatus(true);
+			status = await bridge.assistantStatus(true);
 			retry.disabled = false;
 			renderState();
 		});
+		const useApi = button(t.assistantUseApi);
+		useApi.addEventListener("click", () => void openSettings());
 		missing.replaceChildren(
 			el("p", { class: "assistant-empty-title", text: t.assistantMissing }),
 			el("p", { class: "assistant-empty-hint", text: t.assistantMissingHint }),
 			el("code", { class: "assistant-command", text: "npm install -g @anthropic-ai/claude-code" }),
 			el("p", { class: "assistant-empty-hint", text: t.assistantMissingLogin }),
 			el("div", { class: "assistant-missing-actions", children: [install, locate, retry] }),
+			el("p", { class: "assistant-empty-hint", text: t.assistantOrApi }),
+			el("div", { class: "assistant-missing-actions", children: [useApi] }),
 		);
 	}
 
 	function renderState(): void {
-		const found = status?.found === true;
-		missing.hidden = status === null || found;
-		empty.hidden = !found || messages.length > 0;
-		log.hidden = messages.length === 0;
-		input.disabled = !found;
-		sendButton.disabled = !found && !busy;
+		const ready = status?.ready === true;
+		const editing = !settings.element.hidden;
+		missing.hidden = status === null || ready || editing;
+		if (!missing.hidden) renderMissing();
+		empty.hidden = !ready || messages.length > 0 || editing;
+		log.hidden = messages.length === 0 || editing;
+		composer.hidden = editing;
+		input.disabled = !ready;
+		sendButton.disabled = !ready && !busy;
 		share.checked = host.shareDocument();
-		subtitle.textContent =
-			status === null ? t.assistantLooking : status.found ? status.version : t.assistantNotFound;
-		subtitle.title = status?.found === true ? status.path : "";
+		subtitle.textContent = status === null ? t.assistantLooking : status.label;
+		subtitle.title = status?.detail ?? "";
+		settingsButton.setAttribute("aria-pressed", String(editing));
 		sendButton.replaceChildren(icon(busy ? "stop" : "send"));
 		sendButton.title = busy ? t.assistantStop : t.assistantSend;
 		sendButton.setAttribute("aria-label", sendButton.title);
 		sendButton.classList.toggle("busy", busy);
 		newChat.disabled = messages.length === 0;
+	}
+
+	async function openSettings(): Promise<void> {
+		settings.element.hidden = false;
+		renderState();
+		await settings.show();
+	}
+
+	function closeSettings(): void {
+		settings.element.hidden = true;
+		renderState();
+		if (status?.ready === true) input.focus();
 	}
 
 	function refreshSelection(): void {
@@ -427,8 +482,10 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	// --- Asking --------------------------------------------------------------------
 
 	let current: Message | null = null;
+	/** Called when the reply in progress has ended (its last event, not the request, says so). */
+	let ended: (() => void) | null = null;
 
-	bridge.onClaudeEvent((id, event: ClaudeEvent) => {
+	bridge.onAssistantEvent((id, event: ClaudeEvent) => {
 		if (id !== chatId || current === null) return;
 		const message = current;
 		switch (event.kind) {
@@ -442,15 +499,17 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			case "error":
 				message.error = event.message;
 				scheduleRender(message);
+				ended?.();
 				return;
 			case "done":
+				ended?.();
 				return;
 		}
 	});
 
 	async function send(): Promise<void> {
 		const question = input.value.trim();
-		if (question === "" || busy || status?.found !== true) return;
+		if (question === "" || busy || status?.ready !== true) return;
 		busy = true;
 		input.value = "";
 		renderState();
@@ -487,10 +546,21 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		const reply = addMessage("assistant", "");
 		current = reply;
 		renderReply(reply);
-		const ask = (session: string | null) =>
-			bridge.claudeAsk({ chatId, prompt, sessionId: session, tabId }).catch((error: unknown) => {
-				reply.error = host.errorText(error);
+		// The reply's events and the request's own answer travel separately and
+		// may arrive in either order: the reply has ended with its last event.
+		const ask = async (session: string | null): Promise<void> => {
+			const last = new Promise<void>((resolve) => {
+				ended = resolve;
 			});
+			try {
+				await bridge.assistantAsk({ chatId, prompt, sessionId: session, tabId });
+				await Promise.race([last, new Promise((resolve) => setTimeout(resolve, 5000))]);
+			} catch (error) {
+				reply.error = host.errorText(error);
+			} finally {
+				ended = null;
+			}
+		};
 		await ask(sessionId);
 		// A conversation Claude Code no longer has (cleared, or another computer): start again.
 		if (reply.text === "" && reply.error !== null && /no conversation found/i.test(reply.error)) {
@@ -507,11 +577,11 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	}
 
 	async function stop(): Promise<void> {
-		await bridge.claudeStop(chatId);
+		await bridge.assistantStop(chatId);
 	}
 
 	function reset(): void {
-		if (busy) void bridge.claudeStop(chatId);
+		if (busy) void bridge.assistantStop(chatId);
 		chatId = crypto.randomUUID();
 		sessionId = null;
 		sharedText = null;
@@ -524,7 +594,6 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	}
 
 	renderEmpty();
-	renderMissing();
 	renderState();
 
 	return {
@@ -533,7 +602,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			renderState();
 			refreshSelection();
 			if (status !== null) return;
-			void bridge.claudeStatus().then((found) => {
+			void bridge.assistantStatus().then((found) => {
 				status = found;
 				renderState();
 			});

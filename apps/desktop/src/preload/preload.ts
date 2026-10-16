@@ -102,11 +102,14 @@ const bridge: KalemBridge = {
 	onWorkspaceChange: (handler) => listen<[]>(CHANNEL.workspaceChange, handler),
 	listVersions: (tabId) => ipcRenderer.invoke(CHANNEL.listVersions, tabId),
 	readVersion: (tabId, id) => ipcRenderer.invoke(CHANNEL.readVersion, tabId, id),
-	claudeStatus: (refresh) => ipcRenderer.invoke(CHANNEL.claudeStatus, refresh === true),
+	assistantStatus: (refresh) => ipcRenderer.invoke(CHANNEL.assistantStatus, refresh === true),
+	assistantConfig: () => ipcRenderer.invoke(CHANNEL.assistantConfig),
+	assistantConfigure: (update) => ipcRenderer.invoke(CHANNEL.assistantConfigure, update),
+	assistantModels: (request) => ipcRenderer.invoke(CHANNEL.assistantModels, request),
 	claudeLocate: () => ipcRenderer.invoke(CHANNEL.claudeLocate),
-	claudeAsk: (request) => ipcRenderer.invoke(CHANNEL.claudeAsk, request),
-	claudeStop: (chatId) => ipcRenderer.invoke(CHANNEL.claudeStop, chatId),
-	onClaudeEvent: (handler) => listen<[string, ClaudeEvent]>(CHANNEL.claudeEvent, handler),
+	assistantAsk: (request) => ipcRenderer.invoke(CHANNEL.assistantAsk, request),
+	assistantStop: (chatId) => ipcRenderer.invoke(CHANNEL.assistantStop, chatId),
+	onAssistantEvent: (handler) => listen<[string, ClaudeEvent]>(CHANNEL.assistantEvent, handler),
 };
 
 contextBridge.exposeInMainWorld("kalem", bridge);

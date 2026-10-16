@@ -17,6 +17,7 @@ import type { Lang, Strings } from "../shared/i18n.js";
 import { format, pickLanguage, stringsFor } from "../shared/i18n.js";
 import { quickNoteName } from "../shared/notes.js";
 import { isEditablePath, isPackagePath, isWordPath } from "../shared/paths.js";
+import { AssistantStore } from "./assistant-store.js";
 import { confluenceClient } from "./confluence-ipc.js";
 import { ConfluenceStore } from "./confluence-store.js";
 import { DraftStore } from "./drafts.js";
@@ -65,11 +66,13 @@ function start(): void {
 	const store = new SettingsStore(join(app.getPath("userData"), "settings.json"));
 	const drafts = new DraftStore(join(app.getPath("userData"), "drafts"));
 	const packages = new PackageStore(join(app.getPath("userData"), "packages"));
-	const confluence = new ConfluenceStore(join(app.getPath("userData"), "confluence.json"), {
-		encrypt: (text) =>
+	const secrets = {
+		encrypt: (text: string) =>
 			safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(text) : null,
-		decrypt: (data) => safeStorage.decryptString(data),
-	});
+		decrypt: (data: Buffer) => safeStorage.decryptString(data),
+	};
+	const confluence = new ConfluenceStore(join(app.getPath("userData"), "confluence.json"), secrets);
+	const assistant = new AssistantStore(join(app.getPath("userData"), "assistant.json"), secrets);
 	// End-to-end tests keep every save as its own version.
 	const versionInterval = Number(process.env.KALEM_VERSION_INTERVAL);
 	const versions = new VersionStore(
@@ -389,6 +392,7 @@ function start(): void {
 			packages,
 			versions,
 			confluence,
+			assistant,
 			strings: () => t,
 			language: () => language,
 			changeSettings,

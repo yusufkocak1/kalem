@@ -497,6 +497,7 @@ export function createAppRibbon(
 								"assistant",
 								() => ctx.settings().assistant,
 								ctx.commands.assistant,
+								false,
 							),
 							shortcut: `${MOD}+Shift+L`,
 						},

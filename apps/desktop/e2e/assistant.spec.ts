@@ -1,4 +1,7 @@
 import { chmod, readFile, writeFile } from "node:fs/promises";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { parseDiagram } from "../src/shared/diagram.js";
@@ -92,11 +95,11 @@ test("asks the local Claude about the document and inserts its reply with the di
 
 	await page.locator("#editor p", { hasText: "Giriş" }).click();
 	await page.keyboard.press("End");
-	await clickMenu(app, "View", "Claude Assistant");
+	await clickMenu(app, "View", "AI Assistant");
 	const pane = page.locator(".assistant");
 	await expect(pane).toBeVisible();
 	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
-	await expect(pane.locator(".assistant-empty")).toContainText("Ask Claude about your document");
+	await expect(pane.locator(".assistant-empty")).toContainText("Ask about your document");
 
 	const input = pane.locator(".assistant-input");
 	await input.fill("Onay sürecini çiz");
@@ -175,6 +178,204 @@ test("explains how to install Claude Code when it is not found", async () => {
 	);
 	await expect(pane.locator(".assistant-command")).toHaveText(
 		"npm install -g @anthropic-ai/claude-code",
+	);
+	await expect(pane.locator(".assistant-input")).toBeDisabled();
+	await app.close();
+});
+
+interface Received {
+	readonly path: string;
+	readonly headers: IncomingMessage["headers"];
+	readonly body: Record<string, unknown>;
+}
+
+/** A local stand-in for an OpenAI-compatible service and the Anthropic API, streaming REPLY. */
+async function fakeServices(): Promise<{ url: string; received: Received[]; close(): void }> {
+	const received: Received[] = [];
+	const chunks = (text: string): string[] => text.match(/[\s\S]{1,9}/g) ?? [];
+	const sse = (response: ServerResponse, events: readonly [string | null, unknown][]): void => {
+		response.writeHead(200, { "content-type": "text/event-stream" });
+		for (const [event, data] of events) {
+			response.write(
+				`${event === null ? "" : `event: ${event}\n`}data: ${typeof data === "string" ? data : JSON.stringify(data)}\n\n`,
+			);
+		}
+		response.end();
+	};
+	const server = createServer((request, response) => {
+		let raw = "";
+		request.on("data", (chunk: Buffer) => {
+			raw += chunk.toString("utf8");
+		});
+		request.on("end", () => {
+			const path = (request.url ?? "").replace(/\?.*$/, "");
+			received.push({ path, headers: request.headers, body: raw === "" ? {} : JSON.parse(raw) });
+			if (request.method === "GET" && path === "/v1/models") {
+				response.writeHead(200, { "content-type": "application/json" });
+				response.end(
+					JSON.stringify({
+						data: ["fake-small", "fake-large"].map((id) => ({
+							id,
+							type: "model",
+							display_name: id,
+							created_at: "2026-01-01T00:00:00Z",
+						})),
+						has_more: false,
+						first_id: "fake-small",
+						last_id: "fake-large",
+					}),
+				);
+			} else if (path === "/v1/chat/completions") {
+				sse(response, [
+					...chunks(REPLY).map((text): [null, unknown] => [
+						null,
+						{ choices: [{ delta: { content: text } }] },
+					]),
+					[null, "[DONE]"],
+				]);
+			} else if (path === "/v1/messages") {
+				const message = {
+					id: "msg_1",
+					type: "message",
+					role: "assistant",
+					model: "claude-opus-5-5",
+					content: [],
+					stop_reason: null,
+					stop_sequence: null,
+					usage: { input_tokens: 10, output_tokens: 1 },
+				};
+				sse(response, [
+					["message_start", { type: "message_start", message }],
+					[
+						"content_block_start",
+						{ type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+					],
+					...chunks(REPLY).map((text): [string, unknown] => [
+						"content_block_delta",
+						{ type: "content_block_delta", index: 0, delta: { type: "text_delta", text } },
+					]),
+					["content_block_stop", { type: "content_block_stop", index: 0 }],
+					[
+						"message_delta",
+						{
+							type: "message_delta",
+							delta: { stop_reason: "end_turn", stop_sequence: null },
+							usage: { output_tokens: 20 },
+						},
+					],
+					["message_stop", { type: "message_stop" }],
+				]);
+			} else {
+				response.writeHead(404, { "content-type": "application/json" });
+				response.end(JSON.stringify({ error: { message: `No route ${path}` } }));
+			}
+		});
+	});
+	await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+	const { port } = server.address() as AddressInfo;
+	return { url: `http://127.0.0.1:${port}`, received, close: () => server.close() };
+}
+
+test("connects to an OpenAI-compatible service and to the Anthropic API with a key", async () => {
+	const services = await fakeServices();
+	const folder = await tempDir("assistant-api");
+	const doc = join(folder, "plan.md");
+	await writeFile(doc, "# Plan\n");
+	const { app, page, userData, errors } = await launch({
+		args: [doc],
+		settings: { assistant: true },
+		env: {
+			KALEM_CLAUDE: join(folder, "nothing-here"),
+			NO_PROXY: "127.0.0.1",
+			no_proxy: "127.0.0.1",
+		},
+	});
+	const pane = page.locator(".assistant");
+	await pane.getByRole("button", { name: "Connect a Service…" }).click();
+
+	// An OpenAI-compatible service at an address of its own; its models are listed.
+	const form = pane.locator(".assistant-settings");
+	await form.getByLabel("Service").selectOption("custom");
+	await form.getByLabel("Address").fill(`${services.url}/v1`);
+	await form.getByLabel("API key").fill("sk-test");
+	await form.getByRole("button", { name: "Fetch models" }).click();
+	await expect(form.locator(".assistant-field-note[role=status]")).toHaveText(
+		"2 models found; pick one in the model field.",
+	);
+	await expect(form.locator("#assistant-models option")).toHaveCount(2);
+	await form.getByLabel("Model").fill("fake-large");
+	await form.getByRole("button", { name: "Save" }).click();
+	await expect(form).toBeHidden();
+	await expect(pane.locator(".assistant-subtitle")).toHaveText(
+		"Other (OpenAI-compatible) · fake-large",
+	);
+
+	const input = pane.locator(".assistant-input");
+	await input.fill("Planı çiz");
+	await input.press("Enter");
+	await expect(pane.locator(".assistant-assistant .assistant-diagram figcaption")).toHaveText(
+		"Onay akışı",
+	);
+	await expect(pane.getByRole("button", { name: "Insert", exact: true })).toBeVisible();
+	const first = services.received.find((request) => request.path === "/v1/chat/completions");
+	expect(first?.headers.authorization).toBe("Bearer sk-test");
+	expect(first?.body.model).toBe("fake-large");
+	const sent = first?.body.messages as { role: string; content: string }[];
+	expect(sent.map((message) => message.role)).toEqual(["system", "user"]);
+	expect(sent[0]?.content).toContain("Kalem diagrams");
+	expect(sent[0]?.content).toContain('"File" → "Export"');
+	expect(sent[1]?.content).toContain('<document name="plan.md">');
+
+	// The service keeps no conversation: what was said goes again with the next question.
+	await input.fill("Kısalt");
+	await input.press("Enter");
+	await expect(pane.locator(".assistant-assistant")).toHaveCount(2);
+	await expect(pane.getByRole("button", { name: "Insert", exact: true })).toHaveCount(2);
+	const second = services.received.filter((request) => request.path === "/v1/chat/completions")[1];
+	const history = second?.body.messages as { role: string; content: string }[];
+	expect(history.map((message) => message.role)).toEqual(["system", "user", "assistant", "user"]);
+	expect(history[2]?.content).toBe(REPLY);
+	expect(await readFile(join(userData, "assistant.json"), "utf8")).not.toContain("sk-test");
+
+	// The Anthropic API, through its SDK; a new service starts a new chat.
+	await pane.getByRole("button", { name: "Connection settings" }).click();
+	await form.getByLabel("Service").selectOption("anthropic");
+	await expect(form.getByLabel("Model")).toHaveValue("claude-opus-5-5");
+	await form.getByLabel("Address").fill(services.url);
+	await form.getByLabel("API key").fill("sk-ant-test");
+	await form.getByRole("button", { name: "Save" }).click();
+	await expect(pane.locator(".assistant-subtitle")).toHaveText(
+		"Anthropic (Claude API) · claude-opus-5-5",
+	);
+	await expect(pane.locator(".assistant-assistant")).toHaveCount(0);
+	await input.fill("Planı çiz");
+	await input.press("Enter");
+	await expect(pane.locator(".assistant-assistant .assistant-diagram figcaption")).toHaveText(
+		"Onay akışı",
+	);
+	const anthropic = services.received.find((request) => request.path === "/v1/messages");
+	expect(anthropic?.headers["x-api-key"]).toBe("sk-ant-test");
+	expect(anthropic?.body.model).toBe("claude-opus-5-5");
+	expect(anthropic?.body.stream).toBe(true);
+	expect(String(anthropic?.body.system)).toContain("Kalem diagrams");
+
+	expect(errors).toEqual([]);
+	await app.close();
+	services.close();
+});
+
+test("asks for setup when an API service has no key yet", async () => {
+	const { app, page } = await launch({ settings: { assistant: true } });
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).not.toHaveText("Looking for Claude Code…");
+	await pane.getByRole("button", { name: "Connection settings" }).click();
+	const form = pane.locator(".assistant-settings");
+	await form.getByLabel("Service").selectOption("openai");
+	await expect(form.getByLabel("API key")).toHaveAttribute("placeholder", "Required");
+	await form.getByLabel("Model").fill("some-model");
+	await form.getByRole("button", { name: "Save" }).click();
+	await expect(pane.locator(".assistant-missing")).toContainText(
+		"Choose a service for the assistant",
 	);
 	await expect(pane.locator(".assistant-input")).toBeDisabled();
 	await app.close();

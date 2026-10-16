@@ -13,8 +13,8 @@ import { TABLE_COLORS } from "./table-style.js";
 /** The code fence language of a Kalem diagram in a reply. */
 export const DIAGRAM_FENCE = "kalem-diagram";
 
-/** Appended to Claude Code's own system prompt; teaches Claude what Kalem can show. */
-export const SYSTEM_PROMPT = `You are Claude, working inside Kalem, a Word-like Markdown editor (a desktop app). The user is writing a document and talks to you in a side panel next to it. Reply in the language the user writes in.
+/** Teaches the model what Kalem can show; appended to Claude Code's own system prompt, or an API's system prompt. */
+export const SYSTEM_PROMPT = `You are an AI assistant working inside Kalem, a Word-like Markdown editor (a desktop app). The user is writing a document and talks to you in a side panel next to it. Reply in the language the user writes in.
 
 Your replies are Markdown, and the user can insert a reply into the document with one click. So when they ask for content (a section, a table, a rewrite, a diagram), reply with the content itself, ready to insert, without a preamble such as "Here is…". Keep any explanation short and after the content.
 

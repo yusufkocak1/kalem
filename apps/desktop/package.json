@@ -17,6 +17,7 @@
     "package:dir": "pnpm build && electron-builder --dir --config electron-builder.yml"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.135.0",
     "@kalem-editor/core": "workspace:^",
     "@kalem-editor/editor": "workspace:^",
     "@kalem-editor/plugin-autosave": "workspace:^",

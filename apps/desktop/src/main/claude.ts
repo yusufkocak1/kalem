@@ -1,23 +1,19 @@
 /**
- * The Claude assistant's main-process side: finds the Claude Code CLI
- * installed on this computer and runs one question at a time through it
- * (`claude -p … --output-format stream-json`), passing the reply on to the
- * window as it comes. The CLI brings its own login, so Kalem keeps no key.
+ * The Claude Code CLI as one of the assistant's services: finds it on this
+ * computer and runs one question at a time through it (`claude -p …
+ * --output-format stream-json`), passing the reply on as it comes. The CLI
+ * brings its own login, so Kalem keeps no key for it.
  */
 import type { ChildProcess } from "node:child_process";
 import { execFile, spawn } from "node:child_process";
 import { readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, join } from "node:path";
-import type { IpcMainInvokeEvent, WebContents } from "electron";
-import { dialog, ipcMain } from "electron";
+import type { WebContents } from "electron";
 import type { ClaudeStatus } from "../shared/bridge.js";
-import { CHANNEL } from "../shared/bridge.js";
 import type { ClaudeEvent } from "../shared/claude.js";
-import { ClaudeStreamReader, claudeArgs, LineSplitter, systemPrompt } from "../shared/claude.js";
-import type { Strings } from "../shared/i18n.js";
+import { ClaudeStreamReader, LineSplitter } from "../shared/claude.js";
 import type { SettingsStore } from "./settings.js";
-import type { AppWindow } from "./windows.js";
 import { errorMessage } from "./windows.js";
 
 /** How to start the CLI: the program, and arguments that come before Claude's own. */
@@ -123,123 +119,52 @@ function version(launch: ClaudeLaunch): Promise<string> {
 	});
 }
 
-export interface ClaudeIpcContext {
-	readonly store: SettingsStore;
-	strings(): Strings;
-	senderOf(event: IpcMainInvokeEvent): AppWindow;
-}
+/** The Claude Code CLI found on this computer (or picked by the user). */
+export class ClaudeCli {
+	readonly #store: SettingsStore;
+	#found: { launch: ClaudeLaunch; version: string } | null = null;
 
-export function registerClaudeIpc(ctx: ClaudeIpcContext): void {
-	let found: { launch: ClaudeLaunch; version: string } | null = null;
-	/** Running questions, by window and chat. */
-	const running = new Map<string, ChildProcess>();
-	/** The folder each conversation ran in. */
-	const folders = new Map<string, string>();
+	constructor(store: SettingsStore) {
+		this.#store = store;
+	}
 
-	const status = (): ClaudeStatus =>
-		found === null
+	get launch(): ClaudeLaunch | null {
+		return this.#found?.launch ?? null;
+	}
+
+	status(): ClaudeStatus {
+		const found = this.#found;
+		return found === null
 			? { found: false }
 			: { found: true, path: found.launch.path, version: found.version };
+	}
 
-	const check = async (path: string): Promise<boolean> => {
+	/** Whether the file starts Claude Code; it is then the one used. */
+	async check(path: string): Promise<boolean> {
 		const launch = await launchFor(path);
 		if (launch === null) return false;
 		try {
-			found = { launch, version: await version(launch) };
+			this.#found = { launch, version: await version(launch) };
 			return true;
 		} catch {
 			return false;
 		}
-	};
+	}
 
-	const locate = async (): Promise<ClaudeStatus> => {
-		found = null;
-		const configured = ctx.store.settings.claudePath;
-		if (configured !== "" && (await check(configured))) return status();
+	/** Looks for the CLI where the user put it, then where it is usually installed. */
+	async locate(): Promise<ClaudeStatus> {
+		this.#found = null;
+		const configured = this.#store.settings.claudePath;
+		if (configured !== "" && (await this.check(configured))) return this.status();
 		for (const path of claudeCandidates(process.platform, process.env, homedir())) {
-			if (await check(path)) return status();
+			if (await this.check(path)) return this.status();
 		}
-		return status();
-	};
-
-	ipcMain.handle(CHANNEL.claudeStatus, async (_event, refresh: unknown) =>
-		found !== null && refresh !== true ? status() : locate(),
-	);
-
-	ipcMain.handle(CHANNEL.claudeLocate, async (event) => {
-		const win = ctx.senderOf(event);
-		const t = ctx.strings();
-		const result = await dialog.showOpenDialog(win.window, {
-			title: t.claudeLocateTitle,
-			properties: ["openFile", "dontAddToRecent"],
-			...(process.platform === "win32"
-				? { filters: [{ name: "Claude Code", extensions: ["exe", "cmd"] }] }
-				: {}),
-		});
-		const path = result.filePaths[0];
-		if (result.canceled || path === undefined) return status();
-		if (!(await check(path))) {
-			await dialog.showMessageBox(win.window, {
-				type: "warning",
-				message: t.claudeLocateFailed,
-				detail: path,
-			});
-			return status();
-		}
-		ctx.store.updateSettings({ claudePath: path });
-		return status();
-	});
-
-	ipcMain.handle(CHANNEL.claudeAsk, async (event, raw: unknown) => {
-		const win = ctx.senderOf(event);
-		const request = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
-		const chatId = request.chatId;
-		const prompt = request.prompt;
-		if (typeof chatId !== "string" || typeof prompt !== "string" || prompt.trim() === "") {
-			throw new Error("Invalid question");
-		}
-		const sessionId =
-			typeof request.sessionId === "string" && /^[\w-]{1,100}$/.test(request.sessionId)
-				? request.sessionId
-				: null;
-		const tab = typeof request.tabId === "string" ? win.tabs.get(request.tabId) : undefined;
-		// Claude Code keeps a conversation with the folder it ran in, and resumes
-		// it only from there; a new one runs next to the active document.
-		const folder =
-			(sessionId === null ? undefined : folders.get(sessionId)) ??
-			(tab !== undefined && tab.path !== null && tab.remote === null
-				? dirname(tab.path)
-				: homedir());
-
-		const sender = event.sender;
-		const send = (claudeEvent: ClaudeEvent): void => {
-			if (claudeEvent.kind === "session") folders.set(claudeEvent.id, folder);
-			if (!sender.isDestroyed()) sender.send(CHANNEL.claudeEvent, chatId, claudeEvent);
-		};
-		if (found === null) await locate();
-		if (found === null) {
-			send({ kind: "error", message: ctx.strings().claudeNotFound });
-			return;
-		}
-		const key = `${sender.id}:${chatId}`;
-		running.get(key)?.kill();
-		const args = claudeArgs({ sessionId, systemPrompt: systemPrompt(ctx.strings()) });
-		await run(found.launch, folder, args, prompt, send, sender, (child) => {
-			running.set(key, child);
-		});
-		running.delete(key);
-	});
-
-	ipcMain.handle(CHANNEL.claudeStop, (event, chatId: unknown) => {
-		if (typeof chatId !== "string") return;
-		const key = `${event.sender.id}:${chatId}`;
-		running.get(key)?.kill();
-		running.delete(key);
-	});
+		return this.status();
+	}
 }
 
 /** Runs one question; resolves once the CLI has exited, whatever happened. */
-function run(
+export function runClaude(
 	launch: ClaudeLaunch,
 	cwd: string,
 	args: readonly string[],

@@ -1124,6 +1124,87 @@ button {
 	background: var(--app-error);
 }
 
+.assistant-settings {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: 12px;
+	padding: 14px 16px;
+	overflow-y: auto;
+}
+
+.assistant-settings[hidden],
+.assistant-composer[hidden],
+.assistant-field[hidden],
+.assistant-settings [hidden] {
+	display: none;
+}
+
+.assistant-settings .assistant-empty-title {
+	margin: 0;
+}
+
+.assistant-field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.assistant-field label {
+	font-weight: 600;
+	font-size: 12px;
+}
+
+.assistant-field input,
+.assistant-field select {
+	padding: 6px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+}
+
+.assistant-field input:focus-visible,
+.assistant-field select:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -1px;
+}
+
+.assistant-field-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.assistant-field-note {
+	margin: 0;
+	color: var(--app-muted);
+	font-size: 12px;
+	line-height: 1.4;
+}
+
+.assistant-primary {
+	padding: 5px 12px;
+	border: 0;
+	border-radius: 6px;
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+	font: inherit;
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.assistant-primary:disabled {
+	opacity: 0.6;
+}
+
+.icon-button[aria-pressed="true"] {
+	background: var(--app-pressed);
+	color: var(--app-accent);
+}
+
 /* --- Side pane: headings and files ---------------------------------------- */
 
 .side-pane-tabs {
