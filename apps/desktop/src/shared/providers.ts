@@ -36,6 +36,11 @@ export interface ProviderInfo {
 	readonly modelsUrl?: string;
 }
 
+/** Models offered for a service that cannot list its own: Claude Code's aliases. */
+export const SUGGESTED_MODELS: Readonly<Partial<Record<ProviderId, readonly string[]>>> = {
+	"claude-code": ["opus", "sonnet", "haiku"],
+};
+
 /** Whether the service is a program on this computer rather than an API. */
 export const isCli = (info: ProviderInfo): boolean =>
 	info.protocol === "claude-cli" || info.protocol === "copilot-cli";

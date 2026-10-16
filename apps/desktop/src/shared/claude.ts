@@ -176,6 +176,8 @@ export function claudeArgs(options: {
 	readonly sessionId: string | null;
 	/** Defaults to the instructions without the app's menus. */
 	readonly systemPrompt?: string;
+	/** A model name or alias (`opus`, `sonnet`…); empty for the CLI's own choice. */
+	readonly model?: string;
 }): string[] {
 	return [
 		"-p",
@@ -187,6 +189,7 @@ export function claudeArgs(options: {
 		options.systemPrompt ?? SYSTEM_PROMPT,
 		"--disallowedTools",
 		...DENIED_TOOLS,
+		...(options.model ? ["--model", options.model] : []),
 		...(options.sessionId === null ? [] : ["--resume", options.sessionId]),
 	];
 }

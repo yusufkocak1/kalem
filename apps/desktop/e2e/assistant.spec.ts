@@ -506,7 +506,7 @@ test("asks GitHub Copilot, keeps several chats and picks the last one up after a
 	expect(ask3?.args[ask3.args.indexOf("--session-id") + 1]).not.toBe(session);
 
 	await pane.getByRole("button", { name: "Chats" }).click();
-	const rows = pane.locator(".assistant-history-row");
+	const rows = pane.locator(".assistant-history .assistant-history-row");
 	await expect(rows).toHaveCount(2);
 	await expect(rows.nth(0)).toContainText("Başka bir soru");
 	await expect(rows.nth(1)).toContainText("Raporu çiz");
@@ -533,12 +533,12 @@ test("asks GitHub Copilot, keeps several chats and picks the last one up after a
 	expect(ask5?.args[ask5.args.indexOf("--session-id") + 1]).toBe(session);
 	expect(ask5?.cwd).toBe(folder);
 	await pane.getByRole("button", { name: "Chats" }).click();
-	await expect(pane.locator(".assistant-history-row")).toHaveCount(2);
+	await expect(pane.locator(".assistant-history .assistant-history-row")).toHaveCount(2);
 
 	// A chat can be deleted.
 	page.once("dialog", (dialog) => void dialog.accept());
 	await pane.getByRole("button", { name: "Delete “Başka bir soru”" }).click();
-	await expect(pane.locator(".assistant-history-row")).toHaveCount(1);
+	await expect(pane.locator(".assistant-history .assistant-history-row")).toHaveCount(1);
 	expect([...first.errors, ...second.errors]).toEqual([]);
 	await second.app.close();
 });
@@ -583,4 +583,159 @@ test("resizes the assistant by dragging its edge, and keeps the width", async ()
 		)
 		.toBe(dragged - 20);
 	await second.app.close();
+});
+
+test("picks the model from the panel and keeps the chat going; earlier chats are listed when a new one starts", async () => {
+	const services = await fakeServices();
+	const folder = await tempDir("assistant-models");
+	const claude = await fakeClaude(folder);
+	const { app, page, errors } = await launch({
+		settings: { assistant: true },
+		env: { KALEM_CLAUDE: claude.path, NO_PROXY: "127.0.0.1", no_proxy: "127.0.0.1" },
+	});
+	const pane = page.locator(".assistant");
+	const picker = pane.locator(".assistant-model");
+	const input = pane.locator(".assistant-input");
+
+	// Claude Code: its default model, or one of its aliases.
+	await expect(picker).toHaveValue("");
+	await expect(picker.locator("option")).toHaveText([
+		"Default model",
+		"opus",
+		"sonnet",
+		"haiku",
+		"Other model…",
+	]);
+	await input.fill("Bir");
+	await input.press("Enter");
+	await expect(pane.getByRole("button", { name: "Insert", exact: true })).toHaveCount(1);
+	expect((await claude.calls())[0]?.args).not.toContain("--model");
+	await picker.selectOption("sonnet");
+	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code) · sonnet");
+	await input.fill("İki");
+	await input.press("Enter");
+	await expect(pane.getByRole("button", { name: "Insert", exact: true })).toHaveCount(2);
+	const second = (await claude.calls())[1];
+	expect(second?.args.join(" ")).toContain("--model sonnet --resume sess-1");
+	await expect(pane.locator(".assistant-reply-model")).toHaveText(["sonnet"]);
+
+	// An API service: its models are listed, and a new model goes on in the same chat.
+	await pane.getByRole("button", { name: "Connection settings" }).click();
+	const form = pane.locator(".assistant-settings");
+	await form.getByLabel("Service").selectOption("custom");
+	await form.getByLabel("Address").fill(`${services.url}/v1`);
+	await form.getByLabel("Model").fill("fake-large");
+	await form.getByRole("button", { name: "Save" }).click();
+	await expect(pane.locator(".assistant-message")).toHaveCount(0);
+	await expect(picker.locator("option")).toHaveText(["fake-large", "fake-small", "Other model…"]);
+	// The Claude Code chat is offered under the suggestions of the new, empty one.
+	const recent = pane.locator(".assistant-recent");
+	await expect(recent).toContainText("Recent chats");
+	await expect(recent.locator(".assistant-history-title")).toHaveText(["Bir"]);
+
+	await input.fill("Üç");
+	await input.press("Enter");
+	await expect(pane.getByRole("button", { name: "Insert", exact: true })).toHaveCount(1);
+	await picker.selectOption("fake-small");
+	await input.fill("Dört");
+	await input.press("Enter");
+	await expect(pane.getByRole("button", { name: "Insert", exact: true })).toHaveCount(2);
+	const asked = services.received.filter((request) => request.path === "/v1/chat/completions");
+	expect(asked.map((request) => request.body.model)).toEqual(["fake-large", "fake-small"]);
+	expect(asked[1]?.body.messages).toHaveLength(4);
+	await expect(pane.locator(".assistant-reply-model")).toHaveText(["fake-large", "fake-small"]);
+
+	// "Other model…" leads to the settings.
+	await picker.selectOption("Other model…");
+	await expect(form).toBeVisible();
+	await expect(picker).toBeHidden();
+	await form.getByRole("button", { name: "Cancel" }).click();
+
+	// Back in the earlier chat from the recent list.
+	await pane.getByRole("button", { name: "New chat" }).first().click();
+	await expect(recent.locator(".assistant-history-title")).toHaveText(["Üç", "Bir"]);
+	await recent.getByRole("button", { name: /^Bir/ }).click();
+	await expect(pane.locator(".assistant-user")).toHaveText([/Bir/, /İki/]);
+	await expect(pane.locator(".assistant-reply-model")).toHaveText(["sonnet"]);
+
+	expect(errors).toEqual([]);
+	await app.close();
+	services.close();
+});
+
+test("runs commands typed after a slash: the assistant's, ready questions and the app's", async () => {
+	const folder = await tempDir("assistant-slash");
+	const doc = join(folder, "komut.md");
+	await writeFile(doc, "# Komut\n\nGiriş\n");
+	const claude = await fakeClaude(folder);
+	const { app, page, errors } = await launch({
+		args: [doc],
+		settings: { assistant: true, language: "tr" },
+		env: { KALEM_CLAUDE: claude.path },
+	});
+	await page.locator("#editor p", { hasText: "Giriş" }).click();
+	await page.keyboard.press("End");
+	const pane = page.locator(".assistant");
+	const input = pane.locator(".assistant-input");
+	const menu = pane.locator(".assistant-commands");
+	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
+
+	// "/" lists the commands; typing filters them by name or by their Turkish label.
+	await input.fill("/");
+	await expect(menu).toBeVisible();
+	// All of them, the list scrolling.
+	await expect(menu.locator(".assistant-command")).toHaveCount(28);
+	await expect(menu.locator(".assistant-command-name").last()).toHaveText("/format-code");
+	await input.fill("/kayd");
+	await expect(menu.locator(".assistant-command-name")).toHaveText(["/save", "/save-as"]);
+	await input.fill("/özet");
+	await expect(menu.locator(".assistant-command-name")).toHaveText(["/summarize"]);
+	await input.press("Escape");
+	await expect(menu).toBeHidden();
+
+	// A command with an argument waits for it.
+	await input.fill("/mod");
+	await input.press("Enter");
+	await expect(input).toHaveValue("/model ");
+	await input.pressSequentially("sonnet");
+	await input.press("Enter");
+	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code) · sonnet");
+	await expect(input).toHaveValue("");
+
+	// A ready question is sent as if typed.
+	await input.fill("/diagram onay süreci");
+	await input.press("Enter");
+	await expect(pane.locator(".assistant-user")).toContainText(
+		"Şunun akış diyagramını Kalem diyagramı olarak çiz: onay süreci",
+	);
+	await expect(pane.getByRole("button", { name: "Belgeye Ekle", exact: true })).toBeVisible();
+	expect((await claude.calls())[0]?.prompt).toContain("onay süreci");
+
+	// The app's commands act on the document, where its caret was.
+	await input.fill("/table");
+	await input.press("Enter");
+	await expect(page.locator("#editor table")).toHaveCount(1);
+	await input.fill("/save");
+	await input.press("Enter");
+	await expect(page.locator(".save-status")).toHaveText("Kaydedildi");
+	expect(await readFile(doc, "utf8")).toContain("Giriş\n\n|");
+
+	// Picked with the arrow keys and Tab.
+	await input.fill("/sohbet");
+	await expect(menu.locator(".assistant-command-name")).toHaveText(["/new", "/chats"]);
+	await input.press("ArrowDown");
+	await expect(menu.locator('[aria-selected="true"] .assistant-command-name')).toHaveText("/chats");
+	await input.press("Tab");
+	await expect(pane.locator(".assistant-history")).toBeVisible();
+
+	// An unknown command says so instead of being sent.
+	await pane.getByRole("button", { name: "Sohbetler" }).click();
+	await input.fill("/yokboyle");
+	await input.press("Enter");
+	await expect(pane.locator(".assistant-log .assistant-error")).toContainText(
+		"/yokboyle diye bir komut yok",
+	);
+	expect(await claude.calls()).toHaveLength(1);
+	expect(errors).toEqual([]);
+	await app.close();
 });

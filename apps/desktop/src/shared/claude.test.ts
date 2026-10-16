@@ -60,6 +60,12 @@ describe("CLI arguments", () => {
 		expect(args).not.toContain("--resume");
 	});
 
+	it("asks for a model when one is picked", () => {
+		const args = claudeArgs({ sessionId: "s", model: "sonnet" });
+		expect(args.join(" ")).toContain("--model sonnet --resume s");
+		expect(claudeArgs({ sessionId: null, model: "" })).not.toContain("--model");
+	});
+
 	it("resumes a conversation", () => {
 		const args = claudeArgs({ sessionId: "abc-123" });
 		expect(args.slice(-2)).toEqual(["--resume", "abc-123"]);

@@ -1,7 +1,7 @@
 import type { Root } from "@kalem-editor/core";
 import type { BlockType, MarkType } from "@kalem-editor/core/commands";
 import type { Caret, EditResult } from "@kalem-editor/editor";
-import { indentItem, outdentItem, toggleList } from "@kalem-editor/editor";
+import { holderIn, indentItem, outdentItem, selectRange, toggleList } from "@kalem-editor/editor";
 import type { Command, KalemBridge, Settings, SidePane, TabDocument } from "../shared/bridge.js";
 import { clampZoom, MAX_ZOOM, MIN_ZOOM, pageRule, ZOOM_STEP } from "../shared/bridge.js";
 import type { ContextDiagram, ReplyDiagram } from "../shared/claude.js";
@@ -143,6 +143,11 @@ const assistant = createAssistantPane({
 	hasDiagram: (src) => diagramImages(canvas).some((image) => image.getAttribute("src") === src),
 	updateDiagram: (src, diagram) => rewriteDiagram(session, src, diagram.diagram),
 	openLink: (href) => bridge.openLink(href),
+	runCommand: (command) => {
+		// The command acts where the caret was in the document, not in the assistant.
+		returnToDocument();
+		commands[command]();
+	},
 	close: () => updateSettings({ assistant: false }),
 	errorText: ipcErrorMessage,
 });
@@ -947,6 +952,22 @@ document.addEventListener("selectionchange", () => {
 		assistant.refreshSelection();
 	}
 });
+
+/** Puts the focus back in the document, the caret where it last was there. */
+function returnToDocument(): void {
+	const editor = session.editor;
+	const caret = lastCarets.get(session);
+	const block = caret === undefined ? undefined : editor.getDocument().children[caret.blockIndex];
+	const element = block === undefined ? undefined : editor.getBlockElement(block.id as string);
+	const holder =
+		caret === undefined || element === undefined ? null : holderIn(element, caret.path);
+	if (caret === undefined || holder === null) {
+		editor.focus();
+		return;
+	}
+	selectRange(holder, caret.offset, caret.offset);
+	(holder.closest("[contenteditable]") as HTMLElement | null)?.focus({ preventScroll: true });
+}
 
 function toggleAssistant(): void {
 	if (!settings.assistant) {

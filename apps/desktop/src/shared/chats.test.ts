@@ -31,7 +31,7 @@ describe("chats", () => {
 			messages: [
 				{ role: "user", text: "Özetle", notes: ["with “a.md”", 3] },
 				{ role: "system", text: "x" },
-				{ role: "assistant", text: "Kısaca…", error: null },
+				{ role: "assistant", text: "Kısaca…", error: null, model: "gpt-x" },
 			],
 		});
 		expect(chat).toEqual({
@@ -44,7 +44,7 @@ describe("chats", () => {
 			updated: 2,
 			messages: [
 				{ role: "user", text: "Özetle", error: null, notes: ["with “a.md”"] },
-				{ role: "assistant", text: "Kısaca…", error: null, notes: [] },
+				{ role: "assistant", text: "Kısaca…", error: null, notes: [], model: "gpt-x" },
 			],
 		});
 		expect(chat === null ? null : chatSummary(chat)).toEqual({

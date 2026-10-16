@@ -105,6 +105,13 @@ export class AssistantStore {
 		return { provider: state.provider, connections, encrypted: this.#box.encrypt("") !== null };
 	}
 
+	/** Changes the model of the service in use, nothing else. */
+	async setModel(model: string): Promise<void> {
+		const state = await this.#load();
+		state.connections[state.provider] = { ...this.connection(state, state.provider), model };
+		await this.#save(state);
+	}
+
 	async update(
 		provider: ProviderId,
 		connection: Connection,
