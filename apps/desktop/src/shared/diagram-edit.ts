@@ -4,7 +4,7 @@
  * moving. Each returns a new diagram; none touches the screen.
  */
 import type { Diagram, DiagramEdge, DiagramNode, Point } from "./diagram.js";
-import { GRID, nextId, snap } from "./diagram.js";
+import { ancestors, GRID, liftEdges, nextId, snap } from "./diagram.js";
 
 export interface Box {
 	readonly x: number;
@@ -41,31 +41,200 @@ export function nodesInBox(diagram: Diagram, box: Box): string[] {
 		.map((node) => node.id);
 }
 
+/** The shapes with everything inside the groups among them. */
+export function withContents(diagram: Diagram, ids: Iterable<string>): Set<string> {
+	const all = new Set(ids);
+	for (let grown = true; grown; ) {
+		grown = false;
+		for (const node of diagram.nodes) {
+			if (node.parent !== undefined && all.has(node.parent) && !all.has(node.id)) {
+				all.add(node.id);
+				grown = true;
+			}
+		}
+	}
+	return all;
+}
+
+/** Moves the shapes, and what is inside the groups among them. */
 export function moveNodes(
 	diagram: Diagram,
 	ids: ReadonlySet<string>,
 	dx: number,
 	dy: number,
 ): Diagram {
+	const moving = withContents(diagram, ids);
 	return {
 		...diagram,
 		nodes: diagram.nodes.map((node) =>
-			ids.has(node.id) ? { ...node, x: node.x + dx, y: node.y + dy } : node,
+			moving.has(node.id) ? { ...node, x: node.x + dx, y: node.y + dy } : node,
 		),
 	};
 }
 
-/** Removes shapes (with their connectors) and connectors. */
+/** Removes shapes (a group with what is inside it, all with their connectors) and connectors. */
 export function removeItems(
 	diagram: Diagram,
 	nodes: ReadonlySet<string>,
 	edges: ReadonlySet<string>,
 ): Diagram {
+	const gone = withContents(diagram, nodes);
 	return {
-		nodes: diagram.nodes.filter((node) => !nodes.has(node.id)),
+		nodes: diagram.nodes.filter((node) => !gone.has(node.id)),
 		edges: diagram.edges.filter(
-			(edge) => !edges.has(edge.id) && !nodes.has(edge.from) && !nodes.has(edge.to),
+			(edge) => !edges.has(edge.id) && !gone.has(edge.from) && !gone.has(edge.to),
 		),
+	};
+}
+
+/**
+ * Moves what is inside each group along with it, after an operation that
+ * placed groups but not their contents.
+ */
+function carryContents(before: Diagram, after: Diagram): Diagram {
+	const old = new Map(before.nodes.map((node) => [node.id, node]));
+	const shift = new Map<string, Point>();
+	for (const node of after.nodes) {
+		const was = old.get(node.id);
+		if (node.shape === "group" && was !== undefined && (was.x !== node.x || was.y !== node.y)) {
+			shift.set(node.id, { x: node.x - was.x, y: node.y - was.y });
+		}
+	}
+	if (shift.size === 0) return after;
+	return {
+		...after,
+		nodes: after.nodes.map((node) => {
+			const was = old.get(node.id);
+			// A shape the operation placed itself stays where it was put.
+			if (was === undefined || was.x !== node.x || was.y !== node.y) return node;
+			const group = ancestors(after, node.id).find((id) => shift.has(id));
+			const by = group === undefined ? undefined : shift.get(group);
+			return by === undefined ? node : { ...node, x: node.x + by.x, y: node.y + by.y };
+		}),
+	};
+}
+
+/** Space around a group's contents, and above them for its name. */
+export const GROUP_PADDING = 20;
+export const GROUP_TOP = 40;
+
+/** The group a shape belongs in by where it is: the smallest one around its middle. */
+function groupAt(diagram: Diagram, node: DiagramNode): string | undefined {
+	const cx = node.x + node.w / 2;
+	const cy = node.y + node.h / 2;
+	const own = withContents(diagram, [node.id]);
+	let best: DiagramNode | undefined;
+	for (const group of diagram.nodes) {
+		if (group.shape !== "group" || own.has(group.id)) continue;
+		if (cx < group.x || cx > group.x + group.w || cy < group.y || cy > group.y + group.h) continue;
+		if (best === undefined || group.w * group.h < best.w * best.h) best = group;
+	}
+	return best?.id;
+}
+
+/** Puts each of the shapes in the group it now lies in (or none). */
+export function placeInGroups(diagram: Diagram, ids: Iterable<string>): Diagram {
+	let next = diagram;
+	for (const id of ids) {
+		const node = next.nodes.find((item) => item.id === id);
+		if (node === undefined) continue;
+		const parent = groupAt(next, node);
+		if (parent === node.parent) continue;
+		const { parent: _old, ...rest } = node;
+		const moved: DiagramNode = parent === undefined ? rest : { ...rest, parent };
+		next = { ...next, nodes: next.nodes.map((item) => (item.id === id ? moved : item)) };
+	}
+	return next;
+}
+
+/** Grows each group, inner ones first, to keep its contents inside it with some room. */
+export function fitGroups(diagram: Diagram): Diagram {
+	const groups = diagram.nodes
+		.filter((node) => node.shape === "group")
+		.sort((a, b) => ancestors(diagram, b.id).length - ancestors(diagram, a.id).length);
+	let next = diagram;
+	for (const { id } of groups) {
+		const group = next.nodes.find((node) => node.id === id) as DiagramNode;
+		const contents = next.nodes.filter((node) => node.parent === id);
+		if (contents.length === 0) continue;
+		const box = boxOf(contents);
+		const left = Math.min(group.x, box.x - GROUP_PADDING);
+		const top = Math.min(group.y, box.y - GROUP_TOP);
+		const right = Math.max(group.x + group.w, box.x + box.w + GROUP_PADDING);
+		const bottom = Math.max(group.y + group.h, box.y + box.h + GROUP_PADDING);
+		if (
+			left === group.x &&
+			top === group.y &&
+			right === group.x + group.w &&
+			bottom === group.y + group.h
+		) {
+			continue;
+		}
+		const grown = { ...group, x: left, y: top, w: right - left, h: bottom - top };
+		next = { ...next, nodes: next.nodes.map((node) => (node.id === id ? grown : node)) };
+	}
+	return next;
+}
+
+/**
+ * After shapes moved or were added: each goes into the group it lies in,
+ * groups grow around their contents, and connectors that now cross a
+ * group's border move up to the group.
+ */
+export function settleGroups(diagram: Diagram, moved: Iterable<string>): Diagram {
+	return liftEdges(fitGroups(placeInGroups(diagram, moved)));
+}
+
+/**
+ * Puts the shapes in a new group drawn around them. Connectors from
+ * outside to them now go to the group.
+ */
+export function groupNodes(
+	diagram: Diagram,
+	ids: ReadonlySet<string>,
+	title: string,
+): { diagram: Diagram; id: string } | null {
+	// The outermost of the shapes; what is inside them comes along.
+	const members = diagram.nodes.filter(
+		(node) => ids.has(node.id) && !ancestors(diagram, node.id).some((id) => ids.has(id)),
+	);
+	if (members.length === 0) return null;
+	const parents = new Set(members.map((node) => node.parent));
+	const parent = parents.size === 1 ? [...parents][0] : undefined;
+	const box = boxOf(members);
+	const id = nextId(diagram, "n");
+	const group: DiagramNode = {
+		id,
+		shape: "group",
+		x: snap(box.x - GROUP_PADDING),
+		y: snap(box.y - GROUP_TOP),
+		w: snap(box.w + 2 * GROUP_PADDING),
+		h: snap(box.h + GROUP_TOP + GROUP_PADDING),
+		text: title,
+		color: "default",
+		...(parent === undefined ? {} : { parent }),
+	};
+	const inside = new Set(members.map((node) => node.id));
+	const nodes = [
+		group,
+		...diagram.nodes.map((node) => (inside.has(node.id) ? { ...node, parent: id } : node)),
+	];
+	return { diagram: liftEdges(fitGroups({ ...diagram, nodes })), id };
+}
+
+/** Takes a group away, keeping what was inside it; connectors to the group go with it. */
+export function ungroup(diagram: Diagram, id: string): Diagram {
+	const group = diagram.nodes.find((node) => node.id === id);
+	if (group?.shape !== "group") return diagram;
+	return {
+		nodes: diagram.nodes
+			.filter((node) => node.id !== id)
+			.map((node) => {
+				if (node.parent !== id) return node;
+				const { parent: _old, ...rest } = node;
+				return group.parent === undefined ? rest : { ...rest, parent: group.parent };
+			}),
+		edges: diagram.edges.filter((edge) => edge.from !== id && edge.to !== id),
 	};
 }
 
@@ -90,10 +259,10 @@ export function alignNodes(diagram: Diagram, ids: ReadonlySet<string>, mode: Ali
 				return { ...node, y: box.y + box.h - node.h };
 		}
 	};
-	return {
+	return carryContents(diagram, {
 		...diagram,
 		nodes: diagram.nodes.map((node) => (ids.has(node.id) ? place(node) : node)),
-	};
+	});
 }
 
 /** Spreads three or more shapes so the gaps between them are equal; the outer two stay. */
@@ -117,20 +286,21 @@ export function distributeNodes(
 		placed.set(node.id, Math.round(at));
 		at += node[size] + gap;
 	}
-	return {
+	return carryContents(diagram, {
 		...diagram,
 		nodes: diagram.nodes.map((node) => {
 			const value = placed.get(node.id);
 			return value === undefined ? node : { ...node, [axis]: value };
 		}),
-	};
+	});
 }
 
-/** The shapes and the connectors between them, as they are copied. */
+/** The shapes (groups with what is inside them) and the connectors between them, as they are copied. */
 export function copyItems(diagram: Diagram, ids: ReadonlySet<string>): Diagram {
+	const all = withContents(diagram, ids);
 	return {
-		nodes: selected(diagram, ids),
-		edges: diagram.edges.filter((edge) => ids.has(edge.from) && ids.has(edge.to)),
+		nodes: selected(diagram, all),
+		edges: diagram.edges.filter((edge) => all.has(edge.from) && all.has(edge.to)),
 	};
 }
 
@@ -140,23 +310,39 @@ export function pasteItems(
 	clip: Diagram,
 	offset: Point,
 ): { diagram: Diagram; ids: string[] } {
-	let next: Diagram = diagram;
-	const ids = new Map<string, string>();
-	for (const node of clip.nodes) {
-		const id = nextId(next, "n");
-		ids.set(node.id, id);
-		next = {
-			...next,
-			nodes: [...next.nodes, { ...node, id, x: node.x + offset.x, y: node.y + offset.y }],
+	const taken = new Set([...diagram.nodes, ...diagram.edges].map((item) => item.id));
+	const fresh = (prefix: "n" | "e"): string => {
+		for (let n = 1; ; n++) {
+			const id = `${prefix}${n}`;
+			if (!taken.has(id)) {
+				taken.add(id);
+				return id;
+			}
+		}
+	};
+	const ids = new Map(clip.nodes.map((node) => [node.id, fresh("n")]));
+	const nodes = clip.nodes.map((node): DiagramNode => {
+		// Inside a copied group it stays inside the copy; otherwise its place decides.
+		const { parent, ...rest } = node;
+		const copiedParent = parent === undefined ? undefined : ids.get(parent);
+		return {
+			...rest,
+			id: ids.get(node.id) as string,
+			x: node.x + offset.x,
+			y: node.y + offset.y,
+			...(copiedParent === undefined ? {} : { parent: copiedParent }),
 		};
-	}
+	});
+	const edges: DiagramEdge[] = [];
 	for (const edge of clip.edges) {
 		const from = ids.get(edge.from);
 		const to = ids.get(edge.to);
-		if (from === undefined || to === undefined) continue;
-		next = { ...next, edges: [...next.edges, { ...edge, id: nextId(next, "e"), from, to }] };
+		if (from !== undefined && to !== undefined) edges.push({ ...edge, id: fresh("e"), from, to });
 	}
-	return { diagram: next, ids: [...ids.values()] };
+	return {
+		diagram: { nodes: [...diagram.nodes, ...nodes], edges: [...diagram.edges, ...edges] },
+		ids: [...ids.values()],
+	};
 }
 
 /** "Yes" for a decision's first way out, "No" for its second; nothing for anything else. */
@@ -178,6 +364,31 @@ const NODE_GAP = 40;
  * shapes in a row ordered by where the shapes leading to them are.
  */
 export function layoutDiagram(diagram: Diagram): Diagram {
+	// Groups are laid out as one shape each, their contents carried along.
+	const top = (id: string): string => ancestors(diagram, id).at(-1) ?? id;
+	const outer = diagram.nodes.filter((node) => node.parent === undefined);
+	const seen = new Set<string>();
+	const edges: DiagramEdge[] = [];
+	for (const edge of diagram.edges) {
+		const from = top(edge.from);
+		const to = top(edge.to);
+		const key = `${from}\u0000${to}`;
+		if (from === to || seen.has(key)) continue;
+		seen.add(key);
+		edges.push({ ...edge, from, to });
+	}
+	const laid = layoutFlat({ nodes: outer, edges });
+	const placed = new Map(laid.nodes.map((node) => [node.id, node]));
+	return carryContents(diagram, {
+		...diagram,
+		nodes: diagram.nodes.map((node) => {
+			const at = placed.get(node.id);
+			return at === undefined ? node : { ...node, x: at.x, y: at.y };
+		}),
+	});
+}
+
+function layoutFlat(diagram: Diagram): Diagram {
 	if (diagram.nodes.length === 0) return diagram;
 	const ids = diagram.nodes.map((node) => node.id);
 	const outgoing = new Map<string, string[]>(ids.map((id) => [id, []]));

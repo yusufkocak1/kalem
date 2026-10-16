@@ -282,7 +282,7 @@ const en = {
 	diagramShapeHint:
 		"Drag onto the canvas, or click to add (below the selected shape, connected to it)",
 	diagramHelp:
-		"Double-click a shape or an arrow to write in it. Drag from the dots on a shape's edges to connect it. Drag on the empty canvas to select several; Shift+click adds to the selection. Ctrl+C / Ctrl+V copy and paste, Ctrl+A selects all. Ctrl+wheel zooms; the wheel, the middle button or Space+drag move the view. Hold Alt while moving to skip the guides.",
+		"Double-click a shape or an arrow to write in it. Drag from the dots on a shape's edges to connect it. Drag on the empty canvas to select several; Shift+click adds to the selection. Ctrl+C / Ctrl+V copy and paste, Ctrl+A selects all. Ctrl+wheel zooms; the wheel, the middle button or Space+drag move the view. Hold Alt while moving to skip the guides. A shape dropped into a group (or grouped with Ctrl+G) belongs to it: it moves with the group and can only be connected from inside it.",
 	diagramTerminal: "Start / End",
 	diagramProcess: "Step",
 	diagramDecision: "Decision",
@@ -292,6 +292,13 @@ const en = {
 	diagramSubprocess: "Subprocess",
 	diagramCircle: "Connector",
 	diagramTextShape: "Text",
+	diagramMux: "Multiplexer",
+	diagramGroup: "Group",
+	diagramGroupSelection: "Group",
+	diagramUngroup: "Ungroup",
+	diagramRotate: "Rotate",
+	diagramConnectBlocked:
+		"A shape inside a group can only be connected from inside it. Connect to the group instead.",
 	diagramAlign: "Align",
 	diagramAlignLeft: "Align left",
 	diagramAlignCenter: "Align centers",
@@ -724,7 +731,7 @@ const tr: Strings = {
 	diagramShapeHint:
 		"Kanvasa sürükleyin ya da tıklayıp ekleyin (seçili şeklin altına, ona bağlı olarak)",
 	diagramHelp:
-		"Yazmak için şekle ya da oka çift tıklayın. Bağlamak için şeklin kenarlarındaki noktalardan sürükleyin. Birden fazla şekil seçmek için boş kanvasta sürükleyin; Shift+tıklama seçime ekler. Ctrl+C / Ctrl+V kopyalar ve yapıştırır, Ctrl+A hepsini seçer. Ctrl+tekerlek yakınlaştırır; tekerlek, orta tuş ya da Boşluk+sürükle görünümü kaydırır. Taşırken kılavuzları atlamak için Alt'a basılı tutun.",
+		"Yazmak için şekle ya da oka çift tıklayın. Bağlamak için şeklin kenarlarındaki noktalardan sürükleyin. Birden fazla şekil seçmek için boş kanvasta sürükleyin; Shift+tıklama seçime ekler. Ctrl+C / Ctrl+V kopyalar ve yapıştırır, Ctrl+A hepsini seçer. Ctrl+tekerlek yakınlaştırır; tekerlek, orta tuş ya da Boşluk+sürükle görünümü kaydırır. Taşırken kılavuzları atlamak için Alt'a basılı tutun. Bir gruba bırakılan (ya da Ctrl+G ile gruplanan) şekil o grubun olur: grupla birlikte taşınır ve ona yalnızca grubun içinden bağlanılır.",
 	diagramTerminal: "Başla / Bitir",
 	diagramProcess: "Adım",
 	diagramDecision: "Karar",
@@ -734,6 +741,13 @@ const tr: Strings = {
 	diagramSubprocess: "Alt süreç",
 	diagramCircle: "Bağlayıcı",
 	diagramTextShape: "Metin",
+	diagramMux: "Çoklayıcı (MUX)",
+	diagramGroup: "Grup",
+	diagramGroupSelection: "Grupla",
+	diagramUngroup: "Grubu çöz",
+	diagramRotate: "Döndür",
+	diagramConnectBlocked:
+		"Grubun içindeki bir şekle yalnızca grubun içinden bağlanılabilir. Bunun yerine gruba bağlayın.",
 	diagramAlign: "Hizala",
 	diagramAlignLeft: "Sola hizala",
 	diagramAlignCenter: "Ortalara hizala",

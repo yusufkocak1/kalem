@@ -34,6 +34,8 @@ export const SHAPES = [
 	"subprocess",
 	"circle",
 	"text",
+	"mux",
+	"group",
 ] as const;
 export type ShapeKind = (typeof SHAPES)[number];
 
@@ -48,6 +50,10 @@ export const COLORS = {
 } as const;
 export type ColorName = keyof typeof COLORS;
 
+export const DIRECTIONS = ["right", "down", "left", "up"] as const;
+/** Where a multiplexer's output points; its inputs are on the opposite, long side. */
+export type Direction = (typeof DIRECTIONS)[number];
+
 export interface DiagramNode {
 	readonly id: string;
 	readonly shape: ShapeKind;
@@ -57,6 +63,10 @@ export interface DiagramNode {
 	readonly h: number;
 	readonly text: string;
 	readonly color: ColorName;
+	/** The group the shape is in; shapes outside it cannot connect to it. */
+	readonly parent?: string;
+	/** A multiplexer's output side; `right` when not given. */
+	readonly direction?: Direction;
 }
 
 export const ARROWS = ["end", "both", "none"] as const;
@@ -99,6 +109,8 @@ export const DEFAULT_SIZE: Readonly<Record<ShapeKind, { w: number; h: number }>>
 	subprocess: { w: 170, h: 70 },
 	circle: { w: 60, h: 60 },
 	text: { w: 160, h: 40 },
+	mux: { w: 60, h: 120 },
+	group: { w: 400, h: 260 },
 };
 
 export const FONT_SIZE = 14;
@@ -163,8 +175,13 @@ export function parseDiagram(text: string): Diagram | null {
 			text: str(raw.text),
 			color:
 				typeof raw.color === "string" && raw.color in COLORS ? (raw.color as ColorName) : "default",
+			...(typeof raw.parent === "string" && raw.parent !== "" ? { parent: raw.parent } : {}),
+			...(shape === "mux" && DIRECTIONS.includes(raw.direction as Direction)
+				? { direction: raw.direction as Direction }
+				: {}),
 		});
 	}
+	const checked = withValidParents(nodes);
 	const edges: DiagramEdge[] = [];
 	for (const raw of Array.isArray(data.edges) ? data.edges.slice(0, MAX_ITEMS) : []) {
 		if (!isObject(raw)) continue;
@@ -176,12 +193,104 @@ export function parseDiagram(text: string): Diagram | null {
 		const arrow = ARROWS.includes(raw.arrow as ArrowKind) ? (raw.arrow as ArrowKind) : "end";
 		edges.push({ id, from, to, text: str(raw.text), dashed: raw.dashed === true, arrow });
 	}
-	return { nodes, edges };
+	return liftEdges({ nodes: checked, edges });
+}
+
+/** Drops a `parent` that is not a group of the diagram, or that would make a loop. */
+function withValidParents(nodes: readonly DiagramNode[]): DiagramNode[] {
+	const byId = new Map(nodes.map((node) => [node.id, node]));
+	const loops = (start: DiagramNode): boolean => {
+		const seen = new Set([start.id]);
+		for (let at = start.parent; at !== undefined; at = byId.get(at)?.parent) {
+			if (seen.has(at)) return true;
+			seen.add(at);
+		}
+		return false;
+	};
+	return nodes.map((node) => {
+		if (node.parent === undefined) return node;
+		const parent = byId.get(node.parent);
+		if (parent?.shape === "group" && !loops(node)) return node;
+		const { parent: _dropped, ...rest } = node;
+		return rest;
+	});
+}
+
+// --- Groups ------------------------------------------------------------------
+
+/** The groups a shape is in, innermost first. */
+export function ancestors(diagram: Diagram, id: string): string[] {
+	const byId = new Map(diagram.nodes.map((node) => [node.id, node]));
+	const chain: string[] = [];
+	for (
+		let at = byId.get(id)?.parent;
+		at !== undefined && !chain.includes(at);
+		at = byId.get(at)?.parent
+	) {
+		chain.push(at);
+	}
+	return chain;
+}
+
+/**
+ * Shapes can connect when they are in the same group (or both outside every
+ * group), or when one is the group the other is in. A shape inside a group
+ * is not reachable from outside it: the outside connects to the group.
+ */
+export function connectionAllowed(diagram: Diagram, from: string, to: string): boolean {
+	if (from === to) return false;
+	const parentOf = (id: string): string | undefined =>
+		diagram.nodes.find((node) => node.id === id)?.parent;
+	const a = parentOf(from);
+	const b = parentOf(to);
+	return a === b || a === to || b === from;
+}
+
+/**
+ * Connectors that cross a group's border are moved up to the group: the
+ * end inside is replaced by the group it is in, the deeper end first,
+ * until the connection is allowed. One that ends where it starts goes, as
+ * does a second connector between the same two shapes.
+ */
+export function liftEdges(diagram: Diagram): Diagram {
+	const depth = (id: string): number => ancestors(diagram, id).length;
+	const parentOf = (id: string): string | undefined =>
+		diagram.nodes.find((node) => node.id === id)?.parent;
+	const edges: DiagramEdge[] = [];
+	const seen = new Set<string>();
+	let changed = false;
+	for (const edge of diagram.edges) {
+		let { from, to } = edge;
+		while (from !== to && !connectionAllowed(diagram, from, to)) {
+			const df = depth(from);
+			const dt = depth(to);
+			if (df >= dt) from = parentOf(from) ?? from;
+			if (dt >= df) to = parentOf(to) ?? to;
+		}
+		const key = `${from}\u0000${to}`;
+		if (from === to || seen.has(key)) {
+			changed = true;
+			continue;
+		}
+		seen.add(key);
+		if (from !== edge.from || to !== edge.to) changed = true;
+		edges.push(from === edge.from && to === edge.to ? edge : { ...edge, from, to });
+	}
+	return changed ? { ...diagram, edges } : diagram;
 }
 
 // --- Geometry ----------------------------------------------------------------
 
 type Side = "top" | "right" | "bottom" | "left";
+
+interface Anchor extends Point {
+	readonly side: Side;
+}
+
+export interface Route {
+	readonly points: Point[];
+	readonly label: Point;
+}
 
 function anchor(node: DiagramNode, side: Side): Point {
 	switch (side) {
@@ -239,6 +348,143 @@ export function edgeRoute(from: DiagramNode, to: DiagramNode): { points: Point[]
 	};
 }
 
+const isAcross = (side: Side): boolean => side === "left" || side === "right";
+
+/** The side of a shape that faces a point. */
+function sideToward(node: DiagramNode, point: Point): Side {
+	const dx = (point.x - (node.x + node.w / 2)) / (node.w / 2);
+	const dy = (point.y - (node.y + node.h / 2)) / (node.h / 2);
+	if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? "right" : "left";
+	return dy >= 0 ? "bottom" : "top";
+}
+
+/** A right-angled path between two anchors; the label on its longest leg. */
+function orthogonal(a: Anchor, b: Anchor): Route {
+	let points: Point[];
+	if (Math.abs(a.x - b.x) < 1 || Math.abs(a.y - b.y) < 1) points = [a, b];
+	else if (isAcross(a.side) && isAcross(b.side)) {
+		const middle = (a.x + b.x) / 2;
+		points = [a, { x: middle, y: a.y }, { x: middle, y: b.y }, b];
+	} else if (!isAcross(a.side) && !isAcross(b.side)) {
+		const middle = (a.y + b.y) / 2;
+		points = [a, { x: a.x, y: middle }, { x: b.x, y: middle }, b];
+	} else if (isAcross(a.side)) points = [a, { x: b.x, y: a.y }, b];
+	else points = [a, { x: a.x, y: b.y }, b];
+	let label: Point = a;
+	let longest = -1;
+	for (let i = 1; i < points.length; i++) {
+		const p = points[i - 1] as Point;
+		const q = points[i] as Point;
+		const length = Math.abs(q.x - p.x) + Math.abs(q.y - p.y);
+		if (length > longest) {
+			longest = length;
+			label = { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
+		}
+	}
+	return { points: points.map(({ x, y }) => ({ x, y })), label };
+}
+
+/** How far a multiplexer's narrow side is set in at each end. */
+const muxInset = (node: DiagramNode): number =>
+	(node.direction ?? "right") === "right" || node.direction === "left"
+		? node.h * 0.2
+		: node.w * 0.2;
+
+/** Where the `index`-th of `count` connectors meets a multiplexer: inputs on the long side, outputs on the short one. */
+function muxAnchor(node: DiagramNode, input: boolean, index: number, count: number): Anchor {
+	const direction = node.direction ?? "right";
+	const inset = input ? 0 : muxInset(node);
+	const along = (index + 1) / (count + 1);
+	const out: Record<Direction, Side> = { right: "right", left: "left", down: "bottom", up: "top" };
+	const back: Record<Direction, Side> = { right: "left", left: "right", down: "top", up: "bottom" };
+	const side = input ? back[direction] : out[direction];
+	if (isAcross(side)) {
+		const y = node.y + inset + along * (node.h - 2 * inset);
+		return { x: side === "left" ? node.x : node.x + node.w, y, side };
+	}
+	const x = node.x + inset + along * (node.w - 2 * inset);
+	return { x, y: side === "top" ? node.y : node.y + node.h, side };
+}
+
+/** A group's border opposite a shape inside it, and the shape's side that faces it. */
+function inside(group: DiagramNode, child: DiagramNode): { outer: Anchor; inner: Anchor } {
+	const gaps: [Side, number][] = [
+		["left", child.x - group.x],
+		["right", group.x + group.w - (child.x + child.w)],
+		["top", child.y - group.y],
+		["bottom", group.y + group.h - (child.y + child.h)],
+	];
+	const side = gaps.reduce((best, gap) => (gap[1] < best[1] ? gap : best))[0];
+	const cx = child.x + child.w / 2;
+	const cy = child.y + child.h / 2;
+	const inner = { ...anchor(child, side), side };
+	const outer: Anchor = isAcross(side)
+		? { x: side === "left" ? group.x : group.x + group.w, y: cy, side }
+		: { x: cx, y: side === "top" ? group.y : group.y + group.h, side };
+	return { outer, inner };
+}
+
+/**
+ * Every connector's path. Most go between the facing sides' middles
+ * ({@link edgeRoute}); a multiplexer spreads its inputs along its long side
+ * and its outputs along its short one, and a group meets a shape inside it
+ * from the nearest border.
+ */
+export function routeEdges(diagram: Diagram): Map<string, Route> {
+	const byId = new Map(diagram.nodes.map((node) => [node.id, node]));
+	const center = (node: DiagramNode): Point => ({ x: node.x + node.w / 2, y: node.y + node.h / 2 });
+	// The connectors at each multiplexer, in the order their other ends lie along its side.
+	const slots = new Map<string, { index: number; count: number }>();
+	for (const node of diagram.nodes) {
+		if (node.shape !== "mux") continue;
+		const across = isAcross(muxAnchor(node, true, 0, 1).side);
+		for (const input of [true, false]) {
+			const ends = diagram.edges
+				.filter((edge) => (input ? edge.to : edge.from) === node.id)
+				.map((edge) => ({ edge, other: byId.get(input ? edge.from : edge.to) }))
+				.filter((end): end is { edge: DiagramEdge; other: DiagramNode } => end.other !== undefined)
+				.sort((p, q) =>
+					across ? center(p.other).y - center(q.other).y : center(p.other).x - center(q.other).x,
+				);
+			ends.forEach(({ edge }, index) => {
+				slots.set(`${edge.id}:${input ? "to" : "from"}`, { index, count: ends.length });
+			});
+		}
+	}
+	const routes = new Map<string, Route>();
+	for (const edge of diagram.edges) {
+		const from = byId.get(edge.from);
+		const to = byId.get(edge.to);
+		if (from === undefined || to === undefined) continue;
+		let a: Anchor | null = null;
+		let b: Anchor | null = null;
+		const fromSlot = slots.get(`${edge.id}:from`);
+		const toSlot = slots.get(`${edge.id}:to`);
+		if (fromSlot !== undefined) a = muxAnchor(from, false, fromSlot.index, fromSlot.count);
+		if (toSlot !== undefined) b = muxAnchor(to, true, toSlot.index, toSlot.count);
+		if (to.parent === from.id) {
+			const ends = inside(from, to);
+			a ??= ends.outer;
+			b ??= ends.inner;
+		} else if (from.parent === to.id) {
+			const ends = inside(to, from);
+			a ??= ends.inner;
+			b ??= ends.outer;
+		}
+		if (a === null && b === null) {
+			routes.set(edge.id, edgeRoute(from, to));
+			continue;
+		}
+		a ??= {
+			...anchor(from, sideToward(from, b ?? center(to))),
+			side: sideToward(from, b ?? center(to)),
+		};
+		b ??= { ...anchor(to, sideToward(to, a)), side: sideToward(to, a) };
+		routes.set(edge.id, orthogonal(a, b));
+	}
+	return routes;
+}
+
 /** Lines of `text` that fit `width`, estimated from an average character width. */
 export function wrapLines(text: string, width: number, fontSize = FONT_SIZE): string[] {
 	const perLine = Math.max(1, Math.floor(width / (fontSize * 0.55)));
@@ -281,6 +527,10 @@ function textWidth(node: DiagramNode): number {
 			return node.w * 0.75;
 		case "text":
 			return node.w - 4;
+		case "mux":
+			return Math.min(node.w, node.h) * 0.8;
+		case "group":
+			return node.w - 24;
 		default:
 			return node.w - 16;
 	}
@@ -311,12 +561,11 @@ export function bounds(diagram: Diagram): { x: number; y: number; w: number; h: 
 		bottom = Math.max(bottom, y + h);
 	};
 	for (const node of diagram.nodes) add(node.x, node.y, node.w, node.h);
-	const byId = new Map(diagram.nodes.map((node) => [node.id, node]));
+	const routes = routeEdges(diagram);
 	for (const edge of diagram.edges) {
-		const from = byId.get(edge.from);
-		const to = byId.get(edge.to);
-		if (from === undefined || to === undefined || edge.text === "") continue;
-		const { label } = edgeRoute(from, to);
+		const route = routes.get(edge.id);
+		if (route === undefined || edge.text === "") continue;
+		const { label } = route;
 		const size = labelSize(edge.text);
 		add(label.x - size.w / 2, label.y - size.h / 2, size.w, size.h);
 	}
@@ -394,6 +643,41 @@ function outline(
 			];
 		case "circle":
 			return [svg("ellipse", { cx: x + w / 2, cy: y + h / 2, rx: w / 2, ry: h / 2, ...attrs })];
+		case "mux": {
+			const s = muxInset(node);
+			const corners: Record<Direction, [number, number][]> = {
+				right: [
+					[x, y],
+					[x + w, y + s],
+					[x + w, y + h - s],
+					[x, y + h],
+				],
+				left: [
+					[x, y + s],
+					[x + w, y],
+					[x + w, y + h],
+					[x, y + h - s],
+				],
+				down: [
+					[x, y],
+					[x + w, y],
+					[x + w - s, y + h],
+					[x + s, y + h],
+				],
+				up: [
+					[x + s, y],
+					[x + w - s, y],
+					[x + w, y + h],
+					[x, y + h],
+				],
+			};
+			const points = corners[node.direction ?? "right"]
+				.map(([px, py]) => `${round(px)},${round(py)}`)
+				.join(" ");
+			return [svg("polygon", { points, ...attrs })];
+		}
+		case "group":
+			return [svg("rect", { x, y, width: w, height: h, rx: 8, ...attrs })];
 		case "text":
 			// Only text; in the editor a clear box keeps it easy to grab.
 			return interactive ? [svg("rect", { x, y, width: w, height: h, fill: "transparent" })] : [];
@@ -434,8 +718,36 @@ function textBlock(lines: readonly string[], cx: number, cy: number): SvgNode {
 	);
 }
 
+/** A group's name, in its top left corner. */
+const GROUP_TITLE = 32;
+
 function nodeElement(node: DiagramNode, interactive: boolean): SvgNode {
 	const color = COLORS[node.color];
+	if (node.shape === "group") {
+		const fill = node.color === "default" ? "#f8fafc" : color.fill;
+		const title = wrapLines(node.text, textWidth(node))[0] ?? "";
+		return svg("g", interactive ? { "data-node": node.id, class: "kd-node kd-group" } : {}, [
+			...outline(node, { fill, stroke: color.stroke, "stroke-width": 1.5 }, interactive),
+			...(title === ""
+				? []
+				: [
+						svg(
+							"text",
+							{
+								x: round(node.x + 12),
+								y: round(node.y + GROUP_TITLE / 2 + 2),
+								"dominant-baseline": "central",
+								"font-family": FONT_FAMILY,
+								"font-size": FONT_SIZE,
+								"font-weight": 600,
+								fill: TEXT_COLOR,
+							},
+							undefined,
+							title,
+						),
+					]),
+		]);
+	}
 	const lines = node.text === "" ? [] : wrapLines(node.text, textWidth(node));
 	const centerY =
 		node.shape === "database" ? node.y + node.h / 2 + cap(node) / 2 : node.y + node.h / 2;
@@ -445,13 +757,8 @@ function nodeElement(node: DiagramNode, interactive: boolean): SvgNode {
 	]);
 }
 
-function edgeElement(
-	edge: DiagramEdge,
-	from: DiagramNode,
-	to: DiagramNode,
-	interactive: boolean,
-): SvgNode {
-	const { points } = edgeRoute(from, to);
+function edgeElement(edge: DiagramEdge, route: Route, interactive: boolean): SvgNode {
+	const { points } = route;
 	const d = points
 		.map((point, index) => `${index === 0 ? "M" : "L"}${round(point.x)} ${round(point.y)}`)
 		.join("");
@@ -476,14 +783,9 @@ function edgeElement(
 }
 
 /** A connector's text on a white box; drawn after every line, so no line crosses it. */
-function edgeLabel(
-	edge: DiagramEdge,
-	from: DiagramNode,
-	to: DiagramNode,
-	interactive: boolean,
-): SvgNode | null {
+function edgeLabel(edge: DiagramEdge, route: Route, interactive: boolean): SvgNode | null {
 	if (edge.text === "") return null;
-	const { label } = edgeRoute(from, to);
+	const { label } = route;
 	const size = labelSize(edge.text);
 	return svg("g", interactive ? { "data-edge": edge.id, class: "kd-label" } : {}, [
 		svg("rect", {
@@ -515,24 +817,34 @@ const ARROW = svg("defs", {}, [
 	),
 ]);
 
-/** The diagram's elements: arrow definition, connectors, then shapes on top. */
+/**
+ * The diagram's elements: arrow definition, groups (outer ones first),
+ * connectors, their labels, then the other shapes on top.
+ */
 export function diagramContent(diagram: Diagram, interactive = false): SvgNode[] {
-	const byId = new Map(diagram.nodes.map((node) => [node.id, node]));
+	const routes = routeEdges(diagram);
 	const edges: SvgNode[] = [];
 	const labels: SvgNode[] = [];
 	for (const edge of diagram.edges) {
-		const from = byId.get(edge.from);
-		const to = byId.get(edge.to);
-		if (from === undefined || to === undefined) continue;
-		edges.push(edgeElement(edge, from, to, interactive));
-		const label = edgeLabel(edge, from, to, interactive);
+		const route = routes.get(edge.id);
+		if (route === undefined) continue;
+		edges.push(edgeElement(edge, route, interactive));
+		const label = edgeLabel(edge, route, interactive);
 		if (label !== null) labels.push(label);
 	}
+	const groups = diagram.nodes
+		.filter((node) => node.shape === "group")
+		.map((node) => ({ node, depth: ancestors(diagram, node.id).length }))
+		.sort((a, b) => a.depth - b.depth)
+		.map(({ node }) => nodeElement(node, interactive));
 	return [
 		ARROW,
+		...groups,
 		...edges,
 		...labels,
-		...diagram.nodes.map((node) => nodeElement(node, interactive)),
+		...diagram.nodes
+			.filter((node) => node.shape !== "group")
+			.map((node) => nodeElement(node, interactive)),
 	];
 }
 
