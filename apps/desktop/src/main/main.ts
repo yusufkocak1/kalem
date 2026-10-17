@@ -369,7 +369,18 @@ function start(): void {
 		if (process.platform !== "darwin" && !tray.enabled) app.quit();
 	});
 
-	app.on("will-quit", () => globalShortcut.unregisterAll());
+	// Closing a window deletes its drafts without waiting; quitting before they
+	// are gone would bring a discarded document back as "recovered".
+	let draftsSettled = false;
+	app.on("will-quit", (event) => {
+		globalShortcut.unregisterAll();
+		if (draftsSettled || !drafts.busy) return;
+		event.preventDefault();
+		void drafts.idle().finally(() => {
+			draftsSettled = true;
+			app.quit();
+		});
+	});
 
 	app.on("activate", () => {
 		if (ready && BrowserWindow.getAllWindows().length === 0) windows.open();

@@ -1276,8 +1276,16 @@ export class Editor {
 		this.#applySelection({ kind: "block", anchor, focus });
 	};
 
-	#onPointerUp = (): void => {
+	#onPointerUp = (event: PointerEvent): void => {
+		const tiklama = event.button === 0 && this.#dragAnchor !== null && !this.#blockDrag;
 		this.#dragAnchor = null;
+		// Blok seçiminden sonra bir bloğa tıklamak onu bitiriyor. Tarayıcının
+		// imleci zaten tıklanan yerdeyse `selectionchange` gelmiyor ve blok
+		// seçimi ekranda kalıyordu; ardından yapıştırma bütün seçili blokları
+		// siliyordu.
+		if (tiklama && this.#selection?.kind === "block") {
+			this.#applySelection(readSelection(this.#element));
+		}
 	};
 
 	/**
