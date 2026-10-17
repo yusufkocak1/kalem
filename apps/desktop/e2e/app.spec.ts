@@ -1575,6 +1575,49 @@ test("saves an untitled document before attaching a file to it", async () => {
 	await discardAndClose(app);
 });
 
+test("copies blocks selected by dragging from the context menu", async () => {
+	const path = join(await tempDir("block-copy"), "bloklar.md");
+	await writeFile(path, "Birinci\n\nİkinci\n\nÜçüncü\n");
+	const { app, page, errors } = await launch({ args: [path] });
+	const blocks = page.locator("#editor > *");
+	await expect(blocks).toHaveCount(3);
+
+	const top = await blocks.nth(0).boundingBox();
+	const bottom = await blocks.nth(2).boundingBox();
+	if (top === null || bottom === null) throw new Error("blocks are not visible");
+	await page.mouse.move(top.x + 6, top.y + top.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(bottom.x + 20, bottom.y + bottom.height / 2, { steps: 12 });
+	await page.mouse.up();
+
+	await app.evaluate(({ webContents }) => {
+		const store = globalThis as { canCopy?: boolean };
+		webContents.getAllWebContents()[0]?.once("context-menu", (_event, params) => {
+			store.canCopy = params.editFlags.canCopy;
+		});
+	});
+	// A right click on a selected block keeps the selection.
+	const middle = await blocks.nth(1).boundingBox();
+	if (middle === null) throw new Error("block is not visible");
+	await page.mouse.click(middle.x + 10, middle.y + middle.height / 2, { button: "right" });
+	await expect
+		.poll(() => app.evaluate(() => (globalThis as { canCopy?: boolean }).canCopy))
+		.toBeDefined();
+	await page.keyboard.press("Escape");
+	await expect(page.locator("#editor > .kalem-selected")).toHaveCount(3);
+
+	// What the context menu's Copy does.
+	await app.evaluate(({ clipboard, webContents }) => {
+		clipboard.clear();
+		webContents.getAllWebContents()[0]?.copy();
+	});
+	await expect
+		.poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
+		.toBe("Birinci\n\nİkinci\n\nÜçüncü");
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
 test("copies a styled table with its style and pastes it back styled", async () => {
 	const path = join(await tempDir("table-copy"), "tablo.md");
 	await writeFile(
