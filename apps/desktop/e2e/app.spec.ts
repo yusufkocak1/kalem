@@ -242,8 +242,9 @@ test("recovers unsaved text after a crash", async () => {
 	await expect.poll(async () => (await readdir(drafts).catch(() => [])).length).toBe(1);
 
 	// Hard-kill the real main process: `app.process()` is only Playwright's launcher.
+	// SIGTERM would quit gracefully and stop at the unsaved-changes question.
 	const mainPid = await first.app.evaluate(() => process.pid);
-	process.kill(mainPid);
+	process.kill(mainPid, "SIGKILL");
 
 	const second = await relaunch(first.userData);
 	await expect(second.page.locator("#editor p")).toHaveText("Kaydedilmemiş cümle.");
@@ -677,7 +678,7 @@ test("recovers unsaved changes to a package with its images", async () => {
 	await first.page.keyboard.type(" 2026");
 	const drafts = join(first.userData, "drafts");
 	await expect.poll(async () => (await readdir(drafts).catch(() => [])).length).toBe(1);
-	process.kill(await first.app.evaluate(() => process.pid));
+	process.kill(await first.app.evaluate(() => process.pid), "SIGKILL");
 
 	const second = await relaunch(first.userData);
 	await expect(second.page.locator("#editor h1")).toHaveText("Albüm 2026");
@@ -1573,6 +1574,49 @@ test("saves an untitled document before attaching a file to it", async () => {
 	expect(await readdir(join(folder, "yeni.assets"))).toEqual(["veri.csv"]);
 	expect(await windowTitle(app)).toContain("yeni");
 	await discardAndClose(app);
+});
+
+test("copies blocks selected by dragging from the context menu", async () => {
+	const path = join(await tempDir("block-copy"), "bloklar.md");
+	await writeFile(path, "Birinci\n\nİkinci\n\nÜçüncü\n");
+	const { app, page, errors } = await launch({ args: [path] });
+	const blocks = page.locator("#editor > *");
+	await expect(blocks).toHaveCount(3);
+
+	const top = await blocks.nth(0).boundingBox();
+	const bottom = await blocks.nth(2).boundingBox();
+	if (top === null || bottom === null) throw new Error("blocks are not visible");
+	await page.mouse.move(top.x + 6, top.y + top.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(bottom.x + 20, bottom.y + bottom.height / 2, { steps: 12 });
+	await page.mouse.up();
+
+	await app.evaluate(({ webContents }) => {
+		const store = globalThis as { canCopy?: boolean };
+		webContents.getAllWebContents()[0]?.once("context-menu", (_event, params) => {
+			store.canCopy = params.editFlags.canCopy;
+		});
+	});
+	// A right click on a selected block keeps the selection.
+	const middle = await blocks.nth(1).boundingBox();
+	if (middle === null) throw new Error("block is not visible");
+	await page.mouse.click(middle.x + 10, middle.y + middle.height / 2, { button: "right" });
+	await expect
+		.poll(() => app.evaluate(() => (globalThis as { canCopy?: boolean }).canCopy))
+		.toBeDefined();
+	await page.keyboard.press("Escape");
+	await expect(page.locator("#editor > .kalem-selected")).toHaveCount(3);
+
+	// What the context menu's Copy does.
+	await app.evaluate(({ clipboard, webContents }) => {
+		clipboard.clear();
+		webContents.getAllWebContents()[0]?.copy();
+	});
+	await expect
+		.poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
+		.toBe("Birinci\n\nİkinci\n\nÜçüncü");
+	expect(errors).toEqual([]);
+	await app.close();
 });
 
 test("copies a styled table with its style and pastes it back styled", async () => {

@@ -47,6 +47,8 @@ function parseRemote(raw: unknown): RemotePage | null {
  */
 export class DraftStore {
 	readonly #folder: string;
+	/** Each draft's last pending write or delete; they run in order. */
+	readonly #pending = new Map<string, Promise<void>>();
 
 	constructor(folder: string) {
 		this.#folder = folder;
@@ -55,6 +57,27 @@ export class DraftStore {
 	#file(id: string): string {
 		if (!DRAFT_ID.test(id)) throw new Error(`Invalid draft id: ${id}`);
 		return join(this.#folder, `${id}.json`);
+	}
+
+	/** Runs after the draft's earlier operations, so a late write cannot undo a delete. */
+	#queue(id: string, operation: () => Promise<void>): Promise<void> {
+		const next = (this.#pending.get(id) ?? Promise.resolve()).catch(() => {}).then(operation);
+		this.#pending.set(id, next);
+		const forget = (): void => {
+			if (this.#pending.get(id) === next) this.#pending.delete(id);
+		};
+		next.then(forget, forget);
+		return next;
+	}
+
+	/** Whether a write or delete has not finished yet. */
+	get busy(): boolean {
+		return this.#pending.size > 0;
+	}
+
+	/** Resolves once every pending write and delete has finished. */
+	async idle(): Promise<void> {
+		while (this.#pending.size > 0) await Promise.allSettled([...this.#pending.values()]);
 	}
 
 	async write(
@@ -67,14 +90,17 @@ export class DraftStore {
 		time: number,
 	): Promise<void> {
 		const file = this.#file(id);
-		await mkdir(this.#folder, { recursive: true });
-		const temp = `${file}.tmp`;
-		await writeFile(temp, JSON.stringify({ ...request, time }), "utf8");
-		await rename(temp, file);
+		return this.#queue(id, async () => {
+			await mkdir(this.#folder, { recursive: true });
+			const temp = `${file}.tmp`;
+			await writeFile(temp, JSON.stringify({ ...request, time }), "utf8");
+			await rename(temp, file);
+		});
 	}
 
 	async delete(id: string): Promise<void> {
-		await rm(this.#file(id), { force: true });
+		const file = this.#file(id);
+		return this.#queue(id, () => rm(file, { force: true }));
 	}
 
 	/** All readable drafts, oldest first. */

@@ -102,9 +102,9 @@ itibaren vardır ve kendi öz-testleri de var (`pnpm guard:selftest`).
 |---|---|
 | `@kalem-editor/core` | 13,4 kB |
 | `@kalem-editor/viewer` | 2,9 kB |
-| `@kalem-editor/editor` (çekirdek dâhil) | 31,3 kB |
-| `@kalem-editor/editor` + `@kalem-editor/ui` | 40,0 kB |
-| `@kalem-editor/wc` — tek `<script>` derlemesi | 31,9 kB |
+| `@kalem-editor/editor` (çekirdek dâhil) | 31,4 kB |
+| `@kalem-editor/editor` + `@kalem-editor/ui` | 40,1 kB |
+| `@kalem-editor/wc` — tek `<script>` derlemesi | 32,0 kB |
 | Sarmalayıcılar (react / vue / wc) | 907 B / 686 B / 1,99 kB |
 
 Doğrulama: 1.400'ün üstünde birim testi, 1.200'ün üstünde tarayıcı testi

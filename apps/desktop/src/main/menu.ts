@@ -504,8 +504,11 @@ export function popupContextMenu(
 
 	if (params.isEditable) {
 		items.push(
-			{ label: t.cut, role: "cut", enabled: params.editFlags.canCut },
-			{ label: t.copy, role: "copy", enabled: params.editFlags.canCopy },
+			// Chromium sees no selection when the editor has blocks selected (it keeps
+			// that selection itself), so its canCut/canCopy would disable them. With
+			// nothing selected they do nothing.
+			{ label: t.cut, role: "cut" },
+			{ label: t.copy, role: "copy" },
 			{ label: t.paste, role: "paste", enabled: params.editFlags.canPaste },
 			{
 				label: t.pastePlain,

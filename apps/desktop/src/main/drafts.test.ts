@@ -85,6 +85,24 @@ describe("DraftStore", () => {
 		expect(b?.storage).toBeUndefined();
 	});
 
+	it("runs a draft's writes and deletes in order and waits for them", async () => {
+		const written = store.write(
+			ID_A,
+			{ path: null, name: "a", text: "geç", format: DEFAULT_FORMAT },
+			1,
+		);
+		const deleted = store.delete(ID_A);
+		expect(store.busy).toBe(true);
+		await store.idle();
+		expect(store.busy).toBe(false);
+		await Promise.all([written, deleted]);
+		expect(await store.list()).toEqual([]);
+	});
+
+	it("rejects an invalid id without throwing", async () => {
+		await expect(store.delete("../x")).rejects.toThrow("Invalid draft id");
+	});
+
 	it("overwrites the draft of the same window and leaves no temp file", async () => {
 		const request = { path: null, name: "x", format: DEFAULT_FORMAT };
 		await store.write(ID_A, { ...request, text: "eski" }, 1);

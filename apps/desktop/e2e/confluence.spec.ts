@@ -255,7 +255,11 @@ test("edits a Confluence page and saves it back as a new version", async () => {
 	expect(confluence.saves[1]?.storage).toContain("Hedef eklendi tekrar");
 
 	expect(confluence.auth.every((header) => header === `Bearer ${TOKEN}`)).toBe(true);
-	expect(await readFile(join(userData, "confluence.json"), "utf8")).not.toContain(TOKEN);
+	// Without OS encryption (a CI box with no keyring) the token is never written.
+	const encrypted = await app.evaluate(({ safeStorage }) => safeStorage.isEncryptionAvailable());
+	const stored = await readFile(join(userData, "confluence.json"), "utf8").catch(() => null);
+	expect(stored === null).toBe(!encrypted);
+	expect(stored ?? "").not.toContain(TOKEN);
 	expect(errors).toEqual([]);
 	await app.close();
 });

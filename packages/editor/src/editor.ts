@@ -264,6 +264,7 @@ export class Editor {
 		element.addEventListener("cut", this.#onCut);
 		element.addEventListener("paste", this.#onPaste);
 		element.addEventListener("pointerdown", this.#onPointerDown);
+		element.addEventListener("mousedown", this.#onMouseDown);
 		element.addEventListener("pointermove", this.#onPointerMove);
 		element.ownerDocument.addEventListener("pointerup", this.#onPointerUp);
 		// `selectionchange` yalnızca belge üzerinde tetiklenir; elemana
@@ -807,6 +808,7 @@ export class Editor {
 		this.#element.removeEventListener("cut", this.#onCut);
 		this.#element.removeEventListener("paste", this.#onPaste);
 		this.#element.removeEventListener("pointerdown", this.#onPointerDown);
+		this.#element.removeEventListener("mousedown", this.#onMouseDown);
 		this.#element.removeEventListener("pointermove", this.#onPointerMove);
 		this.#element.ownerDocument.removeEventListener("pointerup", this.#onPointerUp);
 		this.#element.ownerDocument.removeEventListener("selectionchange", this.#onSelectionChange);
@@ -1232,6 +1234,22 @@ export class Editor {
 		this.#blockDrag = false;
 	};
 
+	/**
+	 * Seçili bloklara sağ tıklamak seçimi bozmuyor.
+	 *
+	 * Blok seçiminde tarayıcının aralığı boş; sağ tık onu tıklanan yere
+	 * imleç olarak koyuyor, seçim tek bloğa düşüyor ve bağlam menüsündeki
+	 * "Kopyala" kopyalayacak bir şey bulamıyordu. Varsayılanı engellemek
+	 * `contextmenu` olayını durdurmuyor, menü yine açılıyor.
+	 */
+	#onMouseDown = (event: MouseEvent): void => {
+		if (event.button !== 2 || this.#selection?.kind !== "block") return;
+		const blok = this.#blockOf(event.target);
+		if (blok === null) return;
+		const secili = selectedRange(this.#selection, this.#blockOrder());
+		if (secili.includes(blok.getAttribute(ID_ATTR) as NodeId)) event.preventDefault();
+	};
+
 	#onPointerMove = (event: PointerEvent): void => {
 		const anchor = this.#dragAnchor;
 		if (anchor === null) return;
@@ -1258,8 +1276,16 @@ export class Editor {
 		this.#applySelection({ kind: "block", anchor, focus });
 	};
 
-	#onPointerUp = (): void => {
+	#onPointerUp = (event: PointerEvent): void => {
+		const tiklama = event.button === 0 && this.#dragAnchor !== null && !this.#blockDrag;
 		this.#dragAnchor = null;
+		// Blok seçiminden sonra bir bloğa tıklamak onu bitiriyor. Tarayıcının
+		// imleci zaten tıklanan yerdeyse `selectionchange` gelmiyor ve blok
+		// seçimi ekranda kalıyordu; ardından yapıştırma bütün seçili blokları
+		// siliyordu.
+		if (tiklama && this.#selection?.kind === "block") {
+			this.#applySelection(readSelection(this.#element));
+		}
 	};
 
 	/**
