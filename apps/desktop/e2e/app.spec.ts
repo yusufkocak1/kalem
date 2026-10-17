@@ -242,8 +242,9 @@ test("recovers unsaved text after a crash", async () => {
 	await expect.poll(async () => (await readdir(drafts).catch(() => [])).length).toBe(1);
 
 	// Hard-kill the real main process: `app.process()` is only Playwright's launcher.
+	// SIGTERM would quit gracefully and stop at the unsaved-changes question.
 	const mainPid = await first.app.evaluate(() => process.pid);
-	process.kill(mainPid);
+	process.kill(mainPid, "SIGKILL");
 
 	const second = await relaunch(first.userData);
 	await expect(second.page.locator("#editor p")).toHaveText("Kaydedilmemiş cümle.");
@@ -677,7 +678,7 @@ test("recovers unsaved changes to a package with its images", async () => {
 	await first.page.keyboard.type(" 2026");
 	const drafts = join(first.userData, "drafts");
 	await expect.poll(async () => (await readdir(drafts).catch(() => [])).length).toBe(1);
-	process.kill(await first.app.evaluate(() => process.pid));
+	process.kill(await first.app.evaluate(() => process.pid), "SIGKILL");
 
 	const second = await relaunch(first.userData);
 	await expect(second.page.locator("#editor h1")).toHaveText("Albüm 2026");
