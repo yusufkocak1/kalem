@@ -14,8 +14,17 @@ import { dialog, ipcMain } from "electron";
 import type { AssistantStatus } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
 import { parseChat } from "../shared/chats.js";
-import type { ClaudeEvent } from "../shared/claude.js";
-import { claudeArgs, copilotArgs, systemPrompt, withInstructions } from "../shared/claude.js";
+import type { ClaudeEvent, PromptImage } from "../shared/claude.js";
+import {
+	claudeArgs,
+	claudeInputLine,
+	copilotArgs,
+	isPromptImageType,
+	MAX_PROMPT_IMAGE_DATA,
+	MAX_PROMPT_IMAGES,
+	systemPrompt,
+	withInstructions,
+} from "../shared/claude.js";
 import type { Strings } from "../shared/i18n.js";
 import type { ChatMessage, ProviderId } from "../shared/providers.js";
 import {
@@ -72,6 +81,27 @@ function sentHistory(raw: unknown): ChatMessage[] {
 	}
 	if (history.length % 2 === 1) history.pop();
 	return history.slice(-MAX_HISTORY);
+}
+
+/** The pictures sent by the window that a service takes; the others are dropped. */
+function sentImages(raw: unknown): PromptImage[] {
+	const images: PromptImage[] = [];
+	for (const item of Array.isArray(raw) ? raw : []) {
+		const { label, mediaType, data } = record(item);
+		if (
+			typeof label !== "string" ||
+			!isPromptImageType(mediaType) ||
+			typeof data !== "string" ||
+			data === "" ||
+			data.length > MAX_PROMPT_IMAGE_DATA ||
+			!/^[A-Za-z0-9+/]+={0,2}$/.test(data)
+		) {
+			continue;
+		}
+		images.push({ label: label.slice(0, 500), mediaType, data });
+		if (images.length === MAX_PROMPT_IMAGES) break;
+	}
+	return images;
 }
 
 export function registerAssistantIpc(ctx: AssistantIpcContext): void {
@@ -235,6 +265,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 			typeof request.sessionId === "string" && /^[\w-]{1,100}$/.test(request.sessionId)
 				? request.sessionId
 				: null;
+		const images = sentImages(request.images);
 		const sender = event.sender;
 		const runKey = `${sender.id}:${chatId}`;
 		running.get(runKey)?.();
@@ -277,8 +308,17 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 			let args: string[];
 			let question = prompt;
 			if (program === "claude") {
-				args = claudeArgs({ sessionId, systemPrompt: systemPrompt(t), model: connection.model });
+				// Pictures need the question as a JSON line; without them it stays plain text.
+				const jsonInput = images.length > 0;
+				args = claudeArgs({
+					sessionId,
+					systemPrompt: systemPrompt(t),
+					model: connection.model,
+					jsonInput,
+				});
+				if (jsonInput) question = claudeInputLine(prompt, images);
 			} else {
+				// The Copilot CLI reads no pictures: the question names them only.
 				// Copilot takes the conversation's id from us, and its instructions with the first question.
 				const id = sessionId ?? randomUUID();
 				if (sessionId === null) question = withInstructions(systemPrompt(t), prompt);
@@ -316,6 +356,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 				key,
 				system: systemPrompt(t),
 				messages,
+				images,
 				signal: controller.signal,
 				text: (chunk) => {
 					reply += chunk;

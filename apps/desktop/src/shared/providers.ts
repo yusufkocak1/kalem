@@ -5,6 +5,7 @@
  * Models, OpenRouter, Ollama, LM Studio, or another address). Pure: the
  * main process makes the requests.
  */
+import type { PromptImage } from "./claude.js";
 import type { Strings } from "./i18n.js";
 
 export const PROVIDERS = [
@@ -202,7 +203,23 @@ export function chatCompletionsRequest(
 	key: string | null,
 	system: string,
 	messages: readonly ChatMessage[],
+	images: readonly PromptImage[] = [],
 ): { url: string; init: RequestInit } {
+	// Pictures go with the last question, each after its name.
+	const sent = messages.map(({ role, content }, i) =>
+		images.length > 0 && i === messages.length - 1 && role === "user"
+			? {
+					role,
+					content: [
+						{ type: "text", text: content },
+						...images.flatMap(({ label, mediaType, data }) => [
+							{ type: "text", text: `[${label}]` },
+							{ type: "image_url", image_url: { url: `data:${mediaType};base64,${data}` } },
+						]),
+					],
+				}
+			: { role, content },
+	);
 	return {
 		url: `${connection.baseUrl}/chat/completions`,
 		init: {
@@ -215,7 +232,7 @@ export function chatCompletionsRequest(
 			body: JSON.stringify({
 				model: connection.model,
 				stream: true,
-				messages: [{ role: "system", content: system }, ...messages],
+				messages: [{ role: "system", content: system }, ...sent],
 			}),
 		},
 	};

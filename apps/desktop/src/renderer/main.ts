@@ -29,6 +29,7 @@ import { createFilesPane } from "./files-pane.js";
 import { icon } from "./icons.js";
 import { createNotices } from "./notices.js";
 import { Previews } from "./previews.js";
+import { documentImages } from "./prompt-images.js";
 import { createQuickOpen } from "./quick-open.js";
 import { createAppRibbon } from "./ribbon-layout.js";
 import { ipcErrorMessage, Session } from "./session.js";
@@ -135,6 +136,8 @@ const assistant = createAssistantPane({
 	width: () => settings.assistantWidth,
 	setWidth: (width) => updateSettings({ assistantWidth: width }),
 	context: () => assistantContext(),
+	images: () =>
+		documentImages([...canvas.querySelectorAll("img")].filter((image) => !isDiagramImage(image))),
 	selection: () => lastSelection,
 	insert: (text) => insertReply(text),
 	insertDiagram: (diagram) => insertReplyDiagram(diagram),

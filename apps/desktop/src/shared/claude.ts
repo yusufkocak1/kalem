@@ -110,6 +110,42 @@ export interface PromptContext {
 	readonly documentUnchanged?: boolean;
 	readonly selection?: string | undefined;
 	readonly diagrams?: readonly ContextDiagram[];
+	/** The document's pictures that go with the question, in order. */
+	readonly images?: readonly { readonly src: string; readonly label: string }[];
+}
+
+/** A picture of the document, sent with the question for the model to look at. */
+export interface PromptImage {
+	/** How the prompt names it: its URL, or `image-N` for a picture embedded in the text. */
+	readonly label: string;
+	readonly mediaType: PromptImageType;
+	/** The picture's bytes in base64. */
+	readonly data: string;
+}
+
+/** The kinds of pictures every service reads. */
+export const PROMPT_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const;
+export type PromptImageType = (typeof PROMPT_IMAGE_TYPES)[number];
+export const MAX_PROMPT_IMAGES = 20;
+/** Base64 characters; the services take up to 5 MB a picture. */
+export const MAX_PROMPT_IMAGE_DATA = 6_500_000;
+
+export const isPromptImageType = (type: unknown): type is PromptImageType =>
+	(PROMPT_IMAGE_TYPES as readonly unknown[]).includes(type);
+
+/** A picture embedded in the text, as a Word document's pictures come in. */
+const EMBEDDED_IMAGE = /data:image\/[\w.+-]+;base64,[A-Za-z0-9+/=]+/g;
+
+/**
+ * The document with its embedded pictures named instead of written out: their
+ * base64 says nothing to the model and would fill the room for the text.
+ */
+export function nameEmbeddedImages(
+	text: string,
+	images: readonly { readonly src: string; readonly label: string }[] = [],
+): string {
+	const labels = new Map(images.map(({ src, label }) => [src, label]));
+	return text.replace(EMBEDDED_IMAGE, (url) => labels.get(url) ?? "embedded-image");
 }
 
 /** Longer documents are cut, so a question never fails for its size. */
@@ -150,10 +186,17 @@ export function diagramForPrompt(diagram: Diagram, extra: Record<string, unknown
 /** The text sent to Claude for one question: the context in tags, then the question. */
 export function composePrompt(context: PromptContext): string {
 	const parts: string[] = [];
+	const images = context.images ?? [];
 	if (context.document !== undefined) {
+		const text = nameEmbeddedImages(context.document.text, images).replace(/\n+$/, "");
 		parts.push(
-			`<document name="${attribute(context.document.name)}">\n${clip(context.document.text.replace(/\n+$/, ""), MAX_DOCUMENT)}\n</document>`,
+			`<document name="${attribute(context.document.name)}">\n${clip(text, MAX_DOCUMENT)}\n</document>`,
 		);
+		if (images.length > 0) {
+			parts.push(
+				`<images>The document's pictures come attached to this message, each after its name: ${images.map(({ label }) => label).join(", ")}</images>`,
+			);
+		}
 	} else if (context.documentUnchanged === true) {
 		parts.push("<document-unchanged>The document is as I shared it above.</document-unchanged>");
 	}
@@ -164,6 +207,38 @@ export function composePrompt(context: PromptContext): string {
 	if (selection !== "") parts.push(`<selection>\n${clip(selection, MAX_SELECTION)}\n</selection>`);
 	parts.push(context.question.trim());
 	return parts.join("\n\n");
+}
+
+/** A question with its pictures, as the Anthropic Messages API and Claude Code take it. */
+export type ContentBlock =
+	| { readonly type: "text"; readonly text: string }
+	| {
+			readonly type: "image";
+			readonly source: {
+				readonly type: "base64";
+				readonly media_type: PromptImageType;
+				readonly data: string;
+			};
+	  };
+
+export function promptContent(prompt: string, images: readonly PromptImage[]): ContentBlock[] {
+	return [
+		{ type: "text", text: prompt },
+		...images.flatMap(({ label, mediaType, data }): ContentBlock[] => [
+			{ type: "text", text: `[${label}]` },
+			{ type: "image", source: { type: "base64", media_type: mediaType, data } },
+		]),
+	];
+}
+
+/** The line Claude Code reads a question with pictures from (`--input-format stream-json`). */
+export function claudeInputLine(prompt: string, images: readonly PromptImage[]): string {
+	return `${JSON.stringify({
+		type: "user",
+		session_id: "",
+		parent_tool_use_id: null,
+		message: { role: "user", content: promptContent(prompt, images) },
+	})}\n`;
 }
 
 // --- The CLI ---------------------------------------------------------------------
@@ -178,9 +253,12 @@ export function claudeArgs(options: {
 	readonly systemPrompt?: string;
 	/** A model name or alias (`opus`, `sonnet`…); empty for the CLI's own choice. */
 	readonly model?: string;
+	/** The question comes as a `stream-json` line, so it can carry pictures. */
+	readonly jsonInput?: boolean;
 }): string[] {
 	return [
 		"-p",
+		...(options.jsonInput === true ? ["--input-format", "stream-json"] : []),
 		"--output-format",
 		"stream-json",
 		"--verbose",

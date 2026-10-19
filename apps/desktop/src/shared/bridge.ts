@@ -1,5 +1,5 @@
 import type { ChatSummary, StoredChat } from "./chats.js";
-import type { ClaudeEvent } from "./claude.js";
+import type { ClaudeEvent, PromptImage } from "./claude.js";
 import type { ConfluenceFormat } from "./confluence.js";
 import type { TextFormat } from "./encoding.js";
 import type { Lang } from "./i18n.js";
@@ -414,6 +414,8 @@ export interface AssistantRequest {
 	readonly folder: string | null;
 	/** The chat so far, for an API that has not seen it in this run. */
 	readonly history: readonly ChatMessage[];
+	/** The document's pictures, for the model to look at. */
+	readonly images?: readonly PromptImage[];
 }
 
 export interface DraftRequest {
