@@ -17,6 +17,7 @@ import { createAssistantSettings } from "./assistant-settings.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import type { Previews } from "./previews.js";
+import type { DocumentImage } from "./prompt-images.js";
 
 /** What the assistant knows of the active document when a question is sent. */
 export interface AssistantContext {
@@ -37,6 +38,8 @@ export interface AssistantHost {
 	width(): number;
 	setWidth(width: number): void;
 	context(): Promise<AssistantContext>;
+	/** The document's pictures, for the model to look at. */
+	images(): Promise<DocumentImage[]>;
 	/** The text last selected in the document; empty when none. */
 	selection(): string;
 	/** Puts a reply's Markdown at the caret, its Kalem diagrams as pictures. */
@@ -1136,6 +1139,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		const notes: string[] = [];
 		let prompt: string;
 		let tabId: string | null = null;
+		let images: DocumentImage[] = [];
 		try {
 			const context = await host.context();
 			tabId = context.tabId;
@@ -1144,10 +1148,17 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			const unchanged = sharing && chat.sessionId !== null && chat.sharedText === context.text;
 			if (sharing) notes.push(format(t.assistantSharedDocument, context.name));
 			if (selection.trim() !== "") notes.push(t.assistantSharedSelection);
+			// The pictures go with the document; an API, which keeps none, gets them every time.
+			const cli = isCli(PROVIDER_INFO[provider]);
+			if (sharing && (!unchanged || !cli)) images = await host.images();
 			prompt = composePrompt({
 				question,
 				...(sharing && !unchanged
-					? { document: { name: context.name, text: context.text }, diagrams: context.diagrams }
+					? {
+							document: { name: context.name, text: context.text },
+							diagrams: context.diagrams,
+							images,
+						}
 					: {}),
 				documentUnchanged: unchanged,
 				selection,
@@ -1187,6 +1198,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					tabId,
 					folder: chat.folder,
 					history: earlier,
+					images: images.map(({ label, mediaType, data }) => ({ label, mediaType, data })),
 				});
 				await Promise.race([last, new Promise((resolve) => setTimeout(resolve, 5000))]);
 			} catch (error) {

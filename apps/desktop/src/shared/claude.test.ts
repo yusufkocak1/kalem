@@ -3,6 +3,7 @@ import type { ClaudeEvent } from "./claude.js";
 import {
 	ClaudeStreamReader,
 	claudeArgs,
+	claudeInputLine,
 	composePrompt,
 	copilotArgs,
 	DIAGRAM_FENCE,
@@ -64,6 +65,34 @@ describe("CLI arguments", () => {
 		const args = claudeArgs({ sessionId: "s", model: "sonnet" });
 		expect(args.join(" ")).toContain("--model sonnet --resume s");
 		expect(claudeArgs({ sessionId: null, model: "" })).not.toContain("--model");
+	});
+
+	it("takes the question as a JSON line when it carries pictures", () => {
+		const args = claudeArgs({ sessionId: null, jsonInput: true });
+		expect(args.slice(0, 5)).toEqual([
+			"-p",
+			"--input-format",
+			"stream-json",
+			"--output-format",
+			"stream-json",
+		]);
+		const line = claudeInputLine("Ne görüyorsun?", [
+			{ label: "image-1", mediaType: "image/webp", data: "AAAA" },
+		]);
+		expect(line.endsWith("\n")).toBe(true);
+		expect(JSON.parse(line)).toEqual({
+			type: "user",
+			session_id: "",
+			parent_tool_use_id: null,
+			message: {
+				role: "user",
+				content: [
+					{ type: "text", text: "Ne görüyorsun?" },
+					{ type: "text", text: "[image-1]" },
+					{ type: "image", source: { type: "base64", media_type: "image/webp", data: "AAAA" } },
+				],
+			},
+		});
 	});
 
 	it("resumes a conversation", () => {
@@ -199,6 +228,29 @@ describe("the question", () => {
 
 	it("is only the question without context", () => {
 		expect(composePrompt({ question: "Merhaba", selection: "  " })).toBe("Merhaba");
+	});
+
+	it("names embedded pictures instead of writing their base64", () => {
+		const png = `data:image/png;base64,${"iVBOR".repeat(100_000)}=`;
+		const gif = "data:image/gif;base64,R0lGOD==";
+		const prompt = composePrompt({
+			question: "Vazgeç butonu var mı?",
+			document: {
+				name: "analiz.md",
+				text: `# Akış\n\n![ekran](${png})\n\n![logo](${gif})\n\n![](a.png)\n\n**Vazgeç** butonu`,
+			},
+			images: [
+				{ src: png, label: "image-1" },
+				{ src: "a.png", label: "a.png" },
+			],
+		});
+		expect(prompt).not.toContain("base64");
+		expect(prompt).toContain("![ekran](image-1)");
+		expect(prompt).toContain("![logo](embedded-image)");
+		expect(prompt).toContain("**Vazgeç** butonu");
+		expect(prompt).toContain(
+			"<images>The document's pictures come attached to this message, each after its name: image-1, a.png</images>",
+		);
 	});
 
 	it("cuts a very long document", () => {

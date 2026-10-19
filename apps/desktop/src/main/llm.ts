@@ -6,6 +6,8 @@
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { net } from "electron";
+import type { PromptImage } from "../shared/claude.js";
+import { promptContent } from "../shared/claude.js";
 import type { ChatMessage, Connection, ProviderInfo } from "../shared/providers.js";
 import {
 	chatCompletionsDelta,
@@ -45,15 +47,34 @@ export interface AskOptions {
 	readonly key: string | null;
 	readonly system: string;
 	readonly messages: readonly ChatMessage[];
+	/** Pictures that go with the last message. */
+	readonly images?: readonly PromptImage[];
 	readonly signal: AbortSignal;
 	/** More of the reply. */
 	text(chunk: string): void;
 }
 
-/** Streams one reply; rejects with the service's message when it fails. */
+/**
+ * Streams one reply; rejects with the service's message when it fails. A
+ * model that does not read pictures is asked again without them.
+ */
 export async function askApi(options: AskOptions): Promise<void> {
-	if (options.provider.protocol === "anthropic") await askAnthropic(options);
-	else await askChatCompletions(options);
+	const ask = (asked: AskOptions): Promise<void> =>
+		asked.provider.protocol === "anthropic" ? askAnthropic(asked) : askChatCompletions(asked);
+	if ((options.images ?? []).length === 0) return ask(options);
+	let answered = false;
+	try {
+		await ask({
+			...options,
+			text: (chunk) => {
+				answered = true;
+				options.text(chunk);
+			},
+		});
+	} catch (error) {
+		if (answered || options.signal.aborted) throw error;
+		await ask({ ...options, images: [] });
+	}
 }
 
 async function askAnthropic(options: AskOptions): Promise<void> {
@@ -64,7 +85,11 @@ async function askAnthropic(options: AskOptions): Promise<void> {
 				model: options.connection.model,
 				max_tokens: MAX_OUTPUT_TOKENS,
 				system: options.system,
-				messages: options.messages.map(({ role, content }) => ({ role, content })),
+				messages: options.messages.map(({ role, content }, i) =>
+					i === options.messages.length - 1 && role === "user"
+						? { role, content: promptContent(content, options.images ?? []) }
+						: { role, content },
+				),
 			},
 			{ signal: options.signal },
 		);
@@ -90,6 +115,7 @@ async function askChatCompletions(options: AskOptions): Promise<void> {
 		options.key,
 		options.system,
 		options.messages,
+		options.images,
 	);
 	let response: Response;
 	try {

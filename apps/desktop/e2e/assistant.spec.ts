@@ -166,6 +166,51 @@ test("asks the local Claude about the document and inserts its reply with the di
 	await app.close();
 });
 
+test("sends the document's pictures to Claude instead of their base64", async () => {
+	const folder = await tempDir("assistant-images");
+	const doc = join(folder, "analiz.md");
+	// A red picture embedded as Word's are, and one next to the document.
+	const red =
+		"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
+	await writeFile(join(folder, "ekran.png"), Buffer.from(red, "base64"));
+	await writeFile(
+		doc,
+		`# Analiz\n\n![akış](data:image/png;base64,${red})\n\n![ekran](ekran.png)\n\nVazgeç butonu\n`,
+	);
+	const claude = await fakeClaude(folder);
+	const { app, page, errors } = await launch({ args: [doc], env: { KALEM_CLAUDE: claude.path } });
+	await expect(page.locator("#editor img")).toHaveCount(2);
+
+	await clickMenu(app, "View", "AI Assistant");
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
+	const input = pane.locator(".assistant-input");
+	await input.fill("Görsellerde ne var?");
+	await input.press("Enter");
+	await expect(pane.locator(".assistant-assistant .assistant-markdown").last()).toHaveText(
+		"Bitti.",
+	);
+
+	const [call] = await claude.calls();
+	expect(call?.args.slice(0, 3)).toEqual(["-p", "--input-format", "stream-json"]);
+	const message = JSON.parse(call?.prompt ?? "{}").message;
+	const [question, ...rest] = message.content;
+	expect(question.text).toContain("![akış](image-1)");
+	expect(question.text).toContain("![ekran](ekran.png)");
+	expect(question.text).not.toContain("base64");
+	expect(question.text.endsWith("Görsellerde ne var?")).toBe(true);
+	expect(rest.map((block: { type: string; text?: string }) => block.text ?? block.type)).toEqual([
+		"[image-1]",
+		"image",
+		"[ekran.png]",
+		"image",
+	]);
+	expect(rest[1].source.media_type).toBe("image/webp");
+
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
 test("explains how to install Claude Code when it is not found", async () => {
 	const folder = await tempDir("assistant-missing");
 	const { app, page } = await launch({

@@ -38,6 +38,25 @@ describe("services", () => {
 
 describe("Chat Completions", () => {
 	it("streams with the system prompt first and the key as a bearer token", () => {
+		const withImage = chatCompletionsRequest(
+			{ baseUrl: "http://localhost:11434/v1", model: "llava" },
+			null,
+			"SYSTEM",
+			[
+				{ role: "user", content: "Önce" },
+				{ role: "assistant", content: "Tamam" },
+				{ role: "user", content: "Bu ne?" },
+			],
+			[{ label: "image-1", mediaType: "image/png", data: "AAAA" }],
+		);
+		const sent = JSON.parse(withImage.init.body as string).messages;
+		expect(sent[1]).toEqual({ role: "user", content: "Önce" });
+		expect(sent[3].content).toEqual([
+			{ type: "text", text: "Bu ne?" },
+			{ type: "text", text: "[image-1]" },
+			{ type: "image_url", image_url: { url: "data:image/png;base64,AAAA" } },
+		]);
+
 		const { url, init } = chatCompletionsRequest(
 			{ baseUrl: "http://localhost:11434/v1", model: "llama" },
 			"sk-1",
