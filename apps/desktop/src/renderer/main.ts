@@ -10,7 +10,13 @@ import { attachmentName, linkedAttachment } from "../shared/confluence-common.js
 import type { Diagram } from "../shared/diagram.js";
 import { DIAGRAM_SUFFIX, serializeDiagram } from "../shared/diagram.js";
 import { format, stringsFor } from "../shared/i18n.js";
-import { isEditablePath, isPackagePath, isWordPath } from "../shared/paths.js";
+import {
+	extension,
+	isEditablePath,
+	isPackagePath,
+	isWordPath,
+	TEXT_EXTENSIONS,
+} from "../shared/paths.js";
 import { withColumnWidth } from "../shared/table-style.js";
 import { changeCase, collapseSpaces, nextCase } from "../shared/text-case.js";
 import { createAssistantPane } from "./assistant-pane.js";
@@ -140,9 +146,9 @@ const assistant = createAssistantPane({
 	images: () =>
 		documentImages([...canvas.querySelectorAll("img")].filter((image) => !isDiagramImage(image))),
 	selection: () => lastSelection,
-	workspaceFolder: () => {
+	workspaceFolders: () => {
 		const workspace = filesPane.workspace();
-		return workspace?.opened === true ? workspace.root : null;
+		return workspace?.opened === true ? workspace.roots.map((root) => root.path) : [];
 	},
 	insert: (text) => insertReply(text),
 	insertDiagram: (diagram) => insertReplyDiagram(diagram),
@@ -802,7 +808,9 @@ window.addEventListener(
 		const files = Array.from(event.dataTransfer?.files ?? [])
 			.map((file) => ({ path: bridge.pathForFile(file), image: file.type.startsWith("image/") }))
 			.filter((file) => file.path !== "");
-		const isDocument = (path: string): boolean => isEditablePath(path) || isWordPath(path);
+		// Documents and plain text files open; other files are attached to the document.
+		const isDocument = (path: string): boolean =>
+			isEditablePath(path) || isWordPath(path) || TEXT_EXTENSIONS.includes(extension(path));
 		const documents = files.filter((file) => isDocument(file.path));
 		const others = files.filter((file) => !isDocument(file.path));
 		if (documents.length === 0 && others.every((file) => file.image)) return;

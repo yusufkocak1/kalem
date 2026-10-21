@@ -1,5 +1,6 @@
 import type { Workspace } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
+import { fileName } from "../shared/paths.js";
 import { el } from "./dom.js";
 
 export interface QuickOpenOptions {
@@ -141,22 +142,22 @@ export function createQuickOpen(options: QuickOpenOptions): { show(): Promise<vo
 
 	return {
 		async show() {
-			const workspace = await options.workspace();
-			const root = workspace.root;
-			items =
-				root === null
-					? []
-					: workspace.entries
-							.filter((entry) => !entry.folder)
-							.map((entry) => ({
-								path: entry.path,
-								name: entry.name,
-								relative: relativeTo(root, entry.path),
-							}));
+			const { roots } = await options.workspace();
+			// With several folders, a path says which one it is in.
+			const prefix = (root: string): string => (roots.length > 1 ? `${fileName(root)}/` : "");
+			items = roots.flatMap((root) =>
+				root.entries
+					.filter((entry) => !entry.folder)
+					.map((entry) => ({
+						path: entry.path,
+						name: entry.name,
+						relative: `${prefix(root.path)}${relativeTo(root.path, entry.path)}`,
+					})),
+			);
 			input.value = "";
 			selected = 0;
 			render();
-			if (root === null) empty.textContent = t.noFolder;
+			if (roots.length === 0) empty.textContent = t.noFolder;
 			if (!dialog.open) dialog.showModal();
 			input.focus();
 		},

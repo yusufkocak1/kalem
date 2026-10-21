@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
@@ -10,13 +10,14 @@ import {
 	nativeTheme,
 	safeStorage,
 	session,
+	shell,
 } from "electron";
 import type { Draft, Settings } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format, pickLanguage, stringsFor } from "../shared/i18n.js";
 import { quickNoteName } from "../shared/notes.js";
-import { isEditablePath, isPackagePath, isWordPath } from "../shared/paths.js";
+import { isPackagePath, isProgramPath } from "../shared/paths.js";
 import { ChatStore } from "./assistant-chats.js";
 import { AssistantStore } from "./assistant-store.js";
 import { confluenceClient } from "./confluence-ipc.js";
@@ -34,8 +35,10 @@ import {
 	welcomeDocument,
 } from "./menu.js";
 import { PackageStore } from "./package.js";
+import { pathKey } from "./path-key.js";
 import { handleDocumentScheme, registerDocumentScheme } from "./protocol.js";
-import { SettingsStore } from "./settings.js";
+import { MAX_WORKSPACES, SettingsStore } from "./settings.js";
+import { TextEditor } from "./text-editor.js";
 import { TrayIcon } from "./tray.js";
 import { Updater } from "./updater.js";
 import type { AppWindow } from "./windows.js";
@@ -56,11 +59,19 @@ const PAGE_NUMBER_FOOTER =
 	'<div style="width:100%;font:9px sans-serif;color:#555;text-align:center">' +
 	'<span class="pageNumber"></span> / <span class="totalPages"></span></div>';
 
+/** Files named on the command line: documents open in Kalem, other files where they belong. */
 function documentArguments(argv: readonly string[], cwd: string): string[] {
 	return argv
 		.slice(1)
-		.filter((arg) => !arg.startsWith("-") && (isEditablePath(arg) || isWordPath(arg)))
-		.map((arg) => resolve(cwd, arg));
+		.filter((arg) => !arg.startsWith("-"))
+		.map((arg) => resolve(cwd, arg))
+		.filter((path) => {
+			try {
+				return statSync(path).isFile();
+			} catch {
+				return false;
+			}
+		});
 }
 
 function start(): void {
@@ -100,7 +111,7 @@ function start(): void {
 
 	/** A dated note in the open folder, or in Documents; nothing is written until it is saved. */
 	async function quickNote(): Promise<void> {
-		const folder = store.state.workspace ?? join(app.getPath("documents"), t.quickNotesFolder);
+		const folder = store.state.workspaces[0] ?? join(app.getPath("documents"), t.quickNotesFolder);
 		await mkdir(folder, { recursive: true });
 		const name = quickNoteName(t.quickNoteName, new Date(), (candidate) =>
 			existsSync(join(folder, `${candidate}.md`)),
@@ -144,7 +155,56 @@ function start(): void {
 		language: () => language,
 		onRecentFilesChanged: () => refreshMenu(),
 		showContextMenu: (contents, params) => popupContextMenu(t, contents, params),
+		openOther: (path, win, launch) => openOther(path, win, launch),
 	});
+
+	const textEditor = new TextEditor({
+		preloadPath: join(__dirname, "preload.cjs"),
+		devUrl: process.env.KALEM_DEV_URL || null,
+		pageFile: join(__dirname, "..", "renderer", "text-editor.html"),
+		icon: join(__dirname, "icon.png"),
+		strings: () => t,
+		language: () => language,
+		legacyEncoding: () => (language === "tr" ? "windows-1254" : "windows-1252"),
+		backgroundColor: () => windows.backgroundColor(),
+		spellCheck: () => store.settings.spellCheck,
+		showContextMenu: (contents, params) => popupContextMenu(t, contents, params),
+		openPath: (path) => windows.openPath(path, windows.focused()),
+	});
+
+	/**
+	 * A file that is not a Markdown document: text opens in the text editor
+	 * as it is; anything else opens in the system's app for it when `launch`
+	 * allows, and is shown in its folder otherwise. Programs are never run.
+	 */
+	async function openOther(
+		path: string,
+		win: AppWindow | undefined,
+		launch: boolean,
+	): Promise<void> {
+		const fail = (detail: string): void => {
+			const options = {
+				type: "error" as const,
+				message: t.openFailed,
+				detail: `${path}\n${detail}`,
+			};
+			if (win !== undefined && !win.window.isDestroyed()) {
+				void dialog.showMessageBox(win.window, options);
+			} else void dialog.showMessageBox(options);
+		};
+		try {
+			if (await textEditor.open(path)) return;
+		} catch (error) {
+			fail(errorMessage(error));
+			return;
+		}
+		if (!launch || isProgramPath(path)) {
+			shell.showItemInFolder(path);
+			return;
+		}
+		const failure = await shell.openPath(path);
+		if (failure !== "") fail(failure);
+	}
 
 	function applySpellCheck(): void {
 		const defaultSession = session.defaultSession;
@@ -231,25 +291,36 @@ function start(): void {
 		}
 	}
 
-	function setWorkspace(folder: string | null): void {
-		store.update({ workspace: folder });
+	function setWorkspaces(folders: readonly string[]): void {
+		store.update({ workspaces: folders.slice(0, MAX_WORKSPACES) });
 		for (const win of windows.all()) win.window.webContents.send(CHANNEL.workspaceChange);
 		refreshMenu();
 	}
 
+	/** Closes one open folder; all of them with `null`. */
+	function closeFolder(folder: string | null): void {
+		setWorkspaces(
+			folder === null
+				? []
+				: store.state.workspaces.filter((open) => pathKey(open) !== pathKey(folder)),
+		);
+	}
+
+	/** Adds folders to the open ones; a folder already open stays where it is. */
 	async function openFolder(win: AppWindow | undefined): Promise<void> {
-		const start = store.state.workspace ?? (win === undefined ? null : windows.defaultFolder(win));
+		const open = store.state.workspaces;
+		const start = open.at(-1) ?? (win === undefined ? null : windows.defaultFolder(win));
 		const options: Electron.OpenDialogOptions = {
-			properties: ["openDirectory"],
+			properties: ["openDirectory", "multiSelections"],
 			...(start === null ? {} : { defaultPath: start }),
 		};
 		const result =
 			win === undefined
 				? await dialog.showOpenDialog(options)
 				: await dialog.showOpenDialog(win.window, options);
-		const folder = result.filePaths[0];
-		if (result.canceled || folder === undefined) return;
-		setWorkspace(folder);
+		if (result.canceled || result.filePaths.length === 0) return;
+		const keys = new Set(open.map(pathKey));
+		setWorkspaces([...open, ...result.filePaths.filter((folder) => !keys.has(pathKey(folder)))]);
 		// The files are what the user asked to see.
 		if (store.settings.sidePane !== "files" || !store.settings.navigation) {
 			changeSettings({ sidePane: "files", navigation: true });
@@ -262,9 +333,9 @@ function start(): void {
 			t,
 			settings: store.settings,
 			recentFiles: store.state.recentFiles,
-			workspace: store.state.workspace,
+			workspaces: store.state.workspaces,
 			openFolder: (win) => void openFolder(win),
-			closeFolder: () => setWorkspace(null),
+			closeFolder: () => closeFolder(null),
 			changeSettings,
 			changeLanguage,
 			clearRecentFiles: () => {
@@ -398,6 +469,7 @@ function start(): void {
 		});
 		applySpellCheck();
 		installUserTasks();
+		textEditor.registerIpc();
 		registerIpc({
 			windows,
 			store,
@@ -414,7 +486,7 @@ function start(): void {
 			showTabMenu: (win, tabId, x, y) => popupTabMenu(menuContext(), win, tabId, x, y),
 			showCaseMenu: (win, x, y) => popupCaseMenu(menuContext(), win, x, y),
 			openFolder,
-			closeFolder: () => setWorkspace(null),
+			closeFolder: (folder) => closeFolder(folder),
 		});
 		refreshMenu();
 		tray.apply(store.settings.tray);

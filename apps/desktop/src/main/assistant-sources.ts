@@ -6,9 +6,10 @@
  * what it needs.
  */
 import type { Dirent } from "node:fs";
-import { open, readdir, stat } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, sep } from "node:path";
-import { decodeBytes } from "../shared/encoding.js";
+import { isBinaryPath } from "../shared/paths.js";
+import { readTextFile } from "./text-files.js";
 
 /** How many sources a chat keeps. */
 export const MAX_SOURCES = 20;
@@ -35,21 +36,6 @@ const SKIPPED_FOLDERS = new Set([
 	"__pycache__",
 ]);
 
-/** Files that are never text, so they are not opened to find out. */
-const BINARY = new Set(
-	(
-		"png jpg jpeg gif webp bmp ico tif tiff psd svgz mp3 mp4 m4a wav ogg webm mov avi mkv flac " +
-		"zip gz tgz bz2 xz 7z rar jar war ear class dll exe so dylib o a lib bin dat db sqlite " +
-		"pdf doc docx xls xlsx ppt pptx odt ods kmd woff woff2 ttf otf eot pyc"
-	).split(" "),
-);
-
-function extension(name: string): string {
-	const dot = name.lastIndexOf(".");
-	// kalem-locale-ok: file extensions are ASCII
-	return dot <= 0 ? "" : name.slice(dot + 1).toLowerCase();
-}
-
 const skipFolder = (name: string): boolean =>
 	name.startsWith(".") || SKIPPED_FOLDERS.has(name) || name.endsWith(".assets");
 
@@ -59,22 +45,9 @@ const attribute = (value: string): string =>
 		(c) => ({ "&": "&amp;", '"': "&quot;", "<": "&lt;", ">": "&gt;" })[c] ?? c,
 	);
 
-/** A file's text; `null` when it is not text (a zero byte in its start, without a UTF-16 mark). */
+/** A file's text; `null` when it is not text, or too large to send. */
 export async function readText(path: string): Promise<string | null> {
-	if (BINARY.has(extension(path))) return null;
-	const file = await open(path, "r");
-	try {
-		const size = (await file.stat()).size;
-		if (size > MAX_FILE_BYTES) return null;
-		const bytes = new Uint8Array(size);
-		await file.read(bytes, 0, size, 0);
-		const utf16 =
-			(bytes[0] === 0xff && bytes[1] === 0xfe) || (bytes[0] === 0xfe && bytes[1] === 0xff);
-		if (!utf16 && bytes.subarray(0, 8000).includes(0)) return null;
-		return decodeBytes(bytes).text;
-	} finally {
-		await file.close();
-	}
+	return (await readTextFile(path, "windows-1254", MAX_FILE_BYTES))?.text ?? null;
 }
 
 interface Listed {
@@ -104,7 +77,7 @@ async function listFolder(
 				return;
 			}
 			const path = join(folder, child.name);
-			if (child.isFile() && !BINARY.has(extension(child.name))) {
+			if (child.isFile() && !isBinaryPath(child.name)) {
 				files.push({ path, relative: relative(root, path).split(sep).join("/") });
 			}
 		}

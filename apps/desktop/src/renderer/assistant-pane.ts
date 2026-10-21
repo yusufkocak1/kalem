@@ -42,8 +42,8 @@ export interface AssistantHost {
 	images(): Promise<DocumentImage[]>;
 	/** The text last selected in the document; empty when none. */
 	selection(): string;
-	/** The folder opened with Open Folder; `null` when none. */
-	workspaceFolder(): string | null;
+	/** The folders opened with Open Folder. */
+	workspaceFolders(): readonly string[];
 	/** Puts a reply's Markdown at the caret, its Kalem diagrams as pictures. */
 	insert(text: string): Promise<void>;
 	insertDiagram(diagram: ReplyDiagram): Promise<void>;
@@ -263,17 +263,17 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	}
 
 	function showAddMenu(): void {
-		const workspace = host.workspaceFolder();
 		addMenu.replaceChildren(
 			menuItem(t.assistantAddFiles, "file", () => void pickSources("files")),
 			menuItem(t.assistantAddFolder, "open", () => void pickSources("folder")),
-			...(workspace === null || active.sources.includes(workspace)
-				? []
-				: [
-						menuItem(format(t.assistantAddWorkspace, baseName(workspace)), "open", () =>
-							addSources([workspace]),
-						),
-					]),
+			...host
+				.workspaceFolders()
+				.filter((folder) => !active.sources.includes(folder))
+				.map((folder) =>
+					menuItem(format(t.assistantAddWorkspace, baseName(folder)), "open", () =>
+						addSources([folder]),
+					),
+				),
 		);
 		addMenu.hidden = false;
 		addButton.setAttribute("aria-expanded", "true");

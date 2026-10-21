@@ -82,6 +82,8 @@ export interface WindowManagerOptions {
 	language(): Lang;
 	onRecentFilesChanged(): void;
 	showContextMenu(contents: WebContents, params: Electron.ContextMenuParams): void;
+	/** Opens a file that is not a document; `launch` lets the system's app for it open it. */
+	openOther(path: string, win: AppWindow | undefined, launch: boolean): Promise<void>;
 }
 
 export { pathKey } from "./path-key.js";
@@ -677,6 +679,7 @@ export class WindowManager {
 	async openPath(path: string, preferred?: AppWindow): Promise<void> {
 		const full = resolve(path);
 		if (isWordPath(full)) return this.importWord(full, preferred);
+		if (!isEditablePath(full)) return this.#options.openOther(full, preferred, true);
 
 		// A document that is already open is brought forward, not opened twice.
 		const key = pathKey(full);
@@ -821,9 +824,9 @@ ${errorMessage(error)}`,
 	// --- Links --------------------------------------------------------------
 
 	/**
-	 * Web links open in the browser and relative Markdown files open in the
-	 * app. Anything else is only revealed in its folder: clicking a link in a
-	 * document must never launch a program.
+	 * Web links open in the browser, relative Markdown files in the app and
+	 * other text files in the text editor. Anything else is only revealed in
+	 * its folder: clicking a link in a document must never launch a program.
 	 */
 	async openLink(win: AppWindow, href: string): Promise<void> {
 		if (/^(https?|mailto):/i.test(href)) {
@@ -844,6 +847,6 @@ ${errorMessage(error)}`,
 		const target = resolve(dirname(documentPath), relative);
 		if ((await modifiedTime(target)) === null) return;
 		if (isEditablePath(target)) await this.openPath(target, win);
-		else shell.showItemInFolder(target);
+		else await this.#options.openOther(target, win, false);
 	}
 }

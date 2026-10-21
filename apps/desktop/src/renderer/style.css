@@ -1653,6 +1653,31 @@ button {
 	color: var(--app-muted);
 }
 
+.files-root {
+	display: flex;
+	align-items: center;
+}
+
+.files-root-name {
+	flex: 1;
+	min-width: 0;
+	font-weight: 600;
+}
+
+.files-root-close {
+	flex: none;
+	visibility: hidden;
+}
+
+.files-root:hover .files-root-close,
+.files-root-close:focus-visible {
+	visibility: visible;
+}
+
+.files-other .files-name {
+	color: var(--app-muted);
+}
+
 .files-twisty {
 	flex: none;
 	width: 10px;
