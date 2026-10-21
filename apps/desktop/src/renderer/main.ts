@@ -139,6 +139,10 @@ const assistant = createAssistantPane({
 	images: () =>
 		documentImages([...canvas.querySelectorAll("img")].filter((image) => !isDiagramImage(image))),
 	selection: () => lastSelection,
+	workspaceFolder: () => {
+		const workspace = filesPane.workspace();
+		return workspace?.opened === true ? workspace.root : null;
+	},
 	insert: (text) => insertReply(text),
 	insertDiagram: (diagram) => insertReplyDiagram(diagram),
 	openDiagram: (diagram) =>

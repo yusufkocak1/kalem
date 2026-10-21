@@ -20,6 +20,8 @@ Your replies are Markdown, and the user can insert a reply into the document wit
 
 The user's document, when shared, arrives in <document> tags; the text they selected in it in <selection> tags; Kalem diagrams already in the document in <diagram> tags. Do not repeat the whole document unless asked; when asked to rewrite a part, return only that part. Do not try to edit files: the user inserts what you write.
 
+Files and folders the user added to the chat as sources (code, analysis notes, any text) arrive in <files> tags: a <folder> lists the files under it, a <file> holds one file's text. When a folder's files come without their text, read the ones you need with your file tools before answering. Use the sources to write what the user asks for (for example a software analysis document from a code folder); refer to files by their path below the folder. <files-unchanged> means the sources are as they were sent earlier in the chat.
+
 ## The Markdown Kalem shows
 - CommonMark and GitHub Flavored Markdown: headings, bold, italic, strikethrough, links, images, block quotes, bullet and numbered lists, task lists ("- [ ] item"), tables (with column alignment), footnotes ("text[^1]" and a separate "[^1]: note" paragraph), code blocks with a language.
 - Colored text: <span style="color:#e03131">text</span>. No other HTML: it is shown as plain text.
@@ -255,6 +257,8 @@ export function claudeArgs(options: {
 	readonly model?: string;
 	/** The question comes as a `stream-json` line, so it can carry pictures. */
 	readonly jsonInput?: boolean;
+	/** Folders outside the one it runs in that it may read: the chat's sources. */
+	readonly folders?: readonly string[];
 }): string[] {
 	return [
 		"-p",
@@ -265,6 +269,7 @@ export function claudeArgs(options: {
 		"--include-partial-messages",
 		"--append-system-prompt",
 		options.systemPrompt ?? SYSTEM_PROMPT,
+		...(options.folders ?? []).flatMap((folder) => ["--add-dir", folder]),
 		"--disallowedTools",
 		...DENIED_TOOLS,
 		...(options.model ? ["--model", options.model] : []),
@@ -283,6 +288,8 @@ export const COPILOT_DENIED_TOOLS = ["shell", "write"] as const;
 export function copilotArgs(options: {
 	readonly sessionId: string;
 	readonly model: string;
+	/** Folders outside the one it runs in that it may read: the chat's sources. */
+	readonly folders?: readonly string[];
 }): string[] {
 	return [
 		"-s",
@@ -291,6 +298,7 @@ export function copilotArgs(options: {
 		// Required without a terminal to ask in; the denied tools stay denied.
 		"--allow-all-tools",
 		...COPILOT_DENIED_TOOLS.flatMap((tool) => ["--deny-tool", tool]),
+		...(options.folders ?? []).flatMap((folder) => ["--add-dir", folder]),
 		"--no-ask-user",
 		"--no-auto-update",
 		"--session-id",

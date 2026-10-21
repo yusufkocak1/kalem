@@ -26,6 +26,8 @@ export interface StoredChat {
 	readonly created: number;
 	readonly updated: number;
 	readonly messages: readonly StoredMessage[];
+	/** Files and folders added to the chat, sent with each question. */
+	readonly sources?: readonly string[];
 }
 
 export interface ChatSummary {
@@ -37,6 +39,7 @@ export interface ChatSummary {
 }
 
 export const MAX_CHATS = 100;
+export const MAX_CHAT_SOURCES = 20;
 const MAX_MESSAGES = 400;
 const MAX_TEXT = 200_000;
 
@@ -81,6 +84,11 @@ export function parseChat(raw: unknown): StoredChat | null {
 		});
 	const sessionId = str(chat.sessionId, 100);
 	const folder = str(chat.folder, 4096);
+	const sources = (Array.isArray(chat.sources) ? chat.sources : [])
+		.filter(
+			(path): path is string => typeof path === "string" && path !== "" && path.length <= 4096,
+		)
+		.slice(0, MAX_CHAT_SOURCES);
 	return {
 		id,
 		title: str(chat.title, 200),
@@ -90,6 +98,7 @@ export function parseChat(raw: unknown): StoredChat | null {
 		created: time(chat.created),
 		updated: time(chat.updated),
 		messages,
+		...(sources.length === 0 ? {} : { sources }),
 	};
 }
 

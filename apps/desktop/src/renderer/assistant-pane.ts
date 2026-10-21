@@ -42,6 +42,8 @@ export interface AssistantHost {
 	images(): Promise<DocumentImage[]>;
 	/** The text last selected in the document; empty when none. */
 	selection(): string;
+	/** The folder opened with Open Folder; `null` when none. */
+	workspaceFolder(): string | null;
 	/** Puts a reply's Markdown at the caret, its Kalem diagrams as pictures. */
 	insert(text: string): Promise<void>;
 	insertDiagram(diagram: ReplyDiagram): Promise<void>;
@@ -85,6 +87,8 @@ interface Chat {
 	readonly created: number;
 	updated: number;
 	readonly messages: Message[];
+	/** Files and folders added to the chat; their text goes with each question. */
+	sources: string[];
 	/** The document text the service was last given in this chat, in this run. */
 	sharedText: string | null;
 	/** The reply coming in, and what ends the wait for it. */
@@ -104,6 +108,10 @@ const INSTALL: Readonly<Record<"claude-code" | "copilot", { command: string; url
 };
 
 const WIDTH_STEP = 20;
+const MAX_SOURCES = 20;
+
+/** A path's last part, for a chip. */
+const baseName = (path: string): string => path.split(/[\\/]/).filter(Boolean).pop() ?? path;
 
 function button(
 	label: string,
@@ -150,6 +158,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			created: now,
 			updated: now,
 			messages: [],
+			sources: [],
 			sharedText: null,
 			reply: null,
 			ended: null,
@@ -221,6 +230,122 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		input.focus();
 	});
 
+	// --- Sources: files and folders added to the chat ---
+
+	const addButton = el("button", {
+		class: "assistant-add",
+		attrs: {
+			type: "button",
+			title: t.assistantAddSource,
+			"aria-label": t.assistantAddSource,
+			"aria-haspopup": "menu",
+			"aria-expanded": "false",
+		},
+		children: [icon("plus")],
+	});
+	const addMenu = el("div", {
+		class: "assistant-add-menu",
+		attrs: { role: "menu", hidden: "", "aria-label": t.assistantAddSource },
+	});
+	const sourceList = el("div", { class: "assistant-sources", attrs: { hidden: "" } });
+
+	function menuItem(label: string, name: Parameters<typeof icon>[0], run: () => void): HTMLElement {
+		const item = el("button", {
+			class: "assistant-add-item",
+			attrs: { type: "button", role: "menuitem" },
+			children: [icon(name), label],
+		});
+		item.addEventListener("click", () => {
+			hideAddMenu();
+			run();
+		});
+		return item;
+	}
+
+	function showAddMenu(): void {
+		const workspace = host.workspaceFolder();
+		addMenu.replaceChildren(
+			menuItem(t.assistantAddFiles, "file", () => void pickSources("files")),
+			menuItem(t.assistantAddFolder, "open", () => void pickSources("folder")),
+			...(workspace === null || active.sources.includes(workspace)
+				? []
+				: [
+						menuItem(format(t.assistantAddWorkspace, baseName(workspace)), "open", () =>
+							addSources([workspace]),
+						),
+					]),
+		);
+		addMenu.hidden = false;
+		addButton.setAttribute("aria-expanded", "true");
+		(addMenu.firstElementChild as HTMLElement | null)?.focus();
+	}
+
+	function hideAddMenu(): void {
+		addMenu.hidden = true;
+		addButton.setAttribute("aria-expanded", "false");
+	}
+
+	addButton.addEventListener("click", () => (addMenu.hidden ? showAddMenu() : hideAddMenu()));
+	addMenu.addEventListener("keydown", (event) => {
+		if (event.key === "Escape") {
+			hideAddMenu();
+			addButton.focus();
+		}
+	});
+	document.addEventListener("mousedown", (event) => {
+		if (!addMenu.hidden && !addMenu.contains(event.target as Node) && event.target !== addButton) {
+			hideAddMenu();
+		}
+	});
+
+	async function pickSources(kind: "files" | "folder"): Promise<void> {
+		try {
+			addSources(await bridge.assistantPickSources(kind));
+		} catch (error) {
+			showNotice(format(t.assistantActionFailed, host.errorText(error)));
+		}
+	}
+
+	function addSources(paths: readonly string[]): void {
+		const chat = active;
+		const added = paths.filter((path) => !chat.sources.includes(path));
+		if (added.length === 0) return;
+		chat.sources = [...chat.sources, ...added].slice(0, MAX_SOURCES);
+		save(chat);
+		renderSources();
+		input.focus();
+	}
+
+	function removeSource(path: string): void {
+		active.sources = active.sources.filter((source) => source !== path);
+		save(active);
+		renderSources();
+	}
+
+	function renderSources(): void {
+		sourceList.hidden = active.sources.length === 0;
+		sourceList.replaceChildren(
+			...active.sources.map((path) => {
+				const name = baseName(path);
+				const remove = el("button", {
+					class: "assistant-chip-close",
+					attrs: {
+						type: "button",
+						title: format(t.assistantRemoveSource, name),
+						"aria-label": format(t.assistantRemoveSource, name),
+					},
+					children: [icon("close")],
+				});
+				remove.addEventListener("click", () => removeSource(path));
+				return el("span", {
+					class: "assistant-chip assistant-source",
+					attrs: { title: path },
+					children: [el("span", { class: "assistant-chip-text", text: name }), remove],
+				});
+			}),
+		);
+	}
+
 	const input = el("textarea", {
 		class: "assistant-input",
 		attrs: { rows: "1", placeholder: t.assistantPlaceholder, "aria-label": t.assistantPlaceholder },
@@ -269,13 +394,16 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			el("div", {
 				class: "assistant-context",
 				children: [
+					addButton,
 					el("label", { class: "assistant-share", children: [share, t.assistantShareDocument] }),
 					modelSelect,
 					selectionChip,
 				],
 			}),
+			sourceList,
 			el("div", { class: "assistant-input-row", children: [input, sendButton] }),
 			menu,
+			addMenu,
 		],
 	});
 
@@ -739,6 +867,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		settings.element.hidden = view !== "settings";
 		composer.hidden = !chatting;
 		input.disabled = !ready;
+		addButton.disabled = !ready;
 		sendButton.disabled = !ready && !busy;
 		share.checked = host.shareDocument();
 		subtitle.textContent = status === null ? t.assistantLooking : status.label;
@@ -866,6 +995,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				notes: message.notes,
 				...(message.model === undefined ? {} : { model: message.model }),
 			})),
+			sources: [...(stored.sources ?? [])],
 			sharedText: null,
 			reply: null,
 			ended: null,
@@ -925,6 +1055,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			created: chat.created,
 			updated: chat.updated,
 			messages,
+			...(chat.sources.length === 0 ? {} : { sources: chat.sources }),
 		};
 		bridge.assistantSaveChat(stored).catch(() => {});
 	}
@@ -937,6 +1068,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		log.replaceChildren();
 		for (const message of active.messages) appendMessage(message);
 		log.scrollTop = log.scrollHeight;
+		renderSources();
 		render();
 	}
 
@@ -1148,6 +1280,13 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			const unchanged = sharing && chat.sessionId !== null && chat.sharedText === context.text;
 			if (sharing) notes.push(format(t.assistantSharedDocument, context.name));
 			if (selection.trim() !== "") notes.push(t.assistantSharedSelection);
+			if (chat.sources.length > 0) {
+				notes.push(
+					chat.sources.length === 1
+						? format(t.assistantSharedDocument, baseName(chat.sources[0] as string))
+						: format(t.assistantSharedSources, chat.sources.length),
+				);
+			}
 			// The pictures go with the document; an API, which keeps none, gets them every time.
 			const cli = isCli(PROVIDER_INFO[provider]);
 			if (sharing && (!unchanged || !cli)) images = await host.images();
@@ -1199,6 +1338,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					folder: chat.folder,
 					history: earlier,
 					images: images.map(({ label, mediaType, data }) => ({ label, mediaType, data })),
+					sources: chat.sources,
 				});
 				await Promise.race([last, new Promise((resolve) => setTimeout(resolve, 5000))]);
 			} catch (error) {

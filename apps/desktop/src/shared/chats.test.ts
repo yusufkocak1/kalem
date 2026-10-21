@@ -19,6 +19,14 @@ describe("chats", () => {
 		expect(chatTitle("a".repeat(80))).toBe(`${"a".repeat(59)}…`);
 	});
 
+	it("keep their sources", () => {
+		const base = { id: "c-2", provider: "claude-code", messages: [] };
+		expect(parseChat({ ...base, sources: ["/kod", 3, "", "/notlar/analiz.txt"] })?.sources).toEqual(
+			["/kod", "/notlar/analiz.txt"],
+		);
+		expect(parseChat(base)).not.toHaveProperty("sources");
+	});
+
 	it("are read back only when they make sense", () => {
 		const chat = parseChat({
 			id: "c-1",

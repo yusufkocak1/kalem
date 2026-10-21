@@ -1,4 +1,4 @@
-import { chmod, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -781,6 +781,61 @@ test("runs commands typed after a slash: the assistant's, ready questions and th
 		"/yokboyle diye bir komut yok",
 	);
 	expect(await claude.calls()).toHaveLength(1);
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("adds files and folders to a chat, and Claude may read the folders", async () => {
+	const folder = await tempDir("assistant-sources");
+	const doc = join(folder, "analiz.md");
+	await writeFile(doc, "# Analiz\n");
+	const code = join(folder, "proje");
+	await mkdir(join(code, "src"), { recursive: true });
+	await writeFile(join(code, "src", "Main.java"), "class Main {}\n");
+	const notes = join(folder, "gereksinimler.txt");
+	await writeFile(notes, "Kullanıcı giriş yapabilmeli.\n");
+	const claude = await fakeClaude(folder);
+	const { app, page, errors } = await launch({ args: [doc], env: { KALEM_CLAUDE: claude.path } });
+	const pick = (paths: string[]): Promise<void> =>
+		app.evaluate(({ dialog }, filePaths) => {
+			dialog.showOpenDialog = (async () => ({ canceled: false, filePaths })) as never;
+		}, paths);
+
+	await clickMenu(app, "View", "AI Assistant");
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
+	const add = pane.getByRole("button", { name: "Add files or folders to the chat" });
+	await pick([code]);
+	await add.click();
+	await pane.getByRole("menuitem", { name: "Folder…" }).click();
+	await pick([notes]);
+	await add.click();
+	await pane.getByRole("menuitem", { name: "Files…" }).click();
+	await expect(pane.locator(".assistant-source")).toHaveText(["proje", "gereksinimler.txt"]);
+
+	const input = pane.locator(".assistant-input");
+	await input.fill("Analiz dokümanını yaz");
+	await input.press("Enter");
+	await expect(pane.locator(".assistant-assistant .assistant-markdown").last()).toHaveText(
+		"Bitti.",
+	);
+	await expect(pane.locator(".assistant-user .assistant-notes")).toContainText("with 2 sources");
+	const [first] = await claude.calls();
+	expect(first?.args.join(" ")).toContain(`--add-dir ${code} --add-dir ${folder}`);
+	expect(first?.prompt).toContain(`<folder path="${code}">\nproje/\n  src/Main.java\n</folder>`);
+	expect(first?.prompt).toContain("Kullanıcı giriş yapabilmeli.");
+
+	// The same sources are not sent again; a removed one is gone.
+	await input.fill("Devam et");
+	await input.press("Enter");
+	await expect.poll(async () => (await claude.calls())[1]?.prompt).toContain("<files-unchanged>");
+	await pane.getByRole("button", { name: "Remove “proje” from the chat" }).click();
+	await pane.getByRole("button", { name: "Remove “gereksinimler.txt” from the chat" }).click();
+	await input.fill("Teşekkürler");
+	await input.press("Enter");
+	await expect.poll(async () => (await claude.calls())[2]?.prompt).toContain("Teşekkürler");
+	expect((await claude.calls())[2]?.prompt).not.toContain("<files");
+
 	expect(errors).toEqual([]);
 	await app.close();
 });

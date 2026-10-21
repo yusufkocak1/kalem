@@ -8,7 +8,7 @@
 import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname } from "node:path";
+import { dirname, isAbsolute } from "node:path";
 import type { IpcMainInvokeEvent } from "electron";
 import { dialog, ipcMain } from "electron";
 import type { AssistantStatus } from "../shared/bridge.js";
@@ -35,6 +35,7 @@ import {
 	providerLabel,
 } from "../shared/providers.js";
 import type { ChatStore } from "./assistant-chats.js";
+import { collectSources, MAX_SOURCES, SOURCE_BUDGET } from "./assistant-sources.js";
 import type { AssistantStore } from "./assistant-store.js";
 import type { CliProgram } from "./cli.js";
 import { claudeOutput, LocalCli, runCli, textOutput } from "./cli.js";
@@ -104,6 +105,23 @@ function sentImages(raw: unknown): PromptImage[] {
 	return images;
 }
 
+/** The files and folders sent by the window: absolute paths, at most `MAX_SOURCES`. */
+function sentSources(raw: unknown): string[] {
+	const paths = (Array.isArray(raw) ? raw : []).filter(
+		(path): path is string => typeof path === "string" && path.length <= 4096 && isAbsolute(path),
+	);
+	return [...new Set(paths)].slice(0, MAX_SOURCES);
+}
+
+/** The question with the chat's sources before it; the same sources again are only named. */
+function withSources(sources: string, sent: string | undefined, prompt: string): string {
+	if (sources === "") return prompt;
+	if (sent === sources) {
+		return `<files-unchanged>The sources are as I sent them above.</files-unchanged>\n\n${prompt}`;
+	}
+	return `${sources}\n\n${prompt}`;
+}
+
 export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 	const clis: Record<CliProgram, LocalCli> = {
 		claude: new LocalCli("claude", () => ctx.store.settings.claudePath),
@@ -125,6 +143,8 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 	const folders = new Map<string, string>();
 	/** Each API conversation's messages. */
 	const histories = new Map<string, ChatMessage[]>();
+	/** The sources each CLI conversation was last sent, so unchanged ones are not sent again. */
+	const sentFiles = new Map<string, string>();
 
 	const status = async (refresh = false): Promise<AssistantStatus> => {
 		const t = ctx.strings();
@@ -241,6 +261,17 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 		return status();
 	});
 
+	ipcMain.handle(CHANNEL.assistantPickSources, async (event, kind: unknown) => {
+		const win = ctx.senderOf(event);
+		const t = ctx.strings();
+		const folder = kind === "folder";
+		const result = await dialog.showOpenDialog(win.window, {
+			title: folder ? t.assistantAddFolderTitle : t.assistantAddFilesTitle,
+			properties: [folder ? "openDirectory" : "openFile", "multiSelections", "dontAddToRecent"],
+		});
+		return result.canceled ? [] : result.filePaths;
+	});
+
 	ipcMain.handle(CHANNEL.assistantChats, () => ctx.chats.list());
 	ipcMain.handle(CHANNEL.assistantChat, (_event, id: unknown) =>
 		typeof id === "string" ? ctx.chats.get(id) : null,
@@ -266,6 +297,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 				? request.sessionId
 				: null;
 		const images = sentImages(request.images);
+		const sources = sentSources(request.sources);
 		const sender = event.sender;
 		const runKey = `${sender.id}:${chatId}`;
 		running.get(runKey)?.();
@@ -276,7 +308,13 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 		};
 
 		const program = programOf(provider);
+		const files = await collectSources(sources, {
+			budget: program === null ? SOURCE_BUDGET.api : SOURCE_BUDGET.cli,
+			listOnly: program !== null,
+		});
 		if (program !== null) {
+			const sent = sessionId === null ? undefined : sentFiles.get(sessionId);
+			const asked = withSources(files.text, sent, prompt);
 			const tab = typeof request.tabId === "string" ? win.tabs.get(request.tabId) : undefined;
 			// A CLI keeps a conversation with the folder it ran in, and resumes it
 			// only from there; a new one runs next to the active document.
@@ -293,6 +331,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 			const send = (cliEvent: ClaudeEvent): void => {
 				if (cliEvent.kind === "session") {
 					folders.set(cliEvent.id, folder);
+					sentFiles.set(cliEvent.id, files.text);
 					forward({ ...cliEvent, folder });
 				} else forward(cliEvent);
 			};
@@ -306,7 +345,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 				return;
 			}
 			let args: string[];
-			let question = prompt;
+			let question = asked;
 			if (program === "claude") {
 				// Pictures need the question as a JSON line; without them it stays plain text.
 				const jsonInput = images.length > 0;
@@ -315,15 +354,16 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 					systemPrompt: systemPrompt(t),
 					model: connection.model,
 					jsonInput,
+					folders: files.folders,
 				});
-				if (jsonInput) question = claudeInputLine(prompt, images);
+				if (jsonInput) question = claudeInputLine(asked, images);
 			} else {
 				// The Copilot CLI reads no pictures: the question names them only.
 				// Copilot takes the conversation's id from us, and its instructions with the first question.
 				const id = sessionId ?? randomUUID();
-				if (sessionId === null) question = withInstructions(systemPrompt(t), prompt);
+				if (sessionId === null) question = withInstructions(systemPrompt(t), asked);
 				send({ kind: "session", id });
-				args = copilotArgs({ sessionId: id, model: connection.model });
+				args = copilotArgs({ sessionId: id, model: connection.model, folders: files.folders });
 			}
 			const output = program === "claude" ? claudeOutput() : textOutput();
 			await runCli(launch, folder, args, question, output, send, sender, (child) => {
@@ -343,7 +383,12 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 		const id = sessionId ?? randomUUID();
 		const before = known ?? (sessionId === null ? [] : sentHistory(request.history));
 		forward({ kind: "session", id });
-		const messages: ChatMessage[] = [...before, { role: "user", content: prompt }];
+		// An API sees the sources again only while a kept message still carries them.
+		const seen = files.text !== "" && before.some(({ content }) => content.startsWith(files.text));
+		const messages: ChatMessage[] = [
+			...before,
+			{ role: "user", content: withSources(files.text, seen ? files.text : undefined, prompt) },
+		];
 		const controller = new AbortController();
 		running.set(runKey, () => controller.abort());
 		const stop = (): void => controller.abort();
