@@ -205,6 +205,16 @@ verir.
   belgenin sonunda geri bağlantılı bir listeye dönüşür. Numaralar ilk
   referans sırasına göre verilir.
 
+**Görselleri büyük görmek**
+
+- Belgedeki bir görsele tıklamak onu pencereyi kaplayan bir görüntüleyicide
+  açar. ← / → (ya da kenarlardaki oklar) belgedeki diğer görsellere geçer;
+  görsele tıklamak gerçek boyutuna büyütür (kaydırılarak gezilir), bir daha
+  tıklamak pencereye sığdırır. Esc, ✕ ya da görselin dışına tıklamak kapatır.
+- Görselin açıklaması (alt metni) görüntüleyicideki **Açıklamayı düzenle**
+  ile ya da **Alt+tıklama** ile düzenlenir. Diyagramlar tıklamayla değil,
+  çift tıklamayla diyagram düzenleyicide açılır.
+
 **Word'den içe aktarma**
 
 - **Dosya → Word'den İçe Aktar** (`.docx`): başlıklar, kalın/italik/üstü

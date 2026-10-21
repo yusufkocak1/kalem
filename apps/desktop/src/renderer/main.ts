@@ -27,6 +27,7 @@ import type { TableContext, TableEdit } from "./edits.js";
 import { insertDivider, insertTable, replaceTable, tableAt, toggleTaskList } from "./edits.js";
 import { createFilesPane } from "./files-pane.js";
 import { icon } from "./icons.js";
+import { createImageViewer } from "./image-viewer.js";
 import { createNotices } from "./notices.js";
 import { Previews } from "./previews.js";
 import { documentImages } from "./prompt-images.js";
@@ -939,6 +940,38 @@ deskArea.addEventListener(
 		event.preventDefault();
 		event.stopPropagation();
 		void editDiagram(event.target);
+	},
+	true,
+);
+
+// A click on a picture shows it large; with Alt (or from the viewer) it edits its description.
+let editingAlt = false;
+const imageViewer = createImageViewer({
+	t,
+	readOnly: () => session.editor.isReadOnly(),
+	editAlt(image) {
+		editingAlt = true;
+		try {
+			image.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+		} finally {
+			editingAlt = false;
+		}
+	},
+});
+deskArea.addEventListener(
+	"click",
+	(event) => {
+		const image = event.target;
+		if (!(image instanceof HTMLImageElement) || !canvas.contains(image)) return;
+		if (editingAlt || isDiagramImage(image) || event.altKey || event.ctrlKey || event.metaKey) {
+			return;
+		}
+		event.preventDefault();
+		event.stopImmediatePropagation();
+		imageViewer.open(
+			image,
+			[...canvas.querySelectorAll("img")].filter((shown) => !isDiagramImage(shown)),
+		);
 	},
 	true,
 );

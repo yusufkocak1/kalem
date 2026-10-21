@@ -3142,3 +3142,129 @@ pre[data-confluence-kind="layout"]::before {
 	font-size: 11px;
 	letter-spacing: 0.02em;
 }
+
+/* --- Picture viewer ---------------------------------------------------------- */
+
+.image-viewer {
+	box-sizing: border-box;
+	width: 100vw;
+	max-width: none;
+	height: 100vh;
+	max-height: none;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: rgb(0 0 0 / 88%);
+	color: #fff;
+}
+
+.image-viewer[open] {
+	display: flex;
+	flex-direction: column;
+}
+
+.image-viewer::backdrop {
+	background: transparent;
+}
+
+.image-viewer-bar {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	font-size: 13px;
+}
+
+.image-viewer-caption {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.image-viewer-count {
+	color: rgb(255 255 255 / 70%);
+	font-variant-numeric: tabular-nums;
+}
+
+.image-viewer-button,
+.image-viewer-text-button,
+.image-viewer-nav {
+	border: 0;
+	border-radius: 6px;
+	background: rgb(255 255 255 / 12%);
+	color: #fff;
+	font: inherit;
+	cursor: pointer;
+}
+
+.image-viewer-button {
+	display: inline-flex;
+	padding: 6px;
+}
+
+.image-viewer-text-button {
+	padding: 5px 10px;
+}
+
+.image-viewer-button:hover,
+.image-viewer-text-button:hover,
+.image-viewer-nav:hover {
+	background: rgb(255 255 255 / 24%);
+}
+
+.image-viewer-button[aria-pressed="true"] {
+	background: rgb(255 255 255 / 30%);
+}
+
+.image-viewer-stage {
+	display: flex;
+	flex: 1;
+	align-items: center;
+	justify-content: center;
+	min-height: 0;
+	padding: 0 56px 24px;
+	overflow: hidden;
+}
+
+.image-viewer-image {
+	max-width: 100%;
+	max-height: 100%;
+	object-fit: contain;
+	background: #fff;
+	box-shadow: 0 4px 24px rgb(0 0 0 / 50%);
+	cursor: zoom-in;
+}
+
+/* Actual size: the picture scrolls instead of shrinking. */
+.image-viewer-stage.actual {
+	display: block;
+	overflow: auto;
+	text-align: center;
+}
+
+.image-viewer-stage.actual .image-viewer-image {
+	max-width: none;
+	max-height: none;
+	cursor: zoom-out;
+}
+
+.image-viewer-nav {
+	position: absolute;
+	top: 50%;
+	width: 40px;
+	height: 56px;
+	transform: translateY(-50%);
+	font-size: 32px;
+	line-height: 1;
+}
+
+.image-viewer-previous {
+	left: 8px;
+}
+
+.image-viewer-next {
+	right: 8px;
+}
