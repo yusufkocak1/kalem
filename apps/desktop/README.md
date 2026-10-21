@@ -230,6 +230,11 @@ verir.
 
 - **Dosya → Confluence'tan Aç** (ya da Ekle → İçe Aktar → **Confluence**):
   bir Confluence sitesine bağlanır, sayfaları başlığa ve alana göre arar.
+  Arama kutusuna sayfa ID'si (`123456`) ya da tarayıcıdaki adresi de
+  yapıştırılabilir: Cloud'un `…/pages/123456/…`, Server'ın
+  `viewpage.action?pageId=…` ve `/display/ALAN/Başlık` adresleri ile kısa
+  bağlantılar (`/x/…`). Adres bağlı sitenin değilse sonuç gelmez; yalnızca
+  rakamlar yazılırsa o ID'li sayfa ile başlığında o rakamlar geçenler listelenir.
   Seçilen sayfa bir sekmede açılır; **Kaydet** (`Ctrl+S`) sayfayı
   Confluence'a yeni bir sürüm olarak yazar. Farklı Kaydet sayfayı yerel bir
   Markdown dosyasına çevirir.
