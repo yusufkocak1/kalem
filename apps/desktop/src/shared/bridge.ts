@@ -416,6 +416,8 @@ export interface AssistantRequest {
 	readonly history: readonly ChatMessage[];
 	/** The document's pictures, for the model to look at. */
 	readonly images?: readonly PromptImage[];
+	/** Files and folders added to the chat, whose text goes with the question. */
+	readonly sources?: readonly string[];
 }
 
 export interface DraftRequest {
@@ -633,6 +635,8 @@ export interface KalemBridge {
 	/** Asks the assistant; resolves when the reply has ended. */
 	assistantAsk(request: AssistantRequest): Promise<void>;
 	assistantStop(chatId: string): Promise<void>;
+	/** Asks for files or a folder to add to a chat; empty when cancelled. */
+	assistantPickSources(kind: "files" | "folder"): Promise<string[]>;
 	onAssistantEvent(handler: (chatId: string, event: ClaudeEvent) => void): () => void;
 }
 
@@ -713,5 +717,6 @@ export const CHANNEL = {
 	assistantDeleteChat: "kalem:assistant-delete-chat",
 	assistantAsk: "kalem:assistant-ask",
 	assistantStop: "kalem:assistant-stop",
+	assistantPickSources: "kalem:assistant-pick-sources",
 	assistantEvent: "kalem:assistant-event",
 } as const;

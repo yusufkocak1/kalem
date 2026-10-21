@@ -114,6 +114,16 @@ describe("Copilot CLI arguments", () => {
 		]);
 	});
 
+	it("may read the chat's source folders", () => {
+		expect(
+			copilotArgs({ sessionId: "s-1", model: "", folders: ["/kod", "/notlar"] }).join(" "),
+		).toContain("--add-dir /kod --add-dir /notlar");
+		expect(claudeArgs({ sessionId: null, folders: ["/kod"] }).join(" ")).toContain(
+			"--add-dir /kod --disallowedTools",
+		);
+		expect(claudeArgs({ sessionId: null })).not.toContain("--add-dir");
+	});
+
 	it("puts the instructions before a conversation's first question", () => {
 		expect(withInstructions("KURALLAR", "Soru")).toBe(
 			"<instructions>\nKURALLAR\n</instructions>\n\nSoru",

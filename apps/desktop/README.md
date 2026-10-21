@@ -347,6 +347,22 @@ verir.
   içinde saklanır (en çok 100; soruyla giden belge saklanmaz) ve uygulama
   açılınca en son sohbet geri gelir. Claude Code ve Copilot sohbetleri
   kendi oturumlarıyla, API sohbetleri saklanan mesajlarla sürer.
+- **Kaynak dosya ve klasörler:** soru kutusunun üstündeki **+** düğmesi
+  sohbete dosya (**Dosya…**) ya da klasör (**Klasör…**) ekler; bir klasör
+  açıksa (**Dosya → Klasör Aç…**) **Açık klasör** ile o da eklenebilir.
+  Yalnızca `.md` değil, her metin dosyası (`.txt`, `.java`, `.ts`, `.sql`,
+  `.xml`…) okunur; resim, arşiv, `.class` gibi ikili dosyalar ve gizli,
+  `node_modules`, `target`, `build`, `dist` klasörleri atlanır. Eklenenler
+  soru kutusunun üstünde birer çip olarak görünür, ✕ ile çıkarılır ve
+  sohbetle birlikte saklanır. Örneğin bir kod klasörü ile bir analiz notu
+  ekleyip "yazılım analiz dokümanını yaz" denebilir.
+  - **Claude Code / Copilot:** klasörün dosya listesi gönderilir ve klasör
+    `--add-dir` ile okunabilir yapılır; asistan gerek duyduğu dosyaları
+    kendi araçlarıyla (yalnızca okuma) okur. Tek tek eklenen dosyaların
+    metni doğrudan gider.
+  - **API'ler:** dosyaların metni soruyla gider (dosya başına en çok
+    100 000, toplam 300 000 karakter; sığmayanlar sayıyla belirtilir).
+  Kaynaklar değişmedikçe aynı sohbette yeniden gönderilmez.
 - **Model seçimi:** soru kutusunun üstündeki seçici etkin hizmetin
   modellerini listeler (API'lerde hizmetin kendi listesi; Claude Code'da
   varsayılan, `opus`, `sonnet`, `haiku`; **Başka model…** ayarları açar).
