@@ -47,7 +47,7 @@ import {
 	toggleList,
 } from "./block-edit.js";
 import type { ClipboardPayload } from "./clipboard.js";
-import { blocksPayload, inlinePayload } from "./clipboard.js";
+import { blocksPayload, inlinePayload, MARKDOWN_TYPE } from "./clipboard.js";
 import type { HistoryState } from "./history.js";
 import { History } from "./history.js";
 import { assignIds, newId } from "./ids.js";
@@ -169,6 +169,12 @@ export interface EditorOptions {
 	 * presentation it keeps outside the document.
 	 */
 	transformCopy?: (payload: ClipboardPayload, fragment: Root) => ClipboardPayload;
+	/**
+	 * What copying puts on the clipboard as plain text: the text as it reads,
+	 * without Markdown's marks (default), or the Markdown. The Markdown is
+	 * always there too, under `text/markdown`, for pasting back into Kalem.
+	 */
+	clipboardText?: "plain" | "markdown";
 	/** Replaces the fragment a paste is about to insert; `plain` is set for Ctrl+Shift+V. */
 	transformPaste?: (fragment: Root, input: PasteInput, plain: boolean) => Root;
 }
@@ -267,6 +273,12 @@ export class Editor {
 		element.addEventListener("mousedown", this.#onMouseDown);
 		element.addEventListener("pointermove", this.#onPointerMove);
 		element.ownerDocument.addEventListener("pointerup", this.#onPointerUp);
+		// A block selection has no browser selection behind it: the copy
+		// command must be enabled, and its event caught, wherever the focus is.
+		element.ownerDocument.addEventListener("beforecopy", this.#onBeforeClipboard);
+		element.ownerDocument.addEventListener("beforecut", this.#onBeforeClipboard);
+		element.ownerDocument.addEventListener("copy", this.#onDocumentCopy);
+		element.ownerDocument.addEventListener("cut", this.#onDocumentCut);
 		// `selectionchange` yalnızca belge üzerinde tetiklenir; elemana
 		// bağlanamaz. Sökülürken kaldırılması bu yüzden önemli.
 		element.ownerDocument.addEventListener("selectionchange", this.#onSelectionChange);
@@ -811,6 +823,10 @@ export class Editor {
 		this.#element.removeEventListener("mousedown", this.#onMouseDown);
 		this.#element.removeEventListener("pointermove", this.#onPointerMove);
 		this.#element.ownerDocument.removeEventListener("pointerup", this.#onPointerUp);
+		this.#element.ownerDocument.removeEventListener("beforecopy", this.#onBeforeClipboard);
+		this.#element.ownerDocument.removeEventListener("beforecut", this.#onBeforeClipboard);
+		this.#element.ownerDocument.removeEventListener("copy", this.#onDocumentCopy);
+		this.#element.ownerDocument.removeEventListener("cut", this.#onDocumentCut);
 		this.#element.ownerDocument.removeEventListener("selectionchange", this.#onSelectionChange);
 		this.#paintSelection(null);
 		this.#element.removeAttribute("role");
@@ -1015,6 +1031,39 @@ export class Editor {
 		this.#writeClipboard(event);
 	};
 
+	/** Whether blocks are selected in this editor and it is on screen (not a hidden tab's). */
+	#blocksSelectedHere(): boolean {
+		return (
+			this.#selection?.kind === "block" &&
+			this.#element.isConnected &&
+			this.#element.getClientRects().length > 0
+		);
+	}
+
+	/**
+	 * Chromium enables Copy and Cut only with a browser selection, unless a
+	 * `beforecopy`/`beforecut` handler cancels the event. Selected blocks
+	 * have none (it was cleared when the selection left the first block),
+	 * so Ctrl+C and the menu's Copy did nothing whenever the focus was not
+	 * in a block.
+	 */
+	#onBeforeClipboard = (event: Event): void => {
+		if (this.#blocksSelectedHere()) event.preventDefault();
+	};
+
+	/** A copy with the focus outside the editor, while its blocks are selected. */
+	#onDocumentCopy = (event: ClipboardEvent): void => {
+		if (event.defaultPrevented || this.#element.contains(event.target as Node | null)) return;
+		if (this.#blocksSelectedHere()) this.#writeClipboard(event);
+	};
+
+	#onDocumentCut = (event: ClipboardEvent): void => {
+		if (event.defaultPrevented || this.#element.contains(event.target as Node | null)) return;
+		if (this.#blocksSelectedHere() && !this.#readOnly && this.#writeClipboard(event)) {
+			this.#deleteSelectedBlocks();
+		}
+	};
+
 	/**
 	 * Yapıştırma  (F3-07)
 	 *
@@ -1036,14 +1085,20 @@ export class Editor {
 		const girdi: PasteInput = {
 			html: veri.getData("text/html"),
 			text: veri.getData("text/plain"),
+			markdown: veri.getData(MARKDOWN_TYPE),
 		};
 		if (girdi.html === "" && girdi.text === "") return;
 
 		event.preventDefault();
 		if (this.#selection?.kind !== "block" && this.#selectionInsideSource()) {
 			this.#plainPaste = false;
+			// Source holds Markdown: Kalem's own copy goes in as its Markdown.
 			const text =
-				girdi.text !== "" ? girdi.text : (this.#parseHtml(girdi.html)?.textContent ?? "");
+				girdi.markdown !== undefined && girdi.markdown !== ""
+					? girdi.markdown
+					: girdi.text !== ""
+						? girdi.text
+						: (this.#parseHtml(girdi.html)?.textContent ?? "");
 			if (text !== "") this.#insertIntoSource(text.replace(/\r\n?/g, SATIR_SONU));
 			return;
 		}
@@ -1122,20 +1177,23 @@ export class Editor {
 			if (bloklar.length === 0) return false;
 			const fragment: Root = { type: "root", children: bloklar as Root["children"] };
 			const payload = blocksPayload(fragment);
-			const yuk = this.#options.transformCopy?.(payload, fragment) ?? payload;
 			event.preventDefault();
-			veri.setData("text/plain", yuk.text);
-			veri.setData("text/html", yuk.html);
+			this.#setClipboard(veri, this.#options.transformCopy?.(payload, fragment) ?? payload);
 			return true;
 		}
 
 		const hedef = this.#rangeTarget();
 		if (hedef === null || hedef.from >= hedef.to) return false;
-		const yuk = inlinePayload(sliceInline(hedef.children, hedef.from, hedef.to));
 		event.preventDefault();
-		veri.setData("text/plain", yuk.text);
-		veri.setData("text/html", yuk.html);
+		this.#setClipboard(veri, inlinePayload(sliceInline(hedef.children, hedef.from, hedef.to)));
 		return true;
+	}
+
+	#setClipboard(veri: DataTransfer, yuk: ClipboardPayload): void {
+		const markdown = yuk.markdown ?? yuk.text;
+		veri.setData("text/plain", this.#options.clipboardText === "markdown" ? markdown : yuk.text);
+		veri.setData("text/html", yuk.html);
+		if (yuk.markdown !== undefined) veri.setData(MARKDOWN_TYPE, yuk.markdown);
 	}
 
 	/** Blok içi seçili aralığı siler ve imleci başına koyar. */
@@ -1243,12 +1301,133 @@ export class Editor {
 	 * `contextmenu` olayını durdurmuyor, menü yine açılıyor.
 	 */
 	#onMouseDown = (event: MouseEvent): void => {
+		if (event.button === 0 && event.shiftKey) {
+			this.#shiftClick(event);
+			return;
+		}
 		if (event.button !== 2 || this.#selection?.kind !== "block") return;
 		const blok = this.#blockOf(event.target);
 		if (blok === null) return;
 		const secili = selectedRange(this.#selection, this.#blockOrder());
 		if (secili.includes(blok.getAttribute(ID_ATTR) as NodeId)) event.preventDefault();
 	};
+
+	/**
+	 * Shift+click in another block selects the blocks from the selection to
+	 * it. The browser cannot: its selection does not leave the block it is in,
+	 * so the click only moved the caret and there was nothing to copy.
+	 */
+	#shiftClick(event: MouseEvent): void {
+		const blok = this.#blockOf(event.target);
+		const selection = this.#selection;
+		const anchor =
+			selection?.kind === "block"
+				? selection.anchor
+				: selection?.kind === "text"
+					? selection.blockId
+					: null;
+		if (blok === null || anchor === null) return;
+		const focus = blok.getAttribute(ID_ATTR) as NodeId;
+		// Within the block the browser extends the selection itself.
+		if (focus === anchor && selection?.kind === "text") return;
+		event.preventDefault();
+		this.#dragAnchor = null;
+		this.#selectBlockRange(anchor, focus);
+	}
+
+	/**
+	 * Selects whole blocks from `anchor` to `focus`. Our selection leads and
+	 * the browser's is cleared, as when dragging across blocks.
+	 */
+	#selectBlockRange(anchor: NodeId, focus: NodeId): void {
+		this.#blockDrag = true;
+		this.#element.ownerDocument.getSelection()?.removeAllRanges();
+		this.#applySelection({ kind: "block", anchor, focus });
+		this.#elements.get(focus)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+	}
+
+	/**
+	 * Keys that select across blocks, which the browser cannot do:
+	 *
+	 * - Ctrl+A selects the block, as the browser does; pressed again (or in
+	 *   an empty block) it selects the whole document.
+	 * - Shift+Up/Down at the first/last line of a block goes on into the
+	 *   next block, and with blocks selected moves the selection's end.
+	 * - With blocks selected, an arrow puts the caret back.
+	 */
+	#selectionKey(event: KeyboardEvent): boolean {
+		const mod = event.ctrlKey || event.metaKey;
+		const vertical = event.key === "ArrowDown" || event.key === "ArrowUp";
+		const selection = this.#selection;
+		const order = this.#blockOrder();
+
+		// kalem-locale-ok: tuş adları ASCII; Türkçe kuralı burada zarar verir
+		if (mod && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "a") {
+			if (selection?.kind !== "block" && !this.#blockFullySelected()) return false;
+			const first = order[0];
+			const last = order[order.length - 1];
+			if (first === undefined || last === undefined) return false;
+			event.preventDefault();
+			this.#selectBlockRange(first, last);
+			return true;
+		}
+
+		if (selection?.kind === "block") {
+			if (event.shiftKey && !mod && !event.altKey && vertical) {
+				event.preventDefault();
+				const index = order.indexOf(selection.focus) + (event.key === "ArrowDown" ? 1 : -1);
+				const focus = order[Math.max(0, Math.min(order.length - 1, index))];
+				if (focus !== undefined) this.#selectBlockRange(selection.anchor, focus);
+				return true;
+			}
+			const back = event.key === "ArrowUp" || event.key === "ArrowLeft";
+			if (event.shiftKey || mod || !(vertical || back || event.key === "ArrowRight")) return false;
+			const element = this.#elements.get(selection.focus);
+			if (element === undefined) return false;
+			event.preventDefault();
+			this.#blockDrag = false;
+			placeCaret(element, back ? "start" : "end");
+			return true;
+		}
+
+		if (selection?.kind === "text" && event.shiftKey && !mod && !event.altKey && vertical) {
+			// At the block's very end (start) the browser cannot extend the
+			// selection any further: it goes on into the next (previous) block.
+			const down = event.key === "ArrowDown";
+			if (!this.#focusAtBlockEdge(down ? "end" : "start")) return false;
+			const next = order[order.indexOf(selection.blockId) + (down ? 1 : -1)];
+			if (next === undefined) return false;
+			event.preventDefault();
+			this.#selectBlockRange(selection.blockId, next);
+			return true;
+		}
+		return false;
+	}
+
+	/** Whether the selection's moving end is at the very start or end of its block's text. */
+	#focusAtBlockEdge(edge: "start" | "end"): boolean {
+		const selection = this.#element.ownerDocument.getSelection();
+		const node = selection?.focusNode ?? null;
+		if (selection === null || node === null) return false;
+		const blok = this.#blockOf(node);
+		if (blok === null) return false;
+		const range = this.#element.ownerDocument.createRange();
+		range.selectNodeContents(blok);
+		if (edge === "end") range.setStart(node, selection.focusOffset);
+		else range.setEnd(node, selection.focusOffset);
+		return range.toString() === "";
+	}
+
+	/** Whether the browser's selection holds all of one block's text (or the block is empty). */
+	#blockFullySelected(): boolean {
+		const selection = this.#element.ownerDocument.getSelection();
+		if (selection === null || selection.rangeCount === 0) return false;
+		const range = selection.getRangeAt(0);
+		const blok = this.#blockOf(range.startContainer);
+		if (blok === null || blok !== this.#blockOf(range.endContainer)) return false;
+		const all = (blok.textContent ?? "").replace(/\s+/g, "");
+		return all === selection.toString().replace(/\s+/g, "");
+	}
 
 	#onPointerMove = (event: PointerEvent): void => {
 		const anchor = this.#dragAnchor;
@@ -1350,6 +1529,8 @@ export class Editor {
 			event.preventDefault();
 			return;
 		}
+
+		if (this.#selectionKey(event)) return;
 
 		if (this.#selection?.kind === "block") {
 			if (event.key !== "Backspace" && event.key !== "Delete") return;

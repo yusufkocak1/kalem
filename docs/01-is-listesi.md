@@ -788,6 +788,13 @@ Yazarken otomatik dönüşüm: `# ` → başlık ✅, `- ` / `* ` → liste ✅,
 > **Tarayıcıya hiç bırakılmıyor**, blok içi seçimde bile: asıl kazanç
 > zaten orada, çünkü tarayıcının `text/plain`'i biçim işaretlerini atıyor.
 >
+> **Sonradan değişti (masaüstü 2.0):** kullanıcılar Teams'e, forma, not
+> defterine yapıştırınca `**kalın**` görmeyi hata saydı. `text/plain` artık
+> **düz metin** (ekranda görüldüğü gibi; liste `•`/numara, tablo sekmeli),
+> Markdown ise `text/markdown` altında ayrıca yazılıyor ve Kalem'e geri
+> yapıştırmak önce onu okuyor — gidiş-dönüş yine kayıpsız. Eski davranış
+> `clipboardText: "markdown"` seçeneğiyle duruyor.
+>
 > **Editör artık `@kalem-editor/viewer`'a bağımlı.** `render.ts`'te "editör
 > viewer'ı kullanmaz" yazıyordu ve editör *render'ı* için hâlâ doğru
 > (farklı ihtiyaç). Ama pano için tam olarak viewer'ın ürettiği şey

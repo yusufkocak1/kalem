@@ -1629,6 +1629,65 @@ test("saves an untitled document before attaching a file to it", async () => {
 	await discardAndClose(app);
 });
 
+test("copies text without Markdown marks, and blocks selected with Shift, Ctrl+A or the ribbon", async () => {
+	const path = join(await tempDir("copy-plain"), "kopya.md");
+	await writeFile(
+		path,
+		"Birinci **kalın** paragraf.\n\nİkinci paragraf.\n\nÜçüncü *eğik* paragraf.\n",
+	);
+	const { app, page, errors } = await launch({ args: [path] });
+	const paras = page.locator("#editor p");
+	const clipboard = (): Promise<string> => app.evaluate(({ clipboard }) => clipboard.readText());
+	const clear = (): Promise<void> => app.evaluate(({ clipboard }) => clipboard.writeText("-"));
+	const all = "Birinci kalın paragraf.\n\nİkinci paragraf.\n\nÜçüncü eğik paragraf.";
+
+	// Bold text is copied as it reads, not as **Markdown**.
+	await clear();
+	await paras.first().locator("strong").dblclick();
+	await page.keyboard.press("Control+c");
+	await expect.poll(clipboard).toBe("kalın");
+
+	// Shift+click in another block selects the blocks between.
+	await clear();
+	await paras.nth(0).click();
+	await paras.nth(1).click({ modifiers: ["Shift"] });
+	await expect(page.locator("#editor > .kalem-selected")).toHaveCount(2);
+	await page.keyboard.press("Control+c");
+	await expect.poll(clipboard).toBe("Birinci kalın paragraf.\n\nİkinci paragraf.");
+
+	// Shift+Down goes on past the block's last line; once there, it moves the selection's end.
+	await clear();
+	await paras.nth(0).click();
+	await page.keyboard.press("Home");
+	await page.keyboard.press("Shift+ArrowDown");
+	await page.keyboard.press("Shift+ArrowDown");
+	await page.keyboard.press("Shift+ArrowDown");
+	await expect(page.locator("#editor > .kalem-selected")).toHaveCount(3);
+	await page.keyboard.press("Control+c");
+	await expect.poll(clipboard).toBe(all);
+
+	// Ctrl+A selects the block, and pressed again the whole document; the ribbon's Copy copies it.
+	await clear();
+	await paras.nth(1).click();
+	await page.keyboard.press("Control+a");
+	await expect(page.locator("#editor > .kalem-selected")).toHaveCount(0);
+	await page.keyboard.press("Control+a");
+	await expect(page.locator("#editor > .kalem-selected")).toHaveCount(3);
+	await page.locator('[data-command="copy"]').click();
+	await expect.poll(clipboard).toBe(all);
+
+	// Pasted back into Kalem, the formatting comes back from the Markdown on the clipboard.
+	await paras.nth(2).click();
+	await page.keyboard.press("End");
+	await page.keyboard.press("Enter");
+	await page.keyboard.press("Control+v");
+	await expect(page.locator("#editor p strong")).toHaveCount(2);
+	await expect(page.locator("#editor p em")).toHaveCount(2);
+
+	expect(errors).toEqual([]);
+	await discardAndClose(app);
+});
+
 test("copies blocks selected by dragging from the context menu", async () => {
 	const path = join(await tempDir("block-copy"), "bloklar.md");
 	await writeFile(path, "Birinci\n\nİkinci\n\nÜçüncü\n");
@@ -1709,9 +1768,15 @@ test("copies a styled table with its style and pastes it back styled", async () 
 			?.dispatchEvent(
 				new ClipboardEvent("copy", { clipboardData: data, bubbles: true, cancelable: true }),
 			);
-		return { text: data.getData("text/plain"), html: data.getData("text/html") };
+		return {
+			text: data.getData("text/plain"),
+			html: data.getData("text/html"),
+			markdown: data.getData("text/markdown"),
+		};
 	});
-	expect(copied.text).toContain("<!-- kalem:table color=green widths=150 -->");
+	// The plain text is the table as it reads (cells split by tabs); the style travels in the Markdown.
+	expect(copied.text).toBe("Üst\n\nAd\tYaş\nAli\t3\n\nAlt");
+	expect(copied.markdown).toContain("<!-- kalem:table color=green widths=150 -->");
 	expect(copied.html).toContain("background:#2e8540");
 	expect(copied.html).toContain("width:150px");
 	expect(copied.html).not.toContain("kalem:table");
@@ -1722,6 +1787,7 @@ test("copies a styled table with its style and pastes it back styled", async () 
 		const data = new DataTransfer();
 		data.setData("text/plain", input.text);
 		data.setData("text/html", input.html);
+		data.setData("text/markdown", input.markdown);
 		document.activeElement?.dispatchEvent(
 			new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }),
 		);

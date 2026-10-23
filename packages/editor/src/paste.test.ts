@@ -119,6 +119,14 @@ describe("parça üretimi", () => {
 		expect(serialize(parca)).toBe("a\n");
 	});
 
+	/** Kalem'den kopyalanan: düz metin işaretsiz, kaynak `text/markdown`'da. */
+	it("Markdown türü varsa HTML'den ve düz metinden önce o okunuyor", () => {
+		const girdi = { html: "<p><b>kalın</b></p>", text: "kalın", markdown: "**kalın** metin" };
+		expect(serialize(pasteFragment(girdi, domYok))).toBe("**kalın** metin");
+		// Ctrl+Shift+V biçimsiz: Markdown'a bakılmıyor.
+		expect(serialize(pasteFragment(girdi, domYok, { plainOnly: true }))).toBe("kalın\n");
+	});
+
 	it("hiçbir şey yoksa boş parça", () => {
 		expect(pasteFragment({ html: "", text: "" }, domYok).children).toHaveLength(0);
 	});

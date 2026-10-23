@@ -17,6 +17,8 @@
  * zıplamıyor. Ölçü geçiş anında bir kez alınıyor — kullanıcı kaynakta
  * yazarken kutu kendi kurallarıyla büyüyor.
  */
+
+import { MARKDOWN_TYPE } from "@kalem-editor/editor";
 import type { SourceLabels } from "./labels.js";
 
 export interface SourceViewOptions {
@@ -59,7 +61,17 @@ export function createSourceView(editor: HTMLElement, options: SourceViewOptions
 		}
 	};
 
+	// Kalem'den kopyalanan metnin düz hâli biçim işaretlerini atıyor;
+	// kaynağa onun Markdown'ı yapıştırılıyor. `insertText` geri almayı koruyor.
+	const yapistir = (event: ClipboardEvent): void => {
+		const markdown = event.clipboardData?.getData(MARKDOWN_TYPE) ?? "";
+		if (markdown === "" || kutu.readOnly) return;
+		event.preventDefault();
+		doc.execCommand("insertText", false, markdown);
+	};
+
 	kutu.addEventListener("keydown", tus);
+	kutu.addEventListener("paste", yapistir);
 
 	return {
 		show(text, readOnly) {
@@ -89,6 +101,7 @@ export function createSourceView(editor: HTMLElement, options: SourceViewOptions
 
 		destroy() {
 			kutu.removeEventListener("keydown", tus);
+			kutu.removeEventListener("paste", yapistir);
 			kutu.remove();
 			editor.hidden = false;
 		},
