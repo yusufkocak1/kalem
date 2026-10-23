@@ -1,5 +1,5 @@
 import { mkdir, readdir, readFile, stat, utimes, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import type { ElectronApplication, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import JSZip from "jszip";
@@ -866,26 +866,78 @@ test("lays the PDF out with the page setup", async () => {
 	await discardAndClose(app);
 });
 
-test("opens a plain text file, shows its lines as written and saves it in place", async () => {
-	const path = join(await tempDir("txt"), "notlar.txt");
-	await writeFile(path, "Alışveriş listesi\r\nsüt, ekmek\r\n\r\n2 * 3 * 4 = 24\r\n");
-
-	const { app, page, errors } = await launch({ args: [path] });
-	const first = page.locator("#editor p").first();
-	await expect(first).toHaveText("Alışveriş listesi\nsüt, ekmek");
-	await expect(first).toHaveCSS("white-space", "pre-wrap");
-	await expect(status(page)).toHaveText("Saved");
-	expect(await windowTitle(app)).toBe("notlar – Kalem");
-
-	await first.click();
-	await page.keyboard.press("Control+End");
-	await page.keyboard.type(", yumurta");
-	await save(page);
-	await expect(status(page)).toHaveText("Saved");
-
-	expect(await readFile(path, "utf8")).toBe(
-		"Alışveriş listesi\r\nsüt, ekmek, yumurta\r\n\r\n2 * 3 * 4 = 24\r\n",
+test("opens other text files in the text editor as they are, and several folders", async () => {
+	const folder = await tempDir("text-editor");
+	const notes = join(folder, "notlar.txt");
+	await writeFile(
+		notes,
+		"Alışveriş listesi\r\nsüt, ekmek\r\n\r\n2 * 3 * 4 = 24\r\n# değil başlık\r\n",
 	);
+	await mkdir(join(folder, "kod"));
+	await writeFile(join(folder, "kod", "Main.java"), "class Main {\n\tint x = 1;\n}\n");
+	const other = await tempDir("text-editor-other");
+	await writeFile(join(other, "ayar.json"), '{ "a": 1 }\n');
+	const doc = join(folder, "belge.md");
+	await writeFile(doc, "# Belge\n");
+	const { app, page, errors } = await launch({ args: [doc] });
+	const items = page.locator(".files-item");
+	await page.locator('.side-pane-tab[data-pane="files"]').click();
+	await expect(items).toHaveText(["▾kod", "Main.java", "belge.md", "notlar.txt"]);
+
+	// A text file opens in the text editor's window, exactly as written.
+	const opened = app.waitForEvent("window");
+	await items.filter({ hasText: "notlar.txt" }).click();
+	const editor = await opened;
+	const area = editor.locator(".te-area:visible");
+	await expect(area).toHaveValue(
+		"Alışveriş listesi\nsüt, ekmek\n\n2 * 3 * 4 = 24\n# değil başlık\n",
+	);
+	await expect(editor.locator(".te-encoding")).toHaveText("UTF-8 · CRLF");
+	await expect(editor.locator(".te-gutter:visible")).toContainText("6");
+	await expect(page.locator(".doc-tab")).toHaveCount(1);
+
+	await area.click();
+	await editor.keyboard.press("Control+Home");
+	await editor.keyboard.press("End");
+	await editor.keyboard.type(" (pazar)");
+	await expect(editor.locator('.te-tab[aria-selected="true"]')).toHaveClass(/dirty/);
+	await editor.keyboard.press("Control+s");
+	await expect(editor.locator(".te-message")).toHaveText("“notlar.txt” saved");
+	await expect(editor.locator('.te-tab[aria-selected="true"]')).not.toHaveClass(/dirty/);
+	expect(await readFile(notes, "utf8")).toBe(
+		"Alışveriş listesi (pazar)\r\nsüt, ekmek\r\n\r\n2 * 3 * 4 = 24\r\n# değil başlık\r\n",
+	);
+
+	// A second file opens as a tab of the same window; Tab writes a tab; find selects matches.
+	await items.filter({ hasText: "Main.java" }).click();
+	await expect(editor.locator(".te-tab")).toHaveText(["notlar.txt", "Main.java"]);
+	await expect(editor.locator(".te-area:visible")).toHaveValue("class Main {\n\tint x = 1;\n}\n");
+	await editor.keyboard.press("Control+f");
+	await editor.locator(".te-find-input").fill("X");
+	await expect(editor.locator(".te-find-count")).toHaveText("1 of 1");
+	await editor.screenshot({ path: "test-results/text-editor.png" });
+
+	// Several folders: each is a heading of its own and closes by itself.
+	await stubOpenDialog(app, [folder, other]);
+	await clickMenu(app, "File", "Open Folder…");
+	await expect(page.locator(".files-root-name")).toHaveText([
+		`▾${basename(folder)}`,
+		`▾${basename(other)}`,
+	]);
+	await expect(items.filter({ hasText: "ayar.json" })).toHaveCount(1);
+	await page.screenshot({ path: "test-results/files-folders.png" });
+	await page.locator(".files-search").fill("1");
+	await expect(page.locator(".search-file-name")).toContainText([
+		`${basename(folder)}/kod/Main.java`,
+		`${basename(other)}/ayar.json`,
+	]);
+	await page.locator(".files-search").fill("");
+	const otherRoot = page.locator(".files-root", { hasText: basename(other) });
+	await otherRoot.hover();
+	await otherRoot.getByRole("button", { name: `Close “${basename(other)}”` }).click();
+	await expect(page.locator(".files-root-name")).toHaveCount(0);
+	await expect(page.locator(".files-title")).toHaveText(basename(folder));
+
 	expect(errors).toEqual([]);
 	await app.close();
 });
@@ -1102,7 +1154,8 @@ test("browses, searches and quick-opens the documents of a folder", async () => 
 
 	// Without an open folder the pane shows the document's folder.
 	await page.locator('.side-pane-tab[data-pane="files"]').click();
-	await expect(items).toHaveText(["▾alt", "kiraz.md", "elma.md"]);
+	// Every file is listed; documents open in the editor, others where they belong.
+	await expect(items).toHaveText(["▾alt", "kiraz.md", "elma.md", "resim.png"]);
 	await expect(page.locator('.files-item[aria-current="page"]')).toHaveText("elma.md");
 
 	await items.filter({ hasText: "kiraz.md" }).click();
@@ -1112,7 +1165,7 @@ test("browses, searches and quick-opens the documents of a folder", async () => 
 
 	// Folders collapse.
 	await items.filter({ hasText: "alt" }).click();
-	await expect(items).toHaveText(["▸alt", "elma.md"]);
+	await expect(items).toHaveText(["▸alt", "elma.md", "resim.png"]);
 
 	// Search in files folds case and opens the match with the find panel filled in.
 	await page.locator(".files-search").fill("elma");
@@ -1144,7 +1197,7 @@ test("browses, searches and quick-opens the documents of a folder", async () => 
 	);
 
 	await page.locator('.files-toolbar [aria-label="Close Folder"]').click();
-	await expect(items).toHaveText(["▸alt", "elma.md"]);
+	await expect(items).toHaveText(["▸alt", "elma.md", "resim.png"]);
 	await expect(page.locator('.files-toolbar [aria-label="Close Folder"]')).toBeHidden();
 	await page.screenshot({ path: "test-results/files-pane.png" });
 
@@ -1576,6 +1629,65 @@ test("saves an untitled document before attaching a file to it", async () => {
 	await discardAndClose(app);
 });
 
+test("copies text without Markdown marks, and blocks selected with Shift, Ctrl+A or the ribbon", async () => {
+	const path = join(await tempDir("copy-plain"), "kopya.md");
+	await writeFile(
+		path,
+		"Birinci **kalın** paragraf.\n\nİkinci paragraf.\n\nÜçüncü *eğik* paragraf.\n",
+	);
+	const { app, page, errors } = await launch({ args: [path] });
+	const paras = page.locator("#editor p");
+	const clipboard = (): Promise<string> => app.evaluate(({ clipboard }) => clipboard.readText());
+	const clear = (): Promise<void> => app.evaluate(({ clipboard }) => clipboard.writeText("-"));
+	const all = "Birinci kalın paragraf.\n\nİkinci paragraf.\n\nÜçüncü eğik paragraf.";
+
+	// Bold text is copied as it reads, not as **Markdown**.
+	await clear();
+	await paras.first().locator("strong").dblclick();
+	await page.keyboard.press("Control+c");
+	await expect.poll(clipboard).toBe("kalın");
+
+	// Shift+click in another block selects the blocks between.
+	await clear();
+	await paras.nth(0).click();
+	await paras.nth(1).click({ modifiers: ["Shift"] });
+	await expect(page.locator("#editor > .kalem-selected")).toHaveCount(2);
+	await page.keyboard.press("Control+c");
+	await expect.poll(clipboard).toBe("Birinci kalın paragraf.\n\nİkinci paragraf.");
+
+	// Shift+Down goes on past the block's last line; once there, it moves the selection's end.
+	await clear();
+	await paras.nth(0).click();
+	await page.keyboard.press("Home");
+	await page.keyboard.press("Shift+ArrowDown");
+	await page.keyboard.press("Shift+ArrowDown");
+	await page.keyboard.press("Shift+ArrowDown");
+	await expect(page.locator("#editor > .kalem-selected")).toHaveCount(3);
+	await page.keyboard.press("Control+c");
+	await expect.poll(clipboard).toBe(all);
+
+	// Ctrl+A selects the block, and pressed again the whole document; the ribbon's Copy copies it.
+	await clear();
+	await paras.nth(1).click();
+	await page.keyboard.press("Control+a");
+	await expect(page.locator("#editor > .kalem-selected")).toHaveCount(0);
+	await page.keyboard.press("Control+a");
+	await expect(page.locator("#editor > .kalem-selected")).toHaveCount(3);
+	await page.locator('[data-command="copy"]').click();
+	await expect.poll(clipboard).toBe(all);
+
+	// Pasted back into Kalem, the formatting comes back from the Markdown on the clipboard.
+	await paras.nth(2).click();
+	await page.keyboard.press("End");
+	await page.keyboard.press("Enter");
+	await page.keyboard.press("Control+v");
+	await expect(page.locator("#editor p strong")).toHaveCount(2);
+	await expect(page.locator("#editor p em")).toHaveCount(2);
+
+	expect(errors).toEqual([]);
+	await discardAndClose(app);
+});
+
 test("copies blocks selected by dragging from the context menu", async () => {
 	const path = join(await tempDir("block-copy"), "bloklar.md");
 	await writeFile(path, "Birinci\n\nİkinci\n\nÜçüncü\n");
@@ -1656,9 +1768,15 @@ test("copies a styled table with its style and pastes it back styled", async () 
 			?.dispatchEvent(
 				new ClipboardEvent("copy", { clipboardData: data, bubbles: true, cancelable: true }),
 			);
-		return { text: data.getData("text/plain"), html: data.getData("text/html") };
+		return {
+			text: data.getData("text/plain"),
+			html: data.getData("text/html"),
+			markdown: data.getData("text/markdown"),
+		};
 	});
-	expect(copied.text).toContain("<!-- kalem:table color=green widths=150 -->");
+	// The plain text is the table as it reads (cells split by tabs); the style travels in the Markdown.
+	expect(copied.text).toBe("Üst\n\nAd\tYaş\nAli\t3\n\nAlt");
+	expect(copied.markdown).toContain("<!-- kalem:table color=green widths=150 -->");
 	expect(copied.html).toContain("background:#2e8540");
 	expect(copied.html).toContain("width:150px");
 	expect(copied.html).not.toContain("kalem:table");
@@ -1669,6 +1787,7 @@ test("copies a styled table with its style and pastes it back styled", async () 
 		const data = new DataTransfer();
 		data.setData("text/plain", input.text);
 		data.setData("text/html", input.html);
+		data.setData("text/markdown", input.markdown);
 		document.activeElement?.dispatchEvent(
 			new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }),
 		);

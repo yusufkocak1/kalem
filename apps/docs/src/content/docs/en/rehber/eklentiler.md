@@ -37,7 +37,7 @@ call `defaultPlugins()` and put it at the start of your own list.
 | `@kalem-editor/plugin-image-upload` | Drag-and-drop / paste image upload | 2.9 kB |
 | `@kalem-editor/plugin-outline` | Table of contents panel | 1.9 kB |
 | `@kalem-editor/plugin-word-count` | Word count and reading time | 1.4 kB |
-| `@kalem-editor/plugin-source-mode` | Raw Markdown source (Ctrl+Shift+M) | 1.0 kB |
+| `@kalem-editor/plugin-source-mode` | Raw Markdown source (Ctrl+Shift+M) | 1.1 kB |
 | `@kalem-editor/plugin-autosave` | Debounced saving + status indicator | 657 B |
 
 Each has its own CSS file: `@kalem-editor/themes/plugin-code.css`,

@@ -1017,18 +1017,20 @@ test.describe("pano", () => {
 				DataTransfer.prototype.setData = orijinal;
 			}
 			const bul = (tip: string) => kayit.find(([t]) => t === tip)?.[1] ?? "";
-			return { text: bul("text/plain"), html: bul("text/html") };
+			return { text: bul("text/plain"), html: bul("text/html"), markdown: bul("text/markdown") };
 		}, tur);
 	}
 
-	test("blok içi seçim Markdown olarak kopyalanıyor", async ({ page }) => {
+	test("blok içi seçim düz metin, HTML ve Markdown olarak kopyalanıyor", async ({ page }) => {
 		await page.evaluate(() => window.kalem.editor.setValue("bir **iki** üç\n"));
 		await page.locator("#editor > p").first().click();
 		await page.keyboard.press("ControlOrMeta+a");
 
 		const pano = await kopyala(page);
-		// Asıl kazanç: not defterine yapıştıran kullanıcı işaretleri görür.
-		expect(pano.text).toBe("bir **iki** üç");
+		// Not defterine, forma yapıştıran ekranda gördüğünü alır; Kalem'e geri
+		// yapıştırmak kayıpsız Markdown'ı okur.
+		expect(pano.text).toBe("bir iki üç");
+		expect(pano.markdown).toBe("bir **iki** üç");
 		expect(pano.html).toContain("<strong>iki</strong>");
 	});
 
@@ -1052,7 +1054,8 @@ test.describe("pano", () => {
 		expect(secildi).toBe(2);
 
 		const pano = await kopyala(page);
-		expect(pano.text).toBe("# Başlık\n\n- bir\n- iki");
+		expect(pano.text).toBe("Başlık\n\n• bir\n• iki");
+		expect(pano.markdown).toBe("# Başlık\n\n- bir\n- iki");
 		expect(pano.html).toContain("<h1>Başlık</h1>");
 		expect(pano.html).toContain("<ul>");
 	});

@@ -1,5 +1,5 @@
 import { readFile, stat, writeFile } from "node:fs/promises";
-import { basename, dirname, join, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { IpcMainEvent, IpcMainInvokeEvent } from "electron";
 import { app, dialog, ipcMain } from "electron";
@@ -23,7 +23,6 @@ import {
 	extension,
 	isEditablePath,
 	isPackagePath,
-	isWordPath,
 	MARKDOWN_EXTENSIONS,
 	PACKAGE_EXTENSIONS,
 	stripExtension,
@@ -72,7 +71,8 @@ export interface IpcContext {
 	showCaseMenu(win: AppWindow, x: number, y: number): void;
 	/** Lets the user pick a folder and opens it in every window. */
 	openFolder(win: AppWindow): Promise<void>;
-	closeFolder(): void;
+	/** Closes one open folder; all of them with `null`. */
+	closeFolder(path: string | null): void;
 }
 
 const TYPE_BY_EXTENSION: Readonly<Record<string, string>> = {
@@ -172,8 +172,8 @@ export function registerIpc(ctx: IpcContext): void {
 
 	ipcMain.handle(CHANNEL.openPath, async (event, path: unknown) => {
 		const win = senderOf(event);
-		// Document types only: this channel must not load arbitrary files into the editor.
-		if (typeof path !== "string" || !(isEditablePath(path) || isWordPath(path))) return;
+		// Documents open in the editor; other files where they belong (`openOther`), never as Markdown.
+		if (typeof path !== "string" || !isAbsolute(path)) return;
 		await windows.openPath(path, win);
 	});
 
@@ -217,9 +217,10 @@ export function registerIpc(ctx: IpcContext): void {
 			});
 			if (result.canceled || result.filePath === "") return null;
 
-			const path = isEditablePath(result.filePath)
-				? result.filePath
-				: `${result.filePath}.${wanted}`;
+			const path =
+				isEditablePath(result.filePath) || TEXT_EXTENSIONS.includes(extension(result.filePath))
+					? result.filePath
+					: `${result.filePath}.${wanted}`;
 			if (windows.isOpenElsewhere(path, tab.id)) {
 				await dialog.showMessageBox(win.window, {
 					type: "warning",
@@ -525,37 +526,37 @@ export function registerIpc(ctx: IpcContext): void {
 	/** Without an open folder, the folder each window last showed. */
 	const followedRoots = new WeakMap<AppWindow, string>();
 
-	const workspaceRoot = (win: AppWindow): { root: string | null; opened: boolean } => {
-		const opened = ctx.store.state.workspace;
-		if (opened !== null) return { root: opened, opened: true };
+	const workspaceRoots = (win: AppWindow): { roots: string[]; opened: boolean } => {
+		const opened = ctx.store.state.workspaces;
+		if (opened.length > 0) return { roots: [...opened], opened: true };
 		const path = windows.activeTab(win)?.path ?? null;
 		const followed = followedRoots.get(win);
-		if (path === null) return { root: followed ?? null, opened: false };
+		if (path === null) return { roots: followed === undefined ? [] : [followed], opened: false };
 		// A document further down the shown folder keeps the folder in place.
 		if (followed !== undefined && pathKey(path).startsWith(pathKey(followed) + sep)) {
-			return { root: followed, opened: false };
+			return { roots: [followed], opened: false };
 		}
 		followedRoots.set(win, dirname(path));
-		return { root: dirname(path), opened: false };
+		return { roots: [dirname(path)], opened: false };
 	};
 
 	const collator = () => new Intl.Collator(ctx.language(), { numeric: true, sensitivity: "base" });
 
+	const listRoots = (paths: readonly string[]) =>
+		Promise.all(paths.map(async (path) => ({ path, ...(await listWorkspace(path, collator())) })));
+
 	ipcMain.handle(CHANNEL.getWorkspace, async (event): Promise<Workspace> => {
-		const { root, opened } = workspaceRoot(senderOf(event));
-		if (root === null) return { root, opened, entries: [], truncated: false };
-		const listing = await listWorkspace(root, collator());
-		return { root, opened, ...listing };
+		const { roots, opened } = workspaceRoots(senderOf(event));
+		return { roots: await listRoots(roots), opened };
 	});
 
 	ipcMain.handle(CHANNEL.openFolder, (event) => ctx.openFolder(senderOf(event)));
-	on(CHANNEL.closeFolder, () => ctx.closeFolder());
+	on(CHANNEL.closeFolder, (_win, path) => ctx.closeFolder(typeof path === "string" ? path : null));
 
 	ipcMain.handle(CHANNEL.searchWorkspace, async (event, query: unknown): Promise<SearchResult> => {
-		const { root } = workspaceRoot(senderOf(event));
-		if (root === null || typeof query !== "string") return { hits: [], truncated: false };
-		const { entries } = await listWorkspace(root, collator());
-		return searchWorkspace(entries, root, query, ctx.language());
+		const { roots } = workspaceRoots(senderOf(event));
+		if (roots.length === 0 || typeof query !== "string") return { hits: [], truncated: false };
+		return searchWorkspace(await listRoots(roots), query, ctx.language());
 	});
 
 	// --- Version history ----------------------------------------------------

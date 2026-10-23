@@ -10,7 +10,13 @@ import { attachmentName, linkedAttachment } from "../shared/confluence-common.js
 import type { Diagram } from "../shared/diagram.js";
 import { DIAGRAM_SUFFIX, serializeDiagram } from "../shared/diagram.js";
 import { format, stringsFor } from "../shared/i18n.js";
-import { isEditablePath, isPackagePath, isWordPath } from "../shared/paths.js";
+import {
+	extension,
+	isEditablePath,
+	isPackagePath,
+	isWordPath,
+	TEXT_EXTENSIONS,
+} from "../shared/paths.js";
 import { withColumnWidth } from "../shared/table-style.js";
 import { changeCase, collapseSpaces, nextCase } from "../shared/text-case.js";
 import { createAssistantPane } from "./assistant-pane.js";
@@ -27,6 +33,7 @@ import type { TableContext, TableEdit } from "./edits.js";
 import { insertDivider, insertTable, replaceTable, tableAt, toggleTaskList } from "./edits.js";
 import { createFilesPane } from "./files-pane.js";
 import { icon } from "./icons.js";
+import { createImageViewer } from "./image-viewer.js";
 import { createNotices } from "./notices.js";
 import { Previews } from "./previews.js";
 import { documentImages } from "./prompt-images.js";
@@ -139,9 +146,9 @@ const assistant = createAssistantPane({
 	images: () =>
 		documentImages([...canvas.querySelectorAll("img")].filter((image) => !isDiagramImage(image))),
 	selection: () => lastSelection,
-	workspaceFolder: () => {
+	workspaceFolders: () => {
 		const workspace = filesPane.workspace();
-		return workspace?.opened === true ? workspace.root : null;
+		return workspace?.opened === true ? workspace.roots.map((root) => root.path) : [];
 	},
 	insert: (text) => insertReply(text),
 	insertDiagram: (diagram) => insertReplyDiagram(diagram),
@@ -801,7 +808,9 @@ window.addEventListener(
 		const files = Array.from(event.dataTransfer?.files ?? [])
 			.map((file) => ({ path: bridge.pathForFile(file), image: file.type.startsWith("image/") }))
 			.filter((file) => file.path !== "");
-		const isDocument = (path: string): boolean => isEditablePath(path) || isWordPath(path);
+		// Documents and plain text files open; other files are attached to the document.
+		const isDocument = (path: string): boolean =>
+			isEditablePath(path) || isWordPath(path) || TEXT_EXTENSIONS.includes(extension(path));
 		const documents = files.filter((file) => isDocument(file.path));
 		const others = files.filter((file) => !isDocument(file.path));
 		if (documents.length === 0 && others.every((file) => file.image)) return;
@@ -939,6 +948,38 @@ deskArea.addEventListener(
 		event.preventDefault();
 		event.stopPropagation();
 		void editDiagram(event.target);
+	},
+	true,
+);
+
+// A click on a picture shows it large; with Alt (or from the viewer) it edits its description.
+let editingAlt = false;
+const imageViewer = createImageViewer({
+	t,
+	readOnly: () => session.editor.isReadOnly(),
+	editAlt(image) {
+		editingAlt = true;
+		try {
+			image.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+		} finally {
+			editingAlt = false;
+		}
+	},
+});
+deskArea.addEventListener(
+	"click",
+	(event) => {
+		const image = event.target;
+		if (!(image instanceof HTMLImageElement) || !canvas.contains(image)) return;
+		if (editingAlt || isDiagramImage(image) || event.altKey || event.ctrlKey || event.metaKey) {
+			return;
+		}
+		event.preventDefault();
+		event.stopImmediatePropagation();
+		imageViewer.open(
+			image,
+			[...canvas.querySelectorAll("img")].filter((shown) => !isDiagramImage(shown)),
+		);
 	},
 	true,
 );

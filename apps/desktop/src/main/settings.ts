@@ -32,8 +32,8 @@ export interface StoredState {
 	readonly window: WindowBounds | null;
 	/** Whether the welcome document has been shown once. */
 	readonly welcomed: boolean;
-	/** The folder opened with Open Folder. */
-	readonly workspace: string | null;
+	/** The folders opened with Open Folder, in the order they were opened. */
+	readonly workspaces: readonly string[];
 	/** When releases were last looked up, in ms. */
 	readonly lastUpdateCheck: number | null;
 }
@@ -109,9 +109,24 @@ export function parseStoredState(raw: unknown): StoredState {
 		recentFiles: [...new Set(recentFiles)].slice(0, MAX_RECENT_FILES),
 		window: parseBounds(root.window),
 		welcomed: asBoolean(root.welcomed, false),
-		workspace: typeof root.workspace === "string" && root.workspace !== "" ? root.workspace : null,
+		workspaces: parseWorkspaces(root),
 		lastUpdateCheck: asNumber(root.lastUpdateCheck),
 	};
+}
+
+export const MAX_WORKSPACES = 20;
+
+/** The open folders; an older version kept only one, as `workspace`. */
+function parseWorkspaces(root: Record<string, unknown>): string[] {
+	const list = Array.isArray(root.workspaces)
+		? root.workspaces
+		: typeof root.workspace === "string"
+			? [root.workspace]
+			: [];
+	return [...new Set(list.filter((p): p is string => typeof p === "string" && p !== ""))].slice(
+		0,
+		MAX_WORKSPACES,
+	);
 }
 
 const MAX_FAVORITES = 200;

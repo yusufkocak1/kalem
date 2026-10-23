@@ -1,8 +1,9 @@
 # Kalem Masaüstü
 
 Electron ile yazılmış, **Word rahatlığında** bir Markdown editörü. `.md`
-ve `.txt` dosyalarıyla çalışır; düzenleme motoru bu depodaki Kalem
-(`@kalem-editor/*`) paketleridir.
+belgeleriyle çalışır; diğer metin dosyalarını (`.txt`, `.java`, `.json`…)
+Markdown'a çevirmeden ayrı bir **metin düzenleyicide** açar. Düzenleme
+motoru bu depodaki Kalem (`@kalem-editor/*`) paketleridir.
 
 ```bash
 pnpm install
@@ -125,26 +126,49 @@ verir.
     "Markdown belgeleri" yeterli: görseller yeni belgenin `.assets`
     klasörüne çıkarılır.
 - **Dosyalar bölmesi** (gezinti bölmesinde **Başlıklar / Dosyalar**):
-  **Dosya → Klasör Aç…** ile seçilen klasörün, klasör açılmamışsa etkin
-  belgenin klasörünün `.md`, `.txt` ve `.kmd` belgeleri ağaç olarak
-  listelenir; tıklanan belge sekmede açılır. Belge olmayan dosyalar, boş
-  klasörler, gizli klasörler, `node_modules` gibi araç klasörleri ve
-  `.assets` klasörleri gösterilmez. Açılan klasör uygulama yeniden
-  başlayınca da açık kalır; **Klasörü Kapat** ile bırakılır.
-- **Klasörde arama** (`Ctrl+Shift+E` ya da bölmedeki arama kutusu):
-  klasördeki belgelerin satırları arayüz dilinin büyük/küçük harf
-  kurallarıyla (İ/ı) aranır, sonuçlar dosyaya göre gruplanır. Bir sonuca
-  tıklamak belgeyi açar ve bul panelini aynı sözcükle doldurur. Paketlerin
-  (`.kmd`) içinde arama yapılmaz.
-- **Hızlı Aç** (`Ctrl+Shift+P`): klasördeki belgeleri adla bulup açar;
-  yazılan her sözcük yolda geçmeli, adı sözcükle başlayanlar öne gelir.
+  **Dosya → Klasör Aç…** ile seçilen klasörlerin, klasör açılmamışsa etkin
+  belgenin klasörünün **tüm dosyaları** ağaç olarak listelenir. Birden çok
+  klasör açılabilir (diyalogda birkaç klasör seçilebilir, ya da Klasör Aç
+  tekrar kullanılır); her klasör kendi başlığıyla görünür ve başlığın
+  üstüne gelince çıkan ✕ ile tek başına kapatılır. Araç çubuğundaki ✕
+  (**Dosya → Tüm Klasörleri Kapat**) hepsini kapatır. Açık klasörler
+  uygulama yeniden başlayınca da açık kalır. Boş klasörler, gizli
+  klasörler, `node_modules`/`target`/`build` gibi araç klasörleri ve
+  `.assets` klasörleri gösterilmez.
+  - Tıklanan dosya türüne göre açılır: `.md`/`.kmd` belgeler sekmede
+    Markdown editöründe, Word belgeleri içe aktarılarak; diğer **metin
+    dosyaları** (`.txt`, `.java`, `.json`, `.xml`, `.sql`…) **metin
+    düzenleyicide**; resim, PDF gibi metin olmayan dosyalar sistemdeki
+    uygulamalarıyla (soluk gösterilir). Program dosyaları (`.exe`, `.bat`,
+    `.ps1`…) çalıştırılmaz, yalnızca klasörde gösterilir.
+- **Metin düzenleyici:** Markdown olmayan metin dosyaları için ayrı bir
+  pencere. Dosya **olduğu gibi** gösterilir ve kaydedilir: Markdown'a
+  çevrilmez, kodlaması (UTF-8, UTF-16, BOM) ve satır sonları (CRLF/LF)
+  korunur. Sekmeler, satır numaraları, eş genişlikli yazı, `Tab` ile sekme
+  karakteri, **Satırları kaydır** seçeneği, durum çubuğunda satır/sütun
+  ve kodlama. Kısayollar: `Ctrl+S` kaydet, `Ctrl+O` aç, `Ctrl+W` sekmeyi
+  kapat, `Ctrl+Tab` sekmeler arası, `Ctrl+F` bul (`Enter`/`F3` sonraki,
+  `Shift+Enter` önceki). Dosya açıldıktan sonra başka bir programca
+  değiştirildiyse kaydederken üzerine yazmadan önce sorulur; kaydedilmemiş
+  değişiklikle kapatırken de sorulur. 20 MB'tan büyük dosyalar metin
+  düzenleyicide açılmaz. Eski tek baytlık kodlamalar (Windows-1254/1252)
+  kaydederken UTF-8'e çevrilir.
+- **Klasörde arama** (`Ctrl+Shift+E` ya da bölmedeki arama kutusu): açık
+  klasörlerdeki tüm metin dosyalarının satırları arayüz dilinin
+  büyük/küçük harf kurallarıyla (İ/ı) aranır, sonuçlar dosyaya göre
+  gruplanır (birden çok klasörde yol klasör adıyla başlar). Bir sonuca
+  tıklamak dosyayı açar; belgede bul panelini aynı sözcükle doldurur.
+  Paketlerin (`.kmd`), Word belgelerinin ve metin olmayan dosyaların
+  içinde arama yapılmaz.
+- **Hızlı Aç** (`Ctrl+Shift+P`): açık klasörlerdeki dosyaları adla bulup
+  açar; yazılan her sözcük yolda geçmeli, adı sözcükle başlayanlar öne
+  gelir.
 - **Farklı Kaydet** belgeyi başka bir klasöre taşırsa bağlantı verdiği
   görsel ve dosyalar da yeni yerin `.assets` klasörüne kopyalanır ve
   bağlantılar güncellenir (yeni yerden zaten ulaşılabilen dosyalara
   dokunulmaz).
-- `.txt` dosyaları da açılır ve kendi uzantısıyla kaydedilir. İçerik
-  **Markdown olarak** okunur; satırlar dosyada yazıldığı gibi alt alta
-  gösterilir (bkz. bilinen sınırlar).
+- `.txt` dosyaları (2.0'dan beri) Markdown editöründe değil, metin
+  düzenleyicide açılır; içerikleri Markdown'a çevrilmez.
 - **Sekmeler:** bir pencerede birden çok belge. `Ctrl+N` yeni sekme,
   `Ctrl+Shift+N` yeni pencere, `Ctrl+W` sekmeyi kapatır, `Ctrl+Tab` sekmeler
   arasında gezer. Her sekmenin kendi geri alma geçmişi, kayıt durumu ve
@@ -205,6 +229,16 @@ verir.
   belgenin sonunda geri bağlantılı bir listeye dönüşür. Numaralar ilk
   referans sırasına göre verilir.
 
+**Görselleri büyük görmek**
+
+- Belgedeki bir görsele tıklamak onu pencereyi kaplayan bir görüntüleyicide
+  açar. ← / → (ya da kenarlardaki oklar) belgedeki diğer görsellere geçer;
+  görsele tıklamak gerçek boyutuna büyütür (kaydırılarak gezilir), bir daha
+  tıklamak pencereye sığdırır. Esc, ✕ ya da görselin dışına tıklamak kapatır.
+- Görselin açıklaması (alt metni) görüntüleyicideki **Açıklamayı düzenle**
+  ile ya da **Alt+tıklama** ile düzenlenir. Diyagramlar tıklamayla değil,
+  çift tıklamayla diyagram düzenleyicide açılır.
+
 **Word'den içe aktarma**
 
 - **Dosya → Word'den İçe Aktar** (`.docx`): başlıklar, kalın/italik/üstü
@@ -220,6 +254,11 @@ verir.
 
 - **Dosya → Confluence'tan Aç** (ya da Ekle → İçe Aktar → **Confluence**):
   bir Confluence sitesine bağlanır, sayfaları başlığa ve alana göre arar.
+  Arama kutusuna sayfa ID'si (`123456`) ya da tarayıcıdaki adresi de
+  yapıştırılabilir: Cloud'un `…/pages/123456/…`, Server'ın
+  `viewpage.action?pageId=…` ve `/display/ALAN/Başlık` adresleri ile kısa
+  bağlantılar (`/x/…`). Adres bağlı sitenin değilse sonuç gelmez; yalnızca
+  rakamlar yazılırsa o ID'li sayfa ile başlığında o rakamlar geçenler listelenir.
   Seçilen sayfa bir sekmede açılır; **Kaydet** (`Ctrl+S`) sayfayı
   Confluence'a yeni bir sürüm olarak yazar. Farklı Kaydet sayfayı yerel bir
   Markdown dosyasına çevirir.
@@ -534,10 +573,9 @@ e2e/            Playwright ile gerçek uygulamayı süren testler
 - Kod biçimlendirme JSON, JSONC, XML (SVG, RSS, plist… dâhil), HTML ve
   YAML içindir; JSON5, CSS, JavaScript ve öteki diller biçimlendirilmez.
   YAML'da katlanmış (`>`) metnin satırları birleşebilir (anlamı değişmez).
-- `.txt` dosyası düz metin olarak değil Markdown olarak yorumlanır: `#` ile
-  başlayan satır başlık, `- ` ile başlayan satır liste olur. Kaydederken
-  paragraf başındaki boşluklar (girinti) düşer. `.txt` için "birlikte aç"
-  ilişkilendirmesi kurulmaz; Not Defteri'nin yerini almaz.
+- Metin düzenleyici bir kod editörü değildir: sözdizimi renklendirmesi,
+  değiştir (replace) ve çoklu imleç yoktur. `.txt` için "birlikte aç"
+  ilişkilendirmesi kurulmaz.
 - Paket kaydedilirken yalnızca metinde bağlantısı olan dosyalar pakete girer;
   bağlantısı silinmiş bir görsel bir sonraki kayıtta paketten düşer. Paketin
   içindeki metin her zaman UTF-8 `text.md`'dir; başka bir uygulamanın

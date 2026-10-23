@@ -86,10 +86,11 @@ export function createBlockMenu(editor: Editor, options: BlockMenuOptions): Bloc
 		return hedefId === null ? -1 : editor.getBlockIds().indexOf(hedefId);
 	}
 
-	/** Bloğun Markdown karşılığını panoya yazar. */
+	/** Bloğu panoya yazar: düz metin ve HTML. */
 	async function kopyala(index: number): Promise<void> {
 		const blok = editor.getDocument().children[index];
 		if (blok === undefined) return;
+		// Async pano yalnızca düz metin ve HTML yazabiliyor; Kalem'e geri yapıştırmak HTML'i okur.
 		const { text, html } = blocksPayload({ type: "root", children: [blok] });
 		try {
 			// `ClipboardItem` biçimli yapıştırmayı koruyor; olmayan yerde

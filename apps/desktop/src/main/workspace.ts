@@ -1,9 +1,9 @@
 import type { Dirent } from "node:fs";
-import { readdir, readFile, stat } from "node:fs/promises";
-import { join, relative, sep } from "node:path";
+import { readdir } from "node:fs/promises";
+import { basename, join, relative, sep } from "node:path";
 import type { SearchHit, WorkspaceEntry } from "../shared/bridge.js";
-import { decodeBytes } from "../shared/encoding.js";
-import { isEditablePath, isPackagePath } from "../shared/paths.js";
+import { isPackagePath, isWordPath } from "../shared/paths.js";
+import { readTextFile } from "./text-files.js";
 
 /** A folder this large is listed only in part; the pane says so. */
 export const MAX_ENTRIES = 5000;
@@ -23,7 +23,7 @@ export interface Listing {
 	readonly truncated: boolean;
 }
 
-/** Folders and documents under `root`, depth first, folders before files, by name. */
+/** Folders and files under `root`, depth first, folders before files, by name. */
 export async function listWorkspace(root: string, collator: Intl.Collator): Promise<Listing> {
 	const entries: WorkspaceEntry[] = [];
 	let truncated = false;
@@ -39,7 +39,7 @@ export async function listWorkspace(root: string, collator: Intl.Collator): Prom
 			.filter((child) => child.isDirectory() && !skipFolder(child.name))
 			.sort((a, b) => collator.compare(a.name, b.name));
 		const files = children
-			.filter((child) => child.isFile() && isEditablePath(child.name))
+			.filter((child) => child.isFile())
 			.sort((a, b) => collator.compare(a.name, b.name));
 
 		let found = false;
@@ -48,7 +48,7 @@ export async function listWorkspace(root: string, collator: Intl.Collator): Prom
 			const path = join(folder, child.name);
 			const index = entries.length;
 			entries.push({ path, name: child.name, depth, folder: true });
-			// Folders without documents are left out.
+			// Empty folders are left out.
 			if (depth + 1 < MAX_DEPTH && (await walk(path, depth + 1))) found = true;
 			else entries.splice(index);
 		}
@@ -68,13 +68,13 @@ export async function listWorkspace(root: string, collator: Intl.Collator): Prom
 }
 
 /**
- * Lines containing `query` in the workspace's text documents. Matching folds
- * case with the interface language's rules (Turkish İ/ı) and ignores
- * nothing else. Packages are skipped: their text is inside a zip.
+ * Lines containing `query` in the text files of the workspace's folders.
+ * Matching folds case with the interface language's rules (Turkish İ/ı)
+ * and ignores nothing else. Packages and Word files are skipped: their
+ * text is inside a zip; so are files that are not text.
  */
 export async function searchWorkspace(
-	entries: readonly WorkspaceEntry[],
-	root: string,
+	roots: readonly { readonly path: string; readonly entries: readonly WorkspaceEntry[] }[],
 	query: string,
 	locale: string,
 ): Promise<{ hits: SearchHit[]; truncated: boolean }> {
@@ -82,27 +82,41 @@ export async function searchWorkspace(
 	const hits: SearchHit[] = [];
 	if (needle === "") return { hits, truncated: false };
 
-	for (const entry of entries) {
-		if (entry.folder || isPackagePath(entry.path)) continue;
+	for (const { path: root, entries } of roots) {
+		// With several folders, a path says which one it is in.
+		const prefix = roots.length > 1 ? `${basename(root)}/` : "";
+		for (const entry of entries) {
+			if (entry.folder || isPackagePath(entry.path) || isWordPath(entry.path)) continue;
+			const found = await searchFile(
+				entry.path,
+				`${prefix}${relative(root, entry.path).split(sep).join("/")}`,
+			);
+			if (found) return { hits, truncated: true };
+		}
+	}
+	return { hits, truncated: false };
+
+	/** Adds the file's hits; `true` once there are as many as are shown. */
+	async function searchFile(path: string, shown: string): Promise<boolean> {
 		try {
-			if ((await stat(entry.path)).size > MAX_SEARCH_FILE_SIZE) continue;
-			const { text } = decodeBytes(new Uint8Array(await readFile(entry.path)));
-			const lines = text.split(/\r\n|\r|\n/);
+			const file = await readTextFile(path, "windows-1254", MAX_SEARCH_FILE_SIZE);
+			if (file === null) return false;
+			const lines = file.text.split(/\r\n|\r|\n/);
 			for (const [i, line] of lines.entries()) {
 				const column = line.toLocaleLowerCase(locale).indexOf(needle);
 				if (column === -1) continue;
 				hits.push({
-					path: entry.path,
-					relative: relative(root, entry.path).split(sep).join("/"),
+					path,
+					relative: shown,
 					line: i + 1,
 					column,
 					text: line.length > 240 ? line.slice(Math.max(0, column - 80), column + 160) : line,
 				});
-				if (hits.length >= MAX_HITS) return { hits, truncated: true };
+				if (hits.length >= MAX_HITS) return true;
 			}
 		} catch {
 			// Unreadable files are simply not searched.
 		}
+		return false;
 	}
-	return { hits, truncated: false };
 }

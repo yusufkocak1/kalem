@@ -133,7 +133,7 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 
 	ipcMain.handle(CHANNEL.confluenceSearch, async (_event, query: unknown, spaceKey: unknown) =>
 		(await connected()).search(
-			typeof query === "string" ? query.slice(0, 200) : "",
+			typeof query === "string" ? query.slice(0, 2000) : "",
 			typeof spaceKey === "string" ? spaceKey : null,
 		),
 	);

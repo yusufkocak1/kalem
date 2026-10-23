@@ -32,7 +32,10 @@ describe("names and extensions", () => {
 	it("tells document types apart", () => {
 		expect(isEditablePath("a.md")).toBe(true);
 		expect(isEditablePath("a.MARKDOWN")).toBe(true);
-		expect(isEditablePath("Notlar.TXT")).toBe(true);
+		expect(isEditablePath("a.kmd")).toBe(true);
+		// Other text files open in the text editor as they are.
+		expect(isEditablePath("Notlar.TXT")).toBe(false);
+		expect(isEditablePath("Main.java")).toBe(false);
 		expect(isEditablePath("a.docx")).toBe(false);
 		expect(isEditablePath("a.txt.exe")).toBe(false);
 		expect(isWordPath("a.docx")).toBe(true);

@@ -47,6 +47,11 @@ export interface PasteInput {
 	readonly html: string;
 	/** `text/plain` — yoksa boş dize. */
 	readonly text: string;
+	/**
+	 * `text/markdown` — Kalem'den kopyalananın kaynağı; varsa kayıpsız olduğu
+	 * için HTML'den önce okunuyor.
+	 */
+	readonly markdown?: string;
 }
 
 export interface PasteOptions {
@@ -127,6 +132,10 @@ export function pasteFragment(
 	parseHtml: (html: string) => Parameters<typeof fromHtml>[0] | null,
 	options: PasteOptions = {},
 ): Root {
+	// Kalem'in (ya da Markdown yazan başka bir uygulamanın) kaynağı: kayıpsız.
+	if (options.plainOnly !== true && input.markdown !== undefined && input.markdown !== "") {
+		return parse(input.markdown);
+	}
 	const kaynak = options.plainOnly === true ? "text" : detectPasteSource(input);
 
 	if (kaynak === "word" || kaynak === "gdocs" || kaynak === "html") {
