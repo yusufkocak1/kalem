@@ -31,7 +31,7 @@ export {
 	toggleList,
 } from "./block-edit.js";
 export type { ClipboardPayload } from "./clipboard.js";
-export { blocksPayload, inlinePayload } from "./clipboard.js";
+export { blocksPayload, inlinePayload, MARKDOWN_TYPE, plainText } from "./clipboard.js";
 export type { EditorEvent, EditorOptions } from "./editor.js";
 export { Editor } from "./editor.js";
 export type { HistoryState } from "./history.js";

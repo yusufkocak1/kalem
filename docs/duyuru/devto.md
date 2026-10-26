@@ -110,8 +110,8 @@ The form submits Markdown, like a `<textarea>` would. No build step.
 |---|---|---|
 | `@kalem-editor/core` | Parse and serialize, no DOM | 13.4 kB |
 | `@kalem-editor/viewer` | Render to DOM or to a string (SSR) | 2.9 kB |
-| `@kalem-editor/editor` | The block engine | 31.4 kB |
-| `@kalem-editor/editor` + `@kalem-editor/ui` | The Word-like experience | 40.1 kB |
+| `@kalem-editor/editor` | The block engine | 32.4 kB |
+| `@kalem-editor/editor` + `@kalem-editor/ui` | The Word-like experience | 41.1 kB |
 
 Every package has a size budget in CI, and a build over budget fails. The
 numbers in the docs are checked against the measurement, so they can't

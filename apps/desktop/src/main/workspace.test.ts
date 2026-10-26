@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { listWorkspace, searchWorkspace } from "./workspace.js";
 
@@ -17,7 +17,7 @@ async function folder(files: Record<string, string>): Promise<string> {
 }
 
 describe("listWorkspace", () => {
-	it("lists documents, folders first, and leaves out other files and empty folders", async () => {
+	it("lists every file, folders first, and leaves out hidden, build and empty folders", async () => {
 		const root = await folder({
 			"b.md": "",
 			"a10.md": "",
@@ -25,7 +25,7 @@ describe("listWorkspace", () => {
 			"notlar.txt": "",
 			"resim.png": "",
 			"çalışma/ilk.md": "",
-			"boş/resim.png": "",
+			"boş/.gitkeep/x": "",
 			"rapor.assets/ek.md": "",
 			".git/HEAD.md": "",
 			"node_modules/x/readme.md": "",
@@ -38,6 +38,7 @@ describe("listWorkspace", () => {
 			"a10.md",
 			"b.md",
 			"notlar.txt",
+			"resim.png",
 		]);
 		expect(entries[0]?.folder).toBe(true);
 		expect(truncated).toBe(false);
@@ -50,14 +51,34 @@ describe("searchWorkspace", () => {
 			"bir.md": "# Başlık\n\nISPARTA ve ılık su\n",
 			"alt/iki.md": "Isparta gezisi\nbaşka satır\n",
 			"üç.md": "hiçbir şey\n",
+			"Kod.java": "// Isparta servisi\n",
+			"resim.png": "Isparta",
 		});
 		const { entries } = await listWorkspace(root, collator);
-		const { hits, truncated } = await searchWorkspace(entries, root, "ısparta", "tr");
+		const roots = [{ path: root, entries }];
+		const { hits, truncated } = await searchWorkspace(roots, "ısparta", "tr");
 		expect(truncated).toBe(false);
 		expect(hits.map((hit) => [hit.relative, hit.line, hit.column])).toEqual([
 			["alt/iki.md", 1, 0],
 			["bir.md", 3, 0],
+			["Kod.java", 1, 3],
 		]);
-		expect((await searchWorkspace(entries, root, "  ", "tr")).hits).toEqual([]);
+		expect((await searchWorkspace(roots, "  ", "tr")).hits).toEqual([]);
+	});
+
+	it("searches several folders, naming each hit's folder", async () => {
+		const first = await folder({ "a.md": "kalem\n" });
+		const second = await folder({ "b.txt": "Kalem\n" });
+		const roots = await Promise.all(
+			[first, second].map(async (path) => ({
+				path,
+				entries: (await listWorkspace(path, collator)).entries,
+			})),
+		);
+		const { hits } = await searchWorkspace(roots, "kalem", "tr");
+		expect(hits.map((hit) => hit.relative)).toEqual([
+			`${basename(first)}/a.md`,
+			`${basename(second)}/b.txt`,
+		]);
 	});
 });

@@ -525,7 +525,7 @@ export class Session {
 		this.#images = null;
 	}
 
-	/** Copied tables take their styles along, as comments in the Markdown and inline in the HTML. */
+	/** Copied tables take their styles along, as comments in the Markdown and inline in the HTML; the plain text has none. */
 	#copyTables(payload: ClipboardPayload, fragment: Root): ClipboardPayload {
 		const styleOf = this.#tables.styleOf;
 		const styled = fragment.children.some((block) => {
@@ -534,7 +534,8 @@ export class Session {
 		});
 		if (!styled) return payload;
 		return {
-			text: serialize(injectTableStyles(fragment, styleOf)).replace(/\n$/, ""),
+			text: payload.text,
+			markdown: serialize(injectTableStyles(fragment, styleOf)).replace(/\n$/, ""),
 			html: renderStyledHtml(fragment, styleOf),
 		};
 	}
@@ -545,8 +546,10 @@ export class Session {
 	 * tables the paste inserts.
 	 */
 	#pasteTables(fragment: Root, input: PasteInput, plain: boolean): Root {
-		if (plain || !hasTableDirective(input.text)) return fragment;
-		const extracted = extractTableStyles(input.text);
+		const markdown =
+			input.markdown !== undefined && input.markdown !== "" ? input.markdown : input.text;
+		if (plain || !hasTableDirective(markdown)) return fragment;
+		const extracted = extractTableStyles(markdown);
 		this.#tables.expectPaste(extracted.styles);
 		// The paste's change arrives synchronously; a paste that changes nothing must not leave them behind.
 		queueMicrotask(() => this.#tables.expectPaste(null));

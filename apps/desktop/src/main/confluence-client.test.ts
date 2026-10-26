@@ -3,7 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Fetch } from "./confluence-client.js";
-import { ConfluenceClient, ConfluenceError, normalizeSite } from "./confluence-client.js";
+import {
+	ConfluenceClient,
+	ConfluenceError,
+	normalizeSite,
+	pageReference,
+	tinyLinkId,
+} from "./confluence-client.js";
 import { ConfluenceStore } from "./confluence-store.js";
 
 interface Call {
@@ -37,6 +43,49 @@ describe("normalizeSite", () => {
 			"https://wiki.example.com/confluence",
 		);
 		expect(normalizeSite("http://localhost:8090/")).toBe("http://localhost:8090");
+	});
+});
+
+describe("pageReference", () => {
+	it("reads a page id and the addresses a browser shows", () => {
+		expect(pageReference(" 123456 ")).toEqual({ kind: "id", id: "123456" });
+		expect(
+			pageReference("https://acme.atlassian.net/wiki/spaces/DEV/pages/98765/Sprint+Plan%C4%B1"),
+		).toEqual({ kind: "id", id: "98765", host: "acme.atlassian.net" });
+		expect(pageReference("https://acme.atlassian.net/wiki/spaces/DEV/pages/edit-v2/98765")).toEqual(
+			{
+				kind: "id",
+				id: "98765",
+				host: "acme.atlassian.net",
+			},
+		);
+		expect(
+			pageReference("https://wiki.example.com/pages/viewpage.action?pageId=4242&focused=1"),
+		).toEqual({ kind: "id", id: "4242", host: "wiki.example.com" });
+		expect(pageReference("https://wiki.example.com/display/DEV/Sprint+Plan%C4%B1")).toEqual({
+			kind: "title",
+			spaceKey: "DEV",
+			title: "Sprint Planı",
+			host: "wiki.example.com",
+		});
+		expect(pageReference("https://wiki.example.com/x/AgAB")).toEqual({
+			kind: "id",
+			id: "65538",
+			host: "wiki.example.com",
+		});
+	});
+
+	it("leaves words of a title alone", () => {
+		expect(pageReference("Sprint planı")).toBeNull();
+		expect(pageReference("https://wiki.example.com/spaces/DEV/overview")).toBeNull();
+		expect(pageReference("ftp://wiki.example.com/x/AgAB")).toBeNull();
+	});
+
+	it("decodes tiny links", () => {
+		expect(tinyLinkId("AgAB")).toBe("65538");
+		expect(tinyLinkId("0gKWSQ")).toBe("1234567890");
+		expect(tinyLinkId("AAAA")).toBeNull();
+		expect(tinyLinkId("bad!")).toBeNull();
 	});
 });
 
@@ -219,6 +268,71 @@ describe("ConfluenceClient", () => {
 		expect(cql).toBe(
 			'type=page AND space="DEV" AND title~"plan \\"x\\"*" ORDER BY lastmodified DESC',
 		);
+	});
+
+	it("finds a page by its id or address, in any space", async () => {
+		const { fetch, calls } = fakeFetch([
+			[
+				"/rest/api/content/4242",
+				{
+					type: "page",
+					title: "Mimari",
+					space: { name: "Geliştirme" },
+					version: { when: "2026-10-02T10:00:00.000Z" },
+				},
+			],
+			["/rest/api/search", { results: [{ content: { id: "7", title: "4242 numaralı karar" } }] }],
+		]);
+		const client = new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "", token: "t" },
+			fetch,
+		);
+		const mimari = {
+			id: "4242",
+			title: "Mimari",
+			spaceName: "Geliştirme",
+			modified: "2026-10-02T10:00:00.000Z",
+		};
+		expect(
+			await client.search("https://wiki.example.com/pages/viewpage.action?pageId=4242", "OPS"),
+		).toEqual([mimari]);
+		expect(calls).toHaveLength(1);
+		// Digits alone may also be words of a title.
+		expect((await client.search("4242", null)).map((page) => page.id)).toEqual(["4242", "7"]);
+		// Another site's address names another site's page.
+		expect(
+			await client.search("https://other.example.com/pages/viewpage.action?pageId=4242", null),
+		).toEqual([]);
+	});
+
+	it("looks for a /display/ address by its space and exact title", async () => {
+		const { fetch, calls } = fakeFetch([["/rest/api/search", { results: [] }]]);
+		const client = new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "", token: "t" },
+			fetch,
+		);
+		await client.search("https://wiki.example.com/display/DEV/Sprint+Plan%C4%B1", null);
+		const cql = new URL(calls[0]?.url ?? "").searchParams.get("cql");
+		expect(cql).toBe(
+			'type=page AND space="DEV" AND title="Sprint Planı" ORDER BY lastmodified DESC',
+		);
+	});
+
+	it("finds a Cloud page by its id through the v2 API, and none for a missing one", async () => {
+		const { fetch } = fakeFetch([
+			["/api/v2/spaces/7", { key: "DEV", name: "Geliştirme" }],
+			["/api/v2/pages/42", { title: "Plan", spaceId: "7", version: { createdAt: "2026-10-03" } }],
+		]);
+		const client = new ConfluenceClient(
+			{ site: "acme.atlassian.net", username: "a", token: "b" },
+			fetch,
+		);
+		expect(
+			await client.search("https://acme.atlassian.net/wiki/spaces/DEV/pages/42/Plan", null),
+		).toEqual([{ id: "42", title: "Plan", spaceName: "Geliştirme", modified: "2026-10-03" }]);
+		expect(
+			await client.search("https://acme.atlassian.net/wiki/spaces/DEV/pages/43", null),
+		).toEqual([]);
 	});
 
 	it("reads and updates a Cloud page through the v2 API", async () => {

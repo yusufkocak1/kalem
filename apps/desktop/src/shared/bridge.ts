@@ -324,18 +324,40 @@ export interface WorkspaceEntry {
 	readonly folder: boolean;
 }
 
-export interface Workspace {
-	/** `null` when no folder is open and the active document has never been saved. */
-	readonly root: string | null;
-	/** Opened with Open Folder, rather than the active document's folder. */
-	readonly opened: boolean;
+/** One folder of the workspace with what is in it. */
+export interface WorkspaceRoot {
+	readonly path: string;
 	readonly entries: readonly WorkspaceEntry[];
 	readonly truncated: boolean;
 }
 
+export interface Workspace {
+	/**
+	 * The folders opened with Open Folder; without any, the active document's
+	 * folder. Empty when no folder is open and the document was never saved.
+	 */
+	readonly roots: readonly WorkspaceRoot[];
+	/** Opened with Open Folder, rather than the active document's folder. */
+	readonly opened: boolean;
+}
+
+/** A file in the text editor: its text as written, apart from line endings (always LF here). */
+export interface TextDocument {
+	readonly path: string;
+	readonly name: string;
+	readonly text: string;
+	readonly format: TextFormat;
+}
+
+export interface TextEditorStartup {
+	readonly language: Lang;
+	/** Files to show, asked for before the page was ready. */
+	readonly documents: readonly TextDocument[];
+}
+
 export interface SearchHit {
 	readonly path: string;
-	/** Path below the workspace root, with `/`. */
+	/** Path below the workspace root, with `/`; with several roots, from the root's name. */
 	readonly relative: string;
 	/** From 1. */
 	readonly line: number;
@@ -603,7 +625,8 @@ export interface KalemBridge {
 	/** The open folder, or the active document's folder. */
 	getWorkspace(): Promise<Workspace>;
 	openFolder(): Promise<void>;
-	closeFolder(): void;
+	/** Closes one of the open folders; all of them without a path. */
+	closeFolder(path?: string): void;
 	searchWorkspace(query: string): Promise<SearchResult>;
 
 	/** Earlier saved states of the tab's document, newest first. */
@@ -611,6 +634,15 @@ export interface KalemBridge {
 	readVersion(tabId: string, id: string): Promise<string>;
 	/** The open folder changed, in this window or another. */
 	onWorkspaceChange(handler: () => void): () => void;
+
+	// Text editor window
+	textReady(): Promise<TextEditorStartup>;
+	onTextOpen(handler: (document: TextDocument) => void): () => void;
+	/** Writes a file opened in the text editor; `false` when the user kept the copy on disk. */
+	textSave(path: string, text: string, format: TextFormat): Promise<boolean>;
+	/** Asks for files to open, starting in `from`'s folder. */
+	textOpenDialog(from: string | null): Promise<void>;
+	textClose(path: string): void;
 
 	/** The service in use and whether it can be asked; `refresh` looks for the CLI again. */
 	assistantStatus(refresh?: boolean): Promise<AssistantStatus>;
@@ -702,6 +734,11 @@ export const CHANNEL = {
 	openFolder: "kalem:open-folder",
 	closeFolder: "kalem:close-folder",
 	searchWorkspace: "kalem:search-workspace",
+	textReady: "kalem:text-ready",
+	textOpen: "kalem:text-open",
+	textSave: "kalem:text-save",
+	textOpenDialog: "kalem:text-open-dialog",
+	textClose: "kalem:text-close",
 	workspaceChange: "kalem:workspace-change",
 	listVersions: "kalem:list-versions",
 	readVersion: "kalem:read-version",

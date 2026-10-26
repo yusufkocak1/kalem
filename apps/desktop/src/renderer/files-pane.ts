@@ -1,7 +1,13 @@
-import type { KalemBridge, SearchHit, Workspace, WorkspaceEntry } from "../shared/bridge.js";
+import type {
+	KalemBridge,
+	SearchHit,
+	Workspace,
+	WorkspaceEntry,
+	WorkspaceRoot,
+} from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
-import { fileName } from "../shared/paths.js";
+import { fileName, isBinaryPath, isEditablePath, isWordPath } from "../shared/paths.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
 
@@ -34,6 +40,14 @@ function iconButton(name: Parameters<typeof icon>[0], label: string): HTMLButton
 		children: [icon(name)],
 	});
 }
+
+/** How a file is shown: documents open in the editor, text files in the text editor, others in their app. */
+function fileKind(path: string): "document" | "text" | "other" {
+	if (isEditablePath(path) || isWordPath(path)) return "document";
+	return isBinaryPath(path) ? "other" : "text";
+}
+
+const FILE_ICONS = { document: "file", text: "code", other: "attach" } as const;
 
 /** The line with the first match marked. */
 function hitLine(hit: SearchHit, query: string, lang: string): HTMLElement {
@@ -96,37 +110,90 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 	function renderTree(): void {
 		list.replaceChildren();
 		list.setAttribute("role", "tree");
-		const workspace = current;
-		title.textContent = workspace?.root == null ? "" : fileName(workspace.root);
-		title.title = workspace?.root ?? "";
-		closeFolder.hidden = workspace?.opened !== true;
-		refreshButton.hidden = workspace?.root == null;
-		search.disabled = workspace?.root == null;
+		const roots = current?.roots ?? [];
+		const opened = current?.opened === true;
+		const several = roots.length > 1;
+		const only = roots.length === 1 ? roots[0] : undefined;
+		title.textContent =
+			only !== undefined ? fileName(only.path) : several ? format(t.foldersOpen, roots.length) : "";
+		title.title = only?.path ?? roots.map((root) => root.path).join("\n");
+		closeFolder.hidden = !opened;
+		closeFolder.title = several ? t.closeAllFolders : t.closeFolder;
+		closeFolder.setAttribute("aria-label", closeFolder.title);
+		refreshButton.hidden = roots.length === 0;
+		search.disabled = roots.length === 0;
 
-		if (workspace === null || workspace.root === null) {
+		if (roots.length === 0) {
 			showMessage(t.noFolder);
 			return;
 		}
-		if (workspace.entries.length === 0) {
+		if (roots.every((root) => root.entries.length === 0)) {
 			showMessage(t.folderEmpty);
-			return;
+			if (!several) return;
+		} else {
+			const truncated = roots.find((root) => root.truncated);
+			showMessage(
+				truncated === undefined ? "" : format(t.folderTruncated, truncated.entries.length),
+			);
 		}
-		showMessage(workspace.truncated ? format(t.folderTruncated, workspace.entries.length) : "");
 
 		const active = options.activePath();
-		let hiddenBelow: number | null = null;
-		for (const entry of workspace.entries) {
-			if (hiddenBelow !== null && entry.depth > hiddenBelow) continue;
-			hiddenBelow = null;
-			list.append(row(entry, entry.path === active));
-			if (entry.folder && collapsed.has(entry.path)) hiddenBelow = entry.depth;
+		for (const root of roots) {
+			// One folder is named in the toolbar; several each get a heading row.
+			if (several) {
+				list.append(rootRow(root, opened));
+				if (collapsed.has(root.path)) continue;
+			}
+			const shift = several ? 1 : 0;
+			let hiddenBelow: number | null = null;
+			for (const entry of root.entries) {
+				if (hiddenBelow !== null && entry.depth > hiddenBelow) continue;
+				hiddenBelow = null;
+				list.append(row(entry, entry.path === active, shift));
+				if (entry.folder && collapsed.has(entry.path)) hiddenBelow = entry.depth;
+			}
 		}
 	}
 
-	function row(entry: WorkspaceEntry, active: boolean): HTMLElement {
+	function toggle(path: string): void {
+		if (collapsed.has(path)) collapsed.delete(path);
+		else collapsed.add(path);
+		renderTree();
+	}
+
+	function rootRow(root: WorkspaceRoot, opened: boolean): HTMLElement {
+		const open = !collapsed.has(root.path);
+		const toggleButton = el("button", {
+			class: "files-item files-folder files-root-name",
+			attrs: {
+				type: "button",
+				role: "treeitem",
+				title: root.path,
+				"aria-expanded": String(open),
+				"data-path": root.path,
+			},
+			children: [
+				el("span", { class: "files-twisty", text: open ? "▾" : "▸" }),
+				icon("open"),
+				el("span", { class: "files-name", text: fileName(root.path) }),
+			],
+		});
+		toggleButton.addEventListener("click", () => toggle(root.path));
+		const children: HTMLElement[] = [toggleButton];
+		if (opened) {
+			const close = iconButton("close", format(t.closeThisFolder, fileName(root.path)));
+			close.classList.add("files-root-close");
+			close.addEventListener("click", () => bridge.closeFolder(root.path));
+			children.push(close);
+		}
+		return el("div", { class: "files-root", children });
+	}
+
+	function row(entry: WorkspaceEntry, active: boolean, shift: number): HTMLElement {
 		const open = entry.folder && !collapsed.has(entry.path);
+		const kind = entry.folder ? null : fileKind(entry.path);
 		const item = el("button", {
-			class: entry.folder ? "files-item files-folder" : "files-item",
+			class: entry.folder ? "files-item files-folder" : `files-item files-${kind}`,
 			attrs: {
 				type: "button",
 				role: "treeitem",
@@ -137,19 +204,14 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 			},
 			children: [
 				el("span", { class: "files-twisty", text: entry.folder ? (open ? "▾" : "▸") : "" }),
-				icon(entry.folder ? "open" : "file"),
+				icon(kind === null ? "open" : FILE_ICONS[kind]),
 				el("span", { class: "files-name", text: entry.name }),
 			],
 		});
-		item.style.setProperty("--depth", String(entry.depth));
+		item.style.setProperty("--depth", String(entry.depth + shift));
 		item.addEventListener("click", () => {
-			if (!entry.folder) {
-				options.open(entry.path);
-				return;
-			}
-			if (collapsed.has(entry.path)) collapsed.delete(entry.path);
-			else collapsed.add(entry.path);
-			renderTree();
+			if (entry.folder) toggle(entry.path);
+			else options.open(entry.path);
 		});
 		return item;
 	}

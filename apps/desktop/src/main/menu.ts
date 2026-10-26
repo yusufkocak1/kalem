@@ -14,7 +14,7 @@ export interface MenuContext {
 	readonly settings: Settings;
 	readonly recentFiles: readonly string[];
 	/** The folder opened with Open Folder. */
-	readonly workspace: string | null;
+	readonly workspaces: readonly string[];
 	openFolder(win: AppWindow | undefined): void;
 	closeFolder(): void;
 	changeSettings(patch: Partial<Settings>): void;
@@ -116,7 +116,11 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 			label: t.openFolder,
 			click: (_item, window) => ctx.openFolder(targetOf(ctx, window)),
 		},
-		{ label: t.closeFolder, enabled: ctx.workspace !== null, click: () => ctx.closeFolder() },
+		{
+			label: ctx.workspaces.length > 1 ? t.closeAllFolders : t.closeFolder,
+			enabled: ctx.workspaces.length > 0,
+			click: () => ctx.closeFolder(),
+		},
 		{ type: "separator" },
 		{ label: t.save, accelerator: "CmdOrCtrl+S", click: send(ctx, "save") },
 		{ label: t.saveAs, accelerator: "CmdOrCtrl+Shift+S", click: send(ctx, "save-as") },

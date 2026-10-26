@@ -50,6 +50,75 @@ function cqlString(value: string): string {
 
 type Json = Record<string, unknown>;
 
+/** A page named by the search box instead of words of its title. */
+export type PageReference = (
+	| { readonly kind: "id"; readonly id: string }
+	| { readonly kind: "title"; readonly spaceKey: string; readonly title: string }
+) & {
+	/** The address's host; absent for a bare id. */
+	readonly host?: string;
+};
+
+/**
+ * The page id of a tiny link (`/x/AbCd`): the id's bytes, little-endian, in
+ * base64 with `-` for `/`, `_` for `+` and the trailing zero bytes left out.
+ */
+export function tinyLinkId(code: string): string | null {
+	if (!/^[A-Za-z0-9_-]{1,11}$/.test(code)) return null;
+	const base64 = code.replace(/-/g, "/").replace(/_/g, "+").padEnd(11, "A");
+	const bytes = Buffer.from(`${base64}=`, "base64");
+	if (bytes.length !== 8) return null;
+	const id = bytes.readBigUInt64LE(0);
+	return id === 0n ? null : id.toString();
+}
+
+const decodePart = (part: string): string => {
+	try {
+		return decodeURIComponent(part.replace(/\+/g, " "));
+	} catch {
+		return part;
+	}
+};
+
+/**
+ * What the search box names, when it is not words of a title: a page id, or
+ * a page's address as the browser shows it (Cloud's `/pages/<id>/…`,
+ * Server's `viewpage.action?pageId=…` and `/display/<space>/<title>`, a
+ * tiny link `/x/…`).
+ */
+export function pageReference(query: string): PageReference | null {
+	const text = query.trim();
+	if (/^\d{1,20}$/.test(text)) return { kind: "id", id: text };
+	let url: URL;
+	try {
+		url = new URL(text);
+	} catch {
+		return null;
+	}
+	if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+	const pageId = url.searchParams.get("pageId");
+	const host = url.hostname.toLowerCase(); // kalem-locale-ok: host names are ASCII
+	if (pageId !== null && /^\d+$/.test(pageId)) return { kind: "id", id: pageId, host };
+	const path = url.pathname;
+	const page = /\/pages\/(?:edit-v2\/|edit\/)?(\d+)(?:\/|$)/.exec(path);
+	if (page?.[1] !== undefined) return { kind: "id", id: page[1], host };
+	const tiny = /\/x\/([A-Za-z0-9_-]+)\/?$/.exec(path);
+	if (tiny?.[1] !== undefined) {
+		const id = tinyLinkId(tiny[1]);
+		return id === null ? null : { kind: "id", id, host };
+	}
+	const display = /\/display\/([^/]+)\/([^/]+)\/?$/.exec(path);
+	if (display?.[1] !== undefined && display[2] !== undefined) {
+		return {
+			kind: "title",
+			spaceKey: decodePart(display[1]),
+			title: decodePart(display[2]),
+			host,
+		};
+	}
+	return null;
+}
+
 const asJson = (value: unknown): Json =>
 	typeof value === "object" && value !== null ? (value as Json) : {};
 const asString = (value: unknown): string => (typeof value === "string" ? value : "");
@@ -223,12 +292,70 @@ export class ConfluenceClient {
 		return link.startsWith(`${sitePath}/`) ? link.slice(sitePath.length) : link;
 	}
 
+	/**
+	 * Pages whose title starts with the words, newest first. A page id or a
+	 * page's address finds that page, in whatever space; digits alone are
+	 * also looked for in titles.
+	 */
 	async search(query: string, spaceKey: string | null): Promise<ConfluencePageSummary[]> {
+		const reference = pageReference(query);
+		// The same id on another site is another page.
+		if (reference?.host !== undefined && reference.host !== new URL(this.site).hostname) return [];
+		if (reference?.kind === "title") {
+			return this.#cql(
+				`type=page AND space=${cqlString(reference.spaceKey)} AND title=${cqlString(reference.title)}`,
+			);
+		}
+		if (reference?.kind === "id") {
+			const found = await this.#summary(reference.id);
+			if (!/^\d+$/.test(query.trim())) return found === null ? [] : [found];
+			const titled = await this.#titleSearch(query, spaceKey);
+			return [
+				...(found === null ? [] : [found]),
+				...titled.filter((page) => page.id !== found?.id),
+			];
+		}
+		return this.#titleSearch(query, spaceKey);
+	}
+
+	/** The page with this id; `null` when there is none, or it may not be read. */
+	async #summary(id: string): Promise<ConfluencePageSummary | null> {
+		try {
+			if (this.cloud) {
+				const body = await this.#json(`/api/v2/pages/${id}`);
+				const spaceId = asString(body.spaceId);
+				const space = spaceId === "" ? {} : await this.#json(`/api/v2/spaces/${spaceId}`);
+				return {
+					id,
+					title: asString(body.title),
+					spaceName: asString(space.name),
+					modified: asString(asJson(body.version).createdAt) || null,
+				};
+			}
+			const body = await this.#json(`/rest/api/content/${id}?expand=space,version`);
+			if (asString(body.type) !== "" && asString(body.type) !== "page") return null;
+			return {
+				id,
+				title: asString(body.title),
+				spaceName: asString(asJson(body.space).name),
+				modified: asString(asJson(body.version).when) || null,
+			};
+		} catch (error) {
+			if (error instanceof ConfluenceError && [400, 403, 404].includes(error.status)) return null;
+			throw error;
+		}
+	}
+
+	async #titleSearch(query: string, spaceKey: string | null): Promise<ConfluencePageSummary[]> {
 		const terms = ["type=page"];
 		if (spaceKey !== null && spaceKey !== "") terms.push(`space=${cqlString(spaceKey)}`);
 		const words = query.trim();
 		if (words !== "") terms.push(`title~${cqlString(`${words}*`)}`);
-		const cql = `${terms.join(" AND ")} ORDER BY lastmodified DESC`;
+		return this.#cql(terms.join(" AND "));
+	}
+
+	async #cql(where: string): Promise<ConfluencePageSummary[]> {
+		const cql = `${where} ORDER BY lastmodified DESC`;
 		const body = await this.#json(`/rest/api/search?limit=50&cql=${encodeURIComponent(cql)}`);
 		return asArray(body.results).flatMap((item): ConfluencePageSummary[] => {
 			const result = asJson(item);

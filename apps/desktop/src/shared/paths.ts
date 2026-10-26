@@ -30,14 +30,38 @@ export function isPackagePath(path: string): boolean {
 	return PACKAGE_EXTENSIONS.includes(extension(path));
 }
 
-/** Files the editor opens and saves in place: Markdown, plain text and packages. */
+/**
+ * Files the Markdown editor opens and saves in place: Markdown and packages.
+ * Every other text file (.txt, .java, .json…) opens in the text editor as it
+ * is, never turned into Markdown.
+ */
 export function isEditablePath(path: string): boolean {
 	const ext = extension(path);
-	return (
-		MARKDOWN_EXTENSIONS.includes(ext) ||
-		TEXT_EXTENSIONS.includes(ext) ||
-		PACKAGE_EXTENSIONS.includes(ext)
-	);
+	return MARKDOWN_EXTENSIONS.includes(ext) || PACKAGE_EXTENSIONS.includes(ext);
+}
+
+/** Files that are never text, so they are not opened to find out. */
+export const BINARY_EXTENSIONS: ReadonlySet<string> = new Set(
+	(
+		"png jpg jpeg gif webp bmp ico tif tiff psd svgz heic avif mp3 mp4 m4a wav ogg webm mov avi mkv flac " +
+		"zip gz tgz bz2 xz 7z rar jar war ear class dll exe so dylib o a lib bin dat db sqlite iso dmg msi " +
+		"pdf doc docx xls xlsx ppt pptx odt ods odp kmd textpack woff woff2 ttf otf eot pyc lnk"
+	).split(" "),
+);
+
+export function isBinaryPath(path: string): boolean {
+	return BINARY_EXTENSIONS.has(extension(path));
+}
+
+/** Files that run a program when the system opens them: these are only shown in their folder. */
+const PROGRAM_EXTENSIONS: ReadonlySet<string> = new Set(
+	"exe com bat cmd msi msp ps1 psm1 vbs vbe js jse wsf wsh hta scr pif cpl lnk url reg jar app sh command".split(
+		" ",
+	),
+);
+
+export function isProgramPath(path: string): boolean {
+	return PROGRAM_EXTENSIONS.has(extension(path));
 }
 
 export function isWordPath(path: string): boolean {
