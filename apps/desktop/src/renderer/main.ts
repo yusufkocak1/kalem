@@ -92,6 +92,7 @@ const filesPane = createFilesPane({
 	lang: startup.language,
 	activePath: () => session?.path ?? null,
 	open: (path, query) => void openFromFolder(path, query),
+	notify: (text) => session.notices.show({ id: "files", kind: "error", text }),
 });
 const versionHistory = createVersionHistory({ t, lang: startup.language });
 const attachmentsDialog = createAttachmentsDialog({
@@ -769,6 +770,10 @@ document.addEventListener("keydown", (event) => {
 
 bridge.onCommand((name) => commands[name]?.());
 bridge.onDocument(openDocument);
+bridge.onDocumentMoved((tabId, path) => {
+	tabs.get(tabId)?.session.movedTo(path);
+	refreshFiles();
+});
 bridge.onActivateTab(activateTab);
 bridge.onExternalChange((tabId) => void tabs.get(tabId)?.session.handleExternalChange());
 // The window is closing and the user chose to save this tab first.

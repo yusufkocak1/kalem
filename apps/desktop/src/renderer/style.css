@@ -1618,7 +1618,6 @@ button {
 	overflow-y: auto;
 }
 
-.files-item,
 .confluence-page-item {
 	display: flex;
 	align-items: center;
@@ -1633,19 +1632,16 @@ button {
 	text-align: start;
 }
 
-.files-item:hover,
 .confluence-page-item:hover {
 	background: var(--app-hover);
 }
 
-.files-item[aria-current="page"],
 .confluence-page-item[aria-current="page"] {
 	background: var(--app-pressed);
 	color: var(--app-accent);
 	font-weight: 600;
 }
 
-.files-item .icon,
 .confluence-page-item .icon {
 	flex: none;
 	width: 15px;
@@ -1653,42 +1649,331 @@ button {
 	color: var(--app-muted);
 }
 
-.files-root {
+.confluence-page-title {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* --- Files tree ------------------------------------------------------------ */
+
+.files-pane:not(:hover, :focus-within) .files-hover-action {
+	display: none;
+}
+
+.files-list {
+	--files-indent: 12px;
+	--files-row: 24px;
+	padding: 2px 6px 12px;
+	outline: none;
+}
+
+.files-item {
+	position: relative;
 	display: flex;
 	align-items: center;
+	gap: 4px;
+	width: 100%;
+	height: var(--files-row);
+	padding: 0 6px 0 4px;
+	border-radius: 5px;
+	color: var(--app-text);
+	font-size: 13px;
+	cursor: default;
+	user-select: none;
+	outline: none;
+}
+
+.files-item:hover {
+	background: var(--app-hover);
+}
+
+.files-item.selected {
+	background: color-mix(in srgb, var(--app-accent) 10%, transparent);
+}
+
+.files-item:focus-visible {
+	box-shadow: inset 0 0 0 1.5px var(--app-accent);
+}
+
+/* The open document: a bar at the edge, its name in the accent colour. */
+.files-item[aria-current="page"] {
+	background: var(--app-pressed);
+}
+
+.files-item[aria-current="page"]::before {
+	position: absolute;
+	top: 4px;
+	bottom: 4px;
+	left: 0;
+	width: 3px;
+	border-radius: 2px;
+	background: var(--app-accent);
+	content: "";
+}
+
+.files-item[aria-current="page"] .files-name {
+	color: var(--app-accent);
+	font-weight: 600;
+}
+
+/* One guide line per level, as in a code editor's explorer. */
+.files-indent {
+	flex: none;
+	align-self: stretch;
+	width: var(--files-indent);
+	margin-left: 4px;
+	border-left: 1px solid color-mix(in srgb, var(--app-border) 70%, transparent);
+}
+
+.files-list:hover .files-indent {
+	border-left-color: var(--app-border);
+}
+
+.files-twisty {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 14px;
+	height: 14px;
+	color: var(--app-muted);
+}
+
+.files-twisty .icon {
+	width: 12px;
+	height: 12px;
+	stroke-width: 2;
+	transition: transform 120ms ease;
+}
+
+.files-folder[aria-expanded="true"] > .files-twisty .icon {
+	transform: rotate(90deg);
+}
+
+.files-icon {
+	display: inline-flex;
+	flex: none;
+}
+
+.files-icon .icon {
+	width: 16px;
+	height: 16px;
+}
+
+/* File kinds by colour; a quieter shade in the dark theme. */
+.tone-folder {
+	color: #c08a2b;
+}
+.tone-markdown {
+	color: #2f6fc0;
+}
+.tone-word {
+	color: #2b579a;
+}
+.tone-data {
+	color: #b5701b;
+}
+.tone-code {
+	color: #7a4fc2;
+}
+.tone-sheet {
+	color: #1f8a4c;
+}
+.tone-image {
+	color: #128a8a;
+}
+.tone-pdf {
+	color: #c4362c;
+}
+.tone-plain,
+.tone-other {
+	color: var(--app-muted);
+}
+
+@media (prefers-color-scheme: dark) {
+	.tone-folder {
+		color: #e0b45e;
+	}
+	.tone-markdown {
+		color: #7fb0ef;
+	}
+	.tone-word {
+		color: #8fb1e8;
+	}
+	.tone-data {
+		color: #e6a85a;
+	}
+	.tone-code {
+		color: #b79bf0;
+	}
+	.tone-sheet {
+		color: #6fcf97;
+	}
+	.tone-image {
+		color: #5fcfcf;
+	}
+	.tone-pdf {
+		color: #f08a80;
+	}
+}
+
+.files-name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.files-name mark {
+	border-radius: 2px;
+	background: color-mix(in srgb, var(--app-accent) 22%, transparent);
+	color: inherit;
+}
+
+/* Files that open in another app. */
+.files-system .files-name {
+	color: var(--app-muted);
 }
 
 .files-root-name {
-	flex: 1;
-	min-width: 0;
-	font-weight: 600;
+	margin-top: 4px;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.files-root-name:first-child {
+	margin-top: 0;
 }
 
 .files-root-close {
 	flex: none;
+	width: 20px;
+	height: 20px;
 	visibility: hidden;
 }
 
-.files-root:hover .files-root-close,
-.files-root-close:focus-visible {
+.files-root-close .icon {
+	width: 13px;
+	height: 13px;
+}
+
+.files-root-name:hover .files-root-close,
+.files-root-name:focus-within .files-root-close {
 	visibility: visible;
 }
 
-.files-other .files-name {
-	color: var(--app-muted);
+.files-rename {
+	flex: 1;
+	min-width: 0;
+	height: 20px;
+	padding: 0 4px;
+	border: 1px solid var(--app-accent);
+	border-radius: 3px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	outline: none;
 }
 
-.files-twisty {
+/* --- Files: context menu --- */
+
+.files-menu {
+	position: fixed;
+	z-index: 50;
+	min-width: 220px;
+	padding: 4px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	box-shadow: var(--app-shadow);
+	font-size: 13px;
+}
+
+.files-menu-item {
+	display: flex;
+	justify-content: space-between;
+	gap: 24px;
+	width: 100%;
+	padding: 5px 10px;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: var(--app-text);
+	font: inherit;
+	text-align: start;
+	outline: none;
+}
+
+.files-menu-item:hover,
+.files-menu-item:focus {
+	background: var(--app-pressed);
+}
+
+.files-menu-item.danger {
+	color: var(--app-error);
+}
+
+.files-menu-shortcut {
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.files-menu-separator {
+	height: 1px;
+	margin: 4px 6px;
+	background: var(--app-border);
+}
+
+/* --- Files: search --- */
+
+.search-group-title {
+	padding: 6px 6px 2px;
+	color: var(--app-muted);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.search-names {
+	margin-bottom: 8px;
+}
+
+.search-name {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	height: 24px;
+	padding: 0 6px;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: var(--app-text);
+	font: inherit;
+	font-size: 13px;
+	text-align: start;
+}
+
+.search-name:hover {
+	background: var(--app-hover);
+}
+
+.search-name .files-name {
 	flex: none;
-	width: 10px;
-	color: var(--app-muted);
-	font-size: 10px;
+	max-width: 60%;
 }
 
-.files-name,
-.confluence-page-title {
+.search-name-folder {
 	min-width: 0;
 	overflow: hidden;
+	color: var(--app-muted);
+	font-size: 11px;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
@@ -3305,7 +3590,9 @@ pre[data-confluence-kind="layout"]::before {
 	overflow: hidden;
 }
 
-.page.text-page {
+/* `.app` too: it must outweigh the full-width page's margins (`.app[data-full-width] .page`). */
+.app .page.text-page,
+.app[data-full-width] .page.text-page {
 	display: flex;
 	width: 100%;
 	min-height: 0;

@@ -607,6 +607,8 @@ export interface KalemBridge {
 
 	onCommand(handler: (command: Command) => void): () => void;
 	onDocument(handler: (document: TabDocument) => void): () => void;
+	/** A tab's file was renamed (or its folder was): it now saves to `path`. */
+	onDocumentMoved(handler: (tabId: string, path: string) => void): () => void;
 	onActivateTab(handler: (tabId: string) => void): () => void;
 	/** The main process wants a tab saved (while closing the window). */
 	onSaveRequest(handler: (tabId: string) => void): () => void;
@@ -619,6 +621,16 @@ export interface KalemBridge {
 	/** Closes one of the open folders; all of them without a path. */
 	closeFolder(path?: string): void;
 	searchWorkspace(query: string): Promise<SearchResult>;
+	/** Creates an empty file or a folder in `parent`, one of the shown folders or inside one; returns its path. */
+	createInWorkspace(parent: string, name: string, kind: "file" | "folder"): Promise<string>;
+	/** Renames a file or folder of the shown folders; returns its new path. */
+	renameInWorkspace(path: string, name: string): Promise<string>;
+	/** Moves a file or folder of the shown folders to the recycle bin, once the user agrees; `true` when it went. */
+	trashInWorkspace(path: string): Promise<boolean>;
+	/** Shows a file or folder in the system's file manager. */
+	revealInFolder(path: string): void;
+	/** Opens a file of the shown folders with the system's app for it (programs are only shown). */
+	openWithSystem(path: string): Promise<void>;
 
 	/** Earlier saved states of the tab's document, newest first. */
 	listVersions(tabId: string): Promise<readonly Version[]>;
@@ -716,6 +728,12 @@ export const CHANNEL = {
 	openFolder: "kalem:open-folder",
 	closeFolder: "kalem:close-folder",
 	searchWorkspace: "kalem:search-workspace",
+	createInWorkspace: "kalem:create-in-workspace",
+	renameInWorkspace: "kalem:rename-in-workspace",
+	trashInWorkspace: "kalem:trash-in-workspace",
+	revealInFolder: "kalem:reveal-in-folder",
+	openWithSystem: "kalem:open-with-system",
+	documentMoved: "kalem:document-moved",
 	workspaceChange: "kalem:workspace-change",
 	listVersions: "kalem:list-versions",
 	readVersion: "kalem:read-version",

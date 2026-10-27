@@ -2,7 +2,7 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { IpcMainEvent, IpcMainInvokeEvent } from "electron";
-import { app, dialog, ipcMain } from "electron";
+import { app, dialog, ipcMain, shell } from "electron";
 import type {
 	Attachment,
 	DraftRequest,
@@ -17,12 +17,14 @@ import type {
 import { CHANNEL } from "../shared/bridge.js";
 import { toTextFormat } from "../shared/encoding.js";
 import type { Lang, Strings } from "../shared/i18n.js";
+import { format } from "../shared/i18n.js";
 import { imageInfo } from "../shared/image-size.js";
 import { assetsFolderName, parseDataUrl } from "../shared/images.js";
 import {
 	extension,
 	isEditablePath,
 	isPackagePath,
+	isProgramPath,
 	MARKDOWN_EXTENSIONS,
 	opensAsText,
 	PACKAGE_EXTENSIONS,
@@ -54,6 +56,7 @@ import type { SettingsStore } from "./settings.js";
 import type { AppWindow, WindowManager } from "./windows.js";
 import { errorMessage, pathKey } from "./windows.js";
 import { listWorkspace, searchWorkspace } from "./workspace.js";
+import { createEntry, isInside, renameEntry, WorkspaceFileError } from "./workspace-files.js";
 
 export interface IpcContext {
 	readonly windows: WindowManager;
@@ -575,6 +578,104 @@ export function registerIpc(ctx: IpcContext): void {
 
 	ipcMain.handle(CHANNEL.openFolder, (event) => ctx.openFolder(senderOf(event)));
 	on(CHANNEL.closeFolder, (_win, path) => ctx.closeFolder(typeof path === "string" ? path : null));
+
+	/** A file operation's failure, in words the user reads. */
+	const fileProblem = (error: unknown): Error => {
+		if (!(error instanceof WorkspaceFileError))
+			return error instanceof Error ? error : new Error(String(error));
+		const t = ctx.strings();
+		const name = basename(error.message);
+		const text =
+			error.problem === "invalid-name"
+				? format(t.filesInvalidName, error.message)
+				: error.problem === "exists"
+					? format(t.filesExists, name)
+					: error.problem === "missing"
+						? format(t.filesMissing, name)
+						: t.filesOutside;
+		return new Error(text);
+	};
+
+	/** A path the Files pane names: a string inside one of the folders it shows. */
+	const shownPath = (win: AppWindow, path: unknown): string => {
+		if (typeof path !== "string" || !isAbsolute(path))
+			throw fileProblem(new WorkspaceFileError("outside", ""));
+		if (!isInside(path, workspaceRoots(win).roots))
+			throw fileProblem(new WorkspaceFileError("outside", path));
+		return path;
+	};
+
+	ipcMain.handle(
+		CHANNEL.createInWorkspace,
+		async (event, parent: unknown, name: unknown, kind: unknown) => {
+			const win = senderOf(event);
+			try {
+				return await createEntry(
+					shownPath(win, parent),
+					typeof name === "string" ? name : "",
+					kind === "folder" ? "folder" : "file",
+					workspaceRoots(win).roots,
+				);
+			} catch (error) {
+				throw fileProblem(error);
+			}
+		},
+	);
+
+	ipcMain.handle(CHANNEL.renameInWorkspace, async (event, path: unknown, name: unknown) => {
+		const win = senderOf(event);
+		try {
+			const from = shownPath(win, path);
+			const to = await renameEntry(
+				from,
+				typeof name === "string" ? name : "",
+				workspaceRoots(win).roots,
+			);
+			if (to !== from) windows.followRename(from, to);
+			return to;
+		} catch (error) {
+			throw fileProblem(error);
+		}
+	});
+
+	ipcMain.handle(CHANNEL.trashInWorkspace, async (event, path: unknown) => {
+		const win = senderOf(event);
+		const target = shownPath(win, path);
+		if (workspaceRoots(win).roots.some((root) => pathKey(root) === pathKey(target))) {
+			throw fileProblem(new WorkspaceFileError("outside", target));
+		}
+		const t = ctx.strings();
+		const { response } = await dialog.showMessageBox(win.window, {
+			type: "warning",
+			message: format(t.filesTrashConfirm, basename(target)),
+			detail: target,
+			buttons: [t.filesTrash, t.cancel],
+			defaultId: 0,
+			cancelId: 1,
+		});
+		if (response !== 0) return false;
+		await shell.trashItem(target);
+		return true;
+	});
+
+	on(CHANNEL.revealInFolder, (win, path) => {
+		try {
+			shell.showItemInFolder(shownPath(win, path));
+		} catch {
+			// Not a path of the shown folders: nothing is revealed.
+		}
+	});
+
+	ipcMain.handle(CHANNEL.openWithSystem, async (event, path: unknown) => {
+		const target = shownPath(senderOf(event), path);
+		// Programs are never run from the pane, only shown.
+		if (isProgramPath(target)) {
+			shell.showItemInFolder(target);
+			return;
+		}
+		const failure = await shell.openPath(target);
+		if (failure !== "") throw new Error(failure);
+	});
 
 	ipcMain.handle(CHANNEL.searchWorkspace, async (event, query: unknown): Promise<SearchResult> => {
 		const { roots } = workspaceRoots(senderOf(event));

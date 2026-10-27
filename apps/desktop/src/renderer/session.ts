@@ -1054,6 +1054,18 @@ export class Session {
 		return true;
 	}
 
+	/** The file was renamed from the Files pane (or its folder was): the tab now saves there. */
+	movedTo(path: string): void {
+		const old = this.#path;
+		if (old === null) return;
+		if (this.#base === old) this.#base = path;
+		this.#path = path;
+		this.#name = this.#textView === null ? stripExtension(fileName(path)) : fileName(path);
+		this.#updateBase();
+		this.#report();
+		this.#o.onStateChange();
+	}
+
 	// --- External changes ---------------------------------------------------
 
 	async handleExternalChange(): Promise<void> {

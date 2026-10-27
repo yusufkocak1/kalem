@@ -119,6 +119,13 @@ const PATHS = {
 	stop: ["M7 7h10v10H7z"],
 	diagram: ["M3 3h7v5H3z", "M14 16h7v5h-7z", "M17.5 7l3 3-3 3-3-3z", "M6.5 8v5.5H14", "M17.5 13v3"],
 	attachments: ["M4 4h7l2 2h7v14H4z", "M8 11h8", "M8 15h5"],
+	chevron: ["m9.5 6 6 6-6 6"],
+	folderOpen: ["M3 18V6h6l2 2h8v2", "M3 18l3-8h16l-3 8z"],
+	folderNew: ["M3 6h6l2 2h10v11H3z", "M12 11v6", "M9 14h6"],
+	collapseAll: ["M5 4h14", "m8 13 4-4 4 4", "m8 19 4-4 4 4"],
+	pdf: [...PAGE, "M8.5 17v-4h1.5a1.2 1.2 0 0 1 0 2.4H8.5", "M13 13v4h1a2 2 0 0 0 0-4z"],
+	sheet: [...PAGE, "M8 11h8v7H8z", "M8 14.5h8", "M12 11v7"],
+	archive: [...PAGE, "M11 3v2h2v2h-2v2h2v2h-2"],
 	attach: [
 		"M20 11.5 12 19.5a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.2a1.7 1.7 0 0 1-2.4-2.4l7.5-7.5",
 	],

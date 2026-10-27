@@ -35,6 +35,7 @@ import { pathKey } from "./path-key.js";
 import type { SettingsStore, WindowBounds } from "./settings.js";
 import { isTextFile } from "./text-files.js";
 import { readWord, WordError } from "./word.js";
+import { movedPath } from "./workspace-files.js";
 
 /**
  * Main-process view of one open document. The text itself lives in the
@@ -441,6 +442,25 @@ export class WindowManager {
 		win.writable.add(pathKey(path));
 		this.#addRecentFile(path);
 		this.#updateTitle(win);
+	}
+
+	/**
+	 * Tabs whose file was renamed from the Files pane, or lies in a renamed
+	 * folder, follow it: they save to the new path.
+	 */
+	followRename(from: string, to: string): void {
+		for (const win of this.all()) {
+			for (const tab of win.tabs.values()) {
+				const path = tab.path === null ? null : movedPath(tab.path, from, to);
+				if (path === null || tab.path === null) continue;
+				if (tab.base !== null && pathKey(tab.base) === pathKey(tab.path)) tab.base = path;
+				tab.path = path;
+				tab.name = stripExtension(basename(path));
+				win.writable.add(pathKey(path));
+				win.window.webContents.send(CHANNEL.documentMoved, tab.id, path);
+			}
+			this.#updateTitle(win);
+		}
 	}
 
 	/** Whether another tab, in any window, already has this path open. */

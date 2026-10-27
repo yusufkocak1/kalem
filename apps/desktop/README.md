@@ -141,6 +141,32 @@ verir.
     sekmede, düz metin olarak**; resim, PDF gibi metin olmayan dosyalar sistemdeki
     uygulamalarıyla (soluk gösterilir). Program dosyaları (`.exe`, `.bat`,
     `.ps1`…) çalıştırılmaz, yalnızca klasörde gösterilir.
+  - **Görünüm:** dosya türleri renkli simgelerle ayrılır (Markdown, Word,
+    JSON/XML/YAML, kod, tablo, resim, PDF…), klasörler açık/kapalı simgesi
+    ve dönen okla gösterilir, her seviyenin girinti çizgisi vardır. Açık
+    belge vurgulanır ve kenarında bir çizgi olur.
+  - **Klasörler kapalı başlar**; hangilerinin açık olduğu hatırlanır. Etkin
+    belgenin üstündeki klasörler kendiliğinden açılır ve belge görünür
+    yere kaydırılır. **Tümünü Daralt** hepsini kapatır.
+  - **Klavye:** arama kutusunda `↓` ağaca iner; `↑`/`↓` gezinir, `→`
+    klasörü açar ya da içine girer, `←` kapatır ya da üst klasöre çıkar,
+    `Enter` açar, `F2` yeniden adlandırır, `Delete` siler, `Shift+F10` (ya
+    da menü tuşu) sağ tık menüsünü açar.
+  - **Sağ tık menüsü:** Aç, Sistem Uygulamasıyla Aç, Yeni Dosya…, Yeni
+    Klasör…, Yeniden Adlandır…, Sil, Yolu Kopyala, Göreli Yolu Kopyala,
+    Klasörde Göster (kök klasörde Klasörü Kapat). Yeni dosya/klasör ve
+    yeniden adlandırma ağaçta yerinde yazılır (`Enter` onaylar, `Esc`
+    vazgeçer); yeni dosya hemen açılır. Açık bir dosya ya da içinde açık
+    dosya olan bir klasör yeniden adlandırılınca sekmeleri yeni yola
+    kaydetmeye devam eder. Silmek, onaydan sonra dosyayı **Geri Dönüşüm
+    Kutusu'na** taşır. Bu işlemler yalnızca bölmede görünen klasörlerin
+    içinde yapılabilir. Yeni dosya, yeni klasör, daralt ve yenile düğmeleri
+    bölmenin üzerine gelince görünür.
+  - **Kendiliğinden yenilenir:** açık klasörlerde başka bir programın
+    eklediği, sildiği ya da yeniden adlandırdığı dosyalar ağaca kendiliğinden
+    yansır.
+  - **Arama** önce adı eşleşen dosyaları (**Dosya adları**), sonra
+    dosyaların içindeki satırları gösterir.
 - **Metin sekmesi:** Markdown olmayan metin dosyaları (Dosyalar bölmesinden,
   **Dosya → Aç…**'tan, Hızlı Aç'tan ya da bir belgedeki bağlantıdan) aynı
   penceredeki bir sekmede açılır. Dosya **olduğu gibi** gösterilir ve
