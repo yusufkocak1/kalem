@@ -866,56 +866,83 @@ test("lays the PDF out with the page setup", async () => {
 	await discardAndClose(app);
 });
 
-test("opens other text files in the text editor as they are, and several folders", async () => {
-	const folder = await tempDir("text-editor");
+test("opens other text files in a tab as they are, formats JSON, and several folders", async () => {
+	const folder = await tempDir("text-files");
 	const notes = join(folder, "notlar.txt");
 	await writeFile(
 		notes,
 		"Alışveriş listesi\r\nsüt, ekmek\r\n\r\n2 * 3 * 4 = 24\r\n# değil başlık\r\n",
 	);
 	await mkdir(join(folder, "kod"));
-	await writeFile(join(folder, "kod", "Main.java"), "class Main {\n\tint x = 1;\n}\n");
-	const other = await tempDir("text-editor-other");
+	await writeFile(join(folder, "kod", "Main.java"), "class Main {\n\tint x = 1;\n}");
+	await writeFile(join(folder, "veri.json"), '{"ad":"Ali","yas":3,"etiket":["a","b"]}');
+	const other = await tempDir("text-files-other");
 	await writeFile(join(other, "ayar.json"), '{ "a": 1 }\n');
 	const doc = join(folder, "belge.md");
 	await writeFile(doc, "# Belge\n");
 	const { app, page, errors } = await launch({ args: [doc] });
 	const items = page.locator(".files-item");
+	const tabs = page.locator(".doc-tab");
+	const area = page.locator("#editor .text-view-area");
 	await page.locator('.side-pane-tab[data-pane="files"]').click();
-	await expect(items).toHaveText(["▾kod", "Main.java", "belge.md", "notlar.txt"]);
+	await expect(items).toHaveText(["▾kod", "Main.java", "belge.md", "notlar.txt", "veri.json"]);
 
-	// A text file opens in the text editor's window, exactly as written.
-	const opened = app.waitForEvent("window");
+	// A text file opens in a tab of the same window, exactly as written: never as Markdown.
 	await items.filter({ hasText: "notlar.txt" }).click();
-	const editor = await opened;
-	const area = editor.locator(".te-area:visible");
+	await expect(tabs).toHaveCount(2);
+	expect(app.windows()).toHaveLength(1);
+	await expect(tabs.filter({ hasText: "notlar.txt" })).toHaveAttribute("aria-selected", "true");
 	await expect(area).toHaveValue(
 		"Alışveriş listesi\nsüt, ekmek\n\n2 * 3 * 4 = 24\n# değil başlık\n",
 	);
-	await expect(editor.locator(".te-encoding")).toHaveText("UTF-8 · CRLF");
-	await expect(editor.locator(".te-gutter:visible")).toContainText("6");
-	await expect(page.locator(".doc-tab")).toHaveCount(1);
+	await expect(page.locator("#editor h1")).toHaveCount(0);
+	await expect(page.locator(".status-format")).toHaveText("UTF-8 · CRLF");
+	await expect(page.locator("#editor .text-view-gutter")).toContainText("6");
+	await expect(status(page)).toHaveText("Saved");
 
 	await area.click();
-	await editor.keyboard.press("Control+Home");
-	await editor.keyboard.press("End");
-	await editor.keyboard.type(" (pazar)");
-	await expect(editor.locator('.te-tab[aria-selected="true"]')).toHaveClass(/dirty/);
-	await editor.keyboard.press("Control+s");
-	await expect(editor.locator(".te-message")).toHaveText("“notlar.txt” saved");
-	await expect(editor.locator('.te-tab[aria-selected="true"]')).not.toHaveClass(/dirty/);
+	await page.keyboard.press("Control+Home");
+	await page.keyboard.press("End");
+	await page.keyboard.type(" (pazar)");
+	await expect(status(page)).toHaveText("Unsaved");
+	await save(page);
+	await expect(status(page)).toHaveText("Saved");
 	expect(await readFile(notes, "utf8")).toBe(
 		"Alışveriş listesi (pazar)\r\nsüt, ekmek\r\n\r\n2 * 3 * 4 = 24\r\n# değil başlık\r\n",
 	);
 
-	// A second file opens as a tab of the same window; Tab writes a tab; find selects matches.
+	// Code keeps its tabs and its missing final newline; find works in the file.
 	await items.filter({ hasText: "Main.java" }).click();
-	await expect(editor.locator(".te-tab")).toHaveText(["notlar.txt", "Main.java"]);
-	await expect(editor.locator(".te-area:visible")).toHaveValue("class Main {\n\tint x = 1;\n}\n");
-	await editor.keyboard.press("Control+f");
-	await editor.locator(".te-find-input").fill("X");
-	await expect(editor.locator(".te-find-count")).toHaveText("1 of 1");
-	await editor.screenshot({ path: "test-results/text-editor.png" });
+	await expect(tabs).toHaveCount(3);
+	await expect(area).toHaveValue("class Main {\n\tint x = 1;\n}");
+	await area.click();
+	await page.keyboard.press("Control+End");
+	await page.keyboard.press("Enter");
+	await page.keyboard.type("// son");
+	await save(page);
+	await expect(status(page)).toHaveText("Saved");
+	expect(await readFile(join(folder, "kod", "Main.java"), "utf8")).toBe(
+		"class Main {\n\tint x = 1;\n}\n// son",
+	);
+	await clickMenu(app, "Edit", "Find…");
+	await page.locator("#editor .text-view-find-input").fill("X");
+	await expect(page.locator("#editor .text-view-find-count")).toHaveText("1 of 1");
+
+	// JSON is formatted from the tab's toolbar (or the Code tab), as one edit that undo takes back.
+	await items.filter({ hasText: "veri.json" }).click();
+	await expect(area).toHaveValue('{"ad":"Ali","yas":3,"etiket":["a","b"]}');
+	await page.locator("#editor .text-view-format").click();
+	const formatted = '{\n  "ad": "Ali",\n  "yas": 3,\n  "etiket": [\n    "a",\n    "b"\n  ]\n}';
+	await expect(area).toHaveValue(formatted);
+	await page.keyboard.press("Control+z");
+	await expect(area).toHaveValue('{"ad":"Ali","yas":3,"etiket":["a","b"]}');
+	await page.locator('.ribbon-tab:has-text("Code")').click();
+	await page.locator('[data-command="format-code"]').click();
+	await expect(area).toHaveValue(formatted);
+	await page.screenshot({ path: "test-results/text-tab.png" });
+	await save(page);
+	await expect(status(page)).toHaveText("Saved");
+	expect(await readFile(join(folder, "veri.json"), "utf8")).toBe(formatted);
 
 	// Several folders: each is a heading of its own and closes by itself.
 	await stubOpenDialog(app, [folder, other]);

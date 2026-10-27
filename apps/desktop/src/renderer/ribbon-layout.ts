@@ -699,13 +699,23 @@ export function createAppRibbon(
 						command("format-code", t.formatCode, "braces", {
 							showLabel: true,
 							shortcut: "Shift+Alt+F",
+							enabled: canFormat,
 						}),
-						command("format-all-code", t.formatAllCode, "bracesAll", { showLabel: true }),
+						command("format-all-code", t.formatAllCode, "bracesAll", {
+							showLabel: true,
+							enabled: canFormat,
+						}),
 					],
 				},
 			],
 		},
 	];
+
+	// A text file is formatted whole, from its own box: the Markdown editor is not in use.
+	function canFormat(): boolean {
+		const session = ctx.session();
+		return session.isText ? !session.readOnly : ctx.canEdit();
+	}
 
 	return createRibbon(host, {
 		label: t.ribbon,

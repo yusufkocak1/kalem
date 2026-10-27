@@ -2,7 +2,7 @@
 
 Electron ile yazılmış, **Word rahatlığında** bir Markdown editörü. `.md`
 belgeleriyle çalışır; diğer metin dosyalarını (`.txt`, `.java`, `.json`…)
-Markdown'a çevirmeden ayrı bir **metin düzenleyicide** açar. Düzenleme
+Markdown'a çevirmeden kendi sekmesinde, **düz metin** olarak açar. Düzenleme
 motoru bu depodaki Kalem (`@kalem-editor/*`) paketleridir.
 
 ```bash
@@ -137,22 +137,33 @@ verir.
   `.assets` klasörleri gösterilmez.
   - Tıklanan dosya türüne göre açılır: `.md`/`.kmd` belgeler sekmede
     Markdown editöründe, Word belgeleri içe aktarılarak; diğer **metin
-    dosyaları** (`.txt`, `.java`, `.json`, `.xml`, `.sql`…) **metin
-    düzenleyicide**; resim, PDF gibi metin olmayan dosyalar sistemdeki
+    dosyaları** (`.txt`, `.java`, `.json`, `.xml`, `.sql`…) yine **bir
+    sekmede, düz metin olarak**; resim, PDF gibi metin olmayan dosyalar sistemdeki
     uygulamalarıyla (soluk gösterilir). Program dosyaları (`.exe`, `.bat`,
     `.ps1`…) çalıştırılmaz, yalnızca klasörde gösterilir.
-- **Metin düzenleyici:** Markdown olmayan metin dosyaları için ayrı bir
-  pencere. Dosya **olduğu gibi** gösterilir ve kaydedilir: Markdown'a
-  çevrilmez, kodlaması (UTF-8, UTF-16, BOM) ve satır sonları (CRLF/LF)
-  korunur. Sekmeler, satır numaraları, eş genişlikli yazı, `Tab` ile sekme
-  karakteri, **Satırları kaydır** seçeneği, durum çubuğunda satır/sütun
-  ve kodlama. Kısayollar: `Ctrl+S` kaydet, `Ctrl+O` aç, `Ctrl+W` sekmeyi
-  kapat, `Ctrl+Tab` sekmeler arası, `Ctrl+F` bul (`Enter`/`F3` sonraki,
-  `Shift+Enter` önceki). Dosya açıldıktan sonra başka bir programca
-  değiştirildiyse kaydederken üzerine yazmadan önce sorulur; kaydedilmemiş
-  değişiklikle kapatırken de sorulur. 20 MB'tan büyük dosyalar metin
-  düzenleyicide açılmaz. Eski tek baytlık kodlamalar (Windows-1254/1252)
-  kaydederken UTF-8'e çevrilir.
+- **Metin sekmesi:** Markdown olmayan metin dosyaları (Dosyalar bölmesinden,
+  **Dosya → Aç…**'tan, Hızlı Aç'tan ya da bir belgedeki bağlantıdan) aynı
+  penceredeki bir sekmede açılır. Dosya **olduğu gibi** gösterilir ve
+  kaydedilir: Markdown'a çevrilmez, kodlaması (UTF-8, UTF-16, BOM) ve satır
+  sonları (CRLF/LF) korunur, sona satır sonu eklenmez. Sekmenin adı dosyanın
+  uzantısıyla birlikte tam adıdır. Satır numaraları, eş genişlikli yazı,
+  `Tab` ile sekme karakteri, **Satırları kaydır** seçeneği; durum çubuğunda
+  satır/sütun ve kodlama.
+  - Kaydetme, otomatik kayıt, kurtarma, sürüm geçmişi, başka bir programın
+    değiştirdiği dosyayı yeniden yükleme ve **Farklı Kaydet** (aynı uzantı
+    önerilir, başka ad da yazılabilir) belgelerdeki gibi çalışır.
+  - **Bul** (`Ctrl+F` ya da sekmenin araç çubuğundaki büyüteç): `Enter`/`F3`
+    sonraki, `Shift+Enter` önceki eşleşme.
+  - **Biçimlendir** (sekmenin araç çubuğu, **Kod** sekmesindeki **Kodu
+    Biçimlendir** ya da `Shift+Alt+F`): JSON, XML (SVG, plist… dâhil), HTML
+    ve YAML dosyası iki boşluk girintiyle düzenlenir. Tür uzantıdan, uzantı
+    bilinmiyorsa içerikten anlaşılır. Biçimlendirme tek adımdır, `Ctrl+Z`
+    geri alır. Geçersiz bir dosya olduğu gibi bırakılır ve hatası gösterilir.
+  - Şeritteki biçim düğmeleri (kalın, başlık, tablo…) metin sekmesinde
+    kapalıdır. Asistanın yanıtı **Ekle** ile imlecin olduğu yere düz metin
+    olarak girer.
+  - 20 MB'tan büyük dosyalar sekmede açılmaz. Eski tek baytlık kodlamalar
+    (Windows-1254/1252) kaydederken UTF-8'e çevrilir.
 - **Klasörde arama** (`Ctrl+Shift+E` ya da bölmedeki arama kutusu): açık
   klasörlerdeki tüm metin dosyalarının satırları arayüz dilinin
   büyük/küçük harf kurallarıyla (İ/ı) aranır, sonuçlar dosyaya göre
@@ -573,7 +584,7 @@ e2e/            Playwright ile gerçek uygulamayı süren testler
 - Kod biçimlendirme JSON, JSONC, XML (SVG, RSS, plist… dâhil), HTML ve
   YAML içindir; JSON5, CSS, JavaScript ve öteki diller biçimlendirilmez.
   YAML'da katlanmış (`>`) metnin satırları birleşebilir (anlamı değişmez).
-- Metin düzenleyici bir kod editörü değildir: sözdizimi renklendirmesi,
+- Metin sekmesi bir kod editörü değildir: sözdizimi renklendirmesi,
   değiştir (replace) ve çoklu imleç yoktur. `.txt` için "birlikte aç"
   ilişkilendirmesi kurulmaz.
 - Paket kaydedilirken yalnızca metinde bağlantısı olan dosyalar pakete girer;

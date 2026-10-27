@@ -3293,3 +3293,154 @@ pre[data-confluence-kind="layout"]::before {
 .image-viewer-next {
 	right: 8px;
 }
+
+/* --- Text files ---------------------------------------------------------------
+ * A text file that is not Markdown fills the desk as a plain text box with line
+ * numbers, instead of the white page of a document.
+ */
+
+.desk:has(> .page.text-page) {
+	display: flex;
+	padding: 0;
+	overflow: hidden;
+}
+
+.page.text-page {
+	display: flex;
+	width: 100%;
+	min-height: 0;
+	margin: 0;
+	padding: 0;
+	border-radius: 0;
+	box-shadow: none;
+	font-size: calc(13px * var(--zoom, 1));
+}
+
+.page.text-page > #editor,
+.page.text-page > [data-text-file] {
+	display: flex;
+	flex: 1;
+	min-width: 0;
+}
+
+.text-view {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-width: 0;
+	background: var(--app-page);
+}
+
+.text-view-toolbar,
+.text-view-find {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: 4px;
+	padding: 4px 10px;
+	border-bottom: 1px solid var(--app-border);
+	background: var(--app-surface);
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.text-view-kind {
+	min-width: 32px;
+	margin-right: 6px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+}
+
+.text-view-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 3px 6px;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: var(--app-text);
+	font: inherit;
+}
+
+.text-view-button:hover:not(:disabled) {
+	background: var(--app-hover);
+}
+
+.text-view-button:disabled {
+	opacity: 0.45;
+}
+
+.text-view-button .icon {
+	width: 15px;
+	height: 15px;
+}
+
+.text-view-text-button {
+	min-width: 24px;
+	justify-content: center;
+	font-size: 14px;
+	line-height: 1;
+}
+
+.text-view-wrap {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	margin-left: 8px;
+}
+
+.text-view-find-input {
+	width: 260px;
+	padding: 3px 6px;
+	border: 1px solid var(--app-border);
+	border-radius: 5px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+}
+
+.text-view-find-count {
+	min-width: 70px;
+}
+
+.text-view-body {
+	display: flex;
+	flex: 1;
+	min-height: 0;
+}
+
+.text-view-gutter,
+.text-view-area {
+	margin: 0;
+	padding: 8px 10px;
+	font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
+	font-size: 1em;
+	line-height: 1.55;
+	tab-size: 4;
+}
+
+.text-view-gutter {
+	flex: none;
+	min-width: 3.6em;
+	overflow: hidden;
+	background: var(--app-surface);
+	color: var(--app-muted);
+	text-align: right;
+	user-select: none;
+}
+
+.text-view-area {
+	flex: 1;
+	min-width: 0;
+	border: 0;
+	outline: none;
+	background: transparent;
+	color: var(--app-text);
+	resize: none;
+	white-space: pre;
+}
+
+.text-view-area[wrap="soft"] {
+	white-space: pre-wrap;
+}

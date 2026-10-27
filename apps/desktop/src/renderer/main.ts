@@ -183,7 +183,7 @@ const assistantToggle = el("button", {
 assistantToggle.addEventListener("click", () => {
 	if (settings.assistant) {
 		updateSettings({ assistant: false });
-		session.editor.focus();
+		session.focus();
 	} else {
 		updateSettings({ assistant: true });
 		assistant.focus();
@@ -333,6 +333,10 @@ async function openFromFolder(path: string, query?: string): Promise<void> {
 	// The document arrives through `onDocument`; give it a frame to load.
 	requestAnimationFrame(() => {
 		if (session.path !== path) return;
+		if (session.isText) {
+			session.textView?.openFind(query);
+			return;
+		}
 		session.find?.open("find");
 		// Opening the panel focuses its search field.
 		const input = document.activeElement;
@@ -348,7 +352,7 @@ function renderState(): void {
 	saveStatus.dataset.status = session.status;
 	saveStatus.title = session.path ?? "";
 	formatBadge.textContent = session.formatLabel;
-	readOnlyBadge.hidden = !session.editor.isReadOnly();
+	readOnlyBadge.hidden = !session.readOnly;
 }
 
 function createTab(id: string): Tab {
@@ -435,7 +439,7 @@ function openDocument({ tabId, payload }: TabDocument): void {
 	// Load before activating: the ribbon reads editor state as soon as a tab is active.
 	tab.session.load(payload);
 	activateTab(tabId);
-	tab.session.editor.focus();
+	tab.session.focus();
 }
 
 async function closeTab(id: string): Promise<void> {
@@ -600,7 +604,8 @@ function toggleMark(mark: MarkType): void {
 }
 
 function history(action: "undo" | "redo"): void {
-	// Text fields (source view, find box) keep their own native history.
+	// Text fields (source view, find box, a text file's box) keep their own native history.
+	if (session.isText && !isTextFieldFocused()) session.focus();
 	if (isTextFieldFocused()) document.execCommand(action);
 	else if (action === "undo") session.editor.undo();
 	else session.editor.redo();
@@ -643,8 +648,8 @@ const commands: Record<Command, () => void> = {
 		session.editor.pasteWithoutFormatting();
 		bridge.clipboard("paste");
 	},
-	find: () => session.find?.open("find"),
-	replace: () => session.find?.open("replace"),
+	find: () => (session.isText ? session.textView?.openFind() : session.find?.open("find")),
+	replace: () => (session.isText ? session.textView?.openFind() : session.find?.open("replace")),
 	image: () => void session.insertImages(),
 	"attach-file": () => void session.attachFiles(),
 	diagram: () => newDiagram(),
@@ -675,7 +680,7 @@ const commands: Record<Command, () => void> = {
 		if (canEdit() && !session.editor.mergeBlocks()) warn(t.mergeBlocksBlocked);
 	},
 	source: () => session.source?.toggle(),
-	"read-only": () => session.editor.setReadOnly(!session.editor.isReadOnly()),
+	"read-only": () => session.toggleReadOnly(),
 	focus: toggleFocusMode,
 	"zoom-in": () => setZoom(settings.zoom + ZOOM_STEP),
 	"zoom-out": () => setZoom(settings.zoom - ZOOM_STEP),
@@ -684,8 +689,9 @@ const commands: Record<Command, () => void> = {
 	"export-docx": () => void tools.exportDocx(),
 	"export-confluence": () => void tools.exportConfluence("storage"),
 	"export-confluence-wiki": () => void tools.exportConfluence("wiki"),
-	"format-code": tools.formatCode,
-	"format-all-code": tools.formatAllCode,
+	// In a text file, formatting acts on the whole file.
+	"format-code": () => (session.isText ? session.textView?.beautify() : tools.formatCode()),
+	"format-all-code": () => (session.isText ? session.textView?.beautify() : tools.formatAllCode()),
 	"quick-open": () => void quickOpen.show(),
 	"confluence-open": () => void confluenceDialog.show(),
 	"move-tab": () => moveTab(session.id),
@@ -740,7 +746,7 @@ const ribbon = createAppRibbon(ribbonHost, saveStatus, {
 	updateSettings,
 	canEdit,
 	inSource,
-	inCodeBlock: tools.inCodeBlock,
+	inCodeBlock: () => session.isText || tools.inCodeBlock(),
 	focusMode: () => app.hasAttribute("data-focus"),
 	warn,
 	edit,
@@ -1003,6 +1009,10 @@ document.addEventListener("selectionchange", () => {
 
 /** Puts the focus back in the document, the caret where it last was there. */
 function returnToDocument(): void {
+	if (session.isText) {
+		session.focus();
+		return;
+	}
 	const editor = session.editor;
 	const caret = lastCarets.get(session);
 	const block = caret === undefined ? undefined : editor.getDocument().children[caret.blockIndex];
@@ -1025,7 +1035,7 @@ function toggleAssistant(): void {
 		assistant.focus();
 	} else {
 		updateSettings({ assistant: false });
-		session.editor.focus();
+		session.focus();
 	}
 }
 
@@ -1053,7 +1063,7 @@ async function assistantContext() {
 
 function editableTab(): Session {
 	const tab = session;
-	if (tab.editor.isReadOnly()) throw new Error(t.readOnlyBlocked);
+	if (tab.readOnly) throw new Error(t.readOnlyBlocked);
 	if (inSource()) throw new Error(t.assistantSourceMode);
 	return tab;
 }

@@ -1,11 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
-import type {
-	Command,
-	KalemBridge,
-	Settings,
-	TabDocument,
-	TextDocument,
-} from "../shared/bridge.js";
+import type { Command, KalemBridge, Settings, TabDocument } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
 import type { ClaudeEvent } from "../shared/claude.js";
 
@@ -106,11 +100,6 @@ const bridge: KalemBridge = {
 	closeFolder: (path) => ipcRenderer.send(CHANNEL.closeFolder, path),
 	searchWorkspace: (query) => ipcRenderer.invoke(CHANNEL.searchWorkspace, query),
 	onWorkspaceChange: (handler) => listen<[]>(CHANNEL.workspaceChange, handler),
-	textReady: () => ipcRenderer.invoke(CHANNEL.textReady),
-	onTextOpen: (handler) => listen<[TextDocument]>(CHANNEL.textOpen, handler),
-	textSave: (path, text, format) => ipcRenderer.invoke(CHANNEL.textSave, path, text, format),
-	textOpenDialog: (from) => ipcRenderer.invoke(CHANNEL.textOpenDialog, from),
-	textClose: (path) => ipcRenderer.send(CHANNEL.textClose, path),
 	listVersions: (tabId) => ipcRenderer.invoke(CHANNEL.listVersions, tabId),
 	readVersion: (tabId, id) => ipcRenderer.invoke(CHANNEL.readVersion, tabId, id),
 	assistantStatus: (refresh) => ipcRenderer.invoke(CHANNEL.assistantStatus, refresh === true),

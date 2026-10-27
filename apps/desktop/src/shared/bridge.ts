@@ -341,20 +341,6 @@ export interface Workspace {
 	readonly opened: boolean;
 }
 
-/** A file in the text editor: its text as written, apart from line endings (always LF here). */
-export interface TextDocument {
-	readonly path: string;
-	readonly name: string;
-	readonly text: string;
-	readonly format: TextFormat;
-}
-
-export interface TextEditorStartup {
-	readonly language: Lang;
-	/** Files to show, asked for before the page was ready. */
-	readonly documents: readonly TextDocument[];
-}
-
 export interface SearchHit {
 	readonly path: string;
 	/** Path below the workspace root, with `/`; with several roots, from the root's name. */
@@ -568,7 +554,12 @@ export interface KalemBridge {
 		attachment: { readonly id: string; readonly name: string; readonly used: boolean },
 	): Promise<boolean>;
 	/** `package` proposes a `.kmd`; otherwise Markdown (or the tab's current type) comes first. */
-	chooseSavePath(tabId: string, suggestedName: string, kind?: "package"): Promise<string | null>;
+	/** `kind` "text": a text file, saved under any name with its own extension offered. */
+	chooseSavePath(
+		tabId: string,
+		suggestedName: string,
+		kind?: "package" | "text",
+	): Promise<string | null>;
 	writeDocument(tabId: string, path: string, text: string, format: TextFormat): Promise<SaveResult>;
 	reloadDocument(tabId: string): Promise<OpenedFile | null>;
 	reportState(tabId: string, state: WindowState): void;
@@ -634,15 +625,6 @@ export interface KalemBridge {
 	readVersion(tabId: string, id: string): Promise<string>;
 	/** The open folder changed, in this window or another. */
 	onWorkspaceChange(handler: () => void): () => void;
-
-	// Text editor window
-	textReady(): Promise<TextEditorStartup>;
-	onTextOpen(handler: (document: TextDocument) => void): () => void;
-	/** Writes a file opened in the text editor; `false` when the user kept the copy on disk. */
-	textSave(path: string, text: string, format: TextFormat): Promise<boolean>;
-	/** Asks for files to open, starting in `from`'s folder. */
-	textOpenDialog(from: string | null): Promise<void>;
-	textClose(path: string): void;
 
 	/** The service in use and whether it can be asked; `refresh` looks for the CLI again. */
 	assistantStatus(refresh?: boolean): Promise<AssistantStatus>;
@@ -734,11 +716,6 @@ export const CHANNEL = {
 	openFolder: "kalem:open-folder",
 	closeFolder: "kalem:close-folder",
 	searchWorkspace: "kalem:search-workspace",
-	textReady: "kalem:text-ready",
-	textOpen: "kalem:text-open",
-	textSave: "kalem:text-save",
-	textOpenDialog: "kalem:text-open-dialog",
-	textClose: "kalem:text-close",
 	workspaceChange: "kalem:workspace-change",
 	listVersions: "kalem:list-versions",
 	readVersion: "kalem:read-version",
