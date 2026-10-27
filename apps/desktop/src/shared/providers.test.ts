@@ -6,6 +6,7 @@ import {
 	checkBaseUrl,
 	httpErrorMessage,
 	modelIds,
+	modelsFromHelp,
 	PROVIDER_INFO,
 	PROVIDERS,
 	providerLabel,
@@ -129,5 +130,28 @@ describe("errors and models", () => {
 			"meta/llama",
 			"openai/gpt-4.1",
 		]);
+	});
+});
+
+describe("models a CLI's help names", () => {
+	it("reads GitHub Copilot's choices, over several lines", () => {
+		const help = [
+			"Options:",
+			'  --effort <level>   How hard to think (choices: "low", "high")',
+			'  --model <model>    Set the AI model to use (choices: "claude-sonnet-4.5",',
+			'                     "gpt-5", "gpt-5-mini")',
+			"  -s, --silent       Output only the agent response",
+		].join("\n");
+		expect(modelsFromHelp(help)).toEqual(["claude-sonnet-4.5", "gpt-5", "gpt-5-mini"]);
+	});
+
+	it("takes the names Claude Code gives as examples, and nothing when there are none", () => {
+		expect(
+			modelsFromHelp(
+				"  --model <model>  Provide an alias (e.g. 'sonnet' or 'opus') or a full name (e.g. 'claude-sonnet-4-5-20250929').",
+			),
+		).toEqual(["sonnet", "opus", "claude-sonnet-4-5-20250929"]);
+		expect(modelsFromHelp("  --model <model>  The model to use")).toEqual([]);
+		expect(modelsFromHelp("Usage: tool [options]")).toEqual([]);
 	});
 });

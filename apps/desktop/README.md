@@ -440,8 +440,12 @@ verir.
     100 000, toplam 300 000 karakter; sığmayanlar sayıyla belirtilir).
   Kaynaklar değişmedikçe aynı sohbette yeniden gönderilmez.
 - **Model seçimi:** soru kutusunun üstündeki seçici etkin hizmetin
-  modellerini listeler (API'lerde hizmetin kendi listesi; Claude Code'da
-  varsayılan, `opus`, `sonnet`, `haiku`; **Başka model…** ayarları açar).
+  modellerini listeler: API'lerde hizmetin kendi listesi; Claude Code ve
+  GitHub Copilot'ta varsayılan model ile CLI'nin `--help` çıktısında
+  `--model` için saydığı modeller (Copilot'ta `claude-sonnet-4.5`, `gpt-5`…;
+  Claude Code'da `opus`, `sonnet`, `haiku` ve yardımın örnek verdiği tam
+  adlar). Liste, panel ilk açıldığında bir kez sorulur. **Başka model…**
+  ayarları açar; listede olmayan bir ad oraya yazılabilir.
   Model değiştirmek sohbeti bölmez, sonraki soru aynı sohbette yeni modelle
   gider. Her yanıtın altında onu hangi modelin verdiği yazar ve bu bilgi
   sohbetle birlikte saklanır. Boş bir sohbette **Son sohbetler** listesi
