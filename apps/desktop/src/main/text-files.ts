@@ -13,6 +13,25 @@ export function looksBinary(bytes: Uint8Array): boolean {
 	return !utf16 && bytes.subarray(0, 8000).includes(0);
 }
 
+/** Whether a file is text a tab can show: not too large, and no zero byte in its start. */
+export async function isTextFile(path: string, maxBytes = MAX_TEXT_FILE): Promise<boolean> {
+	if (isBinaryPath(path)) return false;
+	try {
+		const file = await open(path, "r");
+		try {
+			const info = await file.stat();
+			if (!info.isFile() || info.size > maxBytes) return false;
+			const start = new Uint8Array(Math.min(info.size, 8000));
+			await file.read(start, 0, start.length, 0);
+			return !looksBinary(start);
+		} finally {
+			await file.close();
+		}
+	} catch {
+		return false;
+	}
+}
+
 export interface TextFile extends DecodedText {
 	/** Modification time in ms. */
 	readonly modified: number;

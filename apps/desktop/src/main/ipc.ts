@@ -24,6 +24,7 @@ import {
 	isEditablePath,
 	isPackagePath,
 	MARKDOWN_EXTENSIONS,
+	opensAsText,
 	PACKAGE_EXTENSIONS,
 	stripExtension,
 	TEXT_EXTENSIONS,
@@ -182,6 +183,25 @@ export function registerIpc(ctx: IpcContext): void {
 		windows.showConfluenceDialog(senderOf(event)),
 	);
 
+	/** A path the user picked to save to, unless another tab has it open; this window may then write to it. */
+	const allowSave = async (
+		win: AppWindow,
+		tab: { id: string },
+		path: string,
+	): Promise<string | null> => {
+		if (windows.isOpenElsewhere(path, tab.id)) {
+			const t = ctx.strings();
+			await dialog.showMessageBox(win.window, {
+				type: "warning",
+				message: t.saveFailed,
+				detail: t.openInAnotherWindow,
+			});
+			return null;
+		}
+		win.writable.add(pathKey(path));
+		return path;
+	};
+
 	ipcMain.handle(
 		CHANNEL.chooseSavePath,
 		async (event, tabId: unknown, suggested: unknown, kind: unknown) => {
@@ -189,6 +209,19 @@ export function registerIpc(ctx: IpcContext): void {
 			const tab = tabOf(win, tabId);
 			const t = ctx.strings();
 			const name = toFileName(typeof suggested === "string" ? suggested : "", t.untitled);
+
+			// A text file keeps its kind: its own extension is offered, any other name is taken as typed.
+			if (kind === "text" && tab.path !== null) {
+				const ext = extension(tab.path);
+				const all = { name: t.allFiles, extensions: ["*"] };
+				const picked = await dialog.showSaveDialog(win.window, {
+					defaultPath: tab.path,
+					filters:
+						ext === "" ? [all] : [{ name: ext.toLocaleUpperCase("en"), extensions: [ext] }, all],
+				});
+				if (picked.canceled || picked.filePath === "") return null;
+				return allowSave(win, tab, picked.filePath);
+			}
 
 			const markdown = { name: t.markdownDocuments, extensions: [...MARKDOWN_EXTENSIONS] };
 			const text = { name: t.textDocuments, extensions: [...TEXT_EXTENSIONS] };
@@ -221,18 +254,7 @@ export function registerIpc(ctx: IpcContext): void {
 				isEditablePath(result.filePath) || TEXT_EXTENSIONS.includes(extension(result.filePath))
 					? result.filePath
 					: `${result.filePath}.${wanted}`;
-			if (windows.isOpenElsewhere(path, tab.id)) {
-				await dialog.showMessageBox(win.window, {
-					type: "warning",
-					message: t.saveFailed,
-					detail: t.openInAnotherWindow,
-				});
-				return null;
-			}
-
-			// The user picked this path, so this window may now write to it.
-			win.writable.add(pathKey(path));
-			return path;
+			return allowSave(win, tab, path);
 		},
 	);
 
@@ -261,8 +283,9 @@ export function registerIpc(ctx: IpcContext): void {
 			if (isPackagePath(path)) {
 				saved = await ctx.packages.save(path, text, format, from);
 			} else {
+				// Links are moved only in Markdown; a text file is written exactly as it is.
 				const relocated =
-					from === null
+					from === null || opensAsText(path)
 						? { text, changed: false }
 						: await relocateLinks(text, from, path, assetsFolderName(basename(path)));
 				const modified = await writeDocument(path, relocated.text, format);

@@ -33,6 +33,7 @@ import { modifiedTime, readDocument } from "./files.js";
 import type { PackageStore } from "./package.js";
 import { pathKey } from "./path-key.js";
 import type { SettingsStore, WindowBounds } from "./settings.js";
+import { isTextFile } from "./text-files.js";
 import { readWord, WordError } from "./word.js";
 
 /**
@@ -82,7 +83,7 @@ export interface WindowManagerOptions {
 	language(): Lang;
 	onRecentFilesChanged(): void;
 	showContextMenu(contents: WebContents, params: Electron.ContextMenuParams): void;
-	/** Opens a file that is not a document; `launch` lets the system's app for it open it. */
+	/** Opens a file that is neither a document nor text; `launch` lets the system's app for it open it. */
 	openOther(path: string, win: AppWindow | undefined, launch: boolean): Promise<void>;
 }
 
@@ -679,7 +680,10 @@ export class WindowManager {
 	async openPath(path: string, preferred?: AppWindow): Promise<void> {
 		const full = resolve(path);
 		if (isWordPath(full)) return this.importWord(full, preferred);
-		if (!isEditablePath(full)) return this.#options.openOther(full, preferred, true);
+		// Other text files open in a tab too, as they are; the rest where they belong.
+		if (!isEditablePath(full) && !(await isTextFile(full))) {
+			return this.#options.openOther(full, preferred, true);
+		}
 
 		// A document that is already open is brought forward, not opened twice.
 		const key = pathKey(full);
@@ -846,7 +850,8 @@ ${errorMessage(error)}`,
 		if (relative === "") return;
 		const target = resolve(dirname(documentPath), relative);
 		if ((await modifiedTime(target)) === null) return;
-		if (isEditablePath(target)) await this.openPath(target, win);
-		else await this.#options.openOther(target, win, false);
+		if (isEditablePath(target) || (!isWordPath(target) && (await isTextFile(target)))) {
+			await this.openPath(target, win);
+		} else shell.showItemInFolder(target);
 	}
 }

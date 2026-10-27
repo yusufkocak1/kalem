@@ -40,6 +40,14 @@ export function isEditablePath(path: string): boolean {
 	return MARKDOWN_EXTENSIONS.includes(ext) || PACKAGE_EXTENSIONS.includes(ext);
 }
 
+/**
+ * Files a tab shows as plain text, never read as Markdown: anything that is
+ * neither a Markdown document, a package nor a Word file (which is imported).
+ */
+export function opensAsText(path: string): boolean {
+	return !isEditablePath(path) && !isWordPath(path);
+}
+
 /** Files that are never text, so they are not opened to find out. */
 export const BINARY_EXTENSIONS: ReadonlySet<string> = new Set(
 	(

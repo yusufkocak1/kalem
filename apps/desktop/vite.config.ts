@@ -18,10 +18,6 @@ export default defineConfig({
 		outDir: "dist/renderer",
 		emptyOutDir: true,
 		target: "chrome130",
-		rollupOptions: {
-			// The Markdown windows, and the text editor's window.
-			input: { main: "index.html", text: "text-editor.html" },
-		},
 	},
 	server: {
 		port: 5183,

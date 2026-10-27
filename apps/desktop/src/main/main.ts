@@ -38,7 +38,6 @@ import { PackageStore } from "./package.js";
 import { pathKey } from "./path-key.js";
 import { handleDocumentScheme, registerDocumentScheme } from "./protocol.js";
 import { MAX_WORKSPACES, SettingsStore } from "./settings.js";
-import { TextEditor } from "./text-editor.js";
 import { TrayIcon } from "./tray.js";
 import { Updater } from "./updater.js";
 import type { AppWindow } from "./windows.js";
@@ -158,24 +157,10 @@ function start(): void {
 		openOther: (path, win, launch) => openOther(path, win, launch),
 	});
 
-	const textEditor = new TextEditor({
-		preloadPath: join(__dirname, "preload.cjs"),
-		devUrl: process.env.KALEM_DEV_URL || null,
-		pageFile: join(__dirname, "..", "renderer", "text-editor.html"),
-		icon: join(__dirname, "icon.png"),
-		strings: () => t,
-		language: () => language,
-		legacyEncoding: () => (language === "tr" ? "windows-1254" : "windows-1252"),
-		backgroundColor: () => windows.backgroundColor(),
-		spellCheck: () => store.settings.spellCheck,
-		showContextMenu: (contents, params) => popupContextMenu(t, contents, params),
-		openPath: (path) => windows.openPath(path, windows.focused()),
-	});
-
 	/**
-	 * A file that is not a Markdown document: text opens in the text editor
-	 * as it is; anything else opens in the system's app for it when `launch`
-	 * allows, and is shown in its folder otherwise. Programs are never run.
+	 * A file that is neither a document nor text (text files open in a tab
+	 * as they are): the system's app for it opens it when `launch` allows,
+	 * otherwise it is shown in its folder. Programs are never run.
 	 */
 	async function openOther(
 		path: string,
@@ -192,12 +177,6 @@ function start(): void {
 				void dialog.showMessageBox(win.window, options);
 			} else void dialog.showMessageBox(options);
 		};
-		try {
-			if (await textEditor.open(path)) return;
-		} catch (error) {
-			fail(errorMessage(error));
-			return;
-		}
 		if (!launch || isProgramPath(path)) {
 			shell.showItemInFolder(path);
 			return;
@@ -469,7 +448,6 @@ function start(): void {
 		});
 		applySpellCheck();
 		installUserTasks();
-		textEditor.registerIpc();
 		registerIpc({
 			windows,
 			store,

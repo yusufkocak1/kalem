@@ -41,6 +41,7 @@ import {
 	extension,
 	fileName,
 	isPackagePath,
+	opensAsText,
 	stripExtension,
 	TEXT_EXTENSIONS,
 } from "../shared/paths.js";
@@ -57,6 +58,8 @@ import { insertImageBlock, insertLink, insertTable } from "./edits.js";
 import type { Notices } from "./notices.js";
 import type { Previews } from "./previews.js";
 import { TableStyles } from "./table-styles.js";
+import type { TextView } from "./text-view.js";
+import { createTextView } from "./text-view.js";
 import { welcomeDocument } from "./welcome.js";
 import { wordHtmlToMarkdown } from "./word.js";
 
@@ -98,6 +101,13 @@ export class Session {
 	#find: FindReplacePlugin | null = null;
 	#source: SourceModePlugin | null = null;
 	#images: ImageUploadPlugin | null = null;
+	/**
+	 * A text file that is not Markdown is shown here, as it is; the editor
+	 * is then empty, read only and out of sight, so the app's commands find
+	 * one and do nothing.
+	 */
+	#textView: TextView | null = null;
+	#autosaveTimer: ReturnType<typeof setTimeout> | undefined;
 
 	#path: string | null = null;
 	/** The Confluence page this tab saves to; then `#path` is `null`. */
@@ -129,6 +139,36 @@ export class Session {
 	constructor(options: SessionOptions) {
 		this.#o = options;
 		this.#name = options.t.untitled;
+	}
+
+	/** Whether this tab shows a text file as plain text rather than a Markdown document. */
+	get isText(): boolean {
+		return this.#textView !== null;
+	}
+
+	get textView(): TextView | null {
+		return this.#textView;
+	}
+
+	/** Whether the document can be changed: the text box, or the Markdown editor. */
+	get readOnly(): boolean {
+		return this.#textView?.readOnly() ?? this.editor.isReadOnly();
+	}
+
+	toggleReadOnly(): void {
+		const view = this.#textView;
+		if (view === null) {
+			this.editor.setReadOnly(!this.editor.isReadOnly());
+			return;
+		}
+		view.setReadOnly(!view.readOnly());
+		this.#o.onEditorChange();
+		this.#o.onStateChange();
+	}
+
+	focus(): void {
+		if (this.#textView !== null) this.#textView.focus();
+		else this.editor.focus();
 	}
 
 	get editor(): Editor {
@@ -191,8 +231,9 @@ export class Session {
 		return this.#source?.isSource() === true ? this.#source.text() : this.#text();
 	}
 
-	/** The document as written to disk: the editor's Markdown plus table style comments. */
+	/** The document as written to disk: the editor's Markdown plus table style comments, or a text file's text. */
 	#text(): string {
+		if (this.#textView !== null) return this.#textView.value();
 		const editor = this.editor;
 		if (this.#tables.isEmpty) return editor.getValue();
 		return serialize(injectTableStyles(editor.getDocument(), this.#tables.styleOf));
@@ -218,6 +259,7 @@ export class Session {
 
 	/** Puts `text` in place of the document as one edit, so undo brings the old text back. */
 	replaceText(text: string): boolean {
+		if (this.#textView !== null) return this.#textView.replaceAll(text);
 		const editor = this.editor;
 		if (editor.isReadOnly() || this.#source?.isSource() === true) return false;
 		const extracted = extractTableStyles(text);
@@ -234,6 +276,11 @@ export class Session {
 	 * caret after it; `null` when nothing was inserted.
 	 */
 	insertMarkdown(markdown: string, caret: Caret | null): Caret | null {
+		// A text file takes the text as it is, at its caret.
+		if (this.#textView !== null) {
+			this.#textView.insert(markdown);
+			return null;
+		}
 		const editor = this.editor;
 		if (editor.isReadOnly() || this.#source?.isSource() === true) return null;
 		const extracted = extractTableStyles(markdown);
@@ -378,14 +425,22 @@ export class Session {
 				break;
 		}
 
+		// A text file that is not Markdown keeps its whole name and is shown as it is.
+		const textFile = this.#remote === null && this.#path !== null && opensAsText(this.#path);
+		if (textFile && this.#path !== null) this.#name = fileName(this.#path);
+
 		this.#updateBase();
-		// The editor gets plain tables; their styles are kept beside it.
-		const extracted = extractTableStyles(text);
-		this.#mount(extracted.markdown);
-		this.#tables.reset(this.editor.getDocument(), extracted.styles);
-		this.#tables.decorate(this.editor);
-		this.#o.previews.decorate(this.#o.canvas);
-		decorateLocked(this.#o.canvas, this.#o.t);
+		if (textFile) {
+			this.#mountText(text);
+		} else {
+			// The editor gets plain tables; their styles are kept beside it.
+			const extracted = extractTableStyles(text);
+			this.#mount(extracted.markdown);
+			this.#tables.reset(this.editor.getDocument(), extracted.styles);
+			this.#tables.decorate(this.editor);
+			this.#o.previews.decorate(this.#o.canvas);
+			decorateLocked(this.#o.canvas, this.#o.t);
+		}
 		// The baseline is what the editor serializes, not the file text: a file
 		// that does not round-trip byte for byte must not open as "modified".
 		this.#savedText = clean ? this.#text() : null;
@@ -394,7 +449,7 @@ export class Session {
 		this.#report();
 		this.#o.onStateChange();
 		this.#o.onEditorChange();
-		this.editor.focus();
+		this.focus();
 
 		// An imported document exists nowhere on disk until it is edited or saved.
 		if (payload.kind === "word" || payload.kind === "confluence") void this.#writeDraft(text);
@@ -513,7 +568,51 @@ export class Session {
 		this.#images = images;
 	}
 
+	/** A text file in a plain text box; the editor stays, empty and read only, out of sight. */
+	#mountText(text: string): void {
+		this.#unmount();
+		const { canvas, wordCount, t, language, notices } = this.#o;
+		const host = document.createElement("div");
+		host.hidden = true;
+		canvas.append(host);
+		this.#editor = new Editor(host, {
+			value: "",
+			lang: language,
+			label: t.document,
+			readOnly: true,
+			plugins: [],
+		});
+		const view = createTextView({
+			t,
+			lang: language,
+			text,
+			path: this.#path ?? "",
+			onChange: () => this.#textChanged(),
+			onCaret: (line, column) => {
+				wordCount.textContent = format(t.textPosition, line, column);
+			},
+			notify: (message, kind) => notices.show({ id: "text", kind, text: message }),
+		});
+		canvas.append(view.element);
+		canvas.toggleAttribute("data-text-file", true);
+		canvas.parentElement?.classList.add("text-page");
+		this.#textView = view;
+	}
+
+	#textChanged(): void {
+		this.#refreshDirty(this.#text());
+		this.#o.onEditorChange();
+		// As the autosave plugin does for documents: a draft, or the file when autosave is on.
+		clearTimeout(this.#autosaveTimer);
+		this.#autosaveTimer = setTimeout(() => void this.#autoSave().catch(() => {}), AUTOSAVE_DELAY);
+	}
+
 	#unmount(): void {
+		clearTimeout(this.#autosaveTimer);
+		this.#textView = null;
+		this.#o.canvas.removeAttribute("data-text-file");
+		this.#o.canvas.parentElement?.classList.remove("text-page");
+		this.#o.wordCount.textContent = "";
 		// UI first: it removes its own shortcut plugin from the editor.
 		this.#ui?.destroy();
 		this.#editor?.destroy();
@@ -612,7 +711,11 @@ export class Session {
 
 		let path = this.#path;
 		if (path === null || saveAs) {
-			path = await bridge.chooseSavePath(this.id, this.#name, kind);
+			path = await bridge.chooseSavePath(
+				this.id,
+				this.#name,
+				this.#textView === null ? kind : "text",
+			);
 			if (path === null) return false;
 		} else if (!this.#dirty) {
 			return true;
@@ -629,7 +732,7 @@ export class Session {
 				this.#remote = null;
 				this.#losses = [];
 				this.#storage = null;
-				this.#name = stripExtension(fileName(path));
+				this.#name = this.#textView === null ? stripExtension(fileName(path)) : fileName(path);
 				// A package's links resolve inside it; the save result brings that base.
 				if (!isPackagePath(path)) {
 					this.#base = path;
@@ -637,13 +740,19 @@ export class Session {
 				}
 			}
 			const documentPath = path;
-			await this.#extractEmbeddedImages(editor, (image) => bridge.writeImage(documentPath, image));
+			// A text file is written as it is: no pictures pulled out, no newline added.
+			if (this.#textView === null) {
+				await this.#extractEmbeddedImages(editor, (image) =>
+					bridge.writeImage(documentPath, image),
+				);
+			}
 
 			const text = this.#text();
 			const target: TextFormat = willConvertToUtf8(this.#format)
 				? { ...this.#format, encoding: "utf-8" }
 				: this.#format;
-			const needsNewline = this.#finalNewline && text !== "" && !text.endsWith("\n");
+			const needsNewline =
+				this.#textView === null && this.#finalNewline && text !== "" && !text.endsWith("\n");
 			const output = needsNewline ? `${text}\n` : text;
 			const result = await bridge.writeDocument(this.id, path, output, target);
 			if (result.file !== undefined) {
@@ -792,7 +901,7 @@ export class Session {
 			return;
 		}
 		const canWriteFile =
-			this.#o.settings().autoSave && this.#path !== null && this.#editor?.isReadOnly() === false;
+			this.#o.settings().autoSave && this.#path !== null && this.#editor !== null && !this.readOnly;
 		if (canWriteFile) {
 			if (!(await this.save())) throw new Error("Autosave failed");
 			return;

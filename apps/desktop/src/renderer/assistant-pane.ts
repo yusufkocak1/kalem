@@ -456,7 +456,12 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	});
 
 	input.addEventListener("input", () => updateMenu());
-	input.addEventListener("blur", () => setTimeout(() => hideMenu(), 150));
+	// Late, so a click on the menu still lands; not when the box has the focus back by then.
+	input.addEventListener("blur", () =>
+		setTimeout(() => {
+			if (document.activeElement !== input) hideMenu();
+		}, 150),
+	);
 	input.addEventListener("keydown", (event) => {
 		if (!menu.hidden && menuItems.length > 0) {
 			const move = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
