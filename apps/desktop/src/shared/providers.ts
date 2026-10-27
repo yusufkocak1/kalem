@@ -42,6 +42,26 @@ export const SUGGESTED_MODELS: Readonly<Partial<Record<ProviderId, readonly stri
 	"claude-code": ["opus", "sonnet", "haiku"],
 };
 
+/**
+ * The models a CLI's `--help` lists for its `--model` option: GitHub
+ * Copilot's reads `(choices: "claude-sonnet-4.5", "gpt-5", …)`. Model names
+ * the option's description quotes as examples count too (Claude Code's
+ * `'sonnet'`, `'claude-sonnet-…'`). Empty when the help names none.
+ */
+export function modelsFromHelp(help: string): string[] {
+	const lines = help.split(/\r?\n/);
+	const start = lines.findIndex((line) => /^\s*(?:-\w,\s*)?--model[\s=<]/.test(line));
+	if (start === -1) return [];
+	// The option's text runs until the next option.
+	let text = lines[start] ?? "";
+	for (const line of lines.slice(start + 1)) {
+		if (/^\s*-/.test(line) || line.trim() === "") break;
+		text += ` ${line.trim()}`;
+	}
+	const names = [...text.matchAll(/["'`]([\w.:/@-]+)["'`]/g)].map((match) => match[1] as string);
+	return [...new Set(names.filter((name) => /[a-z]/i.test(name) && !name.startsWith("-")))];
+}
+
 /** Whether the service is a program on this computer rather than an API. */
 export const isCli = (info: ProviderInfo): boolean =>
 	info.protocol === "claude-cli" || info.protocol === "copilot-cli";

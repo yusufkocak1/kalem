@@ -132,6 +132,18 @@ function version(launch: CliLaunch): Promise<string> {
 	});
 }
 
+/** What the CLI prints for `--help`; empty when it cannot tell. */
+function help(launch: CliLaunch): Promise<string> {
+	return new Promise((resolve) => {
+		execFile(
+			launch.command,
+			[...launch.prefix, "--help"],
+			{ timeout: 20_000, windowsHide: true, env: environment(launch), maxBuffer: 4 * 1024 * 1024 },
+			(_error, stdout) => resolve(typeof stdout === "string" ? stdout : ""),
+		);
+	});
+}
+
 /** A CLI found on this computer (or picked by the user). */
 export class LocalCli {
 	readonly program: CliProgram;
@@ -142,6 +154,16 @@ export class LocalCli {
 	constructor(program: CliProgram, configured: () => string) {
 		this.program = program;
 		this.#configured = configured;
+	}
+
+	/** Its `--help` text, asked once per program found. */
+	#help: { path: string; text: Promise<string> } | null = null;
+
+	help(): Promise<string> {
+		const launch = this.#found?.launch;
+		if (launch === undefined) return Promise.resolve("");
+		if (this.#help?.path !== launch.path) this.#help = { path: launch.path, text: help(launch) };
+		return this.#help.text;
 	}
 
 	get launch(): CliLaunch | null {
