@@ -42,6 +42,7 @@ import { TrayIcon } from "./tray.js";
 import { Updater } from "./updater.js";
 import type { AppWindow } from "./windows.js";
 import { errorMessage, WindowManager } from "./windows.js";
+import { WorkspaceWatcher } from "./workspace-files.js";
 
 // Lets end-to-end tests run against a throwaway profile. The single-instance
 // lock is tied to this folder, so tests do not collide with a running app.
@@ -270,9 +271,16 @@ function start(): void {
 		}
 	}
 
+	const workspaceChanged = (): void => {
+		for (const win of windows.all()) win.window.webContents.send(CHANNEL.workspaceChange);
+	};
+	/** Files appearing, going or renamed in the open folders refresh the Files pane. */
+	const watcher = new WorkspaceWatcher(workspaceChanged);
+
 	function setWorkspaces(folders: readonly string[]): void {
 		store.update({ workspaces: folders.slice(0, MAX_WORKSPACES) });
-		for (const win of windows.all()) win.window.webContents.send(CHANNEL.workspaceChange);
+		watcher.watch(store.state.workspaces);
+		workspaceChanged();
 		refreshMenu();
 	}
 
@@ -423,6 +431,7 @@ function start(): void {
 	// are gone would bring a discarded document back as "recovered".
 	let draftsSettled = false;
 	app.on("will-quit", (event) => {
+		watcher.close();
 		globalShortcut.unregisterAll();
 		if (draftsSettled || !drafts.busy) return;
 		event.preventDefault();
@@ -442,6 +451,7 @@ function start(): void {
 		ready = true;
 
 		nativeTheme.themeSource = store.settings.theme;
+		watcher.watch(store.state.workspaces);
 		handleDocumentScheme(async (pageId, name) => {
 			const credentials = await confluence.get();
 			return credentials === null ? null : confluenceClient(credentials).attachment(pageId, name);

@@ -91,6 +91,7 @@ const bridge: KalemBridge = {
 
 	onCommand: (handler) => listen<[Command]>(CHANNEL.command, handler),
 	onDocument: (handler) => listen<[TabDocument]>(CHANNEL.document, handler),
+	onDocumentMoved: (handler) => listen<[string, string]>(CHANNEL.documentMoved, handler),
 	onActivateTab: (handler) => listen<[string]>(CHANNEL.activateTab, handler),
 	onSaveRequest: (handler) => listen<[string]>(CHANNEL.saveRequest, handler),
 	onSettings: (handler) => listen<[Settings]>(CHANNEL.settings, handler),
@@ -99,6 +100,12 @@ const bridge: KalemBridge = {
 	openFolder: () => ipcRenderer.invoke(CHANNEL.openFolder),
 	closeFolder: (path) => ipcRenderer.send(CHANNEL.closeFolder, path),
 	searchWorkspace: (query) => ipcRenderer.invoke(CHANNEL.searchWorkspace, query),
+	createInWorkspace: (parent, name, kind) =>
+		ipcRenderer.invoke(CHANNEL.createInWorkspace, parent, name, kind),
+	renameInWorkspace: (path, name) => ipcRenderer.invoke(CHANNEL.renameInWorkspace, path, name),
+	trashInWorkspace: (path) => ipcRenderer.invoke(CHANNEL.trashInWorkspace, path),
+	revealInFolder: (path) => ipcRenderer.send(CHANNEL.revealInFolder, path),
+	openWithSystem: (path) => ipcRenderer.invoke(CHANNEL.openWithSystem, path),
 	onWorkspaceChange: (handler) => listen<[]>(CHANNEL.workspaceChange, handler),
 	listVersions: (tabId) => ipcRenderer.invoke(CHANNEL.listVersions, tabId),
 	readVersion: (tabId, id) => ipcRenderer.invoke(CHANNEL.readVersion, tabId, id),

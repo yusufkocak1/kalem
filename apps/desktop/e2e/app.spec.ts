@@ -880,12 +880,14 @@ test("opens other text files in a tab as they are, formats JSON, and several fol
 	await writeFile(join(other, "ayar.json"), '{ "a": 1 }\n');
 	const doc = join(folder, "belge.md");
 	await writeFile(doc, "# Belge\n");
-	const { app, page, errors } = await launch({ args: [doc] });
+	// Full width gives a document's page margins; a text file has none either way.
+	const { app, page, errors } = await launch({ args: [doc], settings: { fullWidth: true } });
 	const items = page.locator(".files-item");
 	const tabs = page.locator(".doc-tab");
 	const area = page.locator("#editor .text-view-area");
 	await page.locator('.side-pane-tab[data-pane="files"]').click();
-	await expect(items).toHaveText(["▾kod", "Main.java", "belge.md", "notlar.txt", "veri.json"]);
+	// Folders start closed.
+	await expect(items).toHaveText(["kod", "belge.md", "notlar.txt", "veri.json"]);
 
 	// A text file opens in a tab of the same window, exactly as written: never as Markdown.
 	await items.filter({ hasText: "notlar.txt" }).click();
@@ -896,6 +898,10 @@ test("opens other text files in a tab as they are, formats JSON, and several fol
 		"Alışveriş listesi\nsüt, ekmek\n\n2 * 3 * 4 = 24\n# değil başlık\n",
 	);
 	await expect(page.locator("#editor h1")).toHaveCount(0);
+	const view = await page.locator("#editor .text-view").boundingBox();
+	const desk = await page.locator(".desk:visible").boundingBox();
+	expect(Math.abs((view?.x ?? 0) - (desk?.x ?? -9))).toBeLessThanOrEqual(1);
+	expect(Math.abs((view?.width ?? 0) - (desk?.width ?? -9))).toBeLessThanOrEqual(16);
 	await expect(page.locator(".status-format")).toHaveText("UTF-8 · CRLF");
 	await expect(page.locator("#editor .text-view-gutter")).toContainText("6");
 	await expect(status(page)).toHaveText("Saved");
@@ -912,6 +918,7 @@ test("opens other text files in a tab as they are, formats JSON, and several fol
 	);
 
 	// Code keeps its tabs and its missing final newline; find works in the file.
+	await items.filter({ hasText: "kod" }).click();
 	await items.filter({ hasText: "Main.java" }).click();
 	await expect(tabs).toHaveCount(3);
 	await expect(area).toHaveValue("class Main {\n\tint x = 1;\n}");
@@ -947,10 +954,7 @@ test("opens other text files in a tab as they are, formats JSON, and several fol
 	// Several folders: each is a heading of its own and closes by itself.
 	await stubOpenDialog(app, [folder, other]);
 	await clickMenu(app, "File", "Open Folder…");
-	await expect(page.locator(".files-root-name")).toHaveText([
-		`▾${basename(folder)}`,
-		`▾${basename(other)}`,
-	]);
+	await expect(page.locator(".files-root-name")).toHaveText([basename(folder), basename(other)]);
 	await expect(items.filter({ hasText: "ayar.json" })).toHaveCount(1);
 	await page.screenshot({ path: "test-results/files-folders.png" });
 	await page.locator(".files-search").fill("1");
@@ -959,7 +963,7 @@ test("opens other text files in a tab as they are, formats JSON, and several fol
 		`${basename(other)}/ayar.json`,
 	]);
 	await page.locator(".files-search").fill("");
-	const otherRoot = page.locator(".files-root", { hasText: basename(other) });
+	const otherRoot = page.locator(".files-root-name", { hasText: basename(other) });
 	await otherRoot.hover();
 	await otherRoot.getByRole("button", { name: `Close “${basename(other)}”` }).click();
 	await expect(page.locator(".files-root-name")).toHaveCount(0);
@@ -1170,6 +1174,122 @@ test("undo and redo step through table styles", async () => {
 	await app.close();
 });
 
+test("works with files from the tree: keys, menu, new, rename, delete and watching", async () => {
+	const folder = await tempDir("files-tree");
+	await mkdir(join(folder, "alt", "derin"), { recursive: true });
+	await writeFile(join(folder, "notlar.md"), "# Notlar\n");
+	await writeFile(join(folder, "alt", "derin", "a.md"), "Derin\n");
+	await writeFile(join(folder, "veri.json"), "{}\n");
+	const { app, page, errors } = await launch({ args: [join(folder, "notlar.md")] });
+	await stubOpenDialog(app, [folder]);
+	await clickMenu(app, "File", "Open Folder…");
+	const items = page.locator(".files-item[data-path]");
+	const row = (name: string) => page.locator(".files-item[data-path]", { hasText: name });
+	const tabs = page.locator(".doc-tab");
+	await expect(items).toHaveText(["alt", "notlar.md", "veri.json"]);
+	// Each kind of file has its own colour.
+	await expect(row("veri.json").locator(".tone-data")).toHaveCount(1);
+	await expect(row("notlar.md").locator(".tone-markdown")).toHaveCount(1);
+
+	// The keyboard walks the tree: down from the search box, right opens, left goes back up.
+	await page.locator(".files-search").press("ArrowDown");
+	await expect(row("alt")).toBeFocused();
+	await page.keyboard.press("ArrowRight");
+	await expect(items).toHaveText(["alt", "derin", "notlar.md", "veri.json"]);
+	await page.keyboard.press("ArrowRight");
+	await expect(row("derin")).toBeFocused();
+	await page.keyboard.press("ArrowRight");
+	await page.keyboard.press("ArrowDown");
+	await expect(row("a.md")).toBeFocused();
+	await page.keyboard.press("Enter");
+	await expect(tabs).toHaveCount(2);
+	await expect(row("a.md")).toHaveAttribute("aria-current", "page");
+	await row("a.md").focus();
+	await page.keyboard.press("ArrowLeft");
+	await expect(row("derin")).toBeFocused();
+	await page.keyboard.press("ArrowLeft");
+	await expect(items).toHaveText(["alt", "derin", "notlar.md", "veri.json"]);
+
+	// New file from the folder's menu: named in place, created and opened.
+	await row("alt").click({ button: "right" });
+	await page.getByRole("menuitem", { name: "New File…" }).click();
+	const box = page.locator(".files-rename");
+	await expect(box).toHaveValue("New document.md");
+	await box.fill("rapor.md");
+	await box.press("Enter");
+	await expect(row("rapor.md")).toHaveCount(1);
+	await expect(tabs.filter({ hasText: "rapor" })).toHaveAttribute("aria-selected", "true");
+	expect(await readFile(join(folder, "alt", "rapor.md"), "utf8")).toBe("");
+
+	// Renaming an open file: its tab follows and saves to the new name.
+	await row("rapor.md").focus();
+	await page.keyboard.press("F2");
+	await expect(box).toHaveValue("rapor.md");
+	await box.fill("rapor-son.md");
+	await box.press("Enter");
+	await expect(row("rapor-son.md")).toHaveCount(1);
+	await expect(tabs.filter({ hasText: "rapor-son" })).toHaveCount(1);
+	await page.locator("#editor").click();
+	await page.keyboard.type("Son hali");
+	await save(page);
+	await expect(status(page)).toHaveText("Saved");
+	expect(await readFile(join(folder, "alt", "rapor-son.md"), "utf8")).toBe("Son hali\n");
+
+	// A name that is not one is refused, and the box stays.
+	await row("veri.json").click({ button: "right" });
+	await page.getByRole("menuitem", { name: "Rename…" }).click();
+	await box.fill("a/b.json");
+	await box.press("Enter");
+	await expect(page.locator(".notice")).toContainText("is not a valid name");
+	await expect(box).toBeVisible();
+	await box.press("Escape");
+	await expect(box).toHaveCount(0);
+
+	// Copy Path, Show in Folder and Delete (to the recycle bin, once agreed).
+	await app.evaluate(({ shell }) => {
+		const store = globalThis as { revealed?: string; trashed?: string };
+		shell.showItemInFolder = (path: string) => {
+			store.revealed = path;
+		};
+		shell.trashItem = async (path: string) => {
+			store.trashed = path;
+		};
+	});
+	await row("veri.json").click({ button: "right" });
+	await page.getByRole("menuitem", { name: "Copy Path" }).click();
+	await expect
+		.poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
+		.toBe(join(folder, "veri.json"));
+	await row("veri.json").click({ button: "right" });
+	await page.getByRole("menuitem", { name: "Show in Folder" }).click();
+	await expect
+		.poll(() => app.evaluate(() => (globalThis as { revealed?: string }).revealed))
+		.toBe(join(folder, "veri.json"));
+	await stubMessageBox(app, 0);
+	await row("veri.json").focus();
+	await page.keyboard.press("Delete");
+	await expect
+		.poll(() => app.evaluate(() => (globalThis as { trashed?: string }).trashed))
+		.toBe(join(folder, "veri.json"));
+
+	// Files made by another program appear by themselves.
+	await writeFile(join(folder, "disaridan.txt"), "merhaba\n");
+	await expect(row("disaridan.txt")).toHaveCount(1, { timeout: 10_000 });
+
+	// Search shows matching file names first, then lines in files.
+	await page.locator(".files-search").fill("rapor");
+	await expect(page.locator(".search-name")).toHaveCount(1);
+	await expect(page.locator(".search-name .files-name")).toHaveText("rapor-son.md");
+	await page.locator(".files-search").fill("");
+
+	await page.locator('.files-toolbar [aria-label="Collapse All"]').click();
+	await expect(items).toHaveText(["alt", "disaridan.txt", "notlar.md", "veri.json"]);
+	await page.screenshot({ path: "test-results/files-tree.png" });
+
+	expect(errors).toEqual([]);
+	await discardAndClose(app);
+});
+
 test("browses, searches and quick-opens the documents of a folder", async () => {
 	const folder = await tempDir("workspace");
 	await mkdir(join(folder, "alt"));
@@ -1181,10 +1301,12 @@ test("browses, searches and quick-opens the documents of a folder", async () => 
 
 	// Without an open folder the pane shows the document's folder.
 	await page.locator('.side-pane-tab[data-pane="files"]').click();
-	// Every file is listed; documents open in the editor, others where they belong.
-	await expect(items).toHaveText(["▾alt", "kiraz.md", "elma.md", "resim.png"]);
+	// Every file is listed; documents open in the editor, others where they belong. Folders start closed.
+	await expect(items).toHaveText(["alt", "elma.md", "resim.png"]);
 	await expect(page.locator('.files-item[aria-current="page"]')).toHaveText("elma.md");
 
+	await items.filter({ hasText: "alt" }).click();
+	await expect(items).toHaveText(["alt", "kiraz.md", "elma.md", "resim.png"]);
 	await items.filter({ hasText: "kiraz.md" }).click();
 	await expect(page.locator(".doc-tab")).toHaveCount(2);
 	await expect(page.locator("#editor p").first()).toHaveText("Kiraz ve ELMA.");
@@ -1192,7 +1314,7 @@ test("browses, searches and quick-opens the documents of a folder", async () => 
 
 	// Folders collapse.
 	await items.filter({ hasText: "alt" }).click();
-	await expect(items).toHaveText(["▸alt", "elma.md", "resim.png"]);
+	await expect(items).toHaveText(["alt", "elma.md", "resim.png"]);
 
 	// Search in files folds case and opens the match with the find panel filled in.
 	await page.locator(".files-search").fill("elma");
@@ -1224,7 +1346,7 @@ test("browses, searches and quick-opens the documents of a folder", async () => 
 	);
 
 	await page.locator('.files-toolbar [aria-label="Close Folder"]').click();
-	await expect(items).toHaveText(["▸alt", "elma.md", "resim.png"]);
+	await expect(items).toHaveText(["alt", "elma.md", "resim.png"]);
 	await expect(page.locator('.files-toolbar [aria-label="Close Folder"]')).toBeHidden();
 	await page.screenshot({ path: "test-results/files-pane.png" });
 
