@@ -43,6 +43,10 @@ if (args.includes("--version")) {
 	console.log("9.9.9 (Claude Code)");
 	process.exit(0);
 }
+if (args.includes("--help")) {
+	console.log("Usage: claude [options] [command] [prompt]\\n\\nOptions:\\n  -p, --print  Print response and exit\\n  --model <model>  Model for the current session. Provide an alias for the latest model (e.g. 'sonnet' or 'opus') or a\\n                   model's full name (e.g. 'claude-sonnet-4-5-20250929').\\n  --resume [value]  Resume a conversation");
+	process.exit(0);
+}
 let prompt = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => (prompt += chunk));
@@ -463,6 +467,10 @@ if (args.includes("--version")) {
 	console.log("9.9.9-copilot");
 	process.exit(0);
 }
+if (args.includes("--help")) {
+	console.log('Usage: copilot [options]\\n\\nOptions:\\n  --model <model>  Set the AI model to use (choices: "claude-sonnet-4.5", "gpt-5", "gpt-5-mini")\\n  -s, --silent  Output only the agent response');
+	process.exit(0);
+}
 let prompt = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => (prompt += chunk));
@@ -516,6 +524,14 @@ test("asks GitHub Copilot, keeps several chats and picks the last one up after a
 	await expect(form).toContainText("GitHub Copilot CLI");
 	await form.getByRole("button", { name: "Save" }).click();
 	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9-copilot");
+	// The models are the ones Copilot's help lists.
+	await expect(pane.locator(".assistant-model option")).toHaveText([
+		"Default model",
+		"claude-sonnet-4.5",
+		"gpt-5",
+		"gpt-5-mini",
+		"Other model…",
+	]);
 
 	const input = () => pane.locator(".assistant-input");
 	await input().fill("Raporu çiz");
@@ -642,13 +658,14 @@ test("picks the model from the panel and keeps the chat going; earlier chats are
 	const picker = pane.locator(".assistant-model");
 	const input = pane.locator(".assistant-input");
 
-	// Claude Code: its default model, or one of its aliases.
+	// Claude Code: its default model, one of its aliases, or a full name its help gives.
 	await expect(picker).toHaveValue("");
 	await expect(picker.locator("option")).toHaveText([
 		"Default model",
 		"opus",
 		"sonnet",
 		"haiku",
+		"claude-sonnet-4-5-20250929",
 		"Other model…",
 	]);
 	await input.fill("Bir");

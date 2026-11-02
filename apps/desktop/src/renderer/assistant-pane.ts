@@ -800,7 +800,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			el("option", { text: t.assistantMoreModels, attrs: { value: MORE_MODELS } }),
 		);
 		modelSelect.value = status.model;
-		if (modelLists.has(provider) || cli || !status.ready) return;
+		if (modelLists.has(provider) || !status.ready) return;
 		modelLists.set(provider, []);
 		void bridge
 			.assistantModels({ provider, baseUrl: "" })

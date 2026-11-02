@@ -31,8 +31,10 @@ import {
 	checkBaseUrl,
 	isCli,
 	isProvider,
+	modelsFromHelp,
 	PROVIDER_INFO,
 	providerLabel,
+	SUGGESTED_MODELS,
 } from "../shared/providers.js";
 import type { ChatStore } from "./assistant-chats.js";
 import { collectSources, MAX_SOURCES, SOURCE_BUDGET } from "./assistant-sources.js";
@@ -215,8 +217,15 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 
 	ipcMain.handle(CHANNEL.assistantModels, async (_event, raw: unknown) => {
 		const request = record(raw);
-		if (!isProvider(request.provider) || isCli(PROVIDER_INFO[request.provider])) return [];
+		if (!isProvider(request.provider)) return [];
 		const provider = request.provider;
+		// A CLI names its models in its help; the well-known aliases come first.
+		const program = programOf(provider);
+		if (program !== null) {
+			await locate(program);
+			const listed = modelsFromHelp(await clis[program].help());
+			return [...new Set([...(SUGGESTED_MODELS[provider] ?? []), ...listed])];
+		}
 		const info = PROVIDER_INFO[provider];
 		// Without an address, the one the user set for the service.
 		const baseUrl = checkBaseUrl(
