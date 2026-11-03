@@ -43,6 +43,7 @@ import { el, isTextFieldFocused } from "./dom.js";
 import type { TableContext, TableEdit } from "./edits.js";
 import { insertDivider, insertTable, replaceTable, tableAt, toggleTaskList } from "./edits.js";
 import { createFilesPane } from "./files-pane.js";
+import { createGitDialogs } from "./git-dialogs.js";
 import { icon } from "./icons.js";
 import { createImageViewer } from "./image-viewer.js";
 import { createNotices } from "./notices.js";
@@ -104,6 +105,8 @@ const filesPane = createFilesPane({
 	activePath: () => session?.path ?? null,
 	open: (path, query) => void openFromFolder(path, query),
 	notify: (text) => session.notices.show({ id: "files", kind: "error", text }),
+	inform: (text) => session.notices.show({ id: "files", kind: "info", text }),
+	git: createGitDialogs(t, startup.language),
 });
 const versionHistory = createVersionHistory({ t, lang: startup.language });
 const attachmentsDialog = createAttachmentsDialog({

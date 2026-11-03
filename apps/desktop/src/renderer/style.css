@@ -2338,6 +2338,178 @@ button {
 	outline: none;
 }
 
+/* --- Files: git --- */
+
+.files-git {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	margin: 0 8px 6px;
+	padding: 2px 2px 2px 4px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	font-size: 12px;
+}
+
+.files-git[hidden] {
+	display: none;
+}
+
+.files-git-branch {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: 4px;
+	max-width: 55%;
+	padding: 2px 6px;
+	border: 0;
+	border-radius: 4px;
+	background: none;
+	color: var(--app-text);
+	font: inherit;
+	font-weight: 600;
+}
+
+.files-git-branch:hover:not(:disabled) {
+	background: var(--app-hover);
+}
+
+.files-git-branch .icon {
+	flex: none;
+	width: 14px;
+	height: 14px;
+	color: var(--app-accent);
+}
+
+.files-git-name,
+.files-git-state {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.files-git-state {
+	flex: 1;
+	color: var(--app-muted);
+}
+
+.files-git[aria-busy="true"] .files-git-state {
+	color: var(--app-accent);
+}
+
+.files-git .icon-button:disabled {
+	opacity: 0.4;
+}
+
+.files-git-more .icon {
+	transform: rotate(90deg);
+}
+
+.files-root-branch {
+	flex: none;
+	max-width: 40%;
+	overflow: hidden;
+	color: var(--app-muted);
+	font-weight: 500;
+	letter-spacing: normal;
+	text-overflow: ellipsis;
+	text-transform: none;
+	white-space: nowrap;
+}
+
+.git-dialog {
+	box-sizing: border-box;
+	width: min(480px, calc(100vw - 32px));
+	margin: 12vh auto auto;
+	padding: 16px;
+	border: 1px solid var(--app-border);
+	border-radius: 10px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: var(--app-shadow);
+}
+
+.git-dialog.git-branches {
+	padding: 8px;
+}
+
+.git-dialog::backdrop {
+	background: rgb(0 0 0 / 18%);
+}
+
+.git-form {
+	display: grid;
+	gap: 10px;
+}
+
+.git-form h2 {
+	margin: 0;
+	font-size: 15px;
+}
+
+.git-field {
+	display: grid;
+	gap: 4px;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.git-field input,
+.git-field textarea {
+	box-sizing: border-box;
+	width: 100%;
+	padding: 7px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-surface);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 13px;
+	resize: vertical;
+}
+
+.git-field input:focus,
+.git-field textarea:focus {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -1px;
+}
+
+.git-field [hidden],
+.git-hint[hidden],
+.git-error[hidden] {
+	display: none;
+}
+
+.git-hint {
+	margin: 0;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.git-error {
+	margin: 0;
+	color: var(--app-error);
+	font-size: 12px;
+}
+
+.git-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.git-branch {
+	align-items: center;
+}
+
+.git-branch .icon {
+	flex: none;
+	width: 14px;
+	height: 14px;
+	color: var(--app-muted);
+}
+
 /* --- Files: context menu --- */
 
 .files-menu {

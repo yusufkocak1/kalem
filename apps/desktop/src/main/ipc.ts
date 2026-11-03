@@ -6,6 +6,7 @@ import { app, dialog, ipcMain, shell } from "electron";
 import type {
 	Attachment,
 	DraftRequest,
+	GitBranch,
 	ImageFile,
 	SaveResult,
 	SearchResult,
@@ -47,6 +48,15 @@ import type { DocxImage } from "./docx.js";
 import { markdownToDocx } from "./docx.js";
 import type { DraftStore } from "./drafts.js";
 import { copyAttachment, MAX_IMAGE_SIZE, writeDocument, writeImage } from "./files.js";
+import {
+	cloneRepository,
+	GitError,
+	gitBranches,
+	gitStatus,
+	isCloneUrl,
+	runGitAction,
+	toGitAction,
+} from "./git.js";
 import type { VersionStore } from "./history.js";
 import type { PackageStore } from "./package.js";
 import { PACKAGE_ASSETS } from "./package.js";
@@ -75,6 +85,8 @@ export interface IpcContext {
 	showCaseMenu(win: AppWindow, x: number, y: number): void;
 	/** Lets the user pick a folder and opens it in every window. */
 	openFolder(win: AppWindow): Promise<void>;
+	/** Opens `folder` in every window, next to the open ones. */
+	addFolder(folder: string): void;
 	/** Closes one open folder; all of them with `null`. */
 	closeFolder(path: string | null): void;
 }
@@ -573,7 +585,9 @@ export function registerIpc(ctx: IpcContext): void {
 
 	ipcMain.handle(CHANNEL.getWorkspace, async (event): Promise<Workspace> => {
 		const { roots, opened } = workspaceRoots(senderOf(event));
-		return { roots: await listRoots(roots), opened };
+		const listed = await listRoots(roots);
+		const git = await Promise.all(roots.map((root) => gitStatus(root)));
+		return { roots: listed.map((root, i) => ({ ...root, git: git[i] ?? null })), opened };
 	});
 
 	ipcMain.handle(CHANNEL.openFolder, (event) => ctx.openFolder(senderOf(event)));
@@ -675,6 +689,81 @@ export function registerIpc(ctx: IpcContext): void {
 		}
 		const failure = await shell.openPath(target);
 		if (failure !== "") throw new Error(failure);
+	});
+
+	// --- Git -----------------------------------------------------------------
+
+	/** Git's failure, in words the user reads. */
+	const gitProblem = (error: unknown): Error => {
+		if (!(error instanceof GitError))
+			return error instanceof Error ? error : new Error(String(error));
+		const t = ctx.strings();
+		switch (error.problem) {
+			case "missing":
+				return new Error(t.gitMissing);
+			case "invalid-url":
+				return new Error(format(t.gitInvalidUrl, error.message));
+			case "invalid-branch":
+				return new Error(format(t.gitInvalidBranch, error.message));
+			case "exists":
+				return new Error(format(t.filesExists, error.message));
+			default:
+				return new Error(error.message);
+		}
+	};
+
+	/** A folder git may run in: one of the folders the pane shows, not just a path inside one. */
+	const shownRoot = (win: AppWindow, folder: unknown): string => {
+		const roots = workspaceRoots(win).roots;
+		const root =
+			typeof folder === "string" ? roots.find((open) => pathKey(open) === pathKey(folder)) : null;
+		if (root === undefined || root === null)
+			throw fileProblem(new WorkspaceFileError("outside", ""));
+		return root;
+	};
+
+	ipcMain.handle(CHANNEL.gitBranches, async (event, folder: unknown): Promise<GitBranch[]> => {
+		try {
+			return await gitBranches(shownRoot(senderOf(event), folder));
+		} catch (error) {
+			throw gitProblem(error);
+		}
+	});
+
+	ipcMain.handle(CHANNEL.gitRun, async (event, folder: unknown, raw: unknown): Promise<string> => {
+		const win = senderOf(event);
+		try {
+			return await runGitAction(shownRoot(win, folder), toGitAction(raw));
+		} catch (error) {
+			throw gitProblem(error);
+		} finally {
+			// Branches and files change under the open folders: every window shows it.
+			for (const other of windows.all()) other.window.webContents.send(CHANNEL.workspaceChange);
+		}
+	});
+
+	ipcMain.handle(CHANNEL.gitClone, async (event, url: unknown): Promise<string | null> => {
+		const win = senderOf(event);
+		const t = ctx.strings();
+		if (typeof url !== "string" || !isCloneUrl(url)) {
+			throw gitProblem(new GitError("invalid-url", typeof url === "string" ? url.trim() : ""));
+		}
+		const start = ctx.store.state.workspaces.at(-1);
+		const result = await dialog.showOpenDialog(win.window, {
+			title: t.gitCloneWhere,
+			buttonLabel: t.gitCloneHere,
+			properties: ["openDirectory", "createDirectory"],
+			...(start === undefined ? {} : { defaultPath: dirname(start) }),
+		});
+		const parent = result.filePaths[0];
+		if (result.canceled || parent === undefined) return null;
+		try {
+			const folder = await cloneRepository(url, parent);
+			ctx.addFolder(folder);
+			return folder;
+		} catch (error) {
+			throw gitProblem(error);
+		}
 	});
 
 	ipcMain.handle(CHANNEL.searchWorkspace, async (event, query: unknown): Promise<SearchResult> => {

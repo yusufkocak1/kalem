@@ -306,8 +306,14 @@ function start(): void {
 				? await dialog.showOpenDialog(options)
 				: await dialog.showOpenDialog(win.window, options);
 		if (result.canceled || result.filePaths.length === 0) return;
+		addFolders(result.filePaths);
+	}
+
+	/** Adds folders to the open ones and shows them; a folder already open stays where it is. */
+	function addFolders(folders: readonly string[]): void {
+		const open = store.state.workspaces;
 		const keys = new Set(open.map(pathKey));
-		setWorkspaces([...open, ...result.filePaths.filter((folder) => !keys.has(pathKey(folder)))]);
+		setWorkspaces([...open, ...folders.filter((folder) => !keys.has(pathKey(folder)))]);
 		// The files are what the user asked to see.
 		if (store.settings.sidePane !== "files" || !store.settings.navigation) {
 			changeSettings({ sidePane: "files", navigation: true });
@@ -474,6 +480,7 @@ function start(): void {
 			showTabMenu: (win, tabId, x, y) => popupTabMenu(menuContext(), win, tabId, x, y),
 			showCaseMenu: (win, x, y) => popupCaseMenu(menuContext(), win, x, y),
 			openFolder,
+			addFolder: (folder) => addFolders([folder]),
 			closeFolder: (folder) => closeFolder(folder),
 		});
 		refreshMenu();

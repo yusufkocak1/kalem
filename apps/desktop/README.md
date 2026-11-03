@@ -167,6 +167,24 @@ verir.
     yansır.
   - **Arama** önce adı eşleşen dosyaları (**Dosya adları**), sonra
     dosyaların içindeki satırları gösterir.
+  - **Git:** açılan klasör bir Git deposundaysa (içinde `.git` varsa)
+    kendiliğinden tanınır; arama kutusunun üstünde **dal adı**, izlediği
+    uzak dal ve bekleyenler (`2 gönderilecek · 1 çekilecek · 3 değişiklik`)
+    görünür. Yanındaki düğmeler **Çek (Pull)**, **Gönder (Push)** ve **Getir
+    (Fetch)**; `⌄` menüsünde ayrıca **Dal Değiştir…** (yerel ve uzak dallar
+    aranabilir listede; yalnızca uzakta olan dal seçilince onu izleyen yerel
+    dal açılır), **Yeni Dal…** ve **Tüm Değişiklikleri Commit Et…** var.
+    Dal adına tıklamak da dal değiştirir. Aynı işlemler dosyaların sağ tık
+    menüsünde de bulunur; birden çok klasör açıkken her deponun dalı kendi
+    başlığında görünür. Git deposu olmayan klasör, sağ tık menüsündeki
+    **Git Deposu Yap** ile depo yapılır.
+  - **Depo klonlama:** araç çubuğundaki dal simgesi (**Git Deposu
+    Klonla…**) bir adres sorar (https, SSH ya da `file://`), sonra
+    klonlanacağı klasörü; klonlanan depo açık klasörlere eklenir.
+  - İşleri sistemdeki `git` yapar, giriş için de sizin ayarlarınız
+    (Git Credential Manager, SSH anahtarı) kullanılır; Git kurulu değilse
+    bölme bunu söyler. Git'in hata mesajı olduğu gibi gösterilir. Kalem
+    terminal açmadığı için parola soran bir giriş beklemez, hata verir.
 - **Metin sekmesi:** Markdown olmayan metin dosyaları (Dosyalar bölmesinden,
   **Dosya → Aç…**'tan, Hızlı Aç'tan ya da bir belgedeki bağlantıdan) aynı
   penceredeki bir sekmede açılır. Dosya **olduğu gibi** gösterilir ve
