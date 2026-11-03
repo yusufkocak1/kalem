@@ -1,15 +1,19 @@
 import type {
+	GitAction,
+	GitStatus,
 	KalemBridge,
 	SearchHit,
 	Workspace,
 	WorkspaceEntry,
 	WorkspaceRoot,
 } from "../shared/bridge.js";
+import { isCloneUrl } from "../shared/git-url.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import { fileName } from "../shared/paths.js";
 import { el } from "./dom.js";
 import { fileType } from "./file-types.js";
+import type { GitDialogs } from "./git-dialogs.js";
 import { icon } from "./icons.js";
 
 export interface FilesPaneOptions {
@@ -23,6 +27,9 @@ export interface FilesPaneOptions {
 	open(path: string, query?: string): void;
 	/** Tells the user that a file operation failed. */
 	notify(text: string): void;
+	/** Tells the user that something went well. */
+	inform(text: string): void;
+	readonly git: GitDialogs;
 }
 
 export interface FilesPane {
@@ -136,6 +143,9 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 	const openFolder = iconButton("open", t.openFolder);
 	const refreshButton = iconButton("refresh", t.refresh);
 	const closeFolder = iconButton("close", t.closeFolder);
+	const cloneButton = iconButton("branch", t.gitClone);
+	cloneButton.classList.add("files-hover-action");
+	cloneButton.addEventListener("click", () => void cloneRepository());
 	newFile.addEventListener("click", () => startCreate(targetFolder(), false));
 	newFolder.addEventListener("click", () => startCreate(targetFolder(), true));
 	collapseAll.addEventListener("click", () => {
@@ -160,6 +170,8 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 		attrs: { role: "tree", "aria-label": t.filesTab },
 	});
 	const message = el("p", { class: "files-message" });
+	/** The repository of a single open folder: its branch, what is pending, pull and push. */
+	const gitBar = el("div", { class: "files-git", attrs: { hidden: "" } });
 	const menu = el("div", { class: "files-menu", attrs: { role: "menu", hidden: "" } });
 
 	const element = el("div", {
@@ -167,8 +179,18 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 		children: [
 			el("div", {
 				class: "files-toolbar",
-				children: [title, newFile, newFolder, collapseAll, openFolder, refreshButton, closeFolder],
+				children: [
+					title,
+					newFile,
+					newFolder,
+					collapseAll,
+					cloneButton,
+					openFolder,
+					refreshButton,
+					closeFolder,
+				],
 			}),
+			gitBar,
 			search,
 			message,
 			list,
@@ -267,6 +289,7 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 			button.hidden = roots.length === 0;
 		}
 		search.disabled = roots.length === 0;
+		renderGitBar(only);
 
 		if (roots.length === 0) {
 			showMessage(t.noFolder);
@@ -337,6 +360,16 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 		item.append(twisty, glyph);
 		if (renaming) item.append(nameBox(row.name, (name) => commitRename(row, name)));
 		else item.append(el("span", { class: "files-name", text: row.name }));
+		// With several folders, each repository's branch is on its heading.
+		if (row.isRoot && row.root.git !== null) {
+			item.append(
+				el("span", {
+					class: "files-root-branch",
+					text: row.root.git.branch ?? t.gitDetached,
+					attrs: { title: gitSummary(row.root.git) },
+				}),
+			);
+		}
 		if (row.isRoot && current?.opened === true) {
 			const close = iconButton("close", format(t.closeThisFolder, row.name));
 			close.classList.add("files-root-close");
@@ -434,14 +467,15 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 
 	// --- File operations ---
 
-	const failed = (error: unknown): void => {
-		const text = error instanceof Error ? error.message : String(error);
-		options.notify(
-			format(
-				t.filesActionFailed,
-				text.replace(/^Error invoking remote method '[^']+': (Error: )?/, ""),
-			),
+	/** An error from the main process, without Electron's wrapping. */
+	const ipcText = (error: unknown): string =>
+		(error instanceof Error ? error.message : String(error)).replace(
+			/^Error invoking remote method '[^']+': (Error: )?/,
+			"",
 		);
+
+	const failed = (error: unknown): void => {
+		options.notify(format(t.filesActionFailed, ipcText(error)));
 	};
 
 	/** The folder new files go in: the selected folder, or the selected file's; else the first root. */
@@ -538,6 +572,162 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 		void navigator.clipboard.writeText(text).catch(failed);
 	}
 
+	// --- Git ---
+
+	/** Folders git is running in, with what it is doing. */
+	const gitBusy = new Map<string, string>();
+
+	function gitLabel(action: GitAction): string {
+		switch (action.kind) {
+			case "pull":
+				return t.gitPull;
+			case "push":
+				return t.gitPush;
+			case "fetch":
+				return t.gitFetch;
+			case "init":
+				return t.gitInit;
+			case "commit":
+				return t.gitCommitButton;
+			case "checkout":
+			case "create-branch":
+				return action.branch;
+		}
+	}
+
+	function gitSummary(git: GitStatus): string {
+		const parts = [
+			git.ahead > 0 ? format(t.gitAhead, git.ahead) : "",
+			git.behind > 0 ? format(t.gitBehind, git.behind) : "",
+			git.changed > 0 ? format(t.gitChanged, git.changed) : "",
+		].filter((part) => part !== "");
+		if (parts.length === 0 && git.upstream !== null) parts.push(t.gitUpToDate);
+		return [git.upstream ?? "", ...parts].filter((part) => part !== "").join(" · ");
+	}
+
+	function renderGitBar(only: WorkspaceRoot | undefined): void {
+		const git = only?.git ?? null;
+		if (only === undefined || git === null) {
+			gitBar.hidden = true;
+			gitBar.replaceChildren();
+			return;
+		}
+		gitBar.hidden = false;
+		const root = only.path;
+		const busy = gitBusy.get(root);
+		const branch = el("button", {
+			class: "files-git-branch",
+			attrs: { type: "button", title: t.gitCheckout, "aria-label": t.gitCheckout },
+			children: [
+				icon("branch"),
+				el("span", { class: "files-git-name", text: git.branch ?? t.gitDetached }),
+			],
+		});
+		branch.addEventListener("click", () => void switchBranch(root));
+		const text = busy === undefined ? gitSummary(git) : format(t.gitBusy, busy);
+		const state = el("span", { class: "files-git-state", text, attrs: { title: text } });
+		const pull = iconButton("gitPull", t.gitPull);
+		pull.addEventListener("click", () => void runGit(root, { kind: "pull" }));
+		const push = iconButton("gitPush", t.gitPush);
+		push.addEventListener("click", () => void runGit(root, { kind: "push" }));
+		const fetch = iconButton("refresh", t.gitFetch);
+		fetch.addEventListener("click", () => void runGit(root, { kind: "fetch" }));
+		const more = iconButton("chevron", t.gitMore);
+		more.classList.add("files-git-more");
+		for (const button of [branch, pull, push, fetch, more]) button.disabled = busy !== undefined;
+		more.addEventListener("click", () => {
+			const box = more.getBoundingClientRect();
+			showMenu(
+				[
+					{ label: t.gitPull, run: () => void runGit(root, { kind: "pull" }) },
+					{ label: t.gitPush, run: () => void runGit(root, { kind: "push" }) },
+					{ label: t.gitFetch, run: () => void runGit(root, { kind: "fetch" }) },
+					null,
+					{ label: t.gitCheckout, run: () => void switchBranch(root) },
+					{ label: t.gitNewBranch, run: () => void newBranch(root, git) },
+					null,
+					{ label: t.gitCommit, run: () => void commitAll(root, git) },
+				],
+				box.left,
+				box.bottom + 2,
+			);
+		});
+		gitBar.setAttribute("aria-busy", String(busy !== undefined));
+		gitBar.replaceChildren(branch, state, pull, push, fetch, more);
+	}
+
+	async function runGit(root: string, action: GitAction): Promise<boolean> {
+		if (gitBusy.has(root)) return false;
+		const label = gitLabel(action);
+		gitBusy.set(root, label);
+		renderTree();
+		try {
+			await bridge.gitRun(root, action);
+			options.inform(format(t.gitDone, label));
+			return true;
+		} catch (error) {
+			options.notify(format(t.gitFailed, ipcText(error)));
+			return false;
+		} finally {
+			gitBusy.delete(root);
+			await refresh();
+		}
+	}
+
+	async function switchBranch(root: string): Promise<void> {
+		let branches: Awaited<ReturnType<typeof bridge.gitBranches>>;
+		try {
+			branches = await bridge.gitBranches(root);
+		} catch (error) {
+			options.notify(format(t.gitFailed, ipcText(error)));
+			return;
+		}
+		const branch = await options.git.pickBranch(branches);
+		if (branch === null || branch.current) return;
+		await runGit(root, { kind: "checkout", branch: branch.name });
+	}
+
+	async function newBranch(root: string, git: GitStatus): Promise<void> {
+		const name = await options.git.prompt({
+			title: format(t.gitNewBranchTitle, git.branch ?? t.gitDetached),
+			label: t.gitNewBranchName,
+			button: t.gitCreate,
+			check: (value) => (/\s/.test(value) ? format(t.gitInvalidBranch, value) : null),
+		});
+		if (name !== null) await runGit(root, { kind: "create-branch", branch: name });
+	}
+
+	async function commitAll(root: string, git: GitStatus): Promise<void> {
+		const text = await options.git.prompt({
+			title: format(t.gitCommitTitle, git.changed),
+			label: t.gitCommitMessage,
+			button: t.gitCommitButton,
+			multiline: true,
+		});
+		if (text !== null) await runGit(root, { kind: "commit", message: text });
+	}
+
+	async function cloneRepository(): Promise<void> {
+		const url = await options.git.prompt({
+			title: t.gitCloneTitle,
+			label: t.gitCloneUrl,
+			button: t.gitCloneButton,
+			placeholder: "https://github.com/…/….git",
+			hint: t.gitCloneHint,
+			check: (value) => (isCloneUrl(value) ? null : format(t.gitInvalidUrl, value)),
+		});
+		if (url === null) return;
+		showMessage(format(t.gitCloning, url));
+		try {
+			const folder = await bridge.gitClone(url);
+			if (folder !== null) options.inform(format(t.gitCloned, folder));
+		} catch (error) {
+			options.notify(format(t.gitFailed, ipcText(error)));
+		} finally {
+			await refresh();
+		}
+	}
+
 	// --- Context menu ---
 
 	function menuFor(row: Row): (MenuItem | null)[] {
@@ -561,6 +751,21 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 				{ label: t.filesRename, run: () => startRename(row), shortcut: "F2" },
 				{ label: t.filesDelete, run: () => void trash(row), shortcut: "Del", danger: true },
 			);
+		}
+		const git = row.root.git;
+		const root = row.root.path;
+		if (git !== null) {
+			items.push(
+				null,
+				{ label: t.gitPull, run: () => void runGit(root, { kind: "pull" }) },
+				{ label: t.gitPush, run: () => void runGit(root, { kind: "push" }) },
+				{ label: t.gitFetch, run: () => void runGit(root, { kind: "fetch" }) },
+				{ label: t.gitCheckout, run: () => void switchBranch(root) },
+				{ label: t.gitNewBranch, run: () => void newBranch(root, git) },
+				{ label: t.gitCommit, run: () => void commitAll(root, git) },
+			);
+		} else if (row.isRoot || row.parent === null) {
+			items.push(null, { label: t.gitInit, run: () => void runGit(root, { kind: "init" }) });
 		}
 		items.push(
 			null,

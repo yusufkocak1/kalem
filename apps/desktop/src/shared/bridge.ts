@@ -342,7 +342,39 @@ export interface WorkspaceRoot {
 	readonly path: string;
 	readonly entries: readonly WorkspaceEntry[];
 	readonly truncated: boolean;
+	/** The git repository the folder is in; `null` when it is in none. */
+	readonly git: GitStatus | null;
 }
+
+/** Where a git repository stands. */
+export interface GitStatus {
+	/** The repository's top folder. */
+	readonly root: string;
+	/** `null` when no branch is checked out (detached HEAD). */
+	readonly branch: string | null;
+	/** The branch it follows, as `origin/main`; `null` when none. */
+	readonly upstream: string | null;
+	/** Commits not pushed yet. */
+	readonly ahead: number;
+	/** Commits not pulled yet. */
+	readonly behind: number;
+	/** Files changed, added or not tracked. */
+	readonly changed: number;
+}
+
+export interface GitBranch {
+	readonly name: string;
+	/** The remote of a branch that is only there, as `origin`; `null` for a local branch. */
+	readonly remote: string | null;
+	readonly current: boolean;
+}
+
+/** What the Files pane can ask git to do in an open folder. */
+export type GitAction =
+	| { readonly kind: "fetch" | "pull" | "push" | "init" }
+	| { readonly kind: "checkout"; readonly branch: string }
+	| { readonly kind: "create-branch"; readonly branch: string }
+	| { readonly kind: "commit"; readonly message: string };
 
 export interface Workspace {
 	/**
@@ -650,6 +682,12 @@ export interface KalemBridge {
 	revealInFolder(path: string): void;
 	/** Opens a file of the shown folders with the system's app for it (programs are only shown). */
 	openWithSystem(path: string): Promise<void>;
+	/** The branches of the repository a shown folder is in, local ones first. */
+	gitBranches(folder: string): Promise<readonly GitBranch[]>;
+	/** Runs git in a shown folder; resolves to what git said it did. */
+	gitRun(folder: string, action: GitAction): Promise<string>;
+	/** Asks where to clone `url`, clones it and opens the new folder; its path, `null` when cancelled. */
+	gitClone(url: string): Promise<string | null>;
 
 	/** Earlier saved states of the tab's document, newest first. */
 	listVersions(tabId: string): Promise<readonly Version[]>;
@@ -755,6 +793,9 @@ export const CHANNEL = {
 	trashInWorkspace: "kalem:trash-in-workspace",
 	revealInFolder: "kalem:reveal-in-folder",
 	openWithSystem: "kalem:open-with-system",
+	gitBranches: "kalem:git-branches",
+	gitRun: "kalem:git-run",
+	gitClone: "kalem:git-clone",
 	documentMoved: "kalem:document-moved",
 	workspaceChange: "kalem:workspace-change",
 	listVersions: "kalem:list-versions",
