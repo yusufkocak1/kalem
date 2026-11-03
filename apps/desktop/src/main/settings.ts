@@ -15,6 +15,7 @@ import {
 	PAGE_MARGINS,
 	PAGE_SIZES,
 } from "../shared/bridge.js";
+import { groupName } from "../shared/favorites.js";
 import type { Lang } from "../shared/i18n.js";
 
 export const MAX_RECENT_FILES = 12;
@@ -139,12 +140,20 @@ function parseFavorites(value: unknown): ConfluenceFavorite[] {
 	return value
 		.flatMap((item): ConfluenceFavorite[] => {
 			if (typeof item !== "object" || item === null) return [];
-			const { site, id, title } = item as Record<string, unknown>;
+			const { site, id, title, group } = item as Record<string, unknown>;
 			if (typeof site !== "string" || typeof id !== "string" || !/^\d+$/.test(id)) return [];
 			const key = `${site}\n${id}`;
 			if (seen.has(key)) return [];
 			seen.add(key);
-			return [{ site, id, title: typeof title === "string" ? title.slice(0, 500) : "" }];
+			const name = groupName(group);
+			return [
+				{
+					site,
+					id,
+					title: typeof title === "string" ? title.slice(0, 500) : "",
+					...(name === null ? {} : { group: name }),
+				},
+			];
 		})
 		.slice(0, MAX_FAVORITES);
 }

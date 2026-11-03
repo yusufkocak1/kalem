@@ -319,6 +319,15 @@ verir.
   tüm genişliğini kullanır. Gezinme bölmesi sağ kenarından sürüklenerek
   genişletilir (ok tuşları da çalışır, çift tık varsayılana döndürür);
   genişlik hatırlanır.
+- **Favori grupları:** favoriler adlandırılmış gruplara ayrılabilir. Bir
+  favorinin satırındaki klasör düğmesi (**Bir gruba koy…**) mevcut
+  grupları, **Grupsuz**'u ve yeni grup adı kutusunu gösterir (adı yazıp
+  `Enter`). Favoriler sürüklenip bir grubun başlığına bırakılabilir;
+  **Favoriler** başlığına bırakılan favori gruptan çıkar. Grup başlıkları
+  açılıp kapanır, sayfa sayısını gösterir; üzerine gelince **Grubu yeniden
+  adlandır** (var olan bir adı verince iki grup birleşir) ve **Grubu dağıt**
+  (sayfaları favorilerde kalır) çıkar. Önce grupsuz favoriler, sonra
+  gruplar listelenir; gruplar ayarlarla saklanır ve her pencerede aynıdır.
 - **Confluence öğeleri ve bağlantılar:** sayfadaki korunan öğeler (🔒 ile
   gösterilen bahsetmeler, sayfa/blog/alan bağlantıları, tarihler, Jira
   kayıtları, durumlar, çapalar ve diğer satır içi makrolar) **tıklayınca
