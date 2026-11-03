@@ -63,7 +63,9 @@ const pageLevel = (id: string): string => `p:${id}`;
 
 function errorText(error: unknown): string {
 	const message = error instanceof Error ? error.message : String(error);
-	return message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "");
+	return message
+		.replace(/^Error invoking remote method '[^']+': /, "")
+		.replace(/^(Confluence)?Error: /, "");
 }
 
 /** Search results; the next ones are asked for with `next`. */
@@ -591,8 +593,15 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 				...(row.branch === null ? {} : { "aria-expanded": String(open) }),
 				...(active ? { "aria-current": "page" } : {}),
 			},
-			children: [twisty(row.branch, row.title, loading), main, ...actions],
+			children: [
+				twisty(row.branch, row.title, loading),
+				main,
+				...(actions.length === 0
+					? []
+					: [el("span", { class: "confluence-row-actions", children: actions })]),
+			],
 		});
+		if (page !== null && isFavorite(page)) item.classList.add("starred");
 		if (row.branch !== null) item.dataset.branch = row.branch;
 		item.style.setProperty("--depth", String(row.depth));
 		return item;
@@ -724,7 +733,11 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 
 	function toggle(key: string): void {
 		if (expanded.has(key)) expanded.delete(key);
-		else expanded.add(key);
+		else {
+			expanded.add(key);
+			// A level that failed is asked for again when it is opened again.
+			if (levels.get(key)?.status === "error") levels.delete(key);
+		}
 		render();
 	}
 
@@ -737,7 +750,19 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 			return [...naming, note(t.confluenceLoading, depth, true)];
 		}
 		if (level.status === "error") {
-			return [...naming, note(format(t.confluenceRequestFailed, level.message), depth)];
+			const failed = note(format(t.confluenceRequestFailed, level.message), depth);
+			failed.classList.add("error");
+			const retry = el("button", {
+				class: "confluence-link",
+				text: t.confluenceRetry,
+				attrs: { type: "button" },
+			});
+			retry.addEventListener("click", () => {
+				levels.delete(key);
+				render();
+			});
+			failed.append(retry);
+			return [...naming, failed];
 		}
 		if (level.pages.length === 0 && naming.length === 0) {
 			return depth === 0 ? [note(t.confluenceNoPages, depth)] : [];

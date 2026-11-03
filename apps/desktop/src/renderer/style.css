@@ -684,6 +684,7 @@ button {
 }
 
 .navigation {
+	position: relative;
 	display: flex;
 	flex: none;
 	flex-direction: column;
@@ -1351,6 +1352,30 @@ button {
 
 .assistant-send.busy {
 	background: var(--app-error);
+}
+
+/* Dragging the navigation pane's right edge sets its width. */
+.navigation-resizer {
+	position: absolute;
+	top: 0;
+	right: -3px;
+	bottom: 0;
+	z-index: 2;
+	width: 6px;
+	cursor: col-resize;
+	touch-action: none;
+}
+
+.navigation-resizer:hover,
+.navigation-resizer:focus-visible,
+.navigation.resizing .navigation-resizer {
+	background: var(--app-accent);
+	opacity: 0.5;
+	outline: none;
+}
+
+.navigation.resizing {
+	user-select: none;
 }
 
 /* Dragging the panel's left edge sets its width. */
@@ -3686,7 +3711,7 @@ pre[data-preview="error"]::after {
 
 /* One step of the tree's indent; guides are drawn in it, one per level above. */
 .confluence-pane-list {
-	--tree-indent: 16px;
+	--tree-indent: 14px;
 }
 
 .confluence-page-item {
@@ -3811,25 +3836,55 @@ pre[data-preview="error"]::after {
 	font-weight: 600;
 }
 
-/* What a row offers shows when it is pointed at or has the focus. */
+/*
+ * What a row offers floats over its right end when the row is pointed at or
+ * has the focus; otherwise the title has the whole width. A starred page
+ * keeps its star.
+ */
+.confluence-row-actions {
+	position: absolute;
+	top: 50%;
+	right: 2px;
+	display: flex;
+	align-items: center;
+	padding: 1px;
+	border-radius: 6px;
+	background: var(--app-raised);
+	box-shadow: 0 0 0 1px var(--app-border);
+	transform: translateY(-50%);
+	visibility: hidden;
+}
+
+.confluence-page-item:hover .confluence-row-actions,
+.confluence-page-item:focus-within .confluence-row-actions,
+.confluence-page-item.starred .confluence-row-actions {
+	visibility: visible;
+}
+
+.confluence-page-item.starred:not(:hover, :focus-within) .confluence-row-actions {
+	box-shadow: none;
+	background: none;
+}
+
+.confluence-page-item.starred:not(:hover, :focus-within)
+	.confluence-row-action:not(.confluence-star) {
+	display: none;
+}
+
+.confluence-page-item.starred .confluence-row-main {
+	padding-right: 24px;
+}
+
 .confluence-row-action {
 	flex: none;
-	align-self: center;
 	width: 22px;
 	height: 22px;
 	padding: 4px;
-	opacity: 0;
 }
 
 .confluence-row-action .icon {
 	width: 13px;
 	height: 13px;
-}
-
-.confluence-page-item:hover .confluence-row-action,
-.confluence-page-item:focus-within .confluence-row-action,
-.confluence-row-action:focus-visible {
-	opacity: 1;
 }
 
 .confluence-new-page {
@@ -3863,7 +3918,6 @@ pre[data-preview="error"]::after {
 
 .confluence-star[aria-pressed="true"] {
 	color: var(--app-accent);
-	opacity: 1;
 }
 
 .confluence-star[aria-pressed="true"] path {
@@ -3887,6 +3941,11 @@ pre[data-preview="error"]::after {
 	padding: 3px 0 3px calc(18px + var(--depth, 0) * var(--tree-indent));
 	color: var(--app-muted);
 	font-size: 12px;
+}
+
+.confluence-tree-note.error {
+	flex-wrap: wrap;
+	color: var(--app-error);
 }
 
 .confluence-spinner {

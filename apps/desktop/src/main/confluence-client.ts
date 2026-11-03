@@ -253,19 +253,48 @@ export class ConfluenceClient {
 			if (id === "") return [];
 			return this.#treeLevel(`/api/v2/spaces/${id}/pages?depth=root&limit=250`);
 		}
-		return this.#treeLevel(
-			`/rest/api/space/${encodeURIComponent(spaceKey)}/content/page?depth=root&limit=200&expand=children.page`,
-		);
+		const space = `/rest/api/space/${encodeURIComponent(spaceKey)}/content/page?depth=root`;
+		return this.#serverLevel([`${space}&limit=200&expand=children.page`, `${space}&limit=25`]);
 	}
 
 	/** A page's child pages, in Confluence's order. */
 	async childPages(id: string): Promise<ConfluenceTreePage[]> {
 		if (!/^\d+$/.test(id)) throw new Error("Invalid page id");
-		return this.#treeLevel(
-			this.cloud
-				? `/api/v2/pages/${id}/children?limit=250`
-				: `/rest/api/content/${id}/child/page?limit=200&expand=children.page`,
+		if (this.cloud) return this.#treeLevel(`/api/v2/pages/${id}/children?limit=250`);
+		return this.#serverLevel(
+			[
+				`/rest/api/content/${id}/child/page?limit=200&expand=children.page`,
+				`/rest/api/content/${id}/child/page?limit=25`,
+			],
+			id,
 		);
+	}
+
+	/**
+	 * A level on Server / Data Center. Asking for each page's children
+	 * (`expand=children.page`) fails with an error 500 on some pages (a
+	 * child that cannot be read, a very large level), so a failed request is
+	 * tried again in smaller, simpler steps, and at last through search.
+	 */
+	async #serverLevel(paths: readonly string[], parent?: string): Promise<ConfluenceTreePage[]> {
+		let failure: unknown;
+		for (const path of paths) {
+			try {
+				return await this.#treeLevel(path);
+			} catch (error) {
+				if (!(error instanceof ConfluenceError) || error.status < 500) throw error;
+				failure = error;
+			}
+		}
+		if (parent === undefined) throw failure;
+		try {
+			const pages = await this.#cql(`type=page AND parent=${parent}`);
+			return pages
+				.map(({ id, title }) => ({ id, title, hasChildren: null }))
+				.sort((a, b) => a.title.localeCompare(b.title, "tr"));
+		} catch {
+			throw failure;
+		}
 	}
 
 	/**

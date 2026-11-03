@@ -5,7 +5,16 @@ import { holderIn, indentItem, outdentItem, selectRange, toggleList } from "@kal
 import type { DocumentAction } from "../shared/actions.js";
 import { applyActions } from "../shared/actions.js";
 import type { Command, KalemBridge, Settings, SidePane, TabDocument } from "../shared/bridge.js";
-import { clampZoom, MAX_ZOOM, MIN_ZOOM, pageRule, ZOOM_STEP } from "../shared/bridge.js";
+import {
+	clampNavigationWidth,
+	clampZoom,
+	DEFAULT_SETTINGS,
+	MAX_ZOOM,
+	MIN_NAVIGATION_WIDTH,
+	MIN_ZOOM,
+	pageRule,
+	ZOOM_STEP,
+} from "../shared/bridge.js";
 import type { ContextDiagram, ReplyDiagram } from "../shared/claude.js";
 import { splitReply } from "../shared/claude.js";
 import { attachmentName, linkedAttachment } from "../shared/confluence-common.js";
@@ -210,6 +219,17 @@ const sidePaneTabs = [
 	sidePaneTab("files", t.filesTab),
 	sidePaneTab("confluence", t.confluenceTab),
 ];
+const navigationResizer = el("div", {
+	class: "navigation-resizer",
+	attrs: {
+		role: "separator",
+		tabindex: "0",
+		"aria-orientation": "vertical",
+		"aria-label": t.navigationResize,
+		title: t.navigationResize,
+		"aria-valuemin": String(MIN_NAVIGATION_WIDTH),
+	},
+});
 const navigation = el("nav", {
 	class: "navigation kalem-theme",
 	attrs: { "aria-label": t.navigation },
@@ -224,7 +244,56 @@ const navigation = el("nav", {
 		outlineArea,
 		filesPane.element,
 		confluencePane.element,
+		navigationResizer,
 	],
+});
+
+// --- Navigation pane width ------------------------------------------------------
+
+/** At most what leaves the document some room. */
+const widestNavigation = (): number => Math.max(MIN_NAVIGATION_WIDTH, window.innerWidth - 420);
+const fitNavigation = (width: number): number =>
+	Math.min(widestNavigation(), clampNavigationWidth(width));
+
+function showNavigationWidth(width: number): void {
+	navigation.style.width = `${width}px`;
+	navigationResizer.setAttribute("aria-valuenow", String(width));
+	navigationResizer.setAttribute("aria-valuemax", String(widestNavigation()));
+}
+
+navigationResizer.addEventListener("pointerdown", (event) => {
+	if (event.button !== 0) return;
+	event.preventDefault();
+	navigationResizer.setPointerCapture(event.pointerId);
+	const left = navigation.getBoundingClientRect().left;
+	let width = settings.navigationWidth;
+	navigation.classList.add("resizing");
+	const move = (moved: PointerEvent): void => {
+		width = fitNavigation(moved.clientX - left);
+		showNavigationWidth(width);
+	};
+	const up = (): void => {
+		navigationResizer.removeEventListener("pointermove", move);
+		navigationResizer.removeEventListener("pointerup", up);
+		navigationResizer.removeEventListener("pointercancel", up);
+		navigation.classList.remove("resizing");
+		updateSettings({ navigationWidth: width });
+	};
+	navigationResizer.addEventListener("pointermove", move);
+	navigationResizer.addEventListener("pointerup", up);
+	navigationResizer.addEventListener("pointercancel", up);
+});
+navigationResizer.addEventListener("keydown", (event) => {
+	const step = event.key === "ArrowRight" ? 20 : event.key === "ArrowLeft" ? -20 : 0;
+	if (step === 0) return;
+	event.preventDefault();
+	updateSettings({ navigationWidth: fitNavigation(settings.navigationWidth + step) });
+});
+navigationResizer.addEventListener("dblclick", () =>
+	updateSettings({ navigationWidth: DEFAULT_SETTINGS.navigationWidth }),
+);
+window.addEventListener("resize", () => {
+	if (!navigation.hidden) showNavigationWidth(fitNavigation(settings.navigationWidth));
 });
 
 const readOnlyBadge = el("span", { class: "status-badge", text: t.statusReadOnly });
@@ -507,6 +576,7 @@ function applySettings(): void {
 	app.style.setProperty("--zoom", String(settings.zoom / 100));
 	app.toggleAttribute("data-full-width", settings.fullWidth);
 	navigation.hidden = !settings.navigation;
+	if (settings.navigation) showNavigationWidth(fitNavigation(settings.navigationWidth));
 	assistant.element.hidden = !settings.assistant;
 	assistantToggle.setAttribute("aria-expanded", String(settings.assistant));
 	if (settings.assistant) assistant.show();
