@@ -6,35 +6,14 @@ import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { parseDiagram } from "../src/shared/diagram.js";
 import type { Call } from "./fake-claude.js";
-import { fakeClaude } from "./fake-claude.js";
+import { fakeClaude, REPLY } from "./fake-claude.js";
 import { clickMenu, launch, tempDir } from "./launch.js";
-
-const REPLY = [
-	"İşte akış:",
-	"",
-	"```kalem-diagram",
-	JSON.stringify({
-		title: "Onay akışı",
-		nodes: [
-			{ id: "a", shape: "terminal", text: "Başla" },
-			{ id: "b", shape: "decision", text: "Uygun mu?" },
-			{ id: "c", text: "Onayla" },
-		],
-		edges: [
-			{ from: "a", to: "b" },
-			{ from: "b", to: "c", text: "Evet" },
-		],
-	}),
-	"```",
-	"",
-	"Bitti.",
-].join("\n");
 
 test("asks the local Claude about the document and inserts its reply with the diagram", async () => {
 	const folder = await tempDir("assistant");
 	const doc = join(folder, "notlar.md");
 	await writeFile(doc, "# Notlar\n\nGiriş\n");
-	const claude = await fakeClaude(folder, REPLY);
+	const claude = await fakeClaude(folder);
 	const { app, page, errors } = await launch({ args: [doc], env: { KALEM_CLAUDE: claude.path } });
 
 	await page.locator("#editor p", { hasText: "Giriş" }).click();
@@ -121,7 +100,7 @@ test("sends the document's pictures to Claude instead of their base64", async ()
 		doc,
 		`# Analiz\n\n![akış](data:image/png;base64,${red})\n\n![ekran](ekran.png)\n\nVazgeç butonu\n`,
 	);
-	const claude = await fakeClaude(folder, REPLY);
+	const claude = await fakeClaude(folder);
 	const { app, page, errors } = await launch({ args: [doc], env: { KALEM_CLAUDE: claude.path } });
 	await expect(page.locator("#editor img")).toHaveCount(2);
 
@@ -589,7 +568,7 @@ test("resizes the assistant by dragging its edge, and keeps the width", async ()
 test("picks the model from the panel and keeps the chat going; earlier chats are listed when a new one starts", async () => {
 	const services = await fakeServices();
 	const folder = await tempDir("assistant-models");
-	const claude = await fakeClaude(folder, REPLY);
+	const claude = await fakeClaude(folder);
 	const { app, page, errors } = await launch({
 		settings: { assistant: true },
 		env: { KALEM_CLAUDE: claude.path, NO_PROXY: "127.0.0.1", no_proxy: "127.0.0.1" },
@@ -669,7 +648,7 @@ test("runs commands typed after a slash: the assistant's, ready questions and th
 	const folder = await tempDir("assistant-slash");
 	const doc = join(folder, "komut.md");
 	await writeFile(doc, "# Komut\n\nGiriş\n");
-	const claude = await fakeClaude(folder, REPLY);
+	const claude = await fakeClaude(folder);
 	const { app, page, errors } = await launch({
 		args: [doc],
 		settings: { assistant: true, language: "tr" },
@@ -751,7 +730,7 @@ test("adds files and folders to a chat, and Claude may read the folders", async 
 	await writeFile(join(code, "src", "Main.java"), "class Main {}\n");
 	const notes = join(folder, "gereksinimler.txt");
 	await writeFile(notes, "Kullanıcı giriş yapabilmeli.\n");
-	const claude = await fakeClaude(folder, REPLY);
+	const claude = await fakeClaude(folder);
 	const { app, page, errors } = await launch({ args: [doc], env: { KALEM_CLAUDE: claude.path } });
 	const pick = (paths: string[]): Promise<void> =>
 		app.evaluate(({ dialog }, filePaths) => {

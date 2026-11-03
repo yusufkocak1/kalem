@@ -1,13 +1,34 @@
 import { chmod, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+export const REPLY = [
+	"İşte akış:",
+	"",
+	"```kalem-diagram",
+	JSON.stringify({
+		title: "Onay akışı",
+		nodes: [
+			{ id: "a", shape: "terminal", text: "Başla" },
+			{ id: "b", shape: "decision", text: "Uygun mu?" },
+			{ id: "c", text: "Onayla" },
+		],
+		edges: [
+			{ from: "a", to: "b" },
+			{ from: "b", to: "c", text: "Evet" },
+		],
+	}),
+	"```",
+	"",
+	"Bitti.",
+].join("\n");
+
 /**
  * A stand-in for the Claude Code CLI: answers `--version`, writes down how it
  * was run and what it was asked, and streams a reply the way the CLI does.
  */
 export async function fakeClaude(
 	folder: string,
-	answer: string,
+	answer: string = REPLY,
 ): Promise<{ path: string; calls: () => Promise<Call[]> }> {
 	const log = join(folder, "calls.jsonl");
 	const script = join(folder, "fake-claude.cjs");
