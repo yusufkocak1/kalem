@@ -93,7 +93,37 @@ async function fakeConfluence() {
 			});
 		}
 		if (url.pathname === "/rest/api/search") {
-			searches.push(url.searchParams.get("cql") ?? "");
+			const cql = url.searchParams.get("cql") ?? "";
+			searches.push(cql);
+			if (cql.includes("text~")) {
+				// Inside pages: two results, one at a time, with excerpts.
+				const second = url.searchParams.get("start") === "1";
+				return json(res, {
+					results: [
+						second
+							? {
+									content: { id: "41", title: "Ana Sayfa", ancestors: [] },
+									title: "Ana Sayfa",
+									excerpt: "Ekibin @@@hl@@@onay@@@endhl@@@ kuralları",
+									resultGlobalContainer: { title: "Geliştirme" },
+									lastModified: "2026-09-01T10:00:00.000Z",
+								}
+							: {
+									content: {
+										id: "42",
+										title: page.title,
+										ancestors: [{ id: "41", title: "Ana Sayfa" }],
+									},
+									title: page.title,
+									excerpt: "Sprint sonunda @@@hl@@@onay@@@endhl@@@ toplantısı &amp; demo",
+									resultGlobalContainer: { title: "Geliştirme" },
+									lastModified: "2026-10-01T10:00:00.000Z",
+								},
+					],
+					start: second ? 1 : 0,
+					totalSize: 2,
+				});
+			}
 			return json(res, {
 				results: [
 					{
@@ -111,6 +141,7 @@ async function fakeConfluence() {
 				body: { storage: { value: page.storage } },
 				space: { key: "DEV" },
 				_links: { webui: "/display/DEV/Sprint" },
+				ancestors: [{ id: "41", title: "Ana Sayfa" }],
 			});
 		}
 		if (url.pathname === "/rest/api/content/42" && req.method === "PUT") {
@@ -337,6 +368,91 @@ test("browses a space's page tree in the side pane and stars a page", async () =
 	// Unstarring from the favorites section takes it off.
 	await favorite.locator(".confluence-star").click();
 	await expect(pane.locator(".confluence-section")).toHaveCount(0);
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("searches inside pages with filters and more results, and finds the open page in the tree", async () => {
+	const confluence = await fakeConfluence();
+	cleanup.push(confluence.close);
+	const { app, page, errors } = await launch();
+
+	await page.getByRole("tab", { name: "Confluence" }).click();
+	const pane = page.locator(".confluence-pane");
+	await pane.getByRole("button", { name: "Connect" }).click();
+	const dialog = page.locator(".confluence-dialog");
+	await dialog.locator('input[type="url"]').fill(confluence.site);
+	await dialog.locator('input[type="password"]').fill(TOKEN);
+	await dialog.getByRole("button", { name: "Connect" }).click();
+	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
+	await page.keyboard.press("Escape");
+	await pane.locator("select").selectOption("DEV");
+
+	// Contents: every word inside the pages, with the text around it and where each page is.
+	await pane.getByRole("button", { name: "Contents" }).click();
+	const search = pane.locator(".confluence-pane-search");
+	await expect(search).toHaveAttribute("placeholder", /Search inside pages/);
+	await search.fill("onay");
+	await expect
+		.poll(() => confluence.searches.at(-1))
+		.toBe('type=page AND space="DEV" AND (text~"onay" OR text~"onay*")');
+	const first = pane.locator('[data-page="42"]');
+	await expect(first.locator(".confluence-excerpt")).toHaveText(
+		"Sprint sonunda onay toplantısı & demo",
+	);
+	await expect(first.locator(".confluence-excerpt mark")).toHaveText("onay");
+	await expect(first.locator(".confluence-page-path")).toHaveText("Ana Sayfa");
+	await expect(pane.locator(".confluence-pane-message")).toHaveText("1 of 2 results");
+
+	// More results come below the first ones.
+	await pane.getByRole("button", { name: "Show more results" }).click();
+	await expect(pane.locator(".confluence-result")).toHaveCount(2);
+	await expect(pane.locator(".confluence-pane-message")).toHaveText("2 results");
+	await expect(pane.getByRole("button", { name: "Show more results" })).toHaveCount(0);
+
+	// Filters narrow the search; the button counts them.
+	await pane.getByRole("button", { name: "Filters" }).click();
+	await pane.getByRole("button", { name: "Past week" }).click();
+	await pane.getByLabel("Only pages I worked on").check();
+	await expect
+		.poll(() => confluence.searches.at(-1))
+		.toBe(
+			'type=page AND space="DEV" AND (text~"onay" OR text~"onay*") AND lastmodified>=now("-1w") AND contributor=currentUser()',
+		);
+	await expect(pane.locator(".confluence-filter-count")).toHaveText("2");
+	await pane.getByRole("button", { name: "Clear filters" }).click();
+	await expect(pane.locator(".confluence-filter-count")).toHaveText("");
+
+	// A result opens; the tree then finds it, opening the pages above it.
+	await first.locator(".confluence-row-main").click();
+	await expect(page.locator("#editor h1").first()).toHaveText("Sprint Planı");
+	await search.fill("");
+	await search.press("Enter");
+	await pane.getByRole("button", { name: "Show the open page in the tree" }).click();
+	const inTree = pane.locator('[data-page="42"]');
+	await expect(inTree).toHaveAttribute("aria-current", "page");
+	await expect(pane.locator('[data-page="41"]')).toHaveAttribute("aria-expanded", "true");
+	await expect(inTree.locator(".confluence-row-main")).toBeFocused();
+
+	// The arrow keys move through the tree: left goes up to the parent and closes it.
+	await page.keyboard.press("ArrowLeft");
+	await expect(pane.locator('[data-page="41"] .confluence-row-main')).toBeFocused();
+	await page.keyboard.press("ArrowLeft");
+	await expect(pane.locator('[data-page="41"]')).toHaveAttribute("aria-expanded", "false");
+	await page.keyboard.press("ArrowRight");
+	await expect(pane.locator('[data-page="41"]')).toHaveAttribute("aria-expanded", "true");
+
+	// Searching below a page of the tree.
+	await pane.locator('[data-page="41"]').hover();
+	await pane
+		.locator('[data-page="41"]')
+		.getByRole("button", { name: "Search in this page and the pages under it" })
+		.click();
+	await expect(pane.locator(".confluence-under")).toHaveText("Under “Ana Sayfa”");
+	await search.fill("demo ");
+	await expect
+		.poll(() => confluence.searches.at(-1))
+		.toBe('type=page AND space="DEV" AND ancestor=41 AND text~"demo"');
 	expect(errors).toEqual([]);
 	await app.close();
 });

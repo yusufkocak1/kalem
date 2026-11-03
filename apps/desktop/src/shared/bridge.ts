@@ -1,6 +1,7 @@
 import type { ChatSummary, StoredChat } from "./chats.js";
 import type { ClaudeEvent, PromptImage } from "./claude.js";
 import type { ConfluenceFormat } from "./confluence.js";
+import type { ConfluenceSearchRequest, ConfluenceSearchResults } from "./confluence-search.js";
 import type { TextFormat } from "./encoding.js";
 import type { Lang } from "./i18n.js";
 import type { AssistantConfig, AssistantUpdate, ChatMessage, ProviderId } from "./providers.js";
@@ -522,6 +523,10 @@ export interface KalemBridge {
 	/** Creates an empty page (under `parent`, or at the top of the space) and opens it in a tab. */
 	confluenceCreatePage(request: ConfluenceNewPage): Promise<ConfluenceTreePage>;
 	/** Recently changed pages, filtered by title and space when given. */
+	/** The side pane's search: titles or whole pages, with filters, excerpts and more results. */
+	confluenceFind(request: ConfluenceSearchRequest): Promise<ConfluenceSearchResults>;
+	/** The ids of the pages above a page, top first. */
+	confluenceAncestors(pageId: string): Promise<readonly string[]>;
 	confluenceSearch(
 		query: string,
 		spaceKey: string | null,
@@ -681,6 +686,8 @@ export const CHANNEL = {
 	confluenceTree: "kalem:confluence-tree",
 	confluenceCreatePage: "kalem:confluence-create-page",
 	confluenceSearch: "kalem:confluence-search",
+	confluenceFind: "kalem:confluence-find",
+	confluenceAncestors: "kalem:confluence-ancestors",
 	confluenceOpenPage: "kalem:confluence-open-page",
 	confluenceReloadPage: "kalem:confluence-reload-page",
 	confluenceSavePage: "kalem:confluence-save-page",

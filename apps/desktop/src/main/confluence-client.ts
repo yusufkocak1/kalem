@@ -6,6 +6,18 @@ import type {
 	ConfluenceTreePage,
 	RemotePage,
 } from "../shared/bridge.js";
+import type {
+	ConfluenceSearchHit,
+	ConfluenceSearchRequest,
+	ConfluenceSearchResults,
+} from "../shared/confluence-search.js";
+import {
+	cqlString,
+	highlightParts,
+	plainText,
+	SEARCH_PAGE_SIZE,
+	searchCql,
+} from "../shared/confluence-search.js";
 
 export interface ConfluenceCredentials {
 	readonly site: string;
@@ -44,9 +56,9 @@ export function isCloudHost(host: string): boolean {
 	return /\.(atlassian\.net|jira\.com)$/i.test(host);
 }
 
-function cqlString(value: string): string {
-	return `"${value.replace(/[\\"]/g, "\\$&")}"`;
-}
+/** Search requests, and what every page of their answers asks for. */
+const SEARCH_PATH = "/rest/api/search?";
+const SEARCH_PARAMS = { excerpt: "highlight", expand: "content.ancestors,content.space" };
 
 type Json = Record<string, unknown>;
 
@@ -344,6 +356,104 @@ export class ConfluenceClient {
 			if (error instanceof ConfluenceError && [400, 403, 404].includes(error.status)) return null;
 			throw error;
 		}
+	}
+
+	/**
+	 * The search box with its filters: titles or the whole page, with the
+	 * text around the words found and where each page is. A page id or a
+	 * page's address finds that page, as in `search`. `cursor` continues an
+	 * earlier answer.
+	 */
+	async find(request: ConfluenceSearchRequest): Promise<ConfluenceSearchResults> {
+		const cursor = request.cursor ?? null;
+		if (cursor === null && pageReference(request.query) !== null) {
+			const pages = await this.search(request.query, request.spaceKey);
+			return {
+				hits: pages.map((page) => ({
+					...page,
+					titleParts: [{ text: page.title, hit: false }],
+					spaceKey: "",
+					excerpt: [],
+					path: [],
+				})),
+				total: pages.length,
+				next: null,
+			};
+		}
+		let path: string;
+		if (cursor !== null) {
+			path = this.#relative(cursor);
+			if (!path.startsWith(SEARCH_PATH)) throw new Error("Invalid search cursor");
+			for (const [name, value] of Object.entries(SEARCH_PARAMS)) {
+				if (!new RegExp(`[?&]${name}=`).test(path)) path += `&${name}=${encodeURIComponent(value)}`;
+			}
+		} else {
+			const params = new URLSearchParams({
+				cql: searchCql(request),
+				limit: String(SEARCH_PAGE_SIZE),
+				...SEARCH_PARAMS,
+			});
+			path = `${SEARCH_PATH}${params.toString()}`;
+		}
+		const body = await this.#json(path);
+		const results = asArray(body.results);
+		const hits = results.flatMap((item): ConfluenceSearchHit[] => {
+			const result = asJson(item);
+			const content = asJson(result.content);
+			const id = asString(content.id);
+			if (id === "") return [];
+			const title = asString(content.title) || plainText(highlightParts(asString(result.title)));
+			const marked = highlightParts(asString(result.title));
+			const container = asJson(result.resultGlobalContainer);
+			const spaceUrl = /\/(?:spaces|display)\/([^/?#]+)/.exec(asString(container.displayUrl));
+			return [
+				{
+					id,
+					title,
+					titleParts:
+						request.mode === "content" && marked.some((part) => part.hit)
+							? marked
+							: [{ text: title, hit: false }],
+					spaceName: asString(container.title) || asString(asJson(content.space).name),
+					spaceKey: asString(asJson(content.space).key) || decodePart(spaceUrl?.[1] ?? ""),
+					modified: asString(result.lastModified) || null,
+					excerpt: request.mode === "content" ? highlightParts(asString(result.excerpt)) : [],
+					path: asArray(content.ancestors)
+						.map((ancestor) => asString(asJson(ancestor).title))
+						.filter((name) => name !== ""),
+				},
+			];
+		});
+		const total = typeof body.totalSize === "number" ? body.totalSize : null;
+		const link = asString(asJson(body._links).next);
+		let next: string | null = link === "" ? null : link;
+		if (next === null && total !== null && !this.cloud) {
+			// Server may give no link: the next results start after these. Cloud's
+			// cursor link is the only way on there; without it there are no more.
+			const start = (typeof body.start === "number" ? body.start : 0) + results.length;
+			if (results.length > 0 && start < total) {
+				const url = new URL(path, "http://x");
+				url.searchParams.set("start", String(start));
+				next = `${url.pathname}${url.search}`;
+			}
+		}
+		return { hits, total, next };
+	}
+
+	/** The ids of the pages above a page, top first; it is found in the tree by opening them. */
+	async ancestors(id: string): Promise<string[]> {
+		if (!/^\d+$/.test(id)) throw new Error("Invalid page id");
+		if (this.cloud) {
+			const body = await this.#json(`/api/v2/pages/${id}/ancestors?limit=250`);
+			// v2 lists them from the top down.
+			return asArray(body.results)
+				.map((item) => asString(asJson(item).id))
+				.filter((ancestor) => ancestor !== "");
+		}
+		const body = await this.#json(`/rest/api/content/${id}?expand=ancestors`);
+		return asArray(body.ancestors)
+			.map((item) => asString(asJson(item).id))
+			.filter((ancestor) => ancestor !== "");
 	}
 
 	async #titleSearch(query: string, spaceKey: string | null): Promise<ConfluencePageSummary[]> {

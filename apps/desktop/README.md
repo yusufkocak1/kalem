@@ -289,6 +289,33 @@ verir.
 
 **Confluence**
 
+- **Gezinme bölmesi → Confluence sekmesi:** bağlı sitenin alanları ve sayfa
+  ağacı. Ağaç ok simgeleri, girinti çizgileri ve açık sayfayı gösteren bir
+  vurguyla çizilir; satırın üzerine gelince **Bu sayfada ve altındaki
+  sayfalarda ara**, **Alt sayfa ekle** ve **Favorilere ekle** çıkar.
+  Klavyeyle gezilir (`↑`/`↓`, `→` açar ya da ilk alt sayfaya gider, `←`
+  kapatır ya da üst sayfaya döner, `Home`/`End`; arama kutusunda `↓` listeye
+  iner). Araç çubuğunda **Açık sayfayı ağaçta göster** (etkin sekmenin
+  sayfasının üst sayfalarını sorup ağacı oraya kadar açar) ve **Tümünü
+  daralt** vardır.
+- **Arama:** kutunun altındaki **Başlıklar / İçerik** seçimi.
+  - **Başlıklar:** başlığı yazılanla başlayan sayfalar (yeniden eskiye),
+    eşleşen kelimeler işaretlenir; sayfa ID'si ve adresi de kabul edilir.
+  - **İçerik:** sayfaların başlığında, metninde ve etiketlerinde arar
+    (CQL `text~`). Her kelime aranır, son kelime yazılırken önek olarak da
+    (`onay` → `onaylama`); `"tam ifade"` ifadeyi olduğu gibi, `-kelime` ya da
+    `-"ifade"` dışarıda bırakır. Sonuçlarda bulunan kelimenin geçtiği metin
+    parçası vurgulu, sayfanın yeri (alan › üst sayfalar) ve ne zaman
+    değiştiği (“3 gün önce”) görünür; sıralama Confluence'ın ilgililiğine
+    göredir. 25'er sonuç gelir, **Daha fazla sonuç göster** devamını ekler
+    ("25 / 140 sonuç").
+  - **Filtreler** (huni düğmesi; etkin filtre sayısını gösterir):
+    değiştirilme zamanı (son 1 gün / hafta / ay / yıl), sıralama (ilgililik,
+    son değişiklik, başlık), etiket, **Yalnızca üzerinde çalıştığım
+    sayfalar** (`contributor = currentUser()`) ve ağaçtan seçilen bir
+    sayfanın altı (`ancestor`). Yalnız bir filtre de arama sayılır (ör. "son
+    bir haftada değişen sayfalarım").
+
 - **Dosya → Confluence'tan Aç** (ya da Ekle → İçe Aktar → **Confluence**):
   bir Confluence sitesine bağlanır, sayfaları başlığa ve alana göre arar.
   Arama kutusuna sayfa ID'si (`123456`) ya da tarayıcıdaki adresi de

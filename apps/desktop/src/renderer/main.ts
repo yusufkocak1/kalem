@@ -123,6 +123,7 @@ const confluencePane = createConfluencePane({
 	favorites: () => settings.confluenceFavorites,
 	setFavorites: (favorites) => updateSettings({ confluenceFavorites: favorites }),
 	activePage: () => session?.remote?.id ?? null,
+	activeSpace: () => session?.remote?.spaceKey ?? null,
 	connect: () => void confluenceDialog.show(),
 });
 const quickOpen = createQuickOpen({

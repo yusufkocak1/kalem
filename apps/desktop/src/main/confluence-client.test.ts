@@ -12,6 +12,17 @@ import {
 } from "./confluence-client.js";
 import { ConfluenceStore } from "./confluence-store.js";
 
+const DEFAULT_REQUEST = {
+	query: "",
+	spaceKey: null,
+	mode: "title",
+	sort: "relevance",
+	period: "any",
+	mine: false,
+	label: "",
+	ancestor: null,
+} as const;
+
 interface Call {
 	readonly url: string;
 	readonly init: RequestInit | undefined;
@@ -268,6 +279,141 @@ describe("ConfluenceClient", () => {
 		expect(cql).toBe(
 			'type=page AND space="DEV" AND title~"plan \\"x\\"*" ORDER BY lastmodified DESC',
 		);
+	});
+
+	it("searches inside pages, with the text around the words and each page's place", async () => {
+		const { fetch, calls } = fakeFetch([
+			[
+				"cursor=abc",
+				{ results: [{ content: { id: "44", title: "Ek" } }], totalSize: 3, _links: {} },
+			],
+			[
+				"/rest/api/search",
+				{
+					results: [
+						{
+							content: {
+								id: "42",
+								title: "Sprint Planı",
+								space: { key: "DEV" },
+								ancestors: [{ title: "Ana Sayfa" }, { title: "Planlama" }],
+							},
+							title: "@@@hl@@@Sprint@@@endhl@@@ Planı",
+							excerpt: "Bu @@@hl@@@sprint@@@endhl@@@te &quot;onay&quot; adımı…",
+							resultGlobalContainer: { title: "Geliştirme", displayUrl: "/spaces/DEV" },
+							lastModified: "2026-10-01T10:00:00.000Z",
+						},
+					],
+					totalSize: 3,
+					_links: { next: "/rest/api/search?cql=x&cursor=abc&limit=25" },
+				},
+			],
+		]);
+		const client = new ConfluenceClient(
+			{ site: "https://acme.atlassian.net/wiki", username: "a@b.c", token: "t" },
+			fetch,
+		);
+		const found = await client.find({
+			query: "sprint onay",
+			spaceKey: "DEV",
+			mode: "content",
+			sort: "relevance",
+			period: "any",
+			mine: false,
+			label: "",
+			ancestor: null,
+		});
+		expect(found).toEqual({
+			hits: [
+				{
+					id: "42",
+					title: "Sprint Planı",
+					titleParts: [
+						{ text: "Sprint", hit: true },
+						{ text: " Planı", hit: false },
+					],
+					spaceName: "Geliştirme",
+					spaceKey: "DEV",
+					modified: "2026-10-01T10:00:00.000Z",
+					excerpt: [
+						{ text: "Bu ", hit: false },
+						{ text: "sprint", hit: true },
+						{ text: 'te "onay" adımı…', hit: false },
+					],
+					path: ["Ana Sayfa", "Planlama"],
+				},
+			],
+			total: 3,
+			next: "/rest/api/search?cql=x&cursor=abc&limit=25",
+		});
+		const first = new URL(calls[0]?.url ?? "");
+		expect(first.pathname).toBe("/wiki/rest/api/search");
+		expect(first.searchParams.get("cql")).toBe(
+			'type=page AND space="DEV" AND text~"sprint" AND (text~"onay" OR text~"onay*")',
+		);
+		expect(first.searchParams.get("excerpt")).toBe("highlight");
+		expect(first.searchParams.get("expand")).toBe("content.ancestors,content.space");
+
+		// The next results follow the server's link, asking for the same details.
+		const more = await client.find({
+			query: "sprint onay",
+			spaceKey: "DEV",
+			mode: "content",
+			sort: "relevance",
+			period: "any",
+			mine: false,
+			label: "",
+			ancestor: null,
+			cursor: found.next,
+		});
+		expect(more.hits.map((hit) => hit.id)).toEqual(["44"]);
+		expect(more.next).toBeNull();
+		expect(calls[1]?.url).toBe(
+			"https://acme.atlassian.net/wiki/rest/api/search?cql=x&cursor=abc&limit=25&excerpt=highlight&expand=content.ancestors%2Ccontent.space",
+		);
+		// A cursor is never anything but a search.
+		await expect(
+			client.find({ ...DEFAULT_REQUEST, cursor: "/rest/api/content/1" }),
+		).rejects.toThrow("Invalid search cursor");
+	});
+
+	it("pages through Server's results by their start", async () => {
+		const { fetch, calls } = fakeFetch([
+			[
+				"/rest/api/search",
+				{ results: [{ content: { id: "1", title: "A" } }], start: 0, totalSize: 2 },
+			],
+		]);
+		const client = new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "", token: "t" },
+			fetch,
+		);
+		const found = await client.find({ ...DEFAULT_REQUEST, query: "A" });
+		expect(found.next).toMatch(/^\/rest\/api\/search\?.*start=1/);
+		expect(found.hits[0]?.excerpt).toEqual([]);
+		await client.find({ ...DEFAULT_REQUEST, query: "A", cursor: found.next });
+		expect(new URL(calls[1]?.url ?? "").searchParams.get("start")).toBe("1");
+	});
+
+	it("lists the pages above a page, top first", async () => {
+		const server = fakeFetch([
+			["/rest/api/content/42", { ancestors: [{ id: "1" }, { id: "41" }] }],
+		]);
+		const client = new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "", token: "t" },
+			server.fetch,
+		);
+		expect(await client.ancestors("42")).toEqual(["1", "41"]);
+		expect(server.calls[0]?.url).toContain("/rest/api/content/42?expand=ancestors");
+		const cloud = fakeFetch([
+			["/api/v2/pages/42/ancestors", { results: [{ id: "1" }, { id: "41" }] }],
+		]);
+		const cloudClient = new ConfluenceClient(
+			{ site: "https://acme.atlassian.net/wiki", username: "a@b.c", token: "t" },
+			cloud.fetch,
+		);
+		expect(await cloudClient.ancestors("42")).toEqual(["1", "41"]);
+		await expect(client.ancestors("../x")).rejects.toThrow("Invalid page id");
 	});
 
 	it("finds a page by its id or address, in any space", async () => {
