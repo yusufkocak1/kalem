@@ -289,6 +289,33 @@ verir.
 
 **Confluence**
 
+- **Gezinme bölmesi → Confluence sekmesi:** bağlı sitenin alanları ve sayfa
+  ağacı. Ağaç ok simgeleri, girinti çizgileri ve açık sayfayı gösteren bir
+  vurguyla çizilir; satırın üzerine gelince **Bu sayfada ve altındaki
+  sayfalarda ara**, **Alt sayfa ekle** ve **Favorilere ekle** çıkar.
+  Klavyeyle gezilir (`↑`/`↓`, `→` açar ya da ilk alt sayfaya gider, `←`
+  kapatır ya da üst sayfaya döner, `Home`/`End`; arama kutusunda `↓` listeye
+  iner). Araç çubuğunda **Açık sayfayı ağaçta göster** (etkin sekmenin
+  sayfasının üst sayfalarını sorup ağacı oraya kadar açar) ve **Tümünü
+  daralt** vardır.
+- **Arama:** kutunun altındaki **Başlıklar / İçerik** seçimi.
+  - **Başlıklar:** başlığı yazılanla başlayan sayfalar (yeniden eskiye),
+    eşleşen kelimeler işaretlenir; sayfa ID'si ve adresi de kabul edilir.
+  - **İçerik:** sayfaların başlığında, metninde ve etiketlerinde arar
+    (CQL `text~`). Her kelime aranır, son kelime yazılırken önek olarak da
+    (`onay` → `onaylama`); `"tam ifade"` ifadeyi olduğu gibi, `-kelime` ya da
+    `-"ifade"` dışarıda bırakır. Sonuçlarda bulunan kelimenin geçtiği metin
+    parçası vurgulu, sayfanın yeri (alan › üst sayfalar) ve ne zaman
+    değiştiği (“3 gün önce”) görünür; sıralama Confluence'ın ilgililiğine
+    göredir. 25'er sonuç gelir, **Daha fazla sonuç göster** devamını ekler
+    ("25 / 140 sonuç").
+  - **Filtreler** (huni düğmesi; etkin filtre sayısını gösterir):
+    değiştirilme zamanı (son 1 gün / hafta / ay / yıl), sıralama (ilgililik,
+    son değişiklik, başlık), etiket, **Yalnızca üzerinde çalıştığım
+    sayfalar** (`contributor = currentUser()`) ve ağaçtan seçilen bir
+    sayfanın altı (`ancestor`). Yalnız bir filtre de arama sayılır (ör. "son
+    bir haftada değişen sayfalarım").
+
 - **Dosya → Confluence'tan Aç** (ya da Ekle → İçe Aktar → **Confluence**):
   bir Confluence sitesine bağlanır, sayfaları başlığa ve alana göre arar.
   Arama kutusuna sayfa ID'si (`123456`) ya da tarayıcıdaki adresi de
@@ -459,7 +486,33 @@ verir.
   `/export-confluence`, `/history`, `/find`, `/replace`, `/table`,
   `/new-diagram`, `/image`, `/source`, `/focus`, `/read-only`, `/open`,
   `/search`, `/format-code`). Uygulama komutları belgede imlecin son
-  bulunduğu yerde çalışır.
+  bulunduğu yerde çalışır. Seçimle çalışan hazır sorular: `/fix` (yazım ve
+  dil bilgisi; seçim yoksa belgenin tamamı), `/shorten`, `/explain`,
+  `/translate <dil>`; `/apply` son yanıttaki değişiklikleri uygular.
+- **Belgede değişiklik ve komut önerileri:** model, belgeyi değiştirmesi
+  istendiğinde (düzelt, kısalt, çevir, yeniden adlandır, sil, sona ekle…)
+  ya da bir uygulama komutu gerektiğinde (kaydet, Word'e aktar, sürüm
+  geçmişi…) yanıtına ` ```kalem-actions ` bloğunda JSON eylemler yazar
+  (`src/shared/actions.ts`): `replace` (belgenin Markdown'ındaki metni
+  birebir bulup değiştirir; `all` ile her yerde), `insert` (imleç, baş ya
+  da son), `document` (belgenin tamamı) ve izin verilen komut listesinden
+  `command`. Panel bunları JSON yerine bir **Önerilen değişiklikler**
+  kartında silinen/eklenen metin olarak gösterir; hiçbir şey kendiliğinden
+  olmaz: **Uygula** metin değişikliklerini tek bir düzenleme olarak yapar
+  (bulunamayan ya da birden çok kez geçen metin hata verir, belge
+  değişmez), **Geri Al** eski metni getirir; önerilen her komut kendi
+  **Çalıştır** düğmesiyle çalışır. Değişiklik öneren bir yanıtta **Belgeye
+  Ekle** gösterilmez.
+- **Sohbet ekranı:** soru kutusu ile paylaşım, kaynak ekleme ve model
+  seçimi tek bir çerçevededir. Belgede metin seçiliyken kutunun üstünde
+  **İyileştir, Kısalt, Yazımı düzelt, Çevir, Açıkla** düğmeleri çıkar.
+  Yanıt beklenirken "Düşünüyor…", diyagram ya da değişiklik yazılırken
+  JSON yerine "Diyagram çiziliyor…" / "Değişiklikler hazırlanıyor…"
+  görünür. Kod bloklarının köşesinde **Kodu kopyala**, soruların altında
+  **Kopyala** ve **Düzenle ve yeniden sor**, son yanıtın altında **Yanıtı
+  yeniden oluştur** (hatada **Yeniden dene**) vardır. Boş kutuda `↑` son
+  soruyu geri getirir; yukarı kaydırınca **Son mesaja git** düğmesi çıkar;
+  **Sohbetler** listesi başlığa göre aranabilir.
 - **GitHub Copilot** seçiliyken uygulama `copilot`'ı aynı yerlerde (ayrıca
   WinGet bağlantı klasöründe) arar; `KALEM_COPILOT` ortam değişkeni
   verilirse yalnızca o dosya denenir. Copilot'a sistem talimatı

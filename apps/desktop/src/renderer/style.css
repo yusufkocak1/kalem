@@ -783,6 +783,10 @@ button {
 .assistant-log[hidden],
 .assistant-empty[hidden],
 .assistant-missing[hidden],
+.assistant-context[hidden],
+.assistant-jump[hidden],
+.assistant-changes-state[hidden],
+.assistant-action[hidden],
 .assistant-chip[hidden] {
 	display: none;
 }
@@ -851,25 +855,59 @@ button {
 	line-height: 1.45;
 }
 
+.assistant-empty-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 40px;
+	height: 40px;
+	margin-bottom: 10px;
+	border-radius: 12px;
+	background: color-mix(in srgb, var(--app-accent) 14%, transparent);
+	color: var(--app-accent);
+}
+
+.assistant-empty-icon .icon {
+	width: 22px;
+	height: 22px;
+}
+
 .assistant-suggestions {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	gap: 8px;
 }
 
 .assistant-suggestion {
-	padding: 8px 10px;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 6px;
+	padding: 10px 11px;
 	border: 1px solid var(--app-border);
-	border-radius: 8px;
+	border-radius: 10px;
 	background: var(--app-raised);
 	color: var(--app-text);
 	font: inherit;
+	font-size: 12px;
+	line-height: 1.4;
 	text-align: start;
 	cursor: pointer;
+	transition:
+		border-color 0.15s,
+		transform 0.15s;
 }
 
-.assistant-suggestion:hover {
+.assistant-suggestion .icon {
+	width: 16px;
+	height: 16px;
+	color: var(--app-accent);
+}
+
+.assistant-suggestion:hover,
+.assistant-suggestion:focus-visible {
 	border-color: var(--app-accent);
+	transform: translateY(-1px);
 }
 
 .assistant-command {
@@ -903,8 +941,8 @@ button {
 
 .assistant-user .assistant-body {
 	padding: 8px 11px;
-	border-radius: 12px 12px 4px;
-	background: var(--app-pressed);
+	border-radius: 14px 14px 4px;
+	background: color-mix(in srgb, var(--app-accent) 13%, var(--app-raised));
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 }
@@ -952,6 +990,7 @@ button {
 }
 
 .assistant-markdown pre {
+	position: relative;
 	padding: 8px 10px;
 	border-radius: 6px;
 	background: var(--app-raised);
@@ -1135,11 +1174,17 @@ button {
 
 .assistant-add {
 	display: inline-flex;
-	padding: 2px;
+	flex: none;
+	padding: 4px;
 	border: 1px solid var(--app-border);
-	border-radius: 5px;
+	border-radius: 50%;
 	background: var(--app-raised);
 	color: var(--app-text);
+}
+
+.assistant-add:hover:not(:disabled) {
+	border-color: var(--app-accent);
+	color: var(--app-accent);
 }
 
 .assistant-add .icon {
@@ -1207,30 +1252,74 @@ button {
 	max-width: 180px;
 }
 
-.assistant-input-row {
+/* The question box: the text, and under it what goes with the question. */
+.assistant-box {
 	display: flex;
-	align-items: flex-end;
-	gap: 6px;
+	flex-direction: column;
+	border: 1px solid var(--app-border);
+	border-radius: 12px;
+	background: var(--app-raised);
+	transition:
+		border-color 0.15s,
+		box-shadow 0.15s;
+}
+
+.assistant-box:focus-within {
+	border-color: var(--app-accent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 18%, transparent);
 }
 
 .assistant-input {
-	flex: 1;
-	min-height: 36px;
-	max-height: 180px;
-	padding: 8px 10px;
-	border: 1px solid var(--app-border);
-	border-radius: 8px;
-	background: var(--app-raised);
+	min-height: 40px;
+	max-height: 200px;
+	padding: 10px 12px 4px;
+	border: 0;
+	border-radius: 12px 12px 0 0;
+	background: transparent;
 	color: var(--app-text);
 	font: inherit;
-	line-height: 1.4;
+	line-height: 1.45;
 	resize: none;
 	field-sizing: content;
 }
 
 .assistant-input:focus-visible {
-	outline: 2px solid var(--app-accent);
-	outline-offset: -1px;
+	outline: none;
+}
+
+.assistant-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	padding: 4px 6px 6px;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.assistant-toolbar-space {
+	flex: 1;
+}
+
+.assistant-toolbar .assistant-share {
+	min-width: 0;
+	padding: 2px 8px 2px 4px;
+	border-radius: 12px;
+}
+
+.assistant-share-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.assistant-toolbar .assistant-share:hover {
+	background: var(--app-hover);
+	color: var(--app-text);
+}
+
+.assistant-toolbar .assistant-share:has(input:checked) {
+	color: var(--app-accent);
 }
 
 .assistant-send {
@@ -1238,12 +1327,22 @@ button {
 	flex: none;
 	align-items: center;
 	justify-content: center;
-	width: 36px;
-	height: 36px;
+	width: 30px;
+	height: 30px;
 	border: 0;
-	border-radius: 8px;
+	border-radius: 50%;
 	background: var(--app-accent);
 	color: var(--app-accent-text);
+	transition: transform 0.1s;
+}
+
+.assistant-send:not(:disabled):active {
+	transform: scale(0.92);
+}
+
+.assistant-send .icon {
+	width: 16px;
+	height: 16px;
 }
 
 .assistant-send:disabled {
@@ -1516,6 +1615,350 @@ button {
 	opacity: 0.6;
 }
 
+.assistant-toolbar .assistant-model {
+	min-width: 0;
+	max-width: 40%;
+	field-sizing: content;
+	border-color: transparent;
+	background: transparent;
+	color: var(--app-muted);
+	text-overflow: ellipsis;
+}
+
+.assistant-toolbar .assistant-model:hover {
+	border-color: var(--app-border);
+	color: var(--app-text);
+}
+
+/* --- Assistant: messages, tools and proposed changes --------------------- */
+
+.assistant-message {
+	animation: assistant-in 0.18s ease-out;
+}
+
+@keyframes assistant-in {
+	from {
+		opacity: 0;
+		transform: translateY(4px);
+	}
+}
+
+.assistant-message-tools {
+	display: flex;
+	align-self: flex-end;
+	gap: 2px;
+	opacity: 0;
+	transition: opacity 0.15s;
+}
+
+.assistant-user:hover .assistant-message-tools,
+.assistant-message-tools:focus-within {
+	opacity: 1;
+}
+
+.assistant-tool {
+	width: 24px;
+	height: 24px;
+	padding: 4px;
+	color: var(--app-muted);
+}
+
+.assistant-tool .icon {
+	width: 14px;
+	height: 14px;
+}
+
+.assistant-tool:hover {
+	color: var(--app-accent);
+}
+
+.assistant-tool.done {
+	color: var(--app-ok);
+}
+
+.assistant-code-copy {
+	position: absolute;
+	top: 4px;
+	right: 4px;
+	border: 1px solid var(--app-border);
+	background: var(--app-surface);
+	opacity: 0;
+	transition: opacity 0.15s;
+}
+
+.assistant-markdown pre:hover .assistant-code-copy,
+.assistant-code-copy:focus-visible {
+	opacity: 1;
+}
+
+.assistant-reply-footer {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 6px;
+}
+
+.assistant-reply-footer .assistant-actions {
+	align-items: center;
+}
+
+/* Only the latest reply is asked again, and not while one is coming in. */
+.assistant-message:has(~ .assistant-message) .assistant-regenerate,
+.assistant-log.busy .assistant-regenerate {
+	display: none;
+}
+
+.assistant-waiting {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.assistant-dots {
+	display: inline-flex;
+	gap: 3px;
+}
+
+.assistant-dots span {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--app-accent);
+	animation: assistant-dot 1.2s ease-in-out infinite;
+}
+
+.assistant-dots span:nth-child(2) {
+	animation-delay: 0.15s;
+}
+
+.assistant-dots span:nth-child(3) {
+	animation-delay: 0.3s;
+}
+
+@keyframes assistant-dot {
+	0%,
+	80%,
+	100% {
+		opacity: 0.25;
+		transform: scale(0.8);
+	}
+	40% {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.assistant-message,
+	.assistant-dots span {
+		animation: none;
+	}
+}
+
+.assistant-changes {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.assistant-changes-block {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px;
+	border: 1px solid color-mix(in srgb, var(--app-accent) 45%, var(--app-border));
+	border-radius: 10px;
+	background: var(--app-raised);
+}
+
+.assistant-changes-block.applied {
+	border-color: color-mix(in srgb, var(--app-ok) 55%, var(--app-border));
+}
+
+.assistant-changes-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--app-accent);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.assistant-changes-block.applied .assistant-changes-head {
+	color: var(--app-ok);
+}
+
+.assistant-changes-head .icon {
+	width: 14px;
+	height: 14px;
+}
+
+.assistant-change-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	max-height: 320px;
+	margin: 0;
+	padding: 0;
+	overflow-y: auto;
+	list-style: none;
+}
+
+.assistant-change {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	font-size: 12px;
+	line-height: 1.45;
+}
+
+.assistant-change del,
+.assistant-change ins {
+	display: block;
+	padding: 3px 7px;
+	border-radius: 4px;
+	text-decoration: none;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.assistant-change del {
+	background: var(--app-error-bg);
+	color: var(--app-error);
+	text-decoration: line-through;
+	text-decoration-color: color-mix(in srgb, var(--app-error) 50%, transparent);
+}
+
+.assistant-change ins {
+	background: color-mix(in srgb, var(--app-ok) 14%, transparent);
+	color: var(--app-text);
+}
+
+.assistant-change-label {
+	color: var(--app-muted);
+	font-size: 11px;
+}
+
+.assistant-change-badge {
+	align-self: flex-start;
+	padding: 0 6px;
+	border-radius: 8px;
+	background: var(--app-pressed);
+	color: var(--app-muted);
+	font-size: 11px;
+}
+
+.assistant-changes-state {
+	margin: 0;
+	color: var(--app-muted);
+	font-size: 11px;
+}
+
+.assistant-apply {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+}
+
+.assistant-apply .icon {
+	width: 14px;
+	height: 14px;
+}
+
+.assistant-command-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 6px 6px 6px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	font-size: 12px;
+}
+
+.assistant-command-text {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.assistant-quick {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.assistant-quick-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 12px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 11px;
+	cursor: pointer;
+}
+
+.assistant-quick-button .icon {
+	width: 12px;
+	height: 12px;
+	color: var(--app-accent);
+}
+
+.assistant-quick-button:hover:not(:disabled) {
+	border-color: var(--app-accent);
+	color: var(--app-accent);
+}
+
+.assistant-quick-button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.assistant-jump {
+	position: absolute;
+	bottom: calc(100% + 8px);
+	left: 50%;
+	z-index: 2;
+	display: inline-flex;
+	padding: 6px;
+	border: 1px solid var(--app-border);
+	border-radius: 50%;
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: var(--app-shadow);
+	transform: translateX(-50%);
+}
+
+.assistant-jump:hover {
+	color: var(--app-accent);
+}
+
+.assistant-jump .icon {
+	width: 16px;
+	height: 16px;
+}
+
+.assistant-history-search {
+	padding: 6px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+}
+
+.assistant-history-search:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -1px;
+}
+
 .icon-button[aria-pressed="true"] {
 	background: var(--app-pressed);
 	color: var(--app-accent);
@@ -1630,16 +2073,6 @@ button {
 	color: var(--app-text);
 	font: inherit;
 	text-align: start;
-}
-
-.confluence-page-item:hover {
-	background: var(--app-hover);
-}
-
-.confluence-page-item[aria-current="page"] {
-	background: var(--app-pressed);
-	color: var(--app-accent);
-	font-weight: 600;
 }
 
 .confluence-page-item .icon {
@@ -3251,37 +3684,109 @@ pre[data-preview="error"]::after {
 	margin: 0 12px 8px;
 }
 
+/* One step of the tree's indent; guides are drawn in it, one per level above. */
+.confluence-pane-list {
+	--tree-indent: 16px;
+}
+
 .confluence-page-item {
+	position: relative;
 	gap: 0;
-	padding: 0 2px 0 calc(var(--depth, 0) * 14px);
+	min-height: 26px;
+	padding: 0 2px 0 calc(var(--depth, 0) * var(--tree-indent));
+	background-image: repeating-linear-gradient(
+		to right,
+		transparent 0 8px,
+		var(--app-border) 8px 9px,
+		transparent 9px var(--tree-indent)
+	);
+	background-repeat: no-repeat;
+	background-size: calc(var(--depth, 0) * var(--tree-indent)) 100%;
+	transition: background-color 0.1s;
+}
+
+.confluence-page-item:hover {
+	background-color: var(--app-hover);
+}
+
+.confluence-page-item[aria-current="page"] {
+	background-color: color-mix(in srgb, var(--app-accent) 14%, transparent);
+}
+
+.confluence-page-item[aria-current="page"]::before {
+	position: absolute;
+	top: 4px;
+	bottom: 4px;
+	left: calc(var(--depth, 0) * var(--tree-indent));
+	width: 3px;
+	border-radius: 2px;
+	background: var(--app-accent);
+	content: "";
+}
+
+.confluence-page-item.flash {
+	animation: confluence-flash 1.2s ease-out;
+}
+
+@keyframes confluence-flash {
+	0%,
+	40% {
+		background-color: color-mix(in srgb, var(--app-accent) 35%, transparent);
+	}
 }
 
 .confluence-twisty {
+	display: inline-flex;
 	flex: none;
+	align-items: center;
+	justify-content: center;
 	width: 18px;
 	align-self: stretch;
 	padding: 0;
 	border: 0;
+	border-radius: 4px;
 	background: none;
 	color: var(--app-muted);
-	font: inherit;
-	font-size: 10px;
 	cursor: pointer;
+}
+
+.confluence-twisty:hover {
+	color: var(--app-text);
+}
+
+.confluence-twisty .icon {
+	width: 12px;
+	height: 12px;
+	transition: transform 0.12s;
+}
+
+.confluence-page-item[aria-expanded="true"] > .confluence-twisty .icon {
+	transform: rotate(90deg);
+}
+
+.confluence-twisty.loading .icon {
+	opacity: 0.4;
 }
 
 .confluence-row-main {
 	display: flex;
 	flex: 1;
 	align-items: flex-start;
-	gap: 5px;
+	gap: 6px;
 	min-width: 0;
 	padding: 4px 4px 4px 0;
 	border: 0;
+	border-radius: 4px;
 	background: none;
 	color: inherit;
 	font: inherit;
 	text-align: start;
 	cursor: pointer;
+}
+
+.confluence-row-main:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -2px;
 }
 
 .confluence-row-main .icon {
@@ -3292,32 +3797,38 @@ pre[data-preview="error"]::after {
 	color: var(--app-muted);
 }
 
-.confluence-star {
+.confluence-page-item[data-space] .confluence-row-main .icon,
+.confluence-page-item[aria-current="page"] .confluence-row-main .icon {
+	color: var(--app-accent);
+}
+
+.confluence-page-item[data-space] .confluence-page-title {
+	font-weight: 600;
+}
+
+.confluence-page-item[aria-current="page"] .confluence-page-title {
+	color: var(--app-accent);
+	font-weight: 600;
+}
+
+/* What a row offers shows when it is pointed at or has the focus. */
+.confluence-row-action {
 	flex: none;
 	align-self: center;
+	width: 22px;
+	height: 22px;
+	padding: 4px;
 	opacity: 0;
 }
 
-.confluence-star .icon {
-	width: 14px;
-	height: 14px;
+.confluence-row-action .icon {
+	width: 13px;
+	height: 13px;
 }
 
-.confluence-add {
-	flex: none;
-	align-self: center;
-	opacity: 0;
-}
-
-.confluence-add .icon {
-	width: 14px;
-	height: 14px;
-}
-
-.confluence-page-item:hover .confluence-star,
-.confluence-star:focus-visible,
-.confluence-page-item:hover .confluence-add,
-.confluence-add:focus-visible {
+.confluence-page-item:hover .confluence-row-action,
+.confluence-page-item:focus-within .confluence-row-action,
+.confluence-row-action:focus-visible {
 	opacity: 1;
 }
 
@@ -3360,22 +3871,51 @@ pre[data-preview="error"]::after {
 }
 
 .confluence-section {
-	padding: 8px 8px 2px;
+	padding: 10px 8px 3px;
 	color: var(--app-muted);
 	font-size: 11px;
 	font-weight: 600;
+	letter-spacing: 0.03em;
+	text-transform: uppercase;
 }
 
 .confluence-tree-note {
+	display: flex;
+	align-items: center;
+	gap: 6px;
 	margin: 2px 0;
-	padding-left: calc(18px + var(--depth, 0) * 14px);
+	padding: 3px 0 3px calc(18px + var(--depth, 0) * var(--tree-indent));
 	color: var(--app-muted);
 	font-size: 12px;
+}
+
+.confluence-spinner {
+	flex: none;
+	width: 11px;
+	height: 11px;
+	border: 2px solid var(--app-border);
+	border-top-color: var(--app-accent);
+	border-radius: 50%;
+	animation: confluence-spin 0.8s linear infinite;
+}
+
+@keyframes confluence-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.confluence-spinner,
+	.confluence-page-item.flash {
+		animation: none;
+	}
 }
 
 .confluence-page-text {
 	display: flex;
 	flex-direction: column;
+	gap: 1px;
 	min-width: 0;
 }
 
@@ -3386,6 +3926,282 @@ pre[data-preview="error"]::after {
 	font-weight: 400;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+/* --- Confluence search ---------------------------------------------------- */
+
+.confluence-search-area {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin: 0 8px 6px;
+}
+
+.confluence-search-area[hidden],
+.confluence-filters[hidden],
+.confluence-under[hidden],
+.confluence-link[hidden] {
+	display: none;
+}
+
+.confluence-search-row {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.confluence-search-field {
+	position: relative;
+	display: flex;
+	flex: 1;
+	align-items: center;
+	min-width: 0;
+}
+
+.confluence-search-field > .icon {
+	position: absolute;
+	left: 8px;
+	width: 14px;
+	height: 14px;
+	color: var(--app-muted);
+	pointer-events: none;
+}
+
+.confluence-search-field .confluence-pane-search {
+	flex: 1;
+	min-width: 0;
+	margin: 0;
+	padding-left: 28px;
+}
+
+.confluence-filter-button {
+	position: relative;
+	flex: none;
+}
+
+.confluence-filter-button.active,
+.confluence-filter-button[aria-expanded="true"] {
+	color: var(--app-accent);
+}
+
+.confluence-filter-count {
+	position: absolute;
+	top: 0;
+	right: 0;
+	min-width: 13px;
+	padding: 0 3px;
+	border-radius: 7px;
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+	font-size: 9px;
+	font-weight: 700;
+	line-height: 13px;
+	text-align: center;
+}
+
+.confluence-filter-count:empty {
+	display: none;
+}
+
+.confluence-choices {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.confluence-mode {
+	flex-wrap: nowrap;
+	gap: 0;
+	padding: 2px;
+	border-radius: 7px;
+	background: var(--app-pressed);
+}
+
+.confluence-choice {
+	padding: 2px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 11px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 11px;
+	cursor: pointer;
+}
+
+.confluence-choice:hover {
+	border-color: var(--app-accent);
+}
+
+.confluence-choice[aria-pressed="true"] {
+	border-color: var(--app-accent);
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+}
+
+.confluence-mode .confluence-choice {
+	flex: 1;
+	padding: 3px 8px;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.confluence-mode .confluence-choice[aria-pressed="true"] {
+	background: var(--app-raised);
+	color: var(--app-text);
+	font-weight: 600;
+	box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+}
+
+.confluence-filters {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	font-size: 12px;
+}
+
+.confluence-filter {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.confluence-filter-name {
+	color: var(--app-muted);
+	font-size: 11px;
+	font-weight: 600;
+}
+
+.confluence-filter-label {
+	padding: 3px 7px;
+	border: 1px solid var(--app-border);
+	border-radius: 5px;
+	background: var(--app-surface);
+	color: var(--app-text);
+	font: inherit;
+}
+
+.confluence-filter-check {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+}
+
+.confluence-filter-tips {
+	margin: 0;
+	color: var(--app-muted);
+	font-size: 11px;
+	line-height: 1.4;
+}
+
+.confluence-link {
+	align-self: flex-start;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--app-accent);
+	font: inherit;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.confluence-link:hover {
+	text-decoration: underline;
+}
+
+.confluence-under {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	align-self: flex-start;
+	max-width: 100%;
+	padding: 1px 2px 1px 8px;
+	border-radius: 10px;
+	background: var(--app-pressed);
+	font-size: 12px;
+}
+
+.confluence-under > .icon {
+	flex: none;
+	width: 12px;
+	height: 12px;
+	color: var(--app-accent);
+}
+
+.confluence-under-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.confluence-pane-list[aria-busy="true"] {
+	opacity: 0.6;
+}
+
+.confluence-result {
+	padding-top: 3px;
+	padding-bottom: 3px;
+	border-bottom: 1px solid color-mix(in srgb, var(--app-border) 60%, transparent);
+	border-radius: 0;
+}
+
+.confluence-result .confluence-page-title {
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+
+.confluence-page-path {
+	overflow: hidden;
+	color: var(--app-muted);
+	font-size: 11px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.confluence-excerpt {
+	display: -webkit-box;
+	overflow: hidden;
+	color: var(--app-text);
+	font-size: 12px;
+	line-height: 1.45;
+	opacity: 0.85;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+}
+
+.confluence-page-title mark,
+.confluence-excerpt mark {
+	padding: 0 1px;
+	border-radius: 2px;
+	background: color-mix(in srgb, var(--app-warning, #f2c94c) 40%, transparent);
+	color: inherit;
+	font-weight: 600;
+}
+
+.confluence-more {
+	display: block;
+	width: calc(100% - 12px);
+	margin: 8px 6px;
+	padding: 6px;
+	border: 1px dashed var(--app-border);
+	border-radius: 6px;
+	background: none;
+	color: var(--app-accent);
+	font: inherit;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.confluence-more:hover:not(:disabled) {
+	border-style: solid;
+	border-color: var(--app-accent);
 }
 
 /* --- Locked Confluence macros (confluence-locked.ts) ------------------- */

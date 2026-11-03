@@ -32,7 +32,10 @@ const REPLY = [
  * A stand-in for the Claude Code CLI: answers `--version`, writes down how it
  * was run and what it was asked, and streams a reply the way the CLI does.
  */
-async function fakeClaude(folder: string): Promise<{ path: string; calls: () => Promise<Call[]> }> {
+async function fakeClaude(
+	folder: string,
+	answer: string = REPLY,
+): Promise<{ path: string; calls: () => Promise<Call[]> }> {
 	const log = join(folder, "calls.jsonl");
 	const script = join(folder, "fake-claude.cjs");
 	await writeFile(
@@ -52,7 +55,7 @@ process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => (prompt += chunk));
 process.stdin.on("end", () => {
 	fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args, prompt, cwd: process.cwd() }) + "\\n");
-	const reply = ${JSON.stringify(REPLY)};
+	const reply = ${JSON.stringify(answer)};
 	const out = (line) => process.stdout.write(JSON.stringify(line) + "\\n");
 	out({ type: "system", subtype: "init", session_id: "sess-1" });
 	out({ type: "stream_event", event: { type: "message_start" } });
@@ -746,7 +749,7 @@ test("runs commands typed after a slash: the assistant's, ready questions and th
 	await input.fill("/");
 	await expect(menu).toBeVisible();
 	// All of them, the list scrolling.
-	await expect(menu.locator(".assistant-command")).toHaveCount(28);
+	await expect(menu.locator(".assistant-command")).toHaveCount(33);
 	await expect(menu.locator(".assistant-command-name").last()).toHaveText("/format-code");
 	await input.fill("/kayd");
 	await expect(menu.locator(".assistant-command-name")).toHaveText(["/save", "/save-as"]);
@@ -853,6 +856,69 @@ test("adds files and folders to a chat, and Claude may read the folders", async 
 	await expect.poll(async () => (await claude.calls())[2]?.prompt).toContain("Teşekkürler");
 	expect((await claude.calls())[2]?.prompt).not.toContain("<files");
 
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("applies the changes and runs the commands a reply proposes, and undoes them", async () => {
+	const folder = await tempDir("assistant-actions");
+	const doc = join(folder, "taslak.md");
+	await writeFile(doc, "# Taslak\n\nBirinci paragraf.\n\nSon.\n");
+	const reply = [
+		"Paragrafı düzelttim:",
+		"",
+		"```kalem-actions",
+		JSON.stringify([
+			{ type: "replace", find: "Birinci paragraf.", replace: "İlk paragraf." },
+			{ type: "command", command: "save" },
+		]),
+		"```",
+	].join("\n");
+	const claude = await fakeClaude(folder, reply);
+	const { app, page, errors } = await launch({
+		args: [doc],
+		settings: { assistant: true },
+		env: { KALEM_CLAUDE: claude.path },
+	});
+	await page.locator("#editor p", { hasText: "Son." }).click();
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
+	const input = pane.locator(".assistant-input");
+	await input.fill("Birinci paragrafı düzelt");
+	await input.press("Enter");
+
+	// The changes show as a card, not as JSON; there is nothing to insert.
+	const card = pane.locator(".assistant-changes-block");
+	await expect(card.locator("del")).toHaveText("Birinci paragraf.");
+	await expect(card.locator("ins")).toHaveText("İlk paragraf.");
+	await expect(pane.locator(".assistant-assistant pre")).toHaveCount(0);
+	await expect(pane.getByRole("button", { name: "Insert", exact: true })).toHaveCount(0);
+	expect((await claude.calls())[0]?.args.join(" ")).toContain("kalem-actions");
+
+	// Applied with one click, and undone.
+	await card.getByRole("button", { name: "Apply" }).click();
+	await expect(page.locator("#editor p", { hasText: "İlk paragraf." })).toBeVisible();
+	await expect(card.locator(".assistant-changes-state")).toHaveText(
+		"1 changes made. Undo brings the document back.",
+	);
+	await expect(card.getByRole("button", { name: "Applied" })).toBeDisabled();
+	await card.getByRole("button", { name: "Undo" }).click();
+	await expect(page.locator("#editor p", { hasText: "Birinci paragraf." })).toBeVisible();
+	await card.getByRole("button", { name: "Apply" }).click();
+	await expect(page.locator("#editor p", { hasText: "İlk paragraf." })).toBeVisible();
+
+	// The proposed command runs from its row.
+	const row = pane.locator(".assistant-command-row");
+	await expect(row).toContainText("Run “Save”");
+	await row.getByRole("button", { name: "Run" }).click();
+	await expect(page.locator(".save-status")).toHaveText("Saved");
+	expect(await readFile(doc, "utf8")).toContain("İlk paragraf.");
+
+	// The latest reply can be asked for again, in its place.
+	await pane.getByRole("button", { name: "Regenerate the reply" }).click();
+	await expect.poll(async () => (await claude.calls()).length).toBe(2);
+	await expect(pane.locator(".assistant-user")).toHaveCount(1);
+	await expect(pane.locator(".assistant-changes-block")).toHaveCount(1);
 	expect(errors).toEqual([]);
 	await app.close();
 });

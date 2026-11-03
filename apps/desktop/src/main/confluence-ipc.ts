@@ -11,6 +11,7 @@ import type {
 } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
 import { fileUrl } from "../shared/confluence-common.js";
+import { parseSearchRequest } from "../shared/confluence-search.js";
 import { diagramDataName } from "../shared/diagram.js";
 import type { Strings } from "../shared/i18n.js";
 import { format, lossLabel } from "../shared/i18n.js";
@@ -130,6 +131,16 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 		windows.openConfluencePage(await client.page(id), win);
 		return { id, title, hasChildren: false };
 	});
+
+	ipcMain.handle(CHANNEL.confluenceFind, async (_event, raw: unknown) => {
+		const request = parseSearchRequest(raw);
+		if (request === null) throw new Error("Invalid search");
+		return (await connected()).find(request);
+	});
+
+	ipcMain.handle(CHANNEL.confluenceAncestors, async (_event, pageId: unknown) =>
+		(await connected()).ancestors(text(pageId, "page id")),
+	);
 
 	ipcMain.handle(CHANNEL.confluenceSearch, async (_event, query: unknown, spaceKey: unknown) =>
 		(await connected()).search(
