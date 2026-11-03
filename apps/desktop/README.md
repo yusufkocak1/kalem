@@ -398,6 +398,11 @@ verir.
   ya da oka çift tıklayınca yazılır (Shift+Enter yeni satır). Bir kararın
   ilk çıkışı **Evet**, ikincisi **Hayır** etiketini kendiliğinden alır; yana
   giden dal elmasın köşesinden çıkar.
+  - **Metin şekle sığar:** uzun metin şeklin içinde satırlara bölünür;
+    yine sığmazsa yazı, kelimeler bölünmeden ve satırlar şeklin dışına
+    taşmadan sığana kadar küçülür (en az 6 punto). Elmas, daire ve belgenin
+    dalgalı alt kenarı gibi daralan yerler hesaba katılır. Küçülen yazı
+    yakınlaştırılarak okunur; şekli büyütmek yazıyı yeniden büyütür.
   - **Seçim:** tıklama, Shift/Ctrl+tıklama (seçime ekler/çıkarır), boş
     kanvasta sürükleyerek seçim kutusu, Ctrl+A. Seçilenler birlikte taşınır,
     silinir, renklendirilir, ok tuşlarıyla kaydırılır.

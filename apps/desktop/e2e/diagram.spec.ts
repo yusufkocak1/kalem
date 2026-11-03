@@ -48,8 +48,9 @@ test("draws a flow diagram into a Markdown file and edits it again", async () =>
 	await expect(text).toBeFocused();
 	await text.fill("Kayıt var mı?");
 	await text.press("Enter");
-	// Wrapped to the diamond: one line per tspan.
-	await expect(canvas.locator('[data-node="n2"] tspan')).toHaveText(["Kayıt var", "mı?"]);
+	// Short enough for one line inside the diamond, at the usual size.
+	await expect(canvas.locator('[data-node="n2"] tspan')).toHaveText(["Kayıt var mı?"]);
+	await expect(canvas.locator('[data-node="n2"] text')).toHaveAttribute("font-size", "14");
 
 	// Dragging from a connection point to another shape connects them.
 	await canvas.locator('[data-node="n1"]').click();
