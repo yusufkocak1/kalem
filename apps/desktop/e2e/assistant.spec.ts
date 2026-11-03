@@ -241,6 +241,24 @@ interface Received {
 	readonly body: Record<string, unknown>;
 }
 
+/** What the fake model asks for, one call a round, before it answers. */
+const TOOL_CALLS = [
+	{ name: "search", input: { query: "class Main" } },
+	{ name: "read_file", input: { path: "src/Main.java" } },
+];
+
+/** Which round of tool calls a request with tools is in (the results it carries); `null` without tools. */
+function toolRound(request: Received | undefined): number | null {
+	if (request === undefined || !Array.isArray(request.body.tools)) return null;
+	const messages = (request.body.messages ?? []) as { role: string; content: unknown }[];
+	return messages.filter(
+		(message) =>
+			message.role === "tool" ||
+			(Array.isArray(message.content) &&
+				message.content.some((block: { type?: string }) => block.type === "tool_result")),
+	).length;
+}
+
 /** A local stand-in for an OpenAI-compatible service and the Anthropic API, streaming REPLY. */
 async function fakeServices(): Promise<{ url: string; received: Received[]; close(): void }> {
 	const received: Received[] = [];
@@ -277,6 +295,122 @@ async function fakeServices(): Promise<{ url: string; received: Received[]; clos
 						last_id: "fake-large",
 					}),
 				);
+			} else if (path === "/v1/chat/completions" && toolRound(received.at(-1)) !== null) {
+				const round = toolRound(received.at(-1)) as number;
+				const call = TOOL_CALLS[round];
+				if (call === undefined) {
+					sse(response, [
+						[null, { choices: [{ delta: { content: "Main sınıfı boş." } }] }],
+						[null, { choices: [{ delta: {}, finish_reason: "stop" }] }],
+						[null, "[DONE]"],
+					]);
+				} else {
+					const args = JSON.stringify(call.input);
+					sse(response, [
+						[
+							null,
+							{
+								choices: [
+									{
+										delta: {
+											tool_calls: [
+												{
+													index: 0,
+													id: `call_${round}`,
+													type: "function",
+													function: { name: call.name, arguments: args.slice(0, 5) },
+												},
+											],
+										},
+									},
+								],
+							},
+						],
+						[
+							null,
+							{
+								choices: [
+									{ delta: { tool_calls: [{ index: 0, function: { arguments: args.slice(5) } }] } },
+								],
+							},
+						],
+						[null, { choices: [{ delta: {}, finish_reason: "tool_calls" }] }],
+						[null, "[DONE]"],
+					]);
+				}
+			} else if (path === "/v1/messages" && toolRound(received.at(-1)) !== null) {
+				const round = toolRound(received.at(-1)) as number;
+				const call = TOOL_CALLS[round];
+				const message = {
+					id: `msg_t${round}`,
+					type: "message",
+					role: "assistant",
+					model: "claude-opus-5-5",
+					content: [],
+					stop_reason: null,
+					stop_sequence: null,
+					usage: { input_tokens: 10, output_tokens: 1 },
+				};
+				const block =
+					call === undefined
+						? [
+								[
+									"content_block_start",
+									{
+										type: "content_block_start",
+										index: 0,
+										content_block: { type: "text", text: "" },
+									},
+								],
+								[
+									"content_block_delta",
+									{
+										type: "content_block_delta",
+										index: 0,
+										delta: { type: "text_delta", text: "Main sınıfı boş." },
+									},
+								],
+							]
+						: [
+								[
+									"content_block_start",
+									{
+										type: "content_block_start",
+										index: 0,
+										content_block: {
+											type: "tool_use",
+											id: `toolu_${round}`,
+											name: call.name,
+											input: {},
+										},
+									},
+								],
+								[
+									"content_block_delta",
+									{
+										type: "content_block_delta",
+										index: 0,
+										delta: { type: "input_json_delta", partial_json: JSON.stringify(call.input) },
+									},
+								],
+							];
+				sse(response, [
+					["message_start", { type: "message_start", message }],
+					...(block as [string, unknown][]),
+					["content_block_stop", { type: "content_block_stop", index: 0 }],
+					[
+						"message_delta",
+						{
+							type: "message_delta",
+							delta: {
+								stop_reason: call === undefined ? "end_turn" : "tool_use",
+								stop_sequence: null,
+							},
+							usage: { output_tokens: 20 },
+						},
+					],
+					["message_stop", { type: "message_stop" }],
+				]);
 			} else if (path === "/v1/chat/completions") {
 				sse(response, [
 					...chunks(REPLY).map((text): [null, unknown] => [
@@ -842,7 +976,12 @@ test("adds files and folders to a chat, and Claude may read the folders", async 
 	await expect(pane.locator(".assistant-user .assistant-notes")).toContainText("with 2 sources");
 	const [first] = await claude.calls();
 	expect(first?.args.join(" ")).toContain(`--add-dir ${code} --add-dir ${folder}`);
-	expect(first?.prompt).toContain(`<folder path="${code}">\nproje/\n  src/Main.java\n</folder>`);
+	// The folder is a workspace: what it holds is said, its files are read by Claude when needed.
+	expect(first?.prompt).toContain("<workspace>");
+	expect(first?.prompt).toContain(
+		`<workspace-folder name="proje" path="${code}">\n1 files (.java 1)`,
+	);
+	expect(first?.prompt).not.toContain("class Main");
 	expect(first?.prompt).toContain("Kullanıcı giriş yapabilmeli.");
 
 	// The same sources are not sent again; a removed one is gone.
@@ -921,4 +1060,83 @@ test("applies the changes and runs the commands a reply proposes, and undoes the
 	await expect(pane.locator(".assistant-changes-block")).toHaveCount(1);
 	expect(errors).toEqual([]);
 	await app.close();
+});
+
+test("lets an API service search and read a workspace folder instead of sending its files", async () => {
+	const services = await fakeServices();
+	const folder = await tempDir("assistant-workspace");
+	const code = join(folder, "proje");
+	await mkdir(join(code, "src"), { recursive: true });
+	await writeFile(join(code, "src", "Main.java"), "class Main {}\n");
+	const { app, page, errors } = await launch({
+		settings: { assistant: true },
+		env: {
+			KALEM_CLAUDE: join(folder, "nothing-here"),
+			NO_PROXY: "127.0.0.1",
+			no_proxy: "127.0.0.1",
+		},
+	});
+	const pane = page.locator(".assistant");
+	const form = pane.locator(".assistant-settings");
+	const input = pane.locator(".assistant-input");
+	const reply = pane.locator(".assistant-assistant").last();
+
+	for (const service of ["custom", "anthropic"] as const) {
+		await pane
+			.getByRole("button", {
+				name: service === "custom" ? "Connect a Service…" : "Connection settings",
+			})
+			.click();
+		await form.getByLabel("Service").selectOption(service);
+		await form
+			.getByLabel("Address")
+			.fill(service === "custom" ? `${services.url}/v1` : services.url);
+		await form.getByLabel("API key").fill("sk-test");
+		if (service === "custom") await form.getByLabel("Model").fill("fake-large");
+		await form.getByRole("button", { name: "Save" }).click();
+		await expect(form).toBeHidden();
+
+		await app.evaluate(
+			({ dialog }, filePaths) => {
+				dialog.showOpenDialog = (async () => ({ canceled: false, filePaths })) as never;
+			},
+			[code],
+		);
+		await pane.getByRole("button", { name: "Add files or folders to the chat" }).click();
+		await pane.getByRole("menuitem", { name: "Folder…" }).click();
+		await input.fill("Main sınıfı ne yapıyor?");
+		await input.press("Enter");
+		await expect(reply.locator(".assistant-markdown")).toHaveText("Main sınıfı boş.");
+		// What it looked up is listed, folded away.
+		await expect(reply.locator(".assistant-steps summary")).toHaveText(
+			"Looked into the workspace (2)",
+		);
+		await reply.locator(".assistant-steps summary").click();
+		await expect(reply.locator(".assistant-steps li")).toHaveText([
+			"Searched “class Main”",
+			"Read src/Main.java",
+		]);
+		if (service === "custom")
+			await page.screenshot({ path: "test-results/assistant-workspace.png" });
+	}
+
+	const path = (service: string): string =>
+		service === "custom" ? "/v1/chat/completions" : "/v1/messages";
+	for (const service of ["custom", "anthropic"]) {
+		const asked = services.received.filter((request) => request.path === path(service));
+		expect(asked).toHaveLength(3);
+		const firstText = JSON.stringify(asked[0]?.body.messages);
+		// The question says what the folder holds; its files are not in it.
+		expect(firstText).toContain("<workspace>");
+		expect(firstText).not.toContain("class Main {}");
+		expect(JSON.stringify(asked[0]?.body.tools)).toContain("read_file");
+		// The results of the calls go back: the search's line, then the file.
+		const last = JSON.stringify(asked[2]?.body.messages);
+		expect(last).toContain("src/Main.java:1: class Main {}");
+		expect(last).toContain("1  class Main {}");
+	}
+
+	expect(errors).toEqual([]);
+	await app.close();
+	services.close();
 });

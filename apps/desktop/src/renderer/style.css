@@ -1734,6 +1734,30 @@ button {
 	display: none;
 }
 
+.assistant-steps {
+	margin: 0 0 6px;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.assistant-steps summary {
+	cursor: pointer;
+	user-select: none;
+}
+
+.assistant-steps ol {
+	margin: 4px 0 0;
+	padding-inline-start: 20px;
+	max-height: 180px;
+	overflow-y: auto;
+}
+
+.assistant-steps li {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .assistant-waiting {
 	display: inline-flex;
 	align-items: center;

@@ -79,6 +79,8 @@ interface Message {
 	readonly notes: readonly string[];
 	/** The model that answered; empty when the service chose. */
 	readonly model?: string;
+	/** What it looked up in the workspace while answering, in this run. */
+	steps?: string[];
 }
 
 /** A conversation, shown or not; a reply keeps coming in while another chat is shown. */
@@ -1297,9 +1299,13 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					? diagramCard(part)
 					: actionsCard(part.actions, message, index),
 		);
+		const steps = stepsView(message);
+		if (steps !== null) nodes.unshift(steps);
 		if (!message.done && message.error === null) {
+			const lastStep = message.steps?.at(-1);
 			if (pending !== null) nodes.push(waiting(pending));
-			else if (message.text === "") nodes.push(waiting(t.assistantThinking));
+			else if (message.text === "" || (lastStep !== undefined && message.text.endsWith("\n\n")))
+				nodes.push(waiting(lastStep ?? t.assistantThinking));
 			else nodes.push(el("span", { class: "assistant-typing" }));
 		}
 		if (message.error !== null) {
@@ -1313,6 +1319,38 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		view.body.replaceChildren(...nodes);
 		if (follow) log.scrollTop = log.scrollHeight;
 		updateJump();
+	}
+
+	/** One look into the workspace, as the chat says it. */
+	function stepLabel(tool: string, detail: string): string {
+		switch (tool) {
+			case "search":
+			case "Grep":
+				return format(t.assistantStepSearch, detail);
+			case "read_file":
+			case "Read":
+				return format(t.assistantStepRead, detail);
+			case "list_files":
+			case "Glob":
+			case "LS":
+				return detail === "" ? t.assistantStepListAll : format(t.assistantStepList, detail);
+			default:
+				return detail === "" ? tool : `${tool}: ${detail}`;
+		}
+	}
+
+	/** The looks into the workspace behind a reply, folded away once it is done. */
+	function stepsView(message: Message): HTMLElement | null {
+		const steps = message.steps ?? [];
+		if (steps.length === 0) return null;
+		const view = el("details", {
+			class: "assistant-steps",
+			children: [
+				el("summary", { text: format(t.assistantSteps, steps.length) }),
+				el("ol", { children: steps.map((step) => el("li", { text: step })) }),
+			],
+		});
+		return view;
 	}
 
 	function waiting(label: string): HTMLElement {
@@ -1659,6 +1697,10 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				reply.error = event.message;
 				if (chat === active) scheduleRender(reply);
 				chat.ended?.();
+				return;
+			case "step":
+				reply.steps = [...(reply.steps ?? []), stepLabel(event.tool, event.detail)];
+				if (chat === active) scheduleRender(reply);
 				return;
 			case "done":
 				chat.ended?.();

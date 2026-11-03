@@ -217,6 +217,13 @@ export interface ChatMessage {
 /** Longer answers are cut by the service; this leaves room for long documents. */
 export const MAX_OUTPUT_TOKENS = 64_000;
 
+/** A function the model may call, as Chat Completions describes it. */
+export interface ChatTool {
+	readonly name: string;
+	readonly description: string;
+	readonly parameters: unknown;
+}
+
 /** A Chat Completions request that streams. */
 export function chatCompletionsRequest(
 	connection: Connection,
@@ -224,6 +231,11 @@ export function chatCompletionsRequest(
 	system: string,
 	messages: readonly ChatMessage[],
 	images: readonly PromptImage[] = [],
+	extra: {
+		readonly tools?: readonly ChatTool[];
+		/** Messages of this turn after the question: tool calls and their results, as sent. */
+		readonly turn?: readonly unknown[];
+	} = {},
 ): { url: string; init: RequestInit } {
 	// Pictures go with the last question, each after its name.
 	const sent = messages.map(({ role, content }, i) =>
@@ -252,7 +264,15 @@ export function chatCompletionsRequest(
 			body: JSON.stringify({
 				model: connection.model,
 				stream: true,
-				messages: [{ role: "system", content: system }, ...sent],
+				messages: [{ role: "system", content: system }, ...sent, ...(extra.turn ?? [])],
+				...((extra.tools ?? []).length === 0
+					? {}
+					: {
+							tools: (extra.tools ?? []).map(({ name, description, parameters }) => ({
+								type: "function",
+								function: { name, description, parameters },
+							})),
+						}),
 			}),
 		},
 	};
@@ -297,9 +317,18 @@ export class SseReader {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null;
 
-/** One Chat Completions stream event: more text, the end, or an error. */
+/** A piece of a tool call as it streams in: pieces with the same index make one call. */
+export interface ToolCallDelta {
+	readonly index: number;
+	readonly id?: string;
+	readonly name?: string;
+	readonly arguments?: string;
+}
+
+/** One Chat Completions stream event: more text, a tool call, the end, or an error. */
 export function chatCompletionsDelta(data: string): {
 	text?: string;
+	toolCalls?: ToolCallDelta[];
 	done?: boolean;
 	error?: string;
 } {
@@ -316,7 +345,24 @@ export function chatCompletionsDelta(data: string): {
 	if (!isRecord(choice)) return {};
 	const delta = isRecord(choice.delta) ? choice.delta : {};
 	const text = typeof delta.content === "string" ? delta.content : "";
-	return text === "" ? {} : { text };
+	const toolCalls: ToolCallDelta[] = [];
+	for (const [position, raw] of (Array.isArray(delta.tool_calls)
+		? delta.tool_calls
+		: []
+	).entries()) {
+		if (!isRecord(raw)) continue;
+		const fn = isRecord(raw.function) ? raw.function : {};
+		toolCalls.push({
+			index: typeof raw.index === "number" ? raw.index : position,
+			...(typeof raw.id === "string" ? { id: raw.id } : {}),
+			...(typeof fn.name === "string" ? { name: fn.name } : {}),
+			...(typeof fn.arguments === "string" ? { arguments: fn.arguments } : {}),
+		});
+	}
+	return {
+		...(text === "" ? {} : { text }),
+		...(toolCalls.length === 0 ? {} : { toolCalls }),
+	};
 }
 
 function errorText(error: unknown): string {
