@@ -23,6 +23,7 @@ import { AssistantStore } from "./assistant-store.js";
 import { confluenceClient } from "./confluence-ipc.js";
 import { ConfluenceStore } from "./confluence-store.js";
 import { DraftStore } from "./drafts.js";
+import { backgroundFetch } from "./git.js";
 import { VersionStore } from "./history.js";
 import { registerIpc } from "./ipc.js";
 import type { MenuContext } from "./menu.js";
@@ -43,6 +44,9 @@ import { Updater } from "./updater.js";
 import type { AppWindow } from "./windows.js";
 import { errorMessage, WindowManager } from "./windows.js";
 import { WorkspaceWatcher } from "./workspace-files.js";
+
+/** How often the open folders' repositories are fetched in the background. */
+const AUTO_FETCH_INTERVAL = 10 * 60_000;
 
 // Lets end-to-end tests run against a throwaway profile. The single-instance
 // lock is tied to this folder, so tests do not collide with a running app.
@@ -276,6 +280,20 @@ function start(): void {
 	};
 	/** Files appearing, going or renamed in the open folders refresh the Files pane. */
 	const watcher = new WorkspaceWatcher(workspaceChanged);
+
+	/**
+	 * Now and then the open folders' repositories are fetched, so the Files
+	 * pane shows what there is to pull. Quietly: nothing asks to sign in.
+	 */
+	const fetchInBackground = async (): Promise<void> => {
+		if (!store.settings.gitAutoFetch) return;
+		const fetched = await Promise.all(store.state.workspaces.map((root) => backgroundFetch(root)));
+		if (fetched.some(Boolean)) workspaceChanged();
+	};
+	setTimeout(() => {
+		void fetchInBackground();
+		setInterval(() => void fetchInBackground(), AUTO_FETCH_INTERVAL);
+	}, 60_000);
 
 	function setWorkspaces(folders: readonly string[]): void {
 		store.update({ workspaces: folders.slice(0, MAX_WORKSPACES) });

@@ -109,6 +109,8 @@ const filesPane = createFilesPane({
 	notify: (text) => session.notices.show({ id: "files", kind: "error", text }),
 	inform: (text) => session.notices.show({ id: "files", kind: "info", text }),
 	git: createGitDialogs(t, startup.language),
+	autoFetch: () => settings.gitAutoFetch,
+	setAutoFetch: (on) => updateSettings({ gitAutoFetch: on }),
 });
 const versionHistory = createVersionHistory({ t, lang: startup.language });
 const attachmentsDialog = createAttachmentsDialog({

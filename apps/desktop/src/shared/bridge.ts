@@ -57,6 +57,8 @@ export interface Settings {
 	readonly checkUpdates: boolean;
 	/** A notification-area icon and the system-wide quick note shortcut; the app stays there when its windows close. */
 	readonly tray: boolean;
+	/** Fetch the open folders' repositories in the background now and then. */
+	readonly gitAutoFetch: boolean;
 	/** The Claude assistant's panel, at the right of the document. */
 	readonly assistant: boolean;
 	/** Share the active document with Claude along with each question. */
@@ -90,6 +92,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	confluenceFavorites: [],
 	checkUpdates: true,
 	tray: false,
+	gitAutoFetch: true,
 	assistant: false,
 	assistantDocument: true,
 	claudePath: "",
@@ -360,6 +363,22 @@ export interface GitStatus {
 	readonly behind: number;
 	/** Files changed, added or not tracked. */
 	readonly changed: number;
+	/** The changed files, at most a few thousand. */
+	readonly files: readonly GitFileChange[];
+	/** Files with unresolved conflicts. */
+	readonly conflicts: number;
+	/** A merge, rebase or cherry-pick that stopped half-way (on a conflict). */
+	readonly operation: GitOperation | null;
+}
+
+export type GitOperation = "merge" | "rebase" | "cherry-pick";
+
+export type GitChangeKind = "modified" | "added" | "deleted" | "renamed" | "untracked" | "conflict";
+
+export interface GitFileChange {
+	/** Below the repository's top folder, with `/`. */
+	readonly path: string;
+	readonly kind: GitChangeKind;
 }
 
 export interface GitBranch {
@@ -371,10 +390,15 @@ export interface GitBranch {
 
 /** What the Files pane can ask git to do in an open folder. */
 export type GitAction =
-	| { readonly kind: "fetch" | "pull" | "push" | "init" }
+	| { readonly kind: "fetch" | "push" | "init" | "abort" | "continue" }
+	/** `how` when the branches went apart: merge them or put ours on top; git's setting otherwise. */
+	| { readonly kind: "pull"; readonly how?: "merge" | "rebase" }
+	/** Puts back the last commit's version of the files; new files go to the recycle bin. */
+	| { readonly kind: "discard"; readonly paths: readonly string[] }
 	| { readonly kind: "checkout"; readonly branch: string }
 	| { readonly kind: "create-branch"; readonly branch: string }
-	| { readonly kind: "commit"; readonly message: string };
+	/** Without `paths`, every change; with them, only those files. */
+	| { readonly kind: "commit"; readonly message: string; readonly paths?: readonly string[] };
 
 export interface Workspace {
 	/**
@@ -686,6 +710,10 @@ export interface KalemBridge {
 	gitBranches(folder: string): Promise<readonly GitBranch[]>;
 	/** Runs git in a shown folder; resolves to what git said it did. */
 	gitRun(folder: string, action: GitAction): Promise<string>;
+	/** How a changed file of a shown folder's repository differs from the last commit. */
+	gitDiff(folder: string, path: string): Promise<string>;
+	/** A commit message for the changes (of `paths` only, when given), written by the assistant. */
+	gitSuggestMessage(folder: string, paths?: readonly string[]): Promise<string>;
 	/** Asks where to clone `url`, clones it and opens the new folder; its path, `null` when cancelled. */
 	gitClone(url: string): Promise<string | null>;
 
@@ -796,6 +824,8 @@ export const CHANNEL = {
 	gitBranches: "kalem:git-branches",
 	gitRun: "kalem:git-run",
 	gitClone: "kalem:git-clone",
+	gitDiff: "kalem:git-diff",
+	gitSuggestMessage: "kalem:git-suggest-message",
 	documentMoved: "kalem:document-moved",
 	workspaceChange: "kalem:workspace-change",
 	listVersions: "kalem:list-versions",

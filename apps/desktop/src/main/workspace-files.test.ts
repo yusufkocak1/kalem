@@ -7,6 +7,7 @@ import {
 	createEntry,
 	isInside,
 	movedPath,
+	refreshDelay,
 	renameEntry,
 	WorkspaceFileError,
 } from "./workspace-files.js";
@@ -85,5 +86,19 @@ describe("workspace files", () => {
 		expect(
 			movedPath(join(root, "eskiler", "a.md"), join(root, "eski"), join(root, "yeni")),
 		).toBeNull();
+	});
+});
+
+describe("what refreshes the Files pane", () => {
+	it("is files coming and going soon, a file's text and Git's state a little later", () => {
+		expect(refreshDelay("rename", "src/a.md")).toBe(400);
+		expect(refreshDelay("change", "src/a.md")).toBe(1500);
+		expect(refreshDelay("change", ".git/HEAD")).toBe(800);
+		expect(refreshDelay("rename", ".git/index")).toBe(800);
+		expect(refreshDelay("rename", ".git\\refs\\heads\\main")).toBe(800);
+		expect(refreshDelay("change", ".git/objects/ab/cdef")).toBeNull();
+		expect(refreshDelay("rename", ".git/index.lock")).toBeNull();
+		expect(refreshDelay("change", "node_modules/x/index.js")).toBeNull();
+		expect(refreshDelay("rename", "notlar.assets/resim.png")).toBeNull();
 	});
 });

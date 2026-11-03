@@ -16,6 +16,7 @@ import type {
 	Workspace,
 } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
+import { COMMIT_MESSAGE_PROMPT, cleanCommitMessage } from "../shared/commit-message.js";
 import { toTextFormat } from "../shared/encoding.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
@@ -33,6 +34,7 @@ import {
 	TEXT_EXTENSIONS,
 } from "../shared/paths.js";
 import type { ChatStore } from "./assistant-chats.js";
+import type { AssistantService } from "./assistant-ipc.js";
 import { registerAssistantIpc } from "./assistant-ipc.js";
 import type { AssistantStore } from "./assistant-store.js";
 import { registerConfluenceIpc } from "./confluence-ipc.js";
@@ -50,8 +52,10 @@ import type { DraftStore } from "./drafts.js";
 import { copyAttachment, MAX_IMAGE_SIZE, writeDocument, writeImage } from "./files.js";
 import {
 	cloneRepository,
+	commitContext,
 	GitError,
 	gitBranches,
+	gitDiff,
 	gitStatus,
 	isCloneUrl,
 	runGitAction,
@@ -127,6 +131,8 @@ function toImageFile(raw: unknown): ImageFile {
  */
 export function registerIpc(ctx: IpcContext): void {
 	const { windows } = ctx;
+	/** Set at the end, once the assistant's requests are registered. */
+	let assistant: AssistantService;
 
 	const senderOf = (event: IpcMainInvokeEvent | IpcMainEvent): AppWindow => {
 		const win = windows.get(event.sender);
@@ -732,13 +738,76 @@ export function registerIpc(ctx: IpcContext): void {
 
 	ipcMain.handle(CHANNEL.gitRun, async (event, folder: unknown, raw: unknown): Promise<string> => {
 		const win = senderOf(event);
+		const t = ctx.strings();
 		try {
-			return await runGitAction(shownRoot(win, folder), toGitAction(raw));
+			const root = shownRoot(win, folder);
+			const action = toGitAction(raw);
+			if (action.kind === "discard") {
+				const { response } = await dialog.showMessageBox(win.window, {
+					type: "warning",
+					message: format(
+						t.gitDiscardConfirm,
+						action.paths.length === 1
+							? basename(action.paths[0] as string)
+							: String(action.paths.length),
+					),
+					detail: t.gitDiscardDetail,
+					buttons: [t.gitDiscard, t.cancel],
+					defaultId: 1,
+					cancelId: 1,
+				});
+				if (response !== 0) return "";
+			}
+			const trash = (path: string): Promise<void> => shell.trashItem(path);
+			try {
+				return await runGitAction(root, action, trash);
+			} catch (error) {
+				if (!(error instanceof GitError) || error.problem !== "diverged") throw error;
+				// The branches went apart and git has no setting for it: the user says how.
+				const { response } = await dialog.showMessageBox(win.window, {
+					type: "question",
+					message: t.gitDiverged,
+					detail: t.gitDivergedDetail,
+					buttons: [t.gitMerge, t.gitRebase, t.cancel],
+					defaultId: 0,
+					cancelId: 2,
+				});
+				if (response === 2) return "";
+				return await runGitAction(root, { kind: "pull", how: response === 0 ? "merge" : "rebase" });
+			}
 		} catch (error) {
 			throw gitProblem(error);
 		} finally {
 			// Branches and files change under the open folders: every window shows it.
 			for (const other of windows.all()) other.window.webContents.send(CHANNEL.workspaceChange);
+		}
+	});
+
+	ipcMain.handle(CHANNEL.gitDiff, async (event, folder: unknown, path: unknown) => {
+		try {
+			if (typeof path !== "string") throw new Error("Invalid path");
+			return await gitDiff(shownRoot(senderOf(event), folder), path);
+		} catch (error) {
+			throw gitProblem(error);
+		}
+	});
+
+	ipcMain.handle(CHANNEL.gitSuggestMessage, async (event, folder: unknown, paths: unknown) => {
+		const root = shownRoot(senderOf(event), folder);
+		const chosen =
+			Array.isArray(paths) && paths.every((path) => typeof path === "string")
+				? (paths as string[])
+				: undefined;
+		try {
+			const changes = await commitContext(root, chosen);
+			const text = await assistant.complete(
+				COMMIT_MESSAGE_PROMPT,
+				`${changes}\n\nWrite the commit message for these changes.`,
+				event.sender,
+			);
+			return cleanCommitMessage(text);
+		} catch (error) {
+			throw gitProblem(error);
 		}
 	});
 
@@ -842,7 +911,7 @@ export function registerIpc(ctx: IpcContext): void {
 		toImageFile,
 	});
 
-	registerAssistantIpc({
+	assistant = registerAssistantIpc({
 		store: ctx.store,
 		assistant: ctx.assistant,
 		chats: ctx.chats,

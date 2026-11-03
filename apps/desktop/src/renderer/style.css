@@ -2510,6 +2510,235 @@ button {
 	color: var(--app-muted);
 }
 
+/* What Git sees changed, as other editors mark it. */
+.files-item {
+	--git-modified: #b45309;
+	--git-added: #15803d;
+	--git-untracked: #15803d;
+	--git-deleted: #b91c1c;
+	--git-renamed: #1d4ed8;
+	--git-conflict: #be123c;
+}
+
+@media (prefers-color-scheme: dark) {
+	.files-item {
+		--git-modified: #fbbf24;
+		--git-added: #4ade80;
+		--git-untracked: #4ade80;
+		--git-deleted: #f87171;
+		--git-renamed: #60a5fa;
+		--git-conflict: #fb7185;
+	}
+}
+
+.files-git-badge {
+	flex: none;
+	width: 14px;
+	margin-inline-start: 4px;
+	font-size: 11px;
+	font-weight: 700;
+	text-align: center;
+}
+
+.files-git-dot {
+	flex: none;
+	width: 6px;
+	height: 6px;
+	margin-inline: 4px;
+	border-radius: 50%;
+	background: var(--git-modified);
+	opacity: 0.7;
+}
+
+.files-item.git-modified :is(.files-name, .files-git-badge) {
+	color: var(--git-modified);
+}
+
+.files-item.git-added :is(.files-name, .files-git-badge),
+.files-item.git-untracked :is(.files-name, .files-git-badge) {
+	color: var(--git-added);
+}
+
+.files-item.git-deleted :is(.files-name, .files-git-badge) {
+	color: var(--git-deleted);
+	text-decoration: line-through;
+}
+
+.files-item.git-deleted .files-git-badge {
+	text-decoration: none;
+}
+
+.files-item.git-renamed :is(.files-name, .files-git-badge) {
+	color: var(--git-renamed);
+}
+
+.files-item.git-conflict :is(.files-name, .files-git-badge) {
+	color: var(--git-conflict);
+	font-weight: 600;
+}
+
+.files-git.conflicted {
+	border-color: color-mix(in srgb, var(--app-error) 60%, var(--app-border));
+}
+
+.files-git.conflicted .files-git-state {
+	color: var(--app-error);
+}
+
+/* --- Git: commit and diff windows --- */
+
+.git-dialog.git-commit {
+	width: min(560px, calc(100vw - 32px));
+}
+
+.git-all {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.git-files {
+	max-height: 220px;
+	margin: 0;
+	padding: 4px 0;
+	overflow-y: auto;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-surface);
+	list-style: none;
+}
+
+.git-files label {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 8px;
+	font-size: 12px;
+}
+
+.git-files label:hover {
+	background: var(--app-hover);
+}
+
+.git-letter {
+	flex: none;
+	width: 12px;
+	font-weight: 700;
+	text-align: center;
+}
+
+.git-letter.git-modified {
+	color: #b45309;
+}
+.git-letter.git-added,
+.git-letter.git-untracked {
+	color: #15803d;
+}
+.git-letter.git-deleted {
+	color: #b91c1c;
+}
+.git-letter.git-renamed {
+	color: #1d4ed8;
+}
+
+.git-file-path {
+	min-width: 0;
+	overflow: hidden;
+	font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.git-message-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.git-suggest {
+	padding: 3px 10px;
+	font-size: 12px;
+}
+
+.git-commit textarea {
+	box-sizing: border-box;
+	width: 100%;
+	padding: 7px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-surface);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 13px;
+	resize: vertical;
+}
+
+.git-commit textarea:focus {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -1px;
+}
+
+.git-dialog.git-diff-dialog {
+	display: none;
+	flex-direction: column;
+	gap: 10px;
+	width: min(900px, calc(100vw - 48px));
+	height: min(640px, calc(100vh - 64px));
+}
+
+.git-dialog.git-diff-dialog[open] {
+	display: flex;
+}
+
+.git-diff-dialog h2 {
+	margin: 0;
+	overflow: hidden;
+	font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+	font-size: 14px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.git-diff {
+	flex: 1;
+	margin: 0;
+	padding: 6px 0;
+	overflow: auto;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-surface);
+	font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+	font-size: 12px;
+	line-height: 1.45;
+}
+
+.git-diff-line {
+	display: block;
+	padding: 0 10px;
+	white-space: pre;
+}
+
+.git-diff-line.add {
+	background: color-mix(in srgb, #16a34a 16%, transparent);
+}
+
+.git-diff-line.remove {
+	background: color-mix(in srgb, #dc2626 14%, transparent);
+}
+
+.git-diff-line.hunk {
+	color: var(--app-accent);
+}
+
+.git-diff-line.head {
+	color: var(--app-muted);
+	font-weight: 600;
+}
+
 /* --- Files: context menu --- */
 
 .files-menu {

@@ -105,16 +105,42 @@ export function movedPath(path: string, from: string, to: string): string | null
 /** Folders whose changes the pane does not show, so they do not refresh it. */
 const IGNORED = new Set([".git", "node_modules", "dist", "build", "out", "target", "vendor"]);
 
+/** What in a `.git` folder says the branch, the staged files or the remote changed. */
+const GIT_STATE = new Set([
+	"HEAD",
+	"index",
+	"MERGE_HEAD",
+	"FETCH_HEAD",
+	"CHERRY_PICK_HEAD",
+	"packed-refs",
+	"refs",
+	"rebase-merge",
+	"rebase-apply",
+]);
+
+/**
+ * How soon a change below an open folder refreshes the pane: files that
+ * come, go or are renamed soon; the text of a file changing (its Git mark
+ * may change) or Git's own state (a commit, a branch switch, a fetch made
+ * in a terminal) a little later; `null` for what the pane does not show.
+ */
+export function refreshDelay(type: string, file: string): number | null {
+	const parts = file.split(/[\\/]/);
+	if (parts[0] === ".git") return GIT_STATE.has(parts[1] ?? "") ? 800 : null;
+	if (parts.some((part) => IGNORED.has(part) || part.endsWith(".assets"))) return null;
+	return type === "rename" ? 400 : 1500;
+}
+
 /**
  * Watches the open folders, all the way down, and calls `changed` once
- * things settle after files appear, go or are renamed. Contents changing
- * inside a file do not change the pane, but a watcher cannot tell them
- * apart everywhere, so a short pause gathers each burst into one call.
+ * things settle: a pause gathers each burst of changes into one call.
  */
 export class WorkspaceWatcher {
 	readonly #changed: () => void;
 	#watchers: FSWatcher[] = [];
 	#timer: ReturnType<typeof setTimeout> | undefined;
+	/** When the waiting call is due. */
+	#due = 0;
 
 	constructor(changed: () => void) {
 		this.#changed = changed;
@@ -125,11 +151,17 @@ export class WorkspaceWatcher {
 		for (const root of roots) {
 			try {
 				const watcher = watch(root, { recursive: true }, (type, file) => {
-					if (type !== "rename") return;
-					const parts = (file ?? "").split(/[\\/]/);
-					if (parts.some((part) => IGNORED.has(part) || part.endsWith(".assets"))) return;
+					const delay = refreshDelay(type, file ?? "");
+					if (delay === null) return;
+					// A sooner call is not put off by a later one.
+					const due = Date.now() + delay;
+					if (this.#timer !== undefined && this.#due <= due) return;
 					clearTimeout(this.#timer);
-					this.#timer = setTimeout(() => this.#changed(), 400);
+					this.#due = due;
+					this.#timer = setTimeout(() => {
+						this.#timer = undefined;
+						this.#changed();
+					}, delay);
 				});
 				watcher.on("error", () => watcher.close());
 				this.#watchers.push(watcher);
@@ -141,6 +173,7 @@ export class WorkspaceWatcher {
 
 	close(): void {
 		clearTimeout(this.#timer);
+		this.#timer = undefined;
 		for (const watcher of this.#watchers) watcher.close();
 		this.#watchers = [];
 	}
