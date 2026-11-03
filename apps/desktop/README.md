@@ -301,6 +301,27 @@ verir.
   tüm genişliğini kullanır. Gezinme bölmesi sağ kenarından sürüklenerek
   genişletilir (ok tuşları da çalışır, çift tık varsayılana döndürür);
   genişlik hatırlanır.
+- **Confluence öğeleri ve bağlantılar:** sayfadaki korunan öğeler (🔒 ile
+  gösterilen bahsetmeler, sayfa/blog/alan bağlantıları, tarihler, Jira
+  kayıtları, durumlar, çapalar ve diğer satır içi makrolar) **tıklayınca
+  tarayıcıda açılır**. Üzerine gelip bekleyince bir kart açılır:
+  - öğenin türü ve başlığı (Jira anahtarı ve sunucusu; bahsedilen kişinin
+    adı, kullanıcı adı ve e-postası — sunucudan sorulur; bağlantılı
+    sayfanın alanı; durumun renkli etiketi; tarihin uzun yazılışı),
+  - makronun ayarları (ör. `toc` için `maxLevel`),
+  - tarayıcıdaki adresi ve **Tarayıcıda Aç**, **Kopyala**, **Bağlantıyı
+    Kopyala** düğmeleri; bağlantılı sayfalar için **Kalem'de Aç** (sayfayı
+    bir sekmede açar).
+  - Jira'nın adresi sayfada yazmaz: Cloud'da sitenin kendi adresi
+    (`/browse/ANAHTAR`), Server'da Confluence'ın uygulama bağlantılarından
+    (`/rest/applinks/…`) makronun sunucu kimliğiyle bulunur. Bulunamazsa
+    kart anahtarı kopyalamayı önerir. JQL'li Jira makroları arama
+    sayfasını açar.
+  - Yalnızca Confluence'ta görünen makrolar (ör. `toc`) sayfanın kendisini
+    tarayıcıda açar.
+  Sıradan bağlantılarda da aynı kart adresi gösterir ve **Tarayıcıda Aç**
+  sunar; bağlantı metni düzenlenebilsin diye onlarda tek tıklama imleci
+  koyar, `Ctrl+tıklama` açar.
 - Server / Data Center'da bir sayfanın alt sayfaları istenirken sunucu 500
   hatası verirse (bazı sayfalarda `expand=children.page` isteği düşer)
   Kalem daha basit isteklerle, en son da aramayla (`parent=ID`) yeniden

@@ -1,6 +1,7 @@
 import type { ChatSummary, StoredChat } from "./chats.js";
 import type { ClaudeEvent, PromptImage } from "./claude.js";
 import type { ConfluenceFormat } from "./confluence.js";
+import type { AtomDetails } from "./confluence-atoms.js";
 import type { ConfluenceSearchRequest, ConfluenceSearchResults } from "./confluence-search.js";
 import type { TextFormat } from "./encoding.js";
 import type { Lang } from "./i18n.js";
@@ -536,6 +537,8 @@ export interface KalemBridge {
 	/** Recently changed pages, filtered by title and space when given. */
 	/** The side pane's search: titles or whole pages, with filters, excerpts and more results. */
 	confluenceFind(request: ConfluenceSearchRequest): Promise<ConfluenceSearchResults>;
+	/** A kept atom of the tab's page described, with what the server knows (a user's name, Jira's address). */
+	confluenceAtom(tabId: string, xml: string): Promise<AtomDetails | null>;
 	/** The ids of the pages above a page, top first. */
 	confluenceAncestors(pageId: string): Promise<readonly string[]>;
 	confluenceSearch(
@@ -699,6 +702,7 @@ export const CHANNEL = {
 	confluenceSearch: "kalem:confluence-search",
 	confluenceFind: "kalem:confluence-find",
 	confluenceAncestors: "kalem:confluence-ancestors",
+	confluenceAtom: "kalem:confluence-atom",
 	confluenceOpenPage: "kalem:confluence-open-page",
 	confluenceReloadPage: "kalem:confluence-reload-page",
 	confluenceSavePage: "kalem:confluence-save-page",

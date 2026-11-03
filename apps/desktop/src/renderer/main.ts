@@ -17,6 +17,7 @@ import {
 } from "../shared/bridge.js";
 import type { ContextDiagram, ReplyDiagram } from "../shared/claude.js";
 import { splitReply } from "../shared/claude.js";
+import { displayUrl } from "../shared/confluence-atoms.js";
 import { attachmentName, linkedAttachment } from "../shared/confluence-common.js";
 import type { Diagram } from "../shared/diagram.js";
 import { DIAGRAM_SUFFIX, serializeDiagram } from "../shared/diagram.js";
@@ -45,6 +46,7 @@ import { insertDivider, insertTable, replaceTable, tableAt, toggleTaskList } fro
 import { createFilesPane } from "./files-pane.js";
 import { icon } from "./icons.js";
 import { createImageViewer } from "./image-viewer.js";
+import { createLinkCard } from "./link-card.js";
 import { createNotices } from "./notices.js";
 import { Previews } from "./previews.js";
 import { documentImages } from "./prompt-images.js";
@@ -1270,6 +1272,35 @@ const openAttachment = (name: string): void =>
 /** A link in a Confluence page to one of its attachments. */
 const attachmentOf = (link: HTMLAnchorElement): string | null =>
 	session.remote === null ? null : linkedAttachment(link.getAttribute("href") ?? "");
+
+createLinkCard({
+	t,
+	lang: startup.language,
+	host: deskArea,
+	place: () => {
+		const page = session.remote;
+		return page === null
+			? null
+			: { tabId: session.id, site: page.site, spaceKey: page.spaceKey, pageUrl: page.webUrl };
+	},
+	atomSource: (href) => session.atomSource(href),
+	resolve: (tabId, xml) => bridge.confluenceAtom(tabId, xml),
+	isAttachment: (link) => attachmentOf(link) !== null,
+	openLink: (url) => bridge.openLink(url),
+	openPage: async (spaceKey, title) => {
+		const site = session.remote?.site;
+		if (site === undefined) return;
+		const [found] = await bridge.confluenceSearch(displayUrl(site, spaceKey, title), null);
+		if (found === undefined) throw new Error(format(t.atomPageMissing, title));
+		await bridge.confluenceOpenPage(found.id);
+	},
+	notice: (text) =>
+		session.notices.show({
+			id: "link",
+			kind: "error",
+			text: format(t.confluenceRequestFailed, ipcErrorMessage(new Error(text))),
+		}),
+});
 
 createAttachmentCard({
 	t,

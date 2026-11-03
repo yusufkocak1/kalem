@@ -448,6 +448,53 @@ describe("ConfluenceClient", () => {
 		expect(denied.calls).toHaveLength(1);
 	});
 
+	it("finds a mentioned user's name and profile, and Jira's address", async () => {
+		const server = fakeFetch([
+			["/rest/api/user?key=8a1", { username: "ayse", displayName: "Ayşe Balcı Polat" }],
+			[
+				"/rest/applinks/1.0/listApplicationlinks",
+				{
+					list: [
+						{
+							application: { id: "abc-1", typeId: "jira", displayUrl: "https://jira.example.com" },
+						},
+					],
+				},
+			],
+		]);
+		const client = new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "", token: "t" },
+			server.fetch,
+		);
+		expect(await client.user({ key: "8a1" })).toEqual({
+			name: "Ayşe Balcı Polat",
+			username: "ayse",
+			email: "",
+			url: "https://wiki.example.com/display/~ayse",
+		});
+		expect(await client.user({ key: "gone" })).toBeNull();
+		expect(await client.user({})).toBeNull();
+		expect(await client.jiraBase("abc-1")).toBe("https://jira.example.com");
+
+		const cloud = fakeFetch([
+			[
+				"/rest/api/user?accountId=557",
+				{ accountId: "557", displayName: "Didem", publicName: "didem" },
+			],
+		]);
+		const cloudClient = new ConfluenceClient(
+			{ site: "https://acme.atlassian.net/wiki", username: "a@b.c", token: "t" },
+			cloud.fetch,
+		);
+		expect(await cloudClient.user({ accountId: "557" })).toEqual({
+			name: "Didem",
+			username: "",
+			email: "",
+			url: "https://acme.atlassian.net/wiki/people/557",
+		});
+		expect(await cloudClient.jiraBase("")).toBe("https://acme.atlassian.net");
+	});
+
 	it("lists the pages above a page, top first", async () => {
 		const server = fakeFetch([
 			["/rest/api/content/42", { ancestors: [{ id: "1" }, { id: "41" }] }],

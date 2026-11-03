@@ -3193,6 +3193,201 @@ button {
 	outline-offset: -1px;
 }
 
+/* --- Link card: what a link or a kept Confluence atom is (link-card.ts) ------ */
+
+.link-card {
+	position: fixed;
+	z-index: 41;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	width: max-content;
+	min-width: 220px;
+	max-width: min(380px, calc(100vw - 16px));
+	padding: 10px 12px;
+	border: 1px solid var(--app-border);
+	border-radius: 10px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: var(--app-shadow);
+	font-size: 13px;
+	animation: link-card-in 0.12s ease-out;
+}
+
+.link-card[hidden] {
+	display: none;
+}
+
+@keyframes link-card-in {
+	from {
+		opacity: 0;
+		transform: translateY(-3px);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.link-card {
+		animation: none;
+	}
+}
+
+.link-card-kind {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--app-muted);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+}
+
+.link-card-kind .icon {
+	width: 14px;
+	height: 14px;
+	color: var(--app-accent);
+}
+
+.link-card-title {
+	font-size: 15px;
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+/* A status shows as Confluence draws it: a coloured lozenge. */
+.link-card-status {
+	align-self: flex-start;
+	padding: 1px 8px;
+	border-radius: 4px;
+	background: #dfe1e6;
+	color: #42526e;
+	font-size: 12px;
+	font-weight: 700;
+	text-transform: uppercase;
+}
+
+.link-card-status[data-colour="green"] {
+	background: #e3fcef;
+	color: #006644;
+}
+
+.link-card-status[data-colour="red"] {
+	background: #ffebe6;
+	color: #bf2600;
+}
+
+.link-card-status[data-colour="yellow"] {
+	background: #fffae6;
+	color: #ff8b00;
+}
+
+.link-card-status[data-colour="blue"] {
+	background: #deebff;
+	color: #0747a6;
+}
+
+.link-card-status[data-colour="purple"] {
+	background: #eae6ff;
+	color: #403294;
+}
+
+.link-card-subtitle {
+	color: var(--app-muted);
+	font-size: 12px;
+	overflow-wrap: anywhere;
+}
+
+.link-card-fields {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 2px 10px;
+	max-height: 160px;
+	margin: 0;
+	padding: 6px 8px;
+	overflow-y: auto;
+	border-radius: 6px;
+	background: var(--app-surface);
+	font-size: 12px;
+}
+
+.link-card-fields dt {
+	color: var(--app-muted);
+}
+
+.link-card-fields dd {
+	min-width: 0;
+	margin: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.link-card-url {
+	overflow: hidden;
+	color: var(--app-accent);
+	font-size: 12px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.link-card-url.loading {
+	color: var(--app-muted);
+}
+
+.link-card-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-top: 2px;
+}
+
+.link-card-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 4px 9px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.link-card-button .icon {
+	width: 13px;
+	height: 13px;
+}
+
+.link-card-button:hover {
+	border-color: var(--app-accent);
+	color: var(--app-accent);
+}
+
+.link-card-button.primary {
+	border-color: var(--app-accent);
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+}
+
+.link-card-button.primary:hover {
+	color: var(--app-accent-text);
+	filter: brightness(1.08);
+}
+
+.link-card-button:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 1px;
+}
+
+.link-card-hint {
+	margin: 2px 0 0;
+	color: var(--app-muted);
+	font-size: 11px;
+	line-height: 1.4;
+}
+
 /* --- Diagram editor ---------------------------------------------------------- */
 
 .diagram-editor {
@@ -4309,6 +4504,18 @@ pre[data-confluence-locked]::before {
 #editor a[href^="#confluence-keep-"]::before {
 	content: "🔒 ";
 	font-size: 0.75em;
+}
+
+/* A kept atom opens with a click: it reads as something to follow. */
+#editor a[href^="#confluence-keep-"] {
+	cursor: pointer;
+	transition: background-color 0.12s;
+}
+
+#editor a[href^="#confluence-keep-"]:hover {
+	background: color-mix(in srgb, var(--kalem-accent) 22%, transparent);
+	text-decoration: underline;
+	text-underline-offset: 0.15em;
 }
 
 /* Layout column markers: a divider with a label, quieter than a macro box. */

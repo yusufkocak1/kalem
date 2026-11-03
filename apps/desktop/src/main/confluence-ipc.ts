@@ -10,6 +10,7 @@ import type {
 	RemotePage,
 } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
+import { describeAtom, jiraUrl } from "../shared/confluence-atoms.js";
 import { fileUrl } from "../shared/confluence-common.js";
 import { parseSearchRequest } from "../shared/confluence-search.js";
 import { diagramDataName } from "../shared/diagram.js";
@@ -136,6 +137,46 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 		const request = parseSearchRequest(raw);
 		if (request === null) throw new Error("Invalid search");
 		return (await connected()).find(request);
+	});
+
+	/** Jira's address by site and server id, found once a run. */
+	const jiraBases = new Map<string, Promise<string | null>>();
+
+	ipcMain.handle(CHANNEL.confluenceAtom, async (event, tabId: unknown, xml: unknown) => {
+		const win = senderOf(event);
+		if (typeof xml !== "string" || xml.length > 100_000) throw new Error("Invalid atom");
+		const { client, page } = await remoteOf(win, tabId);
+		const details = describeAtom(xml, {
+			site: page.site,
+			spaceKey: page.spaceKey,
+			pageUrl: page.webUrl,
+		});
+		if (details === null) return null;
+		if (details.user !== undefined) {
+			const user = await client.user(details.user).catch(() => null);
+			if (user === null) return details;
+			return {
+				...details,
+				title: user.name || details.title,
+				subtitle: [user.username, user.email].filter((part) => part !== "").join(" · "),
+				url: user.url ?? details.url,
+				copy: user.name || details.copy,
+			};
+		}
+		if (details.jira !== undefined) {
+			const key = `${client.site}\n${details.jira.serverId}`;
+			let base = jiraBases.get(key);
+			if (base === undefined) {
+				base = client.jiraBase(details.jira.serverId).catch(() => null);
+				jiraBases.set(key, base);
+			}
+			const found = await base;
+			// A failed look-up is tried again next time.
+			if (found === null) jiraBases.delete(key);
+			const url = found === null ? null : jiraUrl(found, details.jira);
+			return { ...details, url };
+		}
+		return details;
 	});
 
 	ipcMain.handle(CHANNEL.confluenceAncestors, async (_event, pageId: unknown) =>

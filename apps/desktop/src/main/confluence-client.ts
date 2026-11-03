@@ -6,6 +6,8 @@ import type {
 	ConfluenceTreePage,
 	RemotePage,
 } from "../shared/bridge.js";
+import type { AtomUser } from "../shared/confluence-atoms.js";
+import { jiraBaseFromLinks } from "../shared/confluence-atoms.js";
 import type {
 	ConfluenceSearchHit,
 	ConfluenceSearchRequest,
@@ -467,6 +469,71 @@ export class ConfluenceClient {
 			}
 		}
 		return { hits, total, next };
+	}
+
+	/**
+	 * A mentioned user's name and profile address; `null` when the server
+	 * does not say (the user is gone, or may not be seen).
+	 */
+	async user(ref: AtomUser): Promise<{
+		readonly name: string;
+		readonly username: string;
+		readonly email: string;
+		readonly url: string | null;
+	} | null> {
+		const query =
+			ref.accountId !== undefined
+				? `accountId=${encodeURIComponent(ref.accountId)}`
+				: ref.key !== undefined
+					? `key=${encodeURIComponent(ref.key)}`
+					: ref.username !== undefined
+						? `username=${encodeURIComponent(ref.username)}`
+						: null;
+		if (query === null) return null;
+		let body: Json;
+		try {
+			body = await this.#json(`/rest/api/user?${query}`);
+		} catch (error) {
+			if (error instanceof ConfluenceError && [400, 403, 404].includes(error.status)) return null;
+			throw error;
+		}
+		const username = asString(body.username) || asString(body.publicName);
+		const accountId = asString(body.accountId) || ref.accountId || "";
+		const url = this.cloud
+			? accountId === ""
+				? null
+				: `${this.site}/people/${encodeURIComponent(accountId)}`
+			: username === ""
+				? null
+				: `${this.site}/display/~${encodeURIComponent(username)}`;
+		return {
+			name: asString(body.displayName) || asString(body.publicName) || username,
+			username: this.cloud ? "" : username,
+			email: asString(body.email),
+			url,
+		};
+	}
+
+	/**
+	 * Jira's address for a Jira macro: on Cloud the site's own host; on
+	 * Server the application link with the macro's server id. `null` when
+	 * it cannot be found out.
+	 */
+	async jiraBase(serverId: string): Promise<string | null> {
+		if (this.cloud) return new URL(this.site).origin;
+		for (const path of [
+			"/rest/applinks/1.0/listApplicationlinks",
+			"/rest/applinks/3.0/applinks",
+			"/rest/applinks/1.0/applicationlink/type/jira",
+		]) {
+			try {
+				const found = jiraBaseFromLinks(await this.#json(path), serverId);
+				if (found !== null) return found;
+			} catch (error) {
+				if (!(error instanceof ConfluenceError)) throw error;
+			}
+		}
+		return null;
 	}
 
 	/** The ids of the pages above a page, top first; it is found in the tree by opening them. */

@@ -28,9 +28,11 @@ function boxLabel(text: string, t: Strings): { text: string; hint: string; kind:
  * every change, like the previews.
  */
 export function decorateLocked(root: HTMLElement, t: Strings): void {
-	// Inline atoms (mentions, page links, dates, inline macros) are kept links.
+	// Inline atoms (mentions, page links, dates, inline macros) are kept links;
+	// pointing at one shows what it is (`link-card.ts`), so there is no tooltip.
 	for (const link of root.querySelectorAll<HTMLElement>(`a[href^="${ATOM_PREFIX}"]`)) {
-		if (link.title !== t.confluenceAtomHint) link.title = t.confluenceAtomHint;
+		if (link.hasAttribute("title")) link.removeAttribute("title");
+		if (!link.hasAttribute("data-confluence-atom")) link.setAttribute("data-confluence-atom", "");
 	}
 	for (const code of root.querySelectorAll<HTMLElement>("pre > code[data-kalem-code]")) {
 		const pre = code.parentElement as HTMLElement;
