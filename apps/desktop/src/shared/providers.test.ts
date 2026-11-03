@@ -86,6 +86,17 @@ describe("Chat Completions", () => {
 			text: "Mer",
 		});
 		expect(chatCompletionsDelta('{"choices":[{"delta":{"role":"assistant"}}]}')).toEqual({});
+		// A tool call comes in pieces, joined by their index.
+		expect(
+			chatCompletionsDelta(
+				'{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"search","arguments":"{\\"qu"}}]}}]}',
+			),
+		).toEqual({ toolCalls: [{ index: 0, id: "c1", name: "search", arguments: '{"qu' }] });
+		expect(
+			chatCompletionsDelta(
+				'{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"ery\\":1}"}}]}}]}',
+			),
+		).toEqual({ toolCalls: [{ index: 0, arguments: 'ery":1}' }] });
 		expect(chatCompletionsDelta("[DONE]")).toEqual({ done: true });
 		expect(chatCompletionsDelta('{"error":{"message":"quota"}}')).toEqual({ error: "quota" });
 		expect(chatCompletionsDelta(": keep-alive")).toEqual({});

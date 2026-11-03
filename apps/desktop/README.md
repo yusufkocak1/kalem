@@ -506,12 +506,24 @@ verir.
   soru kutusunun üstünde birer çip olarak görünür, ✕ ile çıkarılır ve
   sohbetle birlikte saklanır. Örneğin bir kod klasörü ile bir analiz notu
   ekleyip "yazılım analiz dokümanını yaz" denebilir.
-  - **Claude Code / Copilot:** klasörün dosya listesi gönderilir ve klasör
-    `--add-dir` ile okunabilir yapılır; asistan gerek duyduğu dosyaları
-    kendi araçlarıyla (yalnızca okuma) okur. Tek tek eklenen dosyaların
-    metni doğrudan gider.
-  - **API'ler:** dosyaların metni soruyla gider (dosya başına en çok
-    100 000, toplam 300 000 karakter; sığmayanlar sayıyla belirtilir).
+  - **Eklenen klasör bir çalışma alanıdır:** dosyaları soruya gömülmez,
+    bağlamı şişirmez. Soruyla yalnızca kısa bir özet gider (dosya sayısı,
+    türleri, üst klasörler, en üstteki dosyalar); asistan gerek görürse
+    dosyalarda **arar**, **listeler** ve istediği dosyayı ya da yalnızca
+    istediği satırları **okur**. Klasörün dosya listesi bir kez dizinlenir
+    ve bir süre yeniden kullanılır; aramalar klasörü baştan taramaz.
+    Asistanın nelere baktığı yanıtın üstünde katlanmış bir listede görünür
+    ("Çalışma alanına bakıldı (3)": aranan metinler, okunan dosyalar).
+    Asistan yalnızca eklenen klasörlerin içini okuyabilir; dışarı çıkan
+    yollar ve klasör dışına giden bağlantılar reddedilir, yazamaz.
+  - **Claude Code / Copilot:** klasör `--add-dir` ile okunabilir yapılır;
+    asistan kendi araçlarıyla (yalnızca okuma) arar ve okur.
+  - **API'ler (Anthropic, OpenAI uyumlu…):** Kalem modele `search`,
+    `list_files` ve `read_file` araçlarını verir; model bir yanıtta en çok
+    30 tur araç çağırabilir. Araç desteklemeyen bir model hata verirse
+    klasörlerin metni eskisi gibi soruyla gönderilir (dosya başına en çok
+    100 000, toplam 300 000 karakter).
+  - **Tek tek eklenen dosyaların** metni ise doğrudan soruyla gider.
   Kaynaklar değişmedikçe aynı sohbette yeniden gönderilmez.
 - **Model seçimi:** soru kutusunun üstündeki seçici etkin hizmetin
   modellerini listeler: API'lerde hizmetin kendi listesi; Claude Code ve

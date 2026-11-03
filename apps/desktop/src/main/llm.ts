@@ -8,7 +8,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { net } from "electron";
 import type { PromptImage } from "../shared/claude.js";
 import { promptContent } from "../shared/claude.js";
-import type { ChatMessage, Connection, ProviderInfo } from "../shared/providers.js";
+import type { ChatMessage, ChatTool, Connection, ProviderInfo } from "../shared/providers.js";
 import {
 	chatCompletionsDelta,
 	chatCompletionsRequest,
@@ -52,6 +52,35 @@ export interface AskOptions {
 	readonly signal: AbortSignal;
 	/** More of the reply. */
 	text(chunk: string): void;
+	/** Tools the model may call while it answers (a workspace's search and read). */
+	readonly tools?: AskTools;
+}
+
+export interface AskTools {
+	readonly definitions: readonly ChatTool[];
+	/** Runs one call; what it returns goes back to the model. */
+	run(name: string, input: unknown): Promise<string>;
+}
+
+/** Calls of tools one answer may make; the last round must answer with what it has. */
+export const MAX_TOOL_ROUNDS = 30;
+
+/** Text of a new round after earlier text starts on a new paragraph. */
+function paragraphs(text: (chunk: string) => void): { write(chunk: string): void; round(): void } {
+	let written = false;
+	let fresh = false;
+	return {
+		write(chunk) {
+			if (chunk === "") return;
+			if (fresh && written) text("\n\n");
+			fresh = false;
+			written = true;
+			text(chunk);
+		},
+		round() {
+			fresh = true;
+		},
+	};
 }
 
 /**
@@ -79,29 +108,62 @@ export async function askApi(options: AskOptions): Promise<void> {
 
 async function askAnthropic(options: AskOptions): Promise<void> {
 	const client = anthropic(options.connection, options.key);
+	const tools = options.tools;
+	const out = paragraphs(options.text);
+	const messages: Anthropic.MessageParam[] = options.messages.map(({ role, content }, i) =>
+		i === options.messages.length - 1 && role === "user"
+			? { role, content: promptContent(content, options.images ?? []) }
+			: { role, content },
+	);
 	try {
-		const stream = client.messages.stream(
-			{
-				model: options.connection.model,
-				max_tokens: MAX_OUTPUT_TOKENS,
-				system: options.system,
-				messages: options.messages.map(({ role, content }, i) =>
-					i === options.messages.length - 1 && role === "user"
-						? { role, content: promptContent(content, options.images ?? []) }
-						: { role, content },
-				),
-			},
-			{ signal: options.signal },
-		);
-		for await (const event of stream) {
-			if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-				options.text(event.delta.text);
+		for (let round = 1; ; round++) {
+			const last = round >= MAX_TOOL_ROUNDS;
+			const stream = client.messages.stream(
+				{
+					model: options.connection.model,
+					max_tokens: MAX_OUTPUT_TOKENS,
+					system: options.system,
+					messages,
+					...(tools === undefined
+						? {}
+						: {
+								tools: tools.definitions.map(({ name, description, parameters }) => ({
+									name,
+									description,
+									input_schema: parameters as Anthropic.Tool.InputSchema,
+								})),
+								...(last ? { tool_choice: { type: "none" as const } } : {}),
+							}),
+				},
+				{ signal: options.signal },
+			);
+			for await (const event of stream) {
+				if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+					out.write(event.delta.text);
+				}
 			}
-		}
-		const message = await stream.finalMessage();
-		if (message.stop_reason === "refusal") {
-			const details = message.stop_details;
-			throw new Error(details?.explanation || "The model declined to answer this request.");
+			const message = await stream.finalMessage();
+			if (message.stop_reason === "refusal") {
+				const details = message.stop_details;
+				throw new Error(details?.explanation || "The model declined to answer this request.");
+			}
+			const calls = message.content.filter(
+				(block): block is Anthropic.ToolUseBlock => block.type === "tool_use",
+			);
+			if (tools === undefined || message.stop_reason !== "tool_use" || calls.length === 0) return;
+			const results: Anthropic.ToolResultBlockParam[] = [];
+			for (const call of calls) {
+				results.push({
+					type: "tool_result",
+					tool_use_id: call.id,
+					content: await tools.run(call.name, call.input),
+				});
+			}
+			messages.push(
+				{ role: "assistant", content: message.content as Anthropic.ContentBlockParam[] },
+				{ role: "user", content: results },
+			);
+			out.round();
 		}
 	} catch (error) {
 		if (options.signal.aborted) return;
@@ -109,41 +171,107 @@ async function askAnthropic(options: AskOptions): Promise<void> {
 	}
 }
 
+/** A tool call put together from its streamed pieces. */
+interface ToolCall {
+	id: string;
+	name: string;
+	arguments: string;
+}
+
 async function askChatCompletions(options: AskOptions): Promise<void> {
-	const { url, init } = chatCompletionsRequest(
-		options.connection,
-		options.key,
-		options.system,
-		options.messages,
-		options.images,
-	);
+	const tools = options.tools;
+	const out = paragraphs(options.text);
+	const turn: unknown[] = [];
+	for (let round = 1; ; round++) {
+		const last = round >= MAX_TOOL_ROUNDS;
+		const { url, init } = chatCompletionsRequest(
+			options.connection,
+			options.key,
+			options.system,
+			options.messages,
+			options.images,
+			// The last round has no tools left: it answers with what it found.
+			tools === undefined ? {} : { tools: last ? [] : tools.definitions, turn },
+		);
+		const calls = new Map<number, ToolCall>();
+		let said = "";
+		const ended = await streamChatCompletions(url, init, options.signal, (delta) => {
+			if (delta.text !== undefined) {
+				said += delta.text;
+				out.write(delta.text);
+			}
+			for (const piece of delta.toolCalls ?? []) {
+				const call = calls.get(piece.index) ?? { id: "", name: "", arguments: "" };
+				if (piece.id !== undefined) call.id = piece.id;
+				if (piece.name !== undefined) call.name += piece.name;
+				if (piece.arguments !== undefined) call.arguments += piece.arguments;
+				calls.set(piece.index, call);
+			}
+		});
+		if (!ended || tools === undefined || calls.size === 0) return;
+		const made = [...calls.values()].map((call, i) => ({
+			...call,
+			id: call.id === "" ? `call_${round}_${i}` : call.id,
+		}));
+		turn.push({
+			role: "assistant",
+			content: said === "" ? null : said,
+			tool_calls: made.map(({ id, name, arguments: args }) => ({
+				id,
+				type: "function",
+				function: { name, arguments: args === "" ? "{}" : args },
+			})),
+		});
+		for (const call of made) {
+			let input: unknown = {};
+			try {
+				input = JSON.parse(call.arguments === "" ? "{}" : call.arguments);
+			} catch {
+				// Arguments that are not JSON: the tool says what it misses.
+			}
+			turn.push({
+				role: "tool",
+				tool_call_id: call.id,
+				content: await tools.run(call.name, input),
+			});
+		}
+		out.round();
+	}
+}
+
+/** Reads one streamed answer; `false` when it was stopped. */
+async function streamChatCompletions(
+	url: string,
+	init: RequestInit,
+	signal: AbortSignal,
+	handle: (delta: ReturnType<typeof chatCompletionsDelta>) => void,
+): Promise<boolean> {
 	let response: Response;
 	try {
-		response = await net.fetch(url, { ...init, signal: options.signal });
+		response = await net.fetch(url, { ...init, signal });
 	} catch (error) {
-		if (options.signal.aborted) return;
+		if (signal.aborted) return false;
 		throw error;
 	}
 	if (!response.ok) throw new Error(httpErrorMessage(response.status, await response.text()));
 	const reader = response.body?.getReader();
-	if (reader === undefined) return;
+	if (reader === undefined) return true;
 	const decoder = new TextDecoder();
 	const sse = new SseReader();
-	const handle = (data: string): boolean => {
-		const delta = chatCompletionsDelta(data);
-		if (delta.error !== undefined) throw new Error(delta.error);
-		if (delta.text !== undefined) options.text(delta.text);
-		return delta.done === true;
-	};
 	try {
 		for (;;) {
 			const { done, value } = await reader.read();
 			const events = done ? sse.end() : sse.push(decoder.decode(value, { stream: true }));
-			for (const event of events) if (handle(event.data)) return;
-			if (done) return;
+			for (const event of events) {
+				const delta = chatCompletionsDelta(event.data);
+				if (delta.error !== undefined) throw new Error(delta.error);
+				handle(delta);
+				if (delta.done === true) return true;
+			}
+			if (done) return true;
 		}
 	} catch (error) {
-		if (options.signal.aborted) return;
+		if (signal.aborted) return false;
 		throw error;
 	} finally {
 		reader.releaseLock();

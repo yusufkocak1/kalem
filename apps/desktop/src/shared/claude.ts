@@ -321,6 +321,8 @@ export type ClaudeEvent =
 	| { readonly kind: "session"; readonly id: string; readonly folder?: string }
 	/** More of the reply. */
 	| { readonly kind: "text"; readonly text: string }
+	/** The model looked into the workspace: searched, listed or read a file. */
+	| { readonly kind: "step"; readonly tool: string; readonly detail: string }
 	| { readonly kind: "done" }
 	| { readonly kind: "error"; readonly message: string };
 
@@ -334,6 +336,21 @@ function messageText(message: unknown): string {
 			isRecord(block) && block.type === "text" && typeof block.text === "string" ? block.text : "",
 		)
 		.join("");
+}
+
+/** What Claude Code's tool calls in a message looked at: a search, a file, a command. */
+export function toolSteps(message: unknown): ClaudeEvent[] {
+	if (!isRecord(message) || !Array.isArray(message.content)) return [];
+	const steps: ClaudeEvent[] = [];
+	for (const block of message.content) {
+		if (!isRecord(block) || block.type !== "tool_use" || typeof block.name !== "string") continue;
+		const input = isRecord(block.input) ? block.input : {};
+		const detail = ["pattern", "file_path", "path", "command", "query", "url", "description"]
+			.map((key) => input[key])
+			.find((value): value is string => typeof value === "string" && value !== "");
+		steps.push({ kind: "step", tool: block.name, detail: (detail ?? "").slice(0, 200) });
+	}
+	return steps;
 }
 
 /**
@@ -389,6 +406,7 @@ export class ClaudeStreamReader {
 					const text = messageText(data.message);
 					if (text !== "") events.push(...this.#write(text));
 				}
+				events.push(...toolSteps(data.message));
 				this.#sawDelta = false;
 				this.#newMessage = true;
 				break;
