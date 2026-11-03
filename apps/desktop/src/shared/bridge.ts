@@ -66,6 +66,8 @@ export interface Settings {
 	readonly copilotPath: string;
 	/** The assistant panel's width in pixels. */
 	readonly assistantWidth: number;
+	/** The navigation pane's width in pixels. */
+	readonly navigationWidth: number;
 }
 
 export type SidePane = "outline" | "files" | "confluence";
@@ -92,6 +94,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	claudePath: "",
 	copilotPath: "",
 	assistantWidth: 380,
+	navigationWidth: 248,
 };
 
 export const MIN_ASSISTANT_WIDTH = 280;
@@ -100,6 +103,14 @@ export const MAX_ASSISTANT_WIDTH = 1200;
 export function clampAssistantWidth(value: number): number {
 	if (!Number.isFinite(value)) return DEFAULT_SETTINGS.assistantWidth;
 	return Math.round(Math.min(MAX_ASSISTANT_WIDTH, Math.max(MIN_ASSISTANT_WIDTH, value)));
+}
+
+export const MIN_NAVIGATION_WIDTH = 200;
+export const MAX_NAVIGATION_WIDTH = 720;
+
+export function clampNavigationWidth(value: number): number {
+	if (!Number.isFinite(value)) return DEFAULT_SETTINGS.navigationWidth;
+	return Math.round(Math.min(MAX_NAVIGATION_WIDTH, Math.max(MIN_NAVIGATION_WIDTH, value)));
 }
 
 /** The `@page` rule printing and PDF export lay the document out with. */

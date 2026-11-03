@@ -9,6 +9,7 @@ import type {
 } from "../shared/bridge.js";
 import {
 	clampAssistantWidth,
+	clampNavigationWidth,
 	clampZoom,
 	DEFAULT_SETTINGS,
 	PAGE_MARGINS,
@@ -105,6 +106,7 @@ export function parseStoredState(raw: unknown): StoredState {
 			claudePath: typeof s.claudePath === "string" ? s.claudePath.slice(0, 4096) : d.claudePath,
 			copilotPath: typeof s.copilotPath === "string" ? s.copilotPath.slice(0, 4096) : d.copilotPath,
 			assistantWidth: clampAssistantWidth(asNumber(s.assistantWidth) ?? d.assistantWidth),
+			navigationWidth: clampNavigationWidth(asNumber(s.navigationWidth) ?? d.navigationWidth),
 		},
 		recentFiles: [...new Set(recentFiles)].slice(0, MAX_RECENT_FILES),
 		window: parseBounds(root.window),

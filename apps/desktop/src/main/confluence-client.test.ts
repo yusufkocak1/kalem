@@ -395,6 +395,59 @@ describe("ConfluenceClient", () => {
 		expect(new URL(calls[1]?.url ?? "").searchParams.get("start")).toBe("1");
 	});
 
+	it("lists a level again in simpler steps when Server fails with an error 500", async () => {
+		const routes: [string, unknown, number?][] = [
+			["expand=children.page", { message: "boom" }, 500],
+			["/child/page?limit=25", { message: "boom" }, 500],
+			[
+				"/rest/api/search",
+				{
+					results: [
+						{ content: { id: "8", title: "Zeta" } },
+						{ content: { id: "7", title: "Alfa" } },
+					],
+				},
+			],
+		];
+		const { fetch, calls } = fakeFetch(routes);
+		const client = new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "", token: "t" },
+			fetch,
+		);
+		expect(await client.childPages("41")).toEqual([
+			{ id: "7", title: "Alfa", hasChildren: null },
+			{ id: "8", title: "Zeta", hasChildren: null },
+		]);
+		expect(calls.map((call) => new URL(call.url).pathname)).toEqual([
+			"/rest/api/content/41/child/page",
+			"/rest/api/content/41/child/page",
+			"/rest/api/search",
+		]);
+		expect(new URL(calls[2]?.url ?? "").searchParams.get("cql")).toBe(
+			"type=page AND parent=41 ORDER BY lastmodified DESC",
+		);
+
+		// The simpler request is enough when it works.
+		const simple = fakeFetch([
+			["expand=children.page", { message: "boom" }, 500],
+			["/child/page?limit=25", { results: [{ id: "9", title: "Bir" }] }],
+		]);
+		const second = new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "", token: "t" },
+			simple.fetch,
+		);
+		expect(await second.childPages("41")).toEqual([{ id: "9", title: "Bir", hasChildren: null }]);
+
+		// Other failures are not hidden.
+		const denied = fakeFetch([["/child/page", { message: "no" }, 403]]);
+		const third = new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "", token: "t" },
+			denied.fetch,
+		);
+		await expect(third.childPages("41")).rejects.toThrow("HTTP 403");
+		expect(denied.calls).toHaveLength(1);
+	});
+
 	it("lists the pages above a page, top first", async () => {
 		const server = fakeFetch([
 			["/rest/api/content/42", { ancestors: [{ id: "1" }, { id: "41" }] }],

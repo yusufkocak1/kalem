@@ -470,6 +470,9 @@ const en = {
 	confluenceSearchTips:
 		'Content search looks in titles, text and labels. Use "quotes" for an exact phrase and -word to leave a word out.',
 	confluenceNoResults: "Nothing found. Try fewer words, another space or Contents.",
+	confluenceRetry: "Try again",
+	navigationResize:
+		"Drag to resize the navigation pane (arrow keys too; double-click for the default)",
 	confluencePageTitle: "Page title",
 	confluenceCreateFailed: "The page could not be created: {0}",
 	confluenceLossNotice:
@@ -1129,6 +1132,9 @@ const tr: Strings = {
 	confluenceRemoveFavorite: "Favorilerden çıkar",
 	confluencePaneTree: "Sayfalar",
 	confluenceNewPage: "Yeni sayfa",
+	confluenceRetry: "Yeniden dene",
+	navigationResize:
+		"Gezinme bölmesinin genişliğini sürükleyerek ayarlayın (ok tuşları da çalışır; varsayılan için çift tıklayın)",
 	confluenceAddChild: "Alt sayfa ekle",
 	confluenceModeTitle: "Başlıklar",
 	confluenceModeContent: "İçerik",

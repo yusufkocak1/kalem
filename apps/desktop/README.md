@@ -297,7 +297,15 @@ verir.
   kapatır ya da üst sayfaya döner, `Home`/`End`; arama kutusunda `↓` listeye
   iner). Araç çubuğunda **Açık sayfayı ağaçta göster** (etkin sekmenin
   sayfasının üst sayfalarını sorup ağacı oraya kadar açar) ve **Tümünü
-  daralt** vardır.
+  daralt** vardır. Satır düğmeleri satırın sağında yüzer; başlık bölmenin
+  tüm genişliğini kullanır. Gezinme bölmesi sağ kenarından sürüklenerek
+  genişletilir (ok tuşları da çalışır, çift tık varsayılana döndürür);
+  genişlik hatırlanır.
+- Server / Data Center'da bir sayfanın alt sayfaları istenirken sunucu 500
+  hatası verirse (bazı sayfalarda `expand=children.page` isteği düşer)
+  Kalem daha basit isteklerle, en son da aramayla (`parent=ID`) yeniden
+  dener; yine olmazsa hatanın yanında **Yeniden dene** çıkar, dalı kapatıp
+  açmak da yeniden ister.
 - **Arama:** kutunun altındaki **Başlıklar / İçerik** seçimi.
   - **Başlıklar:** başlığı yazılanla başlayan sayfalar (yeniden eskiye),
     eşleşen kelimeler işaretlenir; sayfa ID'si ve adresi de kabul edilir.

@@ -33,6 +33,8 @@ async function fakeConfluence() {
 	const attachments = [
 		{ id: "att1", name: "logo.png", type: "image/png", version: 1, bytes: Buffer.from(PNG_1X1) },
 	];
+	/** How page 41's children fail: the heavy request only, or every way of asking. */
+	const failing = { children: "none" as "none" | "expand" | "all" };
 	/** Pages made through the API, under page 41. */
 	const created: { id: string; title: string; body: unknown }[] = [];
 
@@ -58,6 +60,20 @@ async function fakeConfluence() {
 			return json(res, {
 				results: [{ id: "41", title: "Ana Sayfa", children: { page: { size: 1 } } }],
 			});
+		}
+		if (
+			url.pathname === "/rest/api/content/41/child/page" &&
+			(failing.children === "all" ||
+				(failing.children === "expand" && url.searchParams.has("expand")))
+		) {
+			return json(res, { message: "Internal error" }, 500);
+		}
+		if (
+			url.pathname === "/rest/api/search" &&
+			failing.children === "all" &&
+			(url.searchParams.get("cql") ?? "").includes("parent=41")
+		) {
+			return json(res, { message: "Internal error" }, 500);
 		}
 		if (url.pathname === "/rest/api/content/41/child/page") {
 			return json(res, {
@@ -212,6 +228,7 @@ async function fakeConfluence() {
 		attachments,
 		auth,
 		searches,
+		failing,
 		created,
 		close: () => {
 			server.closeAllConnections();
@@ -453,6 +470,75 @@ test("searches inside pages with filters and more results, and finds the open pa
 	await expect
 		.poll(() => confluence.searches.at(-1))
 		.toBe('type=page AND space="DEV" AND ancestor=41 AND text~"demo"');
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("lists a level that fails with an error 500 another way, retries it, and widens the pane", async () => {
+	const confluence = await fakeConfluence();
+	cleanup.push(confluence.close);
+	const { app, page, userData, errors } = await launch();
+
+	await page.getByRole("tab", { name: "Confluence" }).click();
+	const pane = page.locator(".confluence-pane");
+	await pane.getByRole("button", { name: "Connect" }).click();
+	const dialog = page.locator(".confluence-dialog");
+	await dialog.locator('input[type="url"]').fill(confluence.site);
+	await dialog.locator('input[type="password"]').fill(TOKEN);
+	await dialog.getByRole("button", { name: "Connect" }).click();
+	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
+	await page.keyboard.press("Escape");
+	await pane.locator("select").selectOption("DEV");
+	const root = pane.locator('[data-page="41"]');
+
+	// Every way of asking fails: the error says so, without its type, and offers to try again.
+	confluence.failing.children = "all";
+	await root.locator(".confluence-twisty").click();
+	const failed = pane.locator(".confluence-tree-note.error");
+	await expect(failed).toContainText("HTTP 500: Internal error");
+	await expect(failed).not.toContainText("ConfluenceError");
+
+	// The heavy request alone fails: the simpler one lists the level.
+	confluence.failing.children = "expand";
+	await failed.getByRole("button", { name: "Try again" }).click();
+	await expect(pane.locator('[data-page="42"]')).toContainText("Sprint Planı");
+	await expect(failed).toHaveCount(0);
+
+	// Row actions float over the row only when it is pointed at: the title has the width.
+	const title = pane.locator('[data-page="42"] .confluence-row-main');
+	const row = pane.locator('[data-page="42"]');
+	const [titleBox, rowBox] = [await title.boundingBox(), await row.boundingBox()];
+	expect((titleBox?.x ?? 0) + (titleBox?.width ?? 0)).toBeGreaterThan(
+		(rowBox?.x ?? 0) + (rowBox?.width ?? 0) - 10,
+	);
+	await expect(row.getByRole("button", { name: "Add child page" })).toBeHidden();
+	await row.hover();
+	await expect(row.getByRole("button", { name: "Add child page" })).toBeVisible();
+
+	// The navigation pane is widened by dragging its edge, and keeps the width.
+	const navigation = page.locator(".navigation");
+	const edge = await page.locator(".navigation-resizer").boundingBox();
+	const before = (await navigation.boundingBox())?.width ?? 0;
+	expect(edge).not.toBeNull();
+	if (edge !== null) {
+		await page.mouse.move(edge.x + edge.width / 2, edge.y + 100);
+		await page.mouse.down();
+		await page.mouse.move(edge.x + 152, edge.y + 100, { steps: 5 });
+		await page.mouse.up();
+	}
+	await expect
+		.poll(async () => (await navigation.boundingBox())?.width ?? 0)
+		.toBeGreaterThan(before + 100);
+	await expect
+		.poll(
+			async () =>
+				JSON.parse(await readFile(join(userData, "settings.json"), "utf8")).settings
+					.navigationWidth,
+		)
+		.toBeGreaterThan(before + 100);
+	// Double-clicking the edge brings the default back.
+	await page.locator(".navigation-resizer").dblclick();
+	await expect.poll(async () => Math.round((await navigation.boundingBox())?.width ?? 0)).toBe(248);
 	expect(errors).toEqual([]);
 	await app.close();
 });
