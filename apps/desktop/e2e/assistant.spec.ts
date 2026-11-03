@@ -245,6 +245,15 @@ interface Received {
 const TOOL_CALLS = [
 	{ name: "search", input: { query: "class Main" } },
 	{ name: "read_file", input: { path: "src/Main.java" } },
+	{
+		name: "propose_edit",
+		input: {
+			path: "src/Main.java",
+			old_text: "class Main {}",
+			new_text: "class Main {\n\tint x;\n}",
+			summary: "Bir alan ekler",
+		},
+	},
 ];
 
 /** Which round of tool calls a request with tools is in (the results it carries); `null` without tools. */
@@ -295,6 +304,15 @@ async function fakeServices(): Promise<{ url: string; received: Received[]; clos
 						last_id: "fake-large",
 					}),
 				);
+			} else if (path === "/v1/chat/completions" && received.at(-1)?.body.model === "fake-texty") {
+				// A model that takes the tools but writes its calls out as text.
+				const text = Array.isArray(received.at(-1)?.body.tools)
+					? '{"name": "search", "arguments": {"query": "Main"}}'
+					: "Main sınıfı boş (metinden).";
+				sse(response, [
+					[null, { choices: [{ delta: { content: text } }] }],
+					[null, "[DONE]"],
+				]);
 			} else if (path === "/v1/chat/completions" && toolRound(received.at(-1)) !== null) {
 				const round = toolRound(received.at(-1)) as number;
 				const call = TOOL_CALLS[round];
@@ -543,7 +561,9 @@ test("connects to an OpenAI-compatible service and to the Anthropic API with a k
 	expect(anthropic?.headers["x-api-key"]).toBe("sk-ant-test");
 	expect(anthropic?.body.model).toBe("claude-opus-5-5");
 	expect(anthropic?.body.stream).toBe(true);
-	expect(String(anthropic?.body.system)).toContain("Kalem diagrams");
+	// The system prompt is cached between questions.
+	expect(JSON.stringify(anthropic?.body.system)).toContain("Kalem diagrams");
+	expect(JSON.stringify(anthropic?.body.system)).toContain('"cache_control":{"type":"ephemeral"}');
 
 	expect(errors).toEqual([]);
 	await app.close();
@@ -1109,13 +1129,32 @@ test("lets an API service search and read a workspace folder instead of sending 
 		await expect(reply.locator(".assistant-markdown")).toHaveText("Main sınıfı boş.");
 		// What it looked up is listed, folded away.
 		await expect(reply.locator(".assistant-steps summary")).toHaveText(
-			"Looked into the workspace (2)",
+			"Looked into the workspace (3)",
 		);
 		await reply.locator(".assistant-steps summary").click();
 		await expect(reply.locator(".assistant-steps li")).toHaveText([
 			"Searched “class Main”",
 			"Read src/Main.java",
+			"Proposed a change to src/Main.java",
 		]);
+		// The proposed change is shown, and written only when applied.
+		const card = reply.locator(".assistant-edit");
+		await expect(card.locator(".assistant-edit-path")).toHaveText("src/Main.java");
+		await expect(card.locator(".diff-remove")).toHaveText(["- class Main {}"]);
+		await expect(card.locator(".diff-add")).toHaveText(["+ class Main {", "+ \tint x;", "+ }"]);
+		expect(await readFile(join(code, "src", "Main.java"), "utf8")).toBe("class Main {}\n");
+		if (service === "custom") {
+			await card.getByRole("button", { name: "Discard" }).click();
+			await expect(card.locator(".assistant-edit-state")).toHaveText(
+				"Discarded; the file was not changed.",
+			);
+		} else {
+			await card.getByRole("button", { name: "Apply to the file" }).click();
+			await expect(card.locator(".assistant-edit-state")).toHaveText("Applied to src/Main.java.");
+			expect(await readFile(join(code, "src", "Main.java"), "utf8")).toBe(
+				"class Main {\n\tint x;\n}\n",
+			);
+		}
 		if (service === "custom")
 			await page.screenshot({ path: "test-results/assistant-workspace.png" });
 	}
@@ -1124,14 +1163,14 @@ test("lets an API service search and read a workspace folder instead of sending 
 		service === "custom" ? "/v1/chat/completions" : "/v1/messages";
 	for (const service of ["custom", "anthropic"]) {
 		const asked = services.received.filter((request) => request.path === path(service));
-		expect(asked).toHaveLength(3);
+		expect(asked).toHaveLength(4);
 		const firstText = JSON.stringify(asked[0]?.body.messages);
 		// The question says what the folder holds; its files are not in it.
 		expect(firstText).toContain("<workspace>");
 		expect(firstText).not.toContain("class Main {}");
 		expect(JSON.stringify(asked[0]?.body.tools)).toContain("read_file");
 		// The results of the calls go back: the search's line, then the file.
-		const last = JSON.stringify(asked[2]?.body.messages);
+		const last = JSON.stringify(asked[3]?.body.messages);
 		expect(last).toContain("src/Main.java:1: class Main {}");
 		expect(last).toContain("1  class Main {}");
 	}
@@ -1195,4 +1234,49 @@ test("uses the folders open in the Files pane as the chat's workspace on its own
 
 	expect(errors).toEqual([]);
 	await app.close();
+});
+
+test("sends the folder's text the old way to a model that writes its tool calls out", async () => {
+	const services = await fakeServices();
+	const folder = await tempDir("assistant-texty");
+	const code = join(folder, "proje");
+	await mkdir(join(code, "src"), { recursive: true });
+	await writeFile(join(code, "src", "Main.java"), "class Main {}\n");
+	const { app, page, errors } = await launch({
+		settings: { assistant: true },
+		env: {
+			KALEM_CLAUDE: join(folder, "nothing-here"),
+			NO_PROXY: "127.0.0.1",
+			no_proxy: "127.0.0.1",
+		},
+	});
+	const pane = page.locator(".assistant");
+	const form = pane.locator(".assistant-settings");
+	await pane.getByRole("button", { name: "Connect a Service…" }).click();
+	await form.getByLabel("Service").selectOption("custom");
+	await form.getByLabel("Address").fill(`${services.url}/v1`);
+	await form.getByLabel("API key").fill("sk-test");
+	await form.getByLabel("Model").fill("fake-texty");
+	await form.getByRole("button", { name: "Save" }).click();
+	await app.evaluate(
+		({ dialog }, filePaths) => {
+			dialog.showOpenDialog = (async () => ({ canceled: false, filePaths })) as never;
+		},
+		[code],
+	);
+	await pane.getByRole("button", { name: "Add files or folders to the chat" }).click();
+	await pane.getByRole("menuitem", { name: "Folder…" }).click();
+	const input = pane.locator(".assistant-input");
+	await input.fill("Main ne?");
+	await input.press("Enter");
+	const reply = pane.locator(".assistant-assistant").last();
+	await expect(reply.locator(".assistant-markdown")).toHaveText("Main sınıfı boş (metinden).");
+	await expect(reply).not.toContainText('"name"');
+	const asked = services.received.filter((request) => request.path === "/v1/chat/completions");
+	expect(asked).toHaveLength(2);
+	expect(asked[1]?.body.tools).toBeUndefined();
+	expect(JSON.stringify(asked[1]?.body.messages)).toContain("class Main {}");
+	expect(errors).toEqual([]);
+	await app.close();
+	services.close();
 });

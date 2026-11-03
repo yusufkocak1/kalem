@@ -6,8 +6,14 @@ import type { AssistantStatus, Command, KalemBridge } from "../shared/bridge.js"
 import { clampAssistantWidth, DEFAULT_SETTINGS, MIN_ASSISTANT_WIDTH } from "../shared/bridge.js";
 import type { ChatSummary, StoredChat, StoredMessage } from "../shared/chats.js";
 import { chatTitle, historyOf } from "../shared/chats.js";
-import type { ClaudeEvent, ContextDiagram, ReplyDiagram, ReplyPart } from "../shared/claude.js";
-import { composePrompt, splitReply } from "../shared/claude.js";
+import type {
+	ClaudeEvent,
+	ContextDiagram,
+	ProposedEdit,
+	ReplyDiagram,
+	ReplyPart,
+} from "../shared/claude.js";
+import { composePrompt, lineDiff, splitReply } from "../shared/claude.js";
 import { diagramSvg, svgMarkup } from "../shared/diagram.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
@@ -83,6 +89,8 @@ interface Message {
 	readonly model?: string;
 	/** What it looked up in the workspace while answering, in this run. */
 	steps?: string[];
+	/** Changes to workspace files it proposed, in this run. */
+	edits?: ProposedEdit[];
 }
 
 /** A conversation, shown or not; a reply keeps coming in while another chat is shown. */
@@ -1352,6 +1360,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		);
 		const steps = stepsView(message);
 		if (steps !== null) nodes.unshift(steps);
+		for (const proposed of message.edits ?? []) nodes.push(editCard(proposed));
 		if (!message.done && message.error === null) {
 			const lastStep = message.steps?.at(-1);
 			if (pending !== null) nodes.push(waiting(pending));
@@ -1381,6 +1390,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			case "read_file":
 			case "Read":
 				return format(t.assistantStepRead, detail);
+			case "propose_edit":
+				return format(t.assistantStepEdit, detail);
 			case "list_files":
 			case "Glob":
 			case "LS":
@@ -1388,6 +1399,77 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			default:
 				return detail === "" ? tool : `${tool}: ${detail}`;
 		}
+	}
+
+	/** What became of each proposed change: applied, or set aside. */
+	const editStates = new Map<
+		string,
+		{ kind: "applied" | "discarded" } | { kind: "failed"; text: string }
+	>();
+
+	/** A proposed change to a workspace file: what it takes out and puts in, applied on request. */
+	function editCard(proposed: ProposedEdit): HTMLElement {
+		const state = editStates.get(proposed.id);
+		const diff = el("pre", { class: "assistant-edit-diff" });
+		for (const line of lineDiff(proposed.oldText, proposed.newText)) {
+			diff.append(
+				el("span", {
+					class: `assistant-diff-line diff-${line.kind === "+" ? "add" : line.kind === "-" ? "remove" : "keep"}`,
+					text: `${line.kind} ${line.text}\n`,
+				}),
+			);
+		}
+		const status = el("p", { class: "assistant-edit-state", attrs: { role: "status" } });
+		const actions = el("div", { class: "assistant-edit-actions" });
+		if (state?.kind === "applied")
+			status.textContent = format(t.assistantEditApplied, proposed.path);
+		else if (state?.kind === "discarded") status.textContent = t.assistantEditDiscarded;
+		else {
+			if (state?.kind === "failed") {
+				status.textContent = format(t.assistantEditFailed, state.text);
+				status.classList.add("failed");
+			}
+			const apply = button(t.assistantEditApply, { class: "assistant-primary", icon: "check" });
+			const discard = button(t.assistantEditDiscard, { icon: "close" });
+			apply.addEventListener("click", async () => {
+				apply.disabled = true;
+				try {
+					await bridge.assistantApplyEdit(proposed.id);
+					editStates.set(proposed.id, { kind: "applied" });
+				} catch (error) {
+					editStates.set(proposed.id, { kind: "failed", text: host.errorText(error) });
+				}
+				card.replaceWith(editCard(proposed));
+			});
+			discard.addEventListener("click", () => {
+				editStates.set(proposed.id, { kind: "discarded" });
+				card.replaceWith(editCard(proposed));
+			});
+			actions.append(apply, discard);
+		}
+		const card = el("div", {
+			class: `assistant-edit${state === undefined || state.kind === "failed" ? "" : ` ${state.kind}`}`,
+			attrs: { "data-edit": proposed.id },
+			children: [
+				el("div", {
+					class: "assistant-edit-head",
+					children: [
+						icon("pencil"),
+						el("span", { class: "assistant-edit-path", text: proposed.path }),
+						...(proposed.oldText === ""
+							? [el("span", { class: "assistant-edit-new", text: t.assistantEditNew })]
+							: []),
+					],
+				}),
+				...(proposed.summary === ""
+					? []
+					: [el("p", { class: "assistant-edit-summary", text: proposed.summary })]),
+				diff,
+				status,
+				actions,
+			],
+		});
+		return card;
 	}
 
 	/** The looks into the workspace behind a reply, folded away once it is done. */
@@ -1748,6 +1830,16 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				reply.error = event.message;
 				if (chat === active) scheduleRender(reply);
 				chat.ended?.();
+				return;
+			case "reset":
+				reply.text = "";
+				reply.steps = [];
+				reply.edits = [];
+				if (chat === active) scheduleRender(reply);
+				return;
+			case "edit":
+				reply.edits = [...(reply.edits ?? []), event.edit];
+				if (chat === active) scheduleRender(reply);
 				return;
 			case "step":
 				reply.steps = [...(reply.steps ?? []), stepLabel(event.tool, event.detail)];

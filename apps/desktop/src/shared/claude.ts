@@ -316,11 +316,26 @@ export function withInstructions(system: string, question: string): string {
 	return `<instructions>\n${system}\n</instructions>\n\n${question}`;
 }
 
+/** A change to a workspace file the model proposed; written only when the user applies it. */
+export interface ProposedEdit {
+	readonly id: string;
+	/** As the workspace shows it. */
+	readonly path: string;
+	/** Empty for a new file. */
+	readonly oldText: string;
+	readonly newText: string;
+	readonly summary: string;
+}
+
 export type ClaudeEvent =
 	/** The conversation's id, and for a CLI the folder it runs in; the next question resumes it. */
 	| { readonly kind: "session"; readonly id: string; readonly folder?: string }
 	/** More of the reply. */
 	| { readonly kind: "text"; readonly text: string }
+	/** What came of the reply so far is dropped: it is asked again another way. */
+	| { readonly kind: "reset" }
+	/** The model proposes a change to a file of the workspace, for the user to apply. */
+	| { readonly kind: "edit"; readonly edit: ProposedEdit }
 	/** The model looked into the workspace: searched, listed or read a file. */
 	| { readonly kind: "step"; readonly tool: string; readonly detail: string }
 	| { readonly kind: "done" }
@@ -598,4 +613,37 @@ export function splitReply(text: string): ReplyPart[] {
 	const rest = text.slice(at);
 	if (rest.trim() !== "") parts.push({ kind: "markdown", text: rest });
 	return parts;
+}
+
+export interface DiffLine {
+	/** Kept, taken out or put in. */
+	readonly kind: " " | "-" | "+";
+	readonly text: string;
+}
+
+/**
+ * The lines of a change: the lines both texts share at the start and the
+ * end are kept (at most `context` of each shown), the rest is taken out
+ * and put in.
+ */
+export function lineDiff(before: string, after: string, context = 2): DiffLine[] {
+	const a = before === "" ? [] : before.split("\n");
+	const b = after === "" ? [] : after.split("\n");
+	let start = 0;
+	while (start < a.length && start < b.length && a[start] === b[start]) start++;
+	let end = 0;
+	while (
+		end < a.length - start &&
+		end < b.length - start &&
+		a[a.length - 1 - end] === b[b.length - 1 - end]
+	) {
+		end++;
+	}
+	const kept = (lines: readonly string[]): DiffLine[] => lines.map((text) => ({ kind: " ", text }));
+	return [
+		...kept(a.slice(Math.max(0, start - context), start)),
+		...a.slice(start, a.length - end).map((text): DiffLine => ({ kind: "-", text })),
+		...b.slice(start, b.length - end).map((text): DiffLine => ({ kind: "+", text })),
+		...kept(a.slice(a.length - end, Math.min(a.length, a.length - end + context))),
+	];
 }

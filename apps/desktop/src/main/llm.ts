@@ -106,6 +106,33 @@ export async function askApi(options: AskOptions): Promise<void> {
 	}
 }
 
+const EPHEMERAL = { type: "ephemeral" } as const;
+
+/**
+ * The messages with a cache breakpoint on the last one: the next round (a
+ * tool's result) and the next question start with all of this, so the
+ * service reads it from its prompt cache instead of processing it again.
+ * Only the last message carries one; with the system prompt and the tools
+ * that makes three, under the service's limit of four.
+ */
+export function cachedUpToHere(
+	messages: readonly Anthropic.MessageParam[],
+): Anthropic.MessageParam[] {
+	return messages.map((message, i) => {
+		if (i !== messages.length - 1) return message;
+		const blocks: Anthropic.ContentBlockParam[] =
+			typeof message.content === "string"
+				? [{ type: "text", text: message.content }]
+				: [...message.content];
+		const last = blocks.at(-1);
+		if (last === undefined || last.type === "thinking" || last.type === "redacted_thinking") {
+			return message;
+		}
+		blocks[blocks.length - 1] = { ...last, cache_control: EPHEMERAL };
+		return { ...message, content: blocks };
+	});
+}
+
 async function askAnthropic(options: AskOptions): Promise<void> {
 	const client = anthropic(options.connection, options.key);
 	const tools = options.tools;
@@ -122,15 +149,17 @@ async function askAnthropic(options: AskOptions): Promise<void> {
 				{
 					model: options.connection.model,
 					max_tokens: MAX_OUTPUT_TOKENS,
-					system: options.system,
-					messages,
+					// What does not change between questions and rounds is read from the cache.
+					system: [{ type: "text", text: options.system, cache_control: EPHEMERAL }],
+					messages: cachedUpToHere(messages),
 					...(tools === undefined
 						? {}
 						: {
-								tools: tools.definitions.map(({ name, description, parameters }) => ({
+								tools: tools.definitions.map(({ name, description, parameters }, i) => ({
 									name,
 									description,
 									input_schema: parameters as Anthropic.Tool.InputSchema,
+									...(i === tools.definitions.length - 1 ? { cache_control: EPHEMERAL } : {}),
 								})),
 								...(last ? { tool_choice: { type: "none" as const } } : {}),
 							}),

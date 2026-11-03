@@ -720,6 +720,8 @@ export interface KalemBridge {
 	assistantStop(chatId: string): Promise<void>;
 	/** Asks for files or a folder to add to a chat; empty when cancelled. */
 	assistantPickSources(kind: "files" | "folder"): Promise<string[]>;
+	/** Writes a change the assistant proposed to a workspace file. */
+	assistantApplyEdit(id: string): Promise<void>;
 	onAssistantEvent(handler: (chatId: string, event: ClaudeEvent) => void): () => void;
 }
 
@@ -813,5 +815,6 @@ export const CHANNEL = {
 	assistantAsk: "kalem:assistant-ask",
 	assistantStop: "kalem:assistant-stop",
 	assistantPickSources: "kalem:assistant-pick-sources",
+	assistantApplyEdit: "kalem:assistant-apply-edit",
 	assistantEvent: "kalem:assistant-event",
 } as const;

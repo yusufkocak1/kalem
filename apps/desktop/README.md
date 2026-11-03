@@ -521,14 +521,38 @@ verir.
     Asistanın nelere baktığı yanıtın üstünde katlanmış bir listede görünür
     ("Çalışma alanına bakıldı (3)": aranan metinler, okunan dosyalar).
     Asistan yalnızca eklenen klasörlerin içini okuyabilir; dışarı çıkan
-    yollar ve klasör dışına giden bağlantılar reddedilir, yazamaz.
+    yollar ve klasör dışına giden bağlantılar reddedilir. Kendi başına
+    hiçbir dosyaya yazmaz.
+  - **Hangi dosyalar:** klasör bir Git deposundaysa Git'in gördükleri
+    (`.gitignore` kurallarına uyarak; `.github` gibi izlenen gizli
+    klasörler dahil), değilse gizli ve `node_modules`/`target`/`build` gibi
+    klasörler dışındakiler.
+  - **Hızlı arama:** bilgisayarda `ripgrep` (`rg`) varsa arama onunla
+    yapılır; yoksa dosyaların metni bellekte tutulur (en çok 64 MB) ve
+    değişmeyen dosya yeniden okunmaz.
   - **Claude Code / Copilot:** klasör `--add-dir` ile okunabilir yapılır;
     asistan kendi araçlarıyla (yalnızca okuma) arar ve okur.
   - **API'ler (Anthropic, OpenAI uyumlu…):** Kalem modele `search`,
-    `list_files` ve `read_file` araçlarını verir; model bir yanıtta en çok
-    30 tur araç çağırabilir. Araç desteklemeyen bir model hata verirse
-    klasörlerin metni eskisi gibi soruyla gönderilir (dosya başına en çok
-    100 000, toplam 300 000 karakter).
+    `list_files`, `read_file` ve `propose_edit` araçlarını verir; model bir
+    yanıtta en çok 30 tur araç çağırabilir.
+    - **Okunanlar hatırlanır:** bir yanıt için okunan dosyalar (en çok
+      40 000 karakter) sohbetle birlikte sonraki sorulara da gider; model
+      aynı dosyayı yeniden okumaz.
+    - **Prompt önbelleği (Anthropic):** sistem mesajı, araçlar ve sohbetin
+      o ana kadarki kısmı önbelleğe işaretlenir; sonraki tur ve sorularda
+      yeniden işlenmez, daha ucuz ve hızlıdır.
+    - **Dosya değişikliği önerisi:** "şunu düzelt" denince model
+      değişikliği `propose_edit` ile önerir; yanıtta dosya adı, açıklama
+      ve satır farkı (kırmızı çıkan, yeşil giren) olan bir kart çıkar.
+      Dosyaya ancak **Dosyaya Uygula** ile yazılır; **Vazgeç** dosyayı
+      değiştirmez. Uygulanırken dosya o arada değiştiyse uygulanmaz ve
+      nedeni söylenir. Dosyanın satır sonları ve kodlaması korunur; UTF-8
+      dışındaki eski kodlamalı (windows-1254) dosyalar için öneri yapılmaz.
+      Öneriler uygulamanın o çalışmasında geçerlidir.
+    - **Araç kullanamayan modeller:** istek hata verirse ya da model
+      araç çağrısını yanıta metin olarak yazarsa (`{"name": "search", …}`),
+      o yanıt silinir ve klasörlerin metni eskisi gibi soruyla gönderilir
+      (dosya başına en çok 100 000, toplam 300 000 karakter).
   - **Tek tek eklenen dosyaların** metni ise doğrudan soruyla gider.
   Kaynaklar değişmedikçe aynı sohbette yeniden gönderilmez.
 - **Model seçimi:** soru kutusunun üstündeki seçici etkin hizmetin

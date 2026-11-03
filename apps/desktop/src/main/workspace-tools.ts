@@ -8,9 +8,12 @@
  * Each folder's files are indexed once (paths, sizes, times) and the index
  * is reused for a while, so a search does not walk the folder again.
  */
+import { execFile } from "node:child_process";
 import type { Dirent } from "node:fs";
-import { readdir, realpath, stat } from "node:fs/promises";
-import { basename, extname, isAbsolute, join, normalize, relative, sep } from "node:path";
+import { mkdir, readdir, realpath, stat, writeFile } from "node:fs/promises";
+import { basename, dirname, extname, isAbsolute, join, normalize, relative, sep } from "node:path";
+import type { ProposedEdit } from "../shared/claude.js";
+import { encodeText, willConvertToUtf8 } from "../shared/encoding.js";
 import { isBinaryPath } from "../shared/paths.js";
 import { readTextFile } from "./text-files.js";
 import { isInside } from "./workspace-files.js";
@@ -50,16 +53,77 @@ export interface IndexedFile {
 	/** Below the folder, with `/`. */
 	readonly path: string;
 	readonly size: number;
+	readonly modified: number;
 }
 
 export interface FolderIndex {
 	readonly root: string;
+	/** Listed by Git, with its ignore rules. */
+	readonly git: boolean;
 	readonly files: readonly IndexedFile[];
 	readonly truncated: boolean;
 	readonly made: number;
 }
 
+/** Runs a program; its output, or `null` when it is missing or fails. */
+function output(
+	command: string,
+	args: readonly string[],
+	cwd: string,
+	maxBuffer = 64 * 1024 * 1024,
+): Promise<{ stdout: string; code: number } | null> {
+	return new Promise((resolve) => {
+		execFile(
+			command,
+			[...args],
+			{ cwd, timeout: 30_000, windowsHide: true, maxBuffer, env: { ...process.env, LC_ALL: "C" } },
+			(error, stdout) => {
+				if (error === null) resolve({ stdout, code: 0 });
+				else if (typeof error.code === "number") resolve({ stdout, code: error.code });
+				else resolve(null);
+			},
+		);
+	});
+}
+
+/**
+ * In a Git repository, the files Git sees: tracked, and new ones its
+ * ignore rules (`.gitignore`, `info/exclude`, the global one) let through.
+ * `null` outside a repository or without Git.
+ */
+async function gitFiles(root: string): Promise<IndexedFile[] | null> {
+	const listed = await output(
+		"git",
+		["-c", "core.quotepath=off", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+		root,
+	);
+	if (listed === null || listed.code !== 0) return null;
+	const files: IndexedFile[] = [];
+	for (const path of new Set(listed.stdout.split("\0"))) {
+		if (path === "" || isBinaryPath(path)) continue;
+		if (files.length >= MAX_INDEXED) break;
+		try {
+			const info = await stat(join(root, path));
+			if (info.isFile()) files.push({ path, size: info.size, modified: info.mtimeMs });
+		} catch {
+			// Deleted but still in the index: not there to read.
+		}
+	}
+	files.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+	return files;
+}
+
 async function indexFolder(root: string): Promise<FolderIndex> {
+	const tracked = await gitFiles(root);
+	if (tracked !== null) {
+		return {
+			root,
+			git: true,
+			files: tracked,
+			truncated: tracked.length >= MAX_INDEXED,
+			made: Date.now(),
+		};
+	}
 	const files: IndexedFile[] = [];
 	let truncated = false;
 	const walk = async (folder: string, depth: number): Promise<void> => {
@@ -77,13 +141,17 @@ async function indexFolder(root: string): Promise<FolderIndex> {
 				return;
 			}
 			const path = join(folder, child.name);
-			let size = 0;
+			let info: { size: number; mtimeMs: number };
 			try {
-				size = (await stat(path)).size;
+				info = await stat(path);
 			} catch {
 				continue;
 			}
-			files.push({ path: relative(root, path).split(sep).join("/"), size });
+			files.push({
+				path: relative(root, path).split(sep).join("/"),
+				size: info.size,
+				modified: info.mtimeMs,
+			});
 		}
 		for (const child of children) {
 			if (!child.isDirectory() || skipFolder(child.name)) continue;
@@ -96,12 +164,103 @@ async function indexFolder(root: string): Promise<FolderIndex> {
 		}
 	};
 	await walk(root, 0);
-	return { root, files, truncated, made: Date.now() };
+	return { root, git: false, files, truncated, made: Date.now() };
 }
 
-/** The indexes of the folders chats use, kept between questions. */
+/** Whether `rg` runs here; asked once. */
+let ripgrep: Promise<boolean> | null = null;
+
+/**
+ * The files of the folder that contain `query`, found by ripgrep: far
+ * faster than reading every file on a first search. `null` when ripgrep is
+ * not installed, or cannot be trusted with the query (text that is not
+ * ASCII may be in another encoding, or fold the Turkish way; a pattern
+ * ripgrep reads differently): the files are then read one by one.
+ */
+async function ripgrepFiles(
+	index: FolderIndex,
+	query: string,
+	regex: boolean,
+): Promise<Set<string> | null> {
+	// biome-ignore lint/suspicious/noControlCharactersInRegex: the printable ASCII range
+	if (!/^[\x20-\x7e]*$/.test(query)) return null;
+	ripgrep ??= output("rg", ["--version"], index.root).then((found) => found?.code === 0);
+	if (!(await ripgrep)) return null;
+	const found = await output(
+		"rg",
+		[
+			"--files-with-matches",
+			"--ignore-case",
+			"--hidden",
+			"--no-messages",
+			"--max-filesize",
+			"1M",
+			"--glob",
+			"!.git",
+			// Outside Git the index leaves these out; inside, Git's rules apply to both.
+			...(index.git ? [] : [...SKIPPED_FOLDERS].flatMap((name) => ["--glob", `!${name}`])),
+			...(regex ? [] : ["--fixed-strings"]),
+			"--regexp",
+			query,
+			".",
+		],
+		index.root,
+	);
+	// 1: nothing found; 2 or a failure: a pattern ripgrep does not read, or another problem.
+	if (found === null || found.code > 1) return null;
+	return new Set(
+		found.stdout
+			.split(/\r?\n/)
+			.filter((line) => line !== "")
+			.map((line) => line.replace(/\\/g, "/").replace(/^\.\//, "")),
+	);
+}
+
+/** Characters of file text kept in memory for searches, across all folders. */
+const TEXT_CACHE_LIMIT = 64 * 1024 * 1024;
+
+/** The indexes of the folders chats use, and their files' text, kept between questions. */
 export class WorkspaceIndexes {
 	readonly #indexes = new Map<string, Promise<FolderIndex>>();
+	/** By absolute path; the oldest goes first when there is too much. */
+	readonly #texts = new Map<string, { modified: number; size: number; text: string | null }>();
+	#textSize = 0;
+
+	/** A file's text for a search, from memory while the file on disk has not changed. */
+	async text(path: string): Promise<string | null> {
+		let file: { size: number; mtimeMs: number };
+		try {
+			file = await stat(path);
+		} catch {
+			return null;
+		}
+		if (file.size > MAX_SEARCH_BYTES) return null;
+		const kept = this.#texts.get(path);
+		if (kept !== undefined && kept.modified === file.mtimeMs && kept.size === file.size) {
+			// Used again: it goes to the end, last to be dropped.
+			this.#texts.delete(path);
+			this.#texts.set(path, kept);
+			return kept.text;
+		}
+		let text: string | null = null;
+		try {
+			text = (await readTextFile(path, "windows-1254", MAX_SEARCH_BYTES))?.text ?? null;
+		} catch {
+			text = null;
+		}
+		if (kept !== undefined) {
+			this.#texts.delete(path);
+			this.#textSize -= kept.text?.length ?? 0;
+		}
+		this.#texts.set(path, { modified: file.mtimeMs, size: file.size, text });
+		this.#textSize += text?.length ?? 0;
+		for (const [old, entry] of this.#texts) {
+			if (this.#textSize <= TEXT_CACHE_LIMIT) break;
+			this.#texts.delete(old);
+			this.#textSize -= entry.text?.length ?? 0;
+		}
+		return text;
+	}
 
 	get(root: string): Promise<FolderIndex> {
 		const kept = this.#indexes.get(root);
@@ -198,6 +357,68 @@ export const WORKSPACE_TOOLS: readonly ToolDefinition[] = [
 	},
 ];
 
+/** Changes the model may propose; the user applies them, Kalem never writes on its own. */
+export const EDIT_TOOL: ToolDefinition = {
+	name: "propose_edit",
+	description:
+		"Proposes a change to a file of the workspace; nothing is written until the user applies it. `old_text` must be copied exactly from the file (read it first) and occur in it once; give a few lines around the change so it is unique. To propose a new file, leave `old_text` empty and give its whole text as `new_text`. One call per change.",
+	parameters: {
+		type: "object",
+		properties: {
+			path: { type: "string", description: "The file's path, as the workspace shows it." },
+			old_text: { type: "string", description: "The exact text to replace; empty for a new file." },
+			new_text: { type: "string", description: "What replaces it." },
+			summary: { type: "string", description: "A short line saying what the change does." },
+		},
+		required: ["path", "old_text", "new_text"],
+	},
+};
+
+/** A proposal as the main process keeps it until it is applied. */
+export interface KeptEdit extends ProposedEdit {
+	readonly absolute: string;
+}
+
+/** Why a proposed change cannot be applied as it is; `null` when it can. */
+async function editProblem(edit: KeptEdit): Promise<string | null> {
+	let file: Awaited<ReturnType<typeof readTextFile>>;
+	try {
+		file = await readTextFile(edit.absolute, "windows-1254", MAX_READ_BYTES);
+	} catch {
+		return edit.oldText === "" ? null : `${edit.path} cannot be read.`;
+	}
+	if (edit.oldText === "") return `${edit.path} already exists.`;
+	if (file === null) return `${edit.path} is not a text file.`;
+	if (willConvertToUtf8(file.format)) {
+		return `${edit.path} is written in ${file.format.encoding}; changing it here would turn it into UTF-8.`;
+	}
+	const count = file.text.split(edit.oldText).length - 1;
+	if (count === 0) return `The text to replace is not in ${edit.path} (any more).`;
+	if (count > 1)
+		return `The text to replace occurs ${count} times in ${edit.path}; give more lines around it.`;
+	return null;
+}
+
+/** Writes a proposed change, once the user applied it; throws with the reason when it no longer fits. */
+export async function applyEdit(edit: KeptEdit): Promise<void> {
+	const problem = await editProblem(edit);
+	if (problem !== null) throw new Error(problem);
+	if (edit.oldText === "") {
+		await mkdir(dirname(edit.absolute), { recursive: true });
+		await writeFile(edit.absolute, edit.newText, { flag: "wx" });
+		return;
+	}
+	const file = await readTextFile(edit.absolute, "windows-1254", MAX_READ_BYTES);
+	if (file === null) throw new Error(`${edit.path} is not a text file.`);
+	await writeFile(
+		edit.absolute,
+		encodeText(
+			file.text.replace(edit.oldText, () => edit.newText),
+			file.format,
+		),
+	);
+}
+
 /** What a tool did, for the chat to show. */
 export interface ToolStep {
 	readonly tool: string;
@@ -214,10 +435,18 @@ const clip = (text: string): string =>
 export class Workspace {
 	readonly roots: readonly string[];
 	readonly #indexes: WorkspaceIndexes;
+	/** Takes the changes the model proposes; without it, `propose_edit` is refused. */
+	readonly #propose: ((edit: KeptEdit) => void) | undefined;
+	#proposed = 0;
 
-	constructor(roots: readonly string[], indexes: WorkspaceIndexes) {
+	constructor(
+		roots: readonly string[],
+		indexes: WorkspaceIndexes,
+		propose?: (edit: KeptEdit) => void,
+	) {
 		this.roots = roots;
 		this.#indexes = indexes;
+		this.#propose = propose;
 	}
 
 	/** How a file of `root` is named to the model: with several folders, from the folder's name. */
@@ -318,12 +547,55 @@ export class Workspace {
 					step?.({ tool: name, detail: `${text("path")}${lines}` });
 					return clip(await this.#read(text("path"), from, to));
 				}
-				default:
-					return `There is no tool named ${name}.`;
+				case "propose_edit":
+					if (this.#propose === undefined) break;
+					step?.({ tool: name, detail: text("path") });
+					return await this.#proposeEdit(
+						text("path"),
+						typeof args.old_text === "string" ? args.old_text : "",
+						typeof args.new_text === "string" ? args.new_text : "",
+						text("summary"),
+					);
 			}
 		} catch (error) {
 			return `Error: ${error instanceof Error ? error.message : String(error)}`;
 		}
+		return `There is no tool named ${name}.`;
+	}
+
+	async #proposeEdit(
+		raw: string,
+		oldText: string,
+		newText: string,
+		summary: string,
+	): Promise<string> {
+		const target = this.#resolve(raw);
+		if (target === null || target.path === "") return `"${raw}" is not a file of the workspace.`;
+		const absolute = join(target.root, target.path);
+		// A link inside the folder that leads out of it is not followed; a new file's folder is checked.
+		let real: string;
+		try {
+			real = await realpath(absolute);
+		} catch {
+			real = join(await realpath(target.root).catch(() => target.root), target.path);
+		}
+		if (!isInside(real, [await realpath(target.root).catch(() => target.root)])) {
+			return `"${raw}" is not a file of the workspace.`;
+		}
+		const edit: KeptEdit = {
+			id: `edit-${Date.now().toString(36)}-${++this.#proposed}`,
+			path: this.#shown(target.root, target.path),
+			absolute,
+			// The files' text is read with LF line endings; the model may send CRLF.
+			oldText: oldText.replace(/\r\n?/g, "\n"),
+			newText: newText.replace(/\r\n?/g, "\n"),
+			summary: summary.slice(0, 300),
+		};
+		if (edit.oldText === edit.newText) return "The new text is the same as the old.";
+		const problem = await editProblem(edit);
+		if (problem !== null) return `Not proposed: ${problem}`;
+		this.#propose?.(edit);
+		return `Proposed (${edit.id}): the user sees the change and decides whether to apply it. Do not repeat it in your answer; say what it does.`;
 	}
 
 	async #list(folder: string, pattern: string): Promise<string> {
@@ -371,20 +643,13 @@ export class Workspace {
 		const hits: string[] = [];
 		let files = 0;
 		for (const index of await this.#all()) {
+			// ripgrep, when installed, finds the files that have it; the index says which count.
+			const candidates = await ripgrepFiles(index, query, regex);
 			for (const file of index.files) {
 				if (file.size > MAX_SEARCH_BYTES || !matches(file.path)) continue;
-				let text: string;
-				try {
-					const read = await readTextFile(
-						join(index.root, file.path),
-						"windows-1254",
-						MAX_SEARCH_BYTES,
-					);
-					if (read === null) continue;
-					text = read.text;
-				} catch {
-					continue;
-				}
+				if (candidates !== null && !candidates.has(file.path)) continue;
+				const text = await this.#indexes.text(join(index.root, file.path));
+				if (text === null) continue;
 				let found = false;
 				for (const [i, line] of text.split(/\r\n|\r|\n/).entries()) {
 					if (!test(line)) continue;
@@ -433,4 +698,20 @@ export class Workspace {
 }
 
 /** What the model is told about working with a workspace. */
-export const WORKSPACE_INSTRUCTIONS = `The user gave you a workspace: the folders below. Their files are NOT in the message. When the question needs them, look them up with the tools: \`search\` to find where something is, \`list_files\` to see what is there, \`read_file\` to read a file or only the lines you need. Read only what the answer needs, and do not guess at code you have not read. When you name code, give its path and line.`;
+export const WORKSPACE_INSTRUCTIONS = `The user gave you a workspace: the folders below. Their files are NOT in the message. When the question needs them, look them up with the tools: \`search\` to find where something is, \`list_files\` to see what is there, \`read_file\` to read a file or only the lines you need. Read only what the answer needs, and do not guess at code you have not read. When you name code, give its path and line. When the user asks you to change files of the workspace, propose each change with \`propose_edit\` (after reading the file); the user reviews and applies them.`;
+
+/**
+ * Whether a reply wrote a tool call out as text instead of making it: some
+ * models (often small local ones) take the tools but cannot call them, and
+ * print `{"name": "search", …}` or `<tool_call>` at the user. Their answer
+ * is then worthless, and the files are sent the old way instead.
+ */
+export function looksLikeToolText(reply: string): boolean {
+	const names = "search|read_file|list_files|propose_edit";
+	return (
+		/<\/?tool_call>|<\|python_tag\|>/.test(reply) ||
+		new RegExp(`"(?:name|function|tool)"\\s*:\\s*"(?:${names})"`).test(reply) ||
+		// The whole reply is a call: a line of code inside an answer is not.
+		new RegExp(`^\\s*(?:${names})\\s*\\(\\s*[{"'a-z_][^\\n]*\\)\\s*$`).test(reply)
+	);
+}

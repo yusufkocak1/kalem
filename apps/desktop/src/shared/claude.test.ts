@@ -10,6 +10,7 @@ import {
 	diagramForPrompt,
 	diagramFromReply,
 	LineSplitter,
+	lineDiff,
 	SYSTEM_PROMPT,
 	splitReply,
 	systemPrompt,
@@ -453,5 +454,20 @@ describe("Claude Code's tool calls", () => {
 			{ kind: "step", tool: "TodoWrite", detail: "" },
 		]);
 		expect(toolSteps(null)).toEqual([]);
+	});
+});
+
+describe("the lines of a proposed change", () => {
+	it("keeps a little of what is shared around what changes", () => {
+		expect(lineDiff("a\nb\nc\nd\ne", "a\nb\nC\nd\ne", 1)).toEqual([
+			{ kind: " ", text: "b" },
+			{ kind: "-", text: "c" },
+			{ kind: "+", text: "C" },
+			{ kind: " ", text: "d" },
+		]);
+		expect(lineDiff("", "yeni\ndosya")).toEqual([
+			{ kind: "+", text: "yeni" },
+			{ kind: "+", text: "dosya" },
+		]);
 	});
 });
