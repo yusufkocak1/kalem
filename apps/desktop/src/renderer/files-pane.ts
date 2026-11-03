@@ -31,6 +31,8 @@ export interface FilesPaneOptions {
 	notify(text: string): void;
 	/** Tells the user that something went well. */
 	inform(text: string): void;
+	/** The folders were listed again (they may have been opened or closed). */
+	listed?(workspace: Workspace): void;
 	readonly git: GitDialogs;
 	/** Whether open repositories are fetched in the background now and then. */
 	autoFetch(): boolean;
@@ -1231,6 +1233,7 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 	async function refresh(): Promise<void> {
 		current = await bridge.getWorkspace();
 		indexChanges(current);
+		options.listed?.(current);
 		// Folders change under an open menu or a name being typed (a save, the watcher): not now.
 		if (!menu.hidden || editing !== null) {
 			stale = true;

@@ -45,6 +45,16 @@ import { askApi, listModels } from "./llm.js";
 import type { SettingsStore } from "./settings.js";
 import type { AppWindow } from "./windows.js";
 import { errorMessage } from "./windows.js";
+import type { KeptEdit } from "./workspace-tools.js";
+import {
+	applyEdit,
+	EDIT_TOOL,
+	looksLikeToolText,
+	WORKSPACE_INSTRUCTIONS,
+	WORKSPACE_TOOLS,
+	Workspace,
+	WorkspaceIndexes,
+} from "./workspace-tools.js";
 
 export interface AssistantIpcContext {
 	readonly store: SettingsStore;
@@ -115,6 +125,41 @@ function sentSources(raw: unknown): string[] {
 	return [...new Set(paths)].slice(0, MAX_SOURCES);
 }
 
+/** Characters of the files read for one answer that the chat keeps for the next questions. */
+const MAX_REMEMBERED_READS = 40_000;
+
+/**
+ * The files read while answering, as the next questions see them: the
+ * latest read of each file first, up to a limit, so a follow-up question
+ * does not need them read again.
+ */
+export function rememberReads(reads: readonly string[]): string {
+	const kept: string[] = [];
+	const seen = new Set<string>();
+	let room = MAX_REMEMBERED_READS;
+	for (const read of [...reads].reverse()) {
+		// The first line names the file and the lines: `path (lines 1-400 of 900)`.
+		const head = read.split("\n", 1)[0] ?? "";
+		if (seen.has(head) || !/ \(lines \d+-\d+ of \d+\)$/.test(head)) continue;
+		seen.add(head);
+		if (read.length > room) continue;
+		room -= read.length;
+		kept.push(read);
+	}
+	if (kept.length === 0) return "";
+	return `<workspace-reads>\nWhat you read from the workspace to answer this, kept so you need not read it again:\n${kept.reverse().join("\n\n")}\n</workspace-reads>`;
+}
+
+/** What a CLI, which searches and reads with its own tools, is told about a workspace. */
+const CLI_WORKSPACE_INSTRUCTIONS =
+	"The user gave you a workspace: the folders below. Their files are NOT in the message. When the question needs them, search and read them with your own tools, only as much as the answer needs. When you name code, give its path and line.";
+
+/** The `<workspace>` block: what the folders hold, never their files. */
+async function workspaceBlock(workspace: Workspace | null, cli: boolean): Promise<string> {
+	if (workspace === null) return "";
+	return `<workspace>\n${cli ? CLI_WORKSPACE_INSTRUCTIONS : WORKSPACE_INSTRUCTIONS}\n${await workspace.overview()}\n</workspace>`;
+}
+
 /** The question with the chat's sources before it; the same sources again are only named. */
 function withSources(sources: string, sent: string | undefined, prompt: string): string {
 	if (sources === "") return prompt;
@@ -156,6 +201,17 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 	const histories = new Map<string, ChatMessage[]>();
 	/** The sources each CLI conversation was last sent, so unchanged ones are not sent again. */
 	const sentFiles = new Map<string, string>();
+	/** The workspace folders' file lists, shared by the chats. */
+	const indexes = new WorkspaceIndexes();
+	/** Changes the models proposed in this run, until they are applied. */
+	const proposals = new Map<string, KeptEdit>();
+
+	ipcMain.handle(CHANNEL.assistantApplyEdit, async (_event, id: unknown) => {
+		const kept = typeof id === "string" ? proposals.get(id) : undefined;
+		if (kept === undefined) throw new Error(ctx.strings().assistantEditGone);
+		await applyEdit(kept);
+		proposals.delete(kept.id);
+	});
 
 	const status = async (refresh = false): Promise<AssistantStatus> => {
 		const t = ctx.strings();
@@ -326,10 +382,25 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		};
 
 		const program = programOf(provider);
-		const files = await collectSources(sources, {
+		// Folders are a workspace: the question says what they hold, and the model reads what it needs.
+		const collected = await collectSources(sources, {
 			budget: program === null ? SOURCE_BUDGET.api : SOURCE_BUDGET.cli,
 			listOnly: program !== null,
+			workspace: true,
 		});
+		const workspace =
+			collected.roots.length === 0
+				? null
+				: new Workspace(collected.roots, indexes, (proposed) => {
+						proposals.set(proposed.id, proposed);
+						const { absolute: _absolute, ...shown } = proposed;
+						forward({ kind: "edit", edit: shown });
+					});
+		const overview = await workspaceBlock(workspace, program !== null);
+		const files = {
+			...collected,
+			text: [overview, collected.text].filter((part) => part !== "").join("\n\n"),
+		};
 		if (program !== null) {
 			const sent = sessionId === null ? undefined : sentFiles.get(sessionId);
 			const asked = withSources(files.text, sent, prompt);
@@ -412,20 +483,60 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		const stop = (): void => controller.abort();
 		sender.once("destroyed", stop);
 		let reply = "";
-		try {
-			await askApi({
+		let looked = false;
+		/** The files read for this answer: kept with the question, so the next one need not read them again. */
+		const reads: string[] = [];
+		const ask = (asked: readonly ChatMessage[], withTools: boolean): Promise<void> =>
+			askApi({
 				provider: info,
 				connection,
 				key,
 				system: systemPrompt(t),
-				messages,
+				messages: asked,
 				images,
 				signal: controller.signal,
 				text: (chunk) => {
 					reply += chunk;
 					forward({ kind: "text", text: chunk });
 				},
+				...(workspace === null || !withTools
+					? {}
+					: {
+							tools: {
+								definitions: [...WORKSPACE_TOOLS, EDIT_TOOL],
+								run: async (name, input) => {
+									const result = await workspace.run(name, input, (step) => {
+										looked = true;
+										forward({ kind: "step", ...step });
+									});
+									if (name === "read_file") reads.push(result);
+									return result;
+								},
+							},
+						}),
 			});
+		try {
+			try {
+				await ask(messages, true);
+				// It answered by writing a tool call out: it cannot use them.
+				if (workspace !== null && !looked && looksLikeToolText(reply)) {
+					reply = "";
+					forward({ kind: "reset" });
+					throw new Error("Tools are not called");
+				}
+			} catch (error) {
+				// A model that cannot call tools is sent the folders' text instead, as before.
+				if (workspace === null || reply !== "" || looked || controller.signal.aborted) throw error;
+				const inlined = await collectSources(sources, {
+					budget: SOURCE_BUDGET.api,
+					listOnly: false,
+				});
+				messages[messages.length - 1] = {
+					role: "user",
+					content: withSources(inlined.text, undefined, prompt),
+				};
+				await ask(messages, false);
+			}
 			forward({ kind: "done" });
 		} catch (error) {
 			forward({ kind: "error", message: errorMessage(error) });
@@ -435,8 +546,16 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		}
 		// What was said stays, a stopped reply as far as it got; a question without
 		// an answer is left out, so the messages keep taking turns.
+		const asked = messages.at(-1) as ChatMessage;
+		const remembered = rememberReads(reads);
 		const answered: ChatMessage[] =
-			reply === "" ? before : [...messages, { role: "assistant", content: reply }];
+			reply === ""
+				? before
+				: [
+						...messages.slice(0, -1),
+						remembered === "" ? asked : { ...asked, content: `${asked.content}\n\n${remembered}` },
+						{ role: "assistant", content: reply },
+					];
 		histories.set(id, answered.slice(-MAX_HISTORY));
 	});
 

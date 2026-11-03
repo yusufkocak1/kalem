@@ -10,9 +10,11 @@ import {
 	diagramForPrompt,
 	diagramFromReply,
 	LineSplitter,
+	lineDiff,
 	SYSTEM_PROMPT,
 	splitReply,
 	systemPrompt,
+	toolSteps,
 	withInstructions,
 } from "./claude.js";
 import { ancestors, SHAPES } from "./diagram.js";
@@ -432,5 +434,40 @@ describe("what Claude is told about the app", () => {
 		const prompt = systemPrompt(stringsFor("en"));
 		const args = claudeArgs({ sessionId: null, systemPrompt: prompt });
 		expect(args[args.indexOf("--append-system-prompt") + 1]).toBe(prompt);
+	});
+});
+
+describe("Claude Code's tool calls", () => {
+	it("says what each one looked at", () => {
+		expect(
+			toolSteps({
+				content: [
+					{ type: "text", text: "Bakıyorum" },
+					{ type: "tool_use", name: "Grep", input: { pattern: "class Main" } },
+					{ type: "tool_use", name: "Read", input: { file_path: "/p/src/Main.java" } },
+					{ type: "tool_use", name: "TodoWrite", input: { todos: [] } },
+				],
+			}),
+		).toEqual([
+			{ kind: "step", tool: "Grep", detail: "class Main" },
+			{ kind: "step", tool: "Read", detail: "/p/src/Main.java" },
+			{ kind: "step", tool: "TodoWrite", detail: "" },
+		]);
+		expect(toolSteps(null)).toEqual([]);
+	});
+});
+
+describe("the lines of a proposed change", () => {
+	it("keeps a little of what is shared around what changes", () => {
+		expect(lineDiff("a\nb\nc\nd\ne", "a\nb\nC\nd\ne", 1)).toEqual([
+			{ kind: " ", text: "b" },
+			{ kind: "-", text: "c" },
+			{ kind: "+", text: "C" },
+			{ kind: " ", text: "d" },
+		]);
+		expect(lineDiff("", "yeni\ndosya")).toEqual([
+			{ kind: "+", text: "yeni" },
+			{ kind: "+", text: "dosya" },
+		]);
 	});
 });

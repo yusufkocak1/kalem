@@ -14,6 +14,7 @@ import {
 	decisionLabel,
 	distributeNodes,
 	fitGroups,
+	fitNodesToText,
 	groupNodes,
 	layoutDiagram,
 	moveNodes,
@@ -330,5 +331,27 @@ describe("multiplexer and group routes", () => {
 			{ x: 0, y: 85 },
 			{ x: 40, y: 85 },
 		]);
+	});
+});
+
+describe("fitting shapes to their text", () => {
+	it("grows the chosen shapes and the group around them", () => {
+		const text = "Çok uzun bir açıklama metni burada yer alıyor ve kutuya sığmıyor gerçekten";
+		const diagram: Diagram = {
+			nodes: [
+				node("g", 0, 0, { shape: "group", w: 240, h: 140 }),
+				node("a", 20, 40, { text, w: 160, h: 40, parent: "g" }),
+				node("b", 300, 40, { text, w: 160, h: 40 }),
+			],
+			edges: [],
+		};
+		const fitted = fitNodesToText(diagram, new Set(["a"]));
+		const a = fitted.nodes.find((item) => item.id === "a") as DiagramNode;
+		const group = fitted.nodes.find((item) => item.id === "g") as DiagramNode;
+		expect(a.h).toBeGreaterThan(40);
+		expect(group.y + group.h).toBeGreaterThanOrEqual(a.y + a.h);
+		expect(fitted.nodes.find((item) => item.id === "b")?.h).toBe(40);
+		// Nothing to grow: the same diagram, so no undo step.
+		expect(fitNodesToText(fitted, new Set(["a"]))).toBe(fitted);
 	});
 });

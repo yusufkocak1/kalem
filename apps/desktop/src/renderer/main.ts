@@ -56,6 +56,7 @@ import { createAppRibbon } from "./ribbon-layout.js";
 import { ipcErrorMessage, Session } from "./session.js";
 import { enableColumnResize } from "./table-styles.js";
 import { createTabStrip } from "./tabs.js";
+import { measureDiagramText } from "./text-measure.js";
 import { createVersionHistory } from "./version-history.js";
 
 import "@kalem-editor/themes/tokens.css";
@@ -77,6 +78,7 @@ declare global {
 }
 
 const bridge = window.kalem;
+measureDiagramText();
 const startup = await bridge.getStartup();
 const t = stringsFor(startup.language);
 let settings: Settings = startup.settings;
@@ -108,6 +110,8 @@ const filesPane = createFilesPane({
 	open: (path, query) => void openFromFolder(path, query),
 	notify: (text) => session.notices.show({ id: "files", kind: "error", text }),
 	inform: (text) => session.notices.show({ id: "files", kind: "info", text }),
+	// The open folders are the assistant's workspace.
+	listed: () => assistant.workspaceChanged(),
 	git: createGitDialogs(t, startup.language),
 	autoFetch: () => settings.gitAutoFetch,
 	setAutoFetch: (on) => updateSettings({ gitAutoFetch: on }),

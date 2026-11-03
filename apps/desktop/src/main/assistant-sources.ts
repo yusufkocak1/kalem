@@ -100,6 +100,8 @@ export interface SourcesContext {
 	readonly text: string;
 	/** The folders a CLI is allowed to read: the folders added, and those of the files added. */
 	readonly folders: readonly string[];
+	/** The folders added, which are a workspace when `workspace` is asked for. */
+	readonly roots: readonly string[];
 }
 
 /**
@@ -110,7 +112,12 @@ export interface SourcesContext {
  */
 export async function collectSources(
 	paths: readonly string[],
-	options: { readonly budget: number; readonly listOnly: boolean },
+	options: {
+		readonly budget: number;
+		readonly listOnly: boolean;
+		/** Folders are left out of the text: the model looks into them itself (see workspace-tools). */
+		readonly workspace?: boolean;
+	},
 ): Promise<SourcesContext> {
 	const files: string[] = [];
 	const folders: string[] = [];
@@ -123,7 +130,7 @@ export async function collectSources(
 			// A source that was moved or deleted is simply not sent.
 		}
 	}
-	if (files.length === 0 && folders.length === 0) return { text: "", folders: [] };
+	if (files.length === 0 && folders.length === 0) return { text: "", folders: [], roots: [] };
 
 	const parts: string[] = [];
 	let room = options.budget;
@@ -150,7 +157,7 @@ export async function collectSources(
 
 	for (const path of files) await read(path, path);
 	let listed = 0;
-	for (const folder of folders) {
+	for (const folder of options.workspace === true ? [] : folders) {
 		const listing = await listFolder(folder, Math.max(0, MAX_LISTED - listed));
 		listed += listing.files.length;
 		parts.push(
@@ -167,7 +174,8 @@ export async function collectSources(
 	if (left > 0) parts.push(`[${left} more files not included: too much text for one question]`);
 
 	return {
-		text: `<files>\n${parts.join("\n")}\n</files>`,
+		text: parts.length === 0 ? "" : `<files>\n${parts.join("\n")}\n</files>`,
 		folders: [...new Set([...folders, ...files.map((path) => dirname(path))])],
+		roots: folders,
 	};
 }

@@ -25,6 +25,7 @@ import {
 	MIN_HEIGHT,
 	MIN_WIDTH,
 	nextId,
+	nodeText,
 	PADDING,
 	routeEdges,
 	SHAPES,
@@ -40,6 +41,7 @@ import {
 	decisionLabel,
 	distributeNodes,
 	fitGroups,
+	fitNodesToText,
 	groupNodes,
 	layoutDiagram,
 	moveNodes,
@@ -311,6 +313,11 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 		"Ctrl+Shift+G",
 	);
 	const rotateButton = toolButton(t.diagramRotate, "⟳", () => rotateMux());
+	const fitTextButton = toolButton(
+		t.diagramFitText,
+		glyph(["M4 5h16v14H4z", "M12 8v8", "m9.5 10.5 2.5-2.5 2.5 2.5", "m9.5 13.5 2.5 2.5 2.5-2.5"]),
+		() => change(fitNodesToText(diagram, nodesSelected)),
+	);
 	const layoutButton = toolButton(
 		t.diagramLayout,
 		glyph(["M9 3h6v4H9z", "M3 17h6v4H3z", "M15 17h6v4h-6z", "M12 7v5", "M6 17v-5h12v5"]),
@@ -340,7 +347,15 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 			el("div", { class: "diagram-group", children: [undoButton, redoButton] }),
 			el("div", {
 				class: "diagram-group diagram-selection",
-				children: [colorGroup, edgeGroup, rotateButton, groupButton, ungroupButton, deleteButton],
+				children: [
+					colorGroup,
+					edgeGroup,
+					rotateButton,
+					fitTextButton,
+					groupButton,
+					ungroupButton,
+					deleteButton,
+				],
 			}),
 			alignGroup,
 			el("div", { class: "diagram-group", children: [layoutButton] }),
@@ -821,6 +836,15 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 		spreadY.disabled = nodes.length < 3;
 		layoutButton.disabled = diagram.nodes.length < 2;
 		rotateButton.hidden = !nodes.some((node) => node.shape === "mux");
+		// Shown while a selected shape's text had to shrink.
+		fitTextButton.hidden = !nodes.some((node) => nodeText(node).fontSize < FONT_SIZE);
+		for (const mark of content.querySelectorAll("[data-shrunk] .kd-shrunk")) {
+			mark.append(
+				Object.assign(document.createElementNS(SVG_NS, "title"), {
+					textContent: t.diagramTextShrunk,
+				}),
+			);
+		}
 		groupButton.hidden = nodes.length === 0;
 		ungroupButton.hidden = !nodes.some((node) => node.shape === "group");
 		deleteButton.disabled = nodes.length + edges.length === 0;
@@ -953,7 +977,13 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 		textEdit.style.top = `${box.y * view.zoom + view.y}px`;
 		textEdit.style.width = `${box.w * view.zoom}px`;
 		textEdit.style.height = `${box.h * view.zoom}px`;
-		textEdit.style.fontSize = `${FONT_SIZE * view.zoom}px`;
+		// The text is typed at the size the shape will draw it.
+		const node = editing.kind === "node" ? nodeById(editing.id) : undefined;
+		const size =
+			node === undefined || node.shape === "group"
+				? FONT_SIZE
+				: nodeText({ ...node, text: textEdit.value }).fontSize;
+		textEdit.style.fontSize = `${size * view.zoom}px`;
 	}
 
 	function editText(kind: "node" | "edge", id: string): void {
@@ -996,6 +1026,7 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 		}
 	});
 	textEdit.addEventListener("blur", () => finishText(true));
+	textEdit.addEventListener("input", () => placeTextEdit());
 
 	// --- Pointer -----------------------------------------------------------------
 

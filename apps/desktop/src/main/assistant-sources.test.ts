@@ -68,6 +68,7 @@ describe("assistant sources", () => {
 		expect(await collectSources([join(root, "yok")], { budget: 100, listOnly: false })).toEqual({
 			text: "",
 			folders: [],
+			roots: [],
 		});
 	});
 });

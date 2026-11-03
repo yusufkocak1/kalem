@@ -453,6 +453,21 @@ verir.
   ya da oka çift tıklayınca yazılır (Shift+Enter yeni satır). Bir kararın
   ilk çıkışı **Evet**, ikincisi **Hayır** etiketini kendiliğinden alır; yana
   giden dal elmasın köşesinden çıkar.
+  - **Metin şekle sığar:** uzun metin şeklin içinde satırlara bölünür;
+    yine sığmazsa yazı, kelimeler bölünmeden ve satırlar şeklin dışına
+    taşmadan sığana kadar küçülür (en az 6 punto). Elmas, daire ve belgenin
+    dalgalı alt kenarı gibi daralan yerler hesaba katılır. Küçülen yazı
+    yakınlaştırılarak okunur; şekli büyütmek yazıyı yeniden büyütür.
+    - Satırlar gerçek yazı tipiyle ölçülerek bölünür; resim başka bir
+      bilgisayarda ya da Confluence'ta açıldığında da taşmasın diye
+      Segoe UI, Arial ve sistemin yazı tipinden en genişi esas alınır.
+    - Yazısı 10 puntonun altına inen şeklin köşesinde turuncu bir nokta
+      çıkar (yalnızca düzenleyicide). Böyle bir şekil seçiliyken araç
+      çubuğundaki **Şekli metne göre büyüt** şekli önce en uzun kelimeye
+      yetecek kadar genişletir, sonra metin 14 puntoda sığana kadar
+      uzatır (daire iki yönde büyür); grubu da onunla büyür, Ctrl+Z
+      geri alır.
+    - Şekle yazarken kutudaki yazı, şeklin çizeceği boyutta görünür.
   - **Seçim:** tıklama, Shift/Ctrl+tıklama (seçime ekler/çıkarır), boş
     kanvasta sürükleyerek seçim kutusu, Ctrl+A. Seçilenler birlikte taşınır,
     silinir, renklendirilir, ok tuşlarıyla kaydırılır.
@@ -531,21 +546,63 @@ verir.
   içinde saklanır (en çok 100; soruyla giden belge saklanmaz) ve uygulama
   açılınca en son sohbet geri gelir. Claude Code ve Copilot sohbetleri
   kendi oturumlarıyla, API sohbetleri saklanan mesajlarla sürer.
+- **Files bölmesindeki açık klasörler kendiliğinden çalışma alanıdır:**
+  **Dosya → Klasör Aç…** ile açılan klasörler her sohbette, eklemeye gerek
+  kalmadan, soru kutusunun üstünde klasör simgeli bir çip olarak görünür
+  ve aşağıda anlatılan çalışma alanı gibi kullanılır. Çipin ✕'i klasörü
+  yalnızca o sohbette dışarıda bırakır (sohbetle saklanır); **+** menüsündeki
+  **Açık klasör: …** geri alır. Klasör kapatılınca çalışma alanından da
+  çıkar.
 - **Kaynak dosya ve klasörler:** soru kutusunun üstündeki **+** düğmesi
-  sohbete dosya (**Dosya…**) ya da klasör (**Klasör…**) ekler; bir klasör
-  açıksa (**Dosya → Klasör Aç…**) **Açık klasör** ile o da eklenebilir.
+  sohbete dosya (**Dosya…**) ya da klasör (**Klasör…**) ekler.
   Yalnızca `.md` değil, her metin dosyası (`.txt`, `.java`, `.ts`, `.sql`,
   `.xml`…) okunur; resim, arşiv, `.class` gibi ikili dosyalar ve gizli,
   `node_modules`, `target`, `build`, `dist` klasörleri atlanır. Eklenenler
   soru kutusunun üstünde birer çip olarak görünür, ✕ ile çıkarılır ve
   sohbetle birlikte saklanır. Örneğin bir kod klasörü ile bir analiz notu
   ekleyip "yazılım analiz dokümanını yaz" denebilir.
-  - **Claude Code / Copilot:** klasörün dosya listesi gönderilir ve klasör
-    `--add-dir` ile okunabilir yapılır; asistan gerek duyduğu dosyaları
-    kendi araçlarıyla (yalnızca okuma) okur. Tek tek eklenen dosyaların
-    metni doğrudan gider.
-  - **API'ler:** dosyaların metni soruyla gider (dosya başına en çok
-    100 000, toplam 300 000 karakter; sığmayanlar sayıyla belirtilir).
+  - **Eklenen klasör bir çalışma alanıdır:** dosyaları soruya gömülmez,
+    bağlamı şişirmez. Soruyla yalnızca kısa bir özet gider (dosya sayısı,
+    türleri, üst klasörler, en üstteki dosyalar); asistan gerek görürse
+    dosyalarda **arar**, **listeler** ve istediği dosyayı ya da yalnızca
+    istediği satırları **okur**. Klasörün dosya listesi bir kez dizinlenir
+    ve bir süre yeniden kullanılır; aramalar klasörü baştan taramaz.
+    Asistanın nelere baktığı yanıtın üstünde katlanmış bir listede görünür
+    ("Çalışma alanına bakıldı (3)": aranan metinler, okunan dosyalar).
+    Asistan yalnızca eklenen klasörlerin içini okuyabilir; dışarı çıkan
+    yollar ve klasör dışına giden bağlantılar reddedilir. Kendi başına
+    hiçbir dosyaya yazmaz.
+  - **Hangi dosyalar:** klasör bir Git deposundaysa Git'in gördükleri
+    (`.gitignore` kurallarına uyarak; `.github` gibi izlenen gizli
+    klasörler dahil), değilse gizli ve `node_modules`/`target`/`build` gibi
+    klasörler dışındakiler.
+  - **Hızlı arama:** bilgisayarda `ripgrep` (`rg`) varsa arama onunla
+    yapılır; yoksa dosyaların metni bellekte tutulur (en çok 64 MB) ve
+    değişmeyen dosya yeniden okunmaz.
+  - **Claude Code / Copilot:** klasör `--add-dir` ile okunabilir yapılır;
+    asistan kendi araçlarıyla (yalnızca okuma) arar ve okur.
+  - **API'ler (Anthropic, OpenAI uyumlu…):** Kalem modele `search`,
+    `list_files`, `read_file` ve `propose_edit` araçlarını verir; model bir
+    yanıtta en çok 30 tur araç çağırabilir.
+    - **Okunanlar hatırlanır:** bir yanıt için okunan dosyalar (en çok
+      40 000 karakter) sohbetle birlikte sonraki sorulara da gider; model
+      aynı dosyayı yeniden okumaz.
+    - **Prompt önbelleği (Anthropic):** sistem mesajı, araçlar ve sohbetin
+      o ana kadarki kısmı önbelleğe işaretlenir; sonraki tur ve sorularda
+      yeniden işlenmez, daha ucuz ve hızlıdır.
+    - **Dosya değişikliği önerisi:** "şunu düzelt" denince model
+      değişikliği `propose_edit` ile önerir; yanıtta dosya adı, açıklama
+      ve satır farkı (kırmızı çıkan, yeşil giren) olan bir kart çıkar.
+      Dosyaya ancak **Dosyaya Uygula** ile yazılır; **Vazgeç** dosyayı
+      değiştirmez. Uygulanırken dosya o arada değiştiyse uygulanmaz ve
+      nedeni söylenir. Dosyanın satır sonları ve kodlaması korunur; UTF-8
+      dışındaki eski kodlamalı (windows-1254) dosyalar için öneri yapılmaz.
+      Öneriler uygulamanın o çalışmasında geçerlidir.
+    - **Araç kullanamayan modeller:** istek hata verirse ya da model
+      araç çağrısını yanıta metin olarak yazarsa (`{"name": "search", …}`),
+      o yanıt silinir ve klasörlerin metni eskisi gibi soruyla gönderilir
+      (dosya başına en çok 100 000, toplam 300 000 karakter).
+  - **Tek tek eklenen dosyaların** metni ise doğrudan soruyla gider.
   Kaynaklar değişmedikçe aynı sohbette yeniden gönderilmez.
 - **Model seçimi:** soru kutusunun üstündeki seçici etkin hizmetin
   modellerini listeler: API'lerde hizmetin kendi listesi; Claude Code ve

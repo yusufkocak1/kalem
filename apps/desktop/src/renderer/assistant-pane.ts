@@ -6,8 +6,14 @@ import type { AssistantStatus, Command, KalemBridge } from "../shared/bridge.js"
 import { clampAssistantWidth, DEFAULT_SETTINGS, MIN_ASSISTANT_WIDTH } from "../shared/bridge.js";
 import type { ChatSummary, StoredChat, StoredMessage } from "../shared/chats.js";
 import { chatTitle, historyOf } from "../shared/chats.js";
-import type { ClaudeEvent, ContextDiagram, ReplyDiagram, ReplyPart } from "../shared/claude.js";
-import { composePrompt, splitReply } from "../shared/claude.js";
+import type {
+	ClaudeEvent,
+	ContextDiagram,
+	ProposedEdit,
+	ReplyDiagram,
+	ReplyPart,
+} from "../shared/claude.js";
+import { composePrompt, lineDiff, splitReply } from "../shared/claude.js";
 import { diagramSvg, svgMarkup } from "../shared/diagram.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
@@ -44,7 +50,7 @@ export interface AssistantHost {
 	images(): Promise<DocumentImage[]>;
 	/** The text last selected in the document; empty when none. */
 	selection(): string;
-	/** The folders opened with Open Folder. */
+	/** The folders opened with Open Folder: each chat's workspace unless it leaves one out. */
 	workspaceFolders(): readonly string[];
 	/** Puts a reply's Markdown at the caret, its Kalem diagrams as pictures. */
 	insert(text: string): Promise<void>;
@@ -69,6 +75,8 @@ export interface AssistantPane {
 	focus(): void;
 	/** The document's selection changed. */
 	refreshSelection(): void;
+	/** The folders open in the Files pane changed. */
+	workspaceChanged(): void;
 }
 
 interface Message {
@@ -79,6 +87,10 @@ interface Message {
 	readonly notes: readonly string[];
 	/** The model that answered; empty when the service chose. */
 	readonly model?: string;
+	/** What it looked up in the workspace while answering, in this run. */
+	steps?: string[];
+	/** Changes to workspace files it proposed, in this run. */
+	edits?: ProposedEdit[];
 }
 
 /** A conversation, shown or not; a reply keeps coming in while another chat is shown. */
@@ -93,6 +105,8 @@ interface Chat {
 	readonly messages: Message[];
 	/** Files and folders added to the chat; their text goes with each question. */
 	sources: string[];
+	/** Folders open in the Files pane that this chat leaves out. */
+	skipped: string[];
 	/** The document text the service was last given in this chat, in this run. */
 	sharedText: string | null;
 	/** The reply coming in, and what ends the wait for it. */
@@ -163,6 +177,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			updated: now,
 			messages: [],
 			sources: [],
+			skipped: [],
 			sharedText: null,
 			reply: null,
 			ended: null,
@@ -270,13 +285,16 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		addMenu.replaceChildren(
 			menuItem(t.assistantAddFiles, "file", () => void pickSources("files")),
 			menuItem(t.assistantAddFolder, "open", () => void pickSources("folder")),
+			// An open folder this chat left out can come back.
 			...host
 				.workspaceFolders()
-				.filter((folder) => !active.sources.includes(folder))
+				.filter((folder) => active.skipped.includes(folder))
 				.map((folder) =>
-					menuItem(format(t.assistantAddWorkspace, baseName(folder)), "open", () =>
-						addSources([folder]),
-					),
+					menuItem(format(t.assistantAddWorkspace, baseName(folder)), "open", () => {
+						active.skipped = active.skipped.filter((skipped) => skipped !== folder);
+						save(active);
+						renderSources();
+					}),
 				),
 		);
 		addMenu.hidden = false;
@@ -326,9 +344,50 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		renderSources();
 	}
 
+	/** The open folders this chat uses as its workspace. */
+	function openFolders(chat: Chat): string[] {
+		return host
+			.workspaceFolders()
+			.filter((folder) => !chat.skipped.includes(folder) && !chat.sources.includes(folder));
+	}
+
+	/** What goes with a question: the open folders, then what was added to the chat. */
+	function chatSources(chat: Chat): string[] {
+		return [...openFolders(chat), ...chat.sources].slice(0, MAX_SOURCES);
+	}
+
+	function skipFolder(path: string): void {
+		active.skipped = [...active.skipped, path];
+		save(active);
+		renderSources();
+	}
+
 	function renderSources(): void {
-		sourceList.hidden = active.sources.length === 0;
+		const open = openFolders(active);
+		sourceList.hidden = active.sources.length === 0 && open.length === 0;
 		sourceList.replaceChildren(
+			...open.map((path) => {
+				const name = baseName(path);
+				const remove = el("button", {
+					class: "assistant-chip-close",
+					attrs: {
+						type: "button",
+						title: format(t.assistantSkipWorkspace, name),
+						"aria-label": format(t.assistantSkipWorkspace, name),
+					},
+					children: [icon("close")],
+				});
+				remove.addEventListener("click", () => skipFolder(path));
+				return el("span", {
+					class: "assistant-chip assistant-source assistant-source-workspace",
+					attrs: { title: `${path}\n${t.assistantWorkspaceChip}` },
+					children: [
+						icon("open"),
+						el("span", { class: "assistant-chip-text", text: name }),
+						remove,
+					],
+				});
+			}),
 			...active.sources.map((path) => {
 				const name = baseName(path);
 				const remove = el("button", {
@@ -1123,6 +1182,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				...(message.model === undefined ? {} : { model: message.model }),
 			})),
 			sources: [...(stored.sources ?? [])],
+			skipped: [...(stored.skipped ?? [])],
 			sharedText: null,
 			reply: null,
 			ended: null,
@@ -1183,6 +1243,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			updated: chat.updated,
 			messages,
 			...(chat.sources.length === 0 ? {} : { sources: chat.sources }),
+			...(chat.skipped.length === 0 ? {} : { skipped: chat.skipped }),
 		};
 		bridge.assistantSaveChat(stored).catch(() => {});
 	}
@@ -1297,9 +1358,14 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					? diagramCard(part)
 					: actionsCard(part.actions, message, index),
 		);
+		const steps = stepsView(message);
+		if (steps !== null) nodes.unshift(steps);
+		for (const proposed of message.edits ?? []) nodes.push(editCard(proposed));
 		if (!message.done && message.error === null) {
+			const lastStep = message.steps?.at(-1);
 			if (pending !== null) nodes.push(waiting(pending));
-			else if (message.text === "") nodes.push(waiting(t.assistantThinking));
+			else if (message.text === "" || (lastStep !== undefined && message.text.endsWith("\n\n")))
+				nodes.push(waiting(lastStep ?? t.assistantThinking));
 			else nodes.push(el("span", { class: "assistant-typing" }));
 		}
 		if (message.error !== null) {
@@ -1313,6 +1379,111 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		view.body.replaceChildren(...nodes);
 		if (follow) log.scrollTop = log.scrollHeight;
 		updateJump();
+	}
+
+	/** One look into the workspace, as the chat says it. */
+	function stepLabel(tool: string, detail: string): string {
+		switch (tool) {
+			case "search":
+			case "Grep":
+				return format(t.assistantStepSearch, detail);
+			case "read_file":
+			case "Read":
+				return format(t.assistantStepRead, detail);
+			case "propose_edit":
+				return format(t.assistantStepEdit, detail);
+			case "list_files":
+			case "Glob":
+			case "LS":
+				return detail === "" ? t.assistantStepListAll : format(t.assistantStepList, detail);
+			default:
+				return detail === "" ? tool : `${tool}: ${detail}`;
+		}
+	}
+
+	/** What became of each proposed change: applied, or set aside. */
+	const editStates = new Map<
+		string,
+		{ kind: "applied" | "discarded" } | { kind: "failed"; text: string }
+	>();
+
+	/** A proposed change to a workspace file: what it takes out and puts in, applied on request. */
+	function editCard(proposed: ProposedEdit): HTMLElement {
+		const state = editStates.get(proposed.id);
+		const diff = el("pre", { class: "assistant-edit-diff" });
+		for (const line of lineDiff(proposed.oldText, proposed.newText)) {
+			diff.append(
+				el("span", {
+					class: `assistant-diff-line diff-${line.kind === "+" ? "add" : line.kind === "-" ? "remove" : "keep"}`,
+					text: `${line.kind} ${line.text}\n`,
+				}),
+			);
+		}
+		const status = el("p", { class: "assistant-edit-state", attrs: { role: "status" } });
+		const actions = el("div", { class: "assistant-edit-actions" });
+		if (state?.kind === "applied")
+			status.textContent = format(t.assistantEditApplied, proposed.path);
+		else if (state?.kind === "discarded") status.textContent = t.assistantEditDiscarded;
+		else {
+			if (state?.kind === "failed") {
+				status.textContent = format(t.assistantEditFailed, state.text);
+				status.classList.add("failed");
+			}
+			const apply = button(t.assistantEditApply, { class: "assistant-primary", icon: "check" });
+			const discard = button(t.assistantEditDiscard, { icon: "close" });
+			apply.addEventListener("click", async () => {
+				apply.disabled = true;
+				try {
+					await bridge.assistantApplyEdit(proposed.id);
+					editStates.set(proposed.id, { kind: "applied" });
+				} catch (error) {
+					editStates.set(proposed.id, { kind: "failed", text: host.errorText(error) });
+				}
+				card.replaceWith(editCard(proposed));
+			});
+			discard.addEventListener("click", () => {
+				editStates.set(proposed.id, { kind: "discarded" });
+				card.replaceWith(editCard(proposed));
+			});
+			actions.append(apply, discard);
+		}
+		const card = el("div", {
+			class: `assistant-edit${state === undefined || state.kind === "failed" ? "" : ` ${state.kind}`}`,
+			attrs: { "data-edit": proposed.id },
+			children: [
+				el("div", {
+					class: "assistant-edit-head",
+					children: [
+						icon("pencil"),
+						el("span", { class: "assistant-edit-path", text: proposed.path }),
+						...(proposed.oldText === ""
+							? [el("span", { class: "assistant-edit-new", text: t.assistantEditNew })]
+							: []),
+					],
+				}),
+				...(proposed.summary === ""
+					? []
+					: [el("p", { class: "assistant-edit-summary", text: proposed.summary })]),
+				diff,
+				status,
+				actions,
+			],
+		});
+		return card;
+	}
+
+	/** The looks into the workspace behind a reply, folded away once it is done. */
+	function stepsView(message: Message): HTMLElement | null {
+		const steps = message.steps ?? [];
+		if (steps.length === 0) return null;
+		const view = el("details", {
+			class: "assistant-steps",
+			children: [
+				el("summary", { text: format(t.assistantSteps, steps.length) }),
+				el("ol", { children: steps.map((step) => el("li", { text: step })) }),
+			],
+		});
+		return view;
 	}
 
 	function waiting(label: string): HTMLElement {
@@ -1660,6 +1831,20 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				if (chat === active) scheduleRender(reply);
 				chat.ended?.();
 				return;
+			case "reset":
+				reply.text = "";
+				reply.steps = [];
+				reply.edits = [];
+				if (chat === active) scheduleRender(reply);
+				return;
+			case "edit":
+				reply.edits = [...(reply.edits ?? []), event.edit];
+				if (chat === active) scheduleRender(reply);
+				return;
+			case "step":
+				reply.steps = [...(reply.steps ?? []), stepLabel(event.tool, event.detail)];
+				if (chat === active) scheduleRender(reply);
+				return;
 			case "done":
 				chat.ended?.();
 				return;
@@ -1702,11 +1887,12 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			const unchanged = sharing && chat.sessionId !== null && chat.sharedText === context.text;
 			if (sharing) notes.push(format(t.assistantSharedDocument, context.name));
 			if (selection.trim() !== "") notes.push(t.assistantSharedSelection);
-			if (chat.sources.length > 0) {
+			const sources = chatSources(chat);
+			if (sources.length > 0) {
 				notes.push(
-					chat.sources.length === 1
-						? format(t.assistantSharedDocument, baseName(chat.sources[0] as string))
-						: format(t.assistantSharedSources, chat.sources.length),
+					sources.length === 1
+						? format(t.assistantSharedDocument, baseName(sources[0] as string))
+						: format(t.assistantSharedSources, sources.length),
 				);
 			}
 			// The pictures go with the document; an API, which keeps none, gets them every time.
@@ -1760,7 +1946,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					folder: chat.folder,
 					history: earlier,
 					images: images.map(({ label, mediaType, data }) => ({ label, mediaType, data })),
-					sources: chat.sources,
+					sources: chatSources(chat),
 				});
 				await Promise.race([last, new Promise((resolve) => setTimeout(resolve, 5000))]);
 			} catch (error) {
@@ -1818,5 +2004,6 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			input.focus();
 		},
 		refreshSelection,
+		workspaceChanged: () => renderSources(),
 	};
 }

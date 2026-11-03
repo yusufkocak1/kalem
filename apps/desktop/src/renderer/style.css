@@ -1253,6 +1253,20 @@ button {
 	max-width: 180px;
 }
 
+/* An open folder of the Files pane: the chat's workspace on its own. */
+.assistant-source-workspace {
+	gap: 4px;
+	padding-left: 6px;
+	background: color-mix(in srgb, var(--app-accent) 14%, transparent);
+}
+
+.assistant-source-workspace > .icon {
+	flex: none;
+	width: 13px;
+	height: 13px;
+	color: var(--app-accent);
+}
+
 /* The question box: the text, and under it what goes with the question. */
 .assistant-box {
 	display: flex;
@@ -1732,6 +1746,136 @@ button {
 .assistant-message:has(~ .assistant-message) .assistant-regenerate,
 .assistant-log.busy .assistant-regenerate {
 	display: none;
+}
+
+.assistant-edit {
+	margin: 8px 0;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	overflow: hidden;
+}
+
+.assistant-edit.applied {
+	border-color: color-mix(in srgb, var(--app-accent) 50%, var(--app-border));
+}
+
+.assistant-edit.discarded {
+	opacity: 0.6;
+}
+
+.assistant-edit-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 10px;
+	border-bottom: 1px solid var(--app-border);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.assistant-edit-head .icon {
+	flex: none;
+	width: 14px;
+	height: 14px;
+	color: var(--app-accent);
+}
+
+.assistant-edit-path {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.assistant-edit-new {
+	padding: 0 6px;
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--app-accent) 16%, transparent);
+	color: var(--app-accent);
+	font-weight: 500;
+}
+
+.assistant-edit-summary {
+	margin: 6px 10px 0;
+	font-size: 12px;
+}
+
+.assistant-edit-diff {
+	max-height: 280px;
+	margin: 6px 0 0;
+	padding: 4px 0;
+	overflow: auto;
+	font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+	font-size: 11.5px;
+	line-height: 1.45;
+}
+
+.assistant-diff-line {
+	display: block;
+	padding: 0 10px;
+	white-space: pre;
+}
+
+.assistant-diff-line.diff-add {
+	background: color-mix(in srgb, #16a34a 16%, transparent);
+}
+
+.assistant-diff-line.diff-remove {
+	background: color-mix(in srgb, #dc2626 14%, transparent);
+}
+
+.assistant-diff-line.diff-keep {
+	color: var(--app-muted);
+}
+
+.assistant-edit-state {
+	margin: 6px 10px 0;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.assistant-edit-state:empty {
+	display: none;
+}
+
+.assistant-edit-state.failed {
+	color: var(--app-error);
+}
+
+.assistant-edit-actions {
+	display: flex;
+	gap: 6px;
+	padding: 8px 10px;
+}
+
+.assistant-edit-actions:empty {
+	display: none;
+}
+
+.assistant-steps {
+	margin: 0 0 6px;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.assistant-steps summary {
+	cursor: pointer;
+	user-select: none;
+}
+
+.assistant-steps ol {
+	margin: 4px 0 0;
+	padding-inline-start: 20px;
+	max-height: 180px;
+	overflow-y: auto;
+}
+
+.assistant-steps li {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .assistant-waiting {

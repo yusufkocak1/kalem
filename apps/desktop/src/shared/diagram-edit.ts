@@ -4,7 +4,7 @@
  * moving. Each returns a new diagram; none touches the screen.
  */
 import type { Diagram, DiagramEdge, DiagramNode, Point } from "./diagram.js";
-import { ancestors, GRID, liftEdges, nextId, snap } from "./diagram.js";
+import { ancestors, GRID, liftEdges, nextId, sizeForText, snap } from "./diagram.js";
 
 export interface Box {
 	readonly x: number;
@@ -534,4 +534,17 @@ export function alignmentGuides(
 		guides.push({ x1: left - GRID, y1: at, x2: right + GRID, y2: at });
 	}
 	return { dx, dy, guides };
+}
+
+/** Makes the shapes `ids` big enough for their text at the usual size; their groups grow along. */
+export function fitNodesToText(diagram: Diagram, ids: ReadonlySet<string>): Diagram {
+	let changed = false;
+	const nodes = diagram.nodes.map((node) => {
+		if (!ids.has(node.id)) return node;
+		const size = sizeForText(node);
+		if (size.w === node.w && size.h === node.h) return node;
+		changed = true;
+		return { ...node, ...size };
+	});
+	return changed ? fitGroups({ ...diagram, nodes }) : diagram;
 }
