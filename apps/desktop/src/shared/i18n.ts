@@ -600,6 +600,9 @@ const en = {
 	assistantAddFiles: "Files…",
 	assistantAddFolder: "Folder…",
 	assistantAddWorkspace: "Open folder: {0}",
+	assistantWorkspaceChip:
+		"Open in the Files pane: a workspace the assistant searches and reads when it needs to.",
+	assistantSkipWorkspace: "Leave “{0}” out of this chat",
 	assistantSteps: "Looked into the workspace ({0})",
 	assistantStepSearch: "Searched “{0}”",
 	assistantStepRead: "Read {0}",
@@ -1364,6 +1367,9 @@ const tr: Strings = {
 	assistantAddFiles: "Dosya…",
 	assistantAddFolder: "Klasör…",
 	assistantAddWorkspace: "Açık klasör: {0}",
+	assistantWorkspaceChip:
+		"Dosyalar bölmesinde açık: asistanın gerektiğinde arayıp okuduğu çalışma alanı.",
+	assistantSkipWorkspace: "“{0}” klasörünü bu sohbette kullanma",
 	assistantSteps: "Çalışma alanına bakıldı ({0})",
 	assistantStepSearch: "“{0}” arandı",
 	assistantStepRead: "{0} okundu",

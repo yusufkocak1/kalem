@@ -108,6 +108,8 @@ const filesPane = createFilesPane({
 	open: (path, query) => void openFromFolder(path, query),
 	notify: (text) => session.notices.show({ id: "files", kind: "error", text }),
 	inform: (text) => session.notices.show({ id: "files", kind: "info", text }),
+	// The open folders are the assistant's workspace.
+	listed: () => assistant.workspaceChanged(),
 	git: createGitDialogs(t, startup.language),
 });
 const versionHistory = createVersionHistory({ t, lang: startup.language });

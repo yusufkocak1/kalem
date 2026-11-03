@@ -497,9 +497,15 @@ verir.
   içinde saklanır (en çok 100; soruyla giden belge saklanmaz) ve uygulama
   açılınca en son sohbet geri gelir. Claude Code ve Copilot sohbetleri
   kendi oturumlarıyla, API sohbetleri saklanan mesajlarla sürer.
+- **Files bölmesindeki açık klasörler kendiliğinden çalışma alanıdır:**
+  **Dosya → Klasör Aç…** ile açılan klasörler her sohbette, eklemeye gerek
+  kalmadan, soru kutusunun üstünde klasör simgeli bir çip olarak görünür
+  ve aşağıda anlatılan çalışma alanı gibi kullanılır. Çipin ✕'i klasörü
+  yalnızca o sohbette dışarıda bırakır (sohbetle saklanır); **+** menüsündeki
+  **Açık klasör: …** geri alır. Klasör kapatılınca çalışma alanından da
+  çıkar.
 - **Kaynak dosya ve klasörler:** soru kutusunun üstündeki **+** düğmesi
-  sohbete dosya (**Dosya…**) ya da klasör (**Klasör…**) ekler; bir klasör
-  açıksa (**Dosya → Klasör Aç…**) **Açık klasör** ile o da eklenebilir.
+  sohbete dosya (**Dosya…**) ya da klasör (**Klasör…**) ekler.
   Yalnızca `.md` değil, her metin dosyası (`.txt`, `.java`, `.ts`, `.sql`,
   `.xml`…) okunur; resim, arşiv, `.class` gibi ikili dosyalar ve gizli,
   `node_modules`, `target`, `build`, `dist` klasörleri atlanır. Eklenenler

@@ -28,6 +28,8 @@ export interface StoredChat {
 	readonly messages: readonly StoredMessage[];
 	/** Files and folders added to the chat, sent with each question. */
 	readonly sources?: readonly string[];
+	/** Folders open in the Files pane that this chat leaves out of its workspace. */
+	readonly skipped?: readonly string[];
 }
 
 export interface ChatSummary {
@@ -89,6 +91,11 @@ export function parseChat(raw: unknown): StoredChat | null {
 			(path): path is string => typeof path === "string" && path !== "" && path.length <= 4096,
 		)
 		.slice(0, MAX_CHAT_SOURCES);
+	const skipped = (Array.isArray(chat.skipped) ? chat.skipped : [])
+		.filter(
+			(path): path is string => typeof path === "string" && path !== "" && path.length <= 4096,
+		)
+		.slice(0, MAX_CHAT_SOURCES);
 	return {
 		id,
 		title: str(chat.title, 200),
@@ -99,6 +106,7 @@ export function parseChat(raw: unknown): StoredChat | null {
 		updated: time(chat.updated),
 		messages,
 		...(sources.length === 0 ? {} : { sources }),
+		...(skipped.length === 0 ? {} : { skipped }),
 	};
 }
 
