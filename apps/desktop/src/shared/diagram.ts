@@ -488,6 +488,21 @@ export function routeEdges(diagram: Diagram): Map<string, Route> {
 	return routes;
 }
 
+/** Measures text in the font diagrams are drawn in; `null` estimates it from its letters. */
+let measure: ((text: string, fontSize: number) => number) | null = null;
+
+/**
+ * Sets how text is measured: a page measures it in the real font (a
+ * canvas), so lines are broken where they really end. Without it (tests,
+ * the main process), widths are estimated from the letters.
+ */
+export function setTextMeasure(next: ((text: string, fontSize: number) => number) | null): void {
+	measure = next;
+}
+
+/** The font diagrams are drawn in, as CSS names it. */
+export const DIAGRAM_FONT = FONT_FAMILY;
+
 /** About how wide a character is, in ems, in the sans-serif fonts diagrams use. */
 function charWidth(char: string): number {
 	if ("iıjlIİ|!.,:;'`".includes(char)) return 0.28;
@@ -502,6 +517,7 @@ function charWidth(char: string): number {
 
 /** About how wide `text` is drawn at `fontSize`. */
 export function textLength(text: string, fontSize = FONT_SIZE): number {
+	if (measure !== null) return measure(text, fontSize);
 	let ems = 0;
 	for (const char of text) ems += charWidth(char);
 	return ems * fontSize;
@@ -562,6 +578,34 @@ export function fitText(text: string, width: number, height: number): FittedText
 	const lines = wrapLines(text, width, MIN_FONT_SIZE);
 	const room = Math.max(1, Math.floor((height + 0.5) / (MIN_FONT_SIZE * LINE_SPACING)));
 	return { lines: lines.slice(0, room), fontSize: MIN_FONT_SIZE };
+}
+
+/** Below this size, shrunk text is marked in the editor: the shape is too small for it. */
+export const SMALL_FONT_SIZE = 10;
+
+/** A shape's text as it is drawn: its lines and their size. */
+export function nodeText(node: DiagramNode): FittedText {
+	if (node.text === "" || node.shape === "group") return { lines: [], fontSize: FONT_SIZE };
+	return fitText(node.text, textWidth(node), textHeight(node));
+}
+
+/**
+ * The size at which the shape's text fits at the usual size: taller (a
+ * circle grows both ways); never smaller than it is.
+ */
+export function sizeForText(node: DiagramNode): { w: number; h: number } {
+	if (node.text === "" || node.shape === "group") return { w: node.w, h: node.h };
+	const round = node.shape === "circle";
+	// Wide enough for its longest word first, so no word has to be cut…
+	let w = node.w;
+	const longest = Math.max(...node.text.split(/\s+/).map((word) => textLength(word, FONT_SIZE)));
+	while (w < 2000 && textWidth({ ...node, w, h: round ? w : node.h }) < longest) w += GRID;
+	// …then taller until every line fits.
+	for (let grow = 0; grow <= 2000; grow += GRID) {
+		const size = round ? { w: w + grow, h: w + grow } : { w, h: node.h + grow };
+		if (nodeText({ ...node, ...size }).fontSize >= FONT_SIZE) return size;
+	}
+	return { w: node.w, h: node.h };
 }
 
 /** The height inside a shape that text can use. */
@@ -843,15 +887,35 @@ function nodeElement(node: DiagramNode, interactive: boolean): SvgNode {
 					]),
 		]);
 	}
-	const { lines, fontSize } =
-		node.text === ""
-			? { lines: [], fontSize: FONT_SIZE }
-			: fitText(node.text, textWidth(node), textHeight(node));
+	const { lines, fontSize } = nodeText(node);
 	const centerY = textCenterY(node);
-	return svg("g", interactive ? { "data-node": node.id, class: "kd-node" } : {}, [
-		...outline(node, { fill: color.fill, stroke: color.stroke, "stroke-width": 1.5 }, interactive),
-		...(lines.length === 0 ? [] : [textBlock(lines, node.x + node.w / 2, centerY, fontSize)]),
-	]);
+	// In the editor, a shape whose text had to shrink a lot says so in its corner.
+	const shrunk = interactive && fontSize < SMALL_FONT_SIZE;
+	return svg(
+		"g",
+		interactive
+			? { "data-node": node.id, class: "kd-node", ...(shrunk ? { "data-shrunk": "true" } : {}) }
+			: {},
+		[
+			...outline(
+				node,
+				{ fill: color.fill, stroke: color.stroke, "stroke-width": 1.5 },
+				interactive,
+			),
+			...(lines.length === 0 ? [] : [textBlock(lines, node.x + node.w / 2, centerY, fontSize)]),
+			...(shrunk
+				? [
+						svg("circle", {
+							cx: round(node.x + node.w - 7),
+							cy: round(node.y + 7),
+							r: 4,
+							class: "kd-shrunk",
+							fill: "#f59e0b",
+						}),
+					]
+				: []),
+		],
+	);
 }
 
 function edgeElement(edge: DiagramEdge, route: Route, interactive: boolean): SvgNode {

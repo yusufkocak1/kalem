@@ -428,3 +428,60 @@ test("keeps a group's steps reachable only from inside it, with a multiplexer", 
 	expect(errors).toEqual([]);
 	await app.close();
 });
+
+test("shrinks long text into its shape, and grows the shape to fit it on request", async () => {
+	const folder = await tempDir("kalem-diagram-fit-");
+	const doc = join(folder, "notlar.md");
+	await writeFile(doc, "# Notlar\n");
+	const { app, page, errors } = await launch({ args: [doc] });
+	await page.locator("#editor h1").click();
+	await clickMenu(app, "Insert", "Diagram…");
+	const editor = page.locator(".diagram-editor");
+	const canvas = editor.locator(".diagram-canvas");
+	await editor
+		.locator('[data-shape="process"]')
+		.dragTo(canvas, { targetPosition: { x: 300, y: 120 } });
+	const shape = canvas.locator('[data-node="n1"]');
+	await shape.dblclick();
+	const text = editor.locator(".diagram-text-edit");
+	const typedSize = (): Promise<number> =>
+		text.evaluate((box: HTMLTextAreaElement) => Number.parseFloat(box.style.fontSize));
+	const usual = await typedSize();
+	const long =
+		"UpgradeEmdCleanPnr Command FQTU/ASVC, EMD payment satırları, CXFQ temizliği; ALACARTE / BUNDLE kararı RRD validConnectionInd bağlantı < 24 saat";
+	await text.fill(long);
+	// Typed at the size it will be drawn at.
+	expect(await typedSize()).toBeLessThan(usual);
+	await text.press("Enter");
+	const size = (): Promise<number> =>
+		shape.locator("text").evaluate((node) => Number(node.getAttribute("font-size")));
+	expect(await size()).toBeLessThan(10);
+	await expect(shape).toHaveAttribute("data-shrunk", "true");
+	// Every line inside the shape.
+	const inside = (): Promise<boolean> =>
+		shape.evaluate((group) => {
+			const box = (group.querySelector("rect, path, polygon") as SVGGraphicsElement).getBBox();
+			const words = (group.querySelector("text") as SVGGraphicsElement).getBBox();
+			return (
+				words.x >= box.x &&
+				words.y >= box.y &&
+				words.x + words.width <= box.x + box.width &&
+				words.y + words.height <= box.y + box.height
+			);
+		});
+	expect(await inside()).toBe(true);
+
+	await shape.click();
+	const fitButton = editor.getByRole("button", { name: "Make the shape fit its text" });
+	await fitButton.click();
+	expect(await size()).toBe(14);
+	await expect(shape).not.toHaveAttribute("data-shrunk", "true");
+	expect(await inside()).toBe(true);
+	await expect(fitButton).toBeHidden();
+	// One step to undo.
+	await canvas.click({ position: { x: 20, y: 20 } });
+	await page.keyboard.press("Control+z");
+	expect(await size()).toBeLessThan(10);
+	expect(errors).toEqual([]);
+	await app.close();
+});

@@ -2,14 +2,18 @@ import { describe, expect, it } from "vitest";
 import type { Diagram, DiagramNode } from "./diagram.js";
 import {
 	bounds,
+	diagramContent,
 	diagramSvg,
 	edgeRoute,
 	FONT_SIZE,
 	fitText,
 	MIN_FONT_SIZE,
 	nextId,
+	nodeText,
 	parseDiagram,
 	serializeDiagram,
+	setTextMeasure,
+	sizeForText,
 	svgMarkup,
 	textLength,
 	wrapLines,
@@ -194,5 +198,45 @@ describe("diagram drawing", () => {
 		// All its lines are between the top and the bottom of the box.
 		expect(Math.min(...ys)).toBeGreaterThan(200);
 		expect(Math.max(...ys)).toBeLessThan(270);
+	});
+});
+
+describe("text and shape size", () => {
+	const long = "UpgradeEmdCleanPnr Command FQTU/ASVC, EMD payment satırları, CXFQ temizliği";
+
+	it("grows a shape until its text fits at the usual size, a circle both ways", () => {
+		const box = node("a", 0, 0, { text: long, w: 160, h: 50 });
+		expect(nodeText(box).fontSize).toBeLessThan(FONT_SIZE);
+		const size = sizeForText(box);
+		expect(size.w).toBe(160);
+		expect(size.h).toBeGreaterThan(50);
+		expect(size.h % 10).toBe(0);
+		expect(nodeText({ ...box, ...size }).fontSize).toBe(FONT_SIZE);
+		const round = node("c", 0, 0, { shape: "circle", text: "Bağlantı noktası", w: 60, h: 60 });
+		const grown = sizeForText(round);
+		expect(grown.w).toBe(grown.h);
+		expect(grown.w).toBeGreaterThan(60);
+		// Text that already fits leaves it as it is.
+		expect(sizeForText(node("b", 0, 0, { text: "Kısa" }))).toEqual({ w: 160, h: 70 });
+	});
+
+	it("marks shrunk text in the editor only", () => {
+		const tiny = node("a", 0, 0, { text: long, w: 100, h: 40 });
+		const diagram: Diagram = { nodes: [tiny], edges: [] };
+		const editor = JSON.stringify(diagramContent(diagram, true));
+		expect(editor).toContain('"data-shrunk":"true"');
+		expect(editor).toContain("kd-shrunk");
+		expect(JSON.stringify(diagramContent(diagram))).not.toContain("kd-shrunk");
+	});
+
+	it("breaks lines where a measured font ends them", () => {
+		try {
+			// Every letter as wide as the font is high: few fit on a line.
+			setTextMeasure((text, size) => [...text].length * size);
+			expect(wrapLines("ab cd ef", 40, 10)).toEqual(["ab", "cd", "ef"]);
+		} finally {
+			setTextMeasure(null);
+		}
+		expect(wrapLines("ab cd ef", 40, 10)).toEqual(["ab cd ef"]);
 	});
 });
