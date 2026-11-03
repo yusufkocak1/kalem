@@ -2100,6 +2100,79 @@ button {
 	text-align: start;
 }
 
+/* Favorites in groups: a group is a heading row that pages are dropped on. */
+.confluence-group .confluence-page-title {
+	font-weight: 600;
+}
+
+.confluence-group > .confluence-row-main > .icon {
+	color: #d97706;
+}
+
+.confluence-page-item.drop-target,
+.confluence-section.drop-target {
+	outline: 2px dashed var(--app-accent);
+	outline-offset: -2px;
+	border-radius: 5px;
+}
+
+.confluence-page-item[draggable="true"] {
+	cursor: grab;
+}
+
+.confluence-popup {
+	position: fixed;
+	z-index: 50;
+	display: flex;
+	flex-direction: column;
+	min-width: 200px;
+	max-width: 280px;
+	padding: 4px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	box-shadow: var(--app-shadow);
+	font-size: 13px;
+}
+
+.confluence-popup[hidden] {
+	display: none;
+}
+
+.confluence-popup-item {
+	padding: 5px 10px;
+	overflow: hidden;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: var(--app-text);
+	font: inherit;
+	text-align: start;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	outline: none;
+}
+
+.confluence-popup-item:hover,
+.confluence-popup-item:focus {
+	background: var(--app-pressed);
+}
+
+.confluence-popup-input {
+	margin: 4px 2px 2px;
+	padding: 5px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 5px;
+	background: var(--app-surface);
+	color: var(--app-text);
+	font: inherit;
+}
+
+.confluence-popup-input:focus {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -1px;
+}
+
 .confluence-page-item .icon {
 	flex: none;
 	width: 15px;

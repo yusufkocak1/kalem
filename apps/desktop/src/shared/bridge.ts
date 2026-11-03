@@ -254,6 +254,8 @@ export interface ConfluenceFavorite {
 	readonly site: string;
 	readonly id: string;
 	readonly title: string;
+	/** The group the user put it in; none when missing. */
+	readonly group?: string;
 }
 
 export interface ConfluencePageSummary {

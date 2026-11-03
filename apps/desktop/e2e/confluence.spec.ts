@@ -1028,3 +1028,80 @@ test("draws a diagram on a Confluence page as an attachment", async () => {
 	expect(errors).toEqual([]);
 	await app.close();
 });
+
+test("puts favorites in groups: from a menu or by dragging, renamed, closed and taken apart", async () => {
+	const confluence = await fakeConfluence();
+	cleanup.push(confluence.close);
+	const { app, page, userData, errors } = await launch({
+		settings: {
+			sidePane: "confluence",
+			navigation: true,
+			confluenceFavorites: [
+				{ site: confluence.site, id: "41", title: "Ana Sayfa" },
+				{ site: confluence.site, id: "42", title: "Sprint Planı" },
+			],
+		},
+	});
+	const pane = page.locator(".confluence-pane");
+	await pane.getByRole("button", { name: "Connect" }).click();
+	const dialog = page.locator(".confluence-dialog");
+	await dialog.locator('input[type="url"]').fill(confluence.site);
+	await dialog.locator('input[type="password"]').fill(TOKEN);
+	await dialog.getByRole("button", { name: "Connect" }).click();
+	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
+	await page.keyboard.press("Escape");
+
+	const favorite = (id: string) => pane.locator(`[data-page="${id}"][draggable="true"]`);
+	const group = (name: string) => pane.locator(`[data-group="${name}"]`);
+	await expect(favorite("41")).toHaveAttribute("aria-level", "1");
+
+	// A new group from a favorite's menu.
+	await favorite("42").hover();
+	await favorite("42").getByRole("button", { name: "Put in a group…" }).click();
+	const popup = pane.locator(".confluence-popup");
+	await expect(popup.locator(".confluence-popup-item")).toHaveText(["✓ No group"]);
+	await popup.locator("input").fill("Sprintler");
+	await popup.locator("input").press("Enter");
+	await expect(group("Sprintler")).toContainText("1 pages");
+	await expect(favorite("42")).toHaveAttribute("aria-level", "2");
+
+	// Dragged onto the group, another joins it.
+	await favorite("41").dragTo(group("Sprintler"));
+	await expect(group("Sprintler")).toContainText("2 pages");
+	await expect(favorite("41")).toHaveAttribute("aria-level", "2");
+	await page.screenshot({ path: "test-results/confluence-groups.png" });
+
+	// Closed, its pages are hidden; renamed, it stays closed.
+	await group("Sprintler").locator(".confluence-row-main").click();
+	await expect(group("Sprintler")).toHaveAttribute("aria-expanded", "false");
+	await expect(favorite("41")).toHaveCount(0);
+	await group("Sprintler").hover();
+	await group("Sprintler").getByRole("button", { name: "Rename the group" }).click();
+	await popup.locator("input").fill("Planlama");
+	await popup.locator("input").press("Enter");
+	await expect(group("Planlama")).toHaveAttribute("aria-expanded", "false");
+	await group("Planlama").locator(".confluence-row-main").click();
+
+	// Dropped on the Favorites heading, a page leaves its group.
+	await favorite("42").dragTo(pane.locator(".confluence-section").first());
+	await expect(favorite("42")).toHaveAttribute("aria-level", "1");
+	await expect(group("Planlama")).toContainText("1 pages");
+	await expect
+		.poll(async () => JSON.parse(await readFile(join(userData, "settings.json"), "utf8")))
+		.toMatchObject({
+			settings: {
+				confluenceFavorites: [
+					{ site: confluence.site, id: "41", title: "Ana Sayfa", group: "Planlama" },
+					{ site: confluence.site, id: "42", title: "Sprint Planı" },
+				],
+			},
+		});
+
+	// Taken apart, its pages stay in the favorites.
+	await group("Planlama").hover();
+	await group("Planlama").getByRole("button", { name: "Take the group apart" }).click();
+	await expect(pane.locator("[data-group]")).toHaveCount(0);
+	await expect(favorite("41")).toHaveAttribute("aria-level", "1");
+	expect(errors).toEqual([]);
+	await app.close();
+});

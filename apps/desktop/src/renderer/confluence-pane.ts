@@ -15,6 +15,14 @@ import type {
 	TextPart,
 } from "../shared/confluence-search.js";
 import { DEFAULT_SEARCH, hasCriteria, markWords } from "../shared/confluence-search.js";
+import {
+	favoriteSections,
+	groupName,
+	groupNames,
+	moveToGroup,
+	renameGroup,
+	ungroup,
+} from "../shared/favorites.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import { el } from "./dom.js";
@@ -441,6 +449,157 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 		account === null ? [] : options.favorites().filter((item) => item.site === account?.site);
 	const isFavorite = (id: string): boolean => siteFavorites().some((item) => item.id === id);
 
+	/** Groups seen so far: a group starts open, and stays as the user leaves it. */
+	const seenGroups = new Set<string>();
+	const groupLevel = (name: string): string => `g:${name}`;
+	/** What a favorite row carries while it is dragged onto a group. */
+	const DRAGGED = "application/x-kalem-favorite";
+
+	function setGroup(id: string, group: string | null): void {
+		if (account === null) return;
+		const name = groupName(group);
+		if (name !== null) {
+			seenGroups.add(name);
+			expanded.add(groupLevel(name));
+		}
+		options.setFavorites(moveToGroup(options.favorites(), account.site, id, name));
+		render();
+	}
+
+	// --- The small menu of a favorite or a group ---
+
+	const popup = el("div", { class: "confluence-popup", attrs: { role: "menu", hidden: "" } });
+	element.append(popup);
+	let popupReturn: HTMLElement | null = null;
+
+	function closePopup(refocus = true): void {
+		if (popup.hidden) return;
+		popup.hidden = true;
+		popup.replaceChildren();
+		if (refocus) popupReturn?.focus();
+	}
+
+	/** Shows choices under `anchor`, and a box for a name when `input` is given. */
+	function showPopup(
+		anchor: HTMLElement,
+		items: readonly {
+			readonly label: string;
+			readonly run: () => void;
+			readonly checked?: boolean;
+		}[],
+		input?: { readonly placeholder: string; readonly value: string; submit(name: string): void },
+	): void {
+		popupReturn = anchor;
+		const children: HTMLElement[] = items.map((item) => {
+			const button = el("button", {
+				class: "confluence-popup-item",
+				text: `${item.checked === true ? "✓ " : ""}${item.label}`,
+				attrs: { type: "button", role: "menuitem" },
+			});
+			button.addEventListener("click", () => {
+				closePopup();
+				item.run();
+			});
+			return button;
+		});
+		let box: HTMLInputElement | null = null;
+		if (input !== undefined) {
+			const field = el("input", {
+				class: "confluence-popup-input",
+				attrs: { type: "text", placeholder: input.placeholder, "aria-label": input.placeholder },
+			});
+			field.value = input.value;
+			field.addEventListener("keydown", (event) => {
+				event.stopPropagation();
+				if (event.key === "Enter") {
+					event.preventDefault();
+					const name = groupName(field.value);
+					if (name === null) return;
+					closePopup();
+					input.submit(name);
+				} else if (event.key === "Escape") {
+					event.preventDefault();
+					closePopup();
+				}
+			});
+			children.push(field);
+			box = field;
+		}
+		popup.replaceChildren(...children);
+		popup.hidden = false;
+		const where = anchor.getBoundingClientRect();
+		const size = popup.getBoundingClientRect();
+		popup.style.left = `${Math.max(4, Math.min(where.left, window.innerWidth - size.width - 4))}px`;
+		popup.style.top = `${Math.max(4, Math.min(where.bottom + 2, window.innerHeight - size.height - 4))}px`;
+		if (box !== null) {
+			box.focus();
+			box.select();
+		} else popup.querySelector<HTMLElement>("button")?.focus();
+	}
+
+	popup.addEventListener("keydown", (event) => {
+		const items = [...popup.querySelectorAll<HTMLElement>("button, input")];
+		const at = items.indexOf(document.activeElement as HTMLElement);
+		if (event.key === "Escape") {
+			event.preventDefault();
+			closePopup();
+		} else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+			event.preventDefault();
+			const step = event.key === "ArrowDown" ? 1 : -1;
+			items[(at + step + items.length) % items.length]?.focus();
+		}
+	});
+	document.addEventListener(
+		"pointerdown",
+		(event) => {
+			if (!popup.hidden && !popup.contains(event.target as Node)) closePopup(false);
+		},
+		true,
+	);
+
+	function groupMenu(
+		anchor: HTMLElement,
+		page: { readonly id: string; readonly title: string },
+	): void {
+		if (account === null) return;
+		const site = account.site;
+		const current = groupName(
+			options.favorites().find((item) => item.site === site && item.id === page.id)?.group,
+		);
+		showPopup(
+			anchor,
+			[
+				{
+					label: t.confluenceNoGroup,
+					run: () => setGroup(page.id, null),
+					checked: current === null,
+				},
+				...groupNames(options.favorites(), site).map((name) => ({
+					label: name,
+					run: () => setGroup(page.id, name),
+					checked: current === name,
+				})),
+			],
+			{ placeholder: t.confluenceNewGroup, value: "", submit: (name) => setGroup(page.id, name) },
+		);
+	}
+
+	function renameMenu(anchor: HTMLElement, name: string): void {
+		showPopup(anchor, [], {
+			placeholder: t.confluenceRenameGroup,
+			value: name,
+			submit: (next) => {
+				if (account === null || next === name) return;
+				const wasOpen = expanded.has(groupLevel(name));
+				expanded.delete(groupLevel(name));
+				seenGroups.add(next);
+				if (wasOpen) expanded.add(groupLevel(next));
+				options.setFavorites(renameGroup(options.favorites(), account.site, name, next));
+				render();
+			},
+		});
+	}
+
 	function toggleFavorite(page: { readonly id: string; readonly title: string }): void {
 		if (account === null) return;
 		const site = account.site;
@@ -509,6 +668,10 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 		readonly position?: { readonly index: number; readonly size: number };
 		/** What tells this row apart for the keyboard focus. */
 		readonly key: string;
+		/** A row of the favorites: it can be put in a group, and dragged onto one. */
+		readonly favorite?: boolean;
+		/** A group of favorites: renamed, taken apart, and favorites are dropped on it. */
+		readonly group?: string;
 	}
 
 	function marked(parts: readonly TextPart[]): Node[] {
@@ -546,7 +709,7 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 				"data-key": row.key,
 			},
 			children: [
-				icon(row.page === null ? "open" : "file"),
+				icon(row.group !== undefined ? "star" : row.page === null ? "open" : "file"),
 				el("span", {
 					class: "confluence-page-text",
 					children: [
@@ -577,6 +740,23 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 			actions.push(find);
 		}
 		if (row.add !== undefined) actions.push(addButton(row.add.space, row.add.parent));
+		if (page !== null && row.favorite === true) {
+			const move = rowAction("open", t.confluenceMoveToGroup, "confluence-move-group");
+			move.addEventListener("click", () => groupMenu(move, { id: page, title: row.title }));
+			actions.push(move);
+		}
+		const group = row.group;
+		if (group !== undefined) {
+			const rename = rowAction("pencil", t.confluenceRenameGroup, "confluence-rename-group");
+			rename.addEventListener("click", () => renameMenu(rename, group));
+			const apart = rowAction("close", t.confluenceUngroup, "confluence-ungroup");
+			apart.addEventListener("click", () => {
+				if (account === null) return;
+				options.setFavorites(ungroup(options.favorites(), account.site, group));
+				render();
+			});
+			actions.push(rename, apart);
+		}
 		if (page !== null) actions.push(starButton({ id: page, title: row.title }));
 		const item = el("div", {
 			class: `confluence-page-item${row.excerpt !== undefined || row.path !== undefined ? " confluence-result" : ""}`,
@@ -589,7 +769,11 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 							"aria-posinset": String(row.position.index + 1),
 							"aria-setsize": String(row.position.size),
 						}),
-				...(page === null ? { "data-space": row.title } : { "data-page": page }),
+				...(group !== undefined
+					? { "data-group": group }
+					: page === null
+						? { "data-space": row.title }
+						: { "data-page": page }),
 				...(row.branch === null ? {} : { "aria-expanded": String(open) }),
 				...(active ? { "aria-current": "page" } : {}),
 			},
@@ -602,6 +786,17 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 			],
 		});
 		if (page !== null && isFavorite(page)) item.classList.add("starred");
+		if (row.favorite === true && page !== null) {
+			item.draggable = true;
+			item.addEventListener("dragstart", (event) => {
+				event.dataTransfer?.setData(DRAGGED, page);
+				if (event.dataTransfer !== null) event.dataTransfer.effectAllowed = "move";
+			});
+		}
+		if (group !== undefined) {
+			item.classList.add("confluence-group");
+			dropTarget(item, group);
+		}
 		if (row.branch !== null) item.dataset.branch = row.branch;
 		item.style.setProperty("--depth", String(row.depth));
 		return item;
@@ -858,6 +1053,61 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 		return el("div", { class: "confluence-section", text, attrs: { role: "presentation" } });
 	}
 
+	/** Favorites dropped on `element` go into `group`; into none with `null`. */
+	function dropTarget(element: HTMLElement, group: string | null): void {
+		element.addEventListener("dragover", (event) => {
+			if (!event.dataTransfer?.types.includes(DRAGGED)) return;
+			event.preventDefault();
+			event.dataTransfer.dropEffect = "move";
+			element.classList.add("drop-target");
+		});
+		element.addEventListener("dragleave", () => element.classList.remove("drop-target"));
+		element.addEventListener("drop", (event) => {
+			element.classList.remove("drop-target");
+			const id = event.dataTransfer?.getData(DRAGGED);
+			if (id === undefined || id === "") return;
+			event.preventDefault();
+			setGroup(id, group);
+		});
+	}
+
+	/** The favorites: those in no group, then each group, open or closed. */
+	function favoriteRows(): HTMLElement[] {
+		if (account === null) return [];
+		const { loose, groups } = favoriteSections(options.favorites(), account.site);
+		const favorite = (item: { id: string; title: string }, depth: number): HTMLElement =>
+			row({
+				key: `f:${item.id}`,
+				depth,
+				branch: null,
+				title: item.title,
+				page: item.id,
+				favorite: true,
+			});
+		const rows = loose.map((item) => favorite(item, 0));
+		for (const { name, items } of groups) {
+			const level = groupLevel(name);
+			// A group starts open the first time it is seen.
+			if (!seenGroups.has(name)) {
+				seenGroups.add(name);
+				expanded.add(level);
+			}
+			rows.push(
+				row({
+					key: level,
+					depth: 0,
+					branch: level,
+					title: name,
+					meta: format(t.confluenceGroupCount, items.length),
+					page: null,
+					group: name,
+				}),
+			);
+			if (expanded.has(level)) rows.push(...items.map((item) => favorite(item, 1)));
+		}
+		return rows;
+	}
+
 	function render(): void {
 		collapseButton.disabled = results !== null || expanded.size === 0;
 		if (account === null) {
@@ -865,9 +1115,10 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 			return;
 		}
 		const favorites = siteFavorites();
-		const favoriteRows = favorites.map((item) =>
-			row({ key: `f:${item.id}`, depth: 0, branch: null, title: item.title, page: item.id }),
-		);
+		const starred = favoriteRows();
+		// Dropped on the heading, a favorite leaves its group.
+		const favoritesHeading = heading(t.confluenceFavorites);
+		dropTarget(favoritesHeading, null);
 		const body = results === null ? treeRows() : resultRows(results);
 		// Focus stays in the title box across re-renders, or comes back to it when a
 		// removed row (the "+" just clicked) left it nowhere; it is not taken from
@@ -880,12 +1131,7 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 		list.replaceChildren(
 			...(favorites.length === 0 || results !== null
 				? body
-				: [
-						heading(t.confluenceFavorites),
-						...favoriteRows,
-						heading(t.confluencePaneTree),
-						...body,
-					]),
+				: [favoritesHeading, ...starred, heading(t.confluencePaneTree), ...body]),
 		);
 		// One row is reached with Tab; the arrow keys move from it.
 		const rows = rowButtons();
