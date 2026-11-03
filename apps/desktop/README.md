@@ -459,7 +459,33 @@ verir.
   `/export-confluence`, `/history`, `/find`, `/replace`, `/table`,
   `/new-diagram`, `/image`, `/source`, `/focus`, `/read-only`, `/open`,
   `/search`, `/format-code`). Uygulama komutları belgede imlecin son
-  bulunduğu yerde çalışır.
+  bulunduğu yerde çalışır. Seçimle çalışan hazır sorular: `/fix` (yazım ve
+  dil bilgisi; seçim yoksa belgenin tamamı), `/shorten`, `/explain`,
+  `/translate <dil>`; `/apply` son yanıttaki değişiklikleri uygular.
+- **Belgede değişiklik ve komut önerileri:** model, belgeyi değiştirmesi
+  istendiğinde (düzelt, kısalt, çevir, yeniden adlandır, sil, sona ekle…)
+  ya da bir uygulama komutu gerektiğinde (kaydet, Word'e aktar, sürüm
+  geçmişi…) yanıtına ` ```kalem-actions ` bloğunda JSON eylemler yazar
+  (`src/shared/actions.ts`): `replace` (belgenin Markdown'ındaki metni
+  birebir bulup değiştirir; `all` ile her yerde), `insert` (imleç, baş ya
+  da son), `document` (belgenin tamamı) ve izin verilen komut listesinden
+  `command`. Panel bunları JSON yerine bir **Önerilen değişiklikler**
+  kartında silinen/eklenen metin olarak gösterir; hiçbir şey kendiliğinden
+  olmaz: **Uygula** metin değişikliklerini tek bir düzenleme olarak yapar
+  (bulunamayan ya da birden çok kez geçen metin hata verir, belge
+  değişmez), **Geri Al** eski metni getirir; önerilen her komut kendi
+  **Çalıştır** düğmesiyle çalışır. Değişiklik öneren bir yanıtta **Belgeye
+  Ekle** gösterilmez.
+- **Sohbet ekranı:** soru kutusu ile paylaşım, kaynak ekleme ve model
+  seçimi tek bir çerçevededir. Belgede metin seçiliyken kutunun üstünde
+  **İyileştir, Kısalt, Yazımı düzelt, Çevir, Açıkla** düğmeleri çıkar.
+  Yanıt beklenirken "Düşünüyor…", diyagram ya da değişiklik yazılırken
+  JSON yerine "Diyagram çiziliyor…" / "Değişiklikler hazırlanıyor…"
+  görünür. Kod bloklarının köşesinde **Kodu kopyala**, soruların altında
+  **Kopyala** ve **Düzenle ve yeniden sor**, son yanıtın altında **Yanıtı
+  yeniden oluştur** (hatada **Yeniden dene**) vardır. Boş kutuda `↑` son
+  soruyu geri getirir; yukarı kaydırınca **Son mesaja git** düğmesi çıkar;
+  **Sohbetler** listesi başlığa göre aranabilir.
 - **GitHub Copilot** seçiliyken uygulama `copilot`'ı aynı yerlerde (ayrıca
   WinGet bağlantı klasöründe) arar; `KALEM_COPILOT` ortam değişkeni
   verilirse yalnızca o dosya denenir. Copilot'a sistem talimatı

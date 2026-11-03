@@ -783,6 +783,10 @@ button {
 .assistant-log[hidden],
 .assistant-empty[hidden],
 .assistant-missing[hidden],
+.assistant-context[hidden],
+.assistant-jump[hidden],
+.assistant-changes-state[hidden],
+.assistant-action[hidden],
 .assistant-chip[hidden] {
 	display: none;
 }
@@ -851,25 +855,59 @@ button {
 	line-height: 1.45;
 }
 
+.assistant-empty-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 40px;
+	height: 40px;
+	margin-bottom: 10px;
+	border-radius: 12px;
+	background: color-mix(in srgb, var(--app-accent) 14%, transparent);
+	color: var(--app-accent);
+}
+
+.assistant-empty-icon .icon {
+	width: 22px;
+	height: 22px;
+}
+
 .assistant-suggestions {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	gap: 8px;
 }
 
 .assistant-suggestion {
-	padding: 8px 10px;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 6px;
+	padding: 10px 11px;
 	border: 1px solid var(--app-border);
-	border-radius: 8px;
+	border-radius: 10px;
 	background: var(--app-raised);
 	color: var(--app-text);
 	font: inherit;
+	font-size: 12px;
+	line-height: 1.4;
 	text-align: start;
 	cursor: pointer;
+	transition:
+		border-color 0.15s,
+		transform 0.15s;
 }
 
-.assistant-suggestion:hover {
+.assistant-suggestion .icon {
+	width: 16px;
+	height: 16px;
+	color: var(--app-accent);
+}
+
+.assistant-suggestion:hover,
+.assistant-suggestion:focus-visible {
 	border-color: var(--app-accent);
+	transform: translateY(-1px);
 }
 
 .assistant-command {
@@ -903,8 +941,8 @@ button {
 
 .assistant-user .assistant-body {
 	padding: 8px 11px;
-	border-radius: 12px 12px 4px;
-	background: var(--app-pressed);
+	border-radius: 14px 14px 4px;
+	background: color-mix(in srgb, var(--app-accent) 13%, var(--app-raised));
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 }
@@ -952,6 +990,7 @@ button {
 }
 
 .assistant-markdown pre {
+	position: relative;
 	padding: 8px 10px;
 	border-radius: 6px;
 	background: var(--app-raised);
@@ -1135,11 +1174,17 @@ button {
 
 .assistant-add {
 	display: inline-flex;
-	padding: 2px;
+	flex: none;
+	padding: 4px;
 	border: 1px solid var(--app-border);
-	border-radius: 5px;
+	border-radius: 50%;
 	background: var(--app-raised);
 	color: var(--app-text);
+}
+
+.assistant-add:hover:not(:disabled) {
+	border-color: var(--app-accent);
+	color: var(--app-accent);
 }
 
 .assistant-add .icon {
@@ -1207,30 +1252,74 @@ button {
 	max-width: 180px;
 }
 
-.assistant-input-row {
+/* The question box: the text, and under it what goes with the question. */
+.assistant-box {
 	display: flex;
-	align-items: flex-end;
-	gap: 6px;
+	flex-direction: column;
+	border: 1px solid var(--app-border);
+	border-radius: 12px;
+	background: var(--app-raised);
+	transition:
+		border-color 0.15s,
+		box-shadow 0.15s;
+}
+
+.assistant-box:focus-within {
+	border-color: var(--app-accent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 18%, transparent);
 }
 
 .assistant-input {
-	flex: 1;
-	min-height: 36px;
-	max-height: 180px;
-	padding: 8px 10px;
-	border: 1px solid var(--app-border);
-	border-radius: 8px;
-	background: var(--app-raised);
+	min-height: 40px;
+	max-height: 200px;
+	padding: 10px 12px 4px;
+	border: 0;
+	border-radius: 12px 12px 0 0;
+	background: transparent;
 	color: var(--app-text);
 	font: inherit;
-	line-height: 1.4;
+	line-height: 1.45;
 	resize: none;
 	field-sizing: content;
 }
 
 .assistant-input:focus-visible {
-	outline: 2px solid var(--app-accent);
-	outline-offset: -1px;
+	outline: none;
+}
+
+.assistant-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	padding: 4px 6px 6px;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.assistant-toolbar-space {
+	flex: 1;
+}
+
+.assistant-toolbar .assistant-share {
+	min-width: 0;
+	padding: 2px 8px 2px 4px;
+	border-radius: 12px;
+}
+
+.assistant-share-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.assistant-toolbar .assistant-share:hover {
+	background: var(--app-hover);
+	color: var(--app-text);
+}
+
+.assistant-toolbar .assistant-share:has(input:checked) {
+	color: var(--app-accent);
 }
 
 .assistant-send {
@@ -1238,12 +1327,22 @@ button {
 	flex: none;
 	align-items: center;
 	justify-content: center;
-	width: 36px;
-	height: 36px;
+	width: 30px;
+	height: 30px;
 	border: 0;
-	border-radius: 8px;
+	border-radius: 50%;
 	background: var(--app-accent);
 	color: var(--app-accent-text);
+	transition: transform 0.1s;
+}
+
+.assistant-send:not(:disabled):active {
+	transform: scale(0.92);
+}
+
+.assistant-send .icon {
+	width: 16px;
+	height: 16px;
 }
 
 .assistant-send:disabled {
@@ -1514,6 +1613,350 @@ button {
 
 .assistant-primary:disabled {
 	opacity: 0.6;
+}
+
+.assistant-toolbar .assistant-model {
+	min-width: 0;
+	max-width: 40%;
+	field-sizing: content;
+	border-color: transparent;
+	background: transparent;
+	color: var(--app-muted);
+	text-overflow: ellipsis;
+}
+
+.assistant-toolbar .assistant-model:hover {
+	border-color: var(--app-border);
+	color: var(--app-text);
+}
+
+/* --- Assistant: messages, tools and proposed changes --------------------- */
+
+.assistant-message {
+	animation: assistant-in 0.18s ease-out;
+}
+
+@keyframes assistant-in {
+	from {
+		opacity: 0;
+		transform: translateY(4px);
+	}
+}
+
+.assistant-message-tools {
+	display: flex;
+	align-self: flex-end;
+	gap: 2px;
+	opacity: 0;
+	transition: opacity 0.15s;
+}
+
+.assistant-user:hover .assistant-message-tools,
+.assistant-message-tools:focus-within {
+	opacity: 1;
+}
+
+.assistant-tool {
+	width: 24px;
+	height: 24px;
+	padding: 4px;
+	color: var(--app-muted);
+}
+
+.assistant-tool .icon {
+	width: 14px;
+	height: 14px;
+}
+
+.assistant-tool:hover {
+	color: var(--app-accent);
+}
+
+.assistant-tool.done {
+	color: var(--app-ok);
+}
+
+.assistant-code-copy {
+	position: absolute;
+	top: 4px;
+	right: 4px;
+	border: 1px solid var(--app-border);
+	background: var(--app-surface);
+	opacity: 0;
+	transition: opacity 0.15s;
+}
+
+.assistant-markdown pre:hover .assistant-code-copy,
+.assistant-code-copy:focus-visible {
+	opacity: 1;
+}
+
+.assistant-reply-footer {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 6px;
+}
+
+.assistant-reply-footer .assistant-actions {
+	align-items: center;
+}
+
+/* Only the latest reply is asked again, and not while one is coming in. */
+.assistant-message:has(~ .assistant-message) .assistant-regenerate,
+.assistant-log.busy .assistant-regenerate {
+	display: none;
+}
+
+.assistant-waiting {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.assistant-dots {
+	display: inline-flex;
+	gap: 3px;
+}
+
+.assistant-dots span {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--app-accent);
+	animation: assistant-dot 1.2s ease-in-out infinite;
+}
+
+.assistant-dots span:nth-child(2) {
+	animation-delay: 0.15s;
+}
+
+.assistant-dots span:nth-child(3) {
+	animation-delay: 0.3s;
+}
+
+@keyframes assistant-dot {
+	0%,
+	80%,
+	100% {
+		opacity: 0.25;
+		transform: scale(0.8);
+	}
+	40% {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.assistant-message,
+	.assistant-dots span {
+		animation: none;
+	}
+}
+
+.assistant-changes {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.assistant-changes-block {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px;
+	border: 1px solid color-mix(in srgb, var(--app-accent) 45%, var(--app-border));
+	border-radius: 10px;
+	background: var(--app-raised);
+}
+
+.assistant-changes-block.applied {
+	border-color: color-mix(in srgb, var(--app-ok) 55%, var(--app-border));
+}
+
+.assistant-changes-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--app-accent);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.assistant-changes-block.applied .assistant-changes-head {
+	color: var(--app-ok);
+}
+
+.assistant-changes-head .icon {
+	width: 14px;
+	height: 14px;
+}
+
+.assistant-change-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	max-height: 320px;
+	margin: 0;
+	padding: 0;
+	overflow-y: auto;
+	list-style: none;
+}
+
+.assistant-change {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	font-size: 12px;
+	line-height: 1.45;
+}
+
+.assistant-change del,
+.assistant-change ins {
+	display: block;
+	padding: 3px 7px;
+	border-radius: 4px;
+	text-decoration: none;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.assistant-change del {
+	background: var(--app-error-bg);
+	color: var(--app-error);
+	text-decoration: line-through;
+	text-decoration-color: color-mix(in srgb, var(--app-error) 50%, transparent);
+}
+
+.assistant-change ins {
+	background: color-mix(in srgb, var(--app-ok) 14%, transparent);
+	color: var(--app-text);
+}
+
+.assistant-change-label {
+	color: var(--app-muted);
+	font-size: 11px;
+}
+
+.assistant-change-badge {
+	align-self: flex-start;
+	padding: 0 6px;
+	border-radius: 8px;
+	background: var(--app-pressed);
+	color: var(--app-muted);
+	font-size: 11px;
+}
+
+.assistant-changes-state {
+	margin: 0;
+	color: var(--app-muted);
+	font-size: 11px;
+}
+
+.assistant-apply {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+}
+
+.assistant-apply .icon {
+	width: 14px;
+	height: 14px;
+}
+
+.assistant-command-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 6px 6px 6px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	font-size: 12px;
+}
+
+.assistant-command-text {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.assistant-quick {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.assistant-quick-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 12px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 11px;
+	cursor: pointer;
+}
+
+.assistant-quick-button .icon {
+	width: 12px;
+	height: 12px;
+	color: var(--app-accent);
+}
+
+.assistant-quick-button:hover:not(:disabled) {
+	border-color: var(--app-accent);
+	color: var(--app-accent);
+}
+
+.assistant-quick-button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.assistant-jump {
+	position: absolute;
+	bottom: calc(100% + 8px);
+	left: 50%;
+	z-index: 2;
+	display: inline-flex;
+	padding: 6px;
+	border: 1px solid var(--app-border);
+	border-radius: 50%;
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: var(--app-shadow);
+	transform: translateX(-50%);
+}
+
+.assistant-jump:hover {
+	color: var(--app-accent);
+}
+
+.assistant-jump .icon {
+	width: 16px;
+	height: 16px;
+}
+
+.assistant-history-search {
+	padding: 6px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+}
+
+.assistant-history-search:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -1px;
 }
 
 .icon-button[aria-pressed="true"] {

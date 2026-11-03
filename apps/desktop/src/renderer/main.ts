@@ -2,6 +2,8 @@ import type { Root } from "@kalem-editor/core";
 import type { BlockType, MarkType } from "@kalem-editor/core/commands";
 import type { Caret, EditResult } from "@kalem-editor/editor";
 import { holderIn, indentItem, outdentItem, selectRange, toggleList } from "@kalem-editor/editor";
+import type { DocumentAction } from "../shared/actions.js";
+import { applyActions } from "../shared/actions.js";
 import type { Command, KalemBridge, Settings, SidePane, TabDocument } from "../shared/bridge.js";
 import { clampZoom, MAX_ZOOM, MIN_ZOOM, pageRule, ZOOM_STEP } from "../shared/bridge.js";
 import type { ContextDiagram, ReplyDiagram } from "../shared/claude.js";
@@ -152,6 +154,7 @@ const assistant = createAssistantPane({
 		return workspace?.opened === true ? workspace.roots.map((root) => root.path) : [];
 	},
 	insert: (text) => insertReply(text),
+	applyActions: (actions) => applyAssistantActions(actions),
 	insertDiagram: (diagram) => insertReplyDiagram(diagram),
 	openDiagram: (diagram) =>
 		newDiagram(diagram.diagram, diagram.title, lastCarets.get(session) ?? null),
@@ -1078,6 +1081,8 @@ async function insertReply(text: string): Promise<void> {
 	const tab = editableTab();
 	let markdown = "";
 	for (const part of splitReply(text)) {
+		// Proposed changes are applied from their card, not inserted.
+		if (part.kind === "actions") continue;
 		if (part.kind === "markdown") {
 			markdown += part.text;
 			continue;
@@ -1090,6 +1095,48 @@ async function insertReply(text: string): Promise<void> {
 	if (session !== tab) throw new Error(t.assistantTabChanged);
 	const caret = tab.insertMarkdown(markdown, lastCarets.get(tab) ?? tab.editor.getCaret());
 	if (caret !== null) lastCarets.set(tab, caret);
+}
+
+/** A text's start, for a message naming it. */
+const excerpt = (text: string): string => {
+	const line = text.replace(/\s+/g, " ").trim();
+	return line.length > 80 ? `${line.slice(0, 79)}…` : line;
+};
+
+/**
+ * The assistant's proposed changes on the active document: the text edits
+ * as one edit (one undo brings the text back), then the insertions at the
+ * cursor. Resolves with how many changes were made.
+ */
+async function applyAssistantActions(actions: readonly DocumentAction[]): Promise<number> {
+	const tab = editableTab();
+	const edits = actions.filter((action) => action.type !== "insert" || action.at !== "cursor");
+	const atCursor = actions.filter((action) => action.type === "insert" && action.at === "cursor");
+	let changes = 0;
+	if (edits.length > 0) {
+		const before = tab.styledMarkdown();
+		const result = applyActions(before, edits);
+		if (!result.ok) {
+			const failed = edits[result.index];
+			const text = failed?.type === "replace" ? failed.find : "";
+			throw new Error(
+				format(
+					result.reason === "missing" ? t.assistantActionMissing : t.assistantActionAmbiguous,
+					excerpt(text),
+				),
+			);
+		}
+		if (result.text !== before.replace(/\r\n?/g, "\n")) {
+			if (!tab.replaceText(result.text)) throw new Error(t.readOnlyBlocked);
+			changes += result.changes;
+		}
+	}
+	for (const insert of atCursor) {
+		if (insert.type !== "insert") continue;
+		await insertReply(insert.text);
+		changes++;
+	}
+	return changes;
 }
 
 async function insertReplyDiagram(diagram: ReplyDiagram): Promise<void> {

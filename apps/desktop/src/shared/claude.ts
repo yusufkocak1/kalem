@@ -4,6 +4,8 @@
  * Claude Code CLI's `stream-json` output, and the diagrams in a reply.
  * Pure: the main process runs the CLI, the renderer shows the chat.
  */
+import type { AssistantAction } from "./actions.js";
+import { ACTIONS_FENCE, ACTIONS_PROMPT, actionsFromReply } from "./actions.js";
 import type { Diagram, DiagramNode } from "./diagram.js";
 import { ancestors, DIAGRAM_KEYWORD, parseDiagram } from "./diagram.js";
 import { boxOf, GROUP_PADDING, GROUP_TOP, layoutDiagram } from "./diagram-edit.js";
@@ -18,7 +20,7 @@ export const SYSTEM_PROMPT = `You are an AI assistant working inside Kalem, a Wo
 
 Your replies are Markdown, and the user can insert a reply into the document with one click. So when they ask for content (a section, a table, a rewrite, a diagram), reply with the content itself, ready to insert, without a preamble such as "Here is…". Keep any explanation short and after the content.
 
-The user's document, when shared, arrives in <document> tags; the text they selected in it in <selection> tags; Kalem diagrams already in the document in <diagram> tags. Do not repeat the whole document unless asked; when asked to rewrite a part, return only that part. Do not try to edit files: the user inserts what you write.
+The user's document, when shared, arrives in <document> tags; the text they selected in it in <selection> tags; Kalem diagrams already in the document in <diagram> tags. Do not repeat the whole document unless asked; when asked to rewrite a part, return only that part. Do not edit files with tools: the user inserts what you write, or applies the changes you propose in a \`${ACTIONS_FENCE}\` block (see below).
 
 Files and folders the user added to the chat as sources (code, analysis notes, any text) arrive in <files> tags: a <folder> lists the files under it, a <file> holds one file's text. When a folder's files come without their text, read the ones you need with your file tools before answering. Use the sources to write what the user asks for (for example a software analysis document from a code folder); refer to files by their path below the folder. <files-unchanged> means the sources are as they were sent earlier in the chat.
 
@@ -64,7 +66,9 @@ For flowcharts, process flows, decision trees and box-and-arrow pictures of a sy
 
 Use Mermaid instead when the user asks for Mermaid, or for a kind of diagram Kalem diagrams do not draw (sequence, class, entity-relationship, state, Gantt, pie, mind map, timeline).
 
-To change a Kalem diagram that is already in the document (one given in a <diagram src="…"> tag), reply with the whole changed diagram in a \`${DIAGRAM_FENCE}\` block that has "src" set to that tag's src, keeping the ids and the coordinates of the shapes that did not change. The user can then update the picture in the document with it.`;
+To change a Kalem diagram that is already in the document (one given in a <diagram src="…"> tag), reply with the whole changed diagram in a \`${DIAGRAM_FENCE}\` block that has "src" set to that tag's src, keeping the ids and the coordinates of the shapes that did not change. The user can then update the picture in the document with it.
+
+${ACTIONS_PROMPT}`;
 
 /**
  * What the app can do, for questions on how to do something in it. Menus
@@ -75,7 +79,7 @@ export function capabilities(t: Strings): string {
 	const q = (text: string): string => `"${text.replace(/…$/, "")}"`;
 	const path = (...labels: string[]): string => labels.map(q).join(" → ");
 	return `## What Kalem can do
-Use this to answer how to do something in Kalem, and to write content that uses what Kalem offers. Name menus and buttons exactly as quoted here: that is how the user sees them. Shortcuts use Ctrl (Cmd on macOS). You cannot press buttons or change files yourself; tell the user the steps.
+Use this to answer how to do something in Kalem, and to write content that uses what Kalem offers. Name menus and buttons exactly as quoted here: that is how the user sees them. Shortcuts use Ctrl (Cmd on macOS). You cannot press buttons yourself: tell the user the steps, or propose the command (or the change to the document) in a \`${ACTIONS_FENCE}\` block for the user to apply.
 
 Kalem has a ribbon with the tabs ${q(t.tabHome)}, ${q(t.tabInsert)} and ${q(t.tabView)} (plus ${q(t.tabTable)} while the cursor is in a table and ${q(t.tabCode)} in a code block), and the menus ${q(t.file)}, ${q(t.edit)}, ${q(t.insert)}, ${q(t.format)} and ${q(t.view)}.
 - Documents: .md and .txt files in tabs (Ctrl+N new tab, Ctrl+W close). ${path(t.file, t.saveAsPackage)} makes one .kmd file with the document's images and attached files. ${path(t.file, t.versionHistory)} brings back an earlier save. ${path(t.file, t.quickNote)} (Ctrl+Shift+Alt+N) opens a dated note. ${path(t.file, t.openFolder)} lists a folder's documents in the side pane; ${q(t.searchFolder)} (Ctrl+Shift+E) searches them, ${q(t.quickOpen)} (Ctrl+Shift+P) opens one by name. ${q(t.autoSave)} is in the ${q(t.tabView)} tab.
@@ -536,24 +540,41 @@ export function autoLayout(diagram: Diagram): Diagram {
 
 export type ReplyPart =
 	| { readonly kind: "markdown"; readonly text: string }
-	| ({ readonly kind: "diagram"; readonly source: string } & ReplyDiagram);
+	| ({ readonly kind: "diagram"; readonly source: string } & ReplyDiagram)
+	| {
+			readonly kind: "actions";
+			readonly source: string;
+			readonly actions: readonly AssistantAction[];
+	  };
 
-const FENCE = /^( {0,3})(`{3,}|~{3,})[ \t]*kalem-diagram[ \t]*\n([\s\S]*?)\n {0,3}\2[`~]*[ \t]*$/gm;
+const FENCE = new RegExp(
+	`^( {0,3})(\`{3,}|~{3,})[ \\t]*(${DIAGRAM_FENCE}|${ACTIONS_FENCE})[ \\t]*\\n([\\s\\S]*?)\\n {0,3}\\2[\`~]*[ \\t]*$`,
+	"gm",
+);
+
+/** A finished block of the reply as a diagram or actions; `null` when it holds neither. */
+function blockPart(language: string, source: string): ReplyPart | null {
+	if (language === ACTIONS_FENCE) {
+		const actions = actionsFromReply(source);
+		return actions === null ? null : { kind: "actions", source, actions };
+	}
+	const diagram = diagramFromReply(source);
+	return diagram === null ? null : { kind: "diagram", source, ...diagram };
+}
 
 /**
- * The reply cut into Markdown and Kalem diagrams. A diagram block that
- * does not hold a diagram stays in the Markdown, as code.
+ * The reply cut into Markdown, Kalem diagrams and actions. A block that
+ * does not hold what its language says stays in the Markdown, as code.
  */
 export function splitReply(text: string): ReplyPart[] {
 	const parts: ReplyPart[] = [];
 	let at = 0;
 	for (const match of text.matchAll(FENCE)) {
-		const source = match[3] ?? "";
-		const diagram = diagramFromReply(source);
-		if (diagram === null) continue;
+		const part = blockPart(match[3] ?? "", match[4] ?? "");
+		if (part === null) continue;
 		const before = text.slice(at, match.index);
 		if (before.trim() !== "") parts.push({ kind: "markdown", text: before });
-		parts.push({ kind: "diagram", source, ...diagram });
+		parts.push(part);
 		at = match.index + match[0].length;
 	}
 	const rest = text.slice(at);

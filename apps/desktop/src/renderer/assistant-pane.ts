@@ -1,5 +1,7 @@
 import { parse } from "@kalem-editor/core";
 import { renderToDOM } from "@kalem-editor/viewer";
+import type { AssistantAction, AssistantCommand, DocumentAction } from "../shared/actions.js";
+import { isDocumentAction } from "../shared/actions.js";
 import type { AssistantStatus, Command, KalemBridge } from "../shared/bridge.js";
 import { clampAssistantWidth, DEFAULT_SETTINGS, MIN_ASSISTANT_WIDTH } from "../shared/bridge.js";
 import type { ChatSummary, StoredChat, StoredMessage } from "../shared/chats.js";
@@ -46,6 +48,8 @@ export interface AssistantHost {
 	workspaceFolders(): readonly string[];
 	/** Puts a reply's Markdown at the caret, its Kalem diagrams as pictures. */
 	insert(text: string): Promise<void>;
+	/** Applies proposed changes to the active document; resolves with how many were made. */
+	applyActions(actions: readonly DocumentAction[]): Promise<number>;
 	insertDiagram(diagram: ReplyDiagram): Promise<void>;
 	openDiagram(diagram: ReplyDiagram): void;
 	/** Whether the document shows the diagram picture at `src`. */
@@ -127,7 +131,7 @@ function button(
 function iconButton(name: Parameters<typeof icon>[0], label: string): HTMLButtonElement {
 	return el("button", {
 		class: "icon-button",
-		attrs: { type: "button", title: label, "aria-label": label },
+		attrs: { type: "button", title: label, "aria-label": label, "data-icon": name },
 		children: [icon(name)],
 	});
 }
@@ -388,22 +392,74 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	input.setAttribute("aria-autocomplete", "list");
 	input.setAttribute("aria-controls", menu.id);
 	input.setAttribute("aria-expanded", "false");
+	/** One click asks about the selection: the usual rewrites, applied as changes. */
+	const quick = el("div", {
+		class: "assistant-quick",
+		attrs: { role: "group", "aria-label": t.assistantSelectionActions },
+		children: (
+			[
+				[t.assistantQuickImprove, t.assistantPromptImprove, "wand"],
+				[t.assistantQuickShorten, t.assistantPromptShorten, "outdent"],
+				[t.assistantQuickFix, t.assistantPromptFix, "check"],
+				[t.assistantQuickTranslate, t.assistantPromptTranslate, "replace"],
+				[t.assistantQuickExplain, t.assistantPromptExplain, "chats"],
+			] as const
+		).map(([label, prompt, name]) => {
+			const item = button(label, { class: "assistant-quick-button", icon: name, title: prompt });
+			item.addEventListener("click", () => ask(prompt));
+			return item;
+		}),
+	});
+	const context = el("div", {
+		class: "assistant-context",
+		attrs: { hidden: "" },
+		children: [selectionChip, quick],
+	});
+	const jump = el("button", {
+		class: "assistant-jump",
+		attrs: {
+			type: "button",
+			hidden: "",
+			title: t.assistantJumpToEnd,
+			"aria-label": t.assistantJumpToEnd,
+		},
+		children: [icon("arrowDown")],
+	});
+	jump.addEventListener("click", () => {
+		log.scrollTo({ top: log.scrollHeight, behavior: "smooth" });
+		input.focus();
+	});
 	const composer = el("div", {
 		class: "assistant-composer",
 		children: [
+			context,
+			sourceList,
 			el("div", {
-				class: "assistant-context",
+				class: "assistant-box",
 				children: [
-					addButton,
-					el("label", { class: "assistant-share", children: [share, t.assistantShareDocument] }),
-					modelSelect,
-					selectionChip,
+					input,
+					el("div", {
+						class: "assistant-toolbar",
+						children: [
+							addButton,
+							el("label", {
+								class: "assistant-share",
+								attrs: { title: t.slashShare },
+								children: [
+									share,
+									el("span", { class: "assistant-share-text", text: t.assistantShareDocument }),
+								],
+							}),
+							el("span", { class: "assistant-toolbar-space" }),
+							modelSelect,
+							sendButton,
+						],
+					}),
 				],
 			}),
-			sourceList,
-			el("div", { class: "assistant-input-row", children: [input, sendButton] }),
 			menu,
 			addMenu,
+			jump,
 		],
 	});
 
@@ -482,6 +538,15 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				hideMenu();
 				return;
 			}
+		}
+		if (event.key === "ArrowUp" && input.value === "" && !event.isComposing) {
+			// The last question comes back, to ask it again or change it.
+			const last = [...active.messages].reverse().find((message) => message.role === "user");
+			if (last !== undefined) {
+				event.preventDefault();
+				input.value = last.text;
+			}
+			return;
 		}
 		if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
 			event.preventDefault();
@@ -566,6 +631,21 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			run: () => ask(t.assistantSuggestImprove),
 		},
 		{ name: "to-table", label: t.assistantSuggestTable, run: () => ask(t.assistantSuggestTable) },
+		{
+			name: "fix",
+			label: t.slashFix,
+			run: () => ask(host.selection().trim() === "" ? t.assistantSuggestFix : t.assistantPromptFix),
+		},
+		{ name: "shorten", label: t.slashShorten, run: () => ask(t.assistantPromptShorten) },
+		{ name: "explain", label: t.slashExplain, run: () => ask(t.assistantPromptExplain) },
+		{
+			name: "translate",
+			label: t.slashTranslate,
+			argument: t.slashTranslateArgument,
+			run: (arg) =>
+				ask(arg === "" ? t.assistantPromptTranslate : format(t.slashTranslatePrompt, arg)),
+		},
+		{ name: "apply", label: t.slashApply, run: () => applyLatest() },
 		app("save", "save", t.save),
 		app("save-as", "save-as", t.saveAs),
 		app("export-docx", "export-docx", exportLabel(t.exportDocx)),
@@ -718,16 +798,18 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	// --- States --------------------------------------------------------------------
 
 	function renderEmpty(): void {
-		const suggestions = [
-			t.assistantSuggestSummary,
-			t.assistantSuggestDiagram,
-			t.assistantSuggestImprove,
-			t.assistantSuggestTable,
-		].map((text) => {
+		const suggestions = (
+			[
+				[t.assistantSuggestSummary, "file"],
+				[t.assistantSuggestDiagram, "diagram"],
+				[t.assistantSuggestFix, "pencil"],
+				[t.assistantSuggestTable, "table"],
+			] as const
+		).map(([text, name]) => {
 			const suggestion = el("button", {
 				class: "assistant-suggestion",
-				text,
 				attrs: { type: "button" },
+				children: [icon(name), el("span", { text })],
 			});
 			suggestion.addEventListener("click", () => {
 				input.value = text;
@@ -736,6 +818,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			return suggestion;
 		});
 		empty.replaceChildren(
+			el("div", { class: "assistant-empty-icon", children: [icon("assistant")] }),
 			el("p", { class: "assistant-empty-title", text: t.assistantWelcome }),
 			el("p", { class: "assistant-empty-hint", text: t.assistantWelcomeHint }),
 			el("div", { class: "assistant-suggestions", children: suggestions }),
@@ -873,6 +956,9 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		composer.hidden = !chatting;
 		input.disabled = !ready;
 		addButton.disabled = !ready;
+		for (const item of quick.querySelectorAll("button")) item.disabled = !ready || busy;
+		log.classList.toggle("busy", busy);
+		updateJump();
 		sendButton.disabled = !ready && !busy;
 		share.checked = host.shareDocument();
 		subtitle.textContent = status === null ? t.assistantLooking : status.label;
@@ -904,6 +990,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		if (droppedSelection !== null && droppedSelection.trim() !== selection) droppedSelection = null;
 		const visible = selection !== "" && droppedSelection === null;
 		selectionChip.hidden = !visible;
+		context.hidden = !visible;
 		if (!visible) return;
 		const preview = selection.replace(/\s+/g, " ");
 		selectionText.textContent = format(
@@ -936,6 +1023,35 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		if (view !== "history") return;
 		const start = button(t.assistantNewChat, { class: "assistant-primary", icon: "new" });
 		start.addEventListener("click", () => startChat());
+		const fold = (text: string): string => text.toLocaleLowerCase(host.lang);
+		const search = el("input", {
+			class: "assistant-history-search",
+			attrs: {
+				type: "search",
+				placeholder: t.assistantSearchChats,
+				"aria-label": t.assistantSearchChats,
+				value: historyQuery,
+			},
+		});
+		const results = el("div", { class: "assistant-history-results" });
+		const filter = (): void => {
+			historyQuery = search.value;
+			const query = fold(search.value.trim());
+			const shownRows = rows
+				.filter(({ title }) => query === "" || fold(title).includes(query))
+				.map(({ row }) => row);
+			results.replaceChildren(
+				list.length === 0
+					? el("p", { class: "assistant-empty-hint", text: t.assistantNoChats })
+					: shownRows.length === 0
+						? el("p", {
+								class: "assistant-empty-hint",
+								text: format(t.assistantNoMatches, search.value.trim()),
+							})
+						: el("ul", { class: "assistant-history-list", children: shownRows }),
+			);
+		};
+		search.addEventListener("input", filter);
 		const rows = list.map((summary) => {
 			const running = chats.get(summary.id)?.reply != null;
 			const open = el("button", {
@@ -963,18 +1079,24 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				format(t.assistantDeleteChat, summary.title || t.assistantUntitledChat),
 			);
 			remove.addEventListener("click", () => void deleteChat(summary));
-			return el("li", { class: "assistant-history-row", children: [open, remove] });
+			return {
+				title: summary.title || t.assistantUntitledChat,
+				row: el("li", { class: "assistant-history-row", children: [open, remove] }),
+			};
 		});
 		history.replaceChildren(
 			el("div", {
 				class: "assistant-history-header",
 				children: [el("p", { class: "assistant-empty-title", text: t.assistantChats }), start],
 			}),
-			rows.length === 0
-				? el("p", { class: "assistant-empty-hint", text: t.assistantNoChats })
-				: el("ul", { class: "assistant-history-list", children: rows }),
+			...(list.length > 0 ? [search] : []),
+			results,
 		);
+		filter();
 	}
+
+	/** What the chat list was filtered by, kept while the panel is open. */
+	let historyQuery = "";
 
 	/** A new, empty chat; the current one stays in the list. */
 	function startChat(): void {
@@ -1090,8 +1212,42 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		});
 		shown.set(message, { element, body });
 		log.append(element);
-		if (message.role === "user") body.textContent = message.text;
-		else renderReply(message);
+		if (message.role === "user") {
+			body.textContent = message.text;
+			element.append(questionTools(message));
+		} else renderReply(message);
+	}
+
+	function toolButton(name: Parameters<typeof icon>[0], label: string): HTMLButtonElement {
+		const tool = iconButton(name, label);
+		tool.classList.add("assistant-tool");
+		return tool;
+	}
+
+	/** Under a question: copy it, or put it back in the input to change and ask again. */
+	function questionTools(message: Message): HTMLElement {
+		const copy = toolButton("copy", t.assistantCopy);
+		copy.addEventListener("click", () => {
+			void navigator.clipboard.writeText(message.text).then(() => flash(copy));
+		});
+		const edit = toolButton("pencil", t.assistantEditMessage);
+		edit.addEventListener("click", () => {
+			if (status?.ready !== true) return;
+			input.value = message.text;
+			input.focus();
+			input.setSelectionRange(input.value.length, input.value.length);
+		});
+		return el("div", { class: "assistant-message-tools", children: [copy, edit] });
+	}
+
+	/** A tool button shows a check for a moment once it has done its work. */
+	function flash(tool: HTMLButtonElement): void {
+		tool.replaceChildren(icon("check"));
+		tool.classList.add("done");
+		setTimeout(() => {
+			tool.classList.remove("done");
+			tool.replaceChildren(icon(tool.dataset.icon as Parameters<typeof icon>[0]));
+		}, 1200);
 	}
 
 	let renderQueued: Message | null = null;
@@ -1108,30 +1264,69 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		return log.scrollHeight - log.scrollTop - log.clientHeight < 60;
 	}
 
+	/** The button down to the latest message shows while the log is scrolled up. */
+	function updateJump(): void {
+		jump.hidden = log.hidden || view !== "chat" || nearBottom();
+	}
+	log.addEventListener("scroll", () => updateJump(), { passive: true });
+
+	/** The start of a diagram or of actions still coming in: shown as a placeholder, not as JSON. */
+	const OPEN_BLOCK = /^ {0,3}(?:`{3,}|~{3,})[ \t]*(kalem-diagram|kalem-actions)[ \t]*$/m;
+
 	function renderReply(message: Message): void {
 		const view = shown.get(message);
 		if (view === undefined) return;
 		const follow = nearBottom();
-		// While a reply streams in, a finished diagram already shows; an open one is still text.
+		// While a reply streams in, a finished diagram already shows; an open one is a placeholder.
 		const parts: ReplyPart[] = message.text === "" ? [] : splitReply(message.text);
-		const nodes: Node[] = parts.map((part) =>
-			part.kind === "markdown" ? markdown(part.text, message.done) : diagramCard(part),
+		let pending: string | null = null;
+		const last = parts.at(-1);
+		if (!message.done && last?.kind === "markdown") {
+			const open = OPEN_BLOCK.exec(last.text);
+			if (open !== null) {
+				parts.pop();
+				const before = last.text.slice(0, open.index);
+				if (before.trim() !== "") parts.push({ kind: "markdown", text: before });
+				pending = open[1] === "kalem-actions" ? t.assistantPreparing : t.assistantDrawing;
+			}
+		}
+		const nodes: Node[] = parts.map((part, index) =>
+			part.kind === "markdown"
+				? markdown(part.text, message.done)
+				: part.kind === "diagram"
+					? diagramCard(part)
+					: actionsCard(part.actions, message, index),
 		);
-		if (!message.done && message.error === null)
-			nodes.push(el("span", { class: "assistant-typing" }));
+		if (!message.done && message.error === null) {
+			if (pending !== null) nodes.push(waiting(pending));
+			else if (message.text === "") nodes.push(waiting(t.assistantThinking));
+			else nodes.push(el("span", { class: "assistant-typing" }));
+		}
 		if (message.error !== null) {
 			nodes.push(
 				el("div", { class: "assistant-error", attrs: { role: "alert" }, text: message.error }),
 			);
 		}
-		if (message.done && message.error === null && message.text.trim() !== "") {
-			nodes.push(replyActions(message));
-		}
-		if (message.model !== undefined && message.model !== "") {
-			nodes.push(el("div", { class: "assistant-reply-model", text: message.model }));
+		if (message.done && (message.text.trim() !== "" || message.error !== null)) {
+			nodes.push(replyFooter(message, parts));
 		}
 		view.body.replaceChildren(...nodes);
 		if (follow) log.scrollTop = log.scrollHeight;
+		updateJump();
+	}
+
+	function waiting(label: string): HTMLElement {
+		return el("div", {
+			class: "assistant-waiting",
+			children: [
+				el("span", {
+					class: "assistant-dots",
+					attrs: { "aria-hidden": "true" },
+					children: [el("span"), el("span"), el("span")],
+				}),
+				label,
+			],
+		});
 	}
 
 	function markdown(text: string, done: boolean): HTMLElement {
@@ -1141,6 +1336,15 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		if (done) {
 			for (const code of container.querySelectorAll<HTMLElement>("pre > code.language-mermaid")) {
 				void mermaidPreview(code);
+			}
+			for (const pre of container.querySelectorAll<HTMLElement>("pre")) {
+				const copy = toolButton("copy", t.assistantCopyCode);
+				copy.classList.add("assistant-code-copy");
+				copy.addEventListener("click", () => {
+					const code = pre.querySelector("code") ?? pre;
+					void navigator.clipboard.writeText(code.textContent ?? "").then(() => flash(copy));
+				});
+				pre.append(copy);
 			}
 		}
 		return container;
@@ -1209,12 +1413,225 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		});
 	}
 
-	function replyActions(message: Message): HTMLElement {
-		const insert = button(t.assistantInsert, { icon: "paste" });
-		run(insert, () => host.insert(message.text), t.assistantInserted);
-		const copy = button(t.assistantCopy, { icon: "copy" });
-		run(copy, () => navigator.clipboard.writeText(message.text), t.assistantCopied);
-		return el("div", { class: "assistant-actions", children: [insert, copy] });
+	// --- Proposed changes ------------------------------------------------------------
+
+	const strip = (label: string): string => label.replace(/…$/, "");
+	const COMMAND_LABELS: Readonly<Record<AssistantCommand, string>> = {
+		save: t.save,
+		"save-as": t.saveAs,
+		"save-as-package": t.saveAsPackage,
+		"export-docx": exportLabel(t.exportDocx),
+		"export-html": exportLabel(t.exportHtml),
+		"export-confluence": exportLabel(t.exportConfluence),
+		"export-confluence-wiki": exportLabel(t.exportConfluenceWiki),
+		"version-history": t.versionHistory,
+		find: t.find,
+		replace: t.replace,
+		image: t.image,
+		"attach-file": t.attachFile,
+		diagram: t.diagramInsert,
+		table: t.insertTable,
+		source: t.markdownSource,
+		"read-only": t.readOnly,
+		focus: t.focusMode,
+		"zoom-in": t.zoomIn,
+		"zoom-out": t.zoomOut,
+		"zoom-reset": t.zoomReset,
+		"quick-open": t.quickOpen,
+		"search-folder": t.searchFolder,
+		"format-all-code": t.formatAllCode,
+		undo: t.undo,
+		redo: t.redo,
+	};
+
+	/** The changes of each reply that were applied, by the card's place in the reply. */
+	const applied = new WeakMap<Message, Set<number>>();
+
+	const clipped = (text: string, max = 600): string =>
+		text.length > max ? `${text.slice(0, max)}…` : text;
+
+	function changeView(action: DocumentAction): HTMLElement {
+		switch (action.type) {
+			case "replace":
+				return el("li", {
+					class: "assistant-change",
+					children: [
+						...(action.all
+							? [el("span", { class: "assistant-change-badge", text: t.assistantChangeAll })]
+							: []),
+						el("del", { text: clipped(action.find) }),
+						...(action.replace === "" ? [] : [el("ins", { text: clipped(action.replace) })]),
+					],
+				});
+			case "insert":
+				return el("li", {
+					class: "assistant-change",
+					children: [
+						el("span", {
+							class: "assistant-change-label",
+							text:
+								action.at === "start"
+									? t.assistantChangeInsertStart
+									: action.at === "end"
+										? t.assistantChangeInsertEnd
+										: t.assistantChangeInsertCursor,
+						}),
+						el("ins", { text: clipped(action.text) }),
+					],
+				});
+			case "document":
+				return el("li", {
+					class: "assistant-change",
+					children: [
+						el("span", { class: "assistant-change-label", text: t.assistantChangeDocument }),
+						el("ins", { text: clipped(action.text, 400) }),
+					],
+				});
+		}
+	}
+
+	function actionsCard(
+		actions: readonly AssistantAction[],
+		message: Message,
+		index: number,
+	): HTMLElement {
+		const changes = actions.filter(isDocumentAction);
+		const commandsToRun = actions.flatMap((action) =>
+			action.type === "command" ? [action.command] : [],
+		);
+		const done = applied.get(message) ?? new Set<number>();
+		applied.set(message, done);
+		const children: HTMLElement[] = [];
+		if (changes.length > 0) {
+			const state = el("p", { class: "assistant-changes-state", attrs: { role: "status" } });
+			const apply = button(t.assistantApply, {
+				class: "assistant-primary assistant-apply",
+				icon: "check",
+			});
+			const undo = button(t.assistantUndo, { icon: "undo" });
+			const show = (isApplied: boolean, count?: number): void => {
+				apply.disabled = isApplied;
+				if (apply.lastChild !== null) {
+					apply.lastChild.textContent = isApplied ? t.assistantApplied : t.assistantApply;
+				}
+				undo.hidden = !isApplied;
+				state.hidden = count === undefined;
+				state.textContent = count === undefined ? "" : format(t.assistantAppliedCount, count);
+				card.classList.toggle("applied", isApplied);
+			};
+			apply.addEventListener("click", async () => {
+				apply.disabled = true;
+				try {
+					const count = await host.applyActions(changes);
+					done.add(index);
+					show(true, count);
+				} catch (error) {
+					apply.disabled = false;
+					showNotice(format(t.assistantActionFailed, host.errorText(error)));
+				}
+			});
+			undo.addEventListener("click", () => {
+				host.runCommand("undo");
+				done.delete(index);
+				show(false);
+			});
+			const card = el("div", {
+				class: "assistant-changes-block",
+				children: [
+					el("div", {
+						class: "assistant-changes-head",
+						children: [icon("pencil"), el("span", { text: t.assistantChanges })],
+					}),
+					el("ul", { class: "assistant-change-list", children: changes.map(changeView) }),
+					el("div", { class: "assistant-actions", children: [apply, undo] }),
+					state,
+				],
+			});
+			show(done.has(index));
+			children.push(card);
+		}
+		for (const command of commandsToRun) {
+			const label = strip(COMMAND_LABELS[command]);
+			const go = button(t.assistantRun, { icon: "chevron", title: label });
+			go.addEventListener("click", () => host.runCommand(command));
+			children.push(
+				el("div", {
+					class: "assistant-command-row",
+					children: [
+						el("span", {
+							class: "assistant-command-text",
+							text: format(t.assistantChangeCommand, label),
+						}),
+						go,
+					],
+				}),
+			);
+		}
+		return el("div", { class: "assistant-changes", children });
+	}
+
+	/** Applies the changes of the latest reply that proposes some (`/apply`). */
+	function applyLatest(): void {
+		const replies = [...log.querySelectorAll<HTMLButtonElement>(".assistant-apply")];
+		const latest = replies.at(-1);
+		if (latest === undefined) showNotice(t.assistantNothingToApply);
+		else if (!latest.disabled) latest.click();
+	}
+
+	// --- Under a reply ---------------------------------------------------------------
+
+	function replyFooter(message: Message, parts: readonly ReplyPart[]): HTMLElement {
+		const buttons: HTMLElement[] = [];
+		// Around proposed changes the text only explains them: there is nothing to insert.
+		const proposes = parts.some((part) => part.kind === "actions");
+		const insertable = parts.some(
+			(part) => part.kind === "diagram" || (part.kind === "markdown" && !proposes),
+		);
+		if (message.error === null && insertable) {
+			const insert = button(t.assistantInsert, { icon: "paste" });
+			run(insert, () => host.insert(message.text), t.assistantInserted);
+			buttons.push(insert);
+		}
+		if (message.text.trim() !== "") {
+			const copy = button(t.assistantCopy, { icon: "copy" });
+			run(copy, () => navigator.clipboard.writeText(message.text), t.assistantCopied);
+			buttons.push(copy);
+		}
+		const again = toolButton(
+			"refresh",
+			message.error === null ? t.assistantRegenerate : t.assistantRetry,
+		);
+		again.classList.add("assistant-regenerate");
+		again.addEventListener("click", () => regenerate(message));
+		buttons.push(again);
+		return el("div", {
+			class: "assistant-reply-footer",
+			children: [
+				el("div", { class: "assistant-actions", children: buttons }),
+				...(message.model !== undefined && message.model !== ""
+					? [el("span", { class: "assistant-reply-model", text: message.model })]
+					: []),
+			],
+		});
+	}
+
+	/** Asks the last question again in place of its reply. */
+	function regenerate(message: Message): void {
+		const chat = active;
+		const count = chat.messages.length;
+		const question = chat.messages[count - 2];
+		if (chat.reply !== null || chat.messages[count - 1] !== message || question?.role !== "user") {
+			return;
+		}
+		chat.messages.splice(count - 2, 2);
+		for (const gone of [question, message]) {
+			shown.get(gone)?.element.remove();
+			shown.delete(gone);
+		}
+		// An API is sent the chat without the old answer; a CLI keeps its conversation.
+		if (!isCli(PROVIDER_INFO[chat.provider])) chat.sessionId = null;
+		input.value = question.text;
+		void send();
 	}
 
 	function showNotice(text: string): void {
