@@ -173,11 +173,36 @@ verir.
     görünür. Yanındaki düğmeler **Çek (Pull)**, **Gönder (Push)** ve **Getir
     (Fetch)**; `⌄` menüsünde ayrıca **Dal Değiştir…** (yerel ve uzak dallar
     aranabilir listede; yalnızca uzakta olan dal seçilince onu izleyen yerel
-    dal açılır), **Yeni Dal…** ve **Tüm Değişiklikleri Commit Et…** var.
+    dal açılır), **Yeni Dal…** ve **Değişiklikleri Commit Et…** var.
     Dal adına tıklamak da dal değiştirir. Aynı işlemler dosyaların sağ tık
     menüsünde de bulunur; birden çok klasör açıkken her deponun dalı kendi
     başlığında görünür. Git deposu olmayan klasör, sağ tık menüsündeki
     **Git Deposu Yap** ile depo yapılır.
+  - **Değişen dosyalar ağaçta görünür:** değişen dosyanın adı renklenir ve
+    yanında bir harf çıkar (**M** değişti, **A** eklendi, **D** silindi,
+    **R** yeniden adlandırıldı, **U** yeni/izlenmiyor, **!** çakışma);
+    içinde değişiklik olan klasörlerin yanında bir nokta olur. Değişen
+    dosyanın sağ tık menüsünde **Son Commit ile Karşılaştır** (renkli fark
+    penceresi) ve **Değişiklikleri Geri Al…** (onaydan sonra dosya son
+    commit'teki hâline döner; yeni dosya Geri Dönüşüm Kutusu'na gider) var.
+  - **Seçerek commit:** **Değişiklikleri Commit Et…** değişen dosyaları
+    işaret kutularıyla listeler; yalnızca işaretlenenler commit edilir
+    (önceden stage'lenmiş başka dosya olsa da). **✨ Öner**, seçilen
+    dosyaların farkından ve deponun son commit başlıklarının üslubundan
+    asistana (Claude Code, Copilot ya da bağlı API) bir commit mesajı
+    yazdırır; mesaj düzenlenebilir. `Ctrl+Enter` commit eder.
+  - **Çakışmalar:** pull ya da birleştirme çakışmayla durursa çubukta
+    "Birleştirme sürüyor · 2 çakışma" yazar, çakışan dosyalar **!** ile
+    işaretlenir; menüde **Devam Et** (çözdükten sonra) ve **İptal Et** çıkar.
+    Dallar ayrıştığında ve Git'te bunun için bir ayar yoksa pull,
+    **Birleştir (Merge)** mi **Rebase** mi yapılacağını sorar.
+  - **Kendiliğinden güncellenir:** terminalden dal değiştirmek, commit ya da
+    fetch yapmak ve dosyaları başka bir programda düzenlemek bölmeye
+    kendiliğinden yansır (`.git` içindeki HEAD, index ve ref değişiklikleri
+    izlenir; Kalem'in kendi `git status`'u index'e yazmaz). **Klasör Aç**
+    ile açılan depolar 10 dakikada bir arka planda fetch edilir; bu sırada
+    giriş penceresi açılmaz, giriş isteyen fetch sessizce atlanır. `⌄`
+    menüsündeki **Otomatik Getir (Fetch)** ile kapatılır.
   - **Depo klonlama:** araç çubuğundaki dal simgesi (**Git Deposu
     Klonla…**) bir adres sorar (https, SSH ya da `file://`), sonra
     klonlanacağı klasörü; klonlanan depo açık klasörlere eklenir.

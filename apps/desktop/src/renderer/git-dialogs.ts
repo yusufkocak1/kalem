@@ -1,4 +1,4 @@
-import type { GitBranch } from "../shared/bridge.js";
+import type { GitBranch, GitChangeKind, GitFileChange } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import { el } from "./dom.js";
@@ -17,7 +17,34 @@ export interface PromptRequest {
 	readonly check?: (value: string) => string | null;
 }
 
+export interface CommitRequest {
+	readonly title: string;
+	readonly files: readonly GitFileChange[];
+	/** A message written from the chosen files' changes; rejects with why it could not. */
+	suggest?(paths: readonly string[]): Promise<string>;
+}
+
+export interface CommitAnswer {
+	readonly message: string;
+	/** `undefined` when every file is chosen. */
+	readonly paths: readonly string[] | undefined;
+}
+
+/** The letter a change is marked with, as in other editors. */
+export const CHANGE_LETTER: Readonly<Record<GitChangeKind, string>> = {
+	modified: "M",
+	added: "A",
+	deleted: "D",
+	renamed: "R",
+	untracked: "U",
+	conflict: "!",
+};
+
 export interface GitDialogs {
+	/** The files to commit and the message; `null` when cancelled. */
+	commit(request: CommitRequest): Promise<CommitAnswer | null>;
+	/** Shows a unified diff. */
+	diff(title: string, text: string): void;
 	/** The text typed, trimmed; `null` when cancelled. */
 	prompt(request: PromptRequest): Promise<string | null>;
 	/** The branch picked; `null` when cancelled. */
@@ -183,7 +210,200 @@ export function createGitDialogs(t: Strings, lang: string): GitDialogs {
 		if (event.target === branchDialog) settleBranch(null);
 	});
 
+	// --- Commit -----------------------------------------------------------
+	const commitTitle = el("h2");
+	const allFiles = el("input", { attrs: { type: "checkbox" } });
+	const fileList = el("ul", { class: "git-files", attrs: { "aria-label": t.gitCommitFiles } });
+	const message = el("textarea", {
+		attrs: {
+			rows: "4",
+			spellcheck: "true",
+			"aria-label": t.gitCommitMessage,
+			placeholder: t.gitCommitMessage,
+		},
+	});
+	const suggestButton = el("button", {
+		class: "dialog-button git-suggest",
+		text: t.gitSuggest,
+		attrs: { type: "button", title: t.gitSuggestHint },
+	});
+	const commitError = el("p", { class: "git-error", attrs: { role: "alert" } });
+	const commitCancel = el("button", {
+		class: "dialog-button",
+		text: t.cancel,
+		attrs: { type: "button" },
+	});
+	const commitSubmit = el("button", {
+		class: "dialog-button primary",
+		text: t.gitCommitButton,
+		attrs: { type: "submit" },
+	});
+	const commitForm = el("form", {
+		class: "git-form",
+		attrs: { method: "dialog" },
+		children: [
+			commitTitle,
+			el("label", {
+				class: "git-all",
+				children: [allFiles, el("span", { text: t.gitCommitAll })],
+			}),
+			fileList,
+			el("div", {
+				class: "git-message-head",
+				children: [el("span", { text: t.gitCommitMessage }), suggestButton],
+			}),
+			message,
+			commitError,
+			el("div", { class: "git-actions", children: [commitCancel, commitSubmit] }),
+		],
+	});
+	const commitDialog = el("dialog", { class: "git-dialog git-commit", children: [commitForm] });
+	let committing: ((answer: CommitAnswer | null) => void) | null = null;
+	let commitFiles: readonly GitFileChange[] = [];
+	let suggest: CommitRequest["suggest"];
+
+	const chosen = (): string[] =>
+		[...fileList.querySelectorAll<HTMLInputElement>("input:checked")].map((box) => box.value);
+	const updateCommit = (): void => {
+		const count = chosen().length;
+		allFiles.checked = count === commitFiles.length;
+		allFiles.indeterminate = count > 0 && count < commitFiles.length;
+		commitSubmit.disabled = count === 0 || message.value.trim() === "";
+		suggestButton.disabled = count === 0 || suggest === undefined;
+	};
+	const settleCommit = (answer: CommitAnswer | null): void => {
+		const done = committing;
+		committing = null;
+		if (commitDialog.open) commitDialog.close();
+		done?.(answer);
+	};
+	allFiles.addEventListener("change", () => {
+		for (const box of fileList.querySelectorAll<HTMLInputElement>("input")) {
+			box.checked = allFiles.checked;
+		}
+		updateCommit();
+	});
+	fileList.addEventListener("change", updateCommit);
+	message.addEventListener("input", updateCommit);
+	message.addEventListener("keydown", (event) => {
+		if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+			event.preventDefault();
+			commitForm.requestSubmit();
+		}
+	});
+	suggestButton.addEventListener("click", async () => {
+		if (suggest === undefined) return;
+		suggestButton.disabled = true;
+		suggestButton.textContent = t.gitSuggesting;
+		commitError.hidden = true;
+		try {
+			message.value = await suggest(chosen());
+		} catch (error) {
+			commitError.textContent = format(
+				t.gitSuggestFailed,
+				String((error as Error)?.message ?? error).replace(
+					/^Error invoking remote method '[^']+': (Error: )?/,
+					"",
+				),
+			);
+			commitError.hidden = false;
+		} finally {
+			suggestButton.textContent = t.gitSuggest;
+			updateCommit();
+			message.focus();
+		}
+	});
+	commitForm.addEventListener("submit", (event) => {
+		event.preventDefault();
+		const paths = chosen();
+		if (paths.length === 0 || message.value.trim() === "") return;
+		settleCommit({
+			message: message.value.trim(),
+			paths: paths.length === commitFiles.length ? undefined : paths,
+		});
+	});
+	commitCancel.addEventListener("click", () => settleCommit(null));
+	commitDialog.addEventListener("close", () => {
+		if (!commitDialog.open) settleCommit(null);
+	});
+
+	// --- Diff -------------------------------------------------------------
+	const diffTitle = el("h2");
+	const diffBody = el("pre", { class: "git-diff" });
+	const diffClose = el("button", {
+		class: "dialog-button",
+		text: t.close,
+		attrs: { type: "button" },
+	});
+	const diffDialog = el("dialog", {
+		class: "git-dialog git-diff-dialog",
+		children: [diffTitle, diffBody, el("div", { class: "git-actions", children: [diffClose] })],
+	});
+	diffClose.addEventListener("click", () => diffDialog.close());
+	document.body.append(commitDialog, diffDialog);
+
 	return {
+		commit(request) {
+			settleCommit(null);
+			commitFiles = request.files;
+			suggest = request.suggest;
+			commitTitle.textContent = request.title;
+			fileList.replaceChildren(
+				...request.files.map((file) =>
+					el("li", {
+						children: [
+							el("label", {
+								attrs: { title: file.path },
+								children: [
+									Object.assign(el("input", { attrs: { type: "checkbox", value: file.path } }), {
+										checked: true,
+									}),
+									el("span", {
+										class: `git-letter git-${file.kind}`,
+										text: CHANGE_LETTER[file.kind],
+									}),
+									el("span", { class: "git-file-path", text: file.path }),
+								],
+							}),
+						],
+					}),
+				),
+			);
+			message.value = "";
+			commitError.hidden = true;
+			updateCommit();
+			commitDialog.showModal();
+			message.focus();
+			return new Promise((resolve) => {
+				committing = resolve;
+			});
+		},
+		diff(title, text) {
+			diffTitle.textContent = title;
+			diffBody.replaceChildren(
+				...(text.trim() === "" ? [t.gitNoDiff] : text.replace(/\n$/, "").split("\n")).map((line) =>
+					el("span", {
+						class: `git-diff-line${
+							line.startsWith("+++") ||
+							line.startsWith("---") ||
+							line.startsWith("diff ") ||
+							line.startsWith("index ")
+								? " head"
+								: line.startsWith("@@")
+									? " hunk"
+									: line.startsWith("+")
+										? " add"
+										: line.startsWith("-")
+											? " remove"
+											: ""
+						}`,
+						text: `${line}\n`,
+					}),
+				),
+			);
+			diffDialog.showModal();
+			diffClose.focus();
+		},
 		prompt(request) {
 			settle(null);
 			check = request.check;

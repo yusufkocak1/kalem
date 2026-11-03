@@ -1,13 +1,16 @@
 import { execFileSync } from "node:child_process";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
+	backgroundFetch,
 	cloneRepository,
+	commitContext,
 	GitError,
 	gitBranches,
+	gitDiff,
 	gitMessage,
 	gitStatus,
 	isCloneUrl,
@@ -46,6 +49,11 @@ describe("git output", () => {
 			ahead: 2,
 			behind: 3,
 			changed: 2,
+			conflicts: 0,
+			files: [
+				{ path: "notes.md", kind: "modified" },
+				{ path: "new.md", kind: "untracked" },
+			],
 		});
 		expect(parseStatus("# branch.oid 1234\n# branch.head (detached)\n")).toEqual({
 			branch: null,
@@ -53,7 +61,31 @@ describe("git output", () => {
 			ahead: 0,
 			behind: 0,
 			changed: 0,
+			conflicts: 0,
+			files: [],
 		});
+		// With -z: paths as they are (spaces, no quotes); a rename's old path is its own entry.
+		const z = parseStatus(
+			[
+				"# branch.head main",
+				"1 A. N... 000000 100644 100644 0 a yeni dosya.md",
+				"1 .D N... 100644 100644 000000 a a silinen.md",
+				"2 R. N... 100644 100644 100644 a a R100 yeni ad.md",
+				"eski ad.md",
+				"u UU N... 100644 100644 100644 100644 a b c çakışan.md",
+				"? klasör/yeni.txt",
+				"",
+			].join("\0"),
+		);
+		expect(z.files).toEqual([
+			{ path: "yeni dosya.md", kind: "added" },
+			{ path: "silinen.md", kind: "deleted" },
+			{ path: "yeni ad.md", kind: "renamed" },
+			{ path: "çakışan.md", kind: "conflict" },
+			{ path: "klasör/yeni.txt", kind: "untracked" },
+		]);
+		expect(z.conflicts).toBe(1);
+		expect(z.changed).toBe(5);
 	});
 
 	it("lists local branches first and remote ones without a local twin", () => {
@@ -101,6 +133,16 @@ describe("git output", () => {
 		});
 		expect(() => toGitAction({ kind: "commit", message: "  " })).toThrow();
 		expect(() => toGitAction({ kind: "reset" })).toThrow();
+		expect(toGitAction({ kind: "pull", how: "rebase" })).toEqual({ kind: "pull", how: "rebase" });
+		expect(toGitAction({ kind: "commit", message: "m", paths: ["a.md"] })).toEqual({
+			kind: "commit",
+			message: "m",
+			paths: ["a.md"],
+		});
+		// Paths that are options or lead out of the repository never reach git.
+		for (const path of ["-rf", "../x", "/etc/passwd", "C:/Windows", "a/../../b"]) {
+			expect(() => toGitAction({ kind: "discard", paths: [path] })).toThrow();
+		}
 		expect(() => toGitAction(null)).toThrow();
 	});
 
@@ -187,5 +229,139 @@ describe.skipIf(!hasGit)("git in a folder", () => {
 		await expect(runGitAction(folder, { kind: "push" })).rejects.toMatchObject({
 			problem: "failed",
 		});
+	});
+});
+
+describe.skipIf(!hasGit)("git for changed files", () => {
+	let base: string;
+
+	beforeAll(async () => {
+		Object.assign(process.env, {
+			GIT_AUTHOR_NAME: "Kalem",
+			GIT_AUTHOR_EMAIL: "kalem@example.com",
+			GIT_COMMITTER_NAME: "Kalem",
+			GIT_COMMITTER_EMAIL: "kalem@example.com",
+		});
+		base = await mkdtemp(join(tmpdir(), "kalem-git-files-"));
+	});
+
+	const repository = async (): Promise<string> => {
+		const folder = await mkdtemp(join(base, "r-"));
+		execFileSync("git", ["init", "-q", "--initial-branch=main"], { cwd: folder });
+		await writeFile(join(folder, "a.md"), "bir\niki\n");
+		await writeFile(join(folder, "b.md"), "b\n");
+		execFileSync("git", ["add", "."], { cwd: folder });
+		execFileSync("git", ["commit", "-q", "-m", "İlk"], { cwd: folder, env: process.env });
+		return folder;
+	};
+
+	it("lists what changed, shows it, and commits only the files chosen", async () => {
+		const folder = await repository();
+		await writeFile(join(folder, "a.md"), "bir\nüç\n");
+		await writeFile(join(folder, "b.md"), "b değişti\n");
+		await writeFile(join(folder, "yeni.md"), "yeni\n");
+		const status = await gitStatus(folder);
+		expect(status?.files).toEqual([
+			{ path: "a.md", kind: "modified" },
+			{ path: "b.md", kind: "modified" },
+			{ path: "yeni.md", kind: "untracked" },
+		]);
+		expect(status?.operation).toBeNull();
+
+		const diff = await gitDiff(folder, "a.md");
+		expect(diff).toContain("-iki");
+		expect(diff).toContain("+üç");
+		expect(await gitDiff(folder, "yeni.md")).toContain("+yeni");
+
+		await runGitAction(folder, {
+			kind: "commit",
+			message: "Yalnızca a ve yeni",
+			paths: ["a.md", "yeni.md"],
+		});
+		expect((await gitStatus(folder))?.files).toEqual([{ path: "b.md", kind: "modified" }]);
+		const shown = execFileSync("git", ["show", "--name-only", "--format=%s", "HEAD"], {
+			cwd: folder,
+		}).toString();
+		expect(shown).toContain("Yalnızca a ve yeni");
+		expect(shown).toContain("a.md");
+		expect(shown).not.toContain("b.md");
+	});
+
+	it("discards changes: back to the last commit, new files to the recycle bin", async () => {
+		const folder = await repository();
+		await writeFile(join(folder, "a.md"), "bozuldu\n");
+		await writeFile(join(folder, "yeni.md"), "yeni\n");
+		const trashed: string[] = [];
+		await runGitAction(folder, { kind: "discard", paths: ["a.md", "yeni.md"] }, async (path) => {
+			trashed.push(path);
+			await rm(path);
+		});
+		expect(await readFile(join(folder, "a.md"), "utf8")).toBe("bir\niki\n");
+		expect(trashed).toEqual([join(folder, "yeni.md")]);
+		expect((await gitStatus(folder))?.files).toEqual([]);
+	});
+
+	it("says when a merge stopped on a conflict, and aborts it", async () => {
+		const folder = await repository();
+		execFileSync("git", ["switch", "-q", "-c", "yan"], { cwd: folder });
+		await writeFile(join(folder, "a.md"), "yan dal\n");
+		execFileSync("git", ["commit", "-q", "-am", "Yan"], { cwd: folder });
+		execFileSync("git", ["switch", "-q", "main"], { cwd: folder });
+		await writeFile(join(folder, "a.md"), "ana dal\n");
+		execFileSync("git", ["commit", "-q", "-am", "Ana"], { cwd: folder });
+		try {
+			execFileSync("git", ["merge", "yan"], { cwd: folder, stdio: "ignore" });
+		} catch {
+			// A conflict: what is tested.
+		}
+		const status = await gitStatus(folder);
+		expect(status?.operation).toBe("merge");
+		expect(status?.conflicts).toBe(1);
+		expect(status?.files).toEqual([{ path: "a.md", kind: "conflict" }]);
+		await runGitAction(folder, { kind: "abort" });
+		const after = await gitStatus(folder);
+		expect(after?.operation).toBeNull();
+		expect(await readFile(join(folder, "a.md"), "utf8")).toBe("ana dal\n");
+	});
+
+	it("asks how to pull when the branches went apart, then does as told", async () => {
+		const remote = join(base, `remote-${Date.now()}.git`);
+		execFileSync("git", ["init", "-q", "--bare", "--initial-branch=main", remote]);
+		const mine = await repository();
+		execFileSync("git", ["remote", "add", "origin", remote], { cwd: mine });
+		execFileSync("git", ["push", "-q", "-u", "origin", "main"], { cwd: mine, stdio: "ignore" });
+		const theirs = join(base, `theirs-${Date.now()}`);
+		execFileSync("git", ["clone", "-q", remote, theirs], { stdio: "ignore" });
+		await writeFile(join(theirs, "b.md"), "onlar\n");
+		execFileSync("git", ["commit", "-q", "-am", "Onlar"], { cwd: theirs });
+		execFileSync("git", ["push", "-q"], { cwd: theirs, stdio: "ignore" });
+		await writeFile(join(mine, "a.md"), "ben\n");
+		execFileSync("git", ["commit", "-q", "-am", "Ben"], { cwd: mine });
+
+		// Fetching in the background brings what is to pull.
+		expect(await backgroundFetch(mine)).toBe(true);
+		expect((await gitStatus(mine))?.behind).toBe(1);
+		const error = await runGitAction(mine, { kind: "pull" }).catch((caught: unknown) => caught);
+		// Git with a pull.rebase or pull.ff setting does not ask; without one it does.
+		if (error instanceof GitError) {
+			expect(error.problem).toBe("diverged");
+			await runGitAction(mine, { kind: "pull", how: "rebase" });
+		}
+		const after = await gitStatus(mine);
+		expect(after?.behind).toBe(0);
+		expect(await readFile(join(mine, "b.md"), "utf8")).toBe("onlar\n");
+		// A repository without a remote is not fetched.
+		expect(await backgroundFetch(await repository())).toBe(false);
+	});
+
+	it("gives the assistant the changes and the recent subjects for a message", async () => {
+		const folder = await repository();
+		await writeFile(join(folder, "a.md"), "bir\nüç\n");
+		await writeFile(join(folder, "yeni.md"), "yeni\n");
+		const context = await commitContext(folder, ["a.md"]);
+		expect(context).toContain("Recent commit subjects:\nİlk");
+		expect(context).toContain("modified: a.md");
+		expect(context).toContain("+üç");
+		expect(context).not.toContain("yeni.md");
 	});
 });

@@ -102,6 +102,7 @@ export function parseStoredState(raw: unknown): StoredState {
 			confluenceFavorites: parseFavorites(s.confluenceFavorites),
 			checkUpdates: asBoolean(s.checkUpdates, d.checkUpdates),
 			tray: asBoolean(s.tray, d.tray),
+			gitAutoFetch: asBoolean(s.gitAutoFetch, d.gitAutoFetch),
 			assistant: asBoolean(s.assistant, d.assistant),
 			assistantDocument: asBoolean(s.assistantDocument, d.assistantDocument),
 			claudePath: typeof s.claudePath === "string" ? s.claudePath.slice(0, 4096) : d.claudePath,

@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute } from "node:path";
-import type { IpcMainInvokeEvent } from "electron";
+import type { IpcMainInvokeEvent, WebContents } from "electron";
 import { dialog, ipcMain } from "electron";
 import type { AssistantStatus } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
@@ -124,7 +124,16 @@ function withSources(sources: string, sent: string | undefined, prompt: string):
 	return `${sources}\n\n${prompt}`;
 }
 
-export function registerAssistantIpc(ctx: AssistantIpcContext): void {
+/** What the rest of the app can ask the assistant directly, outside a chat. */
+export interface AssistantService {
+	/**
+	 * One answer to one question from the service in use (a CLI or an API),
+	 * with no chat around it and no tools; rejects with why it could not.
+	 */
+	complete(system: string, prompt: string, sender: WebContents): Promise<string>;
+}
+
+export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService {
 	const clis: Record<CliProgram, LocalCli> = {
 		claude: new LocalCli("claude", () => ctx.store.settings.claudePath),
 		copilot: new LocalCli("copilot", () => ctx.store.settings.copilotPath),
@@ -437,4 +446,59 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): void {
 		running.get(runKey)?.();
 		running.delete(runKey);
 	});
+
+	return {
+		async complete(system, prompt, sender) {
+			const t = ctx.strings();
+			const { provider, connection, key } = await ctx.assistant.active();
+			const program = programOf(provider);
+			let reply = "";
+			let failure: string | null = null;
+			if (program !== null) {
+				await locate(program);
+				const launch = clis[program].launch;
+				if (launch === null) {
+					throw new Error(program === "claude" ? t.claudeNotFound : t.copilotNotFound);
+				}
+				const args =
+					program === "claude"
+						? claudeArgs({ sessionId: null, systemPrompt: system, model: connection.model })
+						: copilotArgs({ sessionId: randomUUID(), model: connection.model, folders: [] });
+				const question = program === "claude" ? prompt : withInstructions(system, prompt);
+				const output = program === "claude" ? claudeOutput() : textOutput();
+				await runCli(
+					launch,
+					homedir(),
+					args,
+					question,
+					output,
+					(event) => {
+						if (event.kind === "text") reply += event.text;
+						else if (event.kind === "error") failure = event.message;
+					},
+					sender,
+					() => {},
+				);
+			} else {
+				const info = PROVIDER_INFO[provider];
+				if (connection.model === "" || (info.needsKey && key === null)) {
+					throw new Error(t.assistantNotSetUp);
+				}
+				await askApi({
+					provider: info,
+					connection,
+					key,
+					system,
+					messages: [{ role: "user", content: prompt }],
+					signal: new AbortController().signal,
+					text: (chunk) => {
+						reply += chunk;
+					},
+				});
+			}
+			if (failure !== null) throw new Error(failure);
+			if (reply.trim() === "") throw new Error(t.assistantNotSetUp);
+			return reply;
+		},
+	};
 }
