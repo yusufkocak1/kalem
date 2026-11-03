@@ -453,6 +453,21 @@ verir.
   ya da oka çift tıklayınca yazılır (Shift+Enter yeni satır). Bir kararın
   ilk çıkışı **Evet**, ikincisi **Hayır** etiketini kendiliğinden alır; yana
   giden dal elmasın köşesinden çıkar.
+  - **Metin şekle sığar:** uzun metin şeklin içinde satırlara bölünür;
+    yine sığmazsa yazı, kelimeler bölünmeden ve satırlar şeklin dışına
+    taşmadan sığana kadar küçülür (en az 6 punto). Elmas, daire ve belgenin
+    dalgalı alt kenarı gibi daralan yerler hesaba katılır. Küçülen yazı
+    yakınlaştırılarak okunur; şekli büyütmek yazıyı yeniden büyütür.
+    - Satırlar gerçek yazı tipiyle ölçülerek bölünür; resim başka bir
+      bilgisayarda ya da Confluence'ta açıldığında da taşmasın diye
+      Segoe UI, Arial ve sistemin yazı tipinden en genişi esas alınır.
+    - Yazısı 10 puntonun altına inen şeklin köşesinde turuncu bir nokta
+      çıkar (yalnızca düzenleyicide). Böyle bir şekil seçiliyken araç
+      çubuğundaki **Şekli metne göre büyüt** şekli önce en uzun kelimeye
+      yetecek kadar genişletir, sonra metin 14 puntoda sığana kadar
+      uzatır (daire iki yönde büyür); grubu da onunla büyür, Ctrl+Z
+      geri alır.
+    - Şekle yazarken kutudaki yazı, şeklin çizeceği boyutta görünür.
   - **Seçim:** tıklama, Shift/Ctrl+tıklama (seçime ekler/çıkarır), boş
     kanvasta sürükleyerek seçim kutusu, Ctrl+A. Seçilenler birlikte taşınır,
     silinir, renklendirilir, ok tuşlarıyla kaydırılır.

@@ -414,6 +414,9 @@ const en = {
 	diagramGroupSelection: "Group",
 	diagramUngroup: "Ungroup",
 	diagramRotate: "Rotate",
+	diagramFitText: "Make the shape fit its text",
+	diagramTextShrunk:
+		"The text was made smaller to fit. Make the shape bigger, or use “Make the shape fit its text”.",
 	diagramConnectBlocked:
 		"A shape inside a group can only be connected from inside it. Connect to the group instead.",
 	diagramAlign: "Align",
@@ -1227,6 +1230,9 @@ const tr: Strings = {
 	diagramGroupSelection: "Grupla",
 	diagramUngroup: "Grubu çöz",
 	diagramRotate: "Döndür",
+	diagramFitText: "Şekli metne göre büyüt",
+	diagramTextShrunk:
+		"Metin sığması için küçültüldü. Şekli büyütün ya da “Şekli metne göre büyüt”ü kullanın.",
 	diagramConnectBlocked:
 		"Grubun içindeki bir şekle yalnızca grubun içinden bağlanılabilir. Bunun yerine gruba bağlayın.",
 	diagramAlign: "Hizala",
