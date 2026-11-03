@@ -111,6 +111,8 @@ const filesPane = createFilesPane({
 	// The open folders are the assistant's workspace.
 	listed: () => assistant.workspaceChanged(),
 	git: createGitDialogs(t, startup.language),
+	autoFetch: () => settings.gitAutoFetch,
+	setAutoFetch: (on) => updateSettings({ gitAutoFetch: on }),
 });
 const versionHistory = createVersionHistory({ t, lang: startup.language });
 const attachmentsDialog = createAttachmentsDialog({

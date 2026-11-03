@@ -112,6 +112,9 @@ const bridge: KalemBridge = {
 	gitBranches: (folder) => ipcRenderer.invoke(CHANNEL.gitBranches, folder),
 	gitRun: (folder, action) => ipcRenderer.invoke(CHANNEL.gitRun, folder, action),
 	gitClone: (url) => ipcRenderer.invoke(CHANNEL.gitClone, url),
+	gitDiff: (folder, path) => ipcRenderer.invoke(CHANNEL.gitDiff, folder, path),
+	gitSuggestMessage: (folder, paths) =>
+		ipcRenderer.invoke(CHANNEL.gitSuggestMessage, folder, paths),
 	onWorkspaceChange: (handler) => listen<[]>(CHANNEL.workspaceChange, handler),
 	listVersions: (tabId) => ipcRenderer.invoke(CHANNEL.listVersions, tabId),
 	readVersion: (tabId, id) => ipcRenderer.invoke(CHANNEL.readVersion, tabId, id),
