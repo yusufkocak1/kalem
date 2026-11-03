@@ -1253,6 +1253,20 @@ button {
 	max-width: 180px;
 }
 
+/* An open folder of the Files pane: the chat's workspace on its own. */
+.assistant-source-workspace {
+	gap: 4px;
+	padding-left: 6px;
+	background: color-mix(in srgb, var(--app-accent) 14%, transparent);
+}
+
+.assistant-source-workspace > .icon {
+	flex: none;
+	width: 13px;
+	height: 13px;
+	color: var(--app-accent);
+}
+
 /* The question box: the text, and under it what goes with the question. */
 .assistant-box {
 	display: flex;

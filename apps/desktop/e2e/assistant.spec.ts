@@ -1140,3 +1140,59 @@ test("lets an API service search and read a workspace folder instead of sending 
 	await app.close();
 	services.close();
 });
+
+test("uses the folders open in the Files pane as the chat's workspace on its own", async () => {
+	const folder = await tempDir("assistant-open-folder");
+	const doc = join(folder, "analiz.md");
+	await writeFile(doc, "# Analiz\n");
+	const code = join(folder, "proje");
+	await mkdir(join(code, "src"), { recursive: true });
+	await writeFile(join(code, "src", "Main.java"), "class Main {}\n");
+	const claude = await fakeClaude(folder);
+	const { app, page, errors } = await launch({ args: [doc], env: { KALEM_CLAUDE: claude.path } });
+	await app.evaluate(
+		({ dialog }, filePaths) => {
+			dialog.showOpenDialog = (async () => ({ canceled: false, filePaths })) as never;
+		},
+		[code],
+	);
+
+	await clickMenu(app, "View", "AI Assistant");
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
+	const chip = pane.locator(".assistant-source-workspace");
+	await expect(chip).toHaveCount(0);
+
+	// Opening a folder in the Files pane makes it the workspace, nothing to add.
+	await clickMenu(app, "File", "Open Folder…");
+	await expect(page.locator(".files-title")).toHaveText("proje");
+	await expect(chip).toHaveText("proje");
+	const input = pane.locator(".assistant-input");
+	await input.fill("Main ne yapıyor?");
+	await input.press("Enter");
+	await expect(pane.locator(".assistant-assistant .assistant-markdown").last()).toHaveText(
+		"Bitti.",
+	);
+	const [first] = await claude.calls();
+	expect(first?.args.join(" ")).toContain(`--add-dir ${code}`);
+	expect(first?.prompt).toContain(`<workspace-folder name="proje" path="${code}">`);
+	expect(first?.prompt).not.toContain("class Main");
+
+	// Left out of this chat, it can be taken back from the + menu.
+	await pane.getByRole("button", { name: "Leave “proje” out of this chat" }).click();
+	await expect(chip).toHaveCount(0);
+	await input.fill("Devam");
+	await input.press("Enter");
+	await expect.poll(async () => (await claude.calls())[1]?.prompt).toContain("Devam");
+	expect((await claude.calls())[1]?.prompt).not.toContain("<workspace>");
+	await pane.getByRole("button", { name: "Add files or folders to the chat" }).click();
+	await pane.getByRole("menuitem", { name: "Open folder: proje" }).click();
+	await expect(chip).toHaveText("proje");
+
+	// Closing the folder ends it.
+	await clickMenu(app, "File", "Close Folder");
+	await expect(chip).toHaveCount(0);
+
+	expect(errors).toEqual([]);
+	await app.close();
+});

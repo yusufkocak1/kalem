@@ -44,7 +44,7 @@ export interface AssistantHost {
 	images(): Promise<DocumentImage[]>;
 	/** The text last selected in the document; empty when none. */
 	selection(): string;
-	/** The folders opened with Open Folder. */
+	/** The folders opened with Open Folder: each chat's workspace unless it leaves one out. */
 	workspaceFolders(): readonly string[];
 	/** Puts a reply's Markdown at the caret, its Kalem diagrams as pictures. */
 	insert(text: string): Promise<void>;
@@ -69,6 +69,8 @@ export interface AssistantPane {
 	focus(): void;
 	/** The document's selection changed. */
 	refreshSelection(): void;
+	/** The folders open in the Files pane changed. */
+	workspaceChanged(): void;
 }
 
 interface Message {
@@ -95,6 +97,8 @@ interface Chat {
 	readonly messages: Message[];
 	/** Files and folders added to the chat; their text goes with each question. */
 	sources: string[];
+	/** Folders open in the Files pane that this chat leaves out. */
+	skipped: string[];
 	/** The document text the service was last given in this chat, in this run. */
 	sharedText: string | null;
 	/** The reply coming in, and what ends the wait for it. */
@@ -165,6 +169,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			updated: now,
 			messages: [],
 			sources: [],
+			skipped: [],
 			sharedText: null,
 			reply: null,
 			ended: null,
@@ -272,13 +277,16 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		addMenu.replaceChildren(
 			menuItem(t.assistantAddFiles, "file", () => void pickSources("files")),
 			menuItem(t.assistantAddFolder, "open", () => void pickSources("folder")),
+			// An open folder this chat left out can come back.
 			...host
 				.workspaceFolders()
-				.filter((folder) => !active.sources.includes(folder))
+				.filter((folder) => active.skipped.includes(folder))
 				.map((folder) =>
-					menuItem(format(t.assistantAddWorkspace, baseName(folder)), "open", () =>
-						addSources([folder]),
-					),
+					menuItem(format(t.assistantAddWorkspace, baseName(folder)), "open", () => {
+						active.skipped = active.skipped.filter((skipped) => skipped !== folder);
+						save(active);
+						renderSources();
+					}),
 				),
 		);
 		addMenu.hidden = false;
@@ -328,9 +336,50 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		renderSources();
 	}
 
+	/** The open folders this chat uses as its workspace. */
+	function openFolders(chat: Chat): string[] {
+		return host
+			.workspaceFolders()
+			.filter((folder) => !chat.skipped.includes(folder) && !chat.sources.includes(folder));
+	}
+
+	/** What goes with a question: the open folders, then what was added to the chat. */
+	function chatSources(chat: Chat): string[] {
+		return [...openFolders(chat), ...chat.sources].slice(0, MAX_SOURCES);
+	}
+
+	function skipFolder(path: string): void {
+		active.skipped = [...active.skipped, path];
+		save(active);
+		renderSources();
+	}
+
 	function renderSources(): void {
-		sourceList.hidden = active.sources.length === 0;
+		const open = openFolders(active);
+		sourceList.hidden = active.sources.length === 0 && open.length === 0;
 		sourceList.replaceChildren(
+			...open.map((path) => {
+				const name = baseName(path);
+				const remove = el("button", {
+					class: "assistant-chip-close",
+					attrs: {
+						type: "button",
+						title: format(t.assistantSkipWorkspace, name),
+						"aria-label": format(t.assistantSkipWorkspace, name),
+					},
+					children: [icon("close")],
+				});
+				remove.addEventListener("click", () => skipFolder(path));
+				return el("span", {
+					class: "assistant-chip assistant-source assistant-source-workspace",
+					attrs: { title: `${path}\n${t.assistantWorkspaceChip}` },
+					children: [
+						icon("open"),
+						el("span", { class: "assistant-chip-text", text: name }),
+						remove,
+					],
+				});
+			}),
 			...active.sources.map((path) => {
 				const name = baseName(path);
 				const remove = el("button", {
@@ -1125,6 +1174,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				...(message.model === undefined ? {} : { model: message.model }),
 			})),
 			sources: [...(stored.sources ?? [])],
+			skipped: [...(stored.skipped ?? [])],
 			sharedText: null,
 			reply: null,
 			ended: null,
@@ -1185,6 +1235,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			updated: chat.updated,
 			messages,
 			...(chat.sources.length === 0 ? {} : { sources: chat.sources }),
+			...(chat.skipped.length === 0 ? {} : { skipped: chat.skipped }),
 		};
 		bridge.assistantSaveChat(stored).catch(() => {});
 	}
@@ -1744,11 +1795,12 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			const unchanged = sharing && chat.sessionId !== null && chat.sharedText === context.text;
 			if (sharing) notes.push(format(t.assistantSharedDocument, context.name));
 			if (selection.trim() !== "") notes.push(t.assistantSharedSelection);
-			if (chat.sources.length > 0) {
+			const sources = chatSources(chat);
+			if (sources.length > 0) {
 				notes.push(
-					chat.sources.length === 1
-						? format(t.assistantSharedDocument, baseName(chat.sources[0] as string))
-						: format(t.assistantSharedSources, chat.sources.length),
+					sources.length === 1
+						? format(t.assistantSharedDocument, baseName(sources[0] as string))
+						: format(t.assistantSharedSources, sources.length),
 				);
 			}
 			// The pictures go with the document; an API, which keeps none, gets them every time.
@@ -1802,7 +1854,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					folder: chat.folder,
 					history: earlier,
 					images: images.map(({ label, mediaType, data }) => ({ label, mediaType, data })),
-					sources: chat.sources,
+					sources: chatSources(chat),
 				});
 				await Promise.race([last, new Promise((resolve) => setTimeout(resolve, 5000))]);
 			} catch (error) {
@@ -1860,5 +1912,6 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			input.focus();
 		},
 		refreshSelection,
+		workspaceChanged: () => renderSources(),
 	};
 }
