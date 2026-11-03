@@ -32,6 +32,7 @@ const bridge: KalemBridge = {
 	confluenceTree: (parent) => ipcRenderer.invoke(CHANNEL.confluenceTree, parent),
 	confluenceCreatePage: (request) => ipcRenderer.invoke(CHANNEL.confluenceCreatePage, request),
 	confluenceFind: (request) => ipcRenderer.invoke(CHANNEL.confluenceFind, request),
+	confluenceAtom: (tabId, xml) => ipcRenderer.invoke(CHANNEL.confluenceAtom, tabId, xml),
 	confluenceAncestors: (pageId) => ipcRenderer.invoke(CHANNEL.confluenceAncestors, pageId),
 	confluenceSearch: (query, spaceKey) =>
 		ipcRenderer.invoke(CHANNEL.confluenceSearch, query, spaceKey),

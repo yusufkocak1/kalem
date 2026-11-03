@@ -30,7 +30,7 @@ import type {
 } from "../shared/bridge.js";
 import { confluenceToMarkdown } from "../shared/confluence.js";
 import { fileUrl } from "../shared/confluence-common.js";
-import { exportPage, importPage } from "../shared/confluence-sync.js";
+import { atomsOf, exportPage, importPage } from "../shared/confluence-sync.js";
 import type { TextFormat } from "../shared/encoding.js";
 import { DEFAULT_FORMAT, formatLabel, willConvertToUtf8 } from "../shared/encoding.js";
 import type { Lang, Strings } from "../shared/i18n.js";
@@ -225,6 +225,17 @@ export class Session {
 		if (this.#dirty) return this.#saveFailed ? "error" : "unsaved";
 		return this.#path === null && this.#remote === null ? "new" : "saved";
 	}
+
+	/** The XML of a kept Confluence atom by its link; `null` when this page has none such. */
+	atomSource(href: string): string | null {
+		if (this.#storage === null) return null;
+		if (this.#atoms?.storage !== this.#storage) {
+			this.#atoms = { storage: this.#storage, map: atomsOf(this.#storage) };
+		}
+		return this.#atoms.map.get(href) ?? null;
+	}
+
+	#atoms: { readonly storage: string; readonly map: ReadonlyMap<string, string> } | null = null;
 
 	/** The document with its table style comments; in source mode, the source text. */
 	styledMarkdown(): string {

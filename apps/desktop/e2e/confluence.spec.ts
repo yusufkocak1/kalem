@@ -54,6 +54,16 @@ async function fakeConfluence() {
 		const url = new URL(req.url ?? "/", "http://localhost");
 		if (req.headers.authorization !== `Bearer ${TOKEN}`)
 			return json(res, { message: "Unauthorized" }, 401);
+		if (url.pathname === "/rest/api/user" && url.searchParams.get("key") === "u1") {
+			return json(res, { username: "ayse", displayName: "Ayşe Balcı Polat" });
+		}
+		if (url.pathname === "/rest/applinks/1.0/listApplicationlinks") {
+			return json(res, {
+				list: [
+					{ application: { id: "j1", typeId: "jira", displayUrl: "https://jira.example.com" } },
+				],
+			});
+		}
 		if (url.pathname === "/rest/api/space")
 			return json(res, { results: [{ key: "DEV", name: "Geliştirme" }] });
 		if (url.pathname === "/rest/api/space/DEV/content/page") {
@@ -111,6 +121,9 @@ async function fakeConfluence() {
 		if (url.pathname === "/rest/api/search") {
 			const cql = url.searchParams.get("cql") ?? "";
 			searches.push(cql);
+			if (cql.includes('title="Ana Sayfa"')) {
+				return json(res, { results: [{ content: { id: "41", title: "Ana Sayfa" } }] });
+			}
 			if (cql.includes("text~")) {
 				// Inside pages: two results, one at a time, with excerpts.
 				const second = url.searchParams.get("start") === "1";
@@ -649,7 +662,8 @@ test("keeps mentions and inline macros in a paragraph that is edited", async () 
 
 	const atoms = page.locator('#editor a[href^="#confluence-keep-"]');
 	await expect(atoms).toHaveText(["@u1", "TAMAM"]);
-	await expect(atoms.first()).toHaveAttribute("title", /saved back as it was/);
+	// What they are shows in a card when pointed at, not in a tooltip.
+	await expect(atoms.first()).not.toHaveAttribute("title");
 	// Nothing in this page is lost by editing it.
 	await expect(page.locator(".notice")).toHaveCount(0);
 
@@ -664,6 +678,92 @@ test("keeps mentions and inline macros in a paragraph that is edited", async () 
 	expect(confluence.saves[0]?.storage).toBe(
 		`<h1>Sprint Planı</h1><p>Yeni Sorumlu ${mention}, durum ${status}</p>`,
 	);
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("shows what a kept atom is when pointed at, and opens it with a click", async () => {
+	const confluence = await fakeConfluence();
+	cleanup.push(confluence.close);
+	const mention = '<ac:link><ri:user ri:userkey="u1" /></ac:link>';
+	const jira =
+		'<ac:structured-macro ac:name="jira"><ac:parameter ac:name="server">System JIRA</ac:parameter><ac:parameter ac:name="serverId">j1</ac:parameter><ac:parameter ac:name="key">QR-48077</ac:parameter></ac:structured-macro>';
+	const pageLink = '<ac:link><ri:page ri:content-title="Ana Sayfa" /></ac:link>';
+	const toc =
+		'<ac:structured-macro ac:name="toc"><ac:parameter ac:name="maxLevel">3</ac:parameter></ac:structured-macro>';
+	confluence.page.storage = `<h1>Sprint Planı</h1><p>Sorumlu ${mention}, kayıt ${jira}, bkz. ${pageLink} ${toc} <a href="https://example.com/doc">belge</a></p>`;
+	const { app, page, errors } = await launch();
+	// Links opened in the browser are written down instead.
+	await app.evaluate(({ shell }) => {
+		const opened: string[] = [];
+		(globalThis as { opened?: string[] }).opened = opened;
+		shell.openExternal = async (url: string) => {
+			opened.push(url);
+		};
+	});
+	const opened = () => app.evaluate(() => (globalThis as { opened?: string[] }).opened ?? []);
+
+	await clickMenu(app, "File", "Open from Confluence…");
+	const dialog = page.locator(".confluence-dialog");
+	await dialog.locator('input[type="url"]').fill(confluence.site);
+	await dialog.locator('input[type="password"]').fill(TOKEN);
+	await dialog.getByRole("button", { name: "Connect" }).click();
+	await dialog.locator(".quick-open-item", { hasText: "Sprint Planı" }).click();
+	await expect(dialog).not.toBeVisible();
+
+	const atoms = page.locator('#editor a[href^="#confluence-keep-"]');
+	await expect(atoms).toHaveText(["@u1", "QR-48077", "Ana Sayfa", "⟨toc⟩"]);
+	const card = page.locator(".link-card");
+
+	// A Jira issue: its server, and its address found among the application links.
+	await atoms.nth(1).hover();
+	await expect(card.locator(".link-card-kind")).toHaveText("Jira issue");
+	await expect(card.locator(".link-card-title")).toHaveText("QR-48077");
+	await expect(card.locator(".link-card-subtitle")).toHaveText("System JIRA");
+	await expect(card.locator(".link-card-url")).toHaveText(
+		"https://jira.example.com/browse/QR-48077",
+	);
+	await card.getByRole("button", { name: "Open in Browser" }).click();
+	await expect(card).toBeHidden();
+	await expect.poll(opened).toEqual(["https://jira.example.com/browse/QR-48077"]);
+
+	// A mention: the person's name and profile, asked of the server.
+	await page.mouse.move(0, 0);
+	await atoms.nth(0).hover();
+	await expect(card.locator(".link-card-title")).toHaveText("Ayşe Balcı Polat");
+	await expect(card.locator(".link-card-subtitle")).toHaveText("ayse");
+
+	// A click opens the atom in the browser at once.
+	await page.mouse.move(0, 0);
+	await atoms.nth(0).click();
+	await expect
+		.poll(opened)
+		.toEqual(["https://jira.example.com/browse/QR-48077", `${confluence.site}/display/~ayse`]);
+
+	// A macro that shows only in Confluence: its settings, and the page there.
+	await page.mouse.move(0, 0);
+	await atoms.nth(3).hover();
+	await expect(card.locator(".link-card-kind")).toHaveText("Confluence macro: toc");
+	await expect(card.locator(".link-card-fields")).toHaveText("maxLevel3");
+
+	// A linked page also opens in a tab of Kalem.
+	await page.mouse.move(0, 0);
+	await atoms.nth(2).hover();
+	await expect(card.locator(".link-card-kind")).toHaveText("Confluence page");
+	await expect(card.locator(".link-card-url")).toHaveText(
+		`${confluence.site}/display/DEV/Ana+Sayfa`,
+	);
+	await card.getByRole("button", { name: "Open in Kalem" }).click();
+	await expect(page.locator(".doc-tab", { hasText: "Ana Sayfa" })).toBeVisible();
+	await expect(page.locator("#editor p").first()).toHaveText("Hoş geldiniz");
+
+	// An ordinary link: its address, opened from the card.
+	await page.locator(".doc-tab", { hasText: "Sprint Planı" }).click();
+	await page.locator('#editor a[href="https://example.com/doc"]').hover();
+	await expect(card.locator(".link-card-kind")).toHaveText("Link");
+	await expect(card.locator(".link-card-url")).toHaveText("https://example.com/doc");
+	await card.getByRole("button", { name: "Open in Browser" }).click();
+	await expect.poll(async () => (await opened()).at(-1)).toBe("https://example.com/doc");
 	expect(errors).toEqual([]);
 	await app.close();
 });
