@@ -114,7 +114,10 @@ export const DEFAULT_SIZE: Readonly<Record<ShapeKind, { w: number; h: number }>>
 };
 
 export const FONT_SIZE = 14;
+/** The smallest text a long label shrinks to; below it, it is cut to fit. */
+export const MIN_FONT_SIZE = 6;
 const LINE_HEIGHT = 18;
+const LINE_SPACING = LINE_HEIGHT / FONT_SIZE;
 const FONT_FAMILY = "Segoe UI, Arial, Helvetica, sans-serif";
 const TEXT_COLOR = "#0f172a";
 const EDGE_COLOR = "#475569";
@@ -485,23 +488,46 @@ export function routeEdges(diagram: Diagram): Map<string, Route> {
 	return routes;
 }
 
-/** Lines of `text` that fit `width`, estimated from an average character width. */
+/** About how wide a character is, in ems, in the sans-serif fonts diagrams use. */
+function charWidth(char: string): number {
+	if ("iıjlIİ|!.,:;'`".includes(char)) return 0.28;
+	if ('frt()[]{} /-"'.includes(char)) return 0.38;
+	if ("mw".includes(char)) return 0.84;
+	if ("MW@%".includes(char)) return 0.92;
+	if (/[0-9]/.test(char)) return 0.56;
+	if (/\p{Lu}/u.test(char)) return 0.68;
+	if (/\p{L}/u.test(char)) return 0.54;
+	return 0.62;
+}
+
+/** About how wide `text` is drawn at `fontSize`. */
+export function textLength(text: string, fontSize = FONT_SIZE): number {
+	let ems = 0;
+	for (const char of text) ems += charWidth(char);
+	return ems * fontSize;
+}
+
+/** Lines of `text` that fit `width`, estimated from the widths of its characters. */
 export function wrapLines(text: string, width: number, fontSize = FONT_SIZE): string[] {
-	const perLine = Math.max(1, Math.floor(width / (fontSize * 0.55)));
+	const fits = (line: string): boolean => textLength(line, fontSize) <= width;
 	const lines: string[] = [];
 	for (const paragraph of text.split("\n")) {
 		let line = "";
 		for (const word of paragraph.split(/\s+/).filter((part) => part !== "")) {
 			let rest = word;
 			// A word longer than the line is cut.
-			while (rest.length > perLine) {
+			while (!fits(rest)) {
 				if (line !== "") lines.push(line);
-				lines.push(rest.slice(0, perLine));
-				rest = rest.slice(perLine);
 				line = "";
+				let cut = 1;
+				const chars = [...rest];
+				while (cut < chars.length && fits(chars.slice(0, cut + 1).join(""))) cut++;
+				lines.push(chars.slice(0, cut).join(""));
+				rest = chars.slice(cut).join("");
 			}
+			if (rest === "") continue;
 			if (line === "") line = rest;
-			else if (line.length + 1 + rest.length <= perLine) line += ` ${rest}`;
+			else if (fits(`${line} ${rest}`)) line += ` ${rest}`;
 			else {
 				lines.push(line);
 				line = rest;
@@ -512,11 +538,58 @@ export function wrapLines(text: string, width: number, fontSize = FONT_SIZE): st
 	return lines;
 }
 
+/** Text set to fit a shape: its lines and the size they are drawn at. */
+export interface FittedText {
+	readonly lines: readonly string[];
+	readonly fontSize: number;
+}
+
+/**
+ * `text` in lines that stay inside a `width` × `height` box: the size goes
+ * down, half a point at a time, until the lines fit and no word is cut.
+ * At {@link MIN_FONT_SIZE} what still does not fit is cut, and the lines
+ * that do not fit are left out (the full text is kept and shown when edited).
+ */
+export function fitText(text: string, width: number, height: number): FittedText {
+	const fits = (lines: readonly string[], size: number): boolean =>
+		lines.length * size * LINE_SPACING <= height + 0.5;
+	const wholeWords = (size: number): boolean =>
+		text.split(/\s+/).every((word) => textLength(word, size) <= width);
+	for (let size = FONT_SIZE; size >= MIN_FONT_SIZE; size -= 0.5) {
+		const lines = wrapLines(text, width, size);
+		if (fits(lines, size) && wholeWords(size)) return { lines, fontSize: size };
+	}
+	const lines = wrapLines(text, width, MIN_FONT_SIZE);
+	const room = Math.max(1, Math.floor((height + 0.5) / (MIN_FONT_SIZE * LINE_SPACING)));
+	return { lines: lines.slice(0, room), fontSize: MIN_FONT_SIZE };
+}
+
+/** The height inside a shape that text can use. */
+function textHeight(node: DiagramNode): number {
+	switch (node.shape) {
+		case "decision":
+			// A box this wide stays inside the diamond only this high.
+			return node.h * 0.42;
+		case "circle":
+			return node.h * 0.7;
+		case "mux":
+			return node.h * 0.8;
+		case "document":
+			return node.h - 2 * wave(node) - 8;
+		case "database":
+			return node.h - 3 * cap(node) - 6;
+		case "text":
+			return node.h - 2;
+		default:
+			return node.h - 8;
+	}
+}
+
 /** The width inside a shape that text can use. */
 function textWidth(node: DiagramNode): number {
 	switch (node.shape) {
 		case "decision":
-			return node.w * 0.6;
+			return node.w * 0.56;
 		case "io":
 			return node.w - 2 * skew(node) - 12;
 		case "terminal":
@@ -524,7 +597,8 @@ function textWidth(node: DiagramNode): number {
 		case "subprocess":
 			return node.w - 2 * SIDE_BAR - 12;
 		case "circle":
-			return node.w * 0.75;
+			// The square inside the circle.
+			return node.w * 0.7;
 		case "text":
 			return node.w - 4;
 		case "mux":
@@ -540,11 +614,26 @@ function textWidth(node: DiagramNode): number {
 const SIDE_BAR = 12;
 const skew = (node: DiagramNode): number => Math.min(24, node.w * 0.15);
 const cap = (node: DiagramNode): number => Math.min(12, node.h * 0.15);
+/** How far a document's wavy bottom rises above its bottom edge. */
+const wave = (node: DiagramNode): number => Math.min(10, node.h * 0.12);
+
+/** Where the middle of a shape's text goes. */
+function textCenterY(node: DiagramNode): number {
+	switch (node.shape) {
+		case "database":
+			return node.y + node.h / 2 + cap(node) / 2;
+		case "document":
+			// Above the wave, in the middle of what is left.
+			return node.y + (node.h - 2 * wave(node)) / 2;
+		default:
+			return node.y + node.h / 2;
+	}
+}
 
 function labelSize(text: string): { w: number; h: number } {
 	const lines = text.split("\n");
-	const longest = Math.max(...lines.map((line) => line.length));
-	return { w: longest * FONT_SIZE * 0.55 * 0.9 + 10, h: lines.length * 16 + 6 };
+	const longest = Math.max(...lines.map((line) => textLength(line, FONT_SIZE * 0.9)));
+	return { w: longest + 10, h: lines.length * 16 + 6 };
 }
 
 /** The area the diagram covers, its edge labels included. */
@@ -624,10 +713,10 @@ function outline(
 			];
 		}
 		case "document": {
-			const wave = Math.min(10, h * 0.12);
+			const rise = wave(node);
 			return [
 				svg("path", {
-					d: `M${x} ${y}H${x + w}V${round(y + h - wave)}Q${round(x + w * 0.75)} ${round(y + h - 3 * wave)} ${round(x + w / 2)} ${round(y + h - wave)}T${x} ${round(y + h - wave)}Z`,
+					d: `M${x} ${y}H${x + w}V${round(y + h - rise)}Q${round(x + w * 0.75)} ${round(y + h - 3 * rise)} ${round(x + w / 2)} ${round(y + h - rise)}T${x} ${round(y + h - rise)}Z`,
 					...attrs,
 				}),
 			];
@@ -699,8 +788,14 @@ function outline(
 	}
 }
 
-function textBlock(lines: readonly string[], cx: number, cy: number): SvgNode {
-	const first = cy - ((lines.length - 1) * LINE_HEIGHT) / 2;
+function textBlock(
+	lines: readonly string[],
+	cx: number,
+	cy: number,
+	fontSize = FONT_SIZE,
+): SvgNode {
+	const lineHeight = fontSize * LINE_SPACING;
+	const first = cy - ((lines.length - 1) * lineHeight) / 2;
 	return svg(
 		"text",
 		{
@@ -709,11 +804,11 @@ function textBlock(lines: readonly string[], cx: number, cy: number): SvgNode {
 			"text-anchor": "middle",
 			"dominant-baseline": "central",
 			"font-family": FONT_FAMILY,
-			"font-size": FONT_SIZE,
+			"font-size": fontSize,
 			fill: TEXT_COLOR,
 		},
 		lines.map((line, index) =>
-			svg("tspan", { x: round(cx), y: round(first + index * LINE_HEIGHT) }, undefined, line),
+			svg("tspan", { x: round(cx), y: round(first + index * lineHeight) }, undefined, line),
 		),
 	);
 }
@@ -748,12 +843,14 @@ function nodeElement(node: DiagramNode, interactive: boolean): SvgNode {
 					]),
 		]);
 	}
-	const lines = node.text === "" ? [] : wrapLines(node.text, textWidth(node));
-	const centerY =
-		node.shape === "database" ? node.y + node.h / 2 + cap(node) / 2 : node.y + node.h / 2;
+	const { lines, fontSize } =
+		node.text === ""
+			? { lines: [], fontSize: FONT_SIZE }
+			: fitText(node.text, textWidth(node), textHeight(node));
+	const centerY = textCenterY(node);
 	return svg("g", interactive ? { "data-node": node.id, class: "kd-node" } : {}, [
 		...outline(node, { fill: color.fill, stroke: color.stroke, "stroke-width": 1.5 }, interactive),
-		...(lines.length === 0 ? [] : [textBlock(lines, node.x + node.w / 2, centerY)]),
+		...(lines.length === 0 ? [] : [textBlock(lines, node.x + node.w / 2, centerY, fontSize)]),
 	]);
 }
 

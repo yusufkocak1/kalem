@@ -4,10 +4,14 @@ import {
 	bounds,
 	diagramSvg,
 	edgeRoute,
+	FONT_SIZE,
+	fitText,
+	MIN_FONT_SIZE,
 	nextId,
 	parseDiagram,
 	serializeDiagram,
 	svgMarkup,
+	textLength,
 	wrapLines,
 } from "./diagram.js";
 
@@ -100,7 +104,30 @@ describe("diagram geometry", () => {
 	it("wraps text to the shape", () => {
 		expect(wrapLines("Müşteri kaydı var mı?", 80)).toEqual(["Müşteri", "kaydı var", "mı?"]);
 		expect(wrapLines("bir\niki", 500)).toEqual(["bir", "iki"]);
-		expect(wrapLines("çokuzunbirkelimeburada", 50)).toEqual(["çokuzu", "nbirke", "limebu", "rada"]);
+		expect(wrapLines("çokuzunbirkelimeburada", 50)).toEqual(["çokuzu", "nbirkeli", "mebura", "da"]);
+		// Wide letters take more room than narrow ones.
+		expect(textLength("WWWW")).toBeGreaterThan(textLength("llllllll"));
+		expect(wrapLines("MMMMMMMMMM iiiiiiiiii", 90)).toEqual(["MMMMMM", "MMMM", "iiiiiiiiii"]);
+	});
+
+	it("shrinks text that does not fit, so it stays inside the shape", () => {
+		// Short text keeps the usual size.
+		expect(fitText("Başla", 144, 62)).toEqual({ lines: ["Başla"], fontSize: FONT_SIZE });
+		const long = "UpgradeEmdCleanPnr Command FQTU/ASVC, EMD payment satırları, CXFQ temizliği";
+		const fitted = fitText(long, 144, 62);
+		expect(fitted.fontSize).toBeLessThan(FONT_SIZE);
+		expect(fitted.fontSize).toBeGreaterThanOrEqual(MIN_FONT_SIZE);
+		// Every word is whole, and the lines fit the height.
+		expect(fitted.lines.join(" ")).toBe(long);
+		expect(fitted.lines.length * fitted.fontSize * (18 / 14)).toBeLessThanOrEqual(62.5);
+		// A long word shrinks the text rather than being cut.
+		expect(fitText("validConnectionIndicator", 100, 62).lines).toEqual([
+			"validConnectionIndicator",
+		]);
+		// Text that cannot fit even at the smallest size is cut there.
+		const tiny = fitText("bir iki üç dört beş altı yedi sekiz dokuz on", 20, 10);
+		expect(tiny.fontSize).toBe(MIN_FONT_SIZE);
+		expect(tiny.lines).toHaveLength(1);
 	});
 
 	it("covers the shapes and the edge labels", () => {
@@ -144,5 +171,28 @@ describe("diagram drawing", () => {
 		expect(markup).toContain(">evet</tspan>");
 		// Not interactive: no hit areas or ids for the editor.
 		expect(markup).not.toContain("data-node");
+	});
+
+	it("draws long text smaller, inside its shape", () => {
+		const markup = svgMarkup(
+			diagramSvg({
+				nodes: [
+					node("a", 0, 0, { text: "Kısa" }),
+					node("b", 0, 200, {
+						text: "UpgradeEmdCleanPnr Command FQTU/ASVC, EMD payment satırları, CXFQ temizliği",
+					}),
+				],
+				edges: [],
+			}).svg,
+		);
+		const sizes = [...markup.matchAll(/font-size="([\d.]+)"/g)].map((match) => Number(match[1]));
+		expect(sizes[0]).toBe(FONT_SIZE);
+		expect(sizes[1]).toBeLessThan(FONT_SIZE);
+		const ys = [...markup.matchAll(/<tspan x="80" y="([\d.]+)"/g)]
+			.map((match) => Number(match[1]))
+			.filter((y) => y > 100);
+		// All its lines are between the top and the bottom of the box.
+		expect(Math.min(...ys)).toBeGreaterThan(200);
+		expect(Math.max(...ys)).toBeLessThan(270);
 	});
 });
