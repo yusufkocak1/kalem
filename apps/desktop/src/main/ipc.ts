@@ -37,7 +37,7 @@ import type { ChatStore } from "./assistant-chats.js";
 import type { AssistantService } from "./assistant-ipc.js";
 import { registerAssistantIpc } from "./assistant-ipc.js";
 import type { AssistantStore } from "./assistant-store.js";
-import { registerConfluenceIpc } from "./confluence-ipc.js";
+import { confluenceClient, registerConfluenceIpc } from "./confluence-ipc.js";
 import type { ConfluenceStore } from "./confluence-store.js";
 import {
 	checkDiagramBytes,
@@ -917,5 +917,9 @@ export function registerIpc(ctx: IpcContext): void {
 		chats: ctx.chats,
 		strings: ctx.strings,
 		senderOf,
+		confluence: async () => {
+			const credentials = await ctx.confluence.get();
+			return credentials === null ? null : confluenceClient(credentials);
+		},
 	});
 }

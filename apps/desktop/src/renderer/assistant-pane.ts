@@ -14,6 +14,7 @@ import type {
 	ReplyPart,
 } from "../shared/claude.js";
 import { composePrompt, lineDiff, splitReply } from "../shared/claude.js";
+import { withoutRequests } from "../shared/confluence-tool.js";
 import { diagramSvg, svgMarkup } from "../shared/diagram.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
@@ -691,6 +692,17 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		},
 		{ name: "to-table", label: t.assistantSuggestTable, run: () => ask(t.assistantSuggestTable) },
 		{
+			name: "confluence",
+			label: t.slashConfluence,
+			argument: t.slashConfluenceArgument,
+			run: (arg) => {
+				if (arg === "") {
+					input.value = "/confluence ";
+					input.focus();
+				} else ask(format(t.slashConfluencePrompt, arg));
+			},
+		},
+		{
 			name: "fix",
 			label: t.slashFix,
 			run: () => ask(host.selection().trim() === "" ? t.assistantSuggestFix : t.assistantPromptFix),
@@ -1332,14 +1344,17 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	log.addEventListener("scroll", () => updateJump(), { passive: true });
 
 	/** The start of a diagram or of actions still coming in: shown as a placeholder, not as JSON. */
-	const OPEN_BLOCK = /^ {0,3}(?:`{3,}|~{3,})[ \t]*(kalem-diagram|kalem-actions)[ \t]*$/m;
+	const OPEN_BLOCK =
+		/^ {0,3}(?:`{3,}|~{3,})[ \t]*(kalem-diagram|kalem-actions|kalem-confluence)[ \t]*$/m;
 
 	function renderReply(message: Message): void {
 		const view = shown.get(message);
 		if (view === undefined) return;
 		const follow = nearBottom();
 		// While a reply streams in, a finished diagram already shows; an open one is a placeholder.
-		const parts: ReplyPart[] = message.text === "" ? [] : splitReply(message.text);
+		// Confluence look-ups show as steps, not as their requests.
+		const shownText = withoutRequests(message.text);
+		const parts: ReplyPart[] = shownText.trim() === "" ? [] : splitReply(shownText);
 		let pending: string | null = null;
 		const last = parts.at(-1);
 		if (!message.done && last?.kind === "markdown") {
@@ -1348,7 +1363,12 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				parts.pop();
 				const before = last.text.slice(0, open.index);
 				if (before.trim() !== "") parts.push({ kind: "markdown", text: before });
-				pending = open[1] === "kalem-actions" ? t.assistantPreparing : t.assistantDrawing;
+				pending =
+					open[1] === "kalem-actions"
+						? t.assistantPreparing
+						: open[1] === "kalem-confluence"
+							? t.assistantConfluenceLooking
+							: t.assistantDrawing;
 			}
 		}
 		const nodes: Node[] = parts.map((part, index) =>
@@ -1392,6 +1412,12 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				return format(t.assistantStepRead, detail);
 			case "propose_edit":
 				return format(t.assistantStepEdit, detail);
+			case "confluence_search_content":
+				return format(t.assistantStepConfluenceSearch, detail);
+			case "confluence_search_title":
+				return format(t.assistantStepConfluenceTitles, detail);
+			case "confluence_read_page":
+				return format(t.assistantStepConfluenceRead, detail);
 			case "list_files":
 			case "Glob":
 			case "LS":
@@ -1760,12 +1786,16 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		);
 		if (message.error === null && insertable) {
 			const insert = button(t.assistantInsert, { icon: "paste" });
-			run(insert, () => host.insert(message.text), t.assistantInserted);
+			run(insert, () => host.insert(withoutRequests(message.text)), t.assistantInserted);
 			buttons.push(insert);
 		}
 		if (message.text.trim() !== "") {
 			const copy = button(t.assistantCopy, { icon: "copy" });
-			run(copy, () => navigator.clipboard.writeText(message.text), t.assistantCopied);
+			run(
+				copy,
+				() => navigator.clipboard.writeText(withoutRequests(message.text).trim()),
+				t.assistantCopied,
+			);
 			buttons.push(copy);
 		}
 		const again = toolButton(

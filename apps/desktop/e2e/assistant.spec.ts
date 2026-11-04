@@ -819,7 +819,7 @@ test("runs commands typed after a slash: the assistant's, ready questions and th
 	await input.fill("/");
 	await expect(menu).toBeVisible();
 	// All of them, the list scrolling.
-	await expect(menu.locator(".assistant-command")).toHaveCount(33);
+	await expect(menu.locator(".assistant-command")).toHaveCount(34);
 	await expect(menu.locator(".assistant-command-name").last()).toHaveText("/format-code");
 	await input.fill("/kayd");
 	await expect(menu.locator(".assistant-command-name")).toHaveText(["/save", "/save-as"]);
@@ -1044,9 +1044,7 @@ test("lets an API service search and read a workspace folder instead of sending 
 		await input.press("Enter");
 		await expect(reply.locator(".assistant-markdown")).toHaveText("Main sınıfı boş.");
 		// What it looked up is listed, folded away.
-		await expect(reply.locator(".assistant-steps summary")).toHaveText(
-			"Looked into the workspace (3)",
-		);
+		await expect(reply.locator(".assistant-steps summary")).toHaveText("Looked things up (3)");
 		await reply.locator(".assistant-steps summary").click();
 		await expect(reply.locator(".assistant-steps li")).toHaveText([
 			"Searched “class Main”",

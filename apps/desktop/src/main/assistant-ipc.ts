@@ -25,6 +25,11 @@ import {
 	systemPrompt,
 	withInstructions,
 } from "../shared/claude.js";
+import {
+	confluenceInstructions,
+	confluenceRequests,
+	MAX_ROUNDS,
+} from "../shared/confluence-tool.js";
 import type { Strings } from "../shared/i18n.js";
 import type { ChatMessage, ProviderId } from "../shared/providers.js";
 import {
@@ -37,15 +42,17 @@ import {
 	SUGGESTED_MODELS,
 } from "../shared/providers.js";
 import type { ChatStore } from "./assistant-chats.js";
+import { CONFLUENCE_TOOLS, ConfluenceLookups, isConfluenceTool } from "./assistant-confluence.js";
 import { collectSources, MAX_SOURCES, SOURCE_BUDGET } from "./assistant-sources.js";
 import type { AssistantStore } from "./assistant-store.js";
 import type { CliProgram } from "./cli.js";
 import { claudeOutput, LocalCli, runCli, textOutput } from "./cli.js";
+import type { ConfluenceClient } from "./confluence-client.js";
 import { askApi, listModels } from "./llm.js";
 import type { SettingsStore } from "./settings.js";
 import type { AppWindow } from "./windows.js";
 import { errorMessage } from "./windows.js";
-import type { KeptEdit } from "./workspace-tools.js";
+import type { KeptEdit, ToolStep } from "./workspace-tools.js";
 import {
 	applyEdit,
 	EDIT_TOOL,
@@ -62,6 +69,8 @@ export interface AssistantIpcContext {
 	readonly chats: ChatStore;
 	strings(): Strings;
 	senderOf(event: IpcMainInvokeEvent): AppWindow;
+	/** The connected Confluence site, for the assistant's look-ups; `null` when there is none. */
+	confluence(): Promise<ConfluenceClient | null>;
 }
 
 /** How many past messages of a chat an API is sent again; older ones are dropped. */
@@ -382,6 +391,13 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		};
 
 		const program = programOf(provider);
+		// The connected Confluence site: the model searches and reads it on its own.
+		const lookups = await ctx
+			.confluence()
+			.then((client) => (client === null ? null : new ConfluenceLookups(client)))
+			.catch(() => null);
+		const system = `${systemPrompt(t)}\n\n${confluenceInstructions(lookups?.site ?? null, program !== null)}`;
+		const step = (done: ToolStep): void => forward({ kind: "step", ...done });
 		// Folders are a workspace: the question says what they hold, and the model reads what it needs.
 		const collected = await collectSources(sources, {
 			budget: program === null ? SOURCE_BUDGET.api : SOURCE_BUDGET.cli,
@@ -440,7 +456,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				const jsonInput = images.length > 0;
 				args = claudeArgs({
 					sessionId,
-					systemPrompt: systemPrompt(t),
+					systemPrompt: system,
 					model: connection.model,
 					jsonInput,
 					folders: files.folders,
@@ -450,14 +466,83 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				// The Copilot CLI reads no pictures: the question names them only.
 				// Copilot takes the conversation's id from us, and its instructions with the first question.
 				const id = sessionId ?? randomUUID();
-				if (sessionId === null) question = withInstructions(systemPrompt(t), asked);
+				if (sessionId === null) question = withInstructions(system, asked);
 				send({ kind: "session", id });
 				args = copilotArgs({ sessionId: id, model: connection.model, folders: files.folders });
 			}
-			const output = program === "claude" ? claudeOutput() : textOutput();
-			await runCli(launch, folder, args, question, output, send, sender, (child) => {
-				running.set(runKey, () => child.kill());
+			// Rounds of Confluence look-ups: the reply's requests are run and their
+			// results sent back in the same conversation, until it answers.
+			let conversation = sessionId;
+			let stopped = false;
+			running.set(runKey, () => {
+				stopped = true;
 			});
+			for (let round = 0; ; round++) {
+				let said = "";
+				let ended: "done" | "error" | null = null;
+				const output = program === "claude" ? claudeOutput() : textOutput();
+				await runCli(
+					launch,
+					folder,
+					args,
+					question,
+					output,
+					(cliEvent) => {
+						if (cliEvent.kind === "session") conversation = cliEvent.id;
+						if (cliEvent.kind === "text") said += cliEvent.text;
+						// The answer is done only when no look-ups are left.
+						if (cliEvent.kind === "done") {
+							ended = "done";
+							return;
+						}
+						if (cliEvent.kind === "error") ended = "error";
+						send(cliEvent);
+					},
+					sender,
+					(child) => {
+						running.set(runKey, () => {
+							stopped = true;
+							child.kill();
+						});
+					},
+				);
+				const requests = lookups === null ? [] : confluenceRequests(said);
+				if (
+					ended !== "done" ||
+					stopped ||
+					requests.length === 0 ||
+					conversation === null ||
+					round >= MAX_ROUNDS ||
+					sender.isDestroyed()
+				) {
+					if (ended === "done") send({ kind: "done" });
+					break;
+				}
+				const results = await (lookups as ConfluenceLookups).runAll(requests, step);
+				if (stopped) {
+					send({ kind: "done" });
+					break;
+				}
+				// The last round may not look up more.
+				question =
+					round + 1 >= MAX_ROUNDS
+						? `${results}\n\nThis was the last look-up: answer now with what you found.`
+						: results;
+				send({ kind: "text", text: "\n\n" });
+				args =
+					program === "claude"
+						? claudeArgs({
+								sessionId: conversation,
+								systemPrompt: system,
+								model: connection.model,
+								folders: files.folders,
+							})
+						: copilotArgs({
+								sessionId: conversation,
+								model: connection.model,
+								folders: files.folders,
+							});
+			}
 			running.delete(runKey);
 			return;
 		}
@@ -491,7 +576,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				provider: info,
 				connection,
 				key,
-				system: systemPrompt(t),
+				system,
 				messages: asked,
 				images,
 				signal: controller.signal,
@@ -499,16 +584,25 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 					reply += chunk;
 					forward({ kind: "text", text: chunk });
 				},
-				...(workspace === null || !withTools
+				...((workspace === null && lookups === null) || !withTools
 					? {}
 					: {
 							tools: {
-								definitions: [...WORKSPACE_TOOLS, EDIT_TOOL],
+								definitions: [
+									...(workspace === null ? [] : [...WORKSPACE_TOOLS, EDIT_TOOL]),
+									...(lookups === null ? [] : CONFLUENCE_TOOLS),
+								],
 								run: async (name, input) => {
-									const result = await workspace.run(name, input, (step) => {
+									const looking = (done: ToolStep): void => {
 										looked = true;
-										forward({ kind: "step", ...step });
-									});
+										step(done);
+									};
+									if (isConfluenceTool(name)) {
+										if (lookups === null) return `${name} is not available.`;
+										return lookups.runTool(name, input, looking);
+									}
+									if (workspace === null) return `${name} is not available.`;
+									const result = await workspace.run(name, input, looking);
 									if (name === "read_file") reads.push(result);
 									return result;
 								},
@@ -525,16 +619,26 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 					throw new Error("Tools are not called");
 				}
 			} catch (error) {
-				// A model that cannot call tools is sent the folders' text instead, as before.
-				if (workspace === null || reply !== "" || looked || controller.signal.aborted) throw error;
-				const inlined = await collectSources(sources, {
-					budget: SOURCE_BUDGET.api,
-					listOnly: false,
-				});
-				messages[messages.length - 1] = {
-					role: "user",
-					content: withSources(inlined.text, undefined, prompt),
-				};
+				// A model that cannot call tools is sent the folders' text instead, as before;
+				// without folders it is asked again without tools.
+				if (
+					(workspace === null && lookups === null) ||
+					reply !== "" ||
+					looked ||
+					controller.signal.aborted
+				) {
+					throw error;
+				}
+				if (workspace !== null) {
+					const inlined = await collectSources(sources, {
+						budget: SOURCE_BUDGET.api,
+						listOnly: false,
+					});
+					messages[messages.length - 1] = {
+						role: "user",
+						content: withSources(inlined.text, undefined, prompt),
+					};
+				}
 				await ask(messages, false);
 			}
 			forward({ kind: "done" });

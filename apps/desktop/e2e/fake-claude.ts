@@ -28,7 +28,8 @@ export const REPLY = [
  */
 export async function fakeClaude(
 	folder: string,
-	answer: string = REPLY,
+	/** The reply, or replies by what the question holds: the first whose text is in it, else the last. */
+	answer: string | readonly (readonly [string, string])[] = REPLY,
 ): Promise<{ path: string; calls: () => Promise<Call[]> }> {
 	const log = join(folder, "calls.jsonl");
 	const script = join(folder, "fake-claude.cjs");
@@ -49,7 +50,11 @@ process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => (prompt += chunk));
 process.stdin.on("end", () => {
 	fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args, prompt, cwd: process.cwd() }) + "\\n");
-	const reply = ${JSON.stringify(answer)};
+	const answers = ${JSON.stringify(answer)};
+	const reply =
+		typeof answers === "string"
+			? answers
+			: (answers.find(([needle]) => prompt.includes(needle)) ?? answers[answers.length - 1])[1];
 	const out = (line) => process.stdout.write(JSON.stringify(line) + "\\n");
 	out({ type: "system", subtype: "init", session_id: "sess-1" });
 	out({ type: "stream_event", event: { type: "message_start" } });
