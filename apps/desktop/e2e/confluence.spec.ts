@@ -7,6 +7,7 @@ import { expect, test } from "@playwright/test";
 import { PNG_1X1 } from "../src/main/sample-docx.test-helper.js";
 import { parseDiagram } from "../src/shared/diagram.js";
 import { readPngText } from "../src/shared/png-text.js";
+import { fakeClaude } from "./fake-claude.js";
 import {
 	clickMenu,
 	launch,
@@ -764,6 +765,74 @@ test("shows what a kept atom is when pointed at, and opens it with a click", asy
 	await expect(card.locator(".link-card-url")).toHaveText("https://example.com/doc");
 	await card.getByRole("button", { name: "Open in Browser" }).click();
 	await expect.poll(async () => (await opened()).at(-1)).toBe("https://example.com/doc");
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("the assistant searches Confluence and reads pages to answer, with a local CLI", async () => {
+	const confluence = await fakeConfluence();
+	cleanup.push(confluence.close);
+	const folder = await tempDir("assistant-confluence");
+	const lookUp = [
+		"Bakıyorum.",
+		"",
+		"```kalem-confluence",
+		JSON.stringify([{ search: "onay", mode: "content" }, { read: "42" }]),
+		"```",
+	].join("\n");
+	const answer = `Onay toplantısı sprint sonunda yapılır. Kaynak: [Sprint Planı](${confluence.site}/pages/viewpage.action?pageId=42)`;
+	const claude = await fakeClaude(folder, [
+		["<confluence-results>", answer],
+		["", lookUp],
+	]);
+	const { app, page, errors } = await launch({
+		settings: { assistant: true },
+		env: { KALEM_CLAUDE: claude.path },
+	});
+
+	// Connected to Confluence through the side pane.
+	await page.getByRole("tab", { name: "Confluence" }).click();
+	const pane = page.locator(".confluence-pane");
+	await pane.getByRole("button", { name: "Connect" }).click();
+	const dialog = page.locator(".confluence-dialog");
+	await dialog.locator('input[type="url"]').fill(confluence.site);
+	await dialog.locator('input[type="password"]').fill(TOKEN);
+	await dialog.getByRole("button", { name: "Connect" }).click();
+	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
+	await page.keyboard.press("Escape");
+
+	const assistant = page.locator(".assistant");
+	await expect(assistant.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
+	const input = assistant.locator(".assistant-input");
+	await input.fill("Onay toplantısı ne zaman? Confluence'tan bul");
+	await input.press("Enter");
+
+	// The look-ups show as steps; the answer cites the page.
+	const reply = assistant.locator(".assistant-assistant").last();
+	await expect(reply.locator(".assistant-markdown").last()).toContainText(
+		"Onay toplantısı sprint sonunda yapılır.",
+	);
+	await expect(reply.locator('.assistant-markdown a[href*="pageId=42"]')).toHaveText(
+		"Sprint Planı",
+	);
+	await expect(reply).not.toContainText("kalem-confluence");
+	await expect(reply.locator(".assistant-steps li")).toHaveText([
+		"Searched Confluence for “onay”",
+		"Read the Confluence page “Sprint Planı”",
+	]);
+
+	// Kalem ran the requests and sent what they found back in the same conversation.
+	const calls = await claude.calls();
+	expect(calls).toHaveLength(2);
+	expect(calls[0]?.args.join(" ")).toContain(`connected to the Confluence site ${confluence.site}`);
+	expect(confluence.searches).toContain('type=page AND (text~"onay" OR text~"onay*")');
+	const results = calls[1]?.prompt ?? "";
+	expect(calls[1]?.args).toEqual(expect.arrayContaining(["--resume", "sess-1"]));
+	expect(results).toContain('Search (inside pages) for "onay": 2 pages');
+	expect(results).toContain("1. Sprint Planı (page id 42)");
+	expect(results).toContain("text: Sprint sonunda «onay» toplantısı & demo");
+	expect(results).toContain('Page "Sprint Planı" (page id 42, space DEV)');
+	expect(results).toContain("Hedef");
 	expect(errors).toEqual([]);
 	await app.close();
 });

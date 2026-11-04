@@ -627,6 +627,25 @@ verir.
   bulunduğu yerde çalışır. Seçimle çalışan hazır sorular: `/fix` (yazım ve
   dil bilgisi; seçim yoksa belgenin tamamı), `/shorten`, `/explain`,
   `/translate <dil>`; `/apply` son yanıttaki değişiklikleri uygular.
+- **Confluence'ta arama:** Confluence'a bağlıyken (Gezinme bölmesi →
+  Confluence ya da Dosya → Confluence'tan Aç) asistana "bunu Confluence'tan
+  bul" gibi bir şey sorulunca kendisi arar ve okur: sayfaların içinde
+  (başlık, metin, etiketler) ve başlıklarda arama yapar, farklı
+  kelimelerle (kök, eş anlamlı, İngilizcesi) yeniden dener, uygun 1-4
+  sayfayı okur ve yanıtı okuduklarına dayandırıp her sayfaya
+  `[Başlık](adres)` bağlantısı verir. Yalnızca okur; hiçbir şeyi
+  değiştirmez.
+  - API'lerde (Anthropic, OpenAI uyumlu…) `confluence_search` ve
+    `confluence_read_page` araçlarıyla; uzun sayfalar 24 000 karakterlik
+    parçalar hâlinde okunur.
+  - Claude Code ve GitHub Copilot'ta model yanıtına bir ` ```kalem-confluence `
+    isteği yazar; Kalem aramayı/okumayı yapıp sonuçları aynı sohbete
+    `<confluence-results>` olarak geri gönderir (en fazla 6 tur, turda 6
+    istek). İstek blokları yanıtta görünmez.
+  - Yapılan aramalar ve okunan sayfalar yanıtın üstünde **Bakılanlar**
+    listesinde görünür ("Confluence'ta “onay” arandı", "“Sprint Planı”
+    Confluence sayfası okundu"). `/confluence <ne aranacak>` aynı soruyu
+    hazır sorar. Bağlı değilken model bağlanmayı söyler.
 - **Belgede değişiklik ve komut önerileri:** model, belgeyi değiştirmesi
   istendiğinde (düzelt, kısalt, çevir, yeniden adlandır, sil, sona ekle…)
   ya da bir uygulama komutu gerektiğinde (kaydet, Word'e aktar, sürüm
