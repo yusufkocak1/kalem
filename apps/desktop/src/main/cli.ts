@@ -35,13 +35,14 @@ export interface CliLaunch {
  * those places matter there.
  */
 export function cliCandidates(
-	program: CliProgram,
+	program: CliProgram | "npm",
 	platform: NodeJS.Platform,
 	env: Readonly<Record<string, string | undefined>>,
 	home: string,
 ): string[] {
 	// An override is the only place looked at (tests rely on this).
-	const override = program === "claude" ? env.KALEM_CLAUDE : env.KALEM_COPILOT;
+	const override =
+		program === "claude" ? env.KALEM_CLAUDE : program === "copilot" ? env.KALEM_COPILOT : undefined;
 	if (override) return [override];
 	const windows = platform === "win32";
 	const names = windows ? [`${program}.exe`, `${program}.cmd`] : [program];
@@ -73,6 +74,126 @@ export function cliCandidates(
 		);
 	}
 	return [...new Set(dirs.flatMap((dir) => names.map((name) => join_(dir, name))))];
+}
+
+/** The npm package each CLI is installed from with `npm install -g`. */
+export const NPM_PACKAGES: Readonly<Record<CliProgram, string>> = {
+	claude: "@anthropic-ai/claude-code",
+	copilot: "@github/copilot",
+};
+
+/**
+ * The folder npm puts global programs' links in, from what `npm root -g`
+ * prints: `<prefix>/lib/node_modules` gives `<prefix>/bin`, and on Windows
+ * `<prefix>\node_modules` gives `<prefix>`.
+ */
+export function npmGlobalBin(root: string, platform: NodeJS.Platform): string {
+	if (platform === "win32") return root.replace(/[\\/]+$/, "").replace(/[\\/]node_modules$/i, "");
+	const prefix = dirname(dirname(root.replace(/\/+$/, "")));
+	return join(prefix, "bin");
+}
+
+/** The script a package's `package.json` runs as `program`, relative to the package. */
+export function packageBin(manifest: unknown, program: string): string | null {
+	if (typeof manifest !== "object" || manifest === null) return null;
+	const bin = (manifest as { bin?: unknown }).bin;
+	if (typeof bin === "string") return bin;
+	if (typeof bin !== "object" || bin === null) return null;
+	const script = (bin as Record<string, unknown>)[program];
+	return typeof script === "string" ? script : null;
+}
+
+/** The last line a command printed, or null when it failed. */
+function lastLine(
+	command: string,
+	args: readonly string[],
+	options: { shell?: boolean; env?: NodeJS.ProcessEnv },
+): Promise<string | null> {
+	return new Promise((resolve) => {
+		execFile(command, args, { timeout: 20_000, windowsHide: true, ...options }, (error, stdout) => {
+			if (error || typeof stdout !== "string") resolve(null);
+			else {
+				const lines = stdout.split(/\r?\n/).map((line) => line.trim());
+				resolve(lines.filter((line) => line !== "").pop() ?? null);
+			}
+		});
+	});
+}
+
+async function isDirectory(path: string): Promise<boolean> {
+	try {
+		return (await stat(path)).isDirectory();
+	} catch {
+		return false;
+	}
+}
+
+/** Where `npm root -g` says global packages are, and the npm that said it. */
+export interface NpmRoot {
+	readonly root: string;
+	/** The npm program that was asked; empty when a login shell was asked. */
+	readonly npm: string;
+}
+
+/**
+ * Asks npm where its global packages are (`npm root -g`): first an npm
+ * found on `PATH` or in the usual folders, then, outside Windows, the
+ * user's login shell, which knows the `PATH` that nvm and the like set up.
+ */
+export async function npmGlobalRoot(): Promise<NpmRoot | null> {
+	const windows = process.platform === "win32";
+	const dirs = cliCandidates("npm", process.platform, process.env, homedir()).filter(
+		(path) => !windows || /\.cmd$/i.test(path),
+	);
+	if (windows && process.env.ProgramFiles)
+		dirs.push(`${process.env.ProgramFiles}\\nodejs\\npm.cmd`);
+	for (const npm of [...new Set(dirs)]) {
+		if (!(await isFile(npm))) continue;
+		const env = { ...process.env, PATH: [dirname(npm), process.env.PATH ?? ""].join(delimiter) };
+		// A `.cmd` file only runs in a shell; the arguments are fixed, so that is safe.
+		const root = windows
+			? await lastLine(`"${npm}"`, ["root", "-g"], { shell: true })
+			: await lastLine(npm, ["root", "-g"], { env });
+		if (root !== null && (await isDirectory(root))) return { root, npm };
+	}
+	if (!windows) {
+		const shell = process.env.SHELL || "/bin/sh";
+		const root = await lastLine(shell, ["-ilc", "npm root -g"], {});
+		if (root !== null && (await isDirectory(root))) return { root, npm: "" };
+	}
+	return null;
+}
+
+/**
+ * Where a CLI installed with `npm install -g` may be: npm's link to it,
+ * then its package's script, run with Node.
+ */
+async function npmLaunches(program: CliProgram, found: NpmRoot): Promise<CliLaunch[]> {
+	const windows = process.platform === "win32";
+	const bin = npmGlobalBin(found.root, process.platform);
+	const launches: CliLaunch[] = [];
+	for (const name of windows ? [`${program}.cmd`, `${program}.exe`] : [program]) {
+		const launch = await launchFor(join(bin, name));
+		if (launch !== null) launches.push(launch);
+	}
+	const pkg = join(found.root, ...NPM_PACKAGES[program].split("/"));
+	const manifest: unknown = await readFile(join(pkg, "package.json"), "utf8")
+		.then((text) => JSON.parse(text) as unknown)
+		.catch(() => null);
+	const script = packageBin(manifest, program);
+	if (script !== null && (await isFile(join(pkg, script)))) {
+		const nodeName = windows ? "node.exe" : "node";
+		const nodes = [found.npm === "" ? "" : join(dirname(found.npm), nodeName), join(bin, nodeName)];
+		let node = "node";
+		for (const candidate of nodes) {
+			if (candidate !== "" && (await isFile(candidate))) {
+				node = candidate;
+				break;
+			}
+		}
+		launches.push({ command: node, prefix: [join(pkg, script)], path: join(pkg, script) });
+	}
+	return launches;
 }
 
 /**
@@ -180,7 +301,10 @@ export class LocalCli {
 	/** Whether the file starts the CLI; it is then the one used. */
 	async check(path: string): Promise<boolean> {
 		const launch = await launchFor(path);
-		if (launch === null) return false;
+		return launch !== null && (await this.#try(launch));
+	}
+
+	async #try(launch: CliLaunch): Promise<boolean> {
 		try {
 			this.#found = { launch, version: await version(launch) };
 			return true;
@@ -196,6 +320,15 @@ export class LocalCli {
 		if (configured !== "" && (await this.check(configured))) return this.status();
 		for (const path of cliCandidates(this.program, process.platform, process.env, homedir())) {
 			if (await this.check(path)) return this.status();
+		}
+		// Installed with npm somewhere the folders above miss: ask npm.
+		const override =
+			this.program === "claude" ? process.env.KALEM_CLAUDE : process.env.KALEM_COPILOT;
+		if (override) return this.status();
+		const npm = await npmGlobalRoot();
+		if (npm === null) return this.status();
+		for (const launch of await npmLaunches(this.program, npm)) {
+			if (await this.#try(launch)) return this.status();
 		}
 		return this.status();
 	}
