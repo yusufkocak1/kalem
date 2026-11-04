@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cliCandidates, shimScript, textOutput } from "./cli.js";
+import { cliCandidates, npmGlobalBin, packageBin, shimScript, textOutput } from "./cli.js";
 
 describe("finding Claude Code", () => {
 	it("tries PATH, then the installers' folders", () => {
@@ -68,5 +68,22 @@ describe("finding Claude Code", () => {
 			"C:\\Users\\a\\AppData\\Roaming\\npm\\node_modules\\@anthropic-ai\\claude-code\\cli.js",
 		);
 		expect(shimScript("C:\\x\\claude.cmd", "@echo off\r\nclaude.exe %*")).toBeNull();
+	});
+
+	it("finds npm's link folder from `npm root -g`", () => {
+		expect(npmGlobalBin("/Users/a/.nvm/versions/node/v22.1.0/lib/node_modules", "darwin")).toBe(
+			"/Users/a/.nvm/versions/node/v22.1.0/bin",
+		);
+		expect(npmGlobalBin("/usr/local/lib/node_modules/", "linux")).toBe("/usr/local/bin");
+		expect(npmGlobalBin("C:\\Users\\a\\AppData\\Roaming\\npm\\node_modules", "win32")).toBe(
+			"C:\\Users\\a\\AppData\\Roaming\\npm",
+		);
+	});
+
+	it("reads the script a package runs", () => {
+		expect(packageBin({ bin: { claude: "cli.js" } }, "claude")).toBe("cli.js");
+		expect(packageBin({ bin: "npm-loader.js" }, "copilot")).toBe("npm-loader.js");
+		expect(packageBin({ bin: { other: "x.js" } }, "claude")).toBeNull();
+		expect(packageBin(null, "claude")).toBeNull();
 	});
 });
