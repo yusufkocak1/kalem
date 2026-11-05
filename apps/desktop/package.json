@@ -1,7 +1,7 @@
 {
   "name": "kalem-desktop",
   "private": true,
-  "version": "2.9.1",
+  "version": "2.9.2",
   "type": "module",
   "description": "Kalem Desktop — a Word-like Markdown editor built with Electron",
   "author": "Yusuf Koçak",

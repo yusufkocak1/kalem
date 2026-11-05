@@ -1,7 +1,8 @@
 import type { KalemBridge } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
-import type { JiraIssueRow } from "../shared/jira.js";
+import type { JiraIssueRef, JiraIssueRow } from "../shared/jira.js";
+import { groupByParent } from "../shared/jira.js";
 import { el } from "./dom.js";
 import { statusLozenge } from "./jira-dialog.js";
 
@@ -77,14 +78,20 @@ export function createJiraPane(options: JiraPaneOptions): {
 	let next: string | null = null;
 	let shown = 0;
 
-	const row = (issue: JiraIssueRow): HTMLElement => {
+	/** The issues found so far, drawn again as a tree when more come. */
+	let issues: JiraIssueRow[] = [];
+	/** Parents whose sub-tasks are folded away. */
+	const folded = new Set<string>();
+
+	const row = (issue: JiraIssueRef, extra = "", toggle: HTMLElement | null = null): HTMLElement => {
 		const item = el("li", {
-			class: "jira-row jira-pane-row",
+			class: `jira-row jira-pane-row ${extra}`.trim(),
 			attrs: { tabindex: "0", role: "link", "data-key": issue.key, title: issue.summary },
 			children: [
 				el("span", {
 					class: "jira-pane-row-head",
 					children: [
+						...(toggle === null ? [] : [toggle]),
 						el("span", { class: "jira-key", text: issue.key }),
 						...(issue.status === "" ? [] : [statusLozenge(issue.status, issue.statusCategory)]),
 					],
@@ -100,9 +107,49 @@ export function createJiraPane(options: JiraPaneOptions): {
 		return item;
 	};
 
+	/** Sub-tasks under their parent, which folds them away; a parent the search missed heads them dimmed. */
+	function renderTree(): void {
+		rows.replaceChildren(
+			...groupByParent(issues).flatMap((group) => {
+				const key = group.parent.key;
+				const count = group.children.length;
+				const open = !folded.has(key);
+				const toggle =
+					count === 0
+						? null
+						: el("button", {
+								class: "jira-tree-toggle",
+								text: open ? "▾" : "▸",
+								attrs: {
+									type: "button",
+									"aria-expanded": String(open),
+									"aria-label": format(t.jiraSubtasks, count),
+									title: format(t.jiraSubtasks, count),
+								},
+							});
+				toggle?.addEventListener("click", (event) => {
+					event.stopPropagation();
+					if (open) folded.add(key);
+					else folded.delete(key);
+					renderTree();
+				});
+				const head = row(
+					group.row ?? group.parent,
+					[count > 0 ? "jira-tree-parent" : "", group.row === null ? "jira-tree-context" : ""]
+						.join(" ")
+						.trim(),
+					toggle,
+				);
+				const children = open ? group.children.map((child) => row(child, "jira-tree-child")) : [];
+				return [head, ...children];
+			}),
+		);
+	}
+
 	async function run(append: boolean): Promise<void> {
 		const id = ++searchId;
 		if (!append) {
+			issues = [];
 			rows.replaceChildren();
 			shown = 0;
 			next = null;
@@ -114,7 +161,8 @@ export function createJiraPane(options: JiraPaneOptions): {
 		try {
 			const found = await bridge.jiraSearch(query, append ? next : null);
 			if (id !== searchId) return;
-			rows.append(...found.issues.map(row));
+			issues = [...issues, ...found.issues];
+			renderTree();
 			shown += found.issues.length;
 			next = found.next;
 			more.hidden = next === null;

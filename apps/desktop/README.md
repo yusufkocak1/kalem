@@ -479,6 +479,9 @@ verir.
   `/rest/api/2/search` kullanılır.
 - **Jira paneli** (bağlıyken): bana atanan açık kayıtlar, raporladıklarım,
   izlediklerim, son güncellenenler ya da bir arama; kayda tıklamak onu açar.
+  Alt görevler üst kayıtlarının altında **ağaç** olarak gruplanır (sonuç
+  sırası korunur); üst kaydın ▾ düğmesi alt görevlerini katlar. Aramada
+  bulunmayan bir üst kayıt da alt görevlerinin başında soluk görünür.
 - Kalem Jira'da hiçbir şeyi değiştirmez; yalnızca okur.
 
 **Paneller ve Ayarlar**
