@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import { clickMenu, launch } from "./launch.js";
+import { clickMenu, launch, showPane } from "./launch.js";
 
 const CONFLUENCE_TOKEN = "confluence-pat";
 const JIRA_TOKEN = "jira-pat";
@@ -134,9 +134,11 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	const opened = () => app.evaluate(() => (globalThis as { opened?: string[] }).opened ?? []);
 
 	// Not set up: neither Confluence nor Jira has a pane.
-	await expect(page.locator('.side-pane-tab[data-pane="outline"]')).toBeVisible();
-	await expect(page.locator('.side-pane-tab[data-pane="confluence"]')).toHaveCount(0);
-	await expect(page.locator('.side-pane-tab[data-pane="jira"]')).toHaveCount(0);
+	await expect(page.locator('.stripe-left .stripe-button[data-pane="outline"]')).toBeVisible();
+	await expect(page.locator('.stripe-button[data-pane="confluence"]')).toHaveCount(0);
+	await expect(page.locator('.stripe-button[data-pane="jira"]')).toHaveCount(0);
+	// The left dock names the pane it shows, as the assistant's panel does.
+	await expect(page.locator(".dock-left .dock-title h2")).toHaveText("Headings");
 
 	await clickMenu(app, "File", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
@@ -146,7 +148,7 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await dialog.locator(".quick-open-item", { hasText: "Sprint Planı" }).click();
 	await expect(dialog).not.toBeVisible();
 	// Connected: Confluence's pane is there now.
-	await expect(page.locator('.side-pane-tab[data-pane="confluence"]')).toBeVisible();
+	await expect(page.locator('.stripe-left .stripe-button[data-pane="confluence"]')).toBeVisible();
 
 	// The card: Jira's address from the Jira macro's servers, and an Open button.
 	const atom = page.locator('#editor a[href^="#confluence-keep-"]', { hasText: "QR-1" });
@@ -186,8 +188,8 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await page.mouse.move(0, 0);
 
 	// Jira has a pane once it is connected: the user's issues.
-	const jiraTab = page.locator('.side-pane-tab[data-pane="jira"]');
-	await jiraTab.click();
+	await showPane(page, "jira");
+	await expect(page.locator(".dock-left .dock-title h2")).toHaveText("Jira");
 	await expect(page.locator(".jira-pane .jira-row")).toHaveCount(1);
 	expect(jiraServer.searches.at(-1)).toContain("assignee = currentUser()");
 
@@ -211,12 +213,13 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await expect(page.locator(".dock-right")).toBeVisible();
 
 	// A tab's menu moves a pane too: files go to the right, next to Jira.
-	await page.locator('.side-pane-tab[data-pane="files"]').click({ button: "right" });
+	await page.locator('.stripe-left .stripe-button[data-pane="files"]').click({ button: "right" });
 	await page.locator(".dock-menu").getByRole("menuitem", { name: "Move to Right" }).click();
-	await expect(page.locator('.dock-right .side-pane-tab[data-pane="files"]')).toHaveAttribute(
-		"aria-selected",
+	await expect(page.locator('.stripe-right .stripe-button[data-pane="files"]')).toHaveAttribute(
+		"aria-pressed",
 		"true",
 	);
+	await expect(page.locator(".dock-right .dock-title h2")).toHaveText("Files");
 
 	await expect
 		.poll(async () => {

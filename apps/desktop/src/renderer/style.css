@@ -5914,8 +5914,23 @@ pre[data-confluence-kind="layout"]::before {
 	letter-spacing: 0.02em;
 }
 
-.stripe-left .stripe-label {
-	transform: rotate(180deg);
+/* The dock's header names its pane, as the assistant's panel does. */
+.dock-title {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	color: var(--app-accent);
+}
+
+.dock-title h2 {
+	margin: 0;
+	overflow: hidden;
+	color: var(--app-text);
+	font-size: 13px;
+	font-weight: 600;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .dock-menu {
@@ -6121,4 +6136,9 @@ pre[data-confluence-kind="layout"]::before {
 
 .jira-pane .jira-pane-search {
 	margin: 0;
+}
+
+/* The panes' tabs on the edges look like the assistant's. */
+.stripe-button .icon {
+	color: var(--app-accent);
 }

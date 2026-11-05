@@ -12,6 +12,7 @@ import {
 	clickMenu,
 	lastSaveDialog,
 	launch,
+	showPane,
 	stubMessageBox,
 	stubOpenDialog,
 	stubSaveDialog,
@@ -885,7 +886,7 @@ test("opens other text files in a tab as they are, formats JSON, and several fol
 	const items = page.locator(".files-item");
 	const tabs = page.locator(".doc-tab");
 	const area = page.locator("#editor .text-view-area");
-	await page.locator('.side-pane-tab[data-pane="files"]').click();
+	await showPane(page, "files");
 	// Folders start closed.
 	await expect(items).toHaveText(["kod", "belge.md", "notlar.txt", "veri.json"]);
 
@@ -1300,7 +1301,7 @@ test("browses, searches and quick-opens the documents of a folder", async () => 
 	const items = page.locator(".files-item");
 
 	// Without an open folder the pane shows the document's folder.
-	await page.locator('.side-pane-tab[data-pane="files"]').click();
+	await showPane(page, "files");
 	// Every file is listed; documents open in the editor, others where they belong. Folders start closed.
 	await expect(items).toHaveText(["alt", "elma.md", "resim.png"]);
 	await expect(page.locator('.files-item[aria-current="page"]')).toHaveText("elma.md");

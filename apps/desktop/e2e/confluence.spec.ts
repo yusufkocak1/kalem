@@ -12,6 +12,7 @@ import {
 	clickMenu,
 	launch,
 	recordMessageBoxes,
+	showPane,
 	stubOpenDialog,
 	stubSaveDialog,
 	tempDir,
@@ -333,7 +334,7 @@ test("browses a space's page tree in the side pane and stars a page", async () =
 
 	const pane = page.locator(".confluence-pane");
 	// Without a connection there is no Confluence pane: it comes with the login.
-	await expect(page.getByRole("tab", { name: "Confluence" })).toHaveCount(0);
+	await expect(page.locator('.stripe-button[data-pane="confluence"]')).toHaveCount(0);
 	await clickMenu(app, "File", "Open from Confluence…");
 
 	const dialog = page.locator(".confluence-dialog");
@@ -342,7 +343,7 @@ test("browses a space's page tree in the side pane and stars a page", async () =
 	await dialog.getByRole("button", { name: "Connect" }).click();
 	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
 	await page.keyboard.press("Escape");
-	await page.getByRole("tab", { name: "Confluence" }).click();
+	await showPane(page, "confluence");
 	await expect(dialog).not.toBeVisible();
 
 	// All spaces: each space is a branch.
@@ -417,7 +418,7 @@ test("searches inside pages with filters and more results, and finds the open pa
 	await dialog.getByRole("button", { name: "Connect" }).click();
 	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
 	await page.keyboard.press("Escape");
-	await page.getByRole("tab", { name: "Confluence" }).click();
+	await showPane(page, "confluence");
 	await pane.locator("select").selectOption("DEV");
 
 	// Contents: every word inside the pages, with the text around it and where each page is.
@@ -502,7 +503,7 @@ test("lists a level that fails with an error 500 another way, retries it, and wi
 	await dialog.getByRole("button", { name: "Connect" }).click();
 	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
 	await page.keyboard.press("Escape");
-	await page.getByRole("tab", { name: "Confluence" }).click();
+	await showPane(page, "confluence");
 	await pane.locator("select").selectOption("DEV");
 	const root = pane.locator('[data-page="41"]');
 
@@ -571,7 +572,7 @@ test("adds a child page from the tree and opens it", async () => {
 	await dialog.getByRole("button", { name: "Connect" }).click();
 	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
 	await page.keyboard.press("Escape");
-	await page.getByRole("tab", { name: "Confluence" }).click();
+	await showPane(page, "confluence");
 
 	await pane.locator("select").selectOption("DEV");
 	const root = pane.locator('[data-page="41"]');
@@ -799,7 +800,7 @@ test("the assistant searches Confluence and reads pages to answer, with a local 
 	await dialog.getByRole("button", { name: "Connect" }).click();
 	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
 	await page.keyboard.press("Escape");
-	await page.getByRole("tab", { name: "Confluence" }).click();
+	await showPane(page, "confluence");
 
 	const assistant = page.locator(".assistant");
 	await expect(assistant.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
@@ -858,7 +859,7 @@ test("Claude Code searches Confluence with Kalem's own tools, through its MCP se
 	await dialog.getByRole("button", { name: "Connect" }).click();
 	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
 	await page.keyboard.press("Escape");
-	await page.getByRole("tab", { name: "Confluence" }).click();
+	await showPane(page, "confluence");
 
 	const assistant = page.locator(".assistant");
 	await expect(assistant.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
@@ -1185,7 +1186,7 @@ test("puts favorites in groups: from a menu or by dragging, renamed, closed and 
 	await dialog.getByRole("button", { name: "Connect" }).click();
 	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
 	await page.keyboard.press("Escape");
-	await page.getByRole("tab", { name: "Confluence" }).click();
+	await showPane(page, "confluence");
 
 	const favorite = (id: string) => pane.locator(`[data-page="${id}"][draggable="true"]`);
 	const group = (name: string) => pane.locator(`[data-group="${name}"]`);

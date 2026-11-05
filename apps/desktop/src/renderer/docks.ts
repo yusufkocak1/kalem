@@ -57,9 +57,10 @@ const DEFAULT_SIZE: Readonly<Record<Dock, number>> = {
 /**
  * The tool panes in docks, as in an IDE: the left dock (the navigation
  * pane), a right dock next to the assistant and a bottom dock under the
- * document. Each shows one of its panes, picked by its tabs or by the
- * buttons on the window's edge; a pane's tab or button has a menu that
- * moves it to another dock or hides it.
+ * document. Each shows one of its panes, named in its header like the
+ * assistant's panel, and picked by the buttons on the window's edge; a
+ * pane's header or button has a menu that moves it to another dock or
+ * hides it.
  */
 export function createDocks(options: DocksOptions): Docks {
 	const { t } = options;
@@ -124,14 +125,21 @@ export function createDocks(options: DocksOptions): Docks {
 	// --- The docks ----------------------------------------------------------------
 	interface DockView {
 		readonly element: HTMLElement;
-		readonly tabs: HTMLElement;
+		readonly title: HTMLElement;
 		readonly body: HTMLElement;
 		readonly resizer: HTMLElement;
 		readonly stripe: HTMLElement;
 	}
 
 	function makeDock(dock: Dock): DockView {
-		const tabs = el("div", { class: "side-pane-tabs", attrs: { role: "tablist" } });
+		// The shown pane's icon and name, as the assistant's panel has its own.
+		const title = el("div", { class: "dock-title" });
+		title.addEventListener("contextmenu", (event) => {
+			const shown = shownPane(options.settings(), dock, options.available);
+			if (shown === null) return;
+			event.preventDefault();
+			showMenu(shown, event.clientX, event.clientY);
+		});
 		const layout = el("button", {
 			class: "icon-button dock-layout",
 			attrs: { type: "button", "aria-label": t.panelLayout, title: t.panelLayout },
@@ -171,7 +179,7 @@ export function createDocks(options: DocksOptions): Docks {
 			children: [
 				el("div", {
 					class: "navigation-header",
-					children: [tabs, el("span", { class: "dock-spacer" }), layout, close],
+					children: [title, el("span", { class: "dock-spacer" }), layout, close],
 				}),
 				body,
 				resizer,
@@ -182,7 +190,7 @@ export function createDocks(options: DocksOptions): Docks {
 			attrs: { role: "toolbar", "aria-label": placeName(dock) },
 		});
 		resizable(dock, element, resizer);
-		return { element, tabs, body, resizer, stripe };
+		return { element, title, body, resizer, stripe };
 	}
 
 	function placeName(dock: Dock): string {
@@ -267,22 +275,6 @@ export function createDocks(options: DocksOptions): Docks {
 	});
 
 	// --- Laying out -------------------------------------------------------------------
-	function tab(pane: DockPane, dock: Dock, selected: boolean): HTMLButtonElement {
-		const button = el("button", {
-			class: "side-pane-tab",
-			text: pane.label,
-			attrs: {
-				type: "button",
-				role: "tab",
-				"data-pane": pane.id,
-				"aria-selected": String(selected),
-			},
-		});
-		button.addEventListener("click", () => options.update(dockPatch(dock, { pane: pane.id })));
-		menuOn(button, pane.id);
-		return button;
-	}
-
 	function stripeButton(pane: DockPane, pressed: boolean): HTMLButtonElement {
 		const button = el("button", {
 			class: "stripe-button",
@@ -311,8 +303,11 @@ export function createDocks(options: DocksOptions): Docks {
 			const open = dockState(settings, dock).open && active !== null;
 			view.element.hidden = !open;
 			if (open) showSize(dock, fit(dock, dockState(settings, dock).size));
-			view.tabs.replaceChildren(
-				...panes.map((id) => tab(entries.get(id) as DockPane, dock, id === active)),
+			const shown = active === null ? undefined : entries.get(active);
+			view.title.replaceChildren(
+				...(shown === undefined
+					? []
+					: [icon(shown.icon), el("h2", { text: shown.label, attrs: { "data-pane": shown.id } })]),
 			);
 			for (const id of panes) {
 				const pane = entries.get(id) as DockPane;

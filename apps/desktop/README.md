@@ -474,11 +474,13 @@ verir.
 
 - Başlıklar, Dosyalar, Confluence ve Jira panelleri IDE'lerdeki araç
   pencereleri gibi **sol**, **sağ** ya da **alt** (belgenin altı) yuvaya
-  yerleştirilir ya da gizlenir. Bir yuva aynı anda bir paneli gösterir;
-  sekmeleri başlığında, düğmeleri pencerenin kenarındaki şeritte durur
-  (sol şerit, sağda asistanın üstü, altta durum çubuğu). Şerit düğmesi yuvayı
-  açar; o panel zaten açıksa yuvayı kapatır.
-- Bir panelin sekmesine ya da şerit düğmesine sağ tıklamak (ya da yuvanın
+  yerleştirilir ya da gizlenir. Bir yuva aynı anda bir paneli gösterir ve
+  başlığında, asistan paneli gibi, o panelin simgesi ve adı yazar. Panellerin
+  sekmeleri pencerenin kenarındadır: sol ve sağ yuvanınkiler asistanın düğmesi
+  gibi **dikey** (solda kendi şeridi, sağda asistanın üstü), alt yuvanınkiler
+  durum çubuğunda **yatay**. Sekme paneli açar; o panel zaten açıksa yuvayı
+  kapatır.
+- Bir panelin sekmesine ya da yuvanın başlığına sağ tıklamak (ya da yuvanın
   **⋯** düğmesi) onu **Sola / Sağa / Alta Taşı** ya da **Gizle** seçeneklerini
   verir. Sağ ve alt yuvalar da kenarlarından sürüklenerek boyutlandırılır
   (çift tık varsayılana döner); yerler ve boyutlar hatırlanır.
