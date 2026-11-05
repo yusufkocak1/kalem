@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ElectronApplication, Page } from "@playwright/test";
-import { _electron as electron } from "@playwright/test";
+import { _electron as electron, expect } from "@playwright/test";
 
 const appDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -133,4 +133,12 @@ export async function stubOpenDialog(app: ElectronApplication, filePaths: string
 	await app.evaluate(({ dialog }, paths) => {
 		dialog.showOpenDialog = async () => ({ canceled: false, filePaths: paths });
 	}, filePaths);
+}
+
+/** Shows a pane through its tab on the window's edge; a tab already shown is left as it is. */
+export async function showPane(page: Page, pane: string): Promise<void> {
+	const tab = page.locator(`.stripe-button[data-pane="${pane}"]`);
+	await tab.waitFor();
+	if ((await tab.getAttribute("aria-pressed")) !== "true") await tab.click();
+	await expect(tab).toHaveAttribute("aria-pressed", "true");
 }

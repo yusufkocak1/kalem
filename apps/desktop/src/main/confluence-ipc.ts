@@ -29,6 +29,7 @@ import { ConfluenceClient, ConfluenceError } from "./confluence-client.js";
 import type { ConfluenceStore } from "./confluence-store.js";
 import { checkDiagramBytes, checkDiagramData, diagramFileName } from "./diagram-files.js";
 import type { DraftStore } from "./drafts.js";
+import type { JiraClient } from "./jira-client.js";
 import type { AppWindow, DocumentTab, WindowManager } from "./windows.js";
 import { errorMessage } from "./windows.js";
 
@@ -36,6 +37,8 @@ export interface ConfluenceIpcContext {
 	readonly windows: WindowManager;
 	readonly drafts: DraftStore;
 	readonly confluence: ConfluenceStore;
+	/** The connected Jira, for a Jira issue's summary and status; `null` when there is none. */
+	jira(): Promise<JiraClient | null>;
 	strings(): Strings;
 	senderOf(event: IpcMainInvokeEvent): AppWindow;
 	tabOf(win: AppWindow, tabId: unknown): DocumentTab;
@@ -170,11 +173,20 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 				base = client.jiraBase(details.jira.serverId).catch(() => null);
 				jiraBases.set(key, base);
 			}
-			const found = await base;
+			const jira = await ctx.jira().catch(() => null);
+			// Not found on the page's site: the Jira the app is connected to.
+			const found = (await base) ?? jira?.site ?? null;
 			// A failed look-up is tried again next time.
-			if (found === null) jiraBases.delete(key);
+			if ((await base) === null) jiraBases.delete(key);
 			const url = found === null ? null : jiraUrl(found, details.jira);
-			return { ...details, url };
+			// The issue's summary and status, when the app reaches that Jira.
+			const sameJira =
+				jira !== null && found !== null && new URL(found).host === new URL(jira.site).host;
+			const issue =
+				sameJira && details.jira.key !== ""
+					? await jira.row(details.jira.key).catch(() => null)
+					: null;
+			return { ...details, url, ...(issue === null ? {} : { issue }) };
 		}
 		return details;
 	});

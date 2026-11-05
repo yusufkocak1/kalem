@@ -3,9 +3,18 @@ import { describeAtom } from "../shared/confluence-atoms.js";
 import { ATOM_PREFIX } from "../shared/confluence-storage.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
+import { issueKeyFromUrl } from "../shared/jira.js";
 import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
+import { statusLozenge } from "./jira-dialog.js";
+
+/** A Jira issue or search to show in Kalem, and where it opens in the browser when known. */
+export interface JiraTarget {
+	readonly key: string;
+	readonly jql: string;
+	readonly url: string | null;
+}
 
 export interface LinkCardOptions {
 	readonly t: Strings;
@@ -23,6 +32,8 @@ export interface LinkCardOptions {
 	openLink(url: string): void;
 	/** Opens a Confluence page in a tab of this window. */
 	openPage(spaceKey: string, title: string): Promise<void>;
+	/** Shows a Jira issue or search in Kalem. */
+	openJira(target: JiraTarget): void;
 	/** Shows that something failed. */
 	notice(text: string): void;
 }
@@ -57,8 +68,9 @@ export const isAtomLink = (link: Element): boolean =>
  * the pointer rests on it: what it is (a Jira issue with its server, a
  * mentioned user with their name, a linked page with its space, a macro
  * with its settings), where it leads, and buttons to open it in the
- * browser, open a linked page in Kalem or copy it. A click on an atom opens
- * it in the browser at once; one that leads nowhere shows the card.
+ * browser, open a linked page or a Jira issue in Kalem or copy it. A click
+ * on a Jira issue opens it in Kalem; on another atom it opens it in the
+ * browser at once; one that leads nowhere shows the card.
  */
 export function createLinkCard(options: LinkCardOptions): { hide(): void } {
 	const { t, host } = options;
@@ -140,13 +152,26 @@ export function createLinkCard(options: LinkCardOptions): { hide(): void } {
 		return button;
 	}
 
-	function openAction(url: string): HTMLButtonElement {
+	function openAction(url: string, primary = true): HTMLButtonElement {
 		return action(
 			t.linkOpenBrowser,
 			"open",
 			() => {
 				hide();
 				options.openLink(url);
+			},
+			primary,
+		);
+	}
+
+	/** Opens the Jira issue or search in Kalem: always there, whether or not Jira's address is known. */
+	function jiraAction(jira: JiraTarget): HTMLButtonElement {
+		return action(
+			t.jiraOpen,
+			"open",
+			() => {
+				hide();
+				options.openJira(jira);
 			},
 			true,
 		);
@@ -157,14 +182,19 @@ export function createLinkCard(options: LinkCardOptions): { hide(): void } {
 		const children: HTMLElement[] = [];
 		const buttons: HTMLElement[] = [];
 		if (target.kind === "link") {
+			const key = issueKeyFromUrl(target.url);
 			children.push(
-				el("div", { class: "link-card-kind", children: [icon("link"), t.linkCardLink] }),
+				el("div", {
+					class: "link-card-kind",
+					children: [icon("link"), key === null ? t.linkCardLink : `${t.atomJira} · ${key}`],
+				}),
 				...(target.text !== "" && target.text !== target.url
 					? [el("div", { class: "link-card-title", text: target.text })]
 					: []),
 				el("div", { class: "link-card-url", text: target.url, attrs: { title: target.url } }),
 			);
-			buttons.push(openAction(target.url), copyAction(t.linkCopyUrl, target.url));
+			if (key !== null) buttons.push(jiraAction({ key, jql: "", url: target.url }));
+			buttons.push(openAction(target.url, key === null), copyAction(t.linkCopyUrl, target.url));
 			children.push(el("div", { class: "link-card-actions", children: buttons }));
 			children.push(el("p", { class: "link-card-hint", text: t.linkCardEditHint }));
 		} else {
@@ -192,6 +222,20 @@ export function createLinkCard(options: LinkCardOptions): { hide(): void } {
 			if (details.subtitle !== "") {
 				children.push(el("div", { class: "link-card-subtitle", text: details.subtitle }));
 			}
+			const issue = details.issue;
+			if (issue !== undefined) {
+				children.push(
+					el("div", {
+						class: "link-card-issue",
+						children: [
+							el("span", { class: "jira-summary", text: issue.summary }),
+							...(issue.status === "" ? [] : [statusLozenge(issue.status, issue.statusCategory)]),
+						],
+					}),
+				);
+				const facts = [issue.type, issue.assignee].filter((part) => part !== "").join(" · ");
+				if (facts !== "") children.push(el("div", { class: "link-card-subtitle", text: facts }));
+			}
 			if (details.fields.length > 0) {
 				children.push(
 					el("dl", {
@@ -214,7 +258,11 @@ export function createLinkCard(options: LinkCardOptions): { hide(): void } {
 			} else if (details.type === "jira") {
 				children.push(el("p", { class: "link-card-hint", text: t.atomJiraUnknown }));
 			}
-			if (details.url !== null) buttons.push(openAction(details.url));
+			const jira = details.jira;
+			if (jira !== undefined && (jira.key !== "" || jira.jql !== "")) {
+				buttons.push(jiraAction({ key: jira.key, jql: jira.jql, url: details.url }));
+			}
+			if (details.url !== null) buttons.push(openAction(details.url, jira === undefined));
 			const page = details.page;
 			if (page !== undefined) {
 				buttons.push(
@@ -232,7 +280,12 @@ export function createLinkCard(options: LinkCardOptions): { hide(): void } {
 			children.push(
 				el("p", {
 					class: "link-card-hint",
-					text: details.type === "macro" ? t.atomOnlyInConfluence : t.confluenceAtomHint,
+					text:
+						details.type === "macro"
+							? t.atomOnlyInConfluence
+							: details.type === "jira"
+								? t.atomJiraOpenHint
+								: t.confluenceAtomHint,
 				}),
 			);
 		}
@@ -280,6 +333,8 @@ export function createLinkCard(options: LinkCardOptions): { hide(): void } {
 			resolved.set(atom.xml, request);
 		}
 		return request.then((details) => {
+			// A Jira issue without its summary is asked again: Jira may be connected meanwhile.
+			if (details?.type === "jira" && details.issue === undefined) resolved.delete(atom.xml);
 			atom.resolved = true;
 			if (details !== null) atom.details = details;
 			if (target === atom) render();
@@ -342,6 +397,15 @@ export function createLinkCard(options: LinkCardOptions): { hide(): void } {
 			event.preventDefault();
 			event.stopPropagation();
 			clearTimeout(showTimer);
+			const jira = found.details.jira;
+			// A Jira issue opens in Kalem, with its address for the browser once it is known.
+			if (jira !== undefined && (jira.key !== "" || jira.jql !== "")) {
+				hide();
+				void resolve(found).then((details) =>
+					options.openJira({ key: jira.key, jql: jira.jql, url: details?.url ?? null }),
+				);
+				return;
+			}
 			const open = (details: AtomDetails): boolean => {
 				if (details.url === null) return false;
 				hide();
@@ -349,7 +413,7 @@ export function createLinkCard(options: LinkCardOptions): { hide(): void } {
 				return true;
 			};
 			if (open(found.details)) return;
-			// Jira's address and a user's profile come from the server.
+			// A user's profile comes from the server.
 			if (found.details.type === "jira" || found.details.type === "mention") {
 				void resolve(found).then((details) => {
 					if (details === null || !open(details)) show(anchor, found);

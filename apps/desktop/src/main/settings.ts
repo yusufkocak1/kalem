@@ -17,6 +17,7 @@ import {
 } from "../shared/bridge.js";
 import { groupName } from "../shared/favorites.js";
 import type { Lang } from "../shared/i18n.js";
+import { clampDockSize, isToolPane, parsePanePlaces } from "../shared/panes.js";
 
 export const MAX_RECENT_FILES = 12;
 
@@ -96,7 +97,14 @@ export function parseStoredState(raw: unknown): StoredState {
 				? (s.margins as PageMargins)
 				: d.margins,
 			pageNumbers: asBoolean(s.pageNumbers, d.pageNumbers),
-			sidePane: s.sidePane === "files" || s.sidePane === "confluence" ? s.sidePane : "outline",
+			sidePane: isToolPane(s.sidePane) ? s.sidePane : d.sidePane,
+			panePlaces: parsePanePlaces(s.panePlaces),
+			rightDock: asBoolean(s.rightDock, d.rightDock),
+			rightPane: isToolPane(s.rightPane) ? s.rightPane : d.rightPane,
+			rightWidth: clampDockSize(s.rightWidth, d.rightWidth),
+			bottomDock: asBoolean(s.bottomDock, d.bottomDock),
+			bottomPane: isToolPane(s.bottomPane) ? s.bottomPane : d.bottomPane,
+			bottomHeight: clampDockSize(s.bottomHeight, d.bottomHeight),
 			confluenceSpace:
 				typeof s.confluenceSpace === "string" ? s.confluenceSpace.slice(0, 255) : d.confluenceSpace,
 			confluenceFavorites: parseFavorites(s.confluenceFavorites),

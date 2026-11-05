@@ -332,7 +332,7 @@ verir.
 
 **Confluence**
 
-- **Gezinme bölmesi → Confluence sekmesi:** bağlı sitenin alanları ve sayfa
+- **Confluence paneli** (bağlıyken; varsayılan olarak sol yuvada): bağlı sitenin alanları ve sayfa
   ağacı. Ağaç ok simgeleri, girinti çizgileri ve açık sayfayı gösteren bir
   vurguyla çizilir; satırın üzerine gelince **Bu sayfada ve altındaki
   sayfalarda ara**, **Alt sayfa ekle** ve **Favorilere ekle** çıkar.
@@ -365,10 +365,15 @@ verir.
     Kopyala** düğmeleri; bağlantılı sayfalar için **Kalem'de Aç** (sayfayı
     bir sekmede açar).
   - Jira'nın adresi sayfada yazmaz: Cloud'da sitenin kendi adresi
-    (`/browse/ANAHTAR`), Server'da Confluence'ın uygulama bağlantılarından
-    (`/rest/applinks/…`) makronun sunucu kimliğiyle bulunur. Bulunamazsa
-    kart anahtarı kopyalamayı önerir. JQL'li Jira makroları arama
-    sayfasını açar.
+    (`/browse/ANAHTAR`), Server'da önce Jira makrosunun sunucu listesinden
+    (`/rest/jiraanywhere/1.0/servers`, her kullanıcı okuyabilir), sonra
+    Confluence'ın uygulama bağlantılarından (`/rest/applinks/…`, çoğu sitede
+    yönetici ister) makronun sunucu kimliğiyle bulunur; o da olmazsa Kalem'in
+    Jira bağlantısının adresi kullanılır.
+  - Jira kaydının kartında her zaman **Aç** vardır: kaydı Kalem'de açar (bkz.
+    **Jira**). Jira bağlıysa kart kaydın özetini, durumunu, türünü ve atananı
+    da gösterir. Kayda **tıklamak** da onu Kalem'de açar; JQL'li Jira
+    makroları aramayı açar.
   - Yalnızca Confluence'ta görünen makrolar (ör. `toc`) sayfanın kendisini
     tarayıcıda açar.
   Sıradan bağlantılarda da aynı kart adresi gösterir ve **Tarayıcıda Aç**
@@ -442,6 +447,49 @@ verir.
   olur. Böyle başlayan bir alıntı dışa aktarılırken yeniden panel olur.
 - Göreli görseller ve dosya bağlantıları Confluence ekine (`ri:attachment`)
   çevrilir; dosyaların sayfaya ayrıca eklenmesi gerekir.
+
+**Jira**
+
+- **Dosya → Jira…** Jira'yı Kalem'de açar. Bağlı değilse önce giriş ister:
+  **Jira Cloud**'da Atlassian e-postası ve API jetonu (aynı Atlassian
+  sitesinde Confluence Cloud bağlıysa onun oturumu sormadan kullanılır),
+  **Server / Data Center**'da kişisel erişim jetonu (kullanıcı adı boş).
+  Adres, Confluence'ın bildiği Jira'dan ya da tıklanan kaydın adresinden
+  doldurulur. Jeton Confluence'ınki gibi şifrelenerek saklanır (`jira.json`).
+- Confluence sayfasındaki Jira kayıtları (`jira` makrosu) ve belgelerdeki
+  `…/browse/ANAHTAR` bağlantıları **Kalem'de açılır**: tür, durum (Jira'nın
+  renkleriyle), öncelik, atanan, raporlayan, tarihler, etiketler, bileşenler,
+  sürümler, açıklama ve yorumlar (Markdown olarak), üst kayıt, alt görevler ve
+  bağlantılı kayıtlar. Bir alt göreve ya da bağlantılı kayda tıklamak onu aynı
+  pencerede açar, **Geri** (`Alt+←`) döner; açıklamadaki Jira bağlantıları da
+  orada açılır. **Tarayıcıda Aç**, **Anahtarı Kopyala**, **Bağlantıyı Kopyala**.
+- Arama: anahtar (`QR-123`), kelimeler (`text ~`) ya da JQL; 25'er sonuç,
+  **Daha fazla sonuç göster**. Cloud'da `/rest/api/2/search/jql`, Server'da
+  `/rest/api/2/search` kullanılır.
+- **Jira paneli** (bağlıyken): bana atanan açık kayıtlar, raporladıklarım,
+  izlediklerim, son güncellenenler ya da bir arama; kayda tıklamak onu açar.
+- Kalem Jira'da hiçbir şeyi değiştirmez; yalnızca okur.
+
+**Paneller ve Ayarlar**
+
+- Başlıklar, Dosyalar, Confluence ve Jira panelleri IDE'lerdeki araç
+  pencereleri gibi **sol**, **sağ** ya da **alt** (belgenin altı) yuvaya
+  yerleştirilir ya da gizlenir. Bir yuva aynı anda bir paneli gösterir ve
+  başlığında, asistan paneli gibi, o panelin simgesi ve adı yazar. Panellerin
+  sekmeleri pencerenin kenarındadır: sol ve sağ yuvanınkiler asistanın düğmesi
+  gibi **dikey** (solda kendi şeridi, sağda asistanın üstü), alt yuvanınkiler
+  durum çubuğunda **yatay**. Sekme paneli açar; o panel zaten açıksa yuvayı
+  kapatır.
+- Bir panelin sekmesine ya da yuvanın başlığına sağ tıklamak (ya da yuvanın
+  **⋯** düğmesi) onu **Sola / Sağa / Alta Taşı** ya da **Gizle** seçeneklerini
+  verir. Sağ ve alt yuvalar da kenarlarından sürüklenerek boyutlandırılır
+  (çift tık varsayılana döner); yerler ve boyutlar hatırlanır.
+- **Confluence ve Jira panelleri yalnızca bağlantı kurulunca görünür**;
+  bağlantı kesilince kaybolur.
+- **Görünüm → Ayarlar…** (`Ctrl+,`): panellerin yerleri, Confluence ve Jira
+  bağlantıları (bağlan / bağlantıyı kes) ve genel ayarlar (tema, otomatik
+  kaydetme, yazım denetimi, güncelleme denetimi, bildirim alanı, Git'i
+  otomatik getirme).
 
 **Diyagramlar**
 
@@ -651,6 +699,13 @@ verir.
     Bağlıyken Claude Code'un kendi WebFetch aracı o siteye yasaklanır
     (`WebFetch(domain:…)`): şirket ağındaki, oturum isteyen siteye zaten
     ulaşamaz.
+  - Jira'ya bağlıyken asistan Jira kayıtlarını da okur: API'lerde
+    `jira_get_issue` ve `jira_search` araçlarıyla, Claude Code'da aynı MCP
+    sunucusundan `mcp__kalem__jira_get_issue` ve `mcp__kalem__jira_search`
+    olarak (Jira'nın adresine WebFetch yasaklanır), Copilot'ta
+    ` ```kalem-jira ` istekleriyle (`<jira-results>`). `/jira <anahtar ya da
+    ne aranacak>` hazır sorar. Bakılanlar listesinde "QR-1 Jira kaydı
+    okundu", "Jira'da arandı: …" görünür.
   - GitHub Copilot'ta model yanıtına bir ` ```kalem-confluence ` isteği
     yazar; Kalem aramayı/okumayı yapıp sonuçları aynı sohbete
     `<confluence-results>` olarak geri gönderir (en fazla 6 tur, turda 6

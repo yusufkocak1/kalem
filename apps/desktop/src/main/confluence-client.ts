@@ -521,13 +521,15 @@ export class ConfluenceClient {
 	 */
 	async jiraBase(serverId: string): Promise<string | null> {
 		if (this.cloud) return new URL(this.site).origin;
-		for (const path of [
-			"/rest/applinks/1.0/listApplicationlinks",
-			"/rest/applinks/3.0/applinks",
-			"/rest/applinks/1.0/applicationlink/type/jira",
-		]) {
+		// The Jira macro's own list first: the application links need an administrator on most sites.
+		for (const [path, allJira] of [
+			["/rest/jiraanywhere/1.0/servers", true],
+			["/rest/applinks/1.0/listApplicationlinks", false],
+			["/rest/applinks/3.0/applinks", false],
+			["/rest/applinks/1.0/applicationlink/type/jira", false],
+		] as const) {
 			try {
-				const found = jiraBaseFromLinks(await this.#json(path), serverId);
+				const found = jiraBaseFromLinks(await this.#json(path), serverId, allJira);
 				if (found !== null) return found;
 			} catch (error) {
 				if (!(error instanceof ConfluenceError)) throw error;

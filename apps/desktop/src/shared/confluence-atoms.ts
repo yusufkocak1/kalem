@@ -7,6 +7,7 @@
  */
 import type { MarkupElement } from "./confluence-markup.js";
 import { childElements, parseMarkup, textOf } from "./confluence-markup.js";
+import type { JiraIssueRow } from "./jira.js";
 
 export type AtomType =
 	| "mention"
@@ -44,6 +45,8 @@ export interface AtomDetails {
 	readonly user?: AtomUser;
 	/** A Jira issue or search, whose address the main process looks up. */
 	readonly jira?: { readonly serverId: string; readonly key: string; readonly jql: string };
+	/** The Jira issue's summary and status, when the app reaches that Jira. */
+	readonly issue?: JiraIssueRow;
 	/** A status lozenge's colour. */
 	readonly colour?: string;
 }
@@ -244,12 +247,15 @@ export function jiraUrl(
 }
 
 /**
- * Jira's address among Confluence Server's application links: the one with
- * the macro's server id, or else the only Jira. The list's shape differs
- * between versions, so any object with an id and an address is looked at.
+ * Jira's address among Confluence Server's application links, or the Jira
+ * servers its Jira macro knows (`/rest/jiraanywhere/1.0/servers`, which any
+ * user may read; then every entry is a Jira): the one with the macro's
+ * server id, or else the only Jira, or else the one marked as the default.
+ * The list's shape differs between versions, so any object with an id and
+ * an address is looked at.
  */
-export function jiraBaseFromLinks(data: unknown, serverId: string): string | null {
-	const links: { id: string; url: string; jira: boolean }[] = [];
+export function jiraBaseFromLinks(data: unknown, serverId: string, allJira = false): string | null {
+	const links: { id: string; url: string; jira: boolean; selected: boolean }[] = [];
 	const visit = (value: unknown): void => {
 		if (Array.isArray(value)) {
 			for (const item of value) visit(item);
@@ -262,10 +268,17 @@ export function jiraBaseFromLinks(data: unknown, serverId: string): string | nul
 				? record.displayUrl
 				: typeof record.rpcUrl === "string"
 					? record.rpcUrl
-					: "";
+					: typeof record.url === "string"
+						? record.url
+						: "";
 		if (typeof record.id === "string" && /^https?:\/\//i.test(url)) {
 			const type = `${String(record.typeId ?? record.type ?? "")}`;
-			links.push({ id: record.id, url, jira: /jira/i.test(type) });
+			links.push({
+				id: record.id,
+				url,
+				jira: allJira || /jira/i.test(type),
+				selected: record.selected === true || record.primary === true,
+			});
 		}
 		for (const child of Object.values(record)) visit(child);
 	};
@@ -273,5 +286,6 @@ export function jiraBaseFromLinks(data: unknown, serverId: string): string | nul
 	const exact = links.find((link) => serverId !== "" && link.id === serverId);
 	if (exact !== undefined) return exact.url;
 	const jiras = links.filter((link) => link.jira);
-	return jiras.length === 1 ? (jiras[0]?.url ?? null) : null;
+	if (jiras.length === 1) return jiras[0]?.url ?? null;
+	return jiras.find((link) => link.selected)?.url ?? null;
 }

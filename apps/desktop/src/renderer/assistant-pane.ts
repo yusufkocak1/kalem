@@ -703,6 +703,17 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			},
 		},
 		{
+			name: "jira",
+			label: t.slashJira,
+			argument: t.slashJiraArgument,
+			run: (arg) => {
+				if (arg === "") {
+					input.value = "/jira ";
+					input.focus();
+				} else ask(format(t.slashJiraPrompt, arg));
+			},
+		},
+		{
 			name: "fix",
 			label: t.slashFix,
 			run: () => ask(host.selection().trim() === "" ? t.assistantSuggestFix : t.assistantPromptFix),
@@ -1345,7 +1356,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 	/** The start of a diagram or of actions still coming in: shown as a placeholder, not as JSON. */
 	const OPEN_BLOCK =
-		/^ {0,3}(?:`{3,}|~{3,})[ \t]*(kalem-diagram|kalem-actions|kalem-confluence)[ \t]*$/m;
+		/^ {0,3}(?:`{3,}|~{3,})[ \t]*(kalem-diagram|kalem-actions|kalem-confluence|kalem-jira)[ \t]*$/m;
 
 	function renderReply(message: Message): void {
 		const view = shown.get(message);
@@ -1368,7 +1379,9 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 						? t.assistantPreparing
 						: open[1] === "kalem-confluence"
 							? t.assistantConfluenceLooking
-							: t.assistantDrawing;
+							: open[1] === "kalem-jira"
+								? t.assistantJiraLooking
+								: t.assistantDrawing;
 			}
 		}
 		const nodes: Node[] = parts.map((part, index) =>
@@ -1420,6 +1433,10 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				return format(t.assistantStepConfluenceTitles, detail);
 			case "confluence_read_page":
 				return format(t.assistantStepConfluenceRead, detail);
+			case "jira_get_issue":
+				return format(t.assistantStepJiraIssue, detail);
+			case "jira_search":
+				return format(t.assistantStepJiraSearch, detail);
 			case "list_files":
 			case "Glob":
 			case "LS":

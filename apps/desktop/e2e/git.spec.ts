@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, test } from "@playwright/test";
 import { fakeClaude } from "./fake-claude.js";
-import { clickMenu, launch, tempDir } from "./launch.js";
+import { clickMenu, launch, showPane, tempDir } from "./launch.js";
 
 const IDENTITY = {
 	GIT_AUTHOR_NAME: "Kalem",
@@ -31,7 +31,7 @@ test("knows a folder with .git, commits, pushes, branches and clones", async () 
 	git(work, "push", "-u", "origin", "main");
 
 	const { app, page, errors } = await launch({ args: [doc], env: IDENTITY });
-	await page.locator('.side-pane-tab[data-pane="files"]').click();
+	await showPane(page, "files");
 	const bar = page.locator(".files-git");
 	// The folder is a repository: its branch is shown without being asked.
 	await expect(bar.locator(".files-git-name")).toHaveText("main");

@@ -64,6 +64,7 @@ import {
 	toGitAction,
 } from "./git.js";
 import type { VersionStore } from "./history.js";
+import { registerJiraIpc } from "./jira-ipc.js";
 import type { PackageStore } from "./package.js";
 import { PACKAGE_ASSETS } from "./package.js";
 import { DOCUMENT_SCHEME } from "./protocol.js";
@@ -81,6 +82,8 @@ export interface IpcContext {
 	readonly packages: PackageStore;
 	readonly versions: VersionStore;
 	readonly confluence: ConfluenceStore;
+	/** The Jira login, stored like Confluence's. */
+	readonly jira: ConfluenceStore;
 	readonly assistant: AssistantStore;
 	readonly chats: ChatStore;
 	strings(): Strings;
@@ -903,10 +906,17 @@ export function registerIpc(ctx: IpcContext): void {
 		if (typeof x === "number" && typeof y === "number") ctx.showFileMenu(win, x, y);
 	});
 
+	const { jira: jiraNow } = registerJiraIpc({
+		jira: ctx.jira,
+		confluence: ctx.confluence,
+		strings: ctx.strings,
+	});
+
 	registerConfluenceIpc({
 		windows,
 		drafts: ctx.drafts,
 		confluence: ctx.confluence,
+		jira: jiraNow,
 		strings: ctx.strings,
 		senderOf,
 		tabOf,
@@ -926,11 +936,14 @@ export function registerIpc(ctx: IpcContext): void {
 		strings: ctx.strings,
 		senderOf,
 		confluence: confluenceNow,
+		jira: jiraNow,
 		tools: new AssistantToolServer({
 			folder: join(app.getPath("userData"), "assistant-tools"),
 			node: process.execPath,
 			confluence: confluenceNow,
+			jira: jiraNow,
 			notConnected: () => ctx.strings().confluenceNotConnected,
+			jiraNotConnected: () => ctx.strings().jiraNotConnected,
 		}),
 	});
 }

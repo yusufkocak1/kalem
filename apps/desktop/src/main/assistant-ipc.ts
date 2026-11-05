@@ -32,6 +32,7 @@ import {
 	MAX_ROUNDS,
 } from "../shared/confluence-tool.js";
 import type { Strings } from "../shared/i18n.js";
+import { jiraInstructions, jiraRequests } from "../shared/jira-tool.js";
 import type { ChatMessage, ProviderId } from "../shared/providers.js";
 import {
 	checkBaseUrl,
@@ -44,6 +45,7 @@ import {
 } from "../shared/providers.js";
 import type { ChatStore } from "./assistant-chats.js";
 import { CONFLUENCE_TOOLS, ConfluenceLookups, isConfluenceTool } from "./assistant-confluence.js";
+import { isJiraTool, JIRA_TOOLS, JiraLookups } from "./assistant-jira.js";
 import type { AssistantToolServer } from "./assistant-mcp.js";
 import { mcpToolName } from "./assistant-mcp.js";
 import { collectSources, MAX_SOURCES, SOURCE_BUDGET } from "./assistant-sources.js";
@@ -51,6 +53,7 @@ import type { AssistantStore } from "./assistant-store.js";
 import type { CliProgram } from "./cli.js";
 import { claudeOutput, LocalCli, runCli, textOutput } from "./cli.js";
 import type { ConfluenceClient } from "./confluence-client.js";
+import type { JiraClient } from "./jira-client.js";
 import { askApi, listModels } from "./llm.js";
 import type { SettingsStore } from "./settings.js";
 import type { AppWindow } from "./windows.js";
@@ -74,6 +77,8 @@ export interface AssistantIpcContext {
 	senderOf(event: IpcMainInvokeEvent): AppWindow;
 	/** The connected Confluence site, for the assistant's look-ups; `null` when there is none. */
 	confluence(): Promise<ConfluenceClient | null>;
+	/** The connected Jira, for the assistant's look-ups; `null` when there is none. */
+	jira(): Promise<JiraClient | null>;
 	/** Kalem's tools for Claude Code, as an MCP server. */
 	readonly tools: AssistantToolServer;
 }
@@ -401,21 +406,39 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			.confluence()
 			.then((client) => (client === null ? null : new ConfluenceLookups(client)))
 			.catch(() => null);
+		// The connected Jira: the model reads the issues pages and documents name.
+		const jiraLookups = await ctx
+			.jira()
+			.then((client) => (client === null ? null : new JiraLookups(client)))
+			.catch(() => null);
+		const looksUp = lookups !== null || jiraLookups !== null;
 		// Claude Code gets the look-ups as real tools, from Kalem's MCP server; Copilot
 		// writes them in a block; an API calls them as its own tools.
 		const mcpConfig =
-			lookups !== null && program === "claude" ? await ctx.tools.config().catch(() => null) : null;
+			looksUp && program === "claude" ? await ctx.tools.config().catch(() => null) : null;
 		const mcp =
 			mcpConfig === null
 				? undefined
-				: { config: mcpConfig, tools: CONFLUENCE_TOOLS.map((tool) => mcpToolName(tool.name)) };
-		// The site cannot be fetched without the user's sign-in: Kalem's tools reach it, WebFetch does not.
+				: {
+						config: mcpConfig,
+						tools: [
+							...(lookups === null ? [] : CONFLUENCE_TOOLS),
+							...(jiraLookups === null ? [] : JIRA_TOOLS),
+						].map((tool) => mcpToolName(tool.name)),
+					};
+		// The sites cannot be fetched without the user's sign-in: Kalem's tools reach them, WebFetch does not.
 		const denied =
-			mcp === undefined || lookups === null
+			mcp === undefined
 				? []
-				: [`WebFetch(domain:${new URL(lookups.site).hostname})`];
+				: [
+						...new Set(
+							[lookups?.site, jiraLookups?.site]
+								.filter((site): site is string => site !== undefined)
+								.map((site) => new URL(site).hostname),
+						),
+					].map((host) => `WebFetch(domain:${host})`);
 		const way: LookupWay = program === null ? "tools" : mcp === undefined ? "block" : "mcp";
-		const system = `${systemPrompt(t)}\n\n${confluenceInstructions(lookups?.site ?? null, way)}`;
+		const system = `${systemPrompt(t)}\n\n${confluenceInstructions(lookups?.site ?? null, way)}\n\n${jiraInstructions(jiraLookups?.site ?? null, way)}`;
 		const step = (done: ToolStep): void => forward({ kind: "step", ...done });
 		// Folders are a workspace: the question says what they hold, and the model reads what it needs.
 		const collected = await collectSources(sources, {
@@ -527,10 +550,11 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 					},
 				);
 				const requests = lookups === null ? [] : confluenceRequests(said);
+				const jiraAsked = jiraLookups === null ? [] : jiraRequests(said);
 				if (
 					ended !== "done" ||
 					stopped ||
-					requests.length === 0 ||
+					requests.length + jiraAsked.length === 0 ||
 					conversation === null ||
 					round >= MAX_ROUNDS ||
 					sender.isDestroyed()
@@ -538,7 +562,12 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 					if (ended === "done") send({ kind: "done" });
 					break;
 				}
-				const results = await (lookups as ConfluenceLookups).runAll(requests, step);
+				const found: string[] = [];
+				if (requests.length > 0)
+					found.push(await (lookups as ConfluenceLookups).runAll(requests, step));
+				if (jiraAsked.length > 0)
+					found.push(await (jiraLookups as JiraLookups).runAll(jiraAsked, step));
+				const results = found.join("\n\n");
 				if (stopped) {
 					send({ kind: "done" });
 					break;
@@ -605,19 +634,24 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 					reply += chunk;
 					forward({ kind: "text", text: chunk });
 				},
-				...((workspace === null && lookups === null) || !withTools
+				...((workspace === null && !looksUp) || !withTools
 					? {}
 					: {
 							tools: {
 								definitions: [
 									...(workspace === null ? [] : [...WORKSPACE_TOOLS, EDIT_TOOL]),
 									...(lookups === null ? [] : CONFLUENCE_TOOLS),
+									...(jiraLookups === null ? [] : JIRA_TOOLS),
 								],
 								run: async (name, input) => {
 									const looking = (done: ToolStep): void => {
 										looked = true;
 										step(done);
 									};
+									if (isJiraTool(name)) {
+										if (jiraLookups === null) return `${name} is not available.`;
+										return jiraLookups.runTool(name, input, looking);
+									}
 									if (isConfluenceTool(name)) {
 										if (lookups === null) return `${name} is not available.`;
 										return lookups.runTool(name, input, looking);
@@ -643,7 +677,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				// A model that cannot call tools is sent the folders' text instead, as before;
 				// without folders it is asked again without tools.
 				if (
-					(workspace === null && lookups === null) ||
+					(workspace === null && !looksUp) ||
 					reply !== "" ||
 					looked ||
 					controller.signal.aborted

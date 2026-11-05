@@ -134,6 +134,7 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 		},
 		{ label: t.confluenceOpen, click: send(ctx, "confluence-open") },
 		{ label: t.confluenceAttachmentsMenu, click: send(ctx, "confluence-attachments") },
+		{ label: t.jiraMenu, click: send(ctx, "jira-open") },
 		{
 			label: t.importConfluence,
 			click: (_item, window) => void windows.showConfluenceDialog(targetOf(ctx, window)),
@@ -345,6 +346,7 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 					checked: settings.navigation,
 					click: () => ctx.changeSettings({ navigation: !settings.navigation }),
 				},
+				{ label: t.settingsMenu, accelerator: "CmdOrCtrl+,", click: send(ctx, "settings") },
 				{
 					label: t.assistantPane,
 					type: "checkbox",
