@@ -837,6 +837,73 @@ test("the assistant searches Confluence and reads pages to answer, with a local 
 	await app.close();
 });
 
+test("Claude Code searches Confluence with Kalem's own tools, through its MCP server", async () => {
+	const confluence = await fakeConfluence();
+	cleanup.push(confluence.close);
+	const folder = await tempDir("assistant-confluence-mcp");
+	const answer = `Onay toplantısı sprint sonunda yapılır. Kaynak: [Sprint Planı](${confluence.site}/pages/viewpage.action?pageId=42)`;
+	const claude = await fakeClaude(folder, answer, [
+		{ name: "confluence_search", input: { query: "onay" } },
+		{ name: "confluence_read_page", input: { page_id: "42" } },
+	]);
+	const { app, page, errors } = await launch({
+		settings: { assistant: true },
+		env: { KALEM_CLAUDE: claude.path },
+	});
+
+	await page.getByRole("tab", { name: "Confluence" }).click();
+	const pane = page.locator(".confluence-pane");
+	await pane.getByRole("button", { name: "Connect" }).click();
+	const dialog = page.locator(".confluence-dialog");
+	await dialog.locator('input[type="url"]').fill(confluence.site);
+	await dialog.locator('input[type="password"]').fill(TOKEN);
+	await dialog.getByRole("button", { name: "Connect" }).click();
+	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
+	await page.keyboard.press("Escape");
+
+	const assistant = page.locator(".assistant");
+	await expect(assistant.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
+	const input = assistant.locator(".assistant-input");
+	await input.fill("Test için gds pnr nasıl bulurum? Confluence'tan ara");
+	await input.press("Enter");
+
+	const reply = assistant.locator(".assistant-assistant").last();
+	await expect(reply.locator(".assistant-markdown").last()).toContainText(
+		"Onay toplantısı sprint sonunda yapılır.",
+	);
+	await expect(reply.locator(".assistant-steps li")).toHaveText([
+		"Searched Confluence for “onay”",
+		"Read the Confluence page “42”",
+	]);
+
+	// One run: the CLI called Kalem's tools itself, allowed without asking, and they reached the site.
+	const calls = await claude.calls();
+	expect(calls).toHaveLength(1);
+	const args = calls[0]?.args ?? [];
+	expect(args).toEqual(
+		expect.arrayContaining([
+			"--mcp-config",
+			"--allowedTools",
+			"mcp__kalem__confluence_search",
+			"mcp__kalem__confluence_read_page",
+		]),
+	);
+	// Its own WebFetch may not go to the site: only Kalem's tools reach it.
+	expect(args).toContain(`WebFetch(domain:${new URL(confluence.site).hostname})`);
+	const system = args[args.indexOf("--append-system-prompt") + 1] ?? "";
+	expect(system).toContain("`mcp__kalem__confluence_search`");
+	expect(system).toContain("Do not use WebFetch");
+	const [search, read] = calls[0]?.tools ?? [];
+	expect(search?.allowed).toBe(true);
+	expect(search?.text).toContain("1. Sprint Planı (page id 42)");
+	expect(search?.text).toContain("text: Sprint sonunda «onay» toplantısı & demo");
+	expect(read?.text).toContain('Page "Sprint Planı" (page id 42, space DEV)');
+	expect(read?.text).toContain("Hedef");
+	expect(confluence.searches).toContain('type=page AND (text~"onay" OR text~"onay*")');
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
 test("edits a column of a page layout and keeps the layout", async () => {
 	const confluence = await fakeConfluence();
 	cleanup.push(confluence.close);

@@ -25,6 +25,7 @@ import {
 	systemPrompt,
 	withInstructions,
 } from "../shared/claude.js";
+import type { LookupWay } from "../shared/confluence-tool.js";
 import {
 	confluenceInstructions,
 	confluenceRequests,
@@ -43,6 +44,8 @@ import {
 } from "../shared/providers.js";
 import type { ChatStore } from "./assistant-chats.js";
 import { CONFLUENCE_TOOLS, ConfluenceLookups, isConfluenceTool } from "./assistant-confluence.js";
+import type { AssistantToolServer } from "./assistant-mcp.js";
+import { mcpToolName } from "./assistant-mcp.js";
 import { collectSources, MAX_SOURCES, SOURCE_BUDGET } from "./assistant-sources.js";
 import type { AssistantStore } from "./assistant-store.js";
 import type { CliProgram } from "./cli.js";
@@ -71,6 +74,8 @@ export interface AssistantIpcContext {
 	senderOf(event: IpcMainInvokeEvent): AppWindow;
 	/** The connected Confluence site, for the assistant's look-ups; `null` when there is none. */
 	confluence(): Promise<ConfluenceClient | null>;
+	/** Kalem's tools for Claude Code, as an MCP server. */
+	readonly tools: AssistantToolServer;
 }
 
 /** How many past messages of a chat an API is sent again; older ones are dropped. */
@@ -396,7 +401,21 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			.confluence()
 			.then((client) => (client === null ? null : new ConfluenceLookups(client)))
 			.catch(() => null);
-		const system = `${systemPrompt(t)}\n\n${confluenceInstructions(lookups?.site ?? null, program !== null)}`;
+		// Claude Code gets the look-ups as real tools, from Kalem's MCP server; Copilot
+		// writes them in a block; an API calls them as its own tools.
+		const mcpConfig =
+			lookups !== null && program === "claude" ? await ctx.tools.config().catch(() => null) : null;
+		const mcp =
+			mcpConfig === null
+				? undefined
+				: { config: mcpConfig, tools: CONFLUENCE_TOOLS.map((tool) => mcpToolName(tool.name)) };
+		// The site cannot be fetched without the user's sign-in: Kalem's tools reach it, WebFetch does not.
+		const denied =
+			mcp === undefined || lookups === null
+				? []
+				: [`WebFetch(domain:${new URL(lookups.site).hostname})`];
+		const way: LookupWay = program === null ? "tools" : mcp === undefined ? "block" : "mcp";
+		const system = `${systemPrompt(t)}\n\n${confluenceInstructions(lookups?.site ?? null, way)}`;
 		const step = (done: ToolStep): void => forward({ kind: "step", ...done });
 		// Folders are a workspace: the question says what they hold, and the model reads what it needs.
 		const collected = await collectSources(sources, {
@@ -460,6 +479,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 					model: connection.model,
 					jsonInput,
 					folders: files.folders,
+					...(mcp === undefined ? {} : { mcp, denied }),
 				});
 				if (jsonInput) question = claudeInputLine(asked, images);
 			} else {
@@ -536,6 +556,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 								systemPrompt: system,
 								model: connection.model,
 								folders: files.folders,
+								...(mcp === undefined ? {} : { mcp, denied }),
 							})
 						: copilotArgs({
 								sessionId: conversation,

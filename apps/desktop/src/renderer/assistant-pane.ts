@@ -1403,7 +1403,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 	/** One look into the workspace, as the chat says it. */
 	function stepLabel(tool: string, detail: string): string {
-		switch (tool) {
+		// Kalem's own tools, as Claude Code calls them through its MCP server.
+		switch (tool.replace(/^mcp__kalem__/, "")) {
 			case "search":
 			case "Grep":
 				return format(t.assistantStepSearch, detail);
@@ -1412,6 +1413,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				return format(t.assistantStepRead, detail);
 			case "propose_edit":
 				return format(t.assistantStepEdit, detail);
+			case "confluence_search":
 			case "confluence_search_content":
 				return format(t.assistantStepConfluenceSearch, detail);
 			case "confluence_search_title":

@@ -30,6 +30,12 @@ export async function fakeClaude(
 	folder: string,
 	/** The reply, or replies by what the question holds: the first whose text is in it, else the last. */
 	answer: string | readonly (readonly [string, string])[] = REPLY,
+	/**
+	 * Tools to call before answering, as Claude Code does: through the MCP
+	 * server its `--mcp-config` names. What they return is written down
+	 * with the call, and the calls show in the stream as tool uses.
+	 */
+	tools: readonly { readonly name: string; readonly input: Record<string, unknown> }[] = [],
 ): Promise<{ path: string; calls: () => Promise<Call[]> }> {
 	const log = join(folder, "calls.jsonl");
 	const script = join(folder, "fake-claude.cjs");
@@ -48,8 +54,50 @@ if (args.includes("--help")) {
 let prompt = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => (prompt += chunk));
-process.stdin.on("end", () => {
-	fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args, prompt, cwd: process.cwd() }) + "\\n");
+const tools = ${JSON.stringify(tools)};
+/** Calls the tools through the configured MCP server; their texts. */
+async function callTools() {
+	const at = args.indexOf("--mcp-config");
+	if (tools.length === 0 || at === -1) return [];
+	const config = JSON.parse(fs.readFileSync(args[at + 1], "utf8"));
+	const [name, server] = Object.entries(config.mcpServers)[0];
+	const child = require("node:child_process").spawn(server.command, server.args, {
+		env: { ...process.env, ...server.env },
+		stdio: ["pipe", "pipe", "inherit"],
+	});
+	const pending = new Map();
+	let rest = "";
+	child.stdout.setEncoding("utf8");
+	child.stdout.on("data", (chunk) => {
+		rest += chunk;
+		const lines = rest.split("\\n");
+		rest = lines.pop();
+		for (const line of lines) {
+			if (line.trim() === "") continue;
+			const message = JSON.parse(line);
+			pending.get(message.id)?.(message);
+		}
+	});
+	let next = 0;
+	const ask = (method, params) =>
+		new Promise((resolve) => {
+			const id = ++next;
+			pending.set(id, resolve);
+			child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\\n");
+		});
+	await ask("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "fake" } });
+	const results = [];
+	for (const tool of tools) {
+		const allowed = args.includes("mcp__" + name + "__" + tool.name);
+		const answer = await ask("tools/call", { name: tool.name, arguments: tool.input });
+		results.push({ tool: "mcp__" + name + "__" + tool.name, allowed, text: answer.result.content[0].text });
+	}
+	child.stdin.end();
+	return results;
+}
+process.stdin.on("end", async () => {
+	const used = await callTools();
+	fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args, prompt, cwd: process.cwd(), tools: used }) + "\\n");
 	const answers = ${JSON.stringify(answer)};
 	const reply =
 		typeof answers === "string"
@@ -57,6 +105,10 @@ process.stdin.on("end", () => {
 			: (answers.find(([needle]) => prompt.includes(needle)) ?? answers[answers.length - 1])[1];
 	const out = (line) => process.stdout.write(JSON.stringify(line) + "\\n");
 	out({ type: "system", subtype: "init", session_id: "sess-1" });
+	if (used.length > 0) {
+		const input = (i) => tools[i].input;
+		out({ type: "assistant", message: { content: used.map((call, i) => ({ type: "tool_use", id: "t" + i, name: call.tool, input: input(i) })) }, session_id: "sess-1" });
+	}
 	out({ type: "stream_event", event: { type: "message_start" } });
 	for (let i = 0; i < reply.length; i += 7) {
 		out({ type: "stream_event", event: { type: "content_block_delta", delta: { type: "text_delta", text: reply.slice(i, i + 7) } } });
@@ -90,4 +142,10 @@ export interface Call {
 	readonly args: string[];
 	readonly prompt: string;
 	readonly cwd: string;
+	/** The tools called through the MCP server: their names, whether allowed, and what they returned. */
+	readonly tools?: readonly {
+		readonly tool: string;
+		readonly allowed: boolean;
+		readonly text: string;
+	}[];
 }
