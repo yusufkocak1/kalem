@@ -33,6 +33,8 @@ const issue = (key: string, summary: string, status: string, category: string) =
 /** Jira Server: who is signed in, two issues and a search. */
 async function fakeJira() {
 	const searches: string[] = [];
+	/** Where the issue's "mentioned in" page is: set once the fake Confluence is up. */
+	const confluence = { site: "" };
 	const server = createServer((req, res) => {
 		const url = new URL(req.url ?? "/", "http://localhost");
 		if (req.headers.authorization !== `Bearer ${JIRA_TOKEN}`) {
@@ -47,7 +49,9 @@ async function fakeJira() {
 					...base.fields,
 					priority: { name: "High" },
 					reporter: { displayName: "Mehmet" },
-					description: "Oturum *30 sn* sonra düşüyor.",
+					// An HTML editor plug-in keeps the description as HTML, lines joined by backslashes.
+					description:
+						'<div class="jePanel_warning" style="border:1px solid #d4a19e">\\\n<p dir="auto"><b>HATA</b>: Oturum <u>30 sn</u> sonra düşüyor.</p>\\\n</div><ul>\\\n<li>Chrome</li><li>Edge</li></ul>',
 					labels: ["oturum"],
 					subtasks: [issue("QR-2", "Süreyi ayarla", "Done", "done")],
 					comment: {
@@ -56,6 +60,18 @@ async function fakeJira() {
 					},
 				},
 			});
+		}
+		if (url.pathname === "/rest/api/2/issue/QR-1/remotelink") {
+			return json(res, [
+				{
+					relationship: "mentioned in",
+					application: { type: "com.atlassian.confluence", name: "Confluence" },
+					object: {
+						url: `${confluence.site}/pages/viewpage.action?pageId=42`,
+						title: "Sprint Planı",
+					},
+				},
+			]);
 		}
 		if (url.pathname === "/rest/api/2/issue/QR-2") {
 			return json(res, issue("QR-2", "Süreyi ayarla", "Done", "done"));
@@ -71,7 +87,12 @@ async function fakeJira() {
 		return json(res, { errorMessages: ["Not found"] }, 404);
 	});
 	const site = await listen(server);
-	return { site, searches, close: () => new Promise<void>((done) => server.close(() => done())) };
+	return {
+		site,
+		searches,
+		confluence,
+		close: () => new Promise<void>((done) => server.close(() => done())),
+	};
 }
 
 /**
@@ -123,6 +144,7 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	cleanup.push(jiraServer.close);
 	const confluence = await fakeConfluence(jiraServer.site);
 	cleanup.push(confluence.close);
+	jiraServer.confluence.site = confluence.site;
 	const { app, page, userData, errors } = await launch();
 	await app.evaluate(({ shell }) => {
 		const opened: string[] = [];
@@ -170,7 +192,17 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await expect(jira.locator(".jira-title")).toHaveText("Giriş zaman aşımı");
 	await expect(jira.locator(".jira-issue-head .jira-status")).toHaveText("In Progress");
 	await expect(jira.locator(".jira-fields")).toContainText("AssigneeAyşe Balcı");
-	await expect(jira.locator(".jira-markdown strong").first()).toHaveText("30 sn");
+	// The description kept as HTML is drawn as a page, not shown as code: the panel is an alert.
+	const description = jira.locator(".jira-markdown").first();
+	await expect(description.locator("blockquote")).toContainText(
+		"⚠️ HATA: Oturum 30 sn sonra düşüyor.",
+	);
+	await expect(description.locator("li")).toHaveText(["Chrome", "Edge"]);
+	await expect(description).not.toContainText("<div");
+	await expect(description).not.toContainText("\\");
+	// Links are grouped by how they relate; a Confluence page that mentions it is among them.
+	const mentioned = jira.locator(".jira-link-group", { hasText: "mentioned in" });
+	await expect(mentioned.locator(".jira-remote")).toHaveText("Sprint Planı");
 	await expect(jira.locator(".jira-comment")).toContainText("Bende de oluyor.");
 	// A sub-task opens in the same dialog, and Back returns.
 	await jira.locator('.jira-row[data-key="QR-2"]').click();
@@ -179,8 +211,10 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await expect(jira.locator(".jira-title")).toHaveText("Giriş zaman aşımı");
 	await jira.getByRole("button", { name: "Open in Browser" }).click();
 	await expect.poll(opened).toEqual([`${jiraServer.site}/browse/QR-1`]);
-	await jira.getByRole("button", { name: "Close" }).click();
+	// The page opens in Kalem, and the dialog closes.
+	await mentioned.locator(".jira-remote").click();
 	await expect(jira).toBeHidden();
+	await expect(page.locator(".doc-tab", { hasText: "Sprint Planı" })).toHaveCount(1);
 
 	// The card now shows the issue's summary and status, from Jira.
 	await atom.hover();

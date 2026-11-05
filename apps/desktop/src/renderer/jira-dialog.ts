@@ -8,12 +8,14 @@ import type {
 	JiraIssue,
 	JiraIssueRef,
 	JiraIssueRow,
+	JiraRemoteLink,
 	StatusCategory,
 } from "../shared/jira.js";
 import { issueKey, issueKeyFromUrl, normalizeJiraSite } from "../shared/jira.js";
 import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
+import { jiraHtmlRoot } from "./jira-html.js";
 
 export interface JiraDialogOptions {
 	readonly t: Strings;
@@ -274,11 +276,9 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 			[t.jiraComponents, issue.components.join(", ")],
 			[t.jiraFixVersions, issue.fixVersions.join(", ")],
 		];
-		const description = el("div", { class: "jira-markdown" });
-		if (issue.description === "") {
+		const description = richText(issue.description, issue.descriptionHtml);
+		if (issue.description === "" && issue.descriptionHtml === null) {
 			description.append(message(t.jiraNoDescription));
-		} else {
-			renderToDOM(parse(issue.description), description, { containerClass: false });
 		}
 		const sections: HTMLElement[] = [
 			el("div", {
@@ -311,27 +311,39 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 			}),
 		];
 		if (issue.parent !== null) {
-			sections.push(section(t.jiraParent, [issueRow(issue.parent)]));
+			sections.push(fold(t.jiraParent, [list([issueRow(issue.parent)])]));
 		}
-		sections.push(
-			el("section", {
-				class: "jira-section",
-				children: [el("h3", { text: t.jiraDescription }), description],
-			}),
-		);
+		sections.push(fold(t.jiraDescription, [description]));
 		if (issue.subtasks.length > 0) {
 			sections.push(
-				section(
-					format(t.jiraSubtasks, issue.subtasks.length),
-					issue.subtasks.map((ref) => issueRow(ref)),
-				),
+				fold(format(t.jiraSubtasks, issue.subtasks.length), [
+					list(
+						issue.subtasks.map((ref, index) => issueRow(ref, `${index + 1}.`)),
+						"jira-subtasks",
+					),
+				]),
 			);
 		}
-		if (issue.links.length > 0) {
+		// Links grouped by how they relate, as Jira's "Issue Links": issues and Confluence pages together.
+		const groups = new Map<string, HTMLElement[]>();
+		const add = (relation: string, row: HTMLElement): void => {
+			const rows = groups.get(relation) ?? [];
+			rows.push(row);
+			groups.set(relation, rows);
+		};
+		for (const link of issue.links) add(link.relation, issueRow(link.issue));
+		for (const link of issue.remoteLinks) add(link.relation, remoteRow(link));
+		const linkCount = issue.links.length + issue.remoteLinks.length;
+		if (linkCount > 0) {
 			sections.push(
-				section(
-					format(t.jiraLinks, issue.links.length),
-					issue.links.map((link) => issueRow(link.issue, link.relation)),
+				fold(
+					format(t.jiraLinks, linkCount),
+					[...groups].map(([relation, rows]) =>
+						el("div", {
+							class: "jira-link-group",
+							children: [el("h4", { text: relation }), list(rows)],
+						}),
+					),
 				),
 			);
 		}
@@ -341,40 +353,81 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 					? format(t.jiraCommentsLatest, issue.commentTotal, issue.comments.length)
 					: format(t.jiraComments, issue.commentTotal);
 			sections.push(
-				el("section", {
-					class: "jira-section",
-					children: [
-						el("h3", { text: title }),
-						...issue.comments.map((comment) => {
-							const text = el("div", { class: "jira-markdown" });
-							renderToDOM(parse(comment.body), text, { containerClass: false });
-							return el("article", {
-								class: "jira-comment",
-								children: [
-									el("div", {
-										class: "jira-comment-head",
-										children: [
-											el("strong", { text: comment.author }),
-											el("span", { text: when(comment.created, true) }),
-										],
-									}),
-									text,
-								],
-							});
+				fold(
+					title,
+					issue.comments.map((comment) =>
+						el("article", {
+							class: "jira-comment",
+							children: [
+								el("div", {
+									class: "jira-comment-head",
+									children: [
+										el("strong", { text: comment.author }),
+										el("span", { text: when(comment.created, true) }),
+									],
+								}),
+								richText(comment.body, comment.html),
+							],
 						}),
-					],
-				}),
+					),
+				),
 			);
 		}
 		body.replaceChildren(...sections);
 		heading.textContent = issue.key;
 	}
 
-	function section(title: string, rows: readonly HTMLElement[]): HTMLElement {
-		return el("section", {
+	/** A part of the issue that folds away, as Jira's own sections do. */
+	function fold(title: string, children: readonly HTMLElement[]): HTMLElement {
+		const part = el("details", {
 			class: "jira-section",
-			children: [el("h3", { text: title }), el("ul", { class: "jira-list", children: rows })],
+			attrs: { open: "" },
+			children: [el("summary", { children: [el("h3", { text: title })] }), ...children],
 		});
+		return part;
+	}
+
+	function list(rows: readonly HTMLElement[], extra = ""): HTMLElement {
+		return el("ul", { class: `jira-list ${extra}`.trim(), children: rows });
+	}
+
+	/** Text as Jira shows it: HTML drawn as a page (not as code), wiki markup as Markdown. */
+	function richText(markdown: string, html: string | null): HTMLElement {
+		const target = el("div", { class: "jira-markdown" });
+		renderToDOM(html === null ? parse(markdown) : jiraHtmlRoot(html), target, {
+			containerClass: false,
+		});
+		return target;
+	}
+
+	/** A link outside Jira: a Confluence page opens in a tab of Kalem, anything else in the browser. */
+	function remoteRow(link: JiraRemoteLink): HTMLElement {
+		const row = el("li", {
+			class: "jira-row jira-remote",
+			attrs: { tabindex: "0", role: "link", title: link.url, "data-url": link.url },
+			children: [
+				icon(link.pageId === null ? "link" : "confluence"),
+				el("span", { class: "jira-summary", text: link.title }),
+			],
+		});
+		const open = async (): Promise<void> => {
+			const pageId = link.pageId;
+			if (pageId === null) {
+				options.openLink(link.url);
+				return;
+			}
+			try {
+				await bridge.confluenceOpenPage(pageId);
+				dialog.close();
+			} catch {
+				options.openLink(link.url);
+			}
+		};
+		row.addEventListener("click", () => void open());
+		row.addEventListener("keydown", (event) => {
+			if (event.key === "Enter") void open();
+		});
+		return row;
 	}
 
 	function copyButton(label: string, text: string): HTMLButtonElement {

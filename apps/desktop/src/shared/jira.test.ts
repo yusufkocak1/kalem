@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { withoutRequests } from "./confluence-tool.js";
 import {
+	cleanJiraHtml,
+	htmlText,
 	issueKey,
 	issueKeyFromUrl,
 	issueOf,
 	issueText,
+	looksLikeHtml,
 	normalizeJiraSite,
+	remoteLinksOf,
 	searchJql,
 	searchText,
 } from "./jira.js";
@@ -179,6 +183,80 @@ describe("Jira issues", () => {
 		expect(text).toContain(
 			"- DEV-7 Giriş (Bug, Open, unassigned) https://jira.example.com/browse/DEV-7",
 		);
+	});
+});
+
+describe("Jira fields kept as HTML", () => {
+	const JEDITOR =
+		'<div class="jePanel_warning" style="border:1px solid #d4a19e">\\\n<p dir="auto"><b>HATA</b>:</p><p>SSR kay&#305;tlar&#305; &amp; PNR</p>\\\n</div><ul>\\\n<li>Birinci</li><li>İkinci</li></ul>';
+
+	it("tells an HTML editor plug-in's HTML from wiki markup", () => {
+		expect(looksLikeHtml(JEDITOR)).toBe(true);
+		expect(looksLikeHtml("<p>Merhaba</p>")).toBe(true);
+		expect(looksLikeHtml("h1. Başlık\n*kalın* <b>")).toBe(false);
+		expect(looksLikeHtml("a < b and c > d")).toBe(false);
+	});
+
+	it("joins the lines it continued with a backslash, and reads its text for the assistant", () => {
+		expect(cleanJiraHtml(JEDITOR)).not.toContain("\\");
+		expect(htmlText(JEDITOR)).toBe("HATA:\nSSR kayıtları & PNR\n\n- Birinci\n- İkinci");
+	});
+
+	it("keeps the HTML (Jira's rendering when it has one) and gives the model its text", () => {
+		const issue = issueOf(
+			{
+				key: "QR-1",
+				fields: {
+					description: JEDITOR,
+					comment: {
+						total: 1,
+						comments: [{ author: { name: "can" }, body: "<p>Tamam <b>oldu</b></p>" }],
+					},
+				},
+				renderedFields: { description: "<div>Jira'nın çizdiği</div>", comment: { comments: [{}] } },
+			},
+			"https://jira.example.com",
+		);
+		expect(issue?.descriptionHtml).toBe("<div>Jira'nın çizdiği</div>");
+		expect(issue?.description).toBe("Jira'nın çizdiği");
+		expect(issue?.comments[0]).toMatchObject({
+			body: "Tamam oldu",
+			html: "<p>Tamam <b>oldu</b></p>",
+		});
+	});
+
+	it("reads the issue's links outside Jira", () => {
+		expect(
+			remoteLinksOf([
+				{
+					relationship: "mentioned in",
+					application: { type: "com.atlassian.confluence", name: "Confluence" },
+					object: {
+						url: "https://wiki.example.com/pages/viewpage.action?pageId=42",
+						title: "Analiz Dokümanı",
+					},
+				},
+				{
+					application: { type: "com.atlassian.confluence" },
+					object: { url: "https://wiki.example.com/x/AbC" },
+				},
+				{ object: { url: "javascript:alert(1)", title: "x" } },
+			]),
+		).toEqual([
+			{
+				relation: "mentioned in",
+				title: "Analiz Dokümanı",
+				url: "https://wiki.example.com/pages/viewpage.action?pageId=42",
+				pageId: null,
+			},
+			{
+				relation: "wiki page",
+				title: "https://wiki.example.com/x/AbC",
+				url: "https://wiki.example.com/x/AbC",
+				pageId: null,
+			},
+		]);
+		expect(remoteLinksOf({ errorMessages: ["x"] })).toEqual([]);
 	});
 });
 

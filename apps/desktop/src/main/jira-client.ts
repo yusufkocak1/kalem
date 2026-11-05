@@ -6,6 +6,7 @@ import {
 	issueRowOf,
 	normalizeJiraSite,
 	ROW_FIELDS,
+	remoteLinksOf,
 } from "../shared/jira.js";
 import type { ConfluenceCredentials, Fetch } from "./confluence-client.js";
 import { isCloudHost } from "./confluence-client.js";
@@ -59,6 +60,10 @@ export class JiraClient {
 	}
 
 	async #json(path: string): Promise<Json> {
+		return asJson(await this.#get(path));
+	}
+
+	async #get(path: string): Promise<unknown> {
 		const response = await this.#fetch(`${this.site}${path}`, {
 			headers: { Accept: "application/json", Authorization: this.#auth },
 		});
@@ -76,7 +81,7 @@ export class JiraClient {
 				detail === "" ? `HTTP ${response.status}` : `HTTP ${response.status}: ${detail}`,
 			);
 		}
-		return asJson(await response.json());
+		return response.json();
 	}
 
 	/** Who is signed in; fails when the site or the login is wrong. */
@@ -104,10 +109,17 @@ export class JiraClient {
 	async issue(key: string): Promise<JiraIssue> {
 		const valid = issueKey(key);
 		if (valid === null) throw new Error("Invalid issue key");
-		const body = await this.#json(`/rest/api/2/issue/${valid}?fields=${ISSUE_FIELDS.join(",")}`);
+		// Jira's own rendering too: a site with an HTML editor plug-in keeps its fields as HTML.
+		const [body, remote] = await Promise.all([
+			this.#json(
+				`/rest/api/2/issue/${valid}?fields=${ISSUE_FIELDS.join(",")}&expand=renderedFields`,
+			),
+			// Links outside Jira (Confluence pages that mention it); an issue may have none to read.
+			this.#get(`/rest/api/2/issue/${valid}/remotelink`).catch(() => []),
+		]);
 		const issue = issueOf(body, this.site);
 		if (issue === null) throw new Error("Jira did not return the issue");
-		return issue;
+		return { ...issue, remoteLinks: remoteLinksOf(remote) };
 	}
 
 	/** An issue's key facts, for a card: summary, status, type, assignee. */

@@ -463,6 +463,17 @@ verir.
   bağlantılı kayıtlar. Bir alt göreve ya da bağlantılı kayda tıklamak onu aynı
   pencerede açar, **Geri** (`Alt+←`) döner; açıklamadaki Jira bağlantıları da
   orada açılır. **Tarayıcıda Aç**, **Anahtarı Kopyala**, **Bağlantıyı Kopyala**.
+- Açıklaması ve yorumları **HTML** olarak saklayan Jira'larda (ör. JEditor
+  eklentisi) metin kod gibi değil, sayfa gibi çizilir: Jira'nın kendi
+  çizimi (`expand=renderedFields`) kullanılır; uyarı/bilgi/fikir kutuları
+  simgeli alıntı olur. HTML güvenli biçimde (çalıştırılmadan) Markdown'a
+  çevrilerek gösterilir; asistana düz metni gider.
+- Bölümler (açıklama, alt görevler, bağlantılar, yorumlar) Jira'daki gibi
+  katlanır. Bağlantılar ilişkisine göre gruplanır ("blocks", "mentioned in"…);
+  Jira dışı bağlantılar da (`/remotelink`) listelenir. **Confluence sayfası**
+  bağlı Confluence sitesindeyse tıklamak onu Kalem'de bir sekmede açar
+  (adresteki sayfa kimliğiyle ya da `/display/ALAN/Başlık` adresinden
+  aranarak); değilse tarayıcıda açılır.
 - Arama: anahtar (`QR-123`), kelimeler (`text ~`) ya da JQL; 25'er sonuç,
   **Daha fazla sonuç göster**. Cloud'da `/rest/api/2/search/jql`, Server'da
   `/rest/api/2/search` kullanılır.
