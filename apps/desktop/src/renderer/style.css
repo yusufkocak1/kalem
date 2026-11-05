@@ -5431,3 +5431,322 @@ pre[data-confluence-kind="layout"]::before {
 .text-view-area[wrap="soft"] {
 	white-space: pre-wrap;
 }
+
+/* --- Jira -------------------------------------------------------------------- */
+
+.jira-dialog {
+	display: none;
+	flex-direction: column;
+	width: min(760px, calc(100vw - 32px));
+	max-height: min(84vh, 900px);
+	margin: 6vh auto auto;
+	padding: 0;
+	overflow: hidden;
+	border: 1px solid var(--app-border);
+	border-radius: 10px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: var(--app-shadow);
+}
+
+.jira-dialog[open] {
+	display: flex;
+}
+
+.jira-dialog::backdrop {
+	background: rgb(0 0 0 / 18%);
+}
+
+.jira-header {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 10px;
+	border-bottom: 1px solid var(--app-border);
+}
+
+.jira-heading {
+	flex: none;
+	font-weight: 700;
+}
+
+.jira-site {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	color: var(--app-muted);
+	font-size: 12px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.jira-icon-button {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: 0;
+	border-radius: 6px;
+	background: none;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+}
+
+.jira-icon-button:hover {
+	background: var(--app-hover);
+}
+
+.jira-icon-button[hidden] {
+	display: none;
+}
+
+.jira-icon-button svg,
+.jira-button svg {
+	width: 16px;
+	height: 16px;
+}
+
+.jira-body {
+	display: grid;
+	align-content: start;
+	gap: 12px;
+	padding: 14px 16px 18px;
+	overflow-y: auto;
+}
+
+.jira-message {
+	margin: 0;
+	color: var(--app-muted);
+	font-size: 13px;
+}
+
+.jira-message:empty {
+	display: none;
+}
+
+.jira-error {
+	margin: 0;
+	color: var(--app-error);
+	font-size: 13px;
+}
+
+.jira-issue-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+}
+
+.jira-key {
+	flex: none;
+	color: var(--app-accent);
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.jira-type {
+	color: var(--app-muted);
+}
+
+.jira-title {
+	margin: 0;
+	font-size: 19px;
+	line-height: 1.3;
+	overflow-wrap: anywhere;
+}
+
+/* Statuses are coloured by their category, as Jira draws them. */
+.jira-status {
+	flex: none;
+	padding: 1px 7px;
+	border-radius: 4px;
+	background: #dfe1e6;
+	color: #42526e;
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+.jira-status[data-category="indeterminate"] {
+	background: #deebff;
+	color: #0747a6;
+}
+
+.jira-status[data-category="done"] {
+	background: #e3fcef;
+	color: #006644;
+}
+
+.jira-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-start;
+	gap: 6px;
+}
+
+.confluence-actions.jira-actions {
+	justify-content: flex-end;
+}
+
+.jira-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 5px 12px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-surface);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.jira-button:hover {
+	background: var(--app-hover);
+}
+
+.jira-button.primary {
+	border-color: var(--app-accent);
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+}
+
+.jira-fields {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 4px 16px;
+	margin: 0;
+	font-size: 13px;
+}
+
+.jira-fields dt {
+	color: var(--app-muted);
+}
+
+.jira-fields dd {
+	margin: 0;
+	overflow-wrap: anywhere;
+}
+
+.jira-section h3 {
+	margin: 4px 0 6px;
+	font-size: 13px;
+	text-transform: uppercase;
+	color: var(--app-muted);
+}
+
+.jira-markdown {
+	font-size: 14px;
+	line-height: 1.5;
+	overflow-wrap: anywhere;
+}
+
+.jira-markdown > :first-child {
+	margin-top: 0;
+}
+
+.jira-markdown > :last-child {
+	margin-bottom: 0;
+}
+
+.jira-markdown pre {
+	overflow-x: auto;
+}
+
+.jira-list {
+	display: grid;
+	gap: 2px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.jira-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 6px 8px;
+	border-radius: 6px;
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.jira-row:hover,
+.jira-row:focus {
+	outline: none;
+	background: var(--app-pressed);
+}
+
+.jira-relation {
+	flex: none;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.jira-summary {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.jira-assignee {
+	flex: none;
+	max-width: 30%;
+	overflow: hidden;
+	color: var(--app-muted);
+	font-size: 12px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.jira-comment {
+	padding: 8px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-surface);
+}
+
+.jira-comment + .jira-comment {
+	margin-top: 8px;
+}
+
+.jira-comment-head {
+	display: flex;
+	gap: 8px;
+	margin-bottom: 4px;
+	font-size: 12px;
+	color: var(--app-muted);
+}
+
+.jira-comment-head strong {
+	color: var(--app-text);
+}
+
+.jira-more {
+	justify-self: start;
+	font-size: 13px;
+}
+
+.jira-more[hidden] {
+	display: none;
+}
+
+.link-card-issue {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+}
+
+.link-card-issue .jira-summary {
+	white-space: normal;
+}

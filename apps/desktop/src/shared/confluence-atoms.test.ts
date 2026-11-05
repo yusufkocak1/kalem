@@ -145,4 +145,15 @@ describe("addresses", () => {
 			),
 		).toBeNull();
 	});
+
+	it("finds Jira among the Jira macro's servers, which any user may read", () => {
+		const servers = [
+			{ id: "j1", name: "Jira", url: "https://jira.example.com", selected: false },
+			{ id: "j2", name: "Eski Jira", url: "https://old-jira.example.com", selected: true },
+		];
+		expect(jiraBaseFromLinks(servers, "j1", true)).toBe("https://jira.example.com");
+		// An unknown id: the default one.
+		expect(jiraBaseFromLinks(servers, "zz", true)).toBe("https://old-jira.example.com");
+		expect(jiraBaseFromLinks([servers[0]], "", true)).toBe("https://jira.example.com");
+	});
 });

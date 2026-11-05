@@ -5,6 +5,7 @@ import type { AtomDetails } from "./confluence-atoms.js";
 import type { ConfluenceSearchRequest, ConfluenceSearchResults } from "./confluence-search.js";
 import type { TextFormat } from "./encoding.js";
 import type { Lang } from "./i18n.js";
+import type { JiraAccount, JiraIssue, JiraSearchResults } from "./jira.js";
 import type { AssistantConfig, AssistantUpdate, ChatMessage, ProviderId } from "./providers.js";
 
 export type Theme = "system" | "light" | "dark";
@@ -557,6 +558,7 @@ export const COMMANDS = [
 	"search-folder",
 	"version-history",
 	"confluence-attachments",
+	"jira-open",
 	"move-tab",
 	"case-upper",
 	"case-lower",
@@ -630,6 +632,16 @@ export interface KalemBridge {
 		tabId: string,
 		attachment: { readonly id: string; readonly name: string; readonly used: boolean },
 	): Promise<boolean>;
+	/** The Jira connection: its own, or Confluence Cloud's login on the same site; `null` when none. */
+	jiraAccount(): Promise<JiraAccount | null>;
+	/** Checks the login against the site and remembers it; the token never comes back. */
+	jiraConnect(login: ConfluenceLogin): Promise<JiraAccount>;
+	jiraDisconnect(): Promise<void>;
+	/** Jira's address as Confluence knows it (its Jira macro's servers), to fill in the login. */
+	jiraSuggestedSite(): Promise<string | null>;
+	jiraIssue(key: string): Promise<JiraIssue>;
+	/** A search by JQL, an issue key or words; `next` continues an earlier answer. */
+	jiraSearch(query: string, next: string | null): Promise<JiraSearchResults>;
 	/** `package` proposes a `.kmd`; otherwise Markdown (or the tab's current type) comes first. */
 	/** `kind` "text": a text file, saved under any name with its own extension offered. */
 	chooseSavePath(
@@ -784,6 +796,12 @@ export const CHANNEL = {
 	confluenceOpenAttachment: "kalem:confluence-open-attachment",
 	confluenceDownloadAttachment: "kalem:confluence-download-attachment",
 	confluenceDeleteAttachment: "kalem:confluence-delete-attachment",
+	jiraAccount: "kalem:jira-account",
+	jiraConnect: "kalem:jira-connect",
+	jiraDisconnect: "kalem:jira-disconnect",
+	jiraSuggestedSite: "kalem:jira-suggested-site",
+	jiraIssue: "kalem:jira-issue",
+	jiraSearch: "kalem:jira-search",
 	chooseSavePath: "kalem:choose-save-path",
 	writeDocument: "kalem:write-document",
 	reloadDocument: "kalem:reload-document",

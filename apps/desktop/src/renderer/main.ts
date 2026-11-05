@@ -47,6 +47,7 @@ import { createFilesPane } from "./files-pane.js";
 import { createGitDialogs } from "./git-dialogs.js";
 import { icon } from "./icons.js";
 import { createImageViewer } from "./image-viewer.js";
+import { createJiraDialog } from "./jira-dialog.js";
 import { createLinkCard } from "./link-card.js";
 import { createNotices } from "./notices.js";
 import { Previews } from "./previews.js";
@@ -133,6 +134,12 @@ const confluenceDialog = createConfluenceDialog({
 	onAccountChange: () => {
 		if (settings.navigation && settings.sidePane === "confluence") void confluencePane.refresh();
 	},
+});
+const jiraDialog = createJiraDialog({
+	t,
+	lang: startup.language,
+	bridge,
+	openLink: (url) => bridge.openLink(url),
 });
 const confluencePane = createConfluencePane({
 	t,
@@ -780,6 +787,7 @@ const commands: Record<Command, () => void> = {
 	"format-all-code": () => (session.isText ? session.textView?.beautify() : tools.formatAllCode()),
 	"quick-open": () => void quickOpen.show(),
 	"confluence-open": () => void confluenceDialog.show(),
+	"jira-open": () => void jiraDialog.showSearch(),
 	"move-tab": () => moveTab(session.id),
 	"case-upper": () => rewriteText((text) => changeCase(text, "upper", session.editor.getLang())),
 	"case-lower": () => rewriteText((text) => changeCase(text, "lower", session.editor.getLang())),
@@ -1303,6 +1311,8 @@ createLinkCard({
 		if (found === undefined) throw new Error(format(t.atomPageMissing, title));
 		await bridge.confluenceOpenPage(found.id);
 	},
+	openJira: ({ key, jql, url }) =>
+		void (key !== "" ? jiraDialog.showIssue(key, url) : jiraDialog.showSearch(jql, url)),
 	notice: (text) =>
 		session.notices.show({
 			id: "link",

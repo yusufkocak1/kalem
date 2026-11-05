@@ -2,9 +2,10 @@
  * Kalem's own tools for Claude Code, as an MCP server: the CLI starts a
  * small stdio server (this app's executable run as Node) that passes each
  * tool call to the app over a local HTTP endpoint, where the Confluence
- * search and page read run with the app's connection. The model then calls
- * `mcp__kalem__confluence_search` like any of its tools, instead of trying
- * to reach the site itself.
+ * search and page read, and the Jira issue read and search, run with the
+ * app's connections. The model then calls `mcp__kalem__confluence_search`
+ * or `mcp__kalem__jira_get_issue` like any of its tools, instead of trying
+ * to reach the sites itself.
  *
  * The endpoint listens on 127.0.0.1 only and takes a token made for this
  * run; the token is in a file only the user can read, never on a command
@@ -17,7 +18,9 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { CONFLUENCE_TOOLS, ConfluenceLookups, isConfluenceTool } from "./assistant-confluence.js";
+import { isJiraTool, JIRA_TOOLS, JiraLookups } from "./assistant-jira.js";
 import type { ConfluenceClient } from "./confluence-client.js";
+import type { JiraClient } from "./jira-client.js";
 
 /** The server's name in the CLI: its tools are `mcp__kalem__<tool>`. */
 export const MCP_SERVER = "kalem";
@@ -97,11 +100,13 @@ process.stdin.on("end", () => process.exit(0));
 }
 
 /** The tools as MCP lists them. */
-export const MCP_TOOLS = CONFLUENCE_TOOLS.map(({ name, description, parameters }) => ({
-	name,
-	description,
-	inputSchema: parameters,
-}));
+export const MCP_TOOLS = [...CONFLUENCE_TOOLS, ...JIRA_TOOLS].map(
+	({ name, description, parameters }) => ({
+		name,
+		description,
+		inputSchema: parameters,
+	}),
+);
 
 /** Reads a request's body, up to a size. */
 function bodyOf(request: IncomingMessage, max = 256 * 1024): Promise<string> {
@@ -127,8 +132,11 @@ export interface ToolServerOptions {
 	readonly node: string;
 	/** The connected Confluence site; `null` when there is none. */
 	confluence(): Promise<ConfluenceClient | null>;
+	/** The connected Jira; `null` when there is none. */
+	jira(): Promise<JiraClient | null>;
 	/** What a call says when there is no connection. */
 	notConnected(): string;
+	jiraNotConnected(): string;
 }
 
 /** The app's side of the tools: a local endpoint, and the configuration that points the CLI to it. */
@@ -211,6 +219,15 @@ export class AssistantToolServer {
 		try {
 			const call = JSON.parse(await bodyOf(request)) as { name?: unknown; arguments?: unknown };
 			const name = typeof call.name === "string" ? call.name : "";
+			if (isJiraTool(name)) {
+				const jira = await this.#options.jira();
+				if (jira === null) {
+					reply(200, { text: this.#options.jiraNotConnected(), isError: true });
+					return;
+				}
+				reply(200, { text: await new JiraLookups(jira).runTool(name, call.arguments, () => {}) });
+				return;
+			}
 			if (!isConfluenceTool(name)) {
 				reply(200, { text: `There is no tool ${name}.`, isError: true });
 				return;

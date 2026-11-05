@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { AssistantToolServer, MCP_TOOLS, mcpToolName } from "./assistant-mcp.js";
 import type { ConfluenceClient } from "./confluence-client.js";
+import type { JiraClient } from "./jira-client.js";
 
 /** Just what the look-ups use of a client. */
 const client = {
@@ -41,6 +42,41 @@ const client = {
 		};
 	},
 } as unknown as ConfluenceClient;
+
+const issue = {
+	key: "DEV-7",
+	summary: "Giriş zaman aşımı",
+	status: "In Progress",
+	statusCategory: "indeterminate",
+	type: "Bug",
+	assignee: "Ayşe",
+	priority: "High",
+	updated: "2026-11-01T10:00:00.000+0300",
+	url: "https://jira.example.com/browse/DEV-7",
+	project: "Geliştirme",
+	reporter: "Mehmet",
+	created: null,
+	due: null,
+	resolution: "",
+	labels: [],
+	components: [],
+	fixVersions: [],
+	description: "Oturum **30 sn** sonra düşüyor.",
+	parent: null,
+	subtasks: [],
+	links: [],
+	comments: [],
+	commentTotal: 0,
+};
+const jira = {
+	site: "https://jira.example.com",
+	async issue() {
+		return issue;
+	},
+	async search(jql: string) {
+		return { jql, issues: [issue], total: 1, next: null };
+	},
+} as unknown as JiraClient;
 
 /** Runs the server's script as the CLI would, sends it JSON-RPC lines and collects the answers. */
 async function talk(
@@ -88,7 +124,9 @@ describe("AssistantToolServer", () => {
 			folder,
 			node: "/path/to/Kalem",
 			confluence: async () => (connected ? client : null),
+			jira: async () => (connected ? jira : null),
 			notConnected: () => "Not connected to Confluence.",
+			jiraNotConnected: () => "Not connected to Jira.",
 		});
 		try {
 			const config = await tools.config();
@@ -122,6 +160,18 @@ describe("AssistantToolServer", () => {
 					params: { name: "confluence_read_page", arguments: { page_id: "42" } },
 				},
 				{ jsonrpc: "2.0", id: 5, method: "nope" },
+				{
+					jsonrpc: "2.0",
+					id: 6,
+					method: "tools/call",
+					params: { name: "jira_get_issue", arguments: { key: "dev-7" } },
+				},
+				{
+					jsonrpc: "2.0",
+					id: 7,
+					method: "tools/call",
+					params: { name: "jira_search", arguments: { jql: "project = DEV" } },
+				},
 			]);
 			const byId = new Map(answers.map((answer) => [answer.id, answer]));
 			expect(byId.get(1)).toMatchObject({
@@ -140,6 +190,11 @@ describe("AssistantToolServer", () => {
 			expect(text(4)).toContain('Page "Sprint Planı" (page id 42, space DEV)');
 			expect(text(4)).toContain("Hedef");
 			expect(byId.get(5)).toMatchObject({ error: { code: -32601 } });
+			expect(text(6)).toContain("Issue DEV-7: Giriş zaman aşımı");
+			expect(text(6)).toContain("Status: In Progress");
+			expect(text(6)).toContain("Oturum **30 sn** sonra düşüyor.");
+			expect(text(7)).toContain("Jira search `project = DEV`: 1 issues.");
+			expect(text(7)).toContain("- DEV-7 Giriş zaman aşımı (Bug, In Progress, assignee Ayşe");
 
 			// Without a connection the call says so, as an error the model reads.
 			connected = false;
@@ -154,6 +209,18 @@ describe("AssistantToolServer", () => {
 			]);
 			expect(offline).toMatchObject({
 				result: { content: [{ text: "Not connected to Confluence." }], isError: true },
+			});
+			const [, noJira] = await talk(config, [
+				{ jsonrpc: "2.0", id: 1, method: "initialize", params: {} },
+				{
+					jsonrpc: "2.0",
+					id: 2,
+					method: "tools/call",
+					params: { name: "jira_get_issue", arguments: { key: "DEV-7" } },
+				},
+			]);
+			expect(noJira).toMatchObject({
+				result: { content: [{ text: "Not connected to Jira." }], isError: true },
 			});
 		} finally {
 			tools.close();
@@ -170,7 +237,9 @@ describe("AssistantToolServer", () => {
 			folder,
 			node: "node",
 			confluence: async () => client,
+			jira: async () => null,
 			notConnected: () => "",
+			jiraNotConnected: () => "",
 		});
 		try {
 			const config = JSON.parse(await readFile(await tools.config(), "utf8"));

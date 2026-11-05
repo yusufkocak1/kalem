@@ -375,6 +375,8 @@ export function toolSteps(message: unknown): ClaudeEvent[] {
 			"command",
 			"query",
 			"page_id",
+			"key",
+			"jql",
 			"url",
 			"description",
 		]

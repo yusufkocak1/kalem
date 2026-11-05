@@ -90,9 +90,15 @@ export function confluenceRequests(reply: string): ConfluenceRequest[] {
 	return requests.slice(0, MAX_REQUESTS);
 }
 
-/** The reply without its `kalem-confluence` blocks, which say nothing to the reader. */
+/** Jira's requests, written the same way (see `jira-tool.ts`). */
+const JIRA_BLOCK = new RegExp(BLOCK.source.replace(CONFLUENCE_FENCE, "kalem-jira"), "gm");
+
+/** The reply without its `kalem-confluence` and `kalem-jira` blocks, which say nothing to the reader. */
 export function withoutRequests(reply: string): string {
-	return reply.replace(BLOCK, "").replace(/\n{3,}/g, "\n\n");
+	return reply
+		.replace(BLOCK, "")
+		.replace(JIRA_BLOCK, "")
+		.replace(/\n{3,}/g, "\n\n");
 }
 
 /** A page's address that every Confluence takes. */

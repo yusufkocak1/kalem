@@ -88,6 +88,7 @@ function start(): void {
 		decrypt: (data: Buffer) => safeStorage.decryptString(data),
 	};
 	const confluence = new ConfluenceStore(join(app.getPath("userData"), "confluence.json"), secrets);
+	const jira = new ConfluenceStore(join(app.getPath("userData"), "jira.json"), secrets);
 	const assistant = new AssistantStore(join(app.getPath("userData"), "assistant.json"), secrets);
 	const chats = new ChatStore(join(app.getPath("userData"), "assistant-chats.json"));
 	// End-to-end tests keep every save as its own version.
@@ -489,6 +490,7 @@ function start(): void {
 			packages,
 			versions,
 			confluence,
+			jira,
 			assistant,
 			chats,
 			strings: () => t,
