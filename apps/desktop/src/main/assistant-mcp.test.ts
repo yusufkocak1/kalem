@@ -62,6 +62,8 @@ const issue = {
 	components: [],
 	fixVersions: [],
 	description: "Oturum **30 sn** sonra düşüyor.",
+	descriptionHtml: null,
+	remoteLinks: [],
 	parent: null,
 	subtasks: [],
 	links: [],

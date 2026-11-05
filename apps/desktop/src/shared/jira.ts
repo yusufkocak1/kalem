@@ -30,8 +30,20 @@ export interface JiraIssueRow extends JiraIssueRef {
 export interface JiraComment {
 	readonly author: string;
 	readonly created: string | null;
-	/** As Markdown. */
+	/** As Markdown (for HTML, its text). */
 	readonly body: string;
+	/** The comment as HTML, when Jira keeps it so (an HTML editor plug-in); `null` for wiki markup. */
+	readonly html: string | null;
+}
+
+/** A link to something outside Jira: a Confluence page that mentions the issue, a web page. */
+export interface JiraRemoteLink {
+	/** "mentioned in", "wiki page", "links to"… */
+	readonly relation: string;
+	readonly title: string;
+	readonly url: string;
+	/** The Confluence page's id, when it is on the Confluence site the app is connected to. */
+	readonly pageId: string | null;
 }
 
 export interface JiraIssueLink {
@@ -51,11 +63,15 @@ export interface JiraIssue extends JiraIssueRow {
 	readonly labels: readonly string[];
 	readonly components: readonly string[];
 	readonly fixVersions: readonly string[];
-	/** As Markdown. */
+	/** As Markdown (for HTML, its text). */
 	readonly description: string;
+	/** The description as HTML, when Jira keeps it so (an HTML editor plug-in); `null` for wiki markup. */
+	readonly descriptionHtml: string | null;
 	readonly parent: JiraIssueRef | null;
 	readonly subtasks: readonly JiraIssueRef[];
 	readonly links: readonly JiraIssueLink[];
+	/** Links outside Jira (Confluence pages…), as the issue's "Issue Links" lists them. */
+	readonly remoteLinks: readonly JiraRemoteLink[];
 	/** The latest comments, oldest first. */
 	readonly comments: readonly JiraComment[];
 	/** How many comments the issue has in all. */
@@ -202,6 +218,65 @@ function category(status: Json): StatusCategory {
 	return key === "new" || key === "indeterminate" || key === "done" ? key : "";
 }
 
+/**
+ * Whether Jira keeps the text as HTML rather than wiki markup: some sites
+ * have an HTML editor plug-in (JEditor) that writes `<div class="jePanel_…">`
+ * and `<p>` into the field.
+ */
+export function looksLikeHtml(text: string): boolean {
+	return (
+		/^\s*<(?:div|p|span|table|ul|ol|h[1-6]|b|strong|font|br|pre|blockquote)\b[^>]*>/i.test(text) &&
+		/<\/(?:div|p|span|li|td|b|strong|font|pre|blockquote|h[1-6])>/i.test(text)
+	);
+}
+
+/** The HTML as an HTML editor plug-in stores it: lines it continued with a backslash are joined. */
+export function cleanJiraHtml(html: string): string {
+	return html.replace(/\\(?=\s*(?:<|$))/gm, "").trim();
+}
+
+const ENTITIES: Readonly<Record<string, string>> = {
+	amp: "&",
+	lt: "<",
+	gt: ">",
+	quot: '"',
+	apos: "'",
+	nbsp: " ",
+};
+
+/** HTML's text, a block a line, for the assistant: no tags, entities read. */
+export function htmlText(html: string): string {
+	return cleanJiraHtml(html)
+		.replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, "")
+		.replace(/<br\s*\/?>/gi, "\n")
+		.replace(/<li\b[^>]*>/gi, "\n- ")
+		.replace(/<\/(?:p|div|h[1-6]|tr|table|ul|ol|blockquote|pre)>/gi, "\n")
+		.replace(/<[^>]*>/g, "")
+		.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (whole, name: string) => {
+			if (name.startsWith("#")) {
+				const code =
+					name[1] === "x" || name[1] === "X" ? parseInt(name.slice(2), 16) : Number(name.slice(1));
+				return Number.isFinite(code) && code > 0 && code < 0x110000
+					? String.fromCodePoint(code)
+					: whole;
+			}
+			return ENTITIES[name.toLowerCase()] ?? whole; // kalem-locale-ok: entity names are ASCII
+		})
+		.replace(/[ \t]+\n/g, "\n")
+		.replace(/\n{3,}/g, "\n\n")
+		.trim();
+}
+
+/** A text field: Markdown for the model, and its HTML when Jira keeps HTML (`rendered` is Jira's own rendering). */
+function textField(value: unknown, rendered: unknown): { text: string; html: string | null } {
+	if (typeof value === "string" && looksLikeHtml(value)) {
+		const html =
+			typeof rendered === "string" && rendered.trim() !== "" ? rendered : cleanJiraHtml(value);
+		return { text: htmlText(html), html };
+	}
+	return { text: jiraText(value), html: null };
+}
+
 /** Jira's text: wiki markup from the v2 API; an Atlassian document (Cloud's v3) is read for its text. */
 export function jiraText(value: unknown): string {
 	if (typeof value === "string") return wikiToMarkdown(value).trim();
@@ -257,6 +332,10 @@ export function issueOf(raw: unknown, site: string): JiraIssue | null {
 	const fields = asJson(asJson(raw).fields);
 	const comment = asJson(fields.comment);
 	const comments = asArray(comment.comments);
+	// What Jira shows (`expand=renderedFields`): the HTML of the fields it keeps as HTML.
+	const rendered = asJson(asJson(raw).renderedFields);
+	const renderedComments = asArray(asJson(rendered.comment).comments);
+	const description = textField(fields.description, rendered.description);
 	const links = asArray(fields.issuelinks).flatMap((item): JiraIssueLink[] => {
 		const link = asJson(item);
 		const type = asJson(link.type);
@@ -281,19 +360,24 @@ export function issueOf(raw: unknown, site: string): JiraIssue | null {
 		labels: names(fields.labels),
 		components: names(fields.components),
 		fixVersions: names(fields.fixVersions),
-		description: jiraText(fields.description),
+		description: description.text,
+		descriptionHtml: description.html,
 		parent: issueRefOf(fields.parent),
 		subtasks: asArray(fields.subtasks).flatMap((item) => {
 			const ref = issueRefOf(item);
 			return ref === null ? [] : [ref];
 		}),
 		links,
-		comments: comments.slice(-MAX_COMMENTS).map((item) => {
+		remoteLinks: [],
+		comments: comments.slice(-MAX_COMMENTS).map((item, index) => {
 			const entry = asJson(item);
+			const at = comments.length - Math.min(MAX_COMMENTS, comments.length) + index;
+			const body = textField(entry.body, asJson(renderedComments[at]).body);
 			return {
 				author: nameOf(entry.author),
 				created: date(entry.created),
-				body: jiraText(entry.body),
+				body: body.text,
+				html: body.html,
 			};
 		}),
 		commentTotal: typeof comment.total === "number" ? comment.total : comments.length,
@@ -342,6 +426,16 @@ export function issueText(issue: JiraIssue): string {
 			...issue.links.map((link) => `- ${link.relation}: ${refText(link.issue)}`),
 		);
 	}
+	if (issue.remoteLinks.length > 0) {
+		lines.push(
+			"",
+			"Links outside Jira:",
+			...issue.remoteLinks.map(
+				(link) =>
+					`- ${link.relation}: ${link.title} ${link.url}${link.pageId === null ? "" : ` (Confluence page id ${link.pageId})`}`,
+			),
+		);
+	}
 	if (issue.comments.length > 0) {
 		const skipped = issue.commentTotal - issue.comments.length;
 		lines.push(
@@ -376,4 +470,27 @@ export function searchText(found: JiraSearchResults, site: string, shown = 25): 
 		return `- ${row.key} ${row.summary} (${facts.join(", ")}) ${issueUrl(site, row.key)}`;
 	});
 	return `${head}\n${lines.join("\n")}`;
+}
+
+/**
+ * The issue's links outside Jira (`/rest/api/2/issue/KEY/remotelink`):
+ * Confluence's "mentioned in" and "wiki page" links, web links. Their page
+ * ids are filled in by the main process, which knows the Confluence site.
+ */
+export function remoteLinksOf(raw: unknown): JiraRemoteLink[] {
+	return asArray(raw).flatMap((item): JiraRemoteLink[] => {
+		const link = asJson(item);
+		const object = asJson(link.object);
+		const url = asString(object.url);
+		if (!/^https?:\/\//i.test(url)) return [];
+		const confluence = /confluence/i.test(asString(asJson(link.application).type));
+		return [
+			{
+				relation: asString(link.relationship) || (confluence ? "wiki page" : "links to"),
+				title: asString(object.title) || url,
+				url,
+				pageId: null,
+			},
+		];
+	});
 }

@@ -6142,3 +6142,75 @@ pre[data-confluence-kind="layout"]::before {
 .stripe-button .icon {
 	color: var(--app-accent);
 }
+
+/* The issue's parts fold away, as in Jira. */
+details.jira-section > summary {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	list-style: none;
+	cursor: pointer;
+}
+
+details.jira-section > summary::-webkit-details-marker {
+	display: none;
+}
+
+details.jira-section > summary::before {
+	content: "›";
+	display: inline-block;
+	width: 10px;
+	color: var(--app-muted);
+	font-weight: 700;
+	transition: transform 120ms ease;
+}
+
+details.jira-section[open] > summary::before {
+	transform: rotate(90deg);
+}
+
+details.jira-section > summary h3 {
+	margin: 4px 0 6px;
+}
+
+.jira-link-group {
+	margin: 0 0 8px 16px;
+}
+
+.jira-link-group h4 {
+	margin: 4px 0 2px;
+	color: var(--app-muted);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.jira-subtasks,
+.jira-link-group .jira-list,
+details.jira-section > .jira-list {
+	margin-left: 16px;
+}
+
+.jira-remote svg {
+	flex: none;
+	width: 16px;
+	height: 16px;
+	color: var(--app-accent);
+}
+
+.jira-markdown blockquote {
+	margin: 8px 0;
+	padding: 6px 12px;
+	border-left: 3px solid var(--app-accent);
+	border-radius: 4px;
+	background: var(--app-surface);
+}
+
+.jira-markdown table {
+	border-collapse: collapse;
+}
+
+.jira-markdown td,
+.jira-markdown th {
+	padding: 4px 8px;
+	border: 1px solid var(--app-border);
+}

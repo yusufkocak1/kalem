@@ -1,10 +1,10 @@
 import { ipcMain, net } from "electron";
 import { CHANNEL } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
-import type { JiraAccount } from "../shared/jira.js";
+import type { JiraAccount, JiraIssue } from "../shared/jira.js";
 import { searchJql } from "../shared/jira.js";
 import type { ConfluenceCredentials } from "./confluence-client.js";
-import { isCloudHost } from "./confluence-client.js";
+import { isCloudHost, pageReference } from "./confluence-client.js";
 import { confluenceClient } from "./confluence-ipc.js";
 import type { ConfluenceStore } from "./confluence-store.js";
 import { JiraClient } from "./jira-client.js";
@@ -99,9 +99,25 @@ export function registerJiraIpc(ctx: JiraIpcContext): {
 			.catch(() => null);
 	});
 
-	ipcMain.handle(CHANNEL.jiraIssue, async (_event, key: unknown) =>
-		(await connected()).issue(text(key, "issue key")),
-	);
+	ipcMain.handle(CHANNEL.jiraIssue, async (_event, key: unknown): Promise<JiraIssue> => {
+		const issue = await (await connected()).issue(text(key, "issue key"));
+		// A Confluence page on the connected site opens in Kalem: its id is found in its address.
+		const confluence = await ctx.confluence.get().catch(() => null);
+		if (confluence === null || issue.remoteLinks.length === 0) return issue;
+		const client = confluenceClient(confluence);
+		const host = new URL(client.site).hostname;
+		const remoteLinks = await Promise.all(
+			issue.remoteLinks.map(async (link) => {
+				const reference = pageReference(link.url);
+				if (reference === null || reference.host !== host) return link;
+				if (reference.kind === "id") return { ...link, pageId: reference.id };
+				// A `/display/SPACE/Title` address: the page is looked up by its title.
+				const [found] = await client.search(link.url, null).catch(() => []);
+				return found === undefined ? link : { ...link, pageId: found.id };
+			}),
+		);
+		return { ...issue, remoteLinks };
+	});
 
 	ipcMain.handle(CHANNEL.jiraSearch, async (_event, query: unknown, next: unknown) =>
 		(await connected()).search(
