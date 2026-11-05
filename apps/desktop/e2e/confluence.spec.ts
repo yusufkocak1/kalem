@@ -331,10 +331,10 @@ test("browses a space's page tree in the side pane and stars a page", async () =
 	cleanup.push(confluence.close);
 	const { app, page, userData, errors } = await launch();
 
-	await page.getByRole("tab", { name: "Confluence" }).click();
 	const pane = page.locator(".confluence-pane");
-	await expect(pane).toContainText("Not connected to Confluence.");
-	await pane.getByRole("button", { name: "Connect" }).click();
+	// Without a connection there is no Confluence pane: it comes with the login.
+	await expect(page.getByRole("tab", { name: "Confluence" })).toHaveCount(0);
+	await clickMenu(app, "File", "Open from Confluence…");
 
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
@@ -342,6 +342,7 @@ test("browses a space's page tree in the side pane and stars a page", async () =
 	await dialog.getByRole("button", { name: "Connect" }).click();
 	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
 	await page.keyboard.press("Escape");
+	await page.getByRole("tab", { name: "Confluence" }).click();
 	await expect(dialog).not.toBeVisible();
 
 	// All spaces: each space is a branch.
@@ -408,15 +409,15 @@ test("searches inside pages with filters and more results, and finds the open pa
 	cleanup.push(confluence.close);
 	const { app, page, errors } = await launch();
 
-	await page.getByRole("tab", { name: "Confluence" }).click();
 	const pane = page.locator(".confluence-pane");
-	await pane.getByRole("button", { name: "Connect" }).click();
+	await clickMenu(app, "File", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(TOKEN);
 	await dialog.getByRole("button", { name: "Connect" }).click();
 	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
 	await page.keyboard.press("Escape");
+	await page.getByRole("tab", { name: "Confluence" }).click();
 	await pane.locator("select").selectOption("DEV");
 
 	// Contents: every word inside the pages, with the text around it and where each page is.
@@ -493,15 +494,15 @@ test("lists a level that fails with an error 500 another way, retries it, and wi
 	cleanup.push(confluence.close);
 	const { app, page, userData, errors } = await launch();
 
-	await page.getByRole("tab", { name: "Confluence" }).click();
 	const pane = page.locator(".confluence-pane");
-	await pane.getByRole("button", { name: "Connect" }).click();
+	await clickMenu(app, "File", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(TOKEN);
 	await dialog.getByRole("button", { name: "Connect" }).click();
 	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
 	await page.keyboard.press("Escape");
+	await page.getByRole("tab", { name: "Confluence" }).click();
 	await pane.locator("select").selectOption("DEV");
 	const root = pane.locator('[data-page="41"]');
 
@@ -562,15 +563,15 @@ test("adds a child page from the tree and opens it", async () => {
 	cleanup.push(confluence.close);
 	const { app, page, errors } = await launch();
 
-	await page.getByRole("tab", { name: "Confluence" }).click();
 	const pane = page.locator(".confluence-pane");
-	await pane.getByRole("button", { name: "Connect" }).click();
+	await clickMenu(app, "File", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(TOKEN);
 	await dialog.getByRole("button", { name: "Connect" }).click();
 	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
 	await page.keyboard.press("Escape");
+	await page.getByRole("tab", { name: "Confluence" }).click();
 
 	await pane.locator("select").selectOption("DEV");
 	const root = pane.locator('[data-page="41"]');
@@ -790,16 +791,15 @@ test("the assistant searches Confluence and reads pages to answer, with a local 
 		env: { KALEM_CLAUDE: claude.path },
 	});
 
-	// Connected to Confluence through the side pane.
-	await page.getByRole("tab", { name: "Confluence" }).click();
-	const pane = page.locator(".confluence-pane");
-	await pane.getByRole("button", { name: "Connect" }).click();
+	// Connected to Confluence; its pane comes with the connection.
+	await clickMenu(app, "File", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(TOKEN);
 	await dialog.getByRole("button", { name: "Connect" }).click();
 	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
 	await page.keyboard.press("Escape");
+	await page.getByRole("tab", { name: "Confluence" }).click();
 
 	const assistant = page.locator(".assistant");
 	await expect(assistant.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
@@ -851,15 +851,14 @@ test("Claude Code searches Confluence with Kalem's own tools, through its MCP se
 		env: { KALEM_CLAUDE: claude.path },
 	});
 
-	await page.getByRole("tab", { name: "Confluence" }).click();
-	const pane = page.locator(".confluence-pane");
-	await pane.getByRole("button", { name: "Connect" }).click();
+	await clickMenu(app, "File", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(TOKEN);
 	await dialog.getByRole("button", { name: "Connect" }).click();
 	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
 	await page.keyboard.press("Escape");
+	await page.getByRole("tab", { name: "Confluence" }).click();
 
 	const assistant = page.locator(".assistant");
 	await expect(assistant.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
@@ -1179,13 +1178,14 @@ test("puts favorites in groups: from a menu or by dragging, renamed, closed and 
 		},
 	});
 	const pane = page.locator(".confluence-pane");
-	await pane.getByRole("button", { name: "Connect" }).click();
+	await clickMenu(app, "File", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(TOKEN);
 	await dialog.getByRole("button", { name: "Connect" }).click();
 	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
 	await page.keyboard.press("Escape");
+	await page.getByRole("tab", { name: "Confluence" }).click();
 
 	const favorite = (id: string) => pane.locator(`[data-page="${id}"][draggable="true"]`);
 	const group = (name: string) => pane.locator(`[data-group="${name}"]`);

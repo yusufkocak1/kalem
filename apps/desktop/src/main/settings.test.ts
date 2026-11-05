@@ -50,6 +50,35 @@ describe("parseStoredState", () => {
 		expect(settings.spellCheck).toBe(false);
 	});
 
+	it("reads where the panes dock, and the docks' state", () => {
+		const { settings } = parseStoredState({
+			settings: {
+				sidePane: "jira",
+				panePlaces: { jira: "right", outline: "bottom", files: "sideways" },
+				rightDock: true,
+				rightPane: "jira",
+				rightWidth: 10,
+				bottomPane: "nothing",
+				bottomHeight: 320,
+			},
+		});
+		expect(settings.sidePane).toBe("jira");
+		expect(settings.panePlaces).toEqual({
+			outline: "bottom",
+			files: "left",
+			confluence: "left",
+			jira: "right",
+		});
+		expect(settings).toMatchObject({
+			rightDock: true,
+			rightPane: "jira",
+			rightWidth: 160,
+			bottomDock: false,
+			bottomPane: "outline",
+			bottomHeight: 320,
+		});
+	});
+
 	it("keeps well-formed Confluence favorites once each", () => {
 		const favorite = { site: "https://wiki.example.com", id: "42", title: "Plan" };
 		const state = parseStoredState({

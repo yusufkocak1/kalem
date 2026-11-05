@@ -6,6 +6,8 @@ import type { ConfluenceSearchRequest, ConfluenceSearchResults } from "./conflue
 import type { TextFormat } from "./encoding.js";
 import type { Lang } from "./i18n.js";
 import type { JiraAccount, JiraIssue, JiraSearchResults } from "./jira.js";
+import type { PanePlaces, ToolPane } from "./panes.js";
+import { DEFAULT_PANE_PLACES } from "./panes.js";
 import type { AssistantConfig, AssistantUpdate, ChatMessage, ProviderId } from "./providers.js";
 
 export type Theme = "system" | "light" | "dark";
@@ -48,8 +50,18 @@ export interface Settings {
 	readonly margins: PageMargins;
 	/** PDF export only: the print dialog has its own header and footer option. */
 	readonly pageNumbers: boolean;
-	/** What the side pane shows. */
+	/** What the side pane (the left dock) shows. */
 	readonly sidePane: SidePane;
+	/** Where each tool pane is: the left, right or bottom dock, or hidden. */
+	readonly panePlaces: PanePlaces;
+	/** The right dock: open or not, what it shows, its width. */
+	readonly rightDock: boolean;
+	readonly rightPane: ToolPane;
+	readonly rightWidth: number;
+	/** The bottom dock, under the document: open or not, what it shows, its height. */
+	readonly bottomDock: boolean;
+	readonly bottomPane: ToolPane;
+	readonly bottomHeight: number;
 	/** The space the Confluence pane lists; empty for all spaces. */
 	readonly confluenceSpace: string;
 	/** Starred Confluence pages, shown at the top of the Confluence pane. */
@@ -74,7 +86,7 @@ export interface Settings {
 	readonly navigationWidth: number;
 }
 
-export type SidePane = "outline" | "files" | "confluence";
+export type SidePane = ToolPane;
 
 export const DEFAULT_SETTINGS: Settings = {
 	theme: "system",
@@ -89,6 +101,13 @@ export const DEFAULT_SETTINGS: Settings = {
 	margins: "normal",
 	pageNumbers: false,
 	sidePane: "outline",
+	panePlaces: DEFAULT_PANE_PLACES,
+	rightDock: false,
+	rightPane: "outline",
+	rightWidth: 280,
+	bottomDock: false,
+	bottomPane: "outline",
+	bottomHeight: 240,
 	confluenceSpace: "",
 	confluenceFavorites: [],
 	checkUpdates: true,
@@ -559,6 +578,7 @@ export const COMMANDS = [
 	"version-history",
 	"confluence-attachments",
 	"jira-open",
+	"settings",
 	"move-tab",
 	"case-upper",
 	"case-lower",

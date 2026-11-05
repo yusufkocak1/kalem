@@ -346,6 +346,7 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 					checked: settings.navigation,
 					click: () => ctx.changeSettings({ navigation: !settings.navigation }),
 				},
+				{ label: t.settingsMenu, accelerator: "CmdOrCtrl+,", click: send(ctx, "settings") },
 				{
 					label: t.assistantPane,
 					type: "checkbox",

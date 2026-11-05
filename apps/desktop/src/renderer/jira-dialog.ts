@@ -20,6 +20,8 @@ export interface JiraDialogOptions {
 	readonly lang: string;
 	readonly bridge: KalemBridge;
 	openLink(url: string): void;
+	/** After a login or a disconnect. */
+	onAccountChange?(): void;
 }
 
 export interface JiraDialog {
@@ -27,6 +29,8 @@ export interface JiraDialog {
 	showIssue(key: string, browserUrl?: string | null): Promise<void>;
 	/** Shows a search: JQL, a key or words. */
 	showSearch(query?: string, browserUrl?: string | null): Promise<void>;
+	/** Asks for the login, then shows the search. */
+	showLogin(): Promise<void>;
 }
 
 /** What the dialog shows; the back button returns to the one before. */
@@ -240,6 +244,7 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 				.then((connected) => {
 					token.value = "";
 					account = connected;
+					options.onAccountChange?.();
 					if (current() === undefined) history.push({ kind: "search", query: "" });
 					return render();
 				})
@@ -517,6 +522,7 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 							: [button(t.linkOpenBrowser, "open", () => options.openLink(url))]),
 						button(t.jiraConnectTo, "settings", async () => {
 							await bridge.jiraDisconnect().catch(() => {});
+							options.onAccountChange?.();
 							account = null;
 							updateHeader();
 							await renderLogin();
@@ -567,5 +573,12 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 	return {
 		showIssue: (key, browserUrl = null) => open({ kind: "issue", key }, browserUrl),
 		showSearch: (query = "", browserUrl = null) => open({ kind: "search", query }, browserUrl),
+		async showLogin() {
+			fallback = null;
+			history = [];
+			account = null;
+			if (!dialog.open) dialog.showModal();
+			await render();
+		},
 	};
 }

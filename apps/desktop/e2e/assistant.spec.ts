@@ -819,7 +819,7 @@ test("runs commands typed after a slash: the assistant's, ready questions and th
 	await input.fill("/");
 	await expect(menu).toBeVisible();
 	// All of them, the list scrolling.
-	await expect(menu.locator(".assistant-command")).toHaveCount(34);
+	await expect(menu.locator(".assistant-command")).toHaveCount(35);
 	await expect(menu.locator(".assistant-command-name").last()).toHaveText("/format-code");
 	await input.fill("/kayd");
 	await expect(menu.locator(".assistant-command-name")).toHaveText(["/save", "/save-as"]);

@@ -4,17 +4,8 @@ import type { Caret, EditResult } from "@kalem-editor/editor";
 import { holderIn, indentItem, outdentItem, selectRange, toggleList } from "@kalem-editor/editor";
 import type { DocumentAction } from "../shared/actions.js";
 import { applyActions } from "../shared/actions.js";
-import type { Command, KalemBridge, Settings, SidePane, TabDocument } from "../shared/bridge.js";
-import {
-	clampNavigationWidth,
-	clampZoom,
-	DEFAULT_SETTINGS,
-	MAX_ZOOM,
-	MIN_NAVIGATION_WIDTH,
-	MIN_ZOOM,
-	pageRule,
-	ZOOM_STEP,
-} from "../shared/bridge.js";
+import type { Command, KalemBridge, Settings, TabDocument } from "../shared/bridge.js";
+import { clampZoom, MAX_ZOOM, MIN_ZOOM, pageRule, ZOOM_STEP } from "../shared/bridge.js";
 import type { ContextDiagram, ReplyDiagram } from "../shared/claude.js";
 import { splitReply } from "../shared/claude.js";
 import { displayUrl } from "../shared/confluence-atoms.js";
@@ -22,6 +13,8 @@ import { attachmentName, linkedAttachment } from "../shared/confluence-common.js
 import type { Diagram } from "../shared/diagram.js";
 import { DIAGRAM_SUFFIX, serializeDiagram } from "../shared/diagram.js";
 import { format, stringsFor } from "../shared/i18n.js";
+import type { ToolPane } from "../shared/panes.js";
+import { revealPane } from "../shared/panes.js";
 import {
 	extension,
 	isEditablePath,
@@ -39,6 +32,7 @@ import { createConfluencePane } from "./confluence-pane.js";
 import { createDiagramButton, isDiagramImage } from "./diagram-button.js";
 import { createDiagramEditor } from "./diagram-editor.js";
 import { diagramFromImage, diagramToPng } from "./diagram-image.js";
+import { createDocks } from "./docks.js";
 import { createDocumentTools } from "./document-tools.js";
 import { el, isTextFieldFocused } from "./dom.js";
 import type { TableContext, TableEdit } from "./edits.js";
@@ -48,6 +42,7 @@ import { createGitDialogs } from "./git-dialogs.js";
 import { icon } from "./icons.js";
 import { createImageViewer } from "./image-viewer.js";
 import { createJiraDialog } from "./jira-dialog.js";
+import { createJiraPane } from "./jira-pane.js";
 import { createLinkCard } from "./link-card.js";
 import { createNotices } from "./notices.js";
 import { Previews } from "./previews.js";
@@ -55,6 +50,7 @@ import { documentImages } from "./prompt-images.js";
 import { createQuickOpen } from "./quick-open.js";
 import { createAppRibbon } from "./ribbon-layout.js";
 import { ipcErrorMessage, Session } from "./session.js";
+import { createSettingsDialog } from "./settings-dialog.js";
 import { enableColumnResize } from "./table-styles.js";
 import { createTabStrip } from "./tabs.js";
 import { measureDiagramText } from "./text-measure.js";
@@ -96,13 +92,6 @@ const deskArea = el("div", { class: "desk-area" });
 const outlineArea = el("div", { class: "navigation-content" });
 const wordCountArea = el("div", { class: "status-counts" });
 
-const closeNavigation = el("button", {
-	class: "icon-button",
-	attrs: { type: "button", "aria-label": t.closeNavigation, title: t.closeNavigation },
-	children: [icon("close")],
-});
-closeNavigation.addEventListener("click", () => updateSettings({ navigation: false }));
-
 const filesPane = createFilesPane({
 	t,
 	bridge,
@@ -132,7 +121,7 @@ const confluenceDialog = createConfluenceDialog({
 	lang: startup.language,
 	bridge,
 	onAccountChange: () => {
-		if (settings.navigation && settings.sidePane === "confluence") void confluencePane.refresh();
+		void refreshAccounts();
 	},
 });
 const jiraDialog = createJiraDialog({
@@ -140,6 +129,7 @@ const jiraDialog = createJiraDialog({
 	lang: startup.language,
 	bridge,
 	openLink: (url) => bridge.openLink(url),
+	onAccountChange: () => void refreshAccounts(),
 });
 const confluencePane = createConfluencePane({
 	t,
@@ -223,96 +213,74 @@ assistantToggle.addEventListener("click", () => {
 });
 const assistantRail = el("div", { class: "assistant-rail", children: [assistantToggle] });
 
-function sidePaneTab(pane: SidePane, label: string): HTMLButtonElement {
-	const button = el("button", {
-		class: "side-pane-tab",
-		text: label,
-		attrs: { type: "button", role: "tab", "data-pane": pane },
-	});
-	button.addEventListener("click", () => updateSettings({ sidePane: pane }));
-	return button;
-}
-const sidePaneTabs = [
-	sidePaneTab("outline", t.outlineTab),
-	sidePaneTab("files", t.filesTab),
-	sidePaneTab("confluence", t.confluenceTab),
-];
-const navigationResizer = el("div", {
-	class: "navigation-resizer",
-	attrs: {
-		role: "separator",
-		tabindex: "0",
-		"aria-orientation": "vertical",
-		"aria-label": t.navigationResize,
-		title: t.navigationResize,
-		"aria-valuemin": String(MIN_NAVIGATION_WIDTH),
-	},
+// --- Docks: the tool panes on the left, on the right and under the document ---------
+
+/** Which services are set up: their panes show only then. */
+const accounts = { confluence: false, jira: false };
+const paneAvailable = (pane: ToolPane): boolean =>
+	pane === "confluence" ? accounts.confluence : pane === "jira" ? accounts.jira : true;
+const PANE_LABELS: Readonly<Record<ToolPane, string>> = {
+	outline: t.outlineTab,
+	files: t.filesTab,
+	confluence: t.confluenceTab,
+	jira: t.jiraTab,
+};
+const jiraPane = createJiraPane({
+	t,
+	bridge,
+	openIssue: (key) => void jiraDialog.showIssue(key),
 });
-const navigation = el("nav", {
-	class: "navigation kalem-theme",
-	attrs: { "aria-label": t.navigation },
-	children: [
-		el("div", {
-			class: "navigation-header",
-			children: [
-				el("div", { class: "side-pane-tabs", attrs: { role: "tablist" }, children: sidePaneTabs }),
-				closeNavigation,
-			],
-		}),
-		outlineArea,
-		filesPane.element,
-		confluencePane.element,
-		navigationResizer,
+const docks = createDocks({
+	t,
+	panes: [
+		{ id: "outline", label: t.outlineTab, icon: "navigation", element: outlineArea },
+		{ id: "files", label: t.filesTab, icon: "open", element: filesPane.element },
+		{
+			id: "confluence",
+			label: t.confluenceTab,
+			icon: "confluence",
+			element: confluencePane.element,
+		},
+		{ id: "jira", label: t.jiraTab, icon: "target", element: jiraPane.element },
 	],
+	settings: () => settings,
+	update: (patch) => updateSettings(patch),
+	available: paneAvailable,
+	openLayout: () => void settingsDialog.show("panes"),
+});
+const deskColumn = el("div", { class: "desk-column", children: [deskArea, docks.elements.bottom] });
+assistantRail.prepend(docks.stripes.right);
+const settingsDialog = createSettingsDialog({
+	t,
+	bridge,
+	settings: () => settings,
+	update: (patch) => updateSettings(patch),
+	paneLabel: (pane) => PANE_LABELS[pane],
+	connectConfluence: () => void confluenceDialog.show(),
+	connectJira: () => void jiraDialog.showLogin(),
+	onAccountChange: () => void refreshAccounts(),
 });
 
-// --- Navigation pane width ------------------------------------------------------
-
-/** At most what leaves the document some room. */
-const widestNavigation = (): number => Math.max(MIN_NAVIGATION_WIDTH, window.innerWidth - 420);
-const fitNavigation = (width: number): number =>
-	Math.min(widestNavigation(), clampNavigationWidth(width));
-
-function showNavigationWidth(width: number): void {
-	navigation.style.width = `${width}px`;
-	navigationResizer.setAttribute("aria-valuenow", String(width));
-	navigationResizer.setAttribute("aria-valuemax", String(widestNavigation()));
+/** The panes that came into view are filled: Confluence's tree, Jira's issues, the files. */
+function refreshShown(before: ReadonlySet<ToolPane>): void {
+	const now = docks.shown();
+	if (now.has("confluence") && !before.has("confluence")) void confluencePane.refresh();
+	if (now.has("jira") && !before.has("jira")) void jiraPane.refresh();
 }
 
-navigationResizer.addEventListener("pointerdown", (event) => {
-	if (event.button !== 0) return;
-	event.preventDefault();
-	navigationResizer.setPointerCapture(event.pointerId);
-	const left = navigation.getBoundingClientRect().left;
-	let width = settings.navigationWidth;
-	navigation.classList.add("resizing");
-	const move = (moved: PointerEvent): void => {
-		width = fitNavigation(moved.clientX - left);
-		showNavigationWidth(width);
-	};
-	const up = (): void => {
-		navigationResizer.removeEventListener("pointermove", move);
-		navigationResizer.removeEventListener("pointerup", up);
-		navigationResizer.removeEventListener("pointercancel", up);
-		navigation.classList.remove("resizing");
-		updateSettings({ navigationWidth: width });
-	};
-	navigationResizer.addEventListener("pointermove", move);
-	navigationResizer.addEventListener("pointerup", up);
-	navigationResizer.addEventListener("pointercancel", up);
-});
-navigationResizer.addEventListener("keydown", (event) => {
-	const step = event.key === "ArrowRight" ? 20 : event.key === "ArrowLeft" ? -20 : 0;
-	if (step === 0) return;
-	event.preventDefault();
-	updateSettings({ navigationWidth: fitNavigation(settings.navigationWidth + step) });
-});
-navigationResizer.addEventListener("dblclick", () =>
-	updateSettings({ navigationWidth: DEFAULT_SETTINGS.navigationWidth }),
-);
-window.addEventListener("resize", () => {
-	if (!navigation.hidden) showNavigationWidth(fitNavigation(settings.navigationWidth));
-});
+/** Asks which services are connected; a pane appears or goes with its connection. */
+async function refreshAccounts(): Promise<void> {
+	const before = docks.shown();
+	const [confluence, jira] = await Promise.all([
+		bridge.confluenceAccount().catch(() => null),
+		bridge.jiraAccount().catch(() => null),
+	]);
+	accounts.confluence = confluence !== null;
+	accounts.jira = jira !== null;
+	docks.apply();
+	refreshShown(before);
+	void settingsDialog.refresh();
+}
 
 const readOnlyBadge = el("span", { class: "status-badge", text: t.statusReadOnly });
 const formatBadge = el("span", { class: "status-format" });
@@ -330,6 +298,7 @@ const zoomValue = el("output", { class: "zoom-value" });
 const statusBar = el("footer", {
 	class: "statusbar",
 	children: [
+		docks.stripes.bottom,
 		wordCountArea,
 		el("span", { class: "status-spacer" }),
 		readOnlyBadge,
@@ -362,7 +331,17 @@ app.append(
 	ribbonHost,
 	tabStrip.element,
 	noticeArea,
-	el("div", { class: "body", children: [navigation, deskArea, assistant.element, assistantRail] }),
+	el("div", {
+		class: "body",
+		children: [
+			docks.stripes.left,
+			docks.elements.left,
+			deskColumn,
+			docks.elements.right,
+			assistant.element,
+			assistantRail,
+		],
+	}),
 	statusBar,
 	exitFocus,
 );
@@ -593,28 +572,19 @@ function applySettings(): void {
 	pageSetup.textContent = pageRule(settings);
 	app.style.setProperty("--zoom", String(settings.zoom / 100));
 	app.toggleAttribute("data-full-width", settings.fullWidth);
-	navigation.hidden = !settings.navigation;
-	if (settings.navigation) showNavigationWidth(fitNavigation(settings.navigationWidth));
 	assistant.element.hidden = !settings.assistant;
 	assistantToggle.setAttribute("aria-expanded", String(settings.assistant));
 	if (settings.assistant) assistant.show();
-	outlineArea.hidden = settings.sidePane !== "outline";
-	filesPane.element.hidden = settings.sidePane !== "files";
-	confluencePane.element.hidden = settings.sidePane !== "confluence";
-	for (const tab of sidePaneTabs) {
-		tab.setAttribute("aria-selected", String(tab.dataset.pane === settings.sidePane));
-	}
+	docks.apply();
 	zoomSlider.value = String(settings.zoom);
 	zoomValue.textContent = `${settings.zoom}%`;
 }
 
 function updateSettings(patch: Partial<Settings>): void {
-	const confluenceShown = settings.navigation && settings.sidePane === "confluence";
+	const before = docks.shown();
 	settings = { ...settings, ...patch };
-	if (!confluenceShown && settings.navigation && settings.sidePane === "confluence") {
-		void confluencePane.refresh();
-	}
 	applySettings();
+	refreshShown(before);
 	scheduleRibbonUpdate();
 	bridge.updateSettings(patch);
 }
@@ -788,6 +758,7 @@ const commands: Record<Command, () => void> = {
 	"quick-open": () => void quickOpen.show(),
 	"confluence-open": () => void confluenceDialog.show(),
 	"jira-open": () => void jiraDialog.showSearch(),
+	settings: () => void settingsDialog.show(),
 	"move-tab": () => moveTab(session.id),
 	"case-upper": () => rewriteText((text) => changeCase(text, "upper", session.editor.getLang())),
 	"case-lower": () => rewriteText((text) => changeCase(text, "lower", session.editor.getLang())),
@@ -817,9 +788,7 @@ const commands: Record<Command, () => void> = {
 	},
 	"confluence-attachments": () => showAttachments(),
 	"search-folder": () => {
-		if (!settings.navigation || settings.sidePane !== "files") {
-			updateSettings({ navigation: true, sidePane: "files" });
-		}
+		if (!docks.shown().has("files")) updateSettings(revealPane(settings, "files"));
 		filesPane.focusSearch();
 	},
 };
@@ -827,7 +796,8 @@ const commands: Record<Command, () => void> = {
 // The ribbon reads editor state as soon as it is built, so the documents come first.
 applySettings();
 for (const document of startup.documents) openDocument(document);
-if (settings.navigation && settings.sidePane === "confluence") void confluencePane.refresh();
+// The connections decide whether Confluence and Jira have panes; then they are filled.
+void refreshAccounts();
 
 const ribbon = createAppRibbon(ribbonHost, saveStatus, {
 	t,
@@ -883,19 +853,17 @@ bridge.onTabMenu((id, action) => {
 });
 // Files may have been added or renamed elsewhere.
 window.addEventListener("focus", () => {
-	if (settings.navigation && settings.sidePane === "files") void filesPane.refresh();
+	if (docks.shown().has("files")) void filesPane.refresh();
 });
 
 bridge.onSettings((next) => {
-	const confluenceShown = settings.navigation && settings.sidePane === "confluence";
+	const before = docks.shown();
 	const favoritesChanged =
 		JSON.stringify(next.confluenceFavorites) !== JSON.stringify(settings.confluenceFavorites);
 	settings = next;
 	if (favoritesChanged) confluencePane.render();
-	if (!confluenceShown && settings.navigation && settings.sidePane === "confluence") {
-		void confluencePane.refresh();
-	}
 	applySettings();
+	refreshShown(before);
 	scheduleRibbonUpdate();
 });
 

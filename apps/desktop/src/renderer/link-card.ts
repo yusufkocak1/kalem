@@ -333,6 +333,8 @@ export function createLinkCard(options: LinkCardOptions): { hide(): void } {
 			resolved.set(atom.xml, request);
 		}
 		return request.then((details) => {
+			// A Jira issue without its summary is asked again: Jira may be connected meanwhile.
+			if (details?.type === "jira" && details.issue === undefined) resolved.delete(atom.xml);
 			atom.resolved = true;
 			if (details !== null) atom.details = details;
 			if (target === atom) render();

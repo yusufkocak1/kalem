@@ -17,6 +17,7 @@ import { CHANNEL } from "../shared/bridge.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format, pickLanguage, stringsFor } from "../shared/i18n.js";
 import { quickNoteName } from "../shared/notes.js";
+import { isPaneShown, revealPane } from "../shared/panes.js";
 import { isPackagePath, isProgramPath } from "../shared/paths.js";
 import { ChatStore } from "./assistant-chats.js";
 import { AssistantStore } from "./assistant-store.js";
@@ -334,8 +335,9 @@ function start(): void {
 		const keys = new Set(open.map(pathKey));
 		setWorkspaces([...open, ...folders.filter((folder) => !keys.has(pathKey(folder)))]);
 		// The files are what the user asked to see.
-		if (store.settings.sidePane !== "files" || !store.settings.navigation) {
-			changeSettings({ sidePane: "files", navigation: true });
+		// The files show in whichever dock they are in (or the left one, when hidden).
+		if (!isPaneShown(store.settings, "files", () => true)) {
+			changeSettings(revealPane(store.settings, "files"));
 		}
 	}
 
