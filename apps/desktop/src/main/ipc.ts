@@ -36,7 +36,9 @@ import {
 import type { ChatStore } from "./assistant-chats.js";
 import type { AssistantService } from "./assistant-ipc.js";
 import { registerAssistantIpc } from "./assistant-ipc.js";
+import { AssistantToolServer } from "./assistant-mcp.js";
 import type { AssistantStore } from "./assistant-store.js";
+import type { ConfluenceClient } from "./confluence-client.js";
 import { confluenceClient, registerConfluenceIpc } from "./confluence-ipc.js";
 import type { ConfluenceStore } from "./confluence-store.js";
 import {
@@ -911,15 +913,24 @@ export function registerIpc(ctx: IpcContext): void {
 		toImageFile,
 	});
 
+	/** The connected Confluence site, asked for each time: the connection can change. */
+	const confluenceNow = async (): Promise<ConfluenceClient | null> => {
+		const credentials = await ctx.confluence.get();
+		return credentials === null ? null : confluenceClient(credentials);
+	};
+
 	assistant = registerAssistantIpc({
 		store: ctx.store,
 		assistant: ctx.assistant,
 		chats: ctx.chats,
 		strings: ctx.strings,
 		senderOf,
-		confluence: async () => {
-			const credentials = await ctx.confluence.get();
-			return credentials === null ? null : confluenceClient(credentials);
-		},
+		confluence: confluenceNow,
+		tools: new AssistantToolServer({
+			folder: join(app.getPath("userData"), "assistant-tools"),
+			node: process.execPath,
+			confluence: confluenceNow,
+			notConnected: () => ctx.strings().confluenceNotConnected,
+		}),
 	});
 }

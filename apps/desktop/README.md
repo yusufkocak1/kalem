@@ -638,10 +638,24 @@ verir.
   - API'lerde (Anthropic, OpenAI uyumlu…) `confluence_search` ve
     `confluence_read_page` araçlarıyla; uzun sayfalar 24 000 karakterlik
     parçalar hâlinde okunur.
-  - Claude Code ve GitHub Copilot'ta model yanıtına bir ` ```kalem-confluence `
-    isteği yazar; Kalem aramayı/okumayı yapıp sonuçları aynı sohbete
+  - Claude Code'a aynı iki araç Kalem'in kendi **MCP sunucusuyla** gerçek
+    araç olarak verilir (`mcp__kalem__confluence_search`,
+    `mcp__kalem__confluence_read_page`; `--mcp-config` ve
+    `--allowedTools` ile, sormadan kullanılır). Sunucu, uygulamanın kendi
+    çalıştırılabilir dosyasıyla Node olarak (`ELECTRON_RUN_AS_NODE`)
+    başlar ve her çağrıyı uygulamaya yalnızca `127.0.0.1`'de dinleyen,
+    bu çalıştırmaya özel bir anahtarla korunan bir uç noktadan iletir;
+    arama uygulamanın Confluence bağlantısıyla yapılır. Anahtar
+    kullanıcı veri klasöründe yalnızca kullanıcının okuyabildiği
+    `assistant-tools/mcp.json` dosyasında durur, komut satırına yazılmaz.
+    Bağlıyken Claude Code'un kendi WebFetch aracı o siteye yasaklanır
+    (`WebFetch(domain:…)`): şirket ağındaki, oturum isteyen siteye zaten
+    ulaşamaz.
+  - GitHub Copilot'ta model yanıtına bir ` ```kalem-confluence ` isteği
+    yazar; Kalem aramayı/okumayı yapıp sonuçları aynı sohbete
     `<confluence-results>` olarak geri gönderir (en fazla 6 tur, turda 6
-    istek). İstek blokları yanıtta görünmez.
+    istek). İstek blokları yanıtta görünmez. MCP sunucusu
+    başlatılamazsa Claude Code da bu yolu kullanır.
   - Yapılan aramalar ve okunan sayfalar yanıtın üstünde **Bakılanlar**
     listesinde görünür ("Confluence'ta “onay” arandı", "“Sprint Planı”
     Confluence sayfası okundu"). `/confluence <ne aranacak>` aynı soruyu

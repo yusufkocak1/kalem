@@ -125,13 +125,14 @@ describe("results", () => {
 });
 
 describe("confluenceInstructions", () => {
-	it("tells a CLI to write requests, an API to call the tools, and asks to connect without a site", () => {
-		expect(confluenceInstructions("https://wiki.example.com", true)).toContain(
-			`\`\`\`${CONFLUENCE_FENCE}`,
-		);
-		expect(confluenceInstructions("https://wiki.example.com", false)).toContain(
-			"`confluence_search`",
-		);
-		expect(confluenceInstructions(null, true)).toContain("not connected to Confluence");
+	it("tells Copilot to write requests, Claude Code and an API to call the tools, and asks to connect without a site", () => {
+		const site = "https://wiki.example.com";
+		expect(confluenceInstructions(site, "block")).toContain(`\`\`\`${CONFLUENCE_FENCE}`);
+		expect(confluenceInstructions(site, "tools")).toContain("`confluence_search`");
+		const mcp = confluenceInstructions(site, "mcp");
+		expect(mcp).toContain("`mcp__kalem__confluence_search`");
+		expect(mcp).toContain("Do not use WebFetch");
+		expect(mcp).not.toContain(CONFLUENCE_FENCE);
+		expect(confluenceInstructions(null, "mcp")).toContain("not connected to Confluence");
 	});
 });

@@ -263,6 +263,10 @@ export function claudeArgs(options: {
 	readonly jsonInput?: boolean;
 	/** Folders outside the one it runs in that it may read: the chat's sources. */
 	readonly folders?: readonly string[];
+	/** An MCP configuration file with Kalem's tools, and the tools it may call without asking. */
+	readonly mcp?: { readonly config: string; readonly tools: readonly string[] };
+	/** More it may not use, as permission rules (`WebFetch(domain:…)`). */
+	readonly denied?: readonly string[];
 }): string[] {
 	return [
 		"-p",
@@ -274,8 +278,12 @@ export function claudeArgs(options: {
 		"--append-system-prompt",
 		options.systemPrompt ?? SYSTEM_PROMPT,
 		...(options.folders ?? []).flatMap((folder) => ["--add-dir", folder]),
+		...(options.mcp === undefined
+			? []
+			: ["--mcp-config", options.mcp.config, "--allowedTools", ...options.mcp.tools]),
 		"--disallowedTools",
 		...DENIED_TOOLS,
+		...(options.denied ?? []),
 		...(options.model ? ["--model", options.model] : []),
 		...(options.sessionId === null ? [] : ["--resume", options.sessionId]),
 	];
@@ -360,7 +368,16 @@ export function toolSteps(message: unknown): ClaudeEvent[] {
 	for (const block of message.content) {
 		if (!isRecord(block) || block.type !== "tool_use" || typeof block.name !== "string") continue;
 		const input = isRecord(block.input) ? block.input : {};
-		const detail = ["pattern", "file_path", "path", "command", "query", "url", "description"]
+		const detail = [
+			"pattern",
+			"file_path",
+			"path",
+			"command",
+			"query",
+			"page_id",
+			"url",
+			"description",
+		]
 			.map((key) => input[key])
 			.find((value): value is string => typeof value === "string" && value !== "");
 		steps.push({ kind: "step", tool: block.name, detail: (detail ?? "").slice(0, 200) });

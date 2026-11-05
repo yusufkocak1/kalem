@@ -150,13 +150,22 @@ export function pageText(
 }
 
 /** What the model is told about Confluence; `site` is `null` when the app is not connected to one. */
-export function confluenceInstructions(site: string | null, cli: boolean): string {
+/**
+ * How the model reaches Confluence: an API's tools, Claude Code's tools from
+ * Kalem's MCP server, or (a CLI without them) requests written in a block.
+ */
+export type LookupWay = "tools" | "mcp" | "block";
+
+export function confluenceInstructions(site: string | null, way: LookupWay): string {
 	if (site === null) {
 		return `## Confluence
 The user is not connected to Confluence. If they ask you to find something in Confluence, tell them to connect first ("File" → "Open from Confluence"), then ask again.`;
 	}
-	const how = cli
-		? `To look something up, reply with ONLY a \`${CONFLUENCE_FENCE}\` code block holding a JSON array of requests, and nothing else:
+	const how =
+		way === "mcp"
+			? `Look things up with Kalem's tools \`mcp__kalem__confluence_search\` (inside pages by default, or in titles) and \`mcp__kalem__confluence_read_page\` (a page's text, by the id a search gave). They use the app's own connection to the site. Do not use WebFetch, curl, Bash or any other tool for Confluence: the site is behind the user's sign-in, often on a company network, and only these tools reach it.`
+			: way === "block"
+				? `To look something up, reply with ONLY a \`${CONFLUENCE_FENCE}\` code block holding a JSON array of requests, and nothing else:
 
 \`\`\`${CONFLUENCE_FENCE}
 [
@@ -167,7 +176,7 @@ The user is not connected to Confluence. If they ask you to find something in Co
 \`\`\`
 
 Kalem runs them and sends you what they found in <confluence-results>; then ask again, or answer. At most ${MAX_REQUESTS} requests a round and ${MAX_ROUNDS} rounds. "search" looks inside pages ("mode": "content", the default: title, text and labels) or in titles ("mode": "title"); "space" (a space key) is optional. "read" takes a page id from the results and returns the page's text; a long page comes in parts: add "offset" to read on. Do not use your own tools (WebFetch, Bash…) for Confluence: they cannot reach it.`
-		: `Look things up with the tools: \`confluence_search\` (inside pages by default, or in titles) and \`confluence_read_page\` (a page's text, by the id a search gave).`;
+				: `Look things up with the tools: \`confluence_search\` (inside pages by default, or in titles) and \`confluence_read_page\` (a page's text, by the id a search gave).`;
 	return `## Confluence
 The user is connected to the Confluence site ${site}. When they ask you to find, look up, check or summarise something in Confluence (for example "bunu Confluence'tan bul", "Confluence'ta … var mı?"), or the answer is likely written there (their team's processes, decisions, designs, runbooks), search it yourself instead of saying you cannot.
 

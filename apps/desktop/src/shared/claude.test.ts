@@ -63,6 +63,25 @@ describe("CLI arguments", () => {
 		expect(args).not.toContain("--resume");
 	});
 
+	it("gives Claude Code Kalem's tools from an MCP configuration, allowed, and keeps WebFetch off the site", () => {
+		const args = claudeArgs({
+			sessionId: null,
+			mcp: {
+				config: "/data/mcp.json",
+				tools: ["mcp__kalem__confluence_search", "mcp__kalem__confluence_read_page"],
+			},
+			denied: ["WebFetch(domain:wiki.example.com)"],
+		});
+		const joined = args.join(" ");
+		expect(joined).toContain(
+			"--mcp-config /data/mcp.json --allowedTools mcp__kalem__confluence_search mcp__kalem__confluence_read_page --disallowedTools",
+		);
+		expect(args.at(args.indexOf("--disallowedTools") + 6)).toBe(
+			"WebFetch(domain:wiki.example.com)",
+		);
+		expect(claudeArgs({ sessionId: null })).not.toContain("--mcp-config");
+	});
+
 	it("asks for a model when one is picked", () => {
 		const args = claudeArgs({ sessionId: "s", model: "sonnet" });
 		expect(args.join(" ")).toContain("--model sonnet --resume s");
