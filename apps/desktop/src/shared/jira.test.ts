@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import { withoutRequests } from "./confluence-tool.js";
 import {
 	cleanJiraHtml,
+	groupByParent,
 	htmlText,
 	issueKey,
 	issueKeyFromUrl,
 	issueOf,
+	issueRowOf,
 	issueText,
 	looksLikeHtml,
 	normalizeJiraSite,
@@ -172,6 +174,7 @@ describe("Jira issues", () => {
 						assignee: "",
 						priority: "",
 						updated: null,
+						parent: null,
 					},
 				],
 				total: 1,
@@ -183,6 +186,52 @@ describe("Jira issues", () => {
 		expect(text).toContain(
 			"- DEV-7 Giriş (Bug, Open, unassigned) https://jira.example.com/browse/DEV-7",
 		);
+	});
+});
+
+describe("a search's issues as a tree", () => {
+	const ref = (key: string) => ({
+		key,
+		summary: key,
+		status: "",
+		statusCategory: "" as const,
+		type: "",
+	});
+	const row = (key: string, parent: string | null = null) => ({
+		...ref(key),
+		assignee: "",
+		priority: "",
+		updated: null,
+		parent: parent === null ? null : ref(parent),
+	});
+
+	it("puts sub-tasks under their parent, in the search's order", () => {
+		const groups = groupByParent([
+			row("QR-49185", "QR-26028"),
+			row("QR-48152"),
+			row("QR-26028"),
+			row("QR-49186", "QR-26028"),
+			row("QR-48819", "QR-26073"),
+		]);
+		expect(
+			groups.map((group) => [
+				group.parent.key,
+				group.row === null ? "not found" : "found",
+				group.children.map((child) => child.key),
+			]),
+		).toEqual([
+			["QR-26028", "found", ["QR-49185", "QR-49186"]],
+			["QR-48152", "found", []],
+			// Its parent was not in the results: it still heads its sub-task.
+			["QR-26073", "not found", ["QR-48819"]],
+		]);
+	});
+
+	it("reads a sub-task's parent from the search", () => {
+		expect(
+			issueRowOf({ key: "QR-2", fields: { parent: { key: "QR-1", fields: { summary: "Üst" } } } })
+				?.parent,
+		).toMatchObject({ key: "QR-1", summary: "Üst" });
 	});
 });
 

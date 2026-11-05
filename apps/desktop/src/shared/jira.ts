@@ -25,6 +25,8 @@ export interface JiraIssueRow extends JiraIssueRef {
 	readonly priority: string;
 	/** ISO date, or `null`. */
 	readonly updated: string | null;
+	/** The issue a sub-task belongs to; `null` for any other issue. */
+	readonly parent: JiraIssueRef | null;
 }
 
 export interface JiraComment {
@@ -126,6 +128,7 @@ export const ROW_FIELDS = [
 	"priority",
 	"assignee",
 	"updated",
+	"parent",
 ] as const;
 
 /** Comments kept of an issue: the latest ones. */
@@ -322,7 +325,49 @@ export function issueRowOf(raw: unknown): JiraIssueRow | null {
 		assignee: nameOf(fields.assignee),
 		priority: nameOf(fields.priority),
 		updated: date(fields.updated),
+		parent: issueRefOf(fields.parent),
 	};
+}
+
+/** A parent issue with its sub-tasks, as a list shows them: the sub-tasks under it. */
+export interface IssueGroup {
+	readonly parent: JiraIssueRef;
+	/** The parent's own row when the search found it; `null` when only its sub-tasks matched. */
+	readonly row: JiraIssueRow | null;
+	readonly children: readonly JiraIssueRow[];
+}
+
+/**
+ * A search's issues as a tree: each sub-task under its parent, in the
+ * order the search gave (a group where its parent or first sub-task was).
+ * A parent the search did not find still heads its sub-tasks.
+ */
+export function groupByParent(rows: readonly JiraIssueRow[]): IssueGroup[] {
+	const groups = new Map<
+		string,
+		{ parent: JiraIssueRef; row: JiraIssueRow | null; children: JiraIssueRow[] }
+	>();
+	for (const row of rows) {
+		const parent = row.parent;
+		if (parent !== null && parent.key !== row.key) {
+			const group = groups.get(parent.key) ?? {
+				parent,
+				row: null,
+				children: [],
+			};
+			group.children.push(row);
+			groups.set(parent.key, group);
+			continue;
+		}
+		const group = groups.get(row.key);
+		if (group === undefined) groups.set(row.key, { parent: row, row, children: [] });
+		else {
+			group.row = row;
+			group.parent = row;
+		}
+	}
+	// A parent found after its sub-tasks keeps their place.
+	return [...groups.values()];
 }
 
 /** The whole issue, with its description and comments as Markdown. */

@@ -30,6 +30,17 @@ const issue = (key: string, summary: string, status: string, category: string) =
 	},
 });
 
+const subtask = (key: string, summary: string, parent: string) => {
+	const base = issue(key, summary, "Open", "new");
+	return {
+		...base,
+		fields: {
+			...base.fields,
+			parent: { key: parent, fields: { summary: `Üst ${parent}`, status: { name: "Open" } } },
+		},
+	};
+};
+
 /** Jira Server: who is signed in, two issues and a search. */
 async function fakeJira() {
 	const searches: string[] = [];
@@ -79,8 +90,14 @@ async function fakeJira() {
 		if (url.pathname === "/rest/api/2/search") {
 			searches.push(url.searchParams.get("jql") ?? "");
 			return json(res, {
-				issues: [issue("QR-1", "Giriş zaman aşımı", "In Progress", "indeterminate")],
-				total: 1,
+				// Sub-tasks come before and after their parent; one's parent is not in the results.
+				issues: [
+					subtask("QR-2", "Süreyi ayarla", "QR-1"),
+					issue("QR-1", "Giriş zaman aşımı", "In Progress", "indeterminate"),
+					subtask("QR-5", "Ön yüz", "QR-1"),
+					subtask("QR-8", "Bebek ekleme FE", "QR-7"),
+				],
+				total: 4,
 				startAt: 0,
 			});
 		}
@@ -224,7 +241,18 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	// Jira has a pane once it is connected: the user's issues.
 	await showPane(page, "jira");
 	await expect(page.locator(".dock-left .dock-title h2")).toHaveText("Jira");
-	await expect(page.locator(".jira-pane .jira-row")).toHaveCount(1);
+	// Sub-tasks under their parent, as a tree; a parent the search missed heads its own.
+	const rows = page.locator(".jira-pane .jira-row");
+	await expect(rows.locator(".jira-key")).toHaveText(["QR-1", "QR-2", "QR-5", "QR-7", "QR-8"]);
+	await expect(page.locator(".jira-pane .jira-tree-child")).toHaveCount(3);
+	await expect(page.locator('.jira-pane .jira-tree-context[data-key="QR-7"]')).toBeVisible();
+	// The parent's toggle folds its sub-tasks away and back.
+	const toggle = page.locator('.jira-pane .jira-row[data-key="QR-1"] .jira-tree-toggle');
+	await toggle.click();
+	await expect(rows.locator(".jira-key")).toHaveText(["QR-1", "QR-7", "QR-8"]);
+	await expect(page.locator(".jira-dialog")).toBeHidden();
+	await page.locator('.jira-pane .jira-row[data-key="QR-1"] .jira-tree-toggle').click();
+	await expect(rows).toHaveCount(5);
 	expect(jiraServer.searches.at(-1)).toContain("assignee = currentUser()");
 
 	// Settings: Jira goes to the right dock, the headings under the document.
