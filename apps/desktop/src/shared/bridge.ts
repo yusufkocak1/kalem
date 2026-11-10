@@ -296,6 +296,29 @@ export type ConfluenceTreeParent =
 	| { readonly space: string; readonly page?: undefined }
 	| { readonly page: string; readonly space?: undefined };
 
+/** A local document published as a new page: where, under which title, and what it says. */
+export interface ConfluencePublishRequest {
+	readonly space: string;
+	/** The parent page; `null` for a top-level page. */
+	readonly parent: string | null;
+	readonly title: string;
+	/** The document's Markdown; its local pictures and files go as attachments. */
+	readonly markdown: string;
+	/** Open the new page in a tab of this window. */
+	readonly open: boolean;
+}
+
+export interface ConfluencePublished {
+	readonly id: string;
+	readonly title: string;
+	readonly url: string;
+	readonly spaceKey: string;
+	/** How many of the document's files were attached. */
+	readonly attached: number;
+	/** The document's files that could not be read, as it names them. */
+	readonly missing: readonly string[];
+}
+
 export interface ConfluenceNewPage {
 	readonly space: string;
 	/** The parent page; `null` for a top-level page. */
@@ -630,6 +653,7 @@ export const COMMANDS = [
 	"export-docx",
 	"export-confluence",
 	"export-confluence-wiki",
+	"publish-confluence",
 	"confluence-open",
 	"quick-open",
 	"search-folder",
@@ -673,6 +697,8 @@ export interface KalemBridge {
 	confluenceTree(parent: ConfluenceTreeParent): Promise<readonly ConfluenceTreePage[]>;
 	/** Creates an empty page (under `parent`, or at the top of the space) and opens it in a tab. */
 	confluenceCreatePage(request: ConfluenceNewPage): Promise<ConfluenceTreePage>;
+	/** Publishes the tab's document as a new page, with its local files attached. */
+	confluencePublish(tabId: string, request: ConfluencePublishRequest): Promise<ConfluencePublished>;
 	/** Recently changed pages, filtered by title and space when given. */
 	/** The side pane's search: titles or whole pages, with filters, excerpts and more results. */
 	confluenceFind(request: ConfluenceSearchRequest): Promise<ConfluenceSearchResults>;
@@ -901,6 +927,7 @@ export const CHANNEL = {
 	confluenceSpaces: "kalem:confluence-spaces",
 	confluenceTree: "kalem:confluence-tree",
 	confluenceCreatePage: "kalem:confluence-create-page",
+	confluencePublish: "kalem:confluence-publish",
 	confluenceSearch: "kalem:confluence-search",
 	confluenceFind: "kalem:confluence-find",
 	confluenceAncestors: "kalem:confluence-ancestors",
