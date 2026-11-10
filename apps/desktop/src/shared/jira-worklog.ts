@@ -17,7 +17,7 @@ const DAY_HOURS = 8;
  * are hours); `null` when the text is not a duration or is zero.
  */
 export function parseDuration(text: string): number | null {
-	const value = text.trim().replace(",", ".");
+	const value = text.trim().replaceAll(",", ".");
 	if (value === "") return null;
 	if (/^\d+(\.\d+)?$/.test(value)) {
 		const seconds = Math.round(Number(value) * 3600);
@@ -38,6 +38,16 @@ export function parseDuration(text: string): number | null {
 	}
 	seconds = Math.round(seconds);
 	return seconds > 0 ? seconds : null;
+}
+
+/**
+ * A remaining estimate: a duration as `parseDuration` reads it, or zero
+ * written any way ("0", "0h", "0m", "0,0"), which leaves nothing to do.
+ * `null` when the text is not a duration.
+ */
+export function parseEstimate(text: string): number | null {
+	if (/^(0+([.,]0+)?\s*(dk|d|g|h|s|m)?\s*)+$/i.test(text.trim())) return 0;
+	return parseDuration(text);
 }
 
 /** Seconds as Jira writes them: "8h", "1h 30m", "45m", "0h". */

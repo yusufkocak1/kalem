@@ -62,6 +62,8 @@ body {
 	overflow: hidden;
 	background: var(--app-desk);
 	color: var(--app-text);
+	/* Checkboxes, radios and sliders in the app's colour, not the system blue. */
+	accent-color: var(--app-accent);
 	font:
 		13px / 1.4 system-ui,
 		-apple-system,
@@ -1362,6 +1364,32 @@ button {
 
 .assistant-toolbar-space {
 	flex: 1;
+}
+
+/* A narrow panel cannot hold the whole toolbar on one line: the mode, the model
+   and Send move to a second line instead of cutting the labels short. */
+.assistant-box {
+	container-type: inline-size;
+}
+
+@container (max-width: 430px) {
+	.assistant-toolbar {
+		flex-wrap: wrap;
+		row-gap: 4px;
+	}
+
+	.assistant-toolbar-space {
+		flex-basis: 100%;
+		height: 0;
+	}
+
+	.assistant-toolbar .assistant-mode-picker {
+		margin-left: auto;
+	}
+
+	.assistant-toolbar .assistant-model {
+		max-width: 55%;
+	}
 }
 
 .assistant-toolbar .assistant-share {
@@ -3388,7 +3416,9 @@ button {
 	width: min(50em, 100%);
 	min-height: 64em;
 	margin: 0 auto;
-	padding: 4.5em 5.5em 6em;
+	/* The side margins shrink with a page narrower than 50em (a side panel open
+	   in a small window) instead of squeezing the text into a thin column. */
+	padding: 4.5em min(5.5em, 11%) 6em;
 	border-radius: 2px;
 	background: var(--app-page);
 	box-shadow: var(--app-shadow);
@@ -3887,7 +3917,8 @@ button {
 	gap: 6px;
 	width: max-content;
 	min-width: 220px;
-	max-width: min(380px, calc(100vw - 16px));
+	/* Room for the card's four buttons on one line. */
+	max-width: min(440px, calc(100vw - 16px));
 	padding: 10px 12px;
 	border: 1px solid var(--app-border);
 	border-radius: 10px;
@@ -5528,7 +5559,8 @@ pre[data-confluence-kind="layout"]::before {
 .jira-dialog {
 	display: none;
 	flex-direction: column;
-	width: min(760px, calc(100vw - 32px));
+	/* Wide enough for a description's tables and code, the fields beside it. */
+	width: min(960px, calc(100vw - 32px));
 	max-height: min(84vh, 900px);
 	margin: 6vh auto auto;
 	padding: 0;
@@ -6185,6 +6217,13 @@ pre[data-confluence-kind="layout"]::before {
 	font-size: 14px;
 }
 
+/* A block after another starts with a rule, so its heading does not read as
+   part of the form above it. */
+.settings-block + .settings-block {
+	padding-top: 12px;
+	border-top: 1px solid var(--app-border);
+}
+
 .settings-block .assistant-settings {
 	padding: 0;
 	border: 0;
@@ -6349,8 +6388,18 @@ details.jira-section > .jira-list {
 	background: var(--app-surface);
 }
 
+/* A table wider than the dialog scrolls sideways in its own box instead of
+   being cut off at the dialog's edge. */
 .jira-markdown table {
+	display: block;
+	max-width: 100%;
+	overflow-x: auto;
 	border-collapse: collapse;
+}
+
+.jira-markdown img {
+	max-width: 100%;
+	height: auto;
 }
 
 .jira-markdown td,
@@ -8947,4 +8996,66 @@ h3.mode-panel-name {
 
 .mcp-card-head .mode-icon-button {
 	margin-left: auto;
+}
+
+/* The empty document's hint wraps inside the page instead of running past its
+   right edge on a narrow page. It takes no height, so the caret stays on the
+   first line, held up by the paragraph's own line break. */
+.kalem-editor.kalem-empty > p.kalem-block:first-child::before {
+	display: block;
+	width: auto;
+	height: 0;
+	white-space: normal;
+}
+
+.kalem-editor.kalem-empty > p.kalem-block:first-child > br:only-child {
+	display: inline;
+}
+
+/* Not enough room for the tab's labels (see `fit` in ribbon.ts): icons only.
+   The label stays in the button's accessible name. */
+.ribbon-panel[data-compact] .ribbon-button-label {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.ribbon-panel[data-compact] .ribbon-button,
+.ribbon-panel[data-compact] .ribbon-button-labeled {
+	padding: 0 5px;
+}
+
+/* A narrow Files pane: the folder's name gets a line of its own above the
+   actions instead of being cut to a few letters by them. */
+.files-pane {
+	container-type: inline-size;
+}
+
+@container (max-width: 360px) {
+	.files-toolbar:has(> .files-title:not(:empty)):has(
+		> button:not([hidden]) ~ button:not([hidden]) ~ button:not([hidden])
+	) {
+		flex-wrap: wrap;
+		justify-content: flex-end;
+		row-gap: 2px;
+	}
+
+	.files-toolbar:has(> button:not([hidden]) ~ button:not([hidden]) ~ button:not([hidden]))
+		> .files-title:not(:empty) {
+		flex-basis: 100%;
+	}
+}
+
+/* The style gallery packs tighter too, so the Home tab fits a smaller window. */
+.ribbon-panel[data-compact] .ribbon-style {
+	padding: 0 4px;
+}
+
+.ribbon-panel[data-compact] .ribbon-style-heading-1,
+.ribbon-panel[data-compact] .ribbon-style-heading-2,
+.ribbon-panel[data-compact] .ribbon-style-heading-3 {
+	font-size: 13px;
 }

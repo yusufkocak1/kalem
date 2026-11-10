@@ -76,6 +76,8 @@ export function createStatusControl(options: StatusControlOptions): HTMLElement 
 	});
 	wrap.addEventListener("keydown", (event) => {
 		if (event.key === "Escape" && !menu.hidden) {
+			// Only the menu closes: without this the issue's dialog would close with it.
+			event.preventDefault();
 			event.stopPropagation();
 			close();
 			button.focus();
@@ -312,7 +314,9 @@ export function createDevelopmentSection(options: DevelopmentOptions): HTMLEleme
 				parts.push(
 					line(
 						"branches",
-						format(t.jiraDevBranches, summary.branches.count),
+						summary.branches.count === 1
+							? t.jiraDevBranch
+							: format(t.jiraDevBranches, summary.branches.count),
 						summary.branches,
 						format(t.jiraDevUpdated, ago(summary.branches.updated)),
 					),
@@ -322,7 +326,9 @@ export function createDevelopmentSection(options: DevelopmentOptions): HTMLEleme
 				parts.push(
 					line(
 						"commits",
-						format(t.jiraDevCommits, summary.commits.count),
+						summary.commits.count === 1
+							? t.jiraDevCommit
+							: format(t.jiraDevCommits, summary.commits.count),
 						summary.commits,
 						format(t.jiraDevLatest, ago(summary.commits.updated)),
 					),
@@ -332,7 +338,9 @@ export function createDevelopmentSection(options: DevelopmentOptions): HTMLEleme
 				parts.push(
 					line(
 						"pullRequests",
-						format(t.jiraDevPullRequests, summary.pullRequests.count),
+						summary.pullRequests.count === 1
+							? t.jiraDevPullRequest
+							: format(t.jiraDevPullRequests, summary.pullRequests.count),
 						summary.pullRequests,
 						format(t.jiraDevUpdated, ago(summary.pullRequests.updated)),
 						summary.pullRequests.state,

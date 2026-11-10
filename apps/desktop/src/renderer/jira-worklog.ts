@@ -6,6 +6,7 @@ import {
 	formatDuration,
 	missingAttributes,
 	parseDuration,
+	parseEstimate,
 	QUICK_HOURS,
 	remainingAfter,
 } from "../shared/jira-worklog.js";
@@ -184,6 +185,9 @@ export function createWorklogForm(options: WorklogFormOptions): HTMLElement {
 	const say = (text: string, kind: "info" | "error" | "ok" = "info"): void => {
 		status.textContent = text;
 		status.dataset.kind = kind;
+		// The message is under the button: brought into view, or an empty field
+		// shows only its red border while the reason is scrolled out of sight.
+		if (kind !== "info" && text !== "") status.scrollIntoView?.({ block: "nearest" });
 	};
 
 	function markQuick(): void {
@@ -379,7 +383,7 @@ export function createWorklogForm(options: WorklogFormOptions): HTMLElement {
 		// what Jira counts down to by itself, and setting it can be refused.
 		let remainingSeconds: number | null = null;
 		if (remainingTyped && remaining.value.trim() !== "") {
-			remainingSeconds = remaining.value.trim() === "0" ? 0 : parseDuration(remaining.value);
+			remainingSeconds = parseEstimate(remaining.value);
 			if (remainingSeconds === null) {
 				remaining.focus();
 				say(t.jiraWorkInvalidTime, "error");

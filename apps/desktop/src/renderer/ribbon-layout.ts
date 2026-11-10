@@ -493,11 +493,10 @@ export function createAppRibbon(
 						{
 							...toggle(
 								"assistant",
-								t.assistantPane,
+								t.assistantTitle,
 								"assistant",
 								() => ctx.settings().assistant,
 								ctx.commands.assistant,
-								false,
 							),
 							shortcut: `${MOD}+Shift+L`,
 						},

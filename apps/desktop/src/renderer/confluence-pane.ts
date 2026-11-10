@@ -318,7 +318,10 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 	function placeholder(): void {
 		const text =
 			mode === "content" ? t.confluenceSearchContentPlaceholder : t.confluenceSearchPlaceholder;
-		search.placeholder = text;
+		// The narrow pane shows a shorter hint; the full one is the tooltip and the name.
+		search.placeholder =
+			mode === "content" ? t.confluencePaneContentPlaceholder : t.confluencePaneSearchPlaceholder;
+		search.title = text;
 		search.setAttribute("aria-label", text);
 	}
 	placeholder();
