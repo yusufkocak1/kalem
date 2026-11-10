@@ -230,6 +230,8 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		if (kept === undefined) throw new Error(ctx.strings().assistantEditGone);
 		await applyEdit(kept);
 		proposals.delete(kept.id);
+		// A new file is in the next search's list at once.
+		indexes.forget(kept.absolute);
 	});
 
 	const status = async (refresh = false): Promise<AssistantStatus> => {
