@@ -65,6 +65,19 @@ async function fakeConfluence() {
 		if (url.pathname === "/rest/api/user" && url.searchParams.get("key") === "u1") {
 			return json(res, { username: "ayse", displayName: "Ayşe Balcı Polat" });
 		}
+		if (url.pathname === "/rest/api/search/user") {
+			const cql = url.searchParams.get("cql") ?? "";
+			return json(res, {
+				results: cql.includes('"ay')
+					? [{ user: { userKey: "u1", username: "ayse", displayName: "Ayşe Balcı Polat" } }]
+					: [],
+			});
+		}
+		if (url.pathname === "/rest/jiraanywhere/1.0/servers") {
+			return json(res, [
+				{ id: "j1", name: "Şirket Jira", url: "https://jira.example.com", selected: true },
+			]);
+		}
 		if (url.pathname === "/rest/applinks/1.0/listApplicationlinks") {
 			return json(res, {
 				list: [
@@ -706,6 +719,55 @@ test("keeps mentions and inline macros in a paragraph that is edited", async () 
 	expect(await asked()).toEqual(["Update the page on Confluence?"]);
 	expect(confluence.saves[0]?.storage).toBe(
 		`<h1>Sprint Planı</h1><p>Yeni Sorumlu ${mention}, durum ${status}</p>`,
+	);
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("mentions a person with @ and adds a Jira issue from the / menu, inside a line", async () => {
+	const confluence = await fakeConfluence();
+	cleanup.push(confluence.close);
+	confluence.page.storage = "<h1>Sprint Planı</h1><p>Hedef</p>";
+	const { app, page, errors } = await launch();
+
+	await clickMenu(app, "File", "Open from Confluence…");
+	const dialog = page.locator(".confluence-dialog");
+	await dialog.locator('input[type="url"]').fill(confluence.site);
+	await dialog.locator('input[type="password"]').fill(TOKEN);
+	await dialog.getByRole("button", { name: "Connect" }).click();
+	await dialog.locator(".quick-open-item", { hasText: "Sprint Planı" }).click();
+	await expect(dialog).not.toBeVisible();
+
+	await page.locator("#editor p", { hasText: "Hedef" }).click();
+	await page.keyboard.press("End");
+	await page.keyboard.type(" için @ay");
+	const picker = page.locator(".atom-picker");
+	await expect(picker).toBeVisible();
+	await expect(picker.locator(".kalem-slash-item")).toHaveText(["@Ayşe Balcı Polatayse"]);
+	await page.keyboard.press("Enter");
+	await expect(picker).toBeHidden();
+	const mention = page.locator('#editor a[href^="#confluence-keep-mention-"]');
+	await expect(mention).toHaveText("@Ayşe Balcı Polat");
+
+	// The / menu's item opens the issue box in the line instead of changing the block.
+	await page.keyboard.type("ve /jira");
+	await page.keyboard.press("Enter");
+	await expect(picker).toBeVisible();
+	await page.keyboard.type("abc-7");
+	await expect(picker.locator(".kalem-slash-item")).toHaveText(["◆ABC-7"]);
+	await page.keyboard.press("Enter");
+	await expect(page.locator('#editor a[href^="#confluence-keep-jira-"]')).toHaveText("ABC-7");
+	await page.keyboard.type("bitti");
+	await expect(page.locator("#editor p").first()).toHaveText(
+		"Hedef için @Ayşe Balcı Polat ve ABC-7 bitti",
+	);
+
+	const asked = await recordMessageBoxes(app, 0);
+	await page.locator('[data-command="save"]').click();
+	await expect(page.locator(".save-status")).toHaveText("Saved");
+	expect(await asked()).toEqual(["Update the page on Confluence?"]);
+	expect(confluence.saves[0]?.storage).toBe(
+		'<h1>Sprint Planı</h1><p>Hedef için <ac:link><ri:user ri:userkey="u1" /></ac:link> ve <ac:structured-macro ac:name="jira" ac:schema-version="1"><ac:parameter ac:name="server">Şirket Jira</ac:parameter><ac:parameter ac:name="serverId">j1</ac:parameter><ac:parameter ac:name="key">ABC-7</ac:parameter></ac:structured-macro> bitti</p>',
 	);
 	expect(errors).toEqual([]);
 	await app.close();

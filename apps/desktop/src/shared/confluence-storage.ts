@@ -23,6 +23,7 @@ import {
 	quotePanel,
 	toConfluenceLanguage,
 } from "./confluence-common.js";
+import { insertedAtomXml } from "./confluence-insert.js";
 import type { MarkupElement, MarkupNode } from "./confluence-markup.js";
 import { childElements, parseMarkup, textOf } from "./confluence-markup.js";
 import { extractTableStyles } from "./table-style.js";
@@ -521,8 +522,9 @@ class StorageWriter {
 
 	link(url: string, title: string | null, children: readonly Inline[]): string {
 		if (url.startsWith(ATOM_PREFIX)) {
-			// A kept atom goes back as it was; one this page never had is its text.
-			return this.#atoms.get(url) ?? this.inlines(children);
+			// A kept atom goes back as it was; a mention or Jira issue added while
+			// writing becomes one; any other this page never had is its text.
+			return this.#atoms.get(url) ?? insertedAtomXml(url) ?? this.inlines(children);
 		}
 		const file = linkedAttachment(url);
 		if (file !== null) {

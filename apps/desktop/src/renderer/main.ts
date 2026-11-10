@@ -330,6 +330,7 @@ async function refreshAccounts(): Promise<void> {
 	]);
 	accounts.confluence = confluence !== null;
 	accounts.jira = jira !== null;
+	for (const tab of tabs.values()) tab.session.connectionsChanged();
 	updatePublishButton();
 	docks.apply();
 	refreshShown(before);
@@ -528,6 +529,7 @@ function createTab(id: string): Tab {
 		notices: createNotices(noticeHost, t.dismiss),
 		previews,
 		settings: () => settings,
+		connections: () => accounts,
 		onStateChange: () => {
 			tabStrip.update(id, {
 				title: tabSession.name,

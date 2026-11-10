@@ -8,6 +8,8 @@ import type {
 } from "../shared/bridge.js";
 import type { AtomUser } from "../shared/confluence-atoms.js";
 import { jiraBaseFromLinks } from "../shared/confluence-atoms.js";
+import type { JiraServer, MentionUser } from "../shared/confluence-insert.js";
+import { jiraServerOf, usersOf } from "../shared/confluence-insert.js";
 import type {
 	ConfluenceSearchHit,
 	ConfluenceSearchRequest,
@@ -512,6 +514,54 @@ export class ConfluenceClient {
 			email: asString(body.email),
 			url,
 		};
+	}
+
+	/**
+	 * Users whose name starts with or contains the words, to mention: Cloud's
+	 * user search; on Server the same, then CQL's user search, then the old
+	 * API Confluence's own mention box used. An empty list when none is found.
+	 */
+	async users(query: string): Promise<MentionUser[]> {
+		const words = query.trim();
+		if (words === "") return [];
+		const prefix = /[\p{L}\p{N}]$/u.test(words) ? `${words}*` : words;
+		const cql = `user.fullname ~ ${cqlString(prefix)}`;
+		const paths = [
+			`/rest/api/search/user?${new URLSearchParams({ cql, limit: "10" })}`,
+			...(this.cloud
+				? []
+				: [
+						`/rest/api/search?${new URLSearchParams({ cql: `type = user AND ${cql}`, limit: "10" })}`,
+						`/rest/prototype/1/search/user.json?${new URLSearchParams({ query: words, "max-results": "10" })}`,
+					]),
+		];
+		let failure: unknown = null;
+		let answered = false;
+		for (const path of paths) {
+			try {
+				const users = usersOf(await this.#json(path));
+				if (users.length > 0) return users;
+				answered = true;
+			} catch (error) {
+				if (!(error instanceof ConfluenceError) || error.status === 401) throw error;
+				failure = error;
+			}
+		}
+		if (!answered && failure !== null) throw failure;
+		return [];
+	}
+
+	/**
+	 * The Jira server new Jira macros name: the one on `host` among the Jira
+	 * macro's servers, else the default one; `null` when the site lists none.
+	 */
+	async jiraServer(host: string | null): Promise<JiraServer | null> {
+		try {
+			return jiraServerOf(await this.#json("/rest/jiraanywhere/1.0/servers"), host);
+		} catch (error) {
+			if (error instanceof ConfluenceError) return null;
+			throw error;
+		}
 	}
 
 	/**

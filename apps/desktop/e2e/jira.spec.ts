@@ -101,7 +101,11 @@ async function fakeJira() {
 			res.writeHead(200, { "Content-Type": "application/javascript" });
 			return res.end(
 				`${url.searchParams.get("callback")}(${JSON.stringify({
-					values: [{ key: "3351", value: "Satış Kanalı (QuickRes) Uygulaması" }],
+					values: [
+						{ key: "3350", value: "Sigorta Servisi" },
+						{ key: "3351", value: "Satış Kanalı (QuickRes) Uygulaması" },
+						{ key: "3352", value: "Ana Sayfa Servisi" },
+					],
 				})});`,
 			);
 		}
@@ -402,14 +406,13 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await expect(worklog.locator(".jira-worklog-summary")).toHaveText("Spent 12h · Remaining 8h");
 	await expect(worklog.locator(".jira-worklog-mine li")).toContainText("6h");
 	// The choices come from each attribute's own address, as in Tempo's dialog.
-	await expect(worklog.locator('select[data-attribute="_Servis_"] option')).toHaveText([
-		"Choose…",
-		"Satış Kanalı (QuickRes) Uygulaması",
-	]);
-	await expect(worklog.locator('select[data-attribute="_Sirket_"] option')).toHaveText([
-		"Choose…",
-		"TKAO - Türk Hava Yolları A.O.",
-	]);
+	const servis = worklog.locator('input[data-attribute="_Servis_"]');
+	const sirket = worklog.locator('input[data-attribute="_Sirket_"]');
+	const choices = worklog.locator(".combo-list:not([hidden]) .combo-option");
+	await expect(servis).toHaveAttribute("placeholder", "Choose…");
+	await sirket.click();
+	await expect(choices).toHaveText(["TKAO - Türk Hava Yolları A.O."]);
+	await page.keyboard.press("Escape");
 	await expect(worklog.locator(".jira-worklog-diagnostics")).toBeHidden();
 	await worklog.locator('.jira-worklog-chip[data-hours="5"]').click();
 	await expect(worklog.locator(".jira-worklog-worked")).toHaveValue("5h");
@@ -418,8 +421,24 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await worklog.locator(".jira-worklog-submit").click();
 	await expect(worklog.locator(".jira-worklog-status")).toHaveText("Fill in: Servis");
 	expect(jiraServer.worklogs).toEqual([]);
-	await worklog.locator('select[data-attribute="_Servis_"]').selectOption("3351");
-	await worklog.locator('select[data-attribute="_Sirket_"]').selectOption("TKAO");
+	// Each letter typed narrows the list: names starting with it first, then a word in them.
+	await servis.click();
+	await expect(choices).toHaveCount(3);
+	await page.keyboard.type("s");
+	await expect(choices).toHaveText([
+		"Sigorta Servisi",
+		"Satış Kanalı (QuickRes) Uygulaması",
+		"Ana Sayfa Servisi",
+	]);
+	await page.keyboard.type("a");
+	await expect(choices).toHaveText(["Satış Kanalı (QuickRes) Uygulaması", "Ana Sayfa Servisi"]);
+	await page.keyboard.press("Enter");
+	await expect(servis).toHaveValue("Satış Kanalı (QuickRes) Uygulaması");
+	await sirket.click();
+	await page.keyboard.type("türk");
+	await expect(choices).toHaveText(["TKAO - Türk Hava Yolları A.O."]);
+	await page.keyboard.press("Enter");
+	await expect(sirket).toHaveValue("TKAO - Türk Hava Yolları A.O.");
 	await worklog.locator(".jira-worklog-submit").click();
 	await expect(worklog.locator(".jira-worklog-status")).toHaveText("5h logged on QR-1.");
 	expect(jiraServer.worklogs[0]).toMatchObject({
