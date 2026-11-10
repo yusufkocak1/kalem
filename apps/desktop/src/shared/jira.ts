@@ -370,6 +370,52 @@ export function groupByParent(rows: readonly JiraIssueRow[]): IssueGroup[] {
 	return [...groups.values()];
 }
 
+/** The families of issue types a list draws with their own colour and mark. */
+export type IssueTypeKind =
+	| "bug"
+	| "story"
+	| "task"
+	| "subtask"
+	| "epic"
+	| "feature"
+	| "improvement"
+	| "other";
+
+/** Type names, in English and Turkish, by the family they belong to. */
+const TYPE_KINDS: readonly (readonly [IssueTypeKind, RegExp])[] = [
+	["subtask", /^(sub[- ]?task|alt[- ]?görev|technical sub[- ]?task)/],
+	["bug", /(bug|defect|hata|incident|problem)/],
+	["epic", /^(epic|destan)/],
+	["story", /(story|hikaye|hikâye)/],
+	["feature", /(feature|özellik)/],
+	["improvement", /(improvement|iyileştirme|enhancement)/],
+	["task", /(task|görev|^iş$)/],
+];
+
+/** The family an issue type belongs to, for its colour and mark; `other` when it is none of them. */
+export function issueTypeKind(type: string): IssueTypeKind {
+	const text = type.trim();
+	if (text === "") return "other";
+	// Lower-cased both ways: "IMPROVEMENT" is English, "İYİLEŞTİRME" Turkish.
+	const names = [text.toLocaleLowerCase("en"), text.toLocaleLowerCase("tr")];
+	for (const [kind, pattern] of TYPE_KINDS) {
+		if (names.some((name) => pattern.test(name))) return kind;
+	}
+	return "other";
+}
+
+/** The issue types among rows, with how many of each, most first (ties by first seen). */
+export function typeCounts(
+	rows: readonly JiraIssueRow[],
+): { readonly type: string; readonly count: number }[] {
+	const counts = new Map<string, number>();
+	for (const row of rows) {
+		if (row.type === "") continue;
+		counts.set(row.type, (counts.get(row.type) ?? 0) + 1);
+	}
+	return [...counts].map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count);
+}
+
 /** The whole issue, with its description and comments as Markdown. */
 export function issueOf(raw: unknown, site: string): JiraIssue | null {
 	const row = issueRowOf(raw);

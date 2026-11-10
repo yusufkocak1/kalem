@@ -142,6 +142,22 @@ const PATHS = {
 	],
 	gitPull: ["M12 4v11", "m7 10 5 5 5-5", "M5 20h14"],
 	gitPush: ["M12 16V5", "m7 10 5-5 5 5", "M5 20h14"],
+	// Jira's issue types, drawn white on their colour.
+	typeBug: [
+		circle(12, 13.5, 4.5),
+		"M12 9v9",
+		"M7.5 13.5H4",
+		"M20 13.5h-3.5",
+		"m8.5 5.5 1.8 3",
+		"m15.5 5.5-1.8 3",
+	],
+	typeStory: ["M7 4h10v16l-5-4-5 4z"],
+	typeTask: ["m5.5 12.5 4 4 9-9.5"],
+	typeSubtask: ["M4.5 4.5h8v8h-8z", "M11.5 11.5h8v8h-8z"],
+	typeEpic: ["M13.5 3 6 13.5h6L10.5 21 18 10.5h-6z"],
+	typeFeature: ["M12 5v14", "M5 12h14"],
+	typeImprovement: ["M12 19V5", "m6 11 6-6 6 6"],
+	typeOther: [circle(12, 12, 4)],
 	attach: [
 		"M20 11.5 12 19.5a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.7 17.2a1.7 1.7 0 0 1-2.4-2.4l7.5-7.5",
 	],
