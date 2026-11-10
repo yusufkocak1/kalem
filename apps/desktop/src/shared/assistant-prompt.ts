@@ -15,9 +15,11 @@ import {
 } from "./claude.js";
 import type { LookupWay } from "./confluence-tool.js";
 import { confluenceInstructions } from "./confluence-tool.js";
+import type { CustomMode } from "./custom-modes.js";
 import type { Strings } from "./i18n.js";
 import { jiraInstructions } from "./jira-tool.js";
-import { modeInstructions } from "./modes.js";
+import type { ModeSettings } from "./mode-config.js";
+import { modePrompt } from "./modes.js";
 import type { ToolDefinition } from "./tool-protocol.js";
 import { blockInstructions } from "./tool-protocol.js";
 
@@ -30,6 +32,10 @@ export interface PromptOptions {
 	readonly jira?: string | null;
 	readonly tools?: readonly ToolDefinition[];
 	readonly mode?: unknown;
+	/** The modes as the user shaped them in Settings. */
+	readonly modes?: ModeSettings;
+	/** The modes the user made. */
+	readonly custom?: readonly CustomMode[];
 	readonly document?: { readonly name: string } | null;
 }
 
@@ -81,7 +87,7 @@ Keep it self-contained: the agent has not read the document.`;
 /** Everything the model is told for one question. */
 export function assistantInstructions(t: Strings, options: PromptOptions): string {
 	const tools = options.tools ?? [];
-	const mode = modeInstructions(options.mode);
+	const mode = modePrompt(options.mode, options.modes, options.custom);
 	if (options.way === "none" || tools.length === 0) {
 		return [systemPrompt(t), mode].filter((part) => part !== "").join("\n\n");
 	}

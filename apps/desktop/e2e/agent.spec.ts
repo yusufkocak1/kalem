@@ -279,7 +279,9 @@ test("a review lists the rules' and the model's findings, and the user fixes the
 	});
 	const pane = page.locator(".assistant");
 	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
-	await pane.locator(".assistant-mode").selectOption("review");
+	await pane.locator(".assistant-mode").click();
+	await pane.locator('.assistant-mode-item[data-mode="review"]').click();
+	await expect(pane.locator(".assistant-mode")).toHaveAttribute("data-mode", "review");
 	await pane.locator(".assistant-input").fill("İncele");
 	await pane.locator(".assistant-input").press("Enter");
 
@@ -318,6 +320,161 @@ test("a review lists the rules' and the model's findings, and the user fixes the
 	expect(errors).toEqual([]);
 	// "Don't Save" for the changed document.
 	await stubMessageBox(app, 1);
+	await app.close();
+});
+
+test("modes: shaped in Settings (a step off, one of the user's own), and picked automatically", async () => {
+	const folder = await tempDir("agent-modes");
+	const doc = join(folder, "iptal.md");
+	await writeFile(doc, "# Sipariş İptali\n\nİptal hızlı yapılmalı.\n");
+	const claude = await fakeClaude(folder, "Tamam.", []);
+	const { app, page, userData, errors } = await launch({
+		args: [doc],
+		settings: { assistant: true },
+		env: { KALEM_CLAUDE: claude.path },
+	});
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
+	// Automatic by default; the picker shows every mode with what it is for.
+	const picker = pane.locator(".assistant-mode");
+	await expect(picker).toHaveAttribute("data-mode", "auto");
+	await picker.click();
+	await expect(pane.locator(".assistant-mode-item")).toHaveCount(7);
+	await expect(pane.locator('.assistant-mode-item[data-mode="review"]')).toContainText("9 steps");
+	await pane.getByRole("menuitem", { name: "Customize modes…" }).click();
+
+	// Settings: the review's rule check off, and a step of the user's own.
+	const settings = page.locator(".settings-dialog");
+	await expect(settings.locator(".mode-editor")).toBeVisible();
+	await settings.locator('.mode-tab[data-mode="review"]').click();
+	await settings.locator('.mode-step[data-step="lint"] .mode-switch-input').uncheck();
+	await expect(settings.locator('.mode-step[data-step="lint"]')).toHaveAttribute("data-off", "");
+	await settings.locator(".mode-add").click();
+	const added = settings.locator('.mode-step[data-step="custom-1"]');
+	await added.getByRole("textbox", { name: "Step name" }).fill("KVKK");
+	await added.locator("textarea").fill("Check the KVKK consent texts.");
+	await settings.locator(".mode-preview summary").click();
+	await expect(settings.locator(".mode-preview-text")).toContainText(
+		"Check the KVKK consent texts.",
+	);
+	await expect(settings.locator(".mode-preview-text")).not.toContainText("analysis_lint");
+	await expect(settings.locator('.mode-tab[data-mode="review"]')).toContainText("9 steps");
+	await settings.getByRole("button", { name: "Done" }).click();
+	await expect
+		.poll(async () => {
+			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
+			return stored.settings.assistantModes?.review?.steps?.filter(
+				(step: { on: boolean }) => !step.on,
+			);
+		})
+		.toEqual([{ id: "lint", on: false }]);
+
+	// "Incele" chooses the review by itself, and says so.
+	await pane.locator(".assistant-input").fill("Bu analizi geliştirme öncesi incele");
+	await pane.locator(".assistant-input").press("Enter");
+	await expect(pane.locator(".assistant-user .assistant-notes")).toContainText(
+		"Mode: Review analysis (chosen automatically)",
+	);
+	await expect(pane.locator(".assistant-assistant")).toContainText("Tamam.");
+	const [call] = await claude.calls();
+	const system = call?.args[call.args.indexOf("--append-system-prompt") + 1] ?? "";
+	expect(system).toContain("## Mode: review an analysis document");
+	expect(system).toContain("Check the KVKK consent texts.");
+	expect(system).not.toContain("First call analysis_lint");
+	expect(call?.args).toContain("mcp__kalem__report_findings");
+	expect(call?.args.join(" ")).not.toContain("mcp__kalem__analysis_lint");
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("a mode of the user's own: its instructions, its tools and its MCP server go to Claude Code", async () => {
+	const folder = await tempDir("agent-custom-mode");
+	const doc = join(folder, "gereksinim.md");
+	await writeFile(doc, "# Giriş\n\nKullanıcı şifresiyle girer.\n");
+	const claude = await fakeClaude(folder, "Senaryolar hazır.", []);
+	const { app, page, userData, errors } = await launch({
+		args: [doc],
+		settings: { assistant: true },
+		env: { KALEM_CLAUDE: claude.path },
+	});
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
+	await pane.locator(".assistant-mode").click();
+	await pane.getByRole("menuitem", { name: "Customize modes…" }).click();
+	const settings = page.locator(".settings-dialog");
+
+	// A new mode: its name, instructions and a step.
+	await settings.locator(".mode-tab-new").click();
+	const editor = settings.locator(".custom-mode");
+	await editor.getByRole("textbox", { name: "Name", exact: true }).fill("Test Analisti");
+	await editor
+		.getByRole("textbox", { name: "What it is for" })
+		.fill("Gereksinimlerden test senaryosu yazar");
+	await editor.getByRole("textbox", { name: "Instructions" }).fill("You are a test analyst.");
+	await editor.getByRole("radio", { name: "target" }).click();
+	await editor.locator(".mode-add").first().click();
+	await editor
+		.locator('.mode-step[data-step="step-1"] textarea')
+		.fill("Write a test case for each rule.");
+	// Only two of Kalem's tools.
+	await editor.getByRole("radio", { name: "Only those chosen" }).click();
+	await editor.locator('input[data-tool="document_read"]').check();
+	await editor.locator('input[data-tool="document_outline"]').check();
+	// An MCP server: a program on this computer.
+	await editor.getByRole("button", { name: "Add an MCP server" }).click();
+	const server = editor.locator(".mcp-card");
+	await server.getByRole("textbox", { name: "Server name" }).fill("dosyalar");
+	await server.getByRole("textbox", { name: "Server name" }).press("Tab");
+	await editor
+		.locator(".mcp-card")
+		.getByRole("textbox", { name: "Arguments (one a line)" })
+		.fill("-y\nmcp-files\n/tmp");
+	await editor
+		.locator(".mcp-card")
+		.getByRole("textbox", { name: "Environment (KEY=value, one a line)" })
+		.fill("TOKEN=abc");
+	await expect(settings.locator(".mode-tab-custom")).toContainText("Test Analisti");
+	await settings.getByRole("button", { name: "Done" }).click();
+	await expect
+		.poll(async () => {
+			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
+			const [mode] = stored.settings.assistantCustomModes ?? [];
+			return mode === undefined
+				? null
+				: { name: mode.name, tools: mode.tools, mcp: mode.mcp[0]?.name };
+		})
+		.toEqual({
+			name: "Test Analisti",
+			tools: ["document_outline", "document_read"],
+			mcp: "dosyalar",
+		});
+
+	// It is in the picker, with its line.
+	await pane.locator(".assistant-mode").click();
+	const item = pane.locator('.assistant-mode-item[data-mode="custom-1"]');
+	await expect(item).toContainText("Gereksinimlerden test senaryosu yazar");
+	await item.click();
+	await pane.locator(".assistant-input").fill("Senaryoları yaz");
+	await pane.locator(".assistant-input").press("Enter");
+	await expect(pane.locator(".assistant-assistant")).toContainText("Senaryolar hazır.");
+
+	const [call] = await claude.calls();
+	const system = call?.args[call.args.indexOf("--append-system-prompt") + 1] ?? "";
+	expect(system).toContain("## Mode: Test Analisti");
+	expect(system).toContain("You are a test analyst.");
+	expect(system).toContain("1. Write a test case for each rule.");
+	// Only the chosen tools of Kalem's, and the mode's server, which may be called without asking.
+	const allowed = call?.args.slice(call.args.indexOf("--allowedTools") + 1) ?? [];
+	expect(allowed).toContain("mcp__kalem__document_read");
+	expect(allowed).not.toContain("mcp__kalem__document_edit");
+	expect(allowed).toContain("mcp__dosyalar");
+	expect(call?.mcp?.mcpServers.dosyalar).toEqual({
+		type: "stdio",
+		command: "npx",
+		args: ["-y", "mcp-files", "/tmp"],
+		env: { TOKEN: "abc" },
+	});
+	expect(errors).toEqual([]);
 	await app.close();
 });
 

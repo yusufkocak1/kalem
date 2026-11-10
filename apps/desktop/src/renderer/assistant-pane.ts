@@ -22,14 +22,21 @@ import type {
 } from "../shared/claude.js";
 import { composePrompt, lineDiff, splitReply } from "../shared/claude.js";
 import { withoutRequests as withoutLookups } from "../shared/confluence-tool.js";
+import type { CustomMode } from "../shared/custom-modes.js";
+import { isCustomModeId } from "../shared/custom-modes.js";
 import { diagramSvg, svgMarkup } from "../shared/diagram.js";
 import { findHeading, outlineOf, outlineText } from "../shared/document-outline.js";
 import type { Finding } from "../shared/findings.js";
 import { addToQuestions, noteBlock, questionLine, withNoteAfter } from "../shared/findings.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
-import type { Mode } from "../shared/modes.js";
-import { isMode, MODE_LABELS, MODES } from "../shared/modes.js";
+import type { ModeSettings } from "../shared/mode-config.js";
+import { resolveMode } from "../shared/mode-config.js";
+import { detectMode } from "../shared/mode-detect.js";
+import type { ModelOption } from "../shared/models.js";
+import { claudeModelName } from "../shared/models.js";
+import type { ModeChoice } from "../shared/modes.js";
+import { customModeOf, isMode, MODE_HINTS, MODE_LABELS, MODES } from "../shared/modes.js";
 import { clampDockSize, MIN_DOCK_SIZE } from "../shared/panes.js";
 import type { ProviderId } from "../shared/providers.js";
 import { isCli, PROVIDER_INFO, providerLabel, SUGGESTED_MODELS } from "../shared/providers.js";
@@ -43,7 +50,9 @@ import type { FindingState } from "./assistant-review.js";
 import { findingsCard } from "./assistant-review.js";
 import { createAssistantSettings } from "./assistant-settings.js";
 import { el } from "./dom.js";
+import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
+import { MODE_ICONS } from "./mode-settings.js";
 import type { Previews } from "./previews.js";
 import type { DocumentImage } from "./prompt-images.js";
 
@@ -97,6 +106,12 @@ export interface AssistantHost {
 	revealQuote(quote: string): boolean;
 	close(): void;
 	errorText(error: unknown): string;
+	/** The modes as the user shaped them in Settings. */
+	modes(): ModeSettings;
+	/** The modes the user made. */
+	customModes(): readonly CustomMode[];
+	/** Opens Settings on the assistant's modes. */
+	openModeSettings(): void;
 }
 
 export interface AssistantPane {
@@ -119,7 +134,7 @@ interface Message {
 	done: boolean;
 	readonly notes: readonly string[];
 	/** The model that answered; empty when the service chose. */
-	readonly model?: string;
+	model?: string;
 	/** What it looked up in the workspace while answering, in this run. */
 	steps?: string[];
 	/** Changes to workspace files it proposed, in this run. */
@@ -595,31 +610,177 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		class: "assistant-model",
 		attrs: { "aria-label": t.assistantModel, title: t.assistantModel },
 	});
-	let mode: Mode = "ask";
+	/** An icon with a class of its own. */
+	const glyph = (name: IconName, className: string): Element => {
+		const svg = icon(name);
+		svg.classList.add(className);
+		return svg;
+	};
+	// The mode: one the user picked, or "auto" to pick one for each question.
+	let mode: ModeChoice = "auto";
 	try {
 		const kept = localStorage.getItem("kalem.assistant.mode");
-		if (isMode(kept)) mode = kept;
+		if (isMode(kept) || kept === "auto" || isCustomModeId(kept)) mode = kept;
 	} catch {
 		// Storage may be unavailable: the default mode is fine.
 	}
-	const modeSelect = el("select", {
+	/** The user's own mode a choice names; `null` for Kalem's, or one that was removed. */
+	const ownMode = (choice: ModeChoice): CustomMode | null =>
+		customModeOf(choice, host.customModes());
+	const modeLabel = (choice: ModeChoice): string =>
+		choice === "auto"
+			? t.modeAuto
+			: isMode(choice)
+				? t[MODE_LABELS[choice]]
+				: (ownMode(choice)?.name ?? t.modeAsk);
+	const modeGlyphName = (choice: ModeChoice): IconName =>
+		choice === "auto" || isMode(choice) ? MODE_ICONS[choice] : (ownMode(choice)?.icon ?? "star");
+	const modeHint = (choice: ModeChoice): string =>
+		choice === "auto"
+			? t.modeAutoHint
+			: isMode(choice)
+				? t[MODE_HINTS[choice]]
+				: ownMode(choice)?.description || t.modeCustomHint;
+	const modeStepCount = (choice: ModeChoice): number | null => {
+		if (choice === "auto") return null;
+		if (isMode(choice))
+			return resolveMode(choice, host.modes()).steps.filter((step) => step.on).length;
+		return ownMode(choice)?.steps.filter((step) => step.on).length ?? null;
+	};
+	const modeIcon = el("span", { class: "assistant-mode-icon" });
+	const modeText = el("span", { class: "assistant-mode-text" });
+	const modeButton = el("button", {
 		class: "assistant-mode",
-		attrs: { "aria-label": t.assistantMode, title: t.assistantMode },
-		children: MODES.map((value) => el("option", { text: t[MODE_LABELS[value]], attrs: { value } })),
+		attrs: {
+			type: "button",
+			"aria-haspopup": "menu",
+			"aria-expanded": "false",
+			"aria-label": t.assistantMode,
+		},
+		children: [modeIcon, modeText, glyph("chevron", "assistant-mode-chevron")],
 	});
-	modeSelect.value = mode;
-	function setMode(next: Mode): void {
+	const modeMenu = el("div", {
+		class: "assistant-mode-menu",
+		attrs: { role: "menu", "aria-label": t.assistantMode },
+	});
+	modeMenu.hidden = true;
+	const modePicker = el("div", {
+		class: "assistant-mode-picker",
+		children: [modeButton, modeMenu],
+	});
+
+	function drawModeButton(): void {
+		// A mode of the user's that was removed is no longer chosen.
+		if (isCustomModeId(mode) && ownMode(mode) === null) mode = "auto";
+		modeIcon.replaceChildren(glyph(modeGlyphName(mode), "assistant-mode-glyph"));
+		modeText.textContent = modeLabel(mode);
+		modeButton.title = `${t.assistantMode}: ${modeLabel(mode)}`;
+		modeButton.dataset.mode = mode;
+	}
+
+	function closeModeMenu(focus = false): void {
+		modeMenu.hidden = true;
+		modeButton.setAttribute("aria-expanded", "false");
+		if (focus) modeButton.focus();
+	}
+
+	function openModeMenu(): void {
+		const settings = host.modes();
+		const choices: ModeChoice[] = [
+			"auto",
+			...MODES.filter((each) => resolveMode(each, settings).enabled || each === mode),
+			...host
+				.customModes()
+				.filter((each) => each.enabled || each.id === mode)
+				.map((each) => each.id),
+		];
+		modeMenu.replaceChildren(
+			...choices.map((choice) => {
+				const count = modeStepCount(choice);
+				const steps = count === null ? "" : format(t.modeSteps, count);
+				const item = el("button", {
+					class: "assistant-mode-item",
+					attrs: {
+						type: "button",
+						role: "menuitemradio",
+						"aria-checked": String(choice === mode),
+						"data-mode": choice,
+					},
+					children: [
+						el("span", {
+							class: "assistant-mode-item-icon",
+							children: [glyph(modeGlyphName(choice), "assistant-mode-item-glyph")],
+						}),
+						el("span", {
+							class: "assistant-mode-item-text",
+							children: [
+								el("strong", { text: modeLabel(choice) }),
+								el("span", { text: modeHint(choice) }),
+							],
+						}),
+						...(steps === ""
+							? []
+							: [el("span", { class: "assistant-mode-item-steps", text: steps })]),
+					],
+				});
+				item.addEventListener("click", () => {
+					setMode(choice);
+					closeModeMenu(true);
+				});
+				return item;
+			}),
+			el("hr", { class: "assistant-mode-separator" }),
+			(() => {
+				const customize = el("button", {
+					class: "assistant-mode-customize",
+					attrs: { type: "button", role: "menuitem" },
+					children: [glyph("settings", "assistant-mode-customize-glyph"), t.modeCustomize],
+				});
+				customize.addEventListener("click", () => {
+					closeModeMenu();
+					host.openModeSettings();
+				});
+				return customize;
+			})(),
+		);
+		modeMenu.hidden = false;
+		modeButton.setAttribute("aria-expanded", "true");
+		modeMenu.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
+	}
+
+	modeButton.addEventListener("click", () => {
+		if (modeMenu.hidden) openModeMenu();
+		else closeModeMenu();
+	});
+	modeMenu.addEventListener("keydown", (event) => {
+		if (event.key === "Escape") {
+			event.stopPropagation();
+			closeModeMenu(true);
+			return;
+		}
+		if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+		event.preventDefault();
+		const items = [...modeMenu.querySelectorAll<HTMLElement>("button")];
+		const index = items.indexOf(document.activeElement as HTMLElement);
+		const step = event.key === "ArrowDown" ? 1 : -1;
+		items[(index + step + items.length) % items.length]?.focus();
+	});
+	document.addEventListener("mousedown", (event) => {
+		if (!modeMenu.hidden && !(event.target instanceof Node && modePicker.contains(event.target))) {
+			closeModeMenu();
+		}
+	});
+
+	function setMode(next: ModeChoice): void {
 		mode = next;
-		modeSelect.value = next;
+		drawModeButton();
 		try {
 			localStorage.setItem("kalem.assistant.mode", mode);
 		} catch {
 			// Kept for this run only.
 		}
 	}
-	modeSelect.addEventListener("change", () => {
-		if (isMode(modeSelect.value)) setMode(modeSelect.value);
-	});
+	drawModeButton();
 	const MORE_MODELS = "\u0000more";
 	modelSelect.addEventListener("change", async () => {
 		const picked = modelSelect.value;
@@ -710,7 +871,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 								],
 							}),
 							el("span", { class: "assistant-toolbar-space" }),
-							modeSelect,
+							modePicker,
 							modelSelect,
 							sendButton,
 						],
@@ -1258,18 +1419,26 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	// --- Models --------------------------------------------------------------------
 
 	/** The models offered for each service, asked for once. */
-	const modelLists = new Map<ProviderId, readonly string[]>();
+	const modelLists = new Map<ProviderId, readonly ModelOption[]>();
 
 	/** Fills the model picker from the service's list (fetched once), the model in use first. */
 	function renderModels(): void {
 		if (status === null) return;
 		const provider = status.provider;
 		const cli = isCli(PROVIDER_INFO[provider]);
-		const listed = modelLists.get(provider) ?? SUGGESTED_MODELS[provider] ?? [];
-		const names = [...new Set([...(status.model === "" ? [] : [status.model]), ...listed])];
+		const listed: readonly ModelOption[] =
+			modelLists.get(provider) ??
+			(SUGGESTED_MODELS[provider] ?? []).map((id) => ({ id, label: id }));
+		// The model chosen stays offered, named as the list names it.
+		const options = [
+			...(status.model === "" || listed.some((option) => option.id === status?.model)
+				? []
+				: [{ id: status.model, label: status.model }]),
+			...listed,
+		];
 		modelSelect.replaceChildren(
 			...(cli ? [el("option", { text: t.assistantDefaultModel, attrs: { value: "" } })] : []),
-			...names.map((name) => el("option", { text: name, attrs: { value: name } })),
+			...options.map((option) => el("option", { text: option.label, attrs: { value: option.id } })),
 			el("option", { text: t.assistantMoreModels, attrs: { value: MORE_MODELS } }),
 		);
 		modelSelect.value = status.model;
@@ -2276,6 +2445,16 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				reply.changes = [...(reply.changes ?? []), { label: event.label, settings: event.undo }];
 				if (chat === active) scheduleRender(reply);
 				return;
+			case "model": {
+				// The CLI said which model answered: the reply names it ("opus · Opus 5.5").
+				const name = claudeModelName(event.model);
+				const alias = reply.model ?? "";
+				reply.model = alias === "" || alias === event.model ? name : `${alias} · ${name}`;
+				// The picker names the alias by it too, the next time it is drawn.
+				modelLists.delete(status?.provider ?? "claude-code");
+				if (chat === active) scheduleRender(reply);
+				return;
+			}
 			case "usage": {
 				const before = reply.usage ?? { input: 0, output: 0, cached: 0 };
 				reply.usage = {
@@ -2515,6 +2694,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		render();
 
 		const notes: string[] = [];
+		/** The mode this question is asked in: the one picked, or the one chosen for it. */
+		let usedMode: ModeChoice = mode === "auto" ? "ask" : mode;
 		let prompt: string;
 		// The sections added with "@" go with the question, whether or not the document is shared.
 		let withSections = question;
@@ -2550,6 +2731,17 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			if (sharing) notes.push(format(t.assistantSharedDocument, context.name));
 			if (selection.trim() !== "") notes.push(t.assistantSharedSelection);
 			const sources = chatSources(chat);
+			if (mode === "auto") {
+				const detected = detectMode(
+					question,
+					{ hasDocument: sharing, hasWorkspace: sources.length > 0 || chat.folder !== null },
+					host.modes(),
+					host.customModes(),
+				);
+				usedMode = detected.mode;
+				// A plain question stays a question: only a mode chosen for it is said.
+				if (usedMode !== "ask") notes.push(format(t.modeChosen, modeLabel(usedMode)));
+			}
 			if (sources.length > 0) {
 				notes.push(
 					sources.length === 1
@@ -2633,7 +2825,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					history: earlier,
 					images: images.map(({ label, mediaType, data }) => ({ label, mediaType, data })),
 					sources: chatSources(chat),
-					mode,
+					mode: usedMode,
 					...(fullPrompt === undefined ? {} : { fullPrompt }),
 					...(documentSnapshot === undefined ? {} : { document: documentSnapshot }),
 				});

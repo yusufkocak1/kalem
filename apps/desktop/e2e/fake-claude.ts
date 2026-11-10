@@ -97,14 +97,19 @@ async function callTools() {
 }
 process.stdin.on("end", async () => {
 	const used = await callTools();
-	fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args, prompt, cwd: process.cwd(), tools: used }) + "\\n");
+	const mcpAt = args.indexOf("--mcp-config");
+	const mcp = mcpAt === -1 ? null : JSON.parse(fs.readFileSync(args[mcpAt + 1], "utf8"));
+	fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args, prompt, cwd: process.cwd(), tools: used, mcp }) + "\\n");
 	const answers = ${JSON.stringify(answer)};
 	const reply =
 		typeof answers === "string"
 			? answers
 			: (answers.find(([needle]) => prompt.includes(needle)) ?? answers[answers.length - 1])[1];
 	const out = (line) => process.stdout.write(JSON.stringify(line) + "\\n");
-	out({ type: "system", subtype: "init", session_id: "sess-1" });
+	// As Claude Code does, the first line names the model that answers: an alias's, or the default's.
+	const alias = args.includes("--model") ? args[args.indexOf("--model") + 1] : "";
+	const model = { opus: "claude-opus-5-5", sonnet: "claude-sonnet-5-5", haiku: "claude-haiku-5-5", "": "claude-sonnet-5-5" }[alias] ?? alias;
+	out({ type: "system", subtype: "init", session_id: "sess-1", model });
 	if (used.length > 0) {
 		const input = (i) => tools[i].input;
 		out({ type: "assistant", message: { content: used.map((call, i) => ({ type: "tool_use", id: "t" + i, name: call.tool, input: input(i) })) }, session_id: "sess-1" });
@@ -148,4 +153,6 @@ export interface Call {
 		readonly allowed: boolean;
 		readonly text: string;
 	}[];
+	/** The `--mcp-config` file's contents, when one was given. */
+	readonly mcp?: { readonly mcpServers: Record<string, Record<string, unknown>> } | null;
 }

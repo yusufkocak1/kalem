@@ -3,6 +3,7 @@ import type { ClaudeEvent, PromptImage } from "./claude.js";
 import type { ConfluenceFormat } from "./confluence.js";
 import type { AtomDetails } from "./confluence-atoms.js";
 import type { ConfluenceSearchRequest, ConfluenceSearchResults } from "./confluence-search.js";
+import type { CustomMode } from "./custom-modes.js";
 import type { TextFormat } from "./encoding.js";
 import type { Lang } from "./i18n.js";
 import type { JiraAccount, JiraIssue, JiraSearchResults } from "./jira.js";
@@ -13,6 +14,8 @@ import type {
 	JiraTransition,
 } from "./jira-dev.js";
 import type { WorklogContext, WorklogEntry } from "./jira-worklog.js";
+import type { ModeSettings } from "./mode-config.js";
+import type { ModelOption } from "./models.js";
 import type { PanePlaces, ToolPane } from "./panes.js";
 import { DEFAULT_PANE_PLACES } from "./panes.js";
 import type { AssistantConfig, AssistantUpdate, ChatMessage, ProviderId } from "./providers.js";
@@ -101,6 +104,10 @@ export interface Settings {
 	readonly copilotTools: CopilotTools;
 	/** The analysis template new documents start from and reviews check against; empty for the built-in one. */
 	readonly defaultTemplate: string;
+	/** The assistant's modes as the user shaped them: steps, options; what is missing is the default. */
+	readonly assistantModes: ModeSettings;
+	/** Modes the user made: their instructions, steps, tools and MCP servers. */
+	readonly assistantCustomModes: readonly CustomMode[];
 	/** Where the assistant's panel is: at the right (as before), at the left, or under the document. */
 	readonly assistantPlace: AssistantPlace;
 	/** The assistant panel's height under the document, in pixels. */
@@ -148,6 +155,8 @@ export const DEFAULT_SETTINGS: Settings = {
 	assistantPermissions: [],
 	copilotTools: "auto",
 	defaultTemplate: "",
+	assistantModes: {},
+	assistantCustomModes: [],
 	assistantPlace: "right",
 	assistantHeight: 320,
 };
@@ -861,11 +870,15 @@ export interface KalemBridge {
 	/** Changes a service's settings and makes it the one in use. */
 	assistantConfigure(update: AssistantUpdate): Promise<AssistantStatus>;
 	/** The models a service offers; without `key`, the kept one is used. */
+	/** Kalem's tools the assistant can be given, for choosing a mode's tools. */
+	assistantToolCatalog(): Promise<
+		readonly { readonly name: string; readonly description: string }[]
+	>;
 	assistantModels(request: {
 		readonly provider: ProviderId;
 		readonly baseUrl: string;
 		readonly key?: string;
-	}): Promise<readonly string[]>;
+	}): Promise<readonly ModelOption[]>;
 	/** Lets the user pick the program of the CLI in use. */
 	assistantLocate(): Promise<AssistantStatus>;
 	/** The kept chats, newest first. */
@@ -1010,6 +1023,7 @@ export const CHANNEL = {
 	assistantConfigure: "kalem:assistant-configure",
 	assistantSetModel: "kalem:assistant-set-model",
 	assistantModels: "kalem:assistant-models",
+	assistantToolCatalog: "kalem:assistant-tool-catalog",
 	assistantLocate: "kalem:assistant-locate",
 	assistantChats: "kalem:assistant-chats",
 	assistantChat: "kalem:assistant-chat",
