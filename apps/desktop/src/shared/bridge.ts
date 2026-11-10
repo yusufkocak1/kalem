@@ -67,6 +67,8 @@ export interface Settings {
 	readonly confluenceSpace: string;
 	/** Starred Confluence pages, shown at the top of the Confluence pane. */
 	readonly confluenceFavorites: readonly ConfluenceFavorite[];
+	/** Jira issues the user starred, newest first. */
+	readonly jiraFavorites: readonly JiraFavorite[];
 	/** Look for a new release once a day (a request to GitHub). */
 	readonly checkUpdates: boolean;
 	/** A notification-area icon and the system-wide quick note shortcut; the app stays there when its windows close. */
@@ -111,6 +113,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	bottomHeight: 240,
 	confluenceSpace: "",
 	confluenceFavorites: [],
+	jiraFavorites: [],
 	checkUpdates: true,
 	tray: false,
 	gitAutoFetch: true,
@@ -280,6 +283,14 @@ export interface ConfluenceFavorite {
 	readonly title: string;
 	/** The group the user put it in; none when missing. */
 	readonly group?: string;
+}
+
+/** A Jira issue the user starred: what the list shows of it until Jira says more. */
+export interface JiraFavorite {
+	readonly site: string;
+	readonly key: string;
+	readonly summary: string;
+	readonly type: string;
 }
 
 export interface ConfluencePageSummary {

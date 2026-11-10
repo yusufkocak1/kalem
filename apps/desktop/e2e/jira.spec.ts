@@ -358,6 +358,46 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await page.keyboard.press("ArrowRight");
 	await expect(rows).toHaveCount(5);
 
+	// A right-click logs work today, with the choices remembered from the form.
+	await page.locator('.jira-pane .jira-row[data-key="QR-1"]').click({ button: "right" });
+	const rowMenu = page.locator(".jira-row-menu");
+	await expect(rowMenu).toBeVisible();
+	await rowMenu.locator('.jira-worklog-chip[data-hours="3"]').click();
+	await expect(rowMenu).toBeHidden();
+	await expect(page.locator('.jira-pane .jira-row[data-key="QR-1"] .jira-row-note')).toHaveText(
+		"✓ 3h",
+	);
+	expect(jiraServer.worklogs.at(-1)).toMatchObject({
+		originTaskId: "QR-1",
+		timeSpentSeconds: 3 * 3600,
+		comment: "Working on issue QR-1",
+		attributes: { _Servis_: { value: "QUICKRES" }, _Sirket_: { value: "TKAO" } },
+	});
+	await expect(page.locator(".jira-dialog")).toBeHidden();
+
+	// Stars: one from the row's menu, one from the row; the favorites list shows them.
+	await page.locator('.jira-pane .jira-row[data-key="QR-5"]').click({ button: "right" });
+	await rowMenu.getByRole("menuitem", { name: "★ Add to favorites" }).click();
+	await expect(page.locator('.jira-pane .jira-row[data-key="QR-5"] .jira-star')).toHaveAttribute(
+		"aria-pressed",
+		"true",
+	);
+	await page.locator('.jira-pane .jira-row[data-key="QR-8"]').hover();
+	await page.locator('.jira-pane .jira-row[data-key="QR-8"] .jira-star').click();
+	await page.locator(".jira-pane-list").selectOption("favorites");
+	await expect(rows.locator(".jira-key")).toHaveText(["QR-7", "QR-8", "QR-1", "QR-5"]);
+	expect(jiraServer.searches.at(-1)).toBe("key IN (QR-8, QR-5)");
+	// Taking a star off takes it out of the list.
+	await page.locator('.jira-pane .jira-row[data-key="QR-8"] .jira-star').click();
+	await expect(rows.locator(".jira-key")).toHaveText(["QR-1", "QR-5"]);
+	await expect
+		.poll(async () => {
+			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
+			return stored.settings.jiraFavorites.map((item: { key: string }) => item.key);
+		})
+		.toEqual(["QR-5"]);
+	await page.locator(".jira-pane-list").selectOption("mine");
+
 	// Settings: Jira goes to the right dock, the headings under the document.
 	await clickMenu(app, "View", "Settings…");
 	const settings = page.locator(".settings-dialog");

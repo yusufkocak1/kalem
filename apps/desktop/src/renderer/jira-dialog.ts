@@ -1,6 +1,6 @@
 import { parse } from "@kalem-editor/core";
 import { renderToDOM } from "@kalem-editor/viewer";
-import type { KalemBridge } from "../shared/bridge.js";
+import type { JiraFavorite, KalemBridge } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type {
@@ -25,11 +25,16 @@ export interface JiraDialogOptions {
 	openLink(url: string): void;
 	/** After a login or a disconnect. */
 	onAccountChange?(): void;
+	/** The starred issues, of every Jira site. */
+	favorites(): readonly JiraFavorite[];
+	setFavorites(favorites: readonly JiraFavorite[]): void;
 }
 
 export interface JiraDialog {
 	/** Shows an issue; `browserUrl` is where it opens while Jira is not connected. */
 	showIssue(key: string, browserUrl?: string | null): Promise<void>;
+	/** Shows an issue with its work log form open. */
+	logWork(key: string): Promise<void>;
 	/** Shows a search: JQL, a key or words. */
 	showSearch(query?: string, browserUrl?: string | null): Promise<void>;
 	/** Asks for the login, then shows the search. */
@@ -323,6 +328,7 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 						"jira-button primary",
 					),
 					logWork,
+					favoriteButton(issue),
 					copyButton(t.jiraCopyKey, issue.key),
 					copyButton(t.linkCopyUrl, issue.url),
 				],
@@ -454,6 +460,32 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 			if (event.key === "Enter") void open();
 		});
 		return row;
+	}
+
+	/** Stars the issue, or takes the star off: it is then in the Jira pane's favorites. */
+	function favoriteButton(issue: JiraIssue): HTMLButtonElement {
+		const site = account?.site ?? null;
+		const starred = (): boolean =>
+			options.favorites().some((item) => item.site === site && item.key === issue.key);
+		const star = el("button", { class: "jira-button jira-favorite", attrs: { type: "button" } });
+		const draw = (): void => {
+			const on = starred();
+			star.textContent = `${on ? "★" : "☆"} ${on ? t.jiraUnfavorite : t.jiraFavorite}`;
+			star.setAttribute("aria-pressed", String(on));
+		};
+		star.addEventListener("click", () => {
+			if (site === null) return;
+			const all = options.favorites();
+			options.setFavorites(
+				starred()
+					? all.filter((item) => !(item.site === site && item.key === issue.key))
+					: [{ site, key: issue.key, summary: issue.summary, type: issue.type }, ...all],
+			);
+			draw();
+		});
+		draw();
+		star.hidden = site === null;
+		return star;
 	}
 
 	function copyButton(label: string, text: string): HTMLButtonElement {
@@ -651,6 +683,10 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 
 	return {
 		showIssue: (key, browserUrl = null) => open({ kind: "issue", key }, browserUrl),
+		logWork: (key) => {
+			worklogOpen = true;
+			return open({ kind: "issue", key }, null);
+		},
 		showSearch: (query = "", browserUrl = null) => open({ kind: "search", query }, browserUrl),
 		async showLogin() {
 			fallback = null;

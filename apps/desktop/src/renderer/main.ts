@@ -130,6 +130,11 @@ const jiraDialog = createJiraDialog({
 	bridge,
 	openLink: (url) => bridge.openLink(url),
 	onAccountChange: () => void refreshAccounts(),
+	favorites: () => settings.jiraFavorites,
+	setFavorites: (favorites) => {
+		updateSettings({ jiraFavorites: favorites });
+		jiraPane.favoritesChanged();
+	},
 });
 const confluencePane = createConfluencePane({
 	t,
@@ -229,6 +234,9 @@ const jiraPane = createJiraPane({
 	t,
 	bridge,
 	openIssue: (key) => void jiraDialog.showIssue(key),
+	logWork: (key) => void jiraDialog.logWork(key),
+	favorites: () => settings.jiraFavorites,
+	setFavorites: (favorites) => updateSettings({ jiraFavorites: favorites }),
 });
 const docks = createDocks({
 	t,

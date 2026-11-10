@@ -1,8 +1,9 @@
-import type { KalemBridge } from "../shared/bridge.js";
+import type { JiraFavorite, KalemBridge } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type { IssueTypeKind, JiraIssueRef, JiraIssueRow } from "../shared/jira.js";
 import { groupByParent, issueTypeKind, typeCounts } from "../shared/jira.js";
+import { formatDuration, QUICK_HOURS, quickEntry } from "../shared/jira-worklog.js";
 import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
@@ -13,6 +14,18 @@ export interface JiraPaneOptions {
 	readonly bridge: KalemBridge;
 	/** Opens an issue in the Jira dialog. */
 	openIssue(key: string): void;
+	/** Opens an issue in the Jira dialog with its work log form. */
+	logWork(key: string): void;
+	/** The starred issues, of every Jira site. */
+	favorites(): readonly JiraFavorite[];
+	setFavorites(favorites: readonly JiraFavorite[]): void;
+}
+
+/** A day as `YYYY-MM-DD`, in local time. */
+function today(): string {
+	const now = new Date();
+	const pad = (n: number): string => String(n).padStart(2, "0");
+	return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
 /** The pane's ready-made lists, as JQL. */
@@ -22,7 +35,8 @@ const LISTS = {
 	watching: "watcher = currentUser() AND resolution = Unresolved ORDER BY updated DESC",
 	recent: "ORDER BY updated DESC",
 } as const;
-type List = keyof typeof LISTS;
+/** The ready-made lists, and the starred issues, which are asked for by their keys. */
+type List = keyof typeof LISTS | "favorites";
 
 const TYPE_ICONS: Record<IssueTypeKind, IconName> = {
 	bug: "typeBug",
@@ -76,6 +90,8 @@ function avatar(name: string): HTMLElement {
 export function createJiraPane(options: JiraPaneOptions): {
 	readonly element: HTMLElement;
 	refresh(): Promise<void>;
+	/** The starred issues changed elsewhere (the Jira dialog): the stars are drawn again. */
+	favoritesChanged(): void;
 } {
 	const { t, bridge } = options;
 	const unassigned = (): HTMLElement =>
@@ -101,6 +117,7 @@ export function createJiraPane(options: JiraPaneOptions): {
 				["reported", t.jiraPaneReported],
 				["watching", t.jiraPaneWatching],
 				["recent", t.jiraPaneRecent],
+				["favorites", `★ ${t.jiraFavorites}`],
 			] as const
 		).map(([value, label]) => el("option", { text: label, attrs: { value } })),
 	});
@@ -150,6 +167,48 @@ export function createJiraPane(options: JiraPaneOptions): {
 	const folded = new Set<string>();
 	/** The issue types shown; none means all of them. */
 	const selected = new Set<string>();
+
+	/** The connected Jira site, which the starred issues are kept by. */
+	let site: string | null = null;
+	const starred = (): JiraFavorite[] => options.favorites().filter((item) => item.site === site);
+	const isFavorite = (key: string): boolean => starred().some((item) => item.key === key);
+
+	function toggleFavorite(issue: JiraIssueRef): void {
+		if (site === null) return;
+		const all = options.favorites();
+		const on = isFavorite(issue.key);
+		options.setFavorites(
+			on
+				? all.filter((item) => !(item.site === site && item.key === issue.key))
+				: [{ site, key: issue.key, summary: issue.summary, type: issue.type }, ...all],
+		);
+		favoritesChanged();
+	}
+
+	function favoritesChanged(): void {
+		if (list.value === "favorites" && search.value.trim() === "") {
+			// The list is the starred issues: one taken off goes, one added comes.
+			const keys = new Set(starred().map((item) => item.key));
+			issues = issues.filter((issue) => keys.has(issue.key));
+			if (starred().some((item) => !issues.some((issue) => issue.key === item.key))) {
+				void run(false);
+				return;
+			}
+			render();
+			return;
+		}
+		for (const star of rows.querySelectorAll<HTMLElement>(".jira-star")) {
+			drawStar(star, isFavorite(star.dataset.key ?? ""));
+		}
+	}
+
+	function drawStar(star: HTMLElement, on: boolean): void {
+		star.textContent = on ? "★" : "☆";
+		star.setAttribute("aria-pressed", String(on));
+		const label = on ? t.jiraUnfavorite : t.jiraFavorite;
+		star.setAttribute("aria-label", label);
+		star.title = label;
+	}
 
 	const shownIssues = (): JiraIssueRow[] =>
 		selected.size === 0 ? issues : issues.filter((issue) => selected.has(issue.type));
@@ -234,6 +293,15 @@ export function createJiraPane(options: JiraPaneOptions): {
 				? []
 				: [issue.assignee === "" ? unassigned() : avatar(issue.assignee)]),
 		];
+		const star = el("button", {
+			class: "jira-star",
+			attrs: { type: "button", tabindex: "-1", "data-key": issue.key },
+		});
+		drawStar(star, isFavorite(issue.key));
+		star.addEventListener("click", (event) => {
+			event.stopPropagation();
+			toggleFavorite(issue);
+		});
 		const item = el("li", {
 			class: `jira-row jira-pane-row ${extra}`.trim(),
 			attrs: {
@@ -253,6 +321,7 @@ export function createJiraPane(options: JiraPaneOptions): {
 							class: "jira-pane-row-head",
 							children: [
 								el("span", { class: "jira-key", text: issue.key }),
+								star,
 								...(issue.status === "" ? [] : [statusLozenge(issue.status, issue.statusCategory)]),
 							],
 						}),
@@ -268,9 +337,139 @@ export function createJiraPane(options: JiraPaneOptions): {
 		item.addEventListener("click", open);
 		item.addEventListener("keydown", (event) => {
 			if (event.key === "Enter") open();
+			// The menu from the keyboard: the context menu key or Shift+F10.
+			if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
+				event.preventDefault();
+				const box = item.getBoundingClientRect();
+				showMenu(issue, item, box.left + 24, box.top + box.height / 2);
+			}
+		});
+		item.addEventListener("contextmenu", (event) => {
+			event.preventDefault();
+			showMenu(issue, item, event.clientX, event.clientY);
 		});
 		return item;
 	};
+
+	// --- A row's menu: quick work logs, the work log form, the star, open, copy ------
+	const menu = el("div", {
+		class: "dock-menu jira-row-menu",
+		attrs: { role: "menu", hidden: "" },
+	});
+	document.body.append(menu);
+	let menuFor: HTMLElement | null = null;
+	const closeMenu = (refocus = false): void => {
+		if (menu.hidden) return;
+		menu.hidden = true;
+		if (refocus) menuFor?.focus();
+		menuFor = null;
+	};
+	document.addEventListener("mousedown", (event) => {
+		if (!(event.target instanceof Node && menu.contains(event.target))) closeMenu();
+	});
+	document.addEventListener("keydown", (event) => {
+		if (event.key === "Escape") closeMenu(true);
+	});
+	menu.addEventListener("keydown", (event) => {
+		if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+		event.preventDefault();
+		const items = [...menu.querySelectorAll<HTMLElement>("button")];
+		const index = items.indexOf(document.activeElement as HTMLElement);
+		const step = event.key === "ArrowDown" ? 1 : -1;
+		items[(index + step + items.length) % items.length]?.focus();
+	});
+
+	function showMenu(issue: JiraIssueRef, item: HTMLElement, x: number, y: number): void {
+		menuFor = item;
+		const action = (label: string, run: () => void, extra = ""): HTMLButtonElement => {
+			const button = el("button", {
+				class: `dock-menu-item ${extra}`.trim(),
+				text: label,
+				attrs: { type: "button", role: "menuitem" },
+			});
+			button.addEventListener("click", () => {
+				closeMenu();
+				run();
+			});
+			return button;
+		};
+		const quick = el("div", {
+			class: "jira-menu-quick",
+			attrs: { role: "group", "aria-label": t.jiraQuickLogToday },
+			children: QUICK_HOURS.map((hours) => {
+				const button = el("button", {
+					class: "jira-worklog-chip",
+					text: `${hours}h`,
+					attrs: {
+						type: "button",
+						role: "menuitem",
+						"data-hours": String(hours),
+						title: format(t.jiraQuickLogTitle, `${hours}h`, issue.key),
+					},
+				});
+				button.addEventListener("click", () => {
+					closeMenu();
+					void quickLog(issue.key, item, hours * 3600);
+				});
+				return button;
+			}),
+		});
+		menu.replaceChildren(
+			el("div", {
+				class: "jira-menu-heading",
+				text: `${issue.key} · ${t.jiraQuickLogToday}`,
+			}),
+			quick,
+			action(`${t.jiraLogWork}…`, () => options.logWork(issue.key)),
+			el("hr", { class: "dock-menu-separator" }),
+			action(
+				isFavorite(issue.key) ? `☆ ${t.jiraUnfavorite}` : `★ ${t.jiraFavorite}`,
+				() => toggleFavorite(issue),
+				"jira-menu-star",
+			),
+			action(t.jiraOpenIssue, () => options.openIssue(issue.key)),
+			action(t.jiraCopyKey, () => void navigator.clipboard.writeText(issue.key)),
+		);
+		menu.hidden = false;
+		const box = menu.getBoundingClientRect();
+		menu.style.left = `${Math.max(4, Math.min(x, window.innerWidth - box.width - 4))}px`;
+		menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - box.height - 4))}px`;
+		quick.querySelector<HTMLElement>("button")?.focus();
+	}
+
+	/** A note on the row for a while: logging, logged, or why not. */
+	function note(item: HTMLElement, text: string, kind: "busy" | "ok" | "error"): void {
+		const head = item.querySelector(".jira-pane-row-head");
+		item.querySelector(".jira-row-note")?.remove();
+		const badge = el("span", {
+			class: "jira-row-note",
+			text,
+			attrs: { "data-kind": kind, role: "status" },
+		});
+		head?.append(badge);
+		if (kind !== "busy") setTimeout(() => badge.remove(), kind === "ok" ? 4000 : 8000);
+	}
+
+	/** Logs `seconds` today with the remembered choices; the full form when one is missing. */
+	async function quickLog(key: string, item: HTMLElement, seconds: number): Promise<void> {
+		note(item, t.jiraWorkSending, "busy");
+		try {
+			const context = await bridge.jiraWorklogContext(key);
+			const quick = quickEntry(context, key, seconds, today());
+			if ("missing" in quick) {
+				note(item, format(t.jiraWorkRequired, quick.missing.join(", ")), "error");
+				options.logWork(key);
+				return;
+			}
+			await bridge.jiraLogWork(key, {
+				...quick.entry,
+				offsetMinutes: -new Date().getTimezoneOffset(),
+			});
+			note(item, `✓ ${formatDuration(seconds)}`, "ok");
+		} catch (error) {
+			note(item, format(t.jiraWorkFailed, errorText(error)), "error");
+		}
+	}
 
 	/** Sub-tasks under their parent, which folds them away; a parent not shown heads them dimmed. */
 	function renderTree(): void {
@@ -402,10 +601,42 @@ export function createJiraPane(options: JiraPaneOptions): {
 		failed = false;
 		renderStatus();
 		more.hidden = true;
-		const query = search.value.trim() === "" ? LISTS[list.value as List] : search.value;
 		try {
-			const found = await bridge.jiraSearch(query, append ? next : null);
+			site ??= (await bridge.jiraAccount())?.site ?? null;
 			if (id !== searchId) return;
+			const chosen = list.value as List;
+			const favorites = chosen === "favorites" && search.value.trim() === "" ? starred() : null;
+			if (favorites !== null && favorites.length === 0) {
+				loading = false;
+				issues = [];
+				render();
+				status.textContent = t.jiraNoFavorites;
+				return;
+			}
+			const query =
+				favorites !== null
+					? `key IN (${favorites.map((item) => item.key).join(", ")})`
+					: search.value.trim() === ""
+						? LISTS[chosen as keyof typeof LISTS]
+						: search.value;
+			let found: Awaited<ReturnType<typeof bridge.jiraSearch>>;
+			try {
+				found = await bridge.jiraSearch(query, append ? next : null);
+			} catch (error) {
+				// A starred issue that is gone (or hidden now) fails the whole search: what was kept is shown.
+				if (favorites === null) throw error;
+				found = { jql: query, issues: favorites.map(keptRow), total: null, next: null };
+			}
+			if (id !== searchId) return;
+			if (favorites !== null) {
+				// In the order they were starred; one Jira did not return is shown as it was kept.
+				found = {
+					...found,
+					issues: favorites.map(
+						(item) => found.issues.find((issue) => issue.key === item.key) ?? keptRow(item),
+					),
+				};
+			}
 			issues = [...issues, ...found.issues];
 			next = found.next;
 			total = found.total;
@@ -421,6 +652,19 @@ export function createJiraPane(options: JiraPaneOptions): {
 			status.textContent = format(t.jiraRequestFailed, errorText(error));
 		}
 	}
+
+	/** A starred issue as it was when starred. */
+	const keptRow = (item: JiraFavorite): JiraIssueRow => ({
+		key: item.key,
+		summary: item.summary,
+		status: "",
+		statusCategory: "",
+		type: item.type,
+		assignee: "",
+		priority: "",
+		updated: null,
+		parent: null,
+	});
 
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	search.addEventListener("input", () => {
@@ -443,5 +687,12 @@ export function createJiraPane(options: JiraPaneOptions): {
 	});
 	more.addEventListener("click", () => void run(true));
 
-	return { element, refresh: () => run(false) };
+	return {
+		element,
+		refresh: () => {
+			site = null;
+			return run(false);
+		},
+		favoritesChanged,
+	};
 }

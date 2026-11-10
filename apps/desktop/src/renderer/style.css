@@ -6935,3 +6935,91 @@ textarea.jira-worklog-input {
 		transition: none;
 	}
 }
+
+/* --- Jira pane: stars, a row's menu, and quick work logs --------------------------- */
+
+.jira-star {
+	flex: none;
+	width: 20px;
+	height: 20px;
+	padding: 0;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: var(--app-muted);
+	font-size: 14px;
+	line-height: 20px;
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+
+.jira-pane-row:hover .jira-star,
+.jira-pane-row:focus .jira-star,
+.jira-star:focus-visible,
+.jira-star[aria-pressed="true"] {
+	opacity: 1;
+}
+
+.jira-star[aria-pressed="true"] {
+	color: #e3a008;
+}
+
+.jira-star:hover {
+	background: var(--app-hover);
+	color: #e3a008;
+}
+
+.jira-row-note {
+	flex: none;
+	max-width: 60%;
+	overflow: hidden;
+	padding: 1px 7px;
+	border-radius: 999px;
+	background: var(--app-hover);
+	color: var(--app-muted);
+	font-size: 11px;
+	font-weight: 600;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.jira-row-note[data-kind="ok"] {
+	background: color-mix(in srgb, var(--app-ok) 18%, transparent);
+	color: var(--app-ok);
+}
+
+.jira-row-note[data-kind="error"] {
+	background: var(--app-error-bg);
+	color: var(--app-error);
+}
+
+.jira-row-menu {
+	min-width: 220px;
+}
+
+.jira-menu-heading {
+	padding: 4px 10px 2px;
+	color: var(--app-muted);
+	font-size: 11px;
+	font-weight: 600;
+}
+
+.jira-menu-quick {
+	display: flex;
+	gap: 4px;
+	padding: 4px 8px 6px;
+}
+
+.jira-menu-quick .jira-worklog-chip {
+	flex: 1;
+	min-width: 0;
+	padding: 4px 0;
+	font-size: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.jira-star {
+		transition: none;
+	}
+}
