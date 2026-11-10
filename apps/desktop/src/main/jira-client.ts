@@ -8,6 +8,19 @@ import {
 	ROW_FIELDS,
 	remoteLinksOf,
 } from "../shared/jira.js";
+import type {
+	DevelopmentItem,
+	DevelopmentKind,
+	DevelopmentSummary,
+	JiraTransition,
+} from "../shared/jira-dev.js";
+import {
+	DEVELOPMENT_DATA_TYPE,
+	developmentItemsOf,
+	developmentSummaryOf,
+	transitionBody,
+	transitionsOf,
+} from "../shared/jira-dev.js";
 import type { WorkAttribute, WorklogContext, WorklogEntry } from "../shared/jira-worklog.js";
 import {
 	jiraWorklogRequest,
@@ -42,7 +55,7 @@ const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : [
  * Jira's REST API, version 2 on both Cloud and Server / Data Center: its
  * text fields are wiki markup, which Kalem reads like Confluence's. It
  * reads, and writes only work logs (through Tempo Timesheets where it is
- * installed). Cloud searches with `/search/jql` (the older `/search` is gone
+ * installed) and status changes. Cloud searches with `/search/jql` (the older `/search` is gone
  * there), Server with `/search`.
  */
 export class JiraClient {
@@ -249,6 +262,64 @@ export class JiraClient {
 			remainingSeconds: typeof remaining === "number" ? remaining : null,
 			mine: worklogsOf(logs, me).slice(0, 5),
 		};
+	}
+
+	/** The steps the issue can take from its status, with what their screens ask for. */
+	async transitions(key: string): Promise<JiraTransition[]> {
+		const valid = issueKey(key);
+		if (valid === null) throw new Error("Invalid issue key");
+		return transitionsOf(
+			await this.#get(`/rest/api/2/issue/${valid}/transitions?expand=transitions.fields`),
+		);
+	}
+
+	/** Takes a step; one whose screen asks for more than a resolution is refused, to be taken in Jira. */
+	async transition(key: string, id: string): Promise<void> {
+		const valid = issueKey(key);
+		if (valid === null) throw new Error("Invalid issue key");
+		// Asked again here: the step and its fields are Jira's, not what the window says.
+		const step = (await this.transitions(valid)).find((each) => each.id === id);
+		if (step === undefined) throw new Error("This status change is no longer available.");
+		if (step.needs.length > 0) throw new Error(`Needs ${step.needs.join(", ")}`);
+		await this.#send("POST", `/rest/api/2/issue/${valid}/transitions`, transitionBody(step));
+	}
+
+	/** The Development panel's counts; `null` where Jira has no development information. */
+	async development(issueId: string): Promise<DevelopmentSummary | null> {
+		if (!/^\d+$/.test(issueId)) throw new Error("Invalid issue id");
+		try {
+			return developmentSummaryOf(
+				await this.#get(`/rest/dev-status/1.0/issue/summary?issueId=${issueId}`),
+			);
+		} catch (error) {
+			if (error instanceof JiraError && (error.status === 404 || error.status === 403)) return null;
+			throw error;
+		}
+	}
+
+	/** The branches, commits or pull requests behind a count, from every tool that holds them. */
+	async developmentDetail(issueId: string, kind: DevelopmentKind): Promise<DevelopmentItem[]> {
+		const summary = await this.development(issueId);
+		if (summary === null) return [];
+		const lists = await Promise.all(
+			summary.sources.map(async (source) =>
+				developmentItemsOf(
+					await this.#get(
+						`/rest/dev-status/1.0/issue/detail?${new URLSearchParams({
+							issueId,
+							applicationType: source,
+							dataType: DEVELOPMENT_DATA_TYPE[kind],
+						}).toString()}`,
+					),
+					kind,
+				),
+			),
+		);
+		return lists
+			.flat()
+			.sort((a, b) =>
+				(a.when ?? "") < (b.when ?? "") ? 1 : (a.when ?? "") > (b.when ?? "") ? -1 : 0,
+			);
 	}
 
 	/** Logs work on an issue: through Tempo, with its work attributes, where it is installed. */

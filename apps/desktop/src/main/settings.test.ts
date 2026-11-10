@@ -103,6 +103,33 @@ describe("parseStoredState", () => {
 		).toEqual([]);
 	});
 
+	it("keeps well-formed Jira favorites once each", () => {
+		const favorite = {
+			site: "https://jira.example.com",
+			key: "QR-1",
+			summary: "Giriş",
+			type: "Bug",
+		};
+		const state = parseStoredState({
+			settings: {
+				jiraFavorites: [
+					favorite,
+					favorite,
+					{ ...favorite, site: "https://other.example.com" },
+					{ ...favorite, key: "qr-1" },
+					{ site: "https://jira.example.com", key: "QR-2" },
+					"junk",
+				],
+			},
+		});
+		expect(state.settings.jiraFavorites).toEqual([
+			favorite,
+			{ ...favorite, site: "https://other.example.com" },
+			{ site: "https://jira.example.com", key: "QR-2", summary: "", type: "" },
+		]);
+		expect(parseStoredState({}).settings.jiraFavorites).toEqual([]);
+	});
+
 	it("deduplicates and caps the recent list", () => {
 		const many = Array.from({ length: 40 }, (_, i) => `C:\\${i}.md`);
 		const { recentFiles } = parseStoredState({ recentFiles: ["a.md", "a.md", 7, "", ...many] });

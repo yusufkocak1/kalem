@@ -46,6 +46,9 @@ async function fakeJira() {
 	const searches: string[] = [];
 	/** The work logs Tempo was sent. */
 	const worklogs: Record<string, unknown>[] = [];
+	/** The status changes Jira was sent, and QR-1's status after them. */
+	const transitions: Record<string, unknown>[] = [];
+	let status = { name: "In Progress", category: "indeterminate" };
 	/** Where the issue's "mentioned in" page is: set once the fake Confluence is up. */
 	const confluence = { site: "" };
 	const server = createServer(async (req, res) => {
@@ -93,9 +96,82 @@ async function fakeJira() {
 				],
 			});
 		}
-		if (url.pathname === "/rest/api/2/issue/QR-1") {
-			const base = issue("QR-1", "Giriş zaman aşımı", "In Progress", "indeterminate");
+		if (url.pathname === "/rest/api/2/issue/QR-1/transitions") {
+			if (req.method === "POST") {
+				let body = "";
+				for await (const chunk of req) body += chunk;
+				transitions.push(JSON.parse(body));
+				status = { name: "Test", category: "indeterminate" };
+				res.writeHead(204);
+				return res.end();
+			}
 			return json(res, {
+				transitions: [
+					{
+						id: "21",
+						name: "Start Test",
+						to: { name: "Test", statusCategory: { key: "indeterminate" } },
+					},
+					{
+						id: "31",
+						name: "Resolve",
+						to: { name: "Done", statusCategory: { key: "done" } },
+						fields: {
+							resolution: { required: true, name: "Resolution", allowedValues: [{ name: "Done" }] },
+						},
+					},
+					{
+						id: "41",
+						name: "Reject",
+						to: { name: "Rejected", statusCategory: { key: "done" } },
+						fields: { customfield_1: { required: true, name: "Reason" } },
+					},
+				],
+			});
+		}
+		// The Development panel, as Bitbucket Server fills it.
+		if (url.pathname === "/rest/dev-status/1.0/issue/summary") {
+			if (url.searchParams.get("issueId") !== "10001") return json(res, { summary: {} });
+			return json(res, {
+				summary: {
+					branch: {
+						overall: { count: 2, lastUpdated: "2026-11-03T10:00:00.000+0300" },
+						byInstanceType: { stash: { count: 2 } },
+					},
+					repository: {
+						overall: { count: 8, lastUpdated: "2026-11-07T10:00:00.000+0300" },
+						byInstanceType: { stash: { count: 8 } },
+					},
+					pullrequest: {
+						overall: { count: 1, lastUpdated: "2026-11-07T11:00:00.000+0300", state: "MERGED" },
+						byInstanceType: { stash: { count: 1 } },
+					},
+				},
+			});
+		}
+		if (url.pathname === "/rest/dev-status/1.0/issue/detail") {
+			return json(res, {
+				detail: [
+					{
+						pullRequests: [
+							{
+								name: "QR-1 Oturum süresi",
+								url: "https://git.example.com/pr/9",
+								status: "MERGED",
+								author: { name: "Ayşe Balcı" },
+								source: { branch: "feature/QR-1", repository: { name: "web" } },
+								destination: { branch: "develop" },
+								lastUpdate: "2026-11-07T11:00:00.000+0300",
+							},
+						],
+					},
+				],
+			});
+		}
+		if (url.pathname === "/rest/api/2/issue/QR-1") {
+			const base = issue("QR-1", "Giriş zaman aşımı", status.name, status.category);
+			return json(res, {
+				id: "10001",
 				...base,
 				fields: {
 					...base.fields,
@@ -154,6 +230,7 @@ async function fakeJira() {
 		site,
 		searches,
 		worklogs,
+		transitions,
 		confluence,
 		close: () => new Promise<void>((done) => server.close(() => done())),
 	};
@@ -268,6 +345,26 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	const mentioned = jira.locator(".jira-link-group", { hasText: "mentioned in" });
 	await expect(mentioned.locator(".jira-remote")).toHaveText("Sprint Planı");
 	await expect(jira.locator(".jira-comment")).toContainText("Bende de oluyor.");
+	// The Development panel: branches, commits and pull requests, each opening into its list.
+	const development = jira.locator(".jira-dev-section");
+	await expect(development.locator(".jira-dev-count")).toHaveText([
+		"2 branches",
+		"8 commits",
+		"1 pull requests",
+	]);
+	await development.locator('.jira-dev-line[data-kind="pullRequests"]').click();
+	const pull = development.locator(".jira-dev-item");
+	await expect(pull.locator(".jira-dev-title")).toHaveText("QR-1 Oturum süresi");
+	await expect(pull.locator(".jira-dev-state")).toHaveText("MERGED");
+	await expect(pull.locator(".jira-dev-detail")).toHaveText("feature/QR-1 → develop");
+	// The status opens the steps the issue can take; one that asks for more is taken in Jira.
+	await jira.locator(".jira-status-button").click();
+	const steps = jira.locator(".jira-transition-menu .jira-transition");
+	await expect(steps).toHaveCount(3);
+	await expect(steps.nth(2)).toHaveAttribute("title", "Asks for Reason: opens in Jira");
+	await steps.filter({ hasText: "Test" }).click();
+	await expect(jira.locator(".jira-status-button .jira-status")).toHaveText("Test");
+	expect(jiraServer.transitions).toEqual([{ transition: { id: "21" } }]);
 	// Work is logged from the issue, through Tempo: a quick button, then its fields.
 	await jira.locator(".jira-log-work").click();
 	const worklog = jira.locator(".jira-worklog");
@@ -357,6 +454,46 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await expect(rows).toHaveCount(3);
 	await page.keyboard.press("ArrowRight");
 	await expect(rows).toHaveCount(5);
+
+	// A right-click logs work today, with the choices remembered from the form.
+	await page.locator('.jira-pane .jira-row[data-key="QR-1"]').click({ button: "right" });
+	const rowMenu = page.locator(".jira-row-menu");
+	await expect(rowMenu).toBeVisible();
+	await rowMenu.locator('.jira-worklog-chip[data-hours="3"]').click();
+	await expect(rowMenu).toBeHidden();
+	await expect(page.locator('.jira-pane .jira-row[data-key="QR-1"] .jira-row-note')).toHaveText(
+		"✓ 3h",
+	);
+	expect(jiraServer.worklogs.at(-1)).toMatchObject({
+		originTaskId: "QR-1",
+		timeSpentSeconds: 3 * 3600,
+		comment: "Working on issue QR-1",
+		attributes: { _Servis_: { value: "QUICKRES" }, _Sirket_: { value: "TKAO" } },
+	});
+	await expect(page.locator(".jira-dialog")).toBeHidden();
+
+	// Stars: one from the row's menu, one from the row; the favorites list shows them.
+	await page.locator('.jira-pane .jira-row[data-key="QR-5"]').click({ button: "right" });
+	await rowMenu.getByRole("menuitem", { name: "★ Add to favorites" }).click();
+	await expect(page.locator('.jira-pane .jira-row[data-key="QR-5"] .jira-star')).toHaveAttribute(
+		"aria-pressed",
+		"true",
+	);
+	await page.locator('.jira-pane .jira-row[data-key="QR-8"]').hover();
+	await page.locator('.jira-pane .jira-row[data-key="QR-8"] .jira-star').click();
+	await page.locator(".jira-pane-list").selectOption("favorites");
+	await expect(rows.locator(".jira-key")).toHaveText(["QR-7", "QR-8", "QR-1", "QR-5"]);
+	expect(jiraServer.searches.at(-1)).toBe("key IN (QR-8, QR-5)");
+	// Taking a star off takes it out of the list.
+	await page.locator('.jira-pane .jira-row[data-key="QR-8"] .jira-star').click();
+	await expect(rows.locator(".jira-key")).toHaveText(["QR-1", "QR-5"]);
+	await expect
+		.poll(async () => {
+			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
+			return stored.settings.jiraFavorites.map((item: { key: string }) => item.key);
+		})
+		.toEqual(["QR-5"]);
+	await page.locator(".jira-pane-list").selectOption("mine");
 
 	// Settings: Jira goes to the right dock, the headings under the document.
 	await clickMenu(app, "View", "Settings…");

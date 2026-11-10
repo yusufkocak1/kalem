@@ -4,6 +4,7 @@ import {
 	jiraWorklogRequest,
 	missingAttributes,
 	parseDuration,
+	quickEntry,
 	remainingAfter,
 	tempoWorklogBody,
 	workAttributesOf,
@@ -160,5 +161,36 @@ describe("Jira's own work log", () => {
 		);
 		expect(logs.map((log) => log.started.slice(0, 10))).toEqual(["2026-10-16", "2026-10-15"]);
 		expect(logs[1]?.comment).toBe("a");
+	});
+});
+
+describe("quick logs", () => {
+	const attributes = workAttributesOf(TEMPO_ATTRIBUTES, ACCOUNTS);
+	const context = {
+		tempo: true,
+		attributes,
+		defaults: { _Servis_: "QUICKRES", _FaturalandirilacakSirket_: "GONE" },
+		spentSeconds: 0,
+		remainingSeconds: 4 * 3600,
+		mine: [],
+	};
+
+	it("use the remembered choices, and leave out one no longer offered", () => {
+		expect(quickEntry(context, "QR-1", 5 * 3600, "2026-11-10")).toEqual({
+			entry: {
+				date: "2026-11-10",
+				seconds: 5 * 3600,
+				remainingSeconds: 0,
+				comment: "Working on issue QR-1",
+				attributes: { _Servis_: "QUICKRES" },
+				remember: false,
+			},
+		});
+	});
+
+	it("say what is missing when a required choice was never made", () => {
+		expect(quickEntry({ ...context, defaults: {} }, "QR-1", 3600, "2026-11-10")).toEqual({
+			missing: ["Servis"],
+		});
 	});
 });

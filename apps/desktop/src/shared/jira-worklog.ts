@@ -247,3 +247,38 @@ export function worklogsOf(raw: unknown, user: { name: string; key: string }): W
 export function remainingAfter(remaining: number | null, seconds: number): number | null {
 	return remaining === null ? null : Math.max(0, remaining - seconds);
 }
+
+/**
+ * A quick log of `seconds` on `date` with the choices remembered: the
+ * estimate counted down, the description Tempo would write. When a
+ * required attribute has no remembered value, the names of those missing:
+ * the full form has to ask.
+ */
+export function quickEntry(
+	context: WorklogContext,
+	issueKey: string,
+	seconds: number,
+	date: string,
+): { readonly entry: WorklogEntry } | { readonly missing: readonly string[] } {
+	const attributes: Record<string, string> = {};
+	for (const attribute of context.attributes) {
+		const value = context.defaults[attribute.key] ?? "";
+		// A remembered choice that is no longer offered is not sent.
+		if (attribute.kind === "list" && !attribute.options.some((option) => option.value === value)) {
+			continue;
+		}
+		if (value !== "") attributes[attribute.key] = value;
+	}
+	const missing = missingAttributes(context.attributes, attributes);
+	if (missing.length > 0) return { missing };
+	return {
+		entry: {
+			date,
+			seconds,
+			remainingSeconds: remainingAfter(context.remainingSeconds, seconds),
+			comment: `Working on issue ${issueKey}`,
+			attributes,
+			remember: false,
+		},
+	};
+}

@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type {
 	ConfluenceFavorite,
+	JiraFavorite,
 	PageMargins,
 	PageSize,
 	Settings,
@@ -108,6 +109,7 @@ export function parseStoredState(raw: unknown): StoredState {
 			confluenceSpace:
 				typeof s.confluenceSpace === "string" ? s.confluenceSpace.slice(0, 255) : d.confluenceSpace,
 			confluenceFavorites: parseFavorites(s.confluenceFavorites),
+			jiraFavorites: parseJiraFavorites(s.jiraFavorites),
 			checkUpdates: asBoolean(s.checkUpdates, d.checkUpdates),
 			tray: asBoolean(s.tray, d.tray),
 			gitAutoFetch: asBoolean(s.gitAutoFetch, d.gitAutoFetch),
@@ -161,6 +163,30 @@ function parseFavorites(value: unknown): ConfluenceFavorite[] {
 					id,
 					title: typeof title === "string" ? title.slice(0, 500) : "",
 					...(name === null ? {} : { group: name }),
+				},
+			];
+		})
+		.slice(0, MAX_FAVORITES);
+}
+
+function parseJiraFavorites(value: unknown): JiraFavorite[] {
+	if (!Array.isArray(value)) return [];
+	const seen = new Set<string>();
+	return value
+		.flatMap((item): JiraFavorite[] => {
+			if (typeof item !== "object" || item === null) return [];
+			const { site, key, summary, type } = item as Record<string, unknown>;
+			if (typeof site !== "string" || typeof key !== "string") return [];
+			if (!/^[A-Z][A-Z0-9_]*-[1-9]\d*$/.test(key)) return [];
+			const id = `${site}\n${key}`;
+			if (seen.has(id)) return [];
+			seen.add(id);
+			return [
+				{
+					site,
+					key,
+					summary: typeof summary === "string" ? summary.slice(0, 500) : "",
+					type: typeof type === "string" ? type.slice(0, 100) : "",
 				},
 			];
 		})

@@ -158,6 +158,25 @@ export function registerJiraIpc(ctx: JiraIpcContext): {
 		if (entry.remember) await worklogDefaults.set(client.site, attributes);
 	});
 
+	ipcMain.handle(CHANNEL.jiraTransitions, async (_event, key: unknown) =>
+		(await connected()).transitions(text(key, "issue key")),
+	);
+
+	ipcMain.handle(CHANNEL.jiraTransition, async (_event, key: unknown, id: unknown) =>
+		(await connected()).transition(text(key, "issue key"), text(id, "transition")),
+	);
+
+	ipcMain.handle(CHANNEL.jiraDevelopment, async (_event, issueId: unknown) =>
+		(await connected()).development(text(issueId, "issue id")),
+	);
+
+	ipcMain.handle(CHANNEL.jiraDevelopmentDetail, async (_event, issueId: unknown, kind: unknown) => {
+		if (kind !== "branches" && kind !== "commits" && kind !== "pullRequests") {
+			throw new Error("Invalid kind");
+		}
+		return (await connected()).developmentDetail(text(issueId, "issue id"), kind);
+	});
+
 	ipcMain.handle(CHANNEL.jiraSearch, async (_event, query: unknown, next: unknown) =>
 		(await connected()).search(
 			searchJql(text(query, "search").slice(0, 2000)),

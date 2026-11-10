@@ -40,6 +40,11 @@ const bridge: KalemBridge = {
 	jiraIssue: (key) => ipcRenderer.invoke(CHANNEL.jiraIssue, key),
 	jiraSearch: (query, next) => ipcRenderer.invoke(CHANNEL.jiraSearch, query, next),
 	jiraWorklogContext: (key) => ipcRenderer.invoke(CHANNEL.jiraWorklogContext, key),
+	jiraTransitions: (key) => ipcRenderer.invoke(CHANNEL.jiraTransitions, key),
+	jiraTransition: (key, id) => ipcRenderer.invoke(CHANNEL.jiraTransition, key, id),
+	jiraDevelopment: (issueId) => ipcRenderer.invoke(CHANNEL.jiraDevelopment, issueId),
+	jiraDevelopmentDetail: (issueId, kind) =>
+		ipcRenderer.invoke(CHANNEL.jiraDevelopmentDetail, issueId, kind),
 	jiraLogWork: (key, entry) => ipcRenderer.invoke(CHANNEL.jiraLogWork, key, entry),
 	confluenceAncestors: (pageId) => ipcRenderer.invoke(CHANNEL.confluenceAncestors, pageId),
 	confluenceSearch: (query, spaceKey) =>
