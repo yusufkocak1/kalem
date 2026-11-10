@@ -399,13 +399,15 @@ export function runCli(
 	send: (event: ClaudeEvent) => void,
 	sender: WebContents,
 	started: (child: ChildProcess) => void,
+	/** More environment variables for this run. */
+	extraEnv: Readonly<Record<string, string>> = {},
 ): Promise<void> {
 	return new Promise((resolve) => {
 		let child: ChildProcess;
 		try {
 			child = spawn(launch.command, [...launch.prefix, ...args], {
 				cwd,
-				env: environment(launch),
+				env: { ...environment(launch), ...extraEnv },
 				windowsHide: true,
 				stdio: ["pipe", "pipe", "pipe"],
 			});

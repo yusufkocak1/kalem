@@ -9,6 +9,7 @@
  * is reused, so a search does not walk the folder again: an older index is
  * still answered with while a new one is made behind it.
  */
+
 import { execFile } from "node:child_process";
 import type { Dirent } from "node:fs";
 import { mkdir, readdir, realpath, stat, writeFile } from "node:fs/promises";
@@ -16,6 +17,7 @@ import { basename, dirname, extname, isAbsolute, join, normalize, relative, sep 
 import type { ProposedEdit } from "../shared/claude.js";
 import { encodeText, willConvertToUtf8 } from "../shared/encoding.js";
 import { isBinaryPath } from "../shared/paths.js";
+import type { ToolDefinition } from "../shared/tool-protocol.js";
 import { readTextFile } from "./text-files.js";
 import { isInside } from "./workspace-files.js";
 
@@ -389,15 +391,7 @@ export function globMatcher(pattern: string): (path: string) => boolean {
 
 // --- The tools -------------------------------------------------------------------
 
-export interface ToolDefinition {
-	readonly name: string;
-	readonly description: string;
-	readonly parameters: {
-		readonly type: "object";
-		readonly properties: Record<string, unknown>;
-		readonly required: readonly string[];
-	};
-}
+export type { ToolDefinition };
 
 export const WORKSPACE_TOOLS: readonly ToolDefinition[] = [
 	{

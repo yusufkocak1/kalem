@@ -235,6 +235,8 @@ export function chatCompletionsRequest(
 		readonly tools?: readonly ChatTool[];
 		/** Messages of this turn after the question: tool calls and their results, as sent. */
 		readonly turn?: readonly unknown[];
+		/** Asks the service to say what the answer cost at its end. */
+		readonly usage?: boolean;
 	} = {},
 ): { url: string; init: RequestInit } {
 	// Pictures go with the last question, each after its name.
@@ -264,6 +266,7 @@ export function chatCompletionsRequest(
 			body: JSON.stringify({
 				model: connection.model,
 				stream: true,
+				...(extra.usage === true ? { stream_options: { include_usage: true } } : {}),
 				messages: [{ role: "system", content: system }, ...sent, ...(extra.turn ?? [])],
 				...((extra.tools ?? []).length === 0
 					? {}
@@ -331,6 +334,7 @@ export function chatCompletionsDelta(data: string): {
 	toolCalls?: ToolCallDelta[];
 	done?: boolean;
 	error?: string;
+	usage?: { input: number; output: number; cached: number };
 } {
 	if (data.trim() === "[DONE]") return { done: true };
 	let parsed: unknown;
@@ -341,8 +345,23 @@ export function chatCompletionsDelta(data: string): {
 	}
 	if (!isRecord(parsed)) return {};
 	if (parsed.error !== undefined) return { error: errorText(parsed.error) };
+	const usage = isRecord(parsed.usage) ? parsed.usage : null;
+	const counted =
+		usage === null
+			? {}
+			: {
+					usage: {
+						input: typeof usage.prompt_tokens === "number" ? usage.prompt_tokens : 0,
+						output: typeof usage.completion_tokens === "number" ? usage.completion_tokens : 0,
+						cached:
+							isRecord(usage.prompt_tokens_details) &&
+							typeof usage.prompt_tokens_details.cached_tokens === "number"
+								? usage.prompt_tokens_details.cached_tokens
+								: 0,
+					},
+				};
 	const choice = Array.isArray(parsed.choices) ? parsed.choices[0] : undefined;
-	if (!isRecord(choice)) return {};
+	if (!isRecord(choice)) return counted;
 	const delta = isRecord(choice.delta) ? choice.delta : {};
 	const text = typeof delta.content === "string" ? delta.content : "";
 	const toolCalls: ToolCallDelta[] = [];
@@ -362,6 +381,7 @@ export function chatCompletionsDelta(data: string): {
 	return {
 		...(text === "" ? {} : { text }),
 		...(toolCalls.length === 0 ? {} : { toolCalls }),
+		...counted,
 	};
 }
 

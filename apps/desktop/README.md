@@ -519,8 +519,9 @@ verir.
     da kayıt penceresindeki düğmeyle eklenir; Jira sitesi başına ayarlarda
     saklanır ve eklenme sırasıyla listelenir. Artık okunamayan bir favori
     saklandığı haliyle görünür.
-- Kalem Jira'da yalnızca **efor girer** ve **statü değiştirir**; başka
-  hiçbir şeyi değiştirmez.
+- Kalem Jira'ya kendiliğinden yazmaz: efor girişi ve statü değişikliği
+  yalnızca senin tıklamanla yapılır; asistanın Jira'ya yazmaları (kayıt
+  açma, yorum, statü) her seferinde onay ister.
 
 **Paneller ve Ayarlar**
 
@@ -538,10 +539,19 @@ verir.
   (çift tık varsayılana döner); yerler ve boyutlar hatırlanır.
 - **Confluence ve Jira panelleri yalnızca bağlantı kurulunca görünür**;
   bağlantı kesilince kaybolur.
-- **Görünüm → Ayarlar…** (`Ctrl+,`): panellerin yerleri, Confluence ve Jira
-  bağlantıları (bağlan / bağlantıyı kes) ve genel ayarlar (tema, otomatik
-  kaydetme, yazım denetimi, güncelleme denetimi, bildirim alanı, Git'i
-  otomatik getirme).
+- **Dosya → Ayarlar…** (`Ctrl+,`; macOS'ta uygulama menüsünde de): bütün
+  ayarlar tek pencerede, solda kategoriler — **Görünüm** (tema, dil,
+  yakınlık, tam genişlik), **Düzenleyici** (otomatik kaydetme, yazım
+  denetimi), **Paneller** (panellerin yeri, yuvaların açıklığı ve
+  boyutları), **Asistan** (hizmet ve model, panel, belgeyi paylaşma),
+  **Bağlantılar** (Confluence ve Jira: bağlan / bağlantıyı kes), **Sayfa
+  Düzeni** (kâğıt, yönlendirme, kenar boşlukları, sayfa numarası) ve
+  **Sistem** (güncelleme denetimi, bildirim alanı, Git'i otomatik getirme).
+  Üstteki arama kutusu bütün kategorilerde arar; Türkçe ya da İngilizce
+  yazılabilir, harf ayrımı ve şapka/nokta farkı gözetmez ("koyu", "dark",
+  "kagit"). Her kategoride **Varsayılanlara Dön** düğmesi vardır. Menülerdeki
+  ve şeritteki hızlı ayarlar (tema, dil, sayfa düzeni…) yerinde durur;
+  oradan yapılan değişiklik açık pencerede hemen görünür.
 
 **Diyagramlar**
 
@@ -613,6 +623,71 @@ verir.
   yeniler.
 
 **Yapay Zekâ Asistanı**
+
+> **3.0'da yeni — analiz öncelikli ajan.** Asistan artık uygulamanın içinde
+> olduğunu biliyor ve Kalem'i kendi araçlarıyla, **izin isteyerek** kullanıyor:
+>
+> - **Uygulamayı kullanma:** "koyu temaya geç", "Jira panelini alta taşı",
+>   "asistanı sola al", "sayfayı yatay yap", "dışa aktar" gibi istekler
+>   `settings_find`/`settings_set`, `pane_move`, `pane_show`, `app_command`
+>   araçlarıyla yapılır. Her değişiklikten önce sohbette bir **onay kartı**
+>   çıkar: **Uygula / Reddet**, ve isteğe göre *Her seferinde sor*, *Bu
+>   oturumda tekrar sorma* ya da *Her zaman izin ver*. Her zaman izin
+>   verilenler **Dosya → Ayarlar → Asistan**'da listelenir ve kaldırılabilir.
+>   Yapılan her değişiklik yanıtın altında **Geri al** ile durur (birden
+>   fazlaysa **Tüm Değişiklikleri Geri Al**). Program yolları, API
+>   anahtarları, izinler ve bağlantılar asistana hiç gösterilmez.
+> - **Az token:** her soruda yalnızca kısa bir tanıtım gider; diyagram
+>   biçimi, menü rehberi, belge değişikliği biçimi, analiz ve prompt
+>   rehberleri `kalem_help` ile gerektiğinde istenir. Uzun belgeler (24 000
+>   karakterden uzun) yalnızca **ana hatlarıyla** gider; asistan gereken
+>   bölümü `document_read`/`document_search` ile okur. Yanıtın altında
+>   harcanan token gösterilir. API sohbetleri `/compact` ile özetlenebilir.
+>   Araç çağıramayan modeller eskisi gibi tüm talimatları ve belgeyi alır.
+> - **Modlar** (soru kutusunun altındaki seçici): *Sor*, *Analiz Yaz*,
+>   *Analizi İncele*, *Prompt Hazırla*, *Kod*, *Uygulama*. Mod, talimatı ve
+>   araçları belirler. `/review`, `/write`, `/prompt`, `/trace`, `/stories`
+>   modu seçip hazır soruyu sorar.
+> - **Analiz şablonları:** **Dosya → Şablondan Yeni…** ve **Dosya → Ayarlar →
+>   Şablonlar**. Ekip şablonları açık klasörün `.kalem/templates/`
+>   klasöründe (Git ile paylaşılır; aynı adlı kişisel şablonun önüne geçer),
+>   kişisel şablonlar uygulama verisinde durur; Kalem ile bir *best practice*
+>   şablonu gelir (salt okunur, **Kopyala ve Uyarla** ile kişiselleştirilir).
+>   Şablon sıradan bir Markdown belgesidir; başındaki kısa ön bilgi
+>   (`kalem-template`, `required`, `ids`, `questions`) adını, zorunlu
+>   bölümlerini ve gereksinim kimliklerini söyler. Etkin belge şablon olarak
+>   kaydedilebilir, `.md` ya da Word dosyası içe aktarılabilir; biri
+>   varsayılan seçilir.
+> - **Analizi İncele:** önce kural tabanlı, ücretsiz bir denetim
+>   (`analysis_lint`: şablonun eksik ya da boş bölümleri, "hızlı", "uygun",
+>   "vb." gibi ölçülemez ifadeler, TBD/TODO, tekrarlanan ya da atlanan
+>   FR/BR/NFR kimlikleri, kabul kriteri olmayan gereksinimler, kırık
+>   başlık bağlantıları), sonra modelin bulguları (çelişki, eksik senaryo,
+>   test edilemezlik, güvenlik, kodla uyumsuzluk). Bulgular yanıtta
+>   **geliştirmeye hazırlık puanıyla** listelenir; her biri **Göster**,
+>   **Düzelt**, **Açık Sorulara Ekle**, **Not Ekle** ya da **Yoksay** ile
+>   ele alınır. Bulgular belgede yalnızca **oturum boyunca** işaretlenir;
+>   Markdown'a ancak kullanıcı bir düğmeye basınca bir şey yazılır.
+> - **Prompt Hazırla:** belgeden (ya da seçili kısımdan) kodlama ajanı için
+>   prompt; istenirse `.kalem/prompts/` altına kaydedilir (onaylı).
+> - **Jira ve Confluence'a yazma:** gereksinimlerden toplu story
+>   (`jira_create_issues` — kartta hangilerinin oluşturulacağı seçilir),
+>   yorum, durum değiştirme, Confluence sayfasına ekleme/oluşturma. **Bunlar
+>   her seferinde sorulur**; çevrim içi işlemler için "oturumda" ya da "her
+>   zaman" izni verilemez. Jira/Confluence içeriği okunduktan sonra gelen
+>   değişiklik isteklerinde kart ayrıca uyarır.
+> - **Agent arayüzü:** modelin planı kart olarak görünür (`plan_update`),
+>   araç adımları yanıtın üstünde listelenir, soru kutusunda `@` yazınca
+>   belgenin bölümleri listelenir ve seçilen bölüm (belge paylaşılmasa da)
+>   soruya eklenir. Asistan paneli **sağda, solda ya da belgenin altında**
+>   durabilir (**Dosya → Ayarlar → Asistan** ya da asistana "kendini alta
+>   al" demek); **✦ Asistan** düğmesi her zaman sağ kenardadır.
+> - **Araçlara erişim:** API'lerde araçlar doğrudan; Claude Code'da her
+>   soruya özel açılan Kalem MCP sunucusundan (`mcp__kalem__*`); GitHub
+>   Copilot'ta CLI `--additional-mcp-config` destekliyorsa MCP ile, yoksa
+>   yanıttaki ` ```kalem-tool ` bloklarıyla — MCP başlatılamazsa otomatik
+>   olarak bloklara geçer (**Ayarlar → Asistan → Copilot, Kalem araçlarını
+>   nasıl kullansın**).
 
 - Pencerenin sağ kenarında her zaman duran **✦ Asistan** düğmesi,
   **Görünüm → Yapay Zekâ Asistanı** ya da `Ctrl+Shift+L` belgenin sağında bir

@@ -1,9 +1,11 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, stat } from "node:fs/promises";
+import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { AssistantToolServer, MCP_TOOLS, mcpToolName } from "./assistant-mcp.js";
+import { CONFLUENCE_TOOLS, ConfluenceLookups, isConfluenceTool } from "./assistant-confluence.js";
+import { isJiraTool, JIRA_TOOLS, JiraLookups } from "./assistant-jira.js";
+import { AssistantToolServer, mcpToolName, mcpTools } from "./assistant-mcp.js";
 import type { ConfluenceClient } from "./confluence-client.js";
 import type { JiraClient } from "./jira-client.js";
 
@@ -120,33 +122,46 @@ async function talk(
 }
 
 describe("AssistantToolServer", () => {
-	it("serves Kalem's Confluence tools to the CLI over MCP, through the app", async () => {
+	const tools = [...CONFLUENCE_TOOLS, ...JIRA_TOOLS];
+	/** The app's side of a run: the look-ups, as the question would run them. */
+	const call = async (name: string, input: unknown) => {
+		if (isConfluenceTool(name)) {
+			return {
+				text: await new ConfluenceLookups(client).runTool(name, input, () => {}),
+				isError: false,
+			};
+		}
+		if (isJiraTool(name)) {
+			return { text: await new JiraLookups(jira).runTool(name, input, () => {}), isError: false };
+		}
+		return { text: `There is no tool named ${name}.`, isError: true };
+	};
+
+	it("serves a question's tools to the CLI over MCP, through the app", async () => {
 		const folder = await mkdtemp(join(tmpdir(), "kalem-mcp-"));
-		let connected = true;
-		const tools = new AssistantToolServer({
-			folder,
-			node: "/path/to/Kalem",
-			confluence: async () => (connected ? client : null),
-			jira: async () => (connected ? jira : null),
-			notConnected: () => "Not connected to Confluence.",
-			jiraNotConnected: () => "Not connected to Jira.",
-		});
+		const server = new AssistantToolServer({ folder, node: "/path/to/Kalem" });
 		try {
-			const config = await tools.config();
-			expect(await tools.config()).toBe(config);
-			// Only the user reads the file that holds the token.
-			if (process.platform !== "win32") expect((await stat(config)).mode & 0o077).toBe(0);
-			const written = JSON.parse(await readFile(config, "utf8"));
+			const run = await server.open(() => tools, call);
+			// Only the user reads the files that hold the token.
+			if (process.platform !== "win32") {
+				expect((await stat(run.claude)).mode & 0o077).toBe(0);
+				expect((await stat(run.copilot)).mode & 0o077).toBe(0);
+			}
+			const written = JSON.parse(await readFile(run.claude, "utf8"));
 			expect(written.mcpServers.kalem).toMatchObject({
 				type: "stdio",
 				command: "/path/to/Kalem",
 				env: {
 					ELECTRON_RUN_AS_NODE: "1",
-					KALEM_TOOLS_URL: expect.stringMatching(/^http:\/\/127\.0\.0\.1:\d+\/call$/),
+					KALEM_TOOLS_URL: expect.stringMatching(/^http:\/\/127\.0\.0\.1:\d+$/),
+					KALEM_TOOLS_RUN: expect.stringMatching(/^[0-9a-f]{24}$/),
 				},
 			});
+			// Copilot's form of the same server.
+			const copilot = JSON.parse(await readFile(run.copilot, "utf8"));
+			expect(copilot.mcpServers.kalem).toMatchObject({ type: "local", tools: ["*"] });
 
-			const answers = await talk(config, [
+			const answers = await talk(run.claude, [
 				{ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } },
 				{ jsonrpc: "2.0", method: "notifications/initialized" },
 				{ jsonrpc: "2.0", id: 2, method: "tools/list" },
@@ -173,7 +188,7 @@ describe("AssistantToolServer", () => {
 					jsonrpc: "2.0",
 					id: 7,
 					method: "tools/call",
-					params: { name: "jira_search", arguments: { jql: "project = DEV" } },
+					params: { name: "nothing", arguments: {} },
 				},
 			]);
 			const byId = new Map(answers.map((answer) => [answer.id, answer]));
@@ -186,7 +201,7 @@ describe("AssistantToolServer", () => {
 			});
 			const result = (id: number): Record<string, unknown> =>
 				(byId.get(id)?.result ?? {}) as Record<string, unknown>;
-			expect(result(2).tools).toEqual(MCP_TOOLS);
+			expect(result(2).tools).toEqual(mcpTools(tools));
 			const text = (id: number): string =>
 				(result(id).content as { text: string }[] | undefined)?.[0]?.text ?? "";
 			expect(text(3)).toContain("1. Bulunan: onay (page id 42)");
@@ -194,14 +209,18 @@ describe("AssistantToolServer", () => {
 			expect(text(4)).toContain("Hedef");
 			expect(byId.get(5)).toMatchObject({ error: { code: -32601 } });
 			expect(text(6)).toContain("Issue DEV-7: Giriş zaman aşımı");
-			expect(text(6)).toContain("Status: In Progress");
 			expect(text(6)).toContain("Oturum **30 sn** sonra düşüyor.");
-			expect(text(7)).toContain("Jira search `project = DEV`: 1 issues.");
-			expect(text(7)).toContain("- DEV-7 Giriş zaman aşımı (Bug, In Progress, assignee Ayşe");
+			expect(result(7)).toMatchObject({ isError: true });
+			expect(text(7)).toContain("There is no tool named nothing.");
 
-			// Without a connection the call says so, as an error the model reads.
-			connected = false;
-			const [, offline] = await talk(config, [
+			// Once the question has ended, its tools answer no more, and its files are gone.
+			const config = run.claude;
+			const kept = await readFile(config, "utf8");
+			await run.close();
+			await expect(stat(config)).rejects.toThrow();
+			const replay = join(folder, "replay.json");
+			await writeFile(replay, kept);
+			const [, ended] = await talk(replay, [
 				{ jsonrpc: "2.0", id: 1, method: "initialize", params: {} },
 				{
 					jsonrpc: "2.0",
@@ -210,23 +229,9 @@ describe("AssistantToolServer", () => {
 					params: { name: "confluence_search", arguments: { query: "x" } },
 				},
 			]);
-			expect(offline).toMatchObject({
-				result: { content: [{ text: "Not connected to Confluence." }], isError: true },
-			});
-			const [, noJira] = await talk(config, [
-				{ jsonrpc: "2.0", id: 1, method: "initialize", params: {} },
-				{
-					jsonrpc: "2.0",
-					id: 2,
-					method: "tools/call",
-					params: { name: "jira_get_issue", arguments: { key: "DEV-7" } },
-				},
-			]);
-			expect(noJira).toMatchObject({
-				result: { content: [{ text: "Not connected to Jira." }], isError: true },
-			});
+			expect(ended).toMatchObject({ result: { isError: true } });
 		} finally {
-			tools.close();
+			server.close();
 		}
 	});
 
@@ -234,27 +239,25 @@ describe("AssistantToolServer", () => {
 		expect(mcpToolName("confluence_search")).toBe("mcp__kalem__confluence_search");
 	});
 
-	it("answers only calls that carry this run's token", async () => {
+	it("answers only calls that carry this app's token", async () => {
 		const folder = await mkdtemp(join(tmpdir(), "kalem-mcp-"));
-		const tools = new AssistantToolServer({
-			folder,
-			node: "node",
-			confluence: async () => client,
-			jira: async () => null,
-			notConnected: () => "",
-			jiraNotConnected: () => "",
-		});
+		const server = new AssistantToolServer({ folder, node: "node" });
 		try {
-			const config = JSON.parse(await readFile(await tools.config(), "utf8"));
+			const run = await server.open(() => tools, call);
+			const config = JSON.parse(await readFile(run.claude, "utf8"));
 			const url = config.mcpServers.kalem.env.KALEM_TOOLS_URL as string;
-			const response = await fetch(url, {
+			const response = await fetch(`${url}/call`, {
 				method: "POST",
-				headers: { authorization: "Bearer wrong" },
+				headers: {
+					authorization: "Bearer wrong",
+					"x-kalem-run": config.mcpServers.kalem.env.KALEM_TOOLS_RUN,
+				},
 				body: JSON.stringify({ name: "confluence_search", arguments: { query: "x" } }),
 			});
 			expect(response.status).toBe(403);
+			await run.close();
 		} finally {
-			tools.close();
+			server.close();
 		}
 	});
 });

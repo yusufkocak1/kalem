@@ -33,6 +33,7 @@ import { createDiagramButton, isDiagramImage } from "./diagram-button.js";
 import { createDiagramEditor } from "./diagram-editor.js";
 import { diagramFromImage, diagramToPng } from "./diagram-image.js";
 import { createDocks } from "./docks.js";
+import { markQuotes, revealQuote } from "./document-marks.js";
 import { createDocumentTools } from "./document-tools.js";
 import { el, isTextFieldFocused } from "./dom.js";
 import type { TableContext, TableEdit } from "./edits.js";
@@ -53,6 +54,7 @@ import { ipcErrorMessage, Session } from "./session.js";
 import { createSettingsDialog } from "./settings-dialog.js";
 import { enableColumnResize } from "./table-styles.js";
 import { createTabStrip } from "./tabs.js";
+import { createTemplatePicker } from "./template-picker.js";
 import { measureDiagramText } from "./text-measure.js";
 import { createVersionHistory } from "./version-history.js";
 
@@ -171,6 +173,9 @@ const assistant = createAssistantPane({
 	setShareDocument: (share) => updateSettings({ assistantDocument: share }),
 	width: () => settings.assistantWidth,
 	setWidth: (width) => updateSettings({ assistantWidth: width }),
+	place: () => settings.assistantPlace,
+	height: () => settings.assistantHeight,
+	setHeight: (height) => updateSettings({ assistantHeight: height }),
 	context: () => assistantContext(),
 	images: () =>
 		documentImages([...canvas.querySelectorAll("img")].filter((image) => !isDiagramImage(image))),
@@ -193,6 +198,9 @@ const assistant = createAssistantPane({
 		commands[command]();
 	},
 	close: () => updateSettings({ assistant: false }),
+	changeSettings: (patch) => updateSettings(patch),
+	markQuotes: (quotes) => markQuotes(canvas, quotes),
+	revealQuote: (quote) => revealQuote(canvas, quote),
 	errorText: ipcErrorMessage,
 });
 
@@ -257,9 +265,19 @@ const docks = createDocks({
 	settings: () => settings,
 	update: (patch) => updateSettings(patch),
 	available: paneAvailable,
-	openLayout: () => void settingsDialog.show("panes"),
+	openLayout: () => void settingsDialog.show("panels"),
 });
 const deskColumn = el("div", { class: "desk-column", children: [deskArea, docks.elements.bottom] });
+
+/** The assistant's panel where the settings put it; its button stays at the right edge. */
+function placeAssistant(): void {
+	const place = settings.assistantPlace;
+	if (assistant.element.dataset.place === place && assistant.element.isConnected) return;
+	if (place === "bottom") deskColumn.append(assistant.element);
+	else if (place === "left") docks.elements.left.after(assistant.element);
+	else assistantRail.before(assistant.element);
+	assistant.element.dataset.place = place;
+}
 assistantRail.prepend(docks.stripes.right);
 const settingsDialog = createSettingsDialog({
 	t,
@@ -270,6 +288,19 @@ const settingsDialog = createSettingsDialog({
 	connectConfluence: () => void confluenceDialog.show(),
 	connectJira: () => void jiraDialog.showLogin(),
 	onAccountChange: () => void refreshAccounts(),
+	assistantConfigured: (status, changed) => assistant.configured(status, changed),
+	openLink: (href) => bridge.openLink(href),
+	errorText: ipcErrorMessage,
+	activeDocument: async () => {
+		const context = await assistantContext();
+		return { name: context.name, text: context.text };
+	},
+});
+const templatePicker = createTemplatePicker({
+	t,
+	bridge,
+	defaultTemplate: () => settings.defaultTemplate,
+	errorText: ipcErrorMessage,
 });
 
 /** The panes that came into view are filled: Confluence's tree, Jira's issues, the files. */
@@ -583,6 +614,7 @@ function applySettings(): void {
 	pageSetup.textContent = pageRule(settings);
 	app.style.setProperty("--zoom", String(settings.zoom / 100));
 	app.toggleAttribute("data-full-width", settings.fullWidth);
+	placeAssistant();
 	assistant.element.hidden = !settings.assistant;
 	assistantToggle.setAttribute("aria-expanded", String(settings.assistant));
 	if (settings.assistant) assistant.show();
@@ -770,6 +802,7 @@ const commands: Record<Command, () => void> = {
 	"confluence-open": () => void confluenceDialog.show(),
 	"jira-open": () => void jiraDialog.showSearch(),
 	settings: () => void settingsDialog.show(),
+	"new-from-template": () => void templatePicker.show(),
 	"move-tab": () => moveTab(session.id),
 	"case-upper": () => rewriteText((text) => changeCase(text, "upper", session.editor.getLang())),
 	"case-lower": () => rewriteText((text) => changeCase(text, "lower", session.editor.getLang())),
@@ -876,6 +909,8 @@ bridge.onSettings((next) => {
 	applySettings();
 	refreshShown(before);
 	scheduleRibbonUpdate();
+	// A setting changed from the menu shows in the Settings window at once.
+	void settingsDialog.refresh();
 });
 
 // --- Dropped files ----------------------------------------------------------
