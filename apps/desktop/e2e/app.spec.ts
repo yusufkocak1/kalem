@@ -2074,13 +2074,13 @@ test("runs a menu command by name from the command palette, and from > in Quick 
 	await clickMenu(app, "View", "Command Palette…");
 	const palette = page.locator(".command-palette");
 	await expect(palette).toBeVisible();
-	const input = palette.locator(".quick-open-input");
+	const input = palette.locator(".palette-input");
 	await expect(input).toBeFocused();
 	// Every word must match the name or its menus; shortcuts and check marks are shown.
 	await input.fill("full width");
 	const items = palette.locator(".palette-item");
-	await expect(items.first().locator(".quick-open-name")).toHaveText("Full Width");
-	await expect(items.first().locator(".quick-open-path")).toHaveText("View");
+	await expect(items.first().locator(".palette-name")).toHaveText("Full Width");
+	await expect(items.first().locator(".palette-group")).toHaveText("View");
 	await input.press("Enter");
 	await expect(palette).toBeHidden();
 	await expect(page.locator(".app")).toHaveAttribute("data-full-width", "");
@@ -2094,7 +2094,7 @@ test("runs a menu command by name from the command palette, and from > in Quick 
 
 	// In Quick Open, ">" turns the search into one for commands.
 	await clickMenu(app, "File", "Quick Open…");
-	await page.locator(".quick-open:not(.command-palette) .quick-open-input").fill(">full");
+	await page.locator(".quick-open .quick-open-input").fill(">full");
 	await expect(palette).toBeVisible();
 	await expect(input).toHaveValue("full");
 	await input.press("Enter");

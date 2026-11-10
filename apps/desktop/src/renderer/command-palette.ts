@@ -54,7 +54,7 @@ export function createCommandPalette(options: CommandPaletteOptions): {
 } {
 	const { t } = options;
 	const input = el("input", {
-		class: "quick-open-input",
+		class: "palette-input",
 		attrs: {
 			type: "text",
 			placeholder: t.palettePlaceholder,
@@ -63,12 +63,12 @@ export function createCommandPalette(options: CommandPaletteOptions): {
 		},
 	});
 	const list = el("ul", {
-		class: "quick-open-list palette-list",
+		class: "palette-list",
 		attrs: { role: "listbox", id: "command-palette-list", "aria-label": t.paletteLabel },
 	});
-	const empty = el("p", { class: "quick-open-empty" });
+	const empty = el("p", { class: "palette-empty" });
 	const dialog = el("dialog", {
-		class: "quick-open command-palette",
+		class: "command-palette",
 		attrs: { "aria-label": t.paletteLabel },
 		children: [
 			el("label", {
@@ -93,7 +93,7 @@ export function createCommandPalette(options: CommandPaletteOptions): {
 		list.replaceChildren(
 			...shown.map((command, index) => {
 				const option = el("li", {
-					class: "quick-open-item palette-item",
+					class: "palette-item",
 					attrs: {
 						role: "option",
 						id: `palette-${index}`,
@@ -106,8 +106,8 @@ export function createCommandPalette(options: CommandPaletteOptions): {
 							attrs: { "aria-hidden": "true" },
 							children: command.checked === true ? [icon("check")] : [],
 						}),
-						el("span", { class: "quick-open-name", text: command.label }),
-						el("span", { class: "quick-open-path", text: command.group }),
+						el("span", { class: "palette-name", text: command.label }),
+						el("span", { class: "palette-group", text: command.group }),
 						...(command.accelerator === ""
 							? []
 							: [el("kbd", { class: "palette-key", text: command.accelerator })]),

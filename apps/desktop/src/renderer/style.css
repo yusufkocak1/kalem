@@ -18,7 +18,13 @@
 	--app-error: #a3301c;
 	--app-error-bg: #fce6e1;
 	--app-ok: #1a7f5a;
-	--app-shadow: 0 1px 3px rgb(34 32 29 / 12%), 0 10px 30px rgb(34 32 29 / 10%);
+	--app-shadow:
+		0 1px 2px rgb(34 32 29 / 6%), 0 6px 16px rgb(34 32 29 / 7%),
+		0 18px 44px -12px rgb(34 32 29 / 16%);
+	--app-shadow-soft: 0 1px 2px rgb(34 32 29 / 5%), 0 4px 14px rgb(34 32 29 / 6%);
+	--app-scrollbar: rgb(34 32 29 / 22%);
+	--app-scrollbar-hover: rgb(34 32 29 / 38%);
+	--app-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -40,7 +46,11 @@
 		--app-error: #ff9b82;
 		--app-error-bg: #40211b;
 		--app-ok: #58d0a0;
-		--app-shadow: 0 1px 3px rgb(0 0 0 / 40%), 0 10px 30px rgb(0 0 0 / 35%);
+		--app-shadow:
+			0 1px 2px rgb(0 0 0 / 30%), 0 8px 20px rgb(0 0 0 / 28%), 0 24px 48px -12px rgb(0 0 0 / 40%);
+		--app-shadow-soft: 0 1px 2px rgb(0 0 0 / 25%), 0 4px 14px rgb(0 0 0 / 22%);
+		--app-scrollbar: rgb(232 230 225 / 20%);
+		--app-scrollbar-hover: rgb(232 230 225 / 34%);
 	}
 }
 
@@ -325,11 +335,14 @@ button {
 	height: 30px;
 	padding: 0 6px;
 	border: 1px solid transparent;
-	border-radius: 5px;
+	border-radius: 6px;
 	background: none;
 	color: inherit;
 	font: inherit;
 	white-space: nowrap;
+	transition:
+		background-color 120ms ease,
+		border-color 120ms ease;
 }
 
 .ribbon-button-labeled {
@@ -380,9 +393,12 @@ button {
 .ribbon-style {
 	height: 30px;
 	padding: 0 6px;
-	border: 1px solid var(--app-border);
-	border-radius: 5px;
-	background: var(--app-surface);
+	border: 1px solid color-mix(in srgb, var(--app-border) 70%, transparent);
+	border-radius: 6px;
+	background: var(--app-raised);
+	transition:
+		background-color 120ms ease,
+		box-shadow 120ms ease;
 	color: inherit;
 	font: inherit;
 	white-space: nowrap;
@@ -390,7 +406,9 @@ button {
 
 .ribbon-style[aria-pressed="true"] {
 	border-color: var(--app-accent);
-	box-shadow: inset 0 0 0 1px var(--app-accent);
+	box-shadow:
+		inset 0 0 0 1px var(--app-accent),
+		0 0 0 3px color-mix(in srgb, var(--app-accent) 14%, transparent);
 }
 
 .ribbon-style-heading-1 {
@@ -3419,9 +3437,11 @@ button {
 	/* The side margins shrink with a page narrower than 50em (a side panel open
 	   in a small window) instead of squeezing the text into a thin column. */
 	padding: 4.5em min(5.5em, 11%) 6em;
-	border-radius: 2px;
+	border-radius: 4px;
 	background: var(--app-page);
-	box-shadow: var(--app-shadow);
+	box-shadow:
+		0 0 0 1px color-mix(in srgb, var(--app-border) 60%, transparent),
+		var(--app-shadow-soft);
 	font-size: calc(16px * var(--zoom, 1));
 }
 
@@ -3501,7 +3521,7 @@ button {
 	height: 26px;
 	padding: 0 12px;
 	border-top: 1px solid var(--app-border);
-	background: var(--app-surface);
+	background: color-mix(in srgb, var(--app-surface) 70%, var(--app-desk));
 	color: var(--app-muted);
 	font-size: 12px;
 	user-select: none;
@@ -9486,9 +9506,17 @@ dialog[open]::backdrop {
 
 .command-palette {
 	width: min(640px, calc(100vw - 32px));
-	margin-top: 10vh;
+	margin: 10vh auto auto;
 	padding: 6px;
+	border: 1px solid var(--app-border);
 	border-radius: 12px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: var(--app-shadow);
+}
+
+.command-palette::backdrop {
+	background: rgb(0 0 0 / 18%);
 }
 
 .palette-field {
@@ -9512,19 +9540,46 @@ dialog[open]::backdrop {
 	font-weight: 700;
 }
 
-.palette-field > .quick-open-input {
-	padding-left: 0;
+.palette-input {
+	flex: 1;
+	min-width: 0;
+	padding: 8px 0;
 	border: 0;
 	background: none;
-}
-
-.palette-field > .quick-open-input:focus {
+	color: var(--app-text);
+	font: inherit;
+	font-size: 14px;
 	outline: none;
 }
 
+.palette-empty {
+	margin: 10px 4px 4px;
+	color: var(--app-muted);
+}
+
+.palette-empty[hidden] {
+	display: none;
+}
+
+.palette-list {
+	max-height: 50vh;
+	margin: 6px 0 0;
+	padding: 0;
+	overflow-y: auto;
+	list-style: none;
+}
+
 .palette-item {
+	display: flex;
 	align-items: center;
+	gap: 10px;
+	padding: 6px 10px;
+	border-radius: 6px;
 	cursor: pointer;
+}
+
+.palette-item[aria-selected="true"] {
+	background: var(--app-pressed);
 }
 
 .palette-item:hover:not([aria-selected="true"]) {
@@ -9543,12 +9598,19 @@ dialog[open]::backdrop {
 	height: 14px;
 }
 
-.palette-item > .quick-open-name {
+.palette-name {
+	flex: none;
 	font-weight: 500;
 }
 
-.palette-item > .quick-open-path {
+.palette-group {
 	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	color: var(--app-muted);
+	font-size: 12px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .palette-key {
@@ -9699,4 +9761,119 @@ dialog[open]::backdrop {
 .start-pin:focus-visible {
 	outline: 2px solid var(--app-accent);
 	outline-offset: -2px;
+}
+
+/* --- A lighter, more modern finish ------------------------------------------------
+   Thin scrollbars, softer depth, rounder corners and short transitions; nothing here
+   moves or resizes what the layout above sets. */
+
+body {
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
+}
+
+/* Thin, rounded scrollbars that keep out of the way until they are used. */
+::-webkit-scrollbar {
+	width: 12px;
+	height: 12px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	border: 3px solid transparent;
+	border-radius: 999px;
+	background: var(--app-scrollbar) padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: var(--app-scrollbar-hover) padding-box;
+}
+
+::-webkit-scrollbar-button {
+	display: none;
+}
+
+/* The File button as a rounded pill inside the title row, not a full-height block. */
+.ribbon-file {
+	margin: 4px 0 4px 6px;
+	padding: 0 16px;
+	border-radius: 7px;
+	box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+	transition: filter 120ms ease;
+}
+
+/* The tab underline as a short rounded bar under the label. */
+.ribbon-tab {
+	position: relative;
+	border-bottom-color: transparent;
+	transition: color 120ms ease;
+}
+
+.ribbon-tab[aria-selected="true"] {
+	border-bottom-color: transparent;
+}
+
+.ribbon-tab[aria-selected="true"]::after {
+	content: "";
+	position: absolute;
+	right: 10px;
+	bottom: 0;
+	left: 10px;
+	height: 3px;
+	border-radius: 3px 3px 0 0;
+	background: var(--app-accent);
+}
+
+/* Tabs: rounder, and the open one lifts a little off the strip. */
+.doc-tab {
+	border-radius: 8px 8px 0 0;
+}
+
+.doc-tab[aria-selected="true"] {
+	box-shadow:
+		inset 0 2px 0 var(--app-accent),
+		0 -1px 6px rgb(0 0 0 / 4%);
+}
+
+/* Dialogs and menus: rounder, with the layered shadow. */
+dialog {
+	border-radius: 12px;
+}
+
+.dock-menu,
+.files-menu,
+.jira-row-menu,
+.kalem-menu {
+	border-radius: 10px;
+	box-shadow: var(--app-shadow);
+}
+
+.dock-menu-item {
+	border-radius: 6px;
+}
+
+/* Buttons that do the main thing of their dialog: a gentle lift on hover. */
+.jira-button.primary {
+	box-shadow: 0 1px 2px rgb(0 0 0 / 14%);
+}
+
+.jira-button.primary:hover {
+	box-shadow: 0 2px 8px color-mix(in srgb, var(--app-accent) 35%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ribbon-file,
+	.ribbon-tab,
+	.ribbon-button,
+	.ribbon-style,
+	.icon-button,
+	.jira-button,
+	.doc-tab,
+	.stripe-button {
+		transition: none;
+	}
 }
