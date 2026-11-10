@@ -80,6 +80,12 @@ export interface JiraIssue extends JiraIssueRow {
 	readonly comments: readonly JiraComment[];
 	/** How many comments the issue has in all. */
 	readonly commentTotal: number;
+	/** Time tracking, in seconds; `null` where Jira keeps none (or does not track time). */
+	readonly time: {
+		readonly spent: number | null;
+		readonly remaining: number | null;
+		readonly estimate: number | null;
+	};
 }
 
 export interface JiraSearchResults {
@@ -121,6 +127,7 @@ export const ISSUE_FIELDS = [
 	"issuelinks",
 	"parent",
 	"project",
+	"timetracking",
 ] as const;
 
 export const ROW_FIELDS = [
@@ -475,7 +482,17 @@ export function issueOf(raw: unknown, site: string): JiraIssue | null {
 			};
 		}),
 		commentTotal: typeof comment.total === "number" ? comment.total : comments.length,
+		time: {
+			spent: seconds(asJson(fields.timetracking).timeSpentSeconds),
+			remaining: seconds(asJson(fields.timetracking).remainingEstimateSeconds),
+			estimate: seconds(asJson(fields.timetracking).originalEstimateSeconds),
+		},
 	};
+}
+
+/** A number of seconds Jira sent; `null` for anything else. */
+function seconds(value: unknown): number | null {
+	return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
 // --- For the assistant -------------------------------------------------------

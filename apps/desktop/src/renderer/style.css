@@ -5751,21 +5751,173 @@ pre[data-confluence-kind="layout"]::before {
 	color: var(--app-accent-text);
 }
 
+/* The issue's facts as small cards, two or three to a row as the dialog allows. */
 .jira-fields {
 	display: grid;
-	grid-template-columns: max-content 1fr;
-	gap: 4px 16px;
+	grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
 	margin: 0;
+	/* Clip, not hidden: a scroll container in the scrolling body may shrink to nothing. */
+	overflow: clip;
+	border: 1px solid var(--app-border);
+	border-radius: 10px;
+	background: var(--app-raised);
 	font-size: 13px;
+}
+
+.jira-fact {
+	display: grid;
+	align-content: start;
+	gap: 3px;
+	min-width: 0;
+	padding: 9px 12px;
+	/* The lines between cards, on their right and bottom; the frame clips the outer ones. */
+	box-shadow:
+		1px 0 0 var(--app-border),
+		0 1px 0 var(--app-border);
+}
+
+.jira-fact-wide {
+	grid-column: 1 / -1;
 }
 
 .jira-fields dt {
 	color: var(--app-muted);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
 }
 
 .jira-fields dd {
+	min-width: 0;
 	margin: 0;
 	overflow-wrap: anywhere;
+}
+
+.jira-person,
+.jira-priority {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	min-width: 0;
+}
+
+.jira-avatar-mark::before {
+	content: attr(data-initials);
+}
+
+.jira-person .jira-avatar {
+	width: 22px;
+	height: 22px;
+	font-size: 9.5px;
+}
+
+.jira-muted {
+	color: var(--app-muted);
+}
+
+/* Priority: a coloured chevron that points up for urgent, down for when there is time. */
+.jira-priority-mark {
+	width: 0;
+	height: 0;
+	border-right: 5px solid transparent;
+	border-left: 5px solid transparent;
+}
+
+.jira-priority[data-level="highest"] .jira-priority-mark,
+.jira-priority[data-level="high"] .jira-priority-mark {
+	border-bottom: 7px solid #e5493a;
+}
+
+.jira-priority[data-level="highest"] .jira-priority-mark {
+	box-shadow: 0 -3px 0 -1px #e5493a;
+}
+
+.jira-priority[data-level="medium"] .jira-priority-mark {
+	width: 10px;
+	height: 3px;
+	border: 0;
+	border-radius: 2px;
+	background: #e2a03f;
+	box-shadow: 0 4px 0 #e2a03f;
+	transform: translateY(-2px);
+}
+
+.jira-priority[data-level="low"] .jira-priority-mark,
+.jira-priority[data-level="lowest"] .jira-priority-mark {
+	border-top: 7px solid #2a7de1;
+}
+
+.jira-time {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.jira-time-bar {
+	flex: 1;
+	max-width: 320px;
+	height: 6px;
+	overflow: hidden;
+	border: 0;
+	border-radius: 999px;
+	background: var(--app-hover);
+	appearance: none;
+}
+
+.jira-time-bar::-webkit-progress-bar {
+	border-radius: 999px;
+	background: var(--app-hover);
+}
+
+.jira-time-bar::-webkit-progress-value {
+	border-radius: 999px;
+	background: var(--app-accent);
+}
+
+.jira-time-text {
+	color: var(--app-muted);
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.jira-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.jira-chip {
+	padding: 1px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 999px;
+	background: var(--app-surface);
+	font-size: 12px;
+}
+
+/* Copy: one button, the key or the link from its menu. */
+.jira-copy {
+	position: relative;
+	display: inline-flex;
+}
+
+.jira-copy-toggle > svg:last-child {
+	width: 12px;
+	height: 12px;
+	transform: rotate(90deg);
+	opacity: 0.6;
+}
+
+.jira-copy > .jira-copy-menu {
+	position: absolute;
+	top: calc(100% + 4px);
+	left: 0;
+	z-index: 5;
+	min-width: 180px;
+}
+
+.jira-copy > .jira-copy-menu[hidden] {
+	display: none;
 }
 
 .jira-section h3 {

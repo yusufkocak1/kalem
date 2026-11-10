@@ -12,6 +12,7 @@ import type {
 	StatusCategory,
 } from "../shared/jira.js";
 import { issueKey, issueKeyFromUrl, normalizeJiraSite } from "../shared/jira.js";
+import { formatDuration } from "../shared/jira-worklog.js";
 import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
@@ -276,20 +277,6 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 
 	// --- Issue ------------------------------------------------------------------
 	function renderIssue(issue: JiraIssue): void {
-		const facts: [string, string][] = [
-			[t.jiraType, issue.type],
-			[t.jiraPriority, issue.priority],
-			[t.jiraAssignee, issue.assignee || t.jiraUnassigned],
-			[t.jiraReporter, issue.reporter],
-			[t.jiraResolution, issue.resolution],
-			[t.jiraProject, issue.project],
-			[t.jiraCreated, when(issue.created)],
-			[t.jiraUpdated, when(issue.updated)],
-			[t.jiraDue, when(issue.due)],
-			[t.jiraLabels, issue.labels.join(", ")],
-			[t.jiraComponents, issue.components.join(", ")],
-			[t.jiraFixVersions, issue.fixVersions.join(", ")],
-		];
 		const worklogSlot = el("div", { class: "jira-worklog-slot" });
 		const logWork = button(t.jiraLogWork, "clock", () => toggleWorklog(!worklogOpen));
 		logWork.classList.add("jira-log-work");
@@ -348,17 +335,14 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 					),
 					logWork,
 					favoriteButton(issue),
-					copyButton(t.jiraCopyKey, issue.key),
-					copyButton(t.linkCopyUrl, issue.url),
+					copyMenu([
+						[t.jiraCopyKey, issue.key],
+						[t.linkCopyUrl, issue.url],
+					]),
 				],
 			}),
 			worklogSlot,
-			el("dl", {
-				class: "jira-fields",
-				children: facts
-					.filter(([, value]) => value !== "")
-					.flatMap(([name, value]) => [el("dt", { text: name }), el("dd", { text: value })]),
-			}),
+			issueFacts(issue),
 		];
 		if (issue.id !== "") {
 			sections.push(
@@ -519,16 +503,160 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 		return star;
 	}
 
-	function copyButton(label: string, text: string): HTMLButtonElement {
-		const copy = button(label, "copy", async () => {
-			await navigator.clipboard.writeText(text);
-			const last = copy.lastChild;
-			if (last !== null) last.textContent = t.linkCopied;
-			setTimeout(() => {
-				if (copy.lastChild !== null) copy.lastChild.textContent = label;
-			}, 1200);
+	/**
+	 * The issue's facts as cards side by side: who (with their initials),
+	 * its kind and priority, its dates, the time logged against the time
+	 * left, and its labels, components and versions as chips. Empty ones
+	 * are left out.
+	 */
+	function issueFacts(issue: JiraIssue): HTMLElement {
+		const fact = (label: string, value: Node | string, wide = false): HTMLElement =>
+			el("div", {
+				class: wide ? "jira-fact jira-fact-wide" : "jira-fact",
+				children: [el("dt", { text: label }), el("dd", { children: [value] })],
+			});
+		const person = (name: string): HTMLElement =>
+			el("span", {
+				class: "jira-person",
+				children: [personMark(name), el("span", { text: name })],
+			});
+		const chips = (values: readonly string[]): HTMLElement =>
+			el("span", {
+				class: "jira-chips",
+				children: values.map((value) => el("span", { class: "jira-chip", text: value })),
+			});
+		const facts: HTMLElement[] = [];
+		facts.push(
+			fact(
+				t.jiraAssignee,
+				issue.assignee === ""
+					? el("span", { class: "jira-muted", text: t.jiraUnassigned })
+					: person(issue.assignee),
+			),
+		);
+		if (issue.reporter !== "") facts.push(fact(t.jiraReporter, person(issue.reporter)));
+		if (issue.priority !== "") {
+			facts.push(
+				fact(
+					t.jiraPriority,
+					el("span", {
+						class: "jira-priority",
+						attrs: { "data-level": priorityLevel(issue.priority) },
+						children: [
+							el("span", { class: "jira-priority-mark", attrs: { "aria-hidden": "true" } }),
+							el("span", { text: issue.priority }),
+						],
+					}),
+				),
+			);
+		}
+		if (issue.type !== "") facts.push(fact(t.jiraType, issue.type));
+		if (issue.project !== "") facts.push(fact(t.jiraProject, issue.project));
+		if (issue.resolution !== "") facts.push(fact(t.jiraResolution, issue.resolution));
+		for (const [label, value] of [
+			[t.jiraCreated, issue.created],
+			[t.jiraUpdated, issue.updated],
+			[t.jiraDue, issue.due],
+		] as const) {
+			if (value !== null) facts.push(fact(label, when(value)));
+		}
+		const { spent, remaining } = issue.time;
+		if (spent !== null || remaining !== null) {
+			const used = spent ?? 0;
+			const left = remaining ?? 0;
+			const bar = el("progress", {
+				class: "jira-time-bar",
+				attrs: { max: String(Math.max(1, used + left)), value: String(used) },
+			});
+			facts.push(
+				fact(
+					t.jiraTimeTracking,
+					el("span", {
+						class: "jira-time",
+						children: [
+							bar,
+							el("span", {
+								class: "jira-time-text",
+								text: format(
+									t.jiraWorkSpent,
+									formatDuration(used),
+									remaining === null ? "—" : formatDuration(left),
+								),
+							}),
+						],
+					}),
+					true,
+				),
+			);
+		}
+		for (const [label, values] of [
+			[t.jiraLabels, issue.labels],
+			[t.jiraComponents, issue.components],
+			[t.jiraFixVersions, issue.fixVersions],
+		] as const) {
+			if (values.length > 0) facts.push(fact(label, chips(values), true));
+		}
+		return el("dl", { class: "jira-fields", children: facts });
+	}
+
+	/** One button that copies the issue's key or its link, from a small menu. */
+	function copyMenu(choices: readonly (readonly [string, string])[]): HTMLElement {
+		const toggle = el("button", {
+			class: "jira-button",
+			attrs: { type: "button", "aria-haspopup": "menu", "aria-expanded": "false" },
+			children: [icon("copy"), t.linkCopy, icon("chevron")],
 		});
-		return copy;
+		toggle.classList.add("jira-copy-toggle");
+		const menu = el("div", { class: "dock-menu jira-copy-menu", attrs: { role: "menu" } });
+		menu.hidden = true;
+		const wrap = el("span", { class: "jira-copy", children: [toggle, menu] });
+		const close = (): void => {
+			menu.hidden = true;
+			toggle.setAttribute("aria-expanded", "false");
+		};
+		for (const [label, text] of choices) {
+			const item = el("button", {
+				class: "dock-menu-item",
+				text: label,
+				attrs: { type: "button", role: "menuitem" },
+			});
+			item.addEventListener("click", async () => {
+				close();
+				await navigator.clipboard.writeText(text);
+				const caption = toggle.childNodes[1];
+				if (caption !== undefined) caption.textContent = t.linkCopied;
+				setTimeout(() => {
+					if (toggle.childNodes[1] !== undefined) toggle.childNodes[1].textContent = t.linkCopy;
+				}, 1200);
+				toggle.focus();
+			});
+			menu.append(item);
+		}
+		toggle.addEventListener("click", () => {
+			const open = menu.hidden;
+			menu.hidden = !open;
+			toggle.setAttribute("aria-expanded", String(open));
+			if (open) menu.querySelector<HTMLElement>("button")?.focus();
+		});
+		wrap.addEventListener("keydown", (event) => {
+			if (event.key === "Escape" && !menu.hidden) {
+				// The menu only: the issue's dialog stays open.
+				event.preventDefault();
+				event.stopPropagation();
+				close();
+				toggle.focus();
+			}
+		});
+		// A click elsewhere closes it; the listener goes with the issue it was drawn for.
+		const outside = (event: MouseEvent): void => {
+			if (!wrap.isConnected) {
+				document.removeEventListener("mousedown", outside);
+				return;
+			}
+			if (!(event.target instanceof Node && wrap.contains(event.target))) close();
+		};
+		document.addEventListener("mousedown", outside);
+		return wrap;
 	}
 
 	// --- Search -------------------------------------------------------------------
@@ -752,4 +880,30 @@ function hostOf(site: string): string {
 	} catch {
 		return site;
 	}
+}
+
+/** How urgent a priority reads, from Jira's usual names (and the scheme's own words). */
+function priorityLevel(name: string): string {
+	if (/highest|blocker|critical|acil|kritik/i.test(name)) return "highest";
+	if (/high|major|yüksek/i.test(name)) return "high";
+	if (/lowest|trivial|en düşük/i.test(name)) return "lowest";
+	if (/low|minor|düşük/i.test(name)) return "low";
+	return "medium";
+}
+
+/**
+ * A person's initials on a colour of their own; drawn from its attribute,
+ * so the name beside it is the only text the row reads as.
+ */
+function personMark(name: string): HTMLElement {
+	const words = name.trim().split(/\s+/).filter(Boolean);
+	const initials = [words[0], words.length > 1 ? words.at(-1) : undefined]
+		.map((word) => (word === undefined ? "" : (Array.from(word)[0] ?? "")))
+		.join("");
+	let hash = 0;
+	for (const char of name) hash = (hash * 31 + (char.codePointAt(0) ?? 0)) >>> 0;
+	return el("span", {
+		class: "jira-avatar jira-avatar-mark",
+		attrs: { "aria-hidden": "true", "data-initials": initials, "data-tone": String(hash % 8) },
+	});
 }

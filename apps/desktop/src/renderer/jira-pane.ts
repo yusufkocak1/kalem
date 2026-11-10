@@ -165,8 +165,13 @@ export function createJiraPane(options: JiraPaneOptions): {
 
 	/** The issues found so far, drawn again as a tree when more come. */
 	let issues: JiraIssueRow[] = [];
-	/** Parents whose sub-tasks are folded away. */
-	const folded = new Set<string>();
+	/**
+	 * Parents the user opened (true) or closed. Sub-tasks start folded under their
+	 * parent, a drawer opened on demand; under a parent the search did not
+	 * find (shown dimmed) they start open, being what was found.
+	 */
+	const drawers = new Map<string, boolean>();
+	const startsOpen = (group: { row: unknown }): boolean => group.row === null;
 	/** The issue types shown; none means all of them. */
 	const selected = new Set<string>();
 
@@ -484,7 +489,7 @@ export function createJiraPane(options: JiraPaneOptions): {
 			...groups.flatMap((group) => {
 				const key = group.parent.key;
 				const count = group.children.length;
-				const open = !folded.has(key);
+				const open = drawers.get(key) ?? startsOpen(group);
 				const toggle =
 					count === 0
 						? el("span", { class: "jira-tree-toggle jira-tree-spacer" })
@@ -536,8 +541,8 @@ export function createJiraPane(options: JiraPaneOptions): {
 	}
 
 	function fold(key: string, open: boolean): void {
-		if (open) folded.add(key);
-		else folded.delete(key);
+		// `open` is how it is now; it turns the other way, and stays so.
+		drawers.set(key, !open);
 		renderTree();
 		rows.querySelector<HTMLElement>(`.jira-tree-root[data-key="${CSS.escape(key)}"]`)?.focus();
 	}
