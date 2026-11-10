@@ -142,6 +142,7 @@ const PATHS = {
 	],
 	gitPull: ["M12 4v11", "m7 10 5 5 5-5", "M5 20h14"],
 	gitPush: ["M12 16V5", "m7 10 5-5 5 5", "M5 20h14"],
+	clock: [circle(12, 12, 8.5), "M12 7.5V12l3 2"],
 	// Jira's issue types, drawn white on their colour.
 	typeBug: [
 		circle(12, 13.5, 4.5),
