@@ -1,3 +1,4 @@
+import { markdownToWiki } from "../shared/confluence-wiki.js";
 import type { JiraIssue, JiraIssueRow, JiraSearchResults } from "../shared/jira.js";
 import {
 	ISSUE_FIELDS,
@@ -282,6 +283,47 @@ export class JiraClient {
 		if (step === undefined) throw new Error("This status change is no longer available.");
 		if (step.needs.length > 0) throw new Error(`Needs ${step.needs.join(", ")}`);
 		await this.#send("POST", `/rest/api/2/issue/${valid}/transitions`, transitionBody(step));
+	}
+
+	/**
+	 * Creates an issue; the description is Markdown, sent as Jira's wiki markup.
+	 * A sub-task names its parent.
+	 */
+	async createIssue(request: {
+		readonly project: string;
+		readonly type: string;
+		readonly summary: string;
+		readonly description: string;
+		readonly parent?: string;
+	}): Promise<{ key: string; url: string }> {
+		const project = request.project.trim();
+		if (!/^[A-Z][A-Z0-9_]*$/i.test(project)) throw new Error("Invalid project key");
+		const parent = request.parent === undefined ? null : issueKey(request.parent);
+		const body = asJson(
+			await this.#send("POST", "/rest/api/2/issue", {
+				fields: {
+					project: { key: project.toLocaleUpperCase("en") },
+					issuetype: { name: request.type.trim() || "Story" },
+					summary: request.summary.trim().slice(0, 254),
+					...(request.description.trim() === ""
+						? {}
+						: { description: markdownToWiki(request.description) }),
+					...(parent === null ? {} : { parent: { key: parent } }),
+				},
+			}),
+		);
+		const key = asString(body.key);
+		if (issueKey(key) === null) throw new Error("Jira did not return the new issue");
+		return { key, url: `${this.site}/browse/${key}` };
+	}
+
+	/** Adds a comment; the text is Markdown, sent as Jira's wiki markup. */
+	async addComment(key: string, markdown: string): Promise<void> {
+		const valid = issueKey(key);
+		if (valid === null) throw new Error("Invalid issue key");
+		await this.#send("POST", `/rest/api/2/issue/${valid}/comment`, {
+			body: markdownToWiki(markdown),
+		});
 	}
 
 	/** The Development panel's counts; `null` where Jira has no development information. */

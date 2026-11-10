@@ -54,6 +54,8 @@ export interface AskOptions {
 	text(chunk: string): void;
 	/** Tools the model may call while it answers (a workspace's search and read). */
 	readonly tools?: AskTools;
+	/** What a round of the answer cost, in tokens. */
+	usage?(usage: { input: number; output: number; cached: number }): void;
 }
 
 export interface AskTools {
@@ -172,6 +174,11 @@ async function askAnthropic(options: AskOptions): Promise<void> {
 				}
 			}
 			const message = await stream.finalMessage();
+			options.usage?.({
+				input: message.usage.input_tokens + (message.usage.cache_creation_input_tokens ?? 0),
+				output: message.usage.output_tokens,
+				cached: message.usage.cache_read_input_tokens ?? 0,
+			});
 			if (message.stop_reason === "refusal") {
 				const details = message.stop_details;
 				throw new Error(details?.explanation || "The model declined to answer this request.");
@@ -220,7 +227,11 @@ async function askChatCompletions(options: AskOptions): Promise<void> {
 			options.messages,
 			options.images,
 			// The last round has no tools left: it answers with what it found.
-			tools === undefined ? {} : { tools: last ? [] : tools.definitions, turn },
+			{
+				...(tools === undefined ? {} : { tools: last ? [] : tools.definitions, turn }),
+				// Only the services known to take it: others may refuse a field they do not know.
+				usage: options.provider.id === "openai" || options.provider.id === "openrouter",
+			},
 		);
 		const calls = new Map<number, ToolCall>();
 		let said = "";
@@ -229,6 +240,7 @@ async function askChatCompletions(options: AskOptions): Promise<void> {
 				said += delta.text;
 				out.write(delta.text);
 			}
+			if (delta.usage !== undefined) options.usage?.(delta.usage);
 			for (const piece of delta.toolCalls ?? []) {
 				const call = calls.get(piece.index) ?? { id: "", name: "", arguments: "" };
 				if (piece.id !== undefined) call.id = piece.id;

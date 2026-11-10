@@ -1,24 +1,7 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import type {
-	ConfluenceFavorite,
-	JiraFavorite,
-	PageMargins,
-	PageSize,
-	Settings,
-	Theme,
-} from "../shared/bridge.js";
-import {
-	clampAssistantWidth,
-	clampNavigationWidth,
-	clampZoom,
-	DEFAULT_SETTINGS,
-	PAGE_MARGINS,
-	PAGE_SIZES,
-} from "../shared/bridge.js";
-import { groupName } from "../shared/favorites.js";
-import type { Lang } from "../shared/i18n.js";
-import { clampDockSize, isToolPane, parsePanePlaces } from "../shared/panes.js";
+import type { Settings } from "../shared/bridge.js";
+import { parseSettings } from "../shared/settings-schema.js";
 
 export const MAX_RECENT_FILES = 12;
 
@@ -41,9 +24,6 @@ export interface StoredState {
 	/** When releases were last looked up, in ms. */
 	readonly lastUpdateCheck: number | null;
 }
-
-const THEMES: readonly Theme[] = ["system", "light", "dark"];
-const LANGUAGES: readonly Lang[] = ["tr", "en"];
 
 function asRecord(value: unknown): Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -76,50 +56,13 @@ function parseBounds(raw: unknown): WindowBounds | null {
 /** The file may be hand-edited, truncated or written by another version: validate every field. */
 export function parseStoredState(raw: unknown): StoredState {
 	const root = asRecord(raw);
-	const s = asRecord(root.settings);
-	const d = DEFAULT_SETTINGS;
 
 	const recentFiles = Array.isArray(root.recentFiles)
 		? root.recentFiles.filter((p): p is string => typeof p === "string" && p !== "")
 		: [];
 
 	return {
-		settings: {
-			theme: THEMES.includes(s.theme as Theme) ? (s.theme as Theme) : d.theme,
-			language: LANGUAGES.includes(s.language as Lang) ? (s.language as Lang) : null,
-			zoom: clampZoom(asNumber(s.zoom) ?? d.zoom),
-			fullWidth: asBoolean(s.fullWidth, d.fullWidth),
-			navigation: asBoolean(s.navigation, d.navigation),
-			autoSave: asBoolean(s.autoSave, d.autoSave),
-			spellCheck: asBoolean(s.spellCheck, d.spellCheck),
-			pageSize: PAGE_SIZES.includes(s.pageSize as PageSize) ? (s.pageSize as PageSize) : d.pageSize,
-			landscape: asBoolean(s.landscape, d.landscape),
-			margins: PAGE_MARGINS.includes(s.margins as PageMargins)
-				? (s.margins as PageMargins)
-				: d.margins,
-			pageNumbers: asBoolean(s.pageNumbers, d.pageNumbers),
-			sidePane: isToolPane(s.sidePane) ? s.sidePane : d.sidePane,
-			panePlaces: parsePanePlaces(s.panePlaces),
-			rightDock: asBoolean(s.rightDock, d.rightDock),
-			rightPane: isToolPane(s.rightPane) ? s.rightPane : d.rightPane,
-			rightWidth: clampDockSize(s.rightWidth, d.rightWidth),
-			bottomDock: asBoolean(s.bottomDock, d.bottomDock),
-			bottomPane: isToolPane(s.bottomPane) ? s.bottomPane : d.bottomPane,
-			bottomHeight: clampDockSize(s.bottomHeight, d.bottomHeight),
-			confluenceSpace:
-				typeof s.confluenceSpace === "string" ? s.confluenceSpace.slice(0, 255) : d.confluenceSpace,
-			confluenceFavorites: parseFavorites(s.confluenceFavorites),
-			jiraFavorites: parseJiraFavorites(s.jiraFavorites),
-			checkUpdates: asBoolean(s.checkUpdates, d.checkUpdates),
-			tray: asBoolean(s.tray, d.tray),
-			gitAutoFetch: asBoolean(s.gitAutoFetch, d.gitAutoFetch),
-			assistant: asBoolean(s.assistant, d.assistant),
-			assistantDocument: asBoolean(s.assistantDocument, d.assistantDocument),
-			claudePath: typeof s.claudePath === "string" ? s.claudePath.slice(0, 4096) : d.claudePath,
-			copilotPath: typeof s.copilotPath === "string" ? s.copilotPath.slice(0, 4096) : d.copilotPath,
-			assistantWidth: clampAssistantWidth(asNumber(s.assistantWidth) ?? d.assistantWidth),
-			navigationWidth: clampNavigationWidth(asNumber(s.navigationWidth) ?? d.navigationWidth),
-		},
+		settings: parseSettings(root.settings),
 		recentFiles: [...new Set(recentFiles)].slice(0, MAX_RECENT_FILES),
 		window: parseBounds(root.window),
 		welcomed: asBoolean(root.welcomed, false),
@@ -141,56 +84,6 @@ function parseWorkspaces(root: Record<string, unknown>): string[] {
 		0,
 		MAX_WORKSPACES,
 	);
-}
-
-const MAX_FAVORITES = 200;
-
-function parseFavorites(value: unknown): ConfluenceFavorite[] {
-	if (!Array.isArray(value)) return [];
-	const seen = new Set<string>();
-	return value
-		.flatMap((item): ConfluenceFavorite[] => {
-			if (typeof item !== "object" || item === null) return [];
-			const { site, id, title, group } = item as Record<string, unknown>;
-			if (typeof site !== "string" || typeof id !== "string" || !/^\d+$/.test(id)) return [];
-			const key = `${site}\n${id}`;
-			if (seen.has(key)) return [];
-			seen.add(key);
-			const name = groupName(group);
-			return [
-				{
-					site,
-					id,
-					title: typeof title === "string" ? title.slice(0, 500) : "",
-					...(name === null ? {} : { group: name }),
-				},
-			];
-		})
-		.slice(0, MAX_FAVORITES);
-}
-
-function parseJiraFavorites(value: unknown): JiraFavorite[] {
-	if (!Array.isArray(value)) return [];
-	const seen = new Set<string>();
-	return value
-		.flatMap((item): JiraFavorite[] => {
-			if (typeof item !== "object" || item === null) return [];
-			const { site, key, summary, type } = item as Record<string, unknown>;
-			if (typeof site !== "string" || typeof key !== "string") return [];
-			if (!/^[A-Z][A-Z0-9_]*-[1-9]\d*$/.test(key)) return [];
-			const id = `${site}\n${key}`;
-			if (seen.has(id)) return [];
-			seen.add(id);
-			return [
-				{
-					site,
-					key,
-					summary: typeof summary === "string" ? summary.slice(0, 500) : "",
-					type: typeof type === "string" ? type.slice(0, 100) : "",
-				},
-			];
-		})
-		.slice(0, MAX_FAVORITES);
 }
 
 export class SettingsStore {

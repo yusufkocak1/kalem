@@ -70,6 +70,8 @@ import { PACKAGE_ASSETS } from "./package.js";
 import { DOCUMENT_SCHEME } from "./protocol.js";
 import { relocateLinks } from "./relocate.js";
 import type { SettingsStore } from "./settings.js";
+import { TemplateStore } from "./templates.js";
+import { registerTemplateIpc } from "./templates-ipc.js";
 import type { AppWindow, WindowManager } from "./windows.js";
 import { errorMessage, pathKey } from "./windows.js";
 import { listWorkspace, searchWorkspace } from "./workspace.js";
@@ -89,6 +91,8 @@ export interface IpcContext {
 	strings(): Strings;
 	language(): Lang;
 	changeSettings(patch: Partial<Settings>): void;
+	/** Changes the interface's language; `null` follows the system. Offers a restart. */
+	changeLanguage(language: Lang | null): void;
 	showFileMenu(win: AppWindow, x: number, y: number): void;
 	showTabMenu(win: AppWindow, tabId: string, x: number, y: number): void;
 	showCaseMenu(win: AppWindow, x: number, y: number): void;
@@ -863,9 +867,16 @@ export function registerIpc(ctx: IpcContext): void {
 
 	on(CHANNEL.updateSettings, (_win, patch) => {
 		if (typeof patch !== "object" || patch === null) return;
-		// Language changes go through the menu flow, which offers a restart.
-		const { language: _language, ...rest } = patch as Partial<Settings>;
-		ctx.changeSettings(rest);
+		// Language changes go through the menu's flow, which offers a restart.
+		const { language, ...rest } = patch as Partial<Settings>;
+		if (Object.keys(rest).length > 0) ctx.changeSettings(rest);
+		if (
+			Object.hasOwn(patch, "language") &&
+			(language === null || language === "tr" || language === "en") &&
+			language !== ctx.store.settings.language
+		) {
+			ctx.changeLanguage(language);
+		}
 	});
 
 	on(CHANNEL.clipboard, (win, action) => {
@@ -929,7 +940,15 @@ export function registerIpc(ctx: IpcContext): void {
 		return credentials === null ? null : confluenceClient(credentials);
 	};
 
+	const templates = new TemplateStore({
+		folder: join(app.getPath("userData"), "templates"),
+		workspaces: () => ctx.store.state.workspaces,
+		language: ctx.language,
+	});
+	registerTemplateIpc({ templates, windows, strings: ctx.strings, senderOf });
+
 	assistant = registerAssistantIpc({
+		templates,
 		store: ctx.store,
 		assistant: ctx.assistant,
 		chats: ctx.chats,
@@ -940,10 +959,9 @@ export function registerIpc(ctx: IpcContext): void {
 		tools: new AssistantToolServer({
 			folder: join(app.getPath("userData"), "assistant-tools"),
 			node: process.execPath,
-			confluence: confluenceNow,
-			jira: jiraNow,
-			notConnected: () => ctx.strings().confluenceNotConnected,
-			jiraNotConnected: () => ctx.strings().jiraNotConnected,
 		}),
+		changeSettings: ctx.changeSettings,
+		changeLanguage: ctx.changeLanguage,
+		language: ctx.language,
 	});
 }

@@ -217,6 +217,7 @@ function start(): void {
 
 	function changeLanguage(next: Lang | null): void {
 		store.updateSettings({ language: next });
+		windows.broadcastSettings(store.settings);
 		refreshMenu();
 		if ((next ?? pickLanguage(app.getLocale())) === language) return;
 
@@ -498,6 +499,7 @@ function start(): void {
 			strings: () => t,
 			language: () => language,
 			changeSettings,
+			changeLanguage,
 			showFileMenu: (win, x, y) => popupFileMenu(menuContext(), win, x, y),
 			showTabMenu: (win, tabId, x, y) => popupTabMenu(menuContext(), win, tabId, x, y),
 			showCaseMenu: (win, x, y) => popupCaseMenu(menuContext(), win, x, y),

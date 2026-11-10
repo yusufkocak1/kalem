@@ -92,6 +92,7 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 				else windows.addTab(win, { kind: "empty" }, false);
 			},
 		},
+		{ label: t.newFromTemplate, click: send(ctx, "new-from-template") },
 		{ label: t.newWindow, accelerator: "CmdOrCtrl+Shift+N", click: () => void windows.open() },
 		{
 			label: t.quickNote,
@@ -156,6 +157,13 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 			click: withWindow(ctx, (win) => ctx.print(win)),
 		},
 		{ type: "separator" },
+		// On macOS the shortcut is on the app menu's entry, where Mac apps keep it.
+		{
+			label: t.settingsMenu,
+			...(isMac ? {} : { accelerator: "CmdOrCtrl+," }),
+			click: send(ctx, "settings"),
+		},
+		{ type: "separator" },
 		{
 			label: t.showInFolder,
 			click: withWindow(ctx, (win) => {
@@ -207,6 +215,26 @@ function pageSetupTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 	];
 }
 
+/** macOS's app menu, as Electron's `appMenu` role makes it, with the settings where Mac apps have them. */
+function appMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions {
+	return {
+		label: app.name,
+		submenu: [
+			{ role: "about" },
+			{ type: "separator" },
+			{ label: ctx.t.settingsMenu, accelerator: "Cmd+,", click: send(ctx, "settings") },
+			{ type: "separator" },
+			{ role: "services" },
+			{ type: "separator" },
+			{ role: "hide" },
+			{ role: "hideOthers" },
+			{ role: "unhide" },
+			{ type: "separator" },
+			{ role: "quit" },
+		],
+	};
+}
+
 function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 	const { t, settings } = ctx;
 
@@ -249,7 +277,7 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 	);
 
 	return [
-		...(isMac ? [{ role: "appMenu" } satisfies MenuItemConstructorOptions] : []),
+		...(isMac ? [appMenuTemplate(ctx)] : []),
 		{ label: t.file, submenu: fileMenuTemplate(ctx) },
 		{
 			label: t.edit,
@@ -346,7 +374,6 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 					checked: settings.navigation,
 					click: () => ctx.changeSettings({ navigation: !settings.navigation }),
 				},
-				{ label: t.settingsMenu, accelerator: "CmdOrCtrl+,", click: send(ctx, "settings") },
 				{
 					label: t.assistantPane,
 					type: "checkbox",

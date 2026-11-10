@@ -496,9 +496,11 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await page.locator(".jira-pane-list").selectOption("mine");
 
 	// Settings: Jira goes to the right dock, the headings under the document.
-	await clickMenu(app, "View", "Settings…");
+	await clickMenu(app, "File", "Settings…");
 	const settings = page.locator(".settings-dialog");
+	await settings.locator('[data-category="connections"]').click();
 	await expect(settings.locator('[data-connection="Jira"]')).toContainText(jiraServer.site);
+	await settings.locator('[data-category="panels"]').click();
 	await settings.locator('select[data-pane="jira"]').selectOption("right");
 	await settings.locator('select[data-pane="outline"]').selectOption("bottom");
 	await settings.getByRole("button", { name: "Done" }).click();

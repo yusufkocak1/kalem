@@ -4,19 +4,21 @@
  * Claude Code CLI's `stream-json` output, and the diagrams in a reply.
  * Pure: the main process runs the CLI, the renderer shows the chat.
  */
+
 import type { AssistantAction } from "./actions.js";
 import { ACTIONS_FENCE, ACTIONS_PROMPT, actionsFromReply } from "./actions.js";
 import type { Diagram, DiagramNode } from "./diagram.js";
 import { ancestors, DIAGRAM_KEYWORD, parseDiagram } from "./diagram.js";
 import { boxOf, GROUP_PADDING, GROUP_TOP, layoutDiagram } from "./diagram-edit.js";
+import type { Finding } from "./findings.js";
 import type { Strings } from "./i18n.js";
 import { TABLE_COLORS } from "./table-style.js";
 
 /** The code fence language of a Kalem diagram in a reply. */
 export const DIAGRAM_FENCE = "kalem-diagram";
 
-/** Teaches the model what Kalem can show; appended to Claude Code's own system prompt, or an API's system prompt. */
-export const SYSTEM_PROMPT = `You are an AI assistant working inside Kalem, a Word-like Markdown editor (a desktop app). The user is writing a document and talks to you in a side panel next to it. Reply in the language the user writes in.
+/** Who the assistant is and what it is sent: the start of the full instructions. */
+export const SYSTEM_INTRO = `You are an AI assistant working inside Kalem, a Word-like Markdown editor (a desktop app). The user is writing a document and talks to you in a side panel next to it. Reply in the language the user writes in.
 
 Your replies are Markdown, and the user can insert a reply into the document with one click. So when they ask for content (a section, a table, a rewrite, a diagram), reply with the content itself, ready to insert, without a preamble such as "Here is…". Keep any explanation short and after the content.
 
@@ -24,13 +26,19 @@ The user's document, when shared, arrives in <document> tags; the text they sele
 
 Files and folders the user added to the chat as sources (code, analysis notes, any text) arrive in <files> tags: a <folder> lists the files under it, a <file> holds one file's text. When a folder's files come without their text, read the ones you need with your file tools before answering. Use the sources to write what the user asks for (for example a software analysis document from a code folder); refer to files by their path below the folder. <files-unchanged> means the sources are as they were sent earlier in the chat.
 
-## The Markdown Kalem shows
+`;
+
+/** The Markdown Kalem shows, for a model that writes content to insert. */
+export const MARKDOWN_GUIDE = `## The Markdown Kalem shows
 - CommonMark and GitHub Flavored Markdown: headings, bold, italic, strikethrough, links, images, block quotes, bullet and numbered lists, task lists ("- [ ] item"), tables (with column alignment), footnotes ("text[^1]" and a separate "[^1]: note" paragraph), code blocks with a language.
 - Colored text: <span style="color:#e03131">text</span>. No other HTML: it is shown as plain text.
 - \`\`\`mermaid code blocks are drawn as Mermaid diagrams (flowchart, sequenceDiagram, classDiagram, erDiagram, stateDiagram-v2, gantt, pie, mindmap, timeline). Keep Mermaid labels plain: no HTML in them.
 - \`\`\`math code blocks (LaTeX) are drawn as formulas with KaTeX.
 
-## Kalem diagrams
+`;
+
+/** Kalem diagrams: their JSON and how to change one in the document. */
+export const DIAGRAM_GUIDE = `## Kalem diagrams
 For flowcharts, process flows, decision trees and box-and-arrow pictures of a system, prefer a Kalem diagram: the user inserts it as a picture and can keep editing it in Kalem's diagram editor (move shapes, rename them, recolor them). Write it as a code block whose language is \`${DIAGRAM_FENCE}\`, holding JSON:
 
 \`\`\`${DIAGRAM_FENCE}
@@ -68,7 +76,10 @@ Use Mermaid instead when the user asks for Mermaid, or for a kind of diagram Kal
 
 To change a Kalem diagram that is already in the document (one given in a <diagram src="…"> tag), reply with the whole changed diagram in a \`${DIAGRAM_FENCE}\` block that has "src" set to that tag's src, keeping the ids and the coordinates of the shapes that did not change. The user can then update the picture in the document with it.
 
-${ACTIONS_PROMPT}`;
+`;
+
+/** Teaches the model what Kalem can show; appended to Claude Code's own system prompt, or an API's system prompt. */
+export const SYSTEM_PROMPT = `${SYSTEM_INTRO}${MARKDOWN_GUIDE}${DIAGRAM_GUIDE}${ACTIONS_PROMPT}`;
 
 /**
  * What the app can do, for questions on how to do something in it. Menus
@@ -112,6 +123,8 @@ export interface PromptContext {
 	readonly question: string;
 	/** The document's Markdown; left out when the user does not share it. */
 	readonly document?: { readonly name: string; readonly text: string } | undefined;
+	/** A long document's outline, sent in place of its text: the model reads parts with its tools. */
+	readonly outline?: { readonly name: string; readonly text: string } | undefined;
 	/** `true` when the document was shared earlier in the chat and has not changed since. */
 	readonly documentUnchanged?: boolean;
 	readonly selection?: string | undefined;
@@ -203,6 +216,10 @@ export function composePrompt(context: PromptContext): string {
 				`<images>The document's pictures come attached to this message, each after its name: ${images.map(({ label }) => label).join(", ")}</images>`,
 			);
 		}
+	} else if (context.outline !== undefined) {
+		parts.push(
+			`<document-outline name="${attribute(context.outline.name)}">\nThe document is long: only its outline is here. Read the parts you need with document_read (by heading) or document_search.\n${context.outline.text}\n</document-outline>`,
+		);
 	} else if (context.documentUnchanged === true) {
 		parts.push("<document-unchanged>The document is as I shared it above.</document-unchanged>");
 	}
@@ -302,6 +319,8 @@ export function copilotArgs(options: {
 	readonly model: string;
 	/** Folders outside the one it runs in that it may read: the chat's sources. */
 	readonly folders?: readonly string[];
+	/** An MCP configuration file with Kalem's tools, for a Copilot that takes one. */
+	readonly mcpConfig?: string;
 }): string[] {
 	return [
 		"-s",
@@ -311,6 +330,9 @@ export function copilotArgs(options: {
 		"--allow-all-tools",
 		...COPILOT_DENIED_TOOLS.flatMap((tool) => ["--deny-tool", tool]),
 		...(options.folders ?? []).flatMap((folder) => ["--add-dir", folder]),
+		...(options.mcpConfig === undefined
+			? []
+			: ["--additional-mcp-config", `@${options.mcpConfig}`]),
 		"--no-ask-user",
 		"--no-auto-update",
 		"--session-id",
@@ -318,6 +340,9 @@ export function copilotArgs(options: {
 		...(options.model === "" ? [] : ["--model", options.model]),
 	];
 }
+
+/** Whether a Copilot CLI's help says it takes more MCP servers on its command line. */
+export const copilotTakesMcp = (help: string): boolean => help.includes("--additional-mcp-config");
 
 /** The Copilot CLI takes no system prompt: a conversation's first question carries the instructions. */
 export function withInstructions(system: string, question: string): string {
@@ -346,8 +371,30 @@ export type ClaudeEvent =
 	| { readonly kind: "edit"; readonly edit: ProposedEdit }
 	/** The model looked into the workspace: searched, listed or read a file. */
 	| { readonly kind: "step"; readonly tool: string; readonly detail: string }
+	/** The model's plan for the answer, its steps as they get done. */
+	| { readonly kind: "plan"; readonly steps: readonly PlanStep[] }
+	/** Problems a review found in the document. */
+	| { readonly kind: "findings"; readonly findings: readonly Finding[] }
+	/** A setting the assistant changed, with what puts it back. */
+	| {
+			readonly kind: "changed";
+			readonly label: string;
+			readonly undo: Readonly<Record<string, unknown>>;
+	  }
+	/** What the answer cost, in tokens. */
+	| {
+			readonly kind: "usage";
+			readonly input: number;
+			readonly output: number;
+			readonly cached: number;
+	  }
 	| { readonly kind: "done" }
 	| { readonly kind: "error"; readonly message: string };
+
+export interface PlanStep {
+	readonly title: string;
+	readonly status: "pending" | "active" | "done";
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === "object" && value !== null;
@@ -376,6 +423,11 @@ export function toolSteps(message: unknown): ClaudeEvent[] {
 			"query",
 			"page_id",
 			"key",
+			"heading",
+			"pane",
+			"command",
+			"topic",
+			"reason",
 			"jql",
 			"url",
 			"description",
@@ -454,6 +506,17 @@ export class ClaudeStreamReader {
 					const result = typeof data.result === "string" ? data.result.trim() : "";
 					events.push({ kind: "error", message: result || String(data.subtype ?? "error") });
 				} else {
+					const usage = isRecord(data.usage) ? data.usage : null;
+					if (usage !== null) {
+						const count = (key: string): number =>
+							typeof usage[key] === "number" ? (usage[key] as number) : 0;
+						events.push({
+							kind: "usage",
+							input: count("input_tokens") + count("cache_creation_input_tokens"),
+							output: count("output_tokens"),
+							cached: count("cache_read_input_tokens"),
+						});
+					}
 					// A reply whose text never came in the stream (an old CLI, or no text messages).
 					const result = typeof data.result === "string" ? data.result : "";
 					if (!this.#written && result !== "") events.push(...this.#write(result));

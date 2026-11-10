@@ -1,6 +1,6 @@
 # Kalem Asistanı — Analiz Öncelikli Ajan, Merkezî Ayarlar ve Uygulama Araçları
 
-> Tarih: 2026-11-10 · Kapsam: `apps/desktop` · Durum: **öneri / plan** (kod değişikliği yok)
+> Tarih: 2026-11-10 · Kapsam: `apps/desktop` · Durum: **plan — kararlar alındı (bkz. §0)**, geliştirme başlamadı
 >
 > Hedef: Asistanın 1. işi kod yazmak değil; **yazılım analiz dokümanı üretmek,
 > var olan analizi okuyup anlamak, sorunlu yerleri bulup düzeltmek ve
@@ -11,6 +11,34 @@
 > bakarak — yapmalı.
 
 ---
+
+## 0. Karar Özeti (istişare sonucu)
+
+| # | Konu | Karar |
+|---|---|---|
+| 1 | Ayarlar menüsü | **Ayarlar… yalnız Dosya menüsünde** (Ctrl+,). Görünüm menüsündeki "Ayarlar" girişi kalkar; ama menülerdeki **hızlı erişim ayarları** (tema, dil, otomatik kaydet, yazım denetimi, tam genişlik, sayfa düzeni…) **olduğu gibi kalır**. Hepsi aynı ayar şemasından beslenir, iki yerden değiştirmek tutarlıdır. |
+| 2 | İzin seçenekleri | Ayar/görünüm (`ui`) değişikliklerinde **"Her zaman sor" / "Bu oturumda izin ver" / "Her zaman izin ver"** üçü de var. Dış sistemler (`external`) için "her zaman izin ver" **yok**. |
+| 3 | Asistan paneli | **Taşınabilir**: diğer paneller gibi sol / sağ / alt dock'a ya da ayrı pencereye. |
+| 4 | Analiz şablonu | **Sabit şablon yok.** Kurumun şablonu kullanılır; şablonlar **özelleştirilebilir**, **birden fazla şablon** oluşturulabilir; yanında bir tane **"best practice" örnek şablon** gelir (silinemez ama kopyalanıp uyarlanabilir). |
+| 5 | Copilot | **İkisi de**: Copilot CLI MCP destekliyorsa MCP, desteklemiyorsa ` ```kalem-tool ` blok yolu. **Otomatik algılama**, biri çalışmazsa diğerine düşer. |
+| 6 | Jira/Confluence'a yazma | **İlk sürümde var**, ama **onaysız hiçbir online işlem yapılamaz** (her işlem için önizlemeli onay kartı; kalıcı izin seçeneği yok). |
+| 7 | Kod modu | **Gerekli.** Okuma + `propose_edit` diff kartları; yazma her zaman onaylı, Bash/komut çalıştırma yok. |
+| 8 | İnceleme bulguları | **Oturum boyunca** belgede işaretlenir; kullanıcı isterse **tek tıkla Markdown'a eklenir**. |
+
+---
+
+## 0.1 Uygulama Durumu (Masaüstü 3.0.0)
+
+| Faz | Durum | Not |
+|---|---|---|
+| A — Ayar şeması, Dosya → Ayarlar | ✅ | `shared/settings-schema.ts`, kategoriler + arama + varsayılana dön |
+| B — Araç kayıt defteri, izin kapısı, MCP, Copilot | ✅ | `main/assistant-tools.ts`, `main/assistant-permissions.ts`; MCP her soruya özel çalıştırma; Copilot MCP/blok otomatik |
+| C — Uygulama araçları, token diyeti | ✅ | Kısa kimlik + `kalem_help`; uzun belge ana hattıyla; token sayacı |
+| D — Şablonlar, modlar, inceleme, prompt, kod | ✅ | `shared/templates.ts`, `shared/analysis-lint.ts`, inceleme kartı, oturumluk vurgu |
+| E — Jira/Confluence'a yazma | ✅ | Her seferinde onay; story seçimi kartta |
+| F — Agent UI | ✅ (kısmen) | Panel sol/sağ/alt, `@` bölüm çipleri, tümünü geri al, `/compact`. **Ayrı pencere** ve `assistant-pane.ts`'nin tamamen bölünmesi yapılmadı: yeni parçalar ayrı modüllerde (`assistant-agent.ts`, `assistant-review.ts`, `document-marks.ts`) |
+
+Testler: birim + e2e (masaüstü e2e'ye `e2e/agent.spec.ts` eklendi: onay kartları, Copilot blok/MCP düşmesi, inceleme, şablonlar, Jira'ya onaysız istek gitmemesi, panel yeri ve `@`).
 
 ## 1. Bugünkü Durum (kodda ne var)
 
@@ -184,10 +212,13 @@ export interface KalemTool<I = unknown> {
 
 ### 4.3 Copilot CLI
 
-Copilot CLI de MCP sunucusu kabul ediyor (ek MCP yapılandırması). Kurulu sürümde destek varsa
-aynı `mcp.json` verilir; yoksa bugünkü blok yöntemi (` ```kalem-jira `) genelleştirilir:
-` ```kalem-tool ` bloğu içinde `{ "tool": "settings_set", "input": {…} }`. **İlk iş: Copilot'un MCP
-desteğini sürüm bazında doğrulamak** (açık soru, §10).
+**Karar: iki yol birlikte, otomatik seçim.**
+
+- **MCP yolu:** kurulu Copilot CLI ek MCP yapılandırmasını destekliyorsa aynı `mcp.json` (Kalem araçları) verilir; araçlar gerçek araç olarak çağrılır.
+- **Blok yolu:** desteklemiyorsa bugünkü yöntem (` ```kalem-jira `) genelleştirilir: ` ```kalem-tool ` bloğu içinde `{ "tool": "settings_set", "input": {…} }`; Kalem çalıştırır, sonucu `<tool-results>` ile aynı oturuma geri yollar (bugünkü tur döngüsü).
+- **Algılama:** CLI bulunduğunda `--help` çıktısında MCP seçeneği aranır (bugün model listesi de `--help`'ten okunuyor: `modelsFromHelp`). Sonuç sürüm numarasıyla önbelleğe alınır.
+- **Düşme (fallback):** MCP ile başlatma hata verirse ya da ilk turda MCP sunucusu hiç bağlanmazsa o oturum blok yoluna geçer ve bu sürüm için "MCP yok" olarak işaretlenir. Ayarlar → Asistan'da "Copilot araç yolu: Otomatik / MCP / Blok" seçimi de bulunur.
+- Aynı mekanizma Claude Code için de yedek olarak kullanılabilir (MCP sunucusu başlatılamazsa blok yolu).
 
 ### 4.4 Önerilen araç seti
 
@@ -271,7 +302,7 @@ export interface SettingDef<K extends keyof Settings = keyof Settings> {
 
 ### 5.2 Ayarlar penceresi
 
-- **Dosya → Ayarlar… (Ctrl+,)** — macOS'ta uygulama menüsünde "Settings…". Görünüm menüsündeki giriş kısayol olarak kalabilir ya da kaldırılır.
+- **Dosya → Ayarlar… (Ctrl+,)** — macOS'ta ayrıca uygulama menüsünde "Settings…". Görünüm menüsündeki "Ayarlar" girişi kaldırılır; **menülerdeki hızlı erişim ayarları kalır** (Görünüm → Tema, Dil, Tam genişlik, Yazım denetimi, Otomatik kaydet; Dosya → Sayfa Düzeni; Yardım → Güncellemeleri otomatik denetle; şeritteki düğmeler). Hepsi aynı `changeSettings` + şema doğrulamasından geçer.
 - Sol kategori listesi + sağda form (IntelliJ ayar penceresi gibi), üstte **arama kutusu** (etiket + `keywords` + açıklama; Türkçe büyük/küçük harf duyarsız — projede zaten Türkçe katlama var).
 - Kategoriler: **Görünüm** (tema, dil, yakınlaştırma, tam genişlik), **Düzenleyici** (otomatik kaydet, yazım denetimi), **Paneller** (bugünkü yerleşim ızgarası + boyutlar), **Asistan** (bugünkü `assistant-settings.ts` diyaloğu buraya taşınır: sağlayıcı, model, belge paylaşımı, mod varsayılanı, izin tercihleri, token bütçesi), **Bağlantılar** (Confluence, Jira), **Sayfa düzeni** (kâğıt, kenar boşluğu, sayfa numarası), **Dosyalar ve Git** (git otomatik fetch), **Güncellemeler ve Sistem** (güncelleme, tepsi).
 - Form elemanları şemadan üretilir; özel olanlar (paneller, bağlantılar, asistan sağlayıcısı) kendi bileşenleriyle.
@@ -294,10 +325,14 @@ export interface SettingDef<K extends keyof Settings = keyof Settings> {
 | Risk | Varsayılan | Kullanıcı seçenekleri (Ayarlar → Asistan → İzinler) |
 |---|---|---|
 | read | Sormaz | — |
-| ui (ayar, panel, görünüm komutu) | Kartla sorar | "Her zaman sor" / "Oturum boyunca izin ver" / "Hep izin ver" |
+| ui (ayar, panel, görünüm komutu) | Kartla sorar | "Her zaman sor" / "Bu oturumda izin ver" / **"Her zaman izin ver"** (kart üzerinden de seçilebilir; Ayarlar → Asistan → İzinler'den geri alınır) |
 | document | Diff kartı | "Her zaman sor" / "Küçük düzeltmeleri otomatik uygula (geri alınabilir)" |
-| workspace (disk) | Diff kartı | Her zaman sor (değiştirilemez) |
-| external (Jira/Confluence yazma) | Her seferinde açık onay, gönderilecek içerik önizlemeli | Değiştirilemez |
+| workspace (disk, Kod modu) | Diff kartı | Her zaman sor (değiştirilemez) |
+| external (Jira/Confluence yazma) | **Her seferinde** açık onay, gönderilecek içerik önizlemeli | Değiştirilemez — **onaysız online işlem yok** |
+
+İzin tercihleri kategori bazında tutulur (ör. "görünüm ayarları", "panel yerleşimi", "sayfa düzeni"),
+böylece "temayı her zaman değiştirebilirsin" demek "bağlantı ayarlarını değiştir" anlamına gelmez.
+"Her zaman izin ver" ile yapılan değişiklikler de günlüğe yazılır ve kartta "Geri al" ile görünür.
 
 Ek kurallar:
 - Jira/Confluence'tan okunan içerik **güvenilmez veri** sayılır (prompt injection). Bu içerik geldikten sonra aynı turda istenen `external` işlemlerin kartında uyarı gösterilir.
@@ -316,15 +351,32 @@ Ek kurallar:
 | **Analiz Yaz** | Şablondan ya da kaynaklardan (kod klasörü, Jira epic, Confluence sayfası, toplantı notu) analiz dokümanı üretir, bölüm bölüm | belge, şablon, workspace okuma, Jira/Confluence okuma |
 | **Analizi İncele** | Var olan analizi okur, sorunları bulgular olarak çıkarır, düzeltme önerir | belge okuma, `analysis_lint`, `document_annotate`, `document_edit` |
 | **Prompt Hazırla** | Analizden (veya seçili bölümden) geliştirme promptu üretir | belge okuma, workspace okuma, `analysis_save_prompt` |
-| **Kod** (nadir) | Kod okuma + `propose_edit` | workspace araçları |
+| **Kod** | Kod okuma, açıklama, analiz ↔ kod karşılaştırması, değişiklik önerisi (`propose_edit` diff kartları; birden çok dosyaya toplu öneri). Yazma her zaman onaylı; Bash/komut çalıştırma yok | workspace araçları, belge okuma |
 | **Uygulama** | Ayarlar/paneller/komutlar | settings, panes, app_command |
 
 Her mod = kısa bir mod talimatı (≤ 200 token) + araç alt kümesi. Mod, `<app-state mode=…>` ile bildirilir.
 
 ### 6.2 Analiz Yaz
 
-- **Şablonlar:** yerleşik "Yazılım Analiz Dokümanı" şablonu — Amaç ve Kapsam, Paydaşlar, Terimler Sözlüğü, Mevcut Durum, İstenen Durum, İş Kuralları (`BR-xx`), Fonksiyonel Gereksinimler (`FR-xx`, her birinde kabul kriterleri Given/When/Then), Fonksiyonel Olmayan Gereksinimler (`NFR-xx`), Veri Modeli (Mermaid `erDiagram`), Akışlar (Kalem diyagramı), Ekranlar, Entegrasyonlar, Hata ve İstisna Senaryoları, Yetkilendirme, Göç/Veri Taşıma, Riskler, **Açık Sorular**, Kapsam Dışı, İzlenebilirlik (FR ↔ Jira).
-- Kullanıcı/ekip şablonları: çalışma alanında `.kalem/templates/*.md` (Git ile paylaşılır). `Dosya → Yeni → Şablondan…`.
+- **Şablonlar — kararla:** sabit bir analiz şablonu dayatılmaz; **kurumun şablonu** esas alınır.
+  - **Birden fazla şablon:** kullanıcı istediği kadar şablon oluşturur, kopyalar, yeniden adlandırır, siler. "Varsayılan şablon" seçilebilir.
+  - **Nerede durur:** kişisel şablonlar uygulama veri klasöründe (`templates/`), ekip şablonları çalışma alanında `.kalem/templates/*.md` (Git ile paylaşılır). Liste ikisini birlikte, kaynağını belirterek gösterir.
+  - **Biçim:** şablon sıradan bir Kalem Markdown belgesidir, Kalem'in kendi editöründe düzenlenir. Başında küçük bir ön bilgi (front matter) olur — Markdown çıktısı temiz kalır:
+    ```markdown
+    ---
+    kalem-template: Kurum Analiz Şablonu v3
+    required: [Amaç, Kapsam, Fonksiyonel Gereksinimler, Kabul Kriterleri, Açık Sorular]
+    ids: { FR: "FR-", BR: "BR-", NFR: "NFR-" }
+    ---
+    # {{başlık}}
+    ## Amaç
+    <!-- yönerge: İşin neden yapıldığını 2-3 cümleyle yazın. -->
+    ```
+    `<!-- yönerge: … -->` yorumları hem kullanıcıya hem asistana bölümün nasıl doldurulacağını söyler; belge oluşturulurken korunur ya da isteğe göre silinir.
+  - **İçe aktarma:** kurumun mevcut şablonu `.docx` (Kalem zaten Word okuyor), Confluence sayfası ya da `.md` olarak içe aktarılıp şablona çevrilir; asistan başlıklardan `required` listesini ve yönergeleri önerebilir (onaylı).
+  - **Best practice şablonu:** yerleşik tek bir örnek gelir — Amaç ve Kapsam, Paydaşlar, Terimler Sözlüğü, Mevcut/İstenen Durum, İş Kuralları (`BR-xx`), Fonksiyonel Gereksinimler (`FR-xx` + Given/When/Then kabul kriterleri), NFR, Veri Modeli, Akışlar, Ekranlar, Entegrasyonlar, Hata Senaryoları, Yetkilendirme, Veri Taşıma, Riskler, Açık Sorular, Kapsam Dışı, İzlenebilirlik. Salt okunurdur; "Kopyala ve uyarla" ile kişisel şablona dönüşür.
+  - **İnceleme şablona bağlıdır:** `analysis_lint` zorunlu bölümleri ve kimlik öneklerini belgenin şablonundan alır (belgede `kalem-template` bilgisi yoksa kullanıcıya şablon seçtirilir ya da varsayılan kullanılır).
+  - Menü: `Dosya → Yeni → Şablondan…` ve `Dosya → Ayarlar → Şablonlar` (şablon yöneticisi).
 - **Bölüm bölüm üretim:** asistan önce `plan_update` ile bölüm planını gösterir, kullanıcı onaylayınca her bölümü ayrı yazar ve `document_edit` ile ekler — tek dev yanıt yerine kontrollü ilerleme, yarıda kesilebilir.
 - **Kaynaktan analiz:** "PRJ-123 epic'inden analiz çıkar" → Jira epic + alt işler + bağlı Confluence sayfaları okunur; kaynaklar dokümanın sonunda listelenir.
 
@@ -352,7 +404,11 @@ Her mod = kısa bir mod talimatı (≤ 200 token) + araç alt kümesi. Mod, `<ap
 
 **UI:** asistan panelinde "İnceleme" sekmesi — bulgular önem derecesine göre gruplu; her bulguda
 [Belgede göster] [Düzelt] (→ `document_edit` diff kartı) [Açık Sorulara ekle] [Yoksay].
-`document_annotate` ile belgede ilgili metin vurgulanır (editör dekorasyonu, Markdown'a yazılmaz).
+`document_annotate` ile belgede ilgili metin **oturum boyunca** vurgulanır (editör dekorasyonu, Markdown'a yazılmaz; belge kapanınca ya da yeniden incelenince yenilenir).
+**Tek tıkla Markdown'a ekle:** bulgu kartında ve vurgunun üzerindeki menüde iki seçenek:
+- **Açık Sorular'a ekle** — şablondaki "Açık Sorular" bölümüne madde olarak (`- [ ] F-07 — Kargoya verilmiş siparişte iptal mümkün mü? (§4.2)`).
+- **Yerine not ekle** — ilgili paragrafın altına Kalem'in bilgi paneli biçiminde bir not (`> 📝 **İnceleme F-07:** …`), Confluence'a da panel olarak gider.
+Toplu seçenek: "Seçili bulguların hepsini ekle". Eklenenler belge değişikliği olarak geri alınabilir.
 "Geliştirmeye hazırlık" puanı: zorunlu bölüm, kabul kriteri oranı, açık soru sayısı.
 
 ### 6.4 Prompt Hazırla
@@ -391,7 +447,7 @@ IntelliJ'in AI Assistant / Junie ajan arayüzündeki iyi fikirler ve Kalem karş
 | **Modlar** (Chat / Edit / Agent) | §6.1 modları |
 | **Checkpoint / geri al** | Ajan çalışmaya başlamadan belge ve ayar anlık görüntüsü; "Bu çalışmayı geri al" |
 | **Onay istemleri** (komut çalıştırma vb.) | İzin kapısı kartları (§5.4) |
-| Ayrı **araç penceresi**, istenen yere taşınabilir | Asistan panelini de dock sistemine sokmak: `TOOL_PANES`'e `assistant` eklenir; sağ/sol/alt/ayrı pencere |
+| Ayrı **araç penceresi**, istenen yere taşınabilir | **Karar: taşınabilir.** `TOOL_PANES`'e `assistant` eklenir; sol/sağ/alt dock ya da ayrı pencere. Bugünkü `assistant`/`assistantWidth` ayarları yeni yerleşime taşınır (eski ayar dosyası bozulmadan okunur); `pane_move("assistant", …)` ile asistan kendi yerini de değiştirebilir |
 
 Ek olarak Kalem'e özel:
 - **İnceleme sekmesi** (bulgular), **Prompt sekmesi** (üretilen promptlar), **Günlük sekmesi** (asistanın uyguladığı tüm değişiklikler + geri al).
@@ -408,16 +464,19 @@ Ek olarak Kalem'e özel:
 ## 8. Yol Haritası (Fazlar)
 
 Her faz kendi başına değer üretir ve ayrı PR olur. Boyut: S (≤1 gün), M (2–3 gün), L (1 hafta).
+Kararlar (§0) gereği Jira/Confluence'a yazma ve Kod modu **ilk sürüm kapsamındadır**.
 
-### Faz A — Temel: Ayar şeması ve Dosya → Ayarlar *(önce bu; her şey buna dayanıyor)*
+### Faz A — Ayar şeması ve Dosya → Ayarlar *(ilk iş; her şey buna dayanıyor)*
+
+> **Durum: tamamlandı** — `shared/settings-schema.ts`, yeni `renderer/settings-dialog.ts`, Dosya → Ayarlar; birim testleri ve e2e (masaüstü e2e 91/91) yeşil.
 
 | # | İş | Boyut | Dosyalar |
 |---|---|---|---|
 | A1 | `shared/settings-schema.ts`: tüm `Settings` alanları için tanım, i18n anahtarları, `keywords`, `assistant` erişimi | M | yeni + `i18n.ts` |
 | A2 | `parseStoredState`'in şemayı kullanması (davranış aynı, testler korunur) | S | `main/settings.ts`, `settings.test.ts` |
 | A3 | Ayarlar penceresinin kategori + arama + şemadan form olarak yeniden yazılması; asistan bağlantı ayarlarının içine taşınması | L | `renderer/settings-dialog.ts`, `assistant-settings.ts`, `style.css` |
-| A4 | Menü: **Dosya → Ayarlar… (Ctrl+,)**, macOS uygulama menüsü | S | `main/menu.ts` |
-| A5 | e2e: arama, kategori, değişikliğin pencerelere yayılması | M | `e2e/app.spec.ts` |
+| A4 | Menü: **Ayarlar… yalnız Dosya menüsünde** (Ctrl+,; macOS uygulama menüsünde de), Görünüm'deki giriş kalkar; hızlı erişim ayarları menülerde kalır | S | `main/menu.ts` |
+| A5 | e2e: arama, kategori, menüden ve pencereden değişikliğin tutarlılığı, pencerelere yayılma | M | `e2e/app.spec.ts` |
 
 ### Faz B — Araç kayıt defteri + izin kapısı
 
@@ -426,51 +485,54 @@ Her faz kendi başına değer üretir ve ayrı PR olur. Boyut: S (≤1 gün), M 
 | B1 | `KalemTool` tipi, kayıt defteri; mevcut 8 aracın taşınması (davranış aynı) | M |
 | B2 | MCP sunucusunun kayıt defterinden beslenmesi, `tools/list` filtreleme, `list_changed` | M |
 | B3 | Main↔renderer araç RPC'si (`assistant-tool-call/result`) | M |
-| B4 | İzin kapısı + onay kartı UI + oturum izinleri + günlük | L |
-| B5 | Testler: izin reddi, zaman aşımı, pencere kapanması, MCP üzerinden onay bekleme (fake-claude genişletilir) | M |
+| B4 | İzin kapısı + onay kartı + "sor / bu oturum / her zaman" (kategori bazlı) + Ayarlar → Asistan → İzinler + değişiklik günlüğü | L |
+| B5 | Copilot: MCP algılama + `kalem-tool` blok yolu + otomatik düşme | M |
+| B6 | Testler: izin reddi, zaman aşımı, pencere kapanması, MCP'de onay bekleme, Copilot düşme senaryosu (fake CLI'lar genişletilir) | M |
 
-### Faz C — Uygulamayı kullanma + token diyeti
+### Faz C — Uygulamayı kullanma + token diyeti *("koyu temaya geç", "Jira'yı alta taşı" burada çalışır)*
 
 | # | İş | Boyut |
 |---|---|---|
 | C1 | `settings_find/get/set`, `pane_move/show`, `dock_toggle`, `app_command`, `app_state` | M |
 | C2 | Kimlik kartı + `<app-state>`; `kalem_help` rehberlerinin bugünkü prompttan ayrılması; `kalem_tools` | M |
-| C3 | `document_outline/read/search/selection`, `document_edit` (actions bloğunun araç hâli; blok yolu Copilot/araçsız modeller için kalır) | L |
+| C3 | `document_outline/read/search/selection`, `document_edit` (actions bloğunun araç hâli; blok yolu araçsız modeller için kalır) | L |
 | C4 | Token sayacı (usage okuma, yanıt altında gösterim) ve önce/sonra ölçümü | S |
-| C5 | Copilot MCP desteğinin doğrulanması; yoksa `kalem-tool` bloğu | M |
 
-### Faz D — Analiz özellikleri
-
-| # | İş | Boyut |
-|---|---|---|
-| D1 | Mod seçici + mod talimatları + mod başına araç setleri | M |
-| D2 | Şablonlar (yerleşik + `.kalem/templates`), `Dosya → Yeni → Şablondan` | M |
-| D3 | `analysis_lint` (saf, `shared/analysis-lint.ts`, kapsamlı birim testi; Türkçe/İngilizce muğlak ifade listeleri) | M |
-| D4 | İnceleme sekmesi, bulgu kartları, `document_annotate` editör vurguları | L |
-| D5 | Prompt Hazırla akışı + Prompt sekmesi + `.kalem/prompts` | M |
-| D6 | Plan kartı (`plan_update`), bölüm bölüm analiz yazımı | M |
-
-### Faz E — Dış sistemlere yazma ve izlenebilirlik
+### Faz D — Şablonlar ve analiz
 
 | # | İş | Boyut |
 |---|---|---|
-| E1 | `jira_create_issue/add_comment/link/transition` araçları (external onay) | M |
-| E2 | FR → story toplu oluşturma, anahtarların belgeye yazılması | M |
+| D1 | Şablon yöneticisi: çoklu şablon (kişisel + `.kalem/templates`), oluştur/kopyala/sil/varsayılan, front matter, best practice örneği | L |
+| D2 | Şablon içe aktarma (.docx / Confluence / .md) ve `Dosya → Yeni → Şablondan…` | M |
+| D3 | Mod seçici (Sor, Analiz Yaz, Analizi İncele, Prompt Hazırla, Kod, Uygulama) + mod talimatları + araç setleri | M |
+| D4 | `analysis_lint` (saf, `shared/analysis-lint.ts`, şablona bağlı kurallar, TR/EN muğlak ifade listeleri, kapsamlı birim testi) | M |
+| D5 | İnceleme sekmesi, bulgu kartları, oturumluk vurgular, **tek tıkla Markdown'a ekle** (Açık Sorular / yerine not) | L |
+| D6 | Prompt Hazırla akışı + Prompt sekmesi + `.kalem/prompts` | M |
+| D7 | Plan kartı (`plan_update`), bölüm bölüm analiz yazımı | M |
+| D8 | Kod modu: çok dosyalı `propose_edit` önerileri, analiz ↔ kod karşılaştırması | M |
+
+### Faz E — Jira/Confluence'a yazma *(ilk sürümde; hepsi onaylı)*
+
+| # | İş | Boyut |
+|---|---|---|
+| E1 | `jira_create_issue/add_comment/link/transition/log_work` araçları (`external`, her seferinde önizlemeli onay) | M |
+| E2 | FR → story toplu oluşturma (tek kartta liste, tek tek seçilebilir), anahtarların belgeye yazılması | M |
 | E3 | İzlenebilirlik tablosu üretimi | S |
-| E4 | `confluence_publish` (önizlemeli) | M |
+| E4 | `confluence_publish`, `confluence_comment` (önizlemeli) | M |
+| E5 | e2e: onay verilmeden hiçbir istek siteye gitmez (sahte Jira/Confluence sunucusunda istek sayımı) | S |
 
-### Faz F — Agent UI cilası
+### Faz F — Agent UI
 
 | # | İş | Boyut |
 |---|---|---|
 | F1 | `assistant-pane.ts`'nin modüllere bölünmesi | M |
-| F2 | `@` bağlam çipleri | M |
-| F3 | Checkpoint / çalışmayı geri al | M |
-| F4 | Asistan panelinin dock sistemine alınması | M |
+| F2 | **Asistan panelinin dock sistemine alınması** (sol/sağ/alt/ayrı pencere, eski ayarların taşınması) | M |
+| F3 | `@` bağlam çipleri | M |
+| F4 | Checkpoint / çalışmayı geri al | M |
 | F5 | Sohbet sıkıştırma (`/compact` + otomatik) | M |
 
-**Önerilen sıra:** A → B → C1/C2 (kullanıcının "koyu temaya geç / Jira'yı alta taşı" isteği burada
-çalışır hâle gelir) → D3/D4 (inceleme — analiz önceliğinin en görünür değeri) → D1/D2/D5 → C3 → E → F.
+**Sıra:** A → B → C → D (D1–D5 önce) → E → F. F1 (panel bölme), B4 ve D5'ten önce yapılırsa
+UI işleri kolaylaşır; bu yüzden F1 Faz B'nin başına çekilebilir.
 
 ---
 
@@ -483,13 +545,7 @@ Her faz kendi başına değer üretir ve ayrı PR olur. Boyut: S (≤1 gün), M 
 
 ---
 
-## 10. Açık Sorular / Karar Gerekenler
+## 10. Kalan Küçük Sorular
 
-1. **Ayar menüsü:** Görünüm → Ayarlar girişi kaldırılsın mı, yoksa ikisi de mi kalsın?
-2. **"Hep izin ver" seçeneği** `ui` riski için sunulsun mu, yoksa en fazla "bu oturumda" mı?
-3. **Asistan paneli dock'a** alınsın mı (alt/sola taşınabilir, ayrı pencere) — yoksa sağda sabit mi kalsın?
-4. **Şablon formatı:** yerleşik şablon tek mi olsun, yoksa kurumunuzun mevcut analiz şablonu (Word/Confluence) içe aktarılıp temel mi alınsın?
-5. **Copilot:** kullanılan Copilot CLI sürümünde MCP desteği var mı? (Yoksa blok yolu.)
-6. **Jira'ya yazma** (story oluşturma, yorum) bu sürümde olsun mu, yoksa ilk aşamada salt okuma mı kalsın?
-7. **Kod modu** gerçekten gerekli mi, yoksa "Prompt Hazırla" çıktısını Claude Code/Junie'ye vermek yeterli mi?
-8. **Bulgu işaretleri** belgeye kalıcı (ör. `<!-- kalem:finding F-07 -->` yorumu) mı yazılsın, yoksa yalnız oturumluk vurgu mu olsun? (Öneri: oturumluk; Git diff'leri kirletmez — Kalem'in "Markdown temiz kalır" ilkesiyle uyumlu.)
+1. Kişisel şablonlar ile çalışma alanındaki `.kalem/templates` aynı adda olursa hangisi öne geçsin? (Öneri: çalışma alanı — ekip standardı.)
+2. "Yerine not ekle" ile eklenen inceleme notları Confluence'a yayınlanırken de gitsin mi, yoksa yayın öncesi uyarı mı verilsin? (Öneri: uyarı.)

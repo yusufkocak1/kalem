@@ -1,7 +1,14 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
-import type { Command, KalemBridge, Settings, TabDocument } from "../shared/bridge.js";
+import type {
+	AssistantToolCall,
+	Command,
+	KalemBridge,
+	Settings,
+	TabDocument,
+} from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
 import type { ClaudeEvent } from "../shared/claude.js";
+import type { ApprovalRequest } from "../shared/tool-protocol.js";
 
 function listen<Args extends unknown[]>(
 	channel: string,
@@ -146,6 +153,19 @@ const bridge: KalemBridge = {
 	assistantPickSources: (kind) => ipcRenderer.invoke(CHANNEL.assistantPickSources, kind),
 	assistantApplyEdit: (id) => ipcRenderer.invoke(CHANNEL.assistantApplyEdit, id),
 	onAssistantEvent: (handler) => listen<[string, ClaudeEvent]>(CHANNEL.assistantEvent, handler),
+	assistantApprove: (id, answer) => ipcRenderer.invoke(CHANNEL.assistantApprove, id, answer),
+	assistantToolResult: (id, answer) => ipcRenderer.invoke(CHANNEL.assistantToolResult, id, answer),
+	assistantForgetPermissions: () => ipcRenderer.invoke(CHANNEL.assistantForgetPermissions),
+	assistantCompact: (sessionId) => ipcRenderer.invoke(CHANNEL.assistantCompact, sessionId),
+	templates: () => ipcRenderer.invoke(CHANNEL.templates),
+	templateNew: (id) => ipcRenderer.invoke(CHANNEL.templateNew, id),
+	templateOpen: (id) => ipcRenderer.invoke(CHANNEL.templateOpen, id),
+	templateCopy: (id) => ipcRenderer.invoke(CHANNEL.templateCopy, id),
+	templateDelete: (id) => ipcRenderer.invoke(CHANNEL.templateDelete, id),
+	templateSave: (request) => ipcRenderer.invoke(CHANNEL.templateSave, request),
+	templateImport: () => ipcRenderer.invoke(CHANNEL.templateImport),
+	onAssistantApproval: (handler) => listen<[ApprovalRequest]>(CHANNEL.assistantApproval, handler),
+	onAssistantToolCall: (handler) => listen<[AssistantToolCall]>(CHANNEL.assistantToolCall, handler),
 };
 
 contextBridge.exposeInMainWorld("kalem", bridge);

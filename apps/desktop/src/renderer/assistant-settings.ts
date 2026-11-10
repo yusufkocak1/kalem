@@ -59,11 +59,13 @@ export function createAssistantSettings(options: AssistantSettingsOptions): Assi
 		text: t.assistantGetKey,
 		attrs: { type: "button" },
 	});
-	const models = el("datalist", { attrs: { id: "assistant-models" } });
+	// One form is in the assistant's panel, another in the Settings window: each has its own list.
+	const modelsId = `assistant-models-${++fieldCount}`;
+	const models = el("datalist", { attrs: { id: modelsId } });
 	const model = el("input", {
 		attrs: {
 			type: "text",
-			list: "assistant-models",
+			list: modelsId,
 			spellcheck: "false",
 			placeholder: t.assistantModelPlaceholder,
 		},

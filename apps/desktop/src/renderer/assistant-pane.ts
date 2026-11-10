@@ -2,26 +2,45 @@ import { parse } from "@kalem-editor/core";
 import { renderToDOM } from "@kalem-editor/viewer";
 import type { AssistantAction, AssistantCommand, DocumentAction } from "../shared/actions.js";
 import { isDocumentAction } from "../shared/actions.js";
-import type { AssistantStatus, Command, KalemBridge } from "../shared/bridge.js";
+import type {
+	AssistantPlace,
+	AssistantStatus,
+	Command,
+	KalemBridge,
+	Settings,
+} from "../shared/bridge.js";
 import { clampAssistantWidth, DEFAULT_SETTINGS, MIN_ASSISTANT_WIDTH } from "../shared/bridge.js";
 import type { ChatSummary, StoredChat, StoredMessage } from "../shared/chats.js";
 import { chatTitle, historyOf } from "../shared/chats.js";
 import type {
 	ClaudeEvent,
 	ContextDiagram,
+	PlanStep,
 	ProposedEdit,
 	ReplyDiagram,
 	ReplyPart,
 } from "../shared/claude.js";
 import { composePrompt, lineDiff, splitReply } from "../shared/claude.js";
-import { withoutRequests } from "../shared/confluence-tool.js";
+import { withoutRequests as withoutLookups } from "../shared/confluence-tool.js";
 import { diagramSvg, svgMarkup } from "../shared/diagram.js";
+import { findHeading, outlineOf, outlineText } from "../shared/document-outline.js";
+import type { Finding } from "../shared/findings.js";
+import { addToQuestions, noteBlock, questionLine, withNoteAfter } from "../shared/findings.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
+import type { Mode } from "../shared/modes.js";
+import { isMode, MODE_LABELS, MODES } from "../shared/modes.js";
+import { clampDockSize, MIN_DOCK_SIZE } from "../shared/panes.js";
 import type { ProviderId } from "../shared/providers.js";
 import { isCli, PROVIDER_INFO, providerLabel, SUGGESTED_MODELS } from "../shared/providers.js";
 import type { SlashEntry } from "../shared/slash.js";
 import { findSlash, matchSlash, slashQuery } from "../shared/slash.js";
+import type { ApprovalRequest } from "../shared/tool-protocol.js";
+import { withoutToolCalls } from "../shared/tool-protocol.js";
+import type { ApprovalState, MadeChange, Usage } from "./assistant-agent.js";
+import { approvalCard, changeLine, planCard, usageText } from "./assistant-agent.js";
+import type { FindingState } from "./assistant-review.js";
+import { findingsCard } from "./assistant-review.js";
 import { createAssistantSettings } from "./assistant-settings.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
@@ -46,6 +65,11 @@ export interface AssistantHost {
 	/** The panel's width; `setWidth` keeps it. */
 	width(): number;
 	setWidth(width: number): void;
+	/** Where the panel is: at the right, at the left, or under the document. */
+	place(): AssistantPlace;
+	/** The panel's height under the document; `setHeight` keeps it. */
+	height(): number;
+	setHeight(height: number): void;
 	context(): Promise<AssistantContext>;
 	/** The document's pictures, for the model to look at. */
 	images(): Promise<DocumentImage[]>;
@@ -65,6 +89,12 @@ export interface AssistantHost {
 	openLink(href: string): void;
 	/** Runs one of the app's commands (save, export, insert a table…) on the active document. */
 	runCommand(command: Command): void;
+	/** Changes settings, as the menus do (an assistant's change undone). */
+	changeSettings(patch: Partial<Settings>): void;
+	/** Marks the quotes in the document for this run; how many were found. */
+	markQuotes(quotes: readonly string[]): number;
+	/** Brings a quote of the document into view and selects it; `false` when it is not there. */
+	revealQuote(quote: string): boolean;
 	close(): void;
 	errorText(error: unknown): string;
 }
@@ -78,6 +108,8 @@ export interface AssistantPane {
 	refreshSelection(): void;
 	/** The folders open in the Files pane changed. */
 	workspaceChanged(): void;
+	/** The service was set in the Settings window; `changed` when it is another service. */
+	configured(status: AssistantStatus, changed: boolean): void;
 }
 
 interface Message {
@@ -92,7 +124,23 @@ interface Message {
 	steps?: string[];
 	/** Changes to workspace files it proposed, in this run. */
 	edits?: ProposedEdit[];
+	/** What it asked the user before changing something, in this run. */
+	approvals?: ApprovalRequest[];
+	/** Its plan for the answer. */
+	plan?: readonly PlanStep[];
+	/** What it changed, each with its undo. */
+	changes?: MadeChange[];
+	/** What the answer cost. */
+	usage?: Usage;
+	/** Problems a review found in the document. */
+	findings?: Finding[];
 }
+
+/** A reply's text as the user sees it: without the look-ups and tool calls written in it. */
+const withoutRequests = (text: string): string => withoutToolCalls(withoutLookups(text));
+
+/** Documents longer than this go to a model that reads them with tools as their outline only. */
+const LARGE_DOCUMENT = 24_000;
 
 /** A conversation, shown or not; a reply keeps coming in while another chat is shown. */
 interface Chat {
@@ -219,13 +267,19 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		openLink: (href) => host.openLink(href),
 		errorText: host.errorText,
 		done(next, changed) {
-			if (next !== null) status = next;
-			// Another service does not know what was said so far: it gets a chat of its own.
-			if (changed && active.messages.length > 0) startChat();
-			else if (changed) active.provider = status?.provider ?? active.provider;
+			if (next !== null) configured(next, changed);
 			void setView("chat");
 		},
 	});
+
+	/** The service or model was set, here or in the Settings window. */
+	function configured(next: AssistantStatus, changed: boolean): void {
+		status = next;
+		// Another service does not know what was said so far: it gets a chat of its own.
+		if (changed && active.messages.length > 0) startChat();
+		else if (changed) active.provider = next.provider;
+		render();
+	}
 
 	const share = el("input", { attrs: { type: "checkbox" } });
 	share.addEventListener("change", () => host.setShareDocument(share.checked));
@@ -268,6 +322,124 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		attrs: { role: "menu", hidden: "", "aria-label": t.assistantAddSource },
 	});
 	const sourceList = el("div", { class: "assistant-sources", attrs: { hidden: "" } });
+
+	// --- Mentions: "@" adds a part of the document to the next question ---
+
+	/** The headings of the sections added to the next question. */
+	let mentions: string[] = [];
+	const mentionList = el("div", {
+		class: "assistant-sources assistant-mentions",
+		attrs: { hidden: "" },
+	});
+	const mentionMenu = el("ul", {
+		class: "assistant-mention-menu",
+		attrs: { role: "listbox", hidden: "", "aria-label": t.mentionsTitle },
+	});
+	let mentionItems: { label: string; run: () => void }[] = [];
+	let mentionIndex = 0;
+
+	function renderMentions(): void {
+		mentionList.hidden = mentions.length === 0;
+		mentionList.replaceChildren(
+			...mentions.map((heading) => {
+				const remove = el("button", {
+					class: "assistant-chip-close",
+					attrs: { type: "button", "aria-label": format(t.mentionSection, heading) },
+					children: [icon("close")],
+				});
+				remove.addEventListener("click", () => {
+					mentions = mentions.filter((kept) => kept !== heading);
+					renderMentions();
+				});
+				return el("span", {
+					class: "assistant-chip assistant-mention",
+					children: [el("span", { class: "assistant-chip-text", text: `§ ${heading}` }), remove],
+				});
+			}),
+		);
+	}
+
+	/** The "@" word being typed before the caret; `null` when there is none. */
+	function mentionQuery(): { query: string; start: number } | null {
+		const before = input.value.slice(0, input.selectionStart ?? input.value.length);
+		const match = /(^|\s)@([^\s@]*)$/.exec(before);
+		if (match === null) return null;
+		const query = match[2] as string;
+		return { query, start: before.length - query.length - 1 };
+	}
+
+	function hideMentions(): void {
+		mentionMenu.hidden = true;
+		mentionItems = [];
+	}
+
+	function renderMentionMenu(): void {
+		mentionMenu.replaceChildren(
+			...mentionItems.map((item, index) => {
+				const row = el("li", {
+					class: `assistant-command${index === mentionIndex ? " active" : ""}`,
+					attrs: { role: "option", "aria-selected": String(index === mentionIndex) },
+					children: [el("span", { class: "assistant-command-label", text: item.label })],
+				});
+				row.addEventListener("mousedown", (event) => {
+					event.preventDefault();
+					item.run();
+				});
+				return row;
+			}),
+		);
+	}
+
+	async function updateMentions(): Promise<void> {
+		const typed = mentionQuery();
+		if (typed === null) {
+			hideMentions();
+			return;
+		}
+		const take = (): void => {
+			const end = input.selectionStart ?? input.value.length;
+			input.value = `${input.value.slice(0, typed.start)}${input.value.slice(end)}`;
+			hideMentions();
+			input.focus();
+		};
+		let headings: string[] = [];
+		try {
+			headings = outlineOf((await host.context()).text).map((entry) => entry.title);
+		} catch {
+			// No document: only the document's own choice.
+		}
+		const wanted = typed.query.toLocaleLowerCase(host.lang);
+		const fits = (label: string): boolean =>
+			wanted === "" || label.toLocaleLowerCase(host.lang).includes(wanted);
+		mentionItems = [
+			...(fits(t.mentionDocument)
+				? [
+						{
+							label: `@ ${t.mentionDocument}`,
+							run: () => {
+								take();
+								host.setShareDocument(true);
+								render();
+							},
+						},
+					]
+				: []),
+			...headings
+				.filter(fits)
+				.slice(0, 30)
+				.map((heading) => ({
+					label: `§ ${heading}`,
+					run: () => {
+						take();
+						if (!mentions.includes(heading)) mentions = [...mentions, heading];
+						renderMentions();
+					},
+				})),
+		];
+		mentionIndex = 0;
+		mentionMenu.hidden = mentionItems.length === 0;
+		renderMentionMenu();
+	}
 
 	function menuItem(label: string, name: Parameters<typeof icon>[0], run: () => void): HTMLElement {
 		const item = el("button", {
@@ -423,6 +595,31 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		class: "assistant-model",
 		attrs: { "aria-label": t.assistantModel, title: t.assistantModel },
 	});
+	let mode: Mode = "ask";
+	try {
+		const kept = localStorage.getItem("kalem.assistant.mode");
+		if (isMode(kept)) mode = kept;
+	} catch {
+		// Storage may be unavailable: the default mode is fine.
+	}
+	const modeSelect = el("select", {
+		class: "assistant-mode",
+		attrs: { "aria-label": t.assistantMode, title: t.assistantMode },
+		children: MODES.map((value) => el("option", { text: t[MODE_LABELS[value]], attrs: { value } })),
+	});
+	modeSelect.value = mode;
+	function setMode(next: Mode): void {
+		mode = next;
+		modeSelect.value = next;
+		try {
+			localStorage.setItem("kalem.assistant.mode", mode);
+		} catch {
+			// Kept for this run only.
+		}
+	}
+	modeSelect.addEventListener("change", () => {
+		if (isMode(modeSelect.value)) setMode(modeSelect.value);
+	});
 	const MORE_MODELS = "\u0000more";
 	modelSelect.addEventListener("change", async () => {
 		const picked = modelSelect.value;
@@ -494,6 +691,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		children: [
 			context,
 			sourceList,
+			mentionList,
+			mentionMenu,
 			el("div", {
 				class: "assistant-box",
 				children: [
@@ -511,6 +710,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 								],
 							}),
 							el("span", { class: "assistant-toolbar-space" }),
+							modeSelect,
 							modelSelect,
 							sendButton,
 						],
@@ -571,7 +771,10 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		if (href !== null && href !== "") host.openLink(href);
 	});
 
-	input.addEventListener("input", () => updateMenu());
+	input.addEventListener("input", () => {
+		updateMenu();
+		void updateMentions();
+	});
 	// Late, so a click on the menu still lands; not when the box has the focus back by then.
 	input.addEventListener("blur", () =>
 		setTimeout(() => {
@@ -579,6 +782,25 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		}, 150),
 	);
 	input.addEventListener("keydown", (event) => {
+		if (!mentionMenu.hidden && mentionItems.length > 0) {
+			const move = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
+			if (move !== 0) {
+				event.preventDefault();
+				mentionIndex = (mentionIndex + move + mentionItems.length) % mentionItems.length;
+				renderMentionMenu();
+				return;
+			}
+			if ((event.key === "Enter" && !event.shiftKey && !event.isComposing) || event.key === "Tab") {
+				event.preventDefault();
+				mentionItems[mentionIndex]?.run();
+				return;
+			}
+			if (event.key === "Escape") {
+				event.preventDefault();
+				hideMentions();
+				return;
+			}
+		}
 		if (!menu.hidden && menuItems.length > 0) {
 			const move = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
 			if (move !== 0) {
@@ -672,6 +894,54 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			run() {
 				input.value = "/";
 				updateMenu();
+			},
+		},
+		{
+			name: "review",
+			label: t.slashReview,
+			run() {
+				setMode("review");
+				ask(t.reviewPrompt);
+			},
+		},
+		{
+			name: "write",
+			label: t.slashWrite,
+			argument: t.slashWriteArgument,
+			run(arg) {
+				setMode("write");
+				ask(arg === "" ? t.writePrompt : format(t.writePromptAbout, arg));
+			},
+		},
+		{
+			name: "prompt",
+			label: t.slashPrompt,
+			run() {
+				setMode("prompt");
+				ask(t.promptPrompt);
+			},
+		},
+		{ name: "trace", label: t.slashTrace, run: () => ask(t.tracePrompt) },
+		{
+			name: "compact",
+			label: t.assistantCompact,
+			async run() {
+				if (active.sessionId === null) return;
+				try {
+					const done = await bridge.assistantCompact(active.sessionId);
+					if (done === "cli") showNotice(t.assistantCompactCli);
+					else if (done === "done") showNotice(t.assistantCompacted);
+				} catch (error) {
+					showNotice(format(t.assistantActionFailed, host.errorText(error)));
+				}
+			},
+		},
+		{
+			name: "stories",
+			label: t.slashStories,
+			run() {
+				setMode("write");
+				ask(t.storiesPrompt);
 			},
 		},
 		{
@@ -837,8 +1107,25 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	const widest = (): number => Math.max(MIN_ASSISTANT_WIDTH, window.innerWidth - 360);
 	const fit = (width: number): number => Math.min(widest(), clampAssistantWidth(width));
 
+	const tallest = (): number => Math.max(MIN_DOCK_SIZE, window.innerHeight - 200);
+	const fitHeight = (height: number): number => Math.min(tallest(), clampDockSize(height, 320));
+
+	/** The panel's size where it is: a width at a side, a height under the document. */
 	function showWidth(width: number): void {
+		const place = host.place();
+		element.dataset.place = place;
+		if (place === "bottom") {
+			const height = fitHeight(host.height());
+			element.style.width = "";
+			element.style.height = `${height}px`;
+			resizer.setAttribute("aria-orientation", "horizontal");
+			resizer.setAttribute("aria-valuenow", String(height));
+			resizer.setAttribute("aria-valuemax", String(tallest()));
+			return;
+		}
+		element.style.height = "";
 		element.style.width = `${width}px`;
+		resizer.setAttribute("aria-orientation", "vertical");
 		resizer.setAttribute("aria-valuenow", String(width));
 		resizer.setAttribute("aria-valuemax", String(widest()));
 	}
@@ -847,11 +1134,18 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		if (event.button !== 0) return;
 		event.preventDefault();
 		resizer.setPointerCapture(event.pointerId);
-		const right = element.getBoundingClientRect().right;
+		const box = element.getBoundingClientRect();
+		const place = host.place();
 		let width = host.width();
+		let height = host.height();
 		element.classList.add("resizing");
 		const move = (moved: PointerEvent): void => {
-			width = fit(right - moved.clientX);
+			if (place === "bottom") {
+				height = fitHeight(box.bottom - moved.clientY);
+				element.style.height = `${height}px`;
+				return;
+			}
+			width = fit(place === "left" ? moved.clientX - box.left : box.right - moved.clientX);
 			showWidth(width);
 		};
 		const up = (): void => {
@@ -859,20 +1153,34 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			resizer.removeEventListener("pointerup", up);
 			resizer.removeEventListener("pointercancel", up);
 			element.classList.remove("resizing");
-			host.setWidth(width);
+			if (place === "bottom") host.setHeight(height);
+			else host.setWidth(width);
 		};
 		resizer.addEventListener("pointermove", move);
 		resizer.addEventListener("pointerup", up);
 		resizer.addEventListener("pointercancel", up);
 	});
 	resizer.addEventListener("keydown", (event) => {
-		const step =
-			event.key === "ArrowLeft" ? WIDTH_STEP : event.key === "ArrowRight" ? -WIDTH_STEP : 0;
+		const place = host.place();
+		if (place === "bottom") {
+			const step =
+				event.key === "ArrowUp" ? WIDTH_STEP : event.key === "ArrowDown" ? -WIDTH_STEP : 0;
+			if (step === 0) return;
+			event.preventDefault();
+			host.setHeight(fitHeight(host.height() + step));
+			return;
+		}
+		const grow = place === "left" ? "ArrowRight" : "ArrowLeft";
+		const shrink = place === "left" ? "ArrowLeft" : "ArrowRight";
+		const step = event.key === grow ? WIDTH_STEP : event.key === shrink ? -WIDTH_STEP : 0;
 		if (step === 0) return;
 		event.preventDefault();
 		host.setWidth(fit(host.width() + step));
 	});
-	resizer.addEventListener("dblclick", () => host.setWidth(fit(DEFAULT_SETTINGS.assistantWidth)));
+	resizer.addEventListener("dblclick", () => {
+		if (host.place() === "bottom") host.setHeight(DEFAULT_SETTINGS.assistantHeight);
+		else host.setWidth(fit(DEFAULT_SETTINGS.assistantWidth));
+	});
 	window.addEventListener("resize", () => {
 		if (!element.hidden) showWidth(fit(host.width()));
 	});
@@ -1356,7 +1664,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 	/** The start of a diagram or of actions still coming in: shown as a placeholder, not as JSON. */
 	const OPEN_BLOCK =
-		/^ {0,3}(?:`{3,}|~{3,})[ \t]*(kalem-diagram|kalem-actions|kalem-confluence|kalem-jira)[ \t]*$/m;
+		/^ {0,3}(?:`{3,}|~{3,})[ \t]*(kalem-diagram|kalem-actions|kalem-confluence|kalem-jira|kalem-tool)[ \t]*$/m;
 
 	function renderReply(message: Message): void {
 		const view = shown.get(message);
@@ -1377,11 +1685,13 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				pending =
 					open[1] === "kalem-actions"
 						? t.assistantPreparing
-						: open[1] === "kalem-confluence"
-							? t.assistantConfluenceLooking
-							: open[1] === "kalem-jira"
-								? t.assistantJiraLooking
-								: t.assistantDrawing;
+						: open[1] === "kalem-tool"
+							? t.assistantThinking
+							: open[1] === "kalem-confluence"
+								? t.assistantConfluenceLooking
+								: open[1] === "kalem-jira"
+									? t.assistantJiraLooking
+									: t.assistantDrawing;
 			}
 		}
 		const nodes: Node[] = parts.map((part, index) =>
@@ -1393,7 +1703,43 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		);
 		const steps = stepsView(message);
 		if (steps !== null) nodes.unshift(steps);
+		if (message.plan !== undefined && message.plan.length > 0)
+			nodes.unshift(planCard(t, message.plan));
 		for (const proposed of message.edits ?? []) nodes.push(editCard(proposed));
+		if (message.findings !== undefined && message.findings.length > 0) {
+			nodes.push(
+				findingsCard(
+					t,
+					message.findings,
+					(finding) => findingStates.get(finding) ?? "open",
+					reviewActions(message),
+				),
+			);
+		}
+		for (const change of message.changes ?? []) {
+			nodes.push(changeLine(t, change, () => void undoChange(message, change)));
+		}
+		const undoable = (message.changes ?? []).filter((change) => change.undone !== true);
+		if (message.done && undoable.length > 1) {
+			const all = el("button", {
+				class: "assistant-link",
+				text: t.assistantUndoAll,
+				attrs: { type: "button" },
+			});
+			all.addEventListener("click", async () => {
+				for (const change of [...undoable].reverse()) await undoChange(message, change);
+			});
+			nodes.push(el("div", { class: "assistant-change assistant-undo-all", children: [all] }));
+		}
+		for (const request of message.approvals ?? []) {
+			nodes.push(
+				approvalCard(t, request, approvalStates.get(request.id) ?? "waiting", (answer) => {
+					approvalStates.set(request.id, answer.approved ? "allowed" : "denied");
+					void bridge.assistantApprove(request.id, answer);
+					renderReply(message);
+				}),
+			);
+		}
 		if (!message.done && message.error === null) {
 			const lastStep = message.steps?.at(-1);
 			if (pending !== null) nodes.push(waiting(pending));
@@ -1437,12 +1783,32 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				return format(t.assistantStepJiraIssue, detail);
 			case "jira_search":
 				return format(t.assistantStepJiraSearch, detail);
+			case "kalem_help":
+				return format(t.assistantStepHelp, detail);
+			case "settings_find":
+				return format(t.assistantStepSettingsFind, detail);
+			case "settings_set":
+			case "pane_move":
+			case "pane_show":
+				return detail === "" ? t.assistantStepSettings : format(t.assistantChanged, detail);
+			case "app_command":
+				return format(t.assistantStepCommand, detail);
+			case "document_outline":
+				return t.assistantStepOutline;
+			case "document_read":
+				return format(t.assistantStepDocumentRead, detail);
+			case "document_search":
+				return format(t.assistantStepDocumentSearch, detail);
+			case "document_edit":
+				return t.assistantStepDocumentEdit;
 			case "list_files":
 			case "Glob":
 			case "LS":
 				return detail === "" ? t.assistantStepListAll : format(t.assistantStepList, detail);
-			default:
-				return detail === "" ? tool : `${tool}: ${detail}`;
+			default: {
+				const name = tool.replace(/^mcp__kalem__/, "");
+				return detail === "" ? name : `${name}: ${detail}`;
+			}
 		}
 	}
 
@@ -1831,6 +2197,14 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				...(message.model !== undefined && message.model !== ""
 					? [el("span", { class: "assistant-reply-model", text: message.model })]
 					: []),
+				...(message.usage === undefined
+					? []
+					: [
+							el("span", {
+								class: "assistant-reply-usage",
+								text: usageText(t, host.lang, message.usage),
+							}),
+						]),
 			],
 		});
 	}
@@ -1894,11 +2268,227 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				reply.steps = [...(reply.steps ?? []), stepLabel(event.tool, event.detail)];
 				if (chat === active) scheduleRender(reply);
 				return;
+			case "plan":
+				reply.plan = event.steps;
+				if (chat === active) scheduleRender(reply);
+				return;
+			case "changed":
+				reply.changes = [...(reply.changes ?? []), { label: event.label, settings: event.undo }];
+				if (chat === active) scheduleRender(reply);
+				return;
+			case "usage": {
+				const before = reply.usage ?? { input: 0, output: 0, cached: 0 };
+				reply.usage = {
+					input: before.input + event.input,
+					output: before.output + event.output,
+					cached: before.cached + event.cached,
+				};
+				return;
+			}
+			case "findings":
+				onFindings(chat.id, reply, event.findings);
+				return;
 			case "done":
 				chat.ended?.();
 				return;
 		}
 	});
+
+	/** A review's findings came: kept with the reply, shown in the review list, marked in the document. */
+	function onFindings(_chatId: string, reply: Message, findings: readonly Finding[]): void {
+		reply.findings = [...(reply.findings ?? []), ...findings];
+		markOpen(reply);
+		scheduleRender(reply);
+	}
+
+	/** What became of each finding, for this run. */
+	const findingStates = new WeakMap<Finding, FindingState>();
+
+	const openFindings = (message: Message): Finding[] =>
+		(message.findings ?? []).filter((finding) => (findingStates.get(finding) ?? "open") === "open");
+
+	function markOpen(message: Message): number {
+		return host.markQuotes(
+			openFindings(message).flatMap((finding) => (finding.quote === "" ? [] : [finding.quote])),
+		);
+	}
+
+	/** Changes the document as the user asked from a finding; the change can be undone. */
+	async function changeDocument(
+		message: Message,
+		label: string,
+		change: (text: string) => DocumentAction[] | null,
+	): Promise<boolean> {
+		try {
+			const before = await host.context();
+			const actions = change(before.text);
+			if (actions === null) {
+				showNotice(t.reviewNotFound);
+				return false;
+			}
+			const made = await host.applyActions(actions);
+			if (made === 0) {
+				showNotice(t.reviewNotFound);
+				return false;
+			}
+			message.changes = [
+				...(message.changes ?? []),
+				{ label, document: { tabId: before.tabId, text: before.text } },
+			];
+			return true;
+		} catch (error) {
+			showNotice(format(t.assistantActionFailed, host.errorText(error)));
+			return false;
+		}
+	}
+
+	function reviewActions(message: Message) {
+		const settle = (finding: Finding, state: FindingState): void => {
+			findingStates.set(finding, state);
+			markOpen(message);
+			renderReply(message);
+		};
+		return {
+			show(finding: Finding) {
+				if (!host.revealQuote(finding.quote)) showNotice(t.reviewNotFound);
+			},
+			async fix(finding: Finding) {
+				const done = await changeDocument(message, `${finding.id}: ${t.reviewFix}`, () => [
+					{ type: "replace", find: finding.quote, replace: finding.suggestion, all: false },
+				]);
+				if (done) settle(finding, "fixed");
+			},
+			async ask(finding: Finding) {
+				const done = await changeDocument(message, `${finding.id}: ${t.reviewAsk}`, (text) => [
+					{
+						type: "document",
+						text: addToQuestions(text, questionLine(finding), t.reviewQuestionsHeading),
+					},
+				]);
+				if (done) settle(finding, "asked");
+			},
+			async note(finding: Finding) {
+				const done = await changeDocument(message, `${finding.id}: ${t.reviewNote}`, (text) => {
+					const next = withNoteAfter(text, finding.quote, noteBlock(finding, t.reviewNoteLabel));
+					return next === null ? null : [{ type: "document", text: next }];
+				});
+				if (done) settle(finding, "noted");
+			},
+			dismiss(finding: Finding) {
+				settle(finding, "dismissed");
+			},
+			markAll() {
+				showNotice(format(t.reviewMarked, markOpen(message)));
+			},
+			async askAll() {
+				const open = openFindings(message);
+				if (open.length === 0) return;
+				const done = await changeDocument(message, t.reviewAskAll, (text) => [
+					{
+						type: "document",
+						text: open.reduce(
+							(next, finding) =>
+								addToQuestions(next, questionLine(finding), t.reviewQuestionsHeading),
+							text,
+						),
+					},
+				]);
+				if (done) for (const finding of open) findingStates.set(finding, "asked");
+				markOpen(message);
+				renderReply(message);
+			},
+		};
+	}
+
+	/** What became of each question the user was asked. */
+	const approvalStates = new Map<string, ApprovalState>();
+
+	bridge.onAssistantApproval((request) => {
+		const chat = chats.get(request.chatId);
+		const reply = chat?.reply;
+		if (chat === undefined || reply == null) {
+			void bridge.assistantApprove(request.id, { approved: false, scope: "once" });
+			return;
+		}
+		reply.approvals = [...(reply.approvals ?? []), request];
+		if (chat === active) {
+			// The question waits for the user: it is brought into view.
+			renderReply(reply);
+			shown
+				.get(reply)
+				?.element.querySelector(".assistant-approval:last-of-type")
+				?.scrollIntoView({ block: "nearest" });
+			log.scrollTop = log.scrollHeight;
+			if (!element.hidden) input.blur();
+		}
+		if (chat !== active || element.hidden) showNotice(t.approvalWaiting);
+	});
+
+	/** A tool's part that works on the window: a command, a change to the document. */
+	bridge.onAssistantToolCall(async (call) => {
+		const answer = (ok: boolean, text: string, document?: string): void => {
+			void bridge.assistantToolResult(call.id, {
+				ok,
+				text,
+				...(document === undefined ? {} : { document }),
+			});
+		};
+		const input = (
+			typeof call.input === "object" && call.input !== null ? call.input : {}
+		) as Record<string, unknown>;
+		try {
+			if (call.name === "app_command" && typeof input.command === "string") {
+				host.runCommand(input.command as Command);
+				answer(true, "");
+				return;
+			}
+			if (call.name === "document_edit" && Array.isArray(input.actions)) {
+				const before = await host.context();
+				if (typeof input.tabId === "string" && input.tabId !== before.tabId) {
+					answer(false, "the user switched to another document; ask them to go back to it");
+					return;
+				}
+				const made = await host.applyActions(input.actions as DocumentAction[]);
+				const after = await host.context();
+				const reply = chats.get(call.chatId)?.reply;
+				if (reply != null) {
+					reply.changes = [
+						...(reply.changes ?? []),
+						{
+							label: format(t.approvalChanges, made),
+							document: { tabId: before.tabId, text: before.text },
+						},
+					];
+					scheduleRender(reply);
+				}
+				answer(true, `${made} changes`, after.text);
+				return;
+			}
+			answer(false, `the window cannot run ${call.name}`);
+		} catch (error) {
+			answer(false, host.errorText(error));
+		}
+	});
+
+	/** Puts back what the assistant changed. */
+	async function undoChange(message: Message, change: MadeChange): Promise<void> {
+		if (change.undone === true) return;
+		try {
+			if (change.settings !== undefined) host.changeSettings(change.settings as Partial<Settings>);
+			if (change.document !== undefined) {
+				const now = await host.context();
+				if (now.tabId !== change.document.tabId) {
+					showNotice(t.assistantUndoOtherTab);
+					return;
+				}
+				await host.applyActions([{ type: "document", text: change.document.text }]);
+			}
+			change.undone = true;
+			renderReply(message);
+		} catch (error) {
+			showNotice(format(t.assistantActionFailed, host.errorText(error)));
+		}
+	}
 
 	async function send(): Promise<void> {
 		const chat = active;
@@ -1926,11 +2516,34 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 		const notes: string[] = [];
 		let prompt: string;
+		// The sections added with "@" go with the question, whether or not the document is shared.
+		let withSections = question;
 		let tabId: string | null = null;
 		let images: DocumentImage[] = [];
+		let fullPrompt: string | undefined;
+		let documentSnapshot:
+			| { tabId: string; name: string; text: string; selection: string }
+			| undefined;
 		try {
 			const context = await host.context();
 			tabId = context.tabId;
+			if (mentions.length > 0) {
+				const lines = context.text.split("\n");
+				const sections = mentions.flatMap((heading) => {
+					const found = findHeading(context.text, heading);
+					if (found === null) return [];
+					const body = lines.slice(found.line - 1, found.end).join("\n");
+					return [`<section heading="${heading.replace(/"/g, "&quot;")}">\n${body}\n</section>`];
+				});
+				if (sections.length > 0) {
+					withSections = `${sections.join("\n\n")}\n\n${question}`;
+					notes.push(
+						format(t.assistantMentioned, mentions.map((heading) => `§ ${heading}`).join(", ")),
+					);
+				}
+				mentions = [];
+				renderMentions();
+			}
 			const selection = droppedSelection === null ? host.selection() : "";
 			const sharing = host.shareDocument();
 			const unchanged = sharing && chat.sessionId !== null && chat.sharedText === context.text;
@@ -1947,18 +2560,42 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			// The pictures go with the document; an API, which keeps none, gets them every time.
 			const cli = isCli(PROVIDER_INFO[provider]);
 			if (sharing && (!unchanged || !cli)) images = await host.images();
-			prompt = composePrompt({
-				question,
-				...(sharing && !unchanged
-					? {
-							document: { name: context.name, text: context.text },
-							diagrams: context.diagrams,
-							images,
-						}
-					: {}),
-				documentUnchanged: unchanged,
-				selection,
-			});
+			documentSnapshot = sharing
+				? { tabId: context.tabId, name: context.name, text: context.text, selection }
+				: undefined;
+			// A long document goes as its outline: the model reads the parts it needs with the tools.
+			if (sharing && !unchanged && context.text.length > LARGE_DOCUMENT) {
+				fullPrompt = composePrompt({
+					question: withSections,
+					document: { name: context.name, text: context.text },
+					diagrams: context.diagrams,
+					images,
+					selection,
+				});
+				notes[0] = format(
+					t.assistantSharedDocument,
+					format(t.assistantDocumentOutline, context.name),
+				);
+				prompt = composePrompt({
+					question: withSections,
+					outline: { name: context.name, text: outlineText(context.text) },
+					diagrams: context.diagrams,
+					selection,
+				});
+				images = [];
+			} else
+				prompt = composePrompt({
+					question: withSections,
+					...(sharing && !unchanged
+						? {
+								document: { name: context.name, text: context.text },
+								diagrams: context.diagrams,
+								images,
+							}
+						: {}),
+					documentUnchanged: unchanged,
+					selection,
+				});
 			if (sharing) chat.sharedText = context.text;
 		} catch (error) {
 			chat.reply = null;
@@ -1996,6 +2633,9 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					history: earlier,
 					images: images.map(({ label, mediaType, data }) => ({ label, mediaType, data })),
 					sources: chatSources(chat),
+					mode,
+					...(fullPrompt === undefined ? {} : { fullPrompt }),
+					...(documentSnapshot === undefined ? {} : { document: documentSnapshot }),
 				});
 				await Promise.race([last, new Promise((resolve) => setTimeout(resolve, 5000))]);
 			} catch (error) {
@@ -2054,5 +2694,6 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		},
 		refreshSelection,
 		workspaceChanged: () => renderSources(),
+		configured,
 	};
 }

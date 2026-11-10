@@ -175,6 +175,11 @@ const TOOL_CALLS = [
 /** Which round of tool calls a request with tools is in (the results it carries); `null` without tools. */
 function toolRound(request: Received | undefined): number | null {
 	if (request === undefined || !Array.isArray(request.body.tools)) return null;
+	// Kalem's own tools come with every question: the script is for a workspace's.
+	const names = (request.body.tools as { name?: string; function?: { name?: string } }[]).map(
+		(tool) => tool.function?.name ?? tool.name,
+	);
+	if (!names.includes("search")) return null;
 	const messages = (request.body.messages ?? []) as { role: string; content: unknown }[];
 	return messages.filter(
 		(message) =>
@@ -422,7 +427,7 @@ test("connects to an OpenAI-compatible service and to the Anthropic API with a k
 	await expect(form.locator(".assistant-field-note[role=status]")).toHaveText(
 		"2 models found; pick one in the model field.",
 	);
-	await expect(form.locator("#assistant-models option")).toHaveCount(2);
+	await expect(form.locator("datalist option")).toHaveCount(2);
 	await form.getByLabel("Model").fill("fake-large");
 	await form.getByRole("button", { name: "Save" }).click();
 	await expect(form).toBeHidden();
@@ -443,7 +448,12 @@ test("connects to an OpenAI-compatible service and to the Anthropic API with a k
 	const sent = first?.body.messages as { role: string; content: string }[];
 	expect(sent.map((message) => message.role)).toEqual(["system", "user"]);
 	expect(sent[0]?.content).toContain("Kalem diagrams");
-	expect(sent[0]?.content).toContain('"File" → "Export"');
+	// The guides are not in every question: the model asks for one with kalem_help.
+	expect(sent[0]?.content).not.toContain('"File" → "Export"');
+	const offered = ((first?.body.tools ?? []) as { function: { name: string } }[]).map(
+		(tool) => tool.function.name,
+	);
+	expect(offered).toEqual(expect.arrayContaining(["kalem_help", "settings_set", "document_edit"]));
 	expect(sent[1]?.content).toContain('<document name="plan.md">');
 
 	// The service keeps no conversation: what was said goes again with the next question.
@@ -819,7 +829,7 @@ test("runs commands typed after a slash: the assistant's, ready questions and th
 	await input.fill("/");
 	await expect(menu).toBeVisible();
 	// All of them, the list scrolling.
-	await expect(menu.locator(".assistant-command")).toHaveCount(35);
+	await expect(menu.locator(".assistant-command")).toHaveCount(41);
 	await expect(menu.locator(".assistant-command-name").last()).toHaveText("/format-code");
 	await input.fill("/kayd");
 	await expect(menu.locator(".assistant-command-name")).toHaveText(["/save", "/save-as"]);
@@ -857,7 +867,7 @@ test("runs commands typed after a slash: the assistant's, ready questions and th
 
 	// Picked with the arrow keys and Tab.
 	await input.fill("/sohbet");
-	await expect(menu.locator(".assistant-command-name")).toHaveText(["/new", "/chats"]);
+	await expect(menu.locator(".assistant-command-name")).toHaveText(["/new", "/chats", "/compact"]);
 	await input.press("ArrowDown");
 	await expect(menu.locator('[aria-selected="true"] .assistant-command-name')).toHaveText("/chats");
 	await input.press("Tab");
