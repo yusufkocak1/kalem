@@ -49,6 +49,23 @@ export function formatDuration(seconds: number): string {
 	return [hours > 0 ? `${hours}h` : "", rest > 0 ? `${rest}m` : ""].filter(Boolean).join(" ");
 }
 
+/**
+ * An answer's JSON, also when it comes wrapped as JSONP (`callback([...])`,
+ * as a ScriptRunner endpoint for Tempo's drop-downs answers); `null` for
+ * an empty answer. Throws when it is neither.
+ */
+export function parseJsonOrJsonp(text: string): unknown {
+	const body = text.trim();
+	if (body === "") return null;
+	try {
+		return JSON.parse(body);
+	} catch (error) {
+		const wrapped = /^(?:\/\*\*\/\s*)?[\w$.]+\s*\(([\s\S]*)\)\s*;?$/.exec(body);
+		if (wrapped === null) throw error;
+		return JSON.parse(wrapped[1] as string);
+	}
+}
+
 /** The kinds of Tempo work attribute Kalem asks for; others are typed as text. */
 export type WorkAttributeKind = "list" | "text" | "number" | "checkbox";
 
@@ -63,6 +80,8 @@ export interface WorkAttribute {
 	/** Tempo's key, as `_Servis_`. */
 	readonly key: string;
 	readonly name: string;
+	/** Tempo's own type, as it is sent back with a log: `ACCOUNT`, `DYNAMIC_DROPDOWN`… */
+	readonly type: string;
 	readonly kind: WorkAttributeKind;
 	readonly required: boolean;
 	/** For a list: what can be chosen. */
@@ -90,6 +109,8 @@ export interface WorklogContext {
 	readonly remainingSeconds: number | null;
 	/** The user's own latest work logs on the issue, newest first. */
 	readonly mine: readonly Worklog[];
+	/** What Tempo said of its fields, for a report when a list comes empty. */
+	readonly diagnostics: string;
 }
 
 /** A work log as the form gives it. */
@@ -116,52 +137,122 @@ const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : [
 const KINDS: Record<string, WorkAttributeKind> = {
 	STATIC_LIST: "list",
 	ACCOUNT: "list",
+	DYNAMIC_DROPDOWN: "list",
 	INPUT_FIELD: "text",
 	INPUT_NUMERIC: "number",
 	CHECKBOX: "checkbox",
 };
 
+/** A Tempo work attribute's type, as its answer names it: `STATIC_LIST`, `ACCOUNT`… */
+export const workAttributeType = (raw: unknown): string => {
+	const attribute = asJson(raw);
+	return asString(asJson(attribute.type).value) || asString(attribute.type);
+};
+
 /**
- * Tempo's work attributes (`/rest/tempo-core/1/work-attribute`); an
- * account attribute takes its choices from `accounts`
- * (`/rest/tempo-accounts/1/account`). Removed choices and closed accounts
- * are left out.
+ * Choices as Tempo's answers give them, whatever their shape: a list, or
+ * one under `values`/`results`; each choice `{value, name}`, `{key, value}`
+ * (a dynamic drop-down's), `{key, name}` (an account, maybe under
+ * `account`) or a plain text. Removed choices and closed accounts are left
+ * out; the order is Tempo's (`sequence` first).
  */
-export function workAttributesOf(raw: unknown, accounts: unknown = []): WorkAttribute[] {
-	const accountOptions = asArray(accounts)
-		.map(asJson)
-		.filter((account) => asString(account.status) !== "CLOSED" && asString(account.key) !== "")
-		.map((account) => ({ value: asString(account.key), name: asString(account.name) }));
+export function tempoOptionsOf(raw: unknown): WorkAttributeOption[] {
+	const root = asJson(raw);
+	const list = Array.isArray(raw)
+		? raw
+		: asArray(root.values ?? root.results ?? root.staticListValues);
+	const seen = new Set<string>();
+	return list
+		.map((item, index) => ({ item, index }))
+		.sort((a, b) => {
+			const sa = Number(asJson(a.item).sequence ?? a.index);
+			const sb = Number(asJson(b.item).sequence ?? b.index);
+			return sa - sb;
+		})
+		.flatMap(({ item }) => {
+			if (typeof item === "string") return [{ value: item, name: item }];
+			const outer = asJson(item);
+			const option = Object.keys(asJson(outer.account)).length > 0 ? asJson(outer.account) : outer;
+			if (option.removed === true || asString(option.status) === "CLOSED") return [];
+			// `{key, value}`: the key is sent, the value shown; `{value, name}`: the value is sent.
+			const value =
+				"key" in option ? asString(option.key) : asString(option.value) || asString(option.id);
+			const name =
+				asString(option.name) ||
+				asString(option.label) ||
+				asString(option.text) ||
+				("key" in option ? asString(option.value) : "") ||
+				value;
+			return value === "" ? [] : [{ value, name }];
+		})
+		.filter((option) => {
+			if (seen.has(option.value)) return false;
+			seen.add(option.value);
+			return true;
+		});
+}
+
+/**
+ * Tempo's work attributes (`/rest/tempo-core/1/work-attribute`), with the
+ * choices found for each elsewhere (`more`, by key: an account's project
+ * accounts, a list asked for on its own, values used before) after its
+ * own.
+ */
+export function workAttributesOf(
+	raw: unknown,
+	more: Readonly<Record<string, readonly WorkAttributeOption[]>> = {},
+): WorkAttribute[] {
 	return asArray(raw).flatMap((item) => {
 		const attribute = asJson(item);
 		const key = asString(attribute.key);
 		const id = Number(attribute.id);
 		if (key === "" || !Number.isFinite(id)) return [];
-		const type = asString(asJson(attribute.type).value) || asString(attribute.type);
-		const kind = KINDS[type] ?? "text";
-		const options =
-			type === "ACCOUNT"
-				? accountOptions
-				: asArray(attribute.staticListValues)
-						.map(asJson)
-						.filter((option) => option.removed !== true)
-						.sort((a, b) => Number(a.sequence ?? 0) - Number(b.sequence ?? 0))
-						.map((option) => ({
-							value: asString(option.value),
-							name: asString(option.name) || asString(option.value),
-						}))
-						.filter((option) => option.value !== "");
+		const own = tempoOptionsOf(attribute.staticListValues);
+		const options = [...own];
+		for (const option of more[key] ?? []) {
+			if (!options.some((known) => known.value === option.value)) options.push(option);
+		}
+		const type = workAttributeType(attribute);
+		// A type Kalem does not know is a list when there is something to choose.
+		const kind = KINDS[type] ?? (options.length > 0 ? "list" : "text");
 		return [
 			{
 				id,
 				key,
 				name: asString(attribute.name) || key,
+				type,
 				kind,
 				required: attribute.required === true,
-				options,
+				options: kind === "list" ? options : [],
 			},
 		];
 	});
+}
+
+/**
+ * The values the user gave each work attribute in their Tempo work logs
+ * (`POST /rest/tempo-timesheets/4/worklogs/search`), by key, latest first.
+ */
+export function recentAttributeValues(raw: unknown): Record<string, string[]> {
+	const logs = asArray(raw)
+		.map(asJson)
+		.sort((a, b) => {
+			const sa = asString(a.started) || asString(a.dateStarted);
+			const sb = asString(b.started) || asString(b.dateStarted);
+			return sa < sb ? 1 : sa > sb ? -1 : 0;
+		});
+	const values: Record<string, string[]> = {};
+	for (const log of logs) {
+		const attributes = asJson(log.attributes);
+		for (const [key, given] of Object.entries(attributes)) {
+			const value = typeof given === "string" ? given : asString(asJson(given).value);
+			if (value === "") continue;
+			const list = values[key] ?? [];
+			if (!list.includes(value)) list.push(value);
+			values[key] = list;
+		}
+	}
+	return values;
 }
 
 /** The attributes that must be given and are not; their names. */
@@ -185,7 +276,14 @@ export function tempoWorklogBody(
 	for (const attribute of attributes) {
 		const value = (entry.attributes[attribute.key] ?? "").trim();
 		if (value === "") continue;
-		given[attribute.key] = { name: attribute.name, workAttributeId: attribute.id, value };
+		// As Tempo's own dialog sends it.
+		given[attribute.key] = {
+			key: attribute.key,
+			name: attribute.name,
+			type: attribute.type,
+			workAttributeId: attribute.id,
+			value,
+		};
 	}
 	return {
 		worker,
@@ -281,4 +379,49 @@ export function quickEntry(
 			remember: false,
 		},
 	};
+}
+
+/** What an attribute's address can name: Tempo fills these in for the issue being logged. */
+export interface IssuePlaceholders {
+	readonly issueKey: string;
+	readonly issueId: string;
+	readonly projectKey: string;
+	readonly projectId: string;
+}
+
+/**
+ * The path on this Jira that an attribute's `externalUrl` asks for its
+ * choices (a Tempo account's `…/billingKeyList/{IssueKey}`, a ScriptRunner
+ * endpoint), with `{IssueKey}`, `{IssueId}`, `{ProjectKey}` and
+ * `{ProjectId}` filled in. `null` for an address on another host: the
+ * login is never sent elsewhere.
+ */
+export function externalPath(
+	address: string,
+	site: string,
+	issue: IssuePlaceholders,
+): string | null {
+	const filled = address.trim().replace(/\{(\w+)\}/g, (whole, name: string) => {
+		const value = {
+			issuekey: issue.issueKey,
+			issueid: issue.issueId,
+			projectkey: issue.projectKey,
+			projectid: issue.projectId,
+		}[name.toLocaleLowerCase("en")];
+		return value === undefined ? whole : encodeURIComponent(value);
+	});
+	if (filled.startsWith("/") && !filled.startsWith("//")) return filled;
+	const root = site.replace(/\/+$/, "");
+	if (filled.startsWith(`${root}/`)) return filled.slice(root.length);
+	// The same host on the other scheme or with its default port is still this Jira.
+	try {
+		const url = new URL(filled);
+		const own = new URL(root);
+		if (url.hostname !== own.hostname) return null;
+		const base = own.pathname.replace(/\/+$/, "");
+		if (!url.pathname.startsWith(`${base}/`)) return null;
+		return `${url.pathname.slice(base.length)}${url.search}`;
+	} catch {
+		return null;
+	}
 }

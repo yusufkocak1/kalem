@@ -482,8 +482,16 @@ verir.
   issue ANAHTAR"). **Tempo Timesheets** kuruluysa efor Tempo'ya
   (`/rest/tempo-timesheets/4/worklogs`) iş özellikleriyle (ör.
   "Faturalandırılacak Şirket", "Servis") gider; zorunlu olanlar
-  doldurulmadan gönderilmez. Seçilen özellikler Jira sitesi başına
-  hatırlanır (`jira-worklog.json`) ve form bir dahaki sefere onlarla açılır.
+  doldurulmadan gönderilmez. Liste seçenekleri Tempo'nun kendi penceresinin
+  sorduğu yerden gelir: özelliğin `externalUrl` adresi (ör. hesabın
+  `…/billingKeyList/{IssueKey}`'i ya da ScriptRunner'daki bir dinamik liste;
+  JSONP yanıtı da okunur), yoksa statik liste ya da projenin hesapları; son
+  4 ayda Tempo'ya girdiğin değerler de eklenir ve hiçbir şey hatırlanmamışsa
+  formu en son girdiğin değerler başlatır. Kullanıcı bilgisi yalnızca aynı
+  Jira'daki adreslere gönderilir. Bir liste boş gelirse **Tempo
+  ayrıntıları** Tempo'nun yanıtını kopyalanabilir biçimde gösterir. Seçilen
+  özellikler Jira sitesi başına hatırlanır (`jira-worklog.json`) ve form bir
+  dahaki sefere onlarla açılır.
   Tempo yoksa (ve Cloud'da) efor Jira'nın kendi iş kaydına girilir. Formda
   harcanan/kalan süre ve kayda girdiğin son eforlar da görünür.
 - Açıklaması ve yorumları **HTML** olarak saklayan Jira'larda (ör. JEditor
@@ -497,6 +505,11 @@ verir.
   bağlı Confluence sitesindeyse tıklamak onu Kalem'de bir sekmede açar
   (adresteki sayfa kimliğiyle ya da `/display/ALAN/Başlık` adresinden
   aranarak); değilse tarayıcıda açılır.
+- **İstek sınırı:** bir Jira sitesine aynı anda en çok 4 istek gider;
+  Jira'nın istek sınırı (HTTP 429, "rate limit exceeded") bir isteği
+  geri çevirirse Kalem `Retry-After` kadar (en çok 15 sn) bekleyip 3 kez
+  yeniden dener. Kim olduğun ve Tempo'nun alanları bir süre hatırlanır,
+  form her açılışta yeniden sormaz.
 - Arama: anahtar (`QR-123`), kelimeler (`text ~`) ya da JQL; 25'er sonuç,
   **Daha fazla sonuç göster**. Cloud'da `/rest/api/2/search/jql`, Server'da
   `/rest/api/2/search` kullanılır.

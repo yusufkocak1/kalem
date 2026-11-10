@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+	externalPath,
 	formatDuration,
 	jiraWorklogRequest,
 	missingAttributes,
 	parseDuration,
+	parseJsonOrJsonp,
 	quickEntry,
+	recentAttributeValues,
 	remainingAfter,
+	tempoOptionsOf,
 	tempoWorklogBody,
 	workAttributesOf,
 	worklogsOf,
@@ -65,7 +69,7 @@ const ACCOUNTS = [
 
 describe("Tempo's work attributes", () => {
 	it("are read with their choices, in order, without removed ones", () => {
-		const attributes = workAttributesOf(TEMPO_ATTRIBUTES, ACCOUNTS);
+		const attributes = workAttributesOf(TEMPO_ATTRIBUTES, { _Servis_: tempoOptionsOf(ACCOUNTS) });
 		expect(attributes.map((a) => [a.key, a.kind, a.required])).toEqual([
 			["_FaturalandirilacakSirket_", "list", false],
 			["_Servis_", "list", true],
@@ -80,7 +84,7 @@ describe("Tempo's work attributes", () => {
 	});
 
 	it("go with the log Tempo is sent", () => {
-		const attributes = workAttributesOf(TEMPO_ATTRIBUTES, ACCOUNTS);
+		const attributes = workAttributesOf(TEMPO_ATTRIBUTES, { _Servis_: tempoOptionsOf(ACCOUNTS) });
 		const body = tempoWorklogBody(
 			"QR-28278",
 			"JIRAUSER1",
@@ -105,11 +109,19 @@ describe("Tempo's work attributes", () => {
 			remainingEstimate: 0,
 			attributes: {
 				_FaturalandirilacakSirket_: {
+					key: "_FaturalandirilacakSirket_",
 					name: "Faturalandırılacak Şirket",
+					type: "STATIC_LIST",
 					workAttributeId: 1,
 					value: "TKAO",
 				},
-				_Servis_: { name: "Servis", workAttributeId: 2, value: "QUICKRES" },
+				_Servis_: {
+					key: "_Servis_",
+					name: "Servis",
+					type: "ACCOUNT",
+					workAttributeId: 2,
+					value: "QUICKRES",
+				},
 			},
 		});
 	});
@@ -165,7 +177,7 @@ describe("Jira's own work log", () => {
 });
 
 describe("quick logs", () => {
-	const attributes = workAttributesOf(TEMPO_ATTRIBUTES, ACCOUNTS);
+	const attributes = workAttributesOf(TEMPO_ATTRIBUTES, { _Servis_: tempoOptionsOf(ACCOUNTS) });
 	const context = {
 		tempo: true,
 		attributes,
@@ -173,6 +185,7 @@ describe("quick logs", () => {
 		spentSeconds: 0,
 		remainingSeconds: 4 * 3600,
 		mine: [],
+		diagnostics: "",
 	};
 
 	it("use the remembered choices, and leave out one no longer offered", () => {
@@ -192,5 +205,125 @@ describe("quick logs", () => {
 		expect(quickEntry({ ...context, defaults: {} }, "QR-1", 3600, "2026-11-10")).toEqual({
 			missing: ["Servis"],
 		});
+	});
+});
+
+describe("Tempo's choices, whatever their shape", () => {
+	it("reads static lists, dynamic drop-downs, accounts and plain texts", () => {
+		expect(
+			tempoOptionsOf([
+				{ value: "TKAO", name: "TKAO - THY" },
+				{ value: "X", removed: true },
+			]),
+		).toEqual([{ value: "TKAO", name: "TKAO - THY" }]);
+		expect(tempoOptionsOf({ values: [{ key: "QR", value: "Satış Kanalı (QuickRes)" }] })).toEqual([
+			{ value: "QR", name: "Satış Kanalı (QuickRes)" },
+		]);
+		expect(
+			tempoOptionsOf([
+				{ account: { key: "ACC1", name: "Hesap", status: "OPEN" } },
+				{ key: "OLD", name: "Kapalı", status: "CLOSED" },
+			]),
+		).toEqual([{ value: "ACC1", name: "Hesap" }]);
+		expect(tempoOptionsOf(["A", "A", "B"])).toEqual([
+			{ value: "A", name: "A" },
+			{ value: "B", name: "B" },
+		]);
+		expect(tempoOptionsOf(null)).toEqual([]);
+	});
+
+	it("makes a dynamic drop-down and an unknown type with choices a list", () => {
+		const attributes = workAttributesOf(
+			[
+				{
+					id: 5,
+					key: "_Servis_",
+					name: "Servis",
+					type: { value: "DYNAMIC_DROPDOWN" },
+					required: true,
+				},
+				{ id: 6, key: "_Yeni_", name: "Yeni", type: { value: "SOMETHING_NEW" } },
+				{ id: 7, key: "_Bos_", name: "Boş", type: { value: "SOMETHING_NEW" } },
+			],
+			{ _Servis_: [{ value: "QR", name: "QuickRes" }], _Yeni_: [{ value: "a", name: "a" }] },
+		);
+		expect(attributes.map((a) => [a.key, a.kind, a.options.length])).toEqual([
+			["_Servis_", "list", 1],
+			["_Yeni_", "list", 1],
+			["_Bos_", "text", 0],
+		]);
+	});
+
+	it("finds the values used before, latest first", () => {
+		expect(
+			recentAttributeValues([
+				{
+					started: "2026-10-15",
+					attributes: { _Servis_: { value: "QR" }, _Sirket_: { value: "TKAO" } },
+				},
+				{ started: "2026-10-20", attributes: { _Servis_: { value: "WEB" } } },
+				{ started: "2026-10-16", attributes: { _Servis_: { value: "QR" } } },
+			]),
+		).toEqual({ _Servis_: ["WEB", "QR"], _Sirket_: ["TKAO"] });
+	});
+});
+
+describe("an attribute's own address", () => {
+	const issue = { issueKey: "QR-28278", issueId: "2749286", projectKey: "QR", projectId: "10400" };
+
+	it("is filled in for the issue, and asked only on this Jira", () => {
+		expect(
+			externalPath(
+				"/rest/tempo-rest/1.0/accounts/json/billingKeyList/{IssueKey}",
+				"https://jira.thy.com",
+				issue,
+			),
+		).toBe("/rest/tempo-rest/1.0/accounts/json/billingKeyList/QR-28278");
+		expect(
+			externalPath(
+				"https://jira.thy.com/rest/scriptrunner/latest/custom/serviceList",
+				"https://jira.thy.com",
+				issue,
+			),
+		).toBe("/rest/scriptrunner/latest/custom/serviceList");
+		expect(externalPath("/x?project={projectId}&id={IssueId}", "https://jira.thy.com", issue)).toBe(
+			"/x?project=10400&id=2749286",
+		);
+		// A Jira under a path: the address is taken below it.
+		expect(
+			externalPath(
+				"https://tools.example.com/jira/rest/a",
+				"https://tools.example.com/jira",
+				issue,
+			),
+		).toBe("/rest/a");
+		expect(
+			externalPath("https://evil.example.com/rest/a", "https://jira.thy.com", issue),
+		).toBeNull();
+		expect(externalPath("//evil.example.com/rest/a", "https://jira.thy.com", issue)).toBeNull();
+	});
+
+	it("gives choices in the shapes Tempo and ScriptRunner answer with", () => {
+		expect(
+			tempoOptionsOf({ values: [{ key: "TKAO", value: "TKAO - Türk Hava Yolları A.O." }] }),
+		).toEqual([{ value: "TKAO", name: "TKAO - Türk Hava Yolları A.O." }]);
+		expect(tempoOptionsOf([{ key: "QR", label: "Satış Kanalı (QuickRes) Uygulaması" }])).toEqual([
+			{ value: "QR", name: "Satış Kanalı (QuickRes) Uygulaması" },
+		]);
+	});
+});
+
+describe("answers wrapped as JSONP", () => {
+	it("are read as their JSON", () => {
+		expect(parseJsonOrJsonp('[{"key":"3351"}]')).toEqual([{ key: "3351" }]);
+		expect(
+			parseJsonOrJsonp('jQuery123_456({"values":[{"key":"3351","value":"QuickRes"}]});'),
+		).toEqual({
+			values: [{ key: "3351", value: "QuickRes" }],
+		});
+		expect(parseJsonOrJsonp('null([{"key":"1"}])')).toEqual([{ key: "1" }]);
+		expect(parseJsonOrJsonp("/**/cb([])")).toEqual([]);
+		expect(parseJsonOrJsonp("  ")).toBeNull();
+		expect(() => parseJsonOrJsonp("<html>")).toThrow();
 	});
 });

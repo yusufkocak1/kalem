@@ -93,6 +93,29 @@ export function createWorklogForm(options: WorklogFormOptions): HTMLElement {
 		attrs: { rows: "2", placeholder: defaultComment },
 	});
 	const attributesBox = el("div", { class: "jira-worklog-attributes" });
+	const diagnosticsText = el("pre", { class: "jira-worklog-diagnostics-text" });
+	const copyDiagnostics = el("button", {
+		class: "jira-button",
+		text: t.jiraWorkCopyDetails,
+		attrs: { type: "button" },
+	});
+	copyDiagnostics.addEventListener("click", () => {
+		void navigator.clipboard.writeText(diagnosticsText.textContent ?? "");
+		copyDiagnostics.textContent = t.linkCopied;
+		setTimeout(() => {
+			copyDiagnostics.textContent = t.jiraWorkCopyDetails;
+		}, 1200);
+	});
+	const diagnostics = el("details", {
+		class: "jira-worklog-diagnostics",
+		children: [
+			el("summary", { class: "jira-worklog-diagnostics-summary", text: t.jiraWorkDetails }),
+			el("p", { class: "jira-worklog-diagnostics-hint", text: t.jiraWorkDetailsHint }),
+			diagnosticsText,
+			copyDiagnostics,
+		],
+	});
+	diagnostics.hidden = true;
 	const remember = el("input", { attrs: { type: "checkbox", checked: "" } });
 	const submit = el("button", {
 		class: "jira-button primary jira-worklog-submit",
@@ -135,6 +158,7 @@ export function createWorklogForm(options: WorklogFormOptions): HTMLElement {
 				],
 			}),
 			attributesBox,
+			diagnostics,
 			el("div", {
 				class: "jira-worklog-footer",
 				children: [
@@ -183,16 +207,24 @@ export function createWorklogForm(options: WorklogFormOptions): HTMLElement {
 	function attributeControl(attribute: WorkAttribute, chosen: string): HTMLElement {
 		let control: HTMLInputElement | HTMLSelectElement;
 		if (attribute.kind === "list") {
+			// A value chosen before that Tempo did not list is still offered, as it was given.
+			const options =
+				chosen === "" || attribute.options.some((option) => option.value === chosen)
+					? attribute.options
+					: [...attribute.options, { value: chosen, name: chosen }];
 			const select = el("select", {
 				class: "jira-worklog-input",
 				children: [
-					el("option", { text: t.jiraWorkChoose, attrs: { value: "" } }),
-					...attribute.options.map((option) =>
+					el("option", {
+						text: options.length === 0 ? t.jiraWorkNoChoices : t.jiraWorkChoose,
+						attrs: { value: "" },
+					}),
+					...options.map((option) =>
 						el("option", { text: option.name, attrs: { value: option.value } }),
 					),
 				],
 			});
-			select.value = attribute.options.some((option) => option.value === chosen) ? chosen : "";
+			select.value = chosen;
 			control = select;
 		} else if (attribute.kind === "checkbox") {
 			control = el("input", { attrs: { type: "checkbox" } });
@@ -241,6 +273,14 @@ export function createWorklogForm(options: WorklogFormOptions): HTMLElement {
 			),
 		);
 		attributesBox.hidden = loaded.attributes.length === 0;
+		// A list with nothing to choose: what Tempo said, to be copied and reported.
+		const empty = loaded.attributes.some(
+			(attribute) =>
+				(attribute.kind === "list" && attribute.options.length === 0) ||
+				(attribute.required && attribute.kind === "text"),
+		);
+		diagnostics.hidden = !empty || loaded.diagnostics === "";
+		diagnosticsText.textContent = loaded.diagnostics;
 		mine.replaceChildren(
 			...loaded.mine.map((log) =>
 				el("li", {
