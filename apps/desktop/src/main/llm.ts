@@ -180,14 +180,14 @@ async function askAnthropic(options: AskOptions): Promise<void> {
 				(block): block is Anthropic.ToolUseBlock => block.type === "tool_use",
 			);
 			if (tools === undefined || message.stop_reason !== "tool_use" || calls.length === 0) return;
-			const results: Anthropic.ToolResultBlockParam[] = [];
-			for (const call of calls) {
-				results.push({
-					type: "tool_result",
+			// Calls the model made together run together; their results keep its order.
+			const results: Anthropic.ToolResultBlockParam[] = await Promise.all(
+				calls.map(async (call) => ({
+					type: "tool_result" as const,
 					tool_use_id: call.id,
 					content: await tools.run(call.name, call.input),
-				});
-			}
+				})),
+			);
 			messages.push(
 				{ role: "assistant", content: message.content as Anthropic.ContentBlockParam[] },
 				{ role: "user", content: results },
@@ -251,19 +251,19 @@ async function askChatCompletions(options: AskOptions): Promise<void> {
 				function: { name, arguments: args === "" ? "{}" : args },
 			})),
 		});
-		for (const call of made) {
-			let input: unknown = {};
-			try {
-				input = JSON.parse(call.arguments === "" ? "{}" : call.arguments);
-			} catch {
-				// Arguments that are not JSON: the tool says what it misses.
-			}
-			turn.push({
-				role: "tool",
-				tool_call_id: call.id,
-				content: await tools.run(call.name, input),
-			});
-		}
+		// Calls the model made together run together; their results keep its order.
+		const results = await Promise.all(
+			made.map(async (call) => {
+				let input: unknown = {};
+				try {
+					input = JSON.parse(call.arguments === "" ? "{}" : call.arguments);
+				} catch {
+					// Arguments that are not JSON: the tool says what it misses.
+				}
+				return { role: "tool", tool_call_id: call.id, content: await tools.run(call.name, input) };
+			}),
+		);
+		turn.push(...results);
 		out.round();
 	}
 }

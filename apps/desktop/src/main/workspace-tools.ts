@@ -6,7 +6,8 @@
  * model reads does.
  *
  * Each folder's files are indexed once (paths, sizes, times) and the index
- * is reused for a while, so a search does not walk the folder again.
+ * is reused, so a search does not walk the folder again: an older index is
+ * still answered with while a new one is made behind it.
  */
 import { execFile } from "node:child_process";
 import type { Dirent } from "node:fs";
@@ -37,8 +38,12 @@ const skipFolder = (name: string): boolean =>
 /** Files indexed in one folder; deeper or later ones are left out. */
 export const MAX_INDEXED = 50_000;
 const MAX_DEPTH = 24;
-/** How long an index is used before the folder is walked again. */
+/** How long an index is used as it is; after that the folder is walked again, behind it. */
 const INDEX_LIFETIME = 15_000;
+/** How long an older index is still answered with while the new one is made. */
+const STALE_LIFETIME = 10 * 60_000;
+/** Files asked about (stat, read) at the same time. */
+const PARALLEL_FILES = 64;
 /** Files larger than this are not searched; they can still be read in parts. */
 const MAX_SEARCH_BYTES = 1024 * 1024;
 const MAX_READ_BYTES = 8 * 1024 * 1024;
@@ -63,6 +68,24 @@ export interface FolderIndex {
 	readonly files: readonly IndexedFile[];
 	readonly truncated: boolean;
 	readonly made: number;
+}
+
+/** `work` for each item, `limit` at a time; the results in the items' order. */
+export async function mapLimit<T, R>(
+	items: readonly T[],
+	limit: number,
+	work: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+	const results = new Array<R>(items.length);
+	let next = 0;
+	const worker = async (): Promise<void> => {
+		while (next < items.length) {
+			const index = next++;
+			results[index] = await work(items[index] as T, index);
+		}
+	};
+	await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+	return results;
 }
 
 /** Runs a program; its output, or `null` when it is missing or fails. */
@@ -98,17 +121,20 @@ async function gitFiles(root: string): Promise<IndexedFile[] | null> {
 		root,
 	);
 	if (listed === null || listed.code !== 0) return null;
-	const files: IndexedFile[] = [];
-	for (const path of new Set(listed.stdout.split("\0"))) {
-		if (path === "" || isBinaryPath(path)) continue;
-		if (files.length >= MAX_INDEXED) break;
+	const paths = [...new Set(listed.stdout.split("\0"))]
+		.filter((path) => path !== "" && !isBinaryPath(path))
+		.slice(0, MAX_INDEXED);
+	// Many at a time: one by one, a large repository took seconds.
+	const found = await mapLimit(paths, PARALLEL_FILES, async (path) => {
 		try {
 			const info = await stat(join(root, path));
-			if (info.isFile()) files.push({ path, size: info.size, modified: info.mtimeMs });
+			return info.isFile() ? { path, size: info.size, modified: info.mtimeMs } : null;
 		} catch {
 			// Deleted but still in the index: not there to read.
+			return null;
 		}
-	}
+	});
+	const files = found.filter((file): file is IndexedFile => file !== null);
 	files.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 	return files;
 }
@@ -134,25 +160,27 @@ async function indexFolder(root: string): Promise<FolderIndex> {
 			return;
 		}
 		children.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-		for (const child of children) {
-			if (!child.isFile() || isBinaryPath(child.name)) continue;
-			if (files.length >= MAX_INDEXED) {
-				truncated = true;
-				return;
-			}
-			const path = join(folder, child.name);
-			let info: { size: number; mtimeMs: number };
-			try {
-				info = await stat(path);
-			} catch {
-				continue;
-			}
-			files.push({
-				path: relative(root, path).split(sep).join("/"),
-				size: info.size,
-				modified: info.mtimeMs,
-			});
-		}
+		const own = children.filter((child) => child.isFile() && !isBinaryPath(child.name));
+		if (files.length + own.length > MAX_INDEXED) truncated = true;
+		const stats = await mapLimit(
+			own.slice(0, Math.max(0, MAX_INDEXED - files.length)),
+			PARALLEL_FILES,
+			async (child) => {
+				const path = join(folder, child.name);
+				try {
+					const info = await stat(path);
+					return {
+						path: relative(root, path).split(sep).join("/"),
+						size: info.size,
+						modified: info.mtimeMs,
+					};
+				} catch {
+					return null;
+				}
+			},
+		);
+		for (const file of stats) if (file !== null) files.push(file);
+		if (files.length >= MAX_INDEXED) return;
 		for (const child of children) {
 			if (!child.isDirectory() || skipFolder(child.name)) continue;
 			if (depth + 1 >= MAX_DEPTH) {
@@ -171,19 +199,36 @@ async function indexFolder(root: string): Promise<FolderIndex> {
 let ripgrep: Promise<boolean> | null = null;
 
 /**
- * The files of the folder that contain `query`, found by ripgrep: far
- * faster than reading every file on a first search. `null` when ripgrep is
- * not installed, or cannot be trusted with the query (text that is not
- * ASCII may be in another encoding, or fold the Turkish way; a pattern
- * ripgrep reads differently): the files are then read one by one.
+ * What ripgrep can look for in place of words to find, sure to be in every
+ * file that has them: the longest run of ASCII without `i` or `I`. ASCII is
+ * the same bytes in UTF-8 and the legacy encodings, and those two letters
+ * fold to `ı` and `İ` the Turkish way, which ripgrep does not do. `null`
+ * when there is no such run.
+ */
+export function ripgrepNeedle(query: string): string | null {
+	const runs = query.match(/[\x20-\x48\x4a-\x68\x6a-\x7e]+/g) ?? [];
+	const longest = runs.reduce((a, b) => (b.trim().length > a.trim().length ? b : a), "");
+	return longest.trim() === "" ? null : longest;
+}
+
+/**
+ * The files of the folder that may contain `query`, found by ripgrep: far
+ * faster than reading every file. Each is then searched the way Kalem
+ * searches, so ripgrep only needs to find too many, never too few. `null`
+ * when ripgrep is not installed, or cannot be trusted with the query (a
+ * pattern that is not ASCII, or that ripgrep reads differently): the files
+ * are then all read.
  */
 async function ripgrepFiles(
 	index: FolderIndex,
 	query: string,
 	regex: boolean,
+	pattern: string,
 ): Promise<Set<string> | null> {
 	// biome-ignore lint/suspicious/noControlCharactersInRegex: the printable ASCII range
-	if (!/^[\x20-\x7e]*$/.test(query)) return null;
+	if (regex && !/^[\x20-\x7e]*$/.test(query)) return null;
+	const needle = regex ? query : ripgrepNeedle(query);
+	if (needle === null) return null;
 	ripgrep ??= output("rg", ["--version"], index.root).then((found) => found?.code === 0);
 	if (!(await ripgrep)) return null;
 	const found = await output(
@@ -199,9 +244,13 @@ async function ripgrepFiles(
 			"!.git",
 			// Outside Git the index leaves these out; inside, Git's rules apply to both.
 			...(index.git ? [] : [...SKIPPED_FOLDERS].flatMap((name) => ["--glob", `!${name}`])),
+			// A pattern on names alone means the same to ripgrep: it need not search the rest.
+			...(pattern !== "" && !pattern.includes("/") && !pattern.includes("\\")
+				? ["--iglob", pattern.trim()]
+				: []),
 			...(regex ? [] : ["--fixed-strings"]),
 			"--regexp",
-			query,
+			needle,
 			".",
 		],
 		index.root,
@@ -262,17 +311,59 @@ export class WorkspaceIndexes {
 		return text;
 	}
 
+	/** Folders being walked again while their older index is still answered with. */
+	readonly #renewing = new Map<string, Promise<FolderIndex>>();
+
 	get(root: string): Promise<FolderIndex> {
 		const kept = this.#indexes.get(root);
-		const fresh = kept?.then((index) => Date.now() - index.made < INDEX_LIFETIME);
+		if (kept === undefined) return this.#make(root);
 		return (async () => {
-			if (kept !== undefined && (await fresh)) return kept;
-			const made = indexFolder(root);
-			this.#indexes.set(root, made);
-			// A folder that is gone is not kept.
-			made.catch(() => this.#indexes.delete(root));
-			return made;
+			let index: FolderIndex;
+			try {
+				index = await kept;
+			} catch {
+				return this.#make(root);
+			}
+			const age = Date.now() - index.made;
+			if (age < INDEX_LIFETIME) return index;
+			// Old, not too old: answered with now, and walked again behind it for the next question.
+			if (age < STALE_LIFETIME) {
+				this.#renew(root);
+				return index;
+			}
+			return this.#renewing.get(root) ?? this.#make(root);
 		})();
+	}
+
+	/** Forgets the index of the folder `path` is in: a file was written there. */
+	forget(path: string): void {
+		for (const root of [...this.#indexes.keys()]) {
+			if (isInside(path, [root])) this.#indexes.delete(root);
+		}
+	}
+
+	#make(root: string): Promise<FolderIndex> {
+		const made = indexFolder(root);
+		this.#indexes.set(root, made);
+		// A folder that is gone is not kept.
+		made.catch(() => {
+			if (this.#indexes.get(root) === made) this.#indexes.delete(root);
+		});
+		return made;
+	}
+
+	#renew(root: string): void {
+		if (this.#renewing.has(root)) return;
+		const made = indexFolder(root);
+		this.#renewing.set(root, made);
+		made
+			.then(
+				(index) => {
+					this.#indexes.set(root, Promise.resolve(index));
+				},
+				() => this.#indexes.delete(root),
+			)
+			.finally(() => this.#renewing.delete(root));
 	}
 }
 
@@ -620,47 +711,68 @@ export class Workspace {
 	async #search(query: string, regex: boolean, pattern: string): Promise<string> {
 		if (query.trim() === "") return "Give a query.";
 		let test: (line: string) => boolean;
+		/** Whether the file's whole text can have a matching line: most files are passed over at once. */
+		let mayHave: (text: string) => boolean;
 		if (regex) {
 			let compiled: RegExp;
+			let whole: RegExp;
 			try {
 				compiled = new RegExp(query, "i");
+				whole = new RegExp(query, "im");
 			} catch (error) {
 				return `Not a regular expression: ${error instanceof Error ? error.message : String(error)}`;
 			}
 			test = (line) => compiled.test(line);
+			// A look around may see past a line's end, so such a pattern is tried line by line.
+			mayHave = query.includes("(?") ? () => true : (text) => whole.test(text);
 		} else {
 			const needle = query.toLocaleLowerCase("en");
 			// Turkish İ/ı fold either way, so both are tried.
 			const turkish = query.toLocaleLowerCase("tr");
-			test = (line) => {
-				return (
-					line.toLocaleLowerCase("en").includes(needle) ||
-					line.toLocaleLowerCase("tr").includes(turkish)
-				);
-			};
+			test = (line) =>
+				line.toLocaleLowerCase("en").includes(needle) ||
+				line.toLocaleLowerCase("tr").includes(turkish);
+			// Sigma lowers differently at a word's end, which a line's end can be.
+			mayHave = /[σςΣ]/.test(query)
+				? () => true
+				: (text) =>
+						text.toLocaleLowerCase("en").includes(needle) ||
+						text.toLocaleLowerCase("tr").includes(turkish);
 		}
 		const matches = pattern === "" ? () => true : globMatcher(pattern);
 		const hits: string[] = [];
 		let files = 0;
 		for (const index of await this.#all()) {
 			// ripgrep, when installed, finds the files that have it; the index says which count.
-			const candidates = await ripgrepFiles(index, query, regex);
-			for (const file of index.files) {
-				if (file.size > MAX_SEARCH_BYTES || !matches(file.path)) continue;
-				if (candidates !== null && !candidates.has(file.path)) continue;
-				const text = await this.#indexes.text(join(index.root, file.path));
-				if (text === null) continue;
-				let found = false;
-				for (const [i, line] of text.split(/\r\n|\r|\n/).entries()) {
-					if (!test(line)) continue;
-					found = true;
-					const shown = line.length > 200 ? `${line.trim().slice(0, 200)}…` : line.trim();
-					hits.push(`${this.#shown(index.root, file.path)}:${i + 1}: ${shown}`);
-					if (hits.length >= MAX_HITS) {
-						return `${hits.join("\n")}\n[… stopped at ${MAX_HITS} matches; search for something narrower]`;
+			const candidates = await ripgrepFiles(index, query, regex, pattern);
+			const searched = index.files.filter(
+				(file) =>
+					file.size <= MAX_SEARCH_BYTES &&
+					matches(file.path) &&
+					(candidates === null || candidates.has(file.path)),
+			);
+			// Read many at a time, a batch after another, until there are enough matches.
+			for (let start = 0; start < searched.length; start += PARALLEL_FILES) {
+				const batch = searched.slice(start, start + PARALLEL_FILES);
+				const texts = await mapLimit(batch, PARALLEL_FILES, async (file) => {
+					const text = await this.#indexes.text(join(index.root, file.path));
+					return text === null || !mayHave(text) ? null : text;
+				});
+				for (const [i, text] of texts.entries()) {
+					if (text === null) continue;
+					const file = batch[i] as IndexedFile;
+					let found = false;
+					for (const [n, line] of text.split(/\r\n|\r|\n/).entries()) {
+						if (!test(line)) continue;
+						found = true;
+						const shown = line.length > 200 ? `${line.trim().slice(0, 200)}…` : line.trim();
+						hits.push(`${this.#shown(index.root, file.path)}:${n + 1}: ${shown}`);
+						if (hits.length >= MAX_HITS) {
+							return `${hits.join("\n")}\n[… stopped at ${MAX_HITS} matches; search for something narrower]`;
+						}
 					}
+					if (found) files++;
 				}
-				if (found) files++;
 			}
 		}
 		if (hits.length === 0) return "No matches.";
@@ -698,7 +810,7 @@ export class Workspace {
 }
 
 /** What the model is told about working with a workspace. */
-export const WORKSPACE_INSTRUCTIONS = `The user gave you a workspace: the folders below. Their files are NOT in the message. When the question needs them, look them up with the tools: \`search\` to find where something is, \`list_files\` to see what is there, \`read_file\` to read a file or only the lines you need. Read only what the answer needs, and do not guess at code you have not read. When you name code, give its path and line. When the user asks you to change files of the workspace, propose each change with \`propose_edit\` (after reading the file); the user reviews and applies them.`;
+export const WORKSPACE_INSTRUCTIONS = `The user gave you a workspace: the folders below. Their files are NOT in the message. When the question needs them, look them up with the tools: \`search\` to find where something is, \`list_files\` to see what is there, \`read_file\` to read a file or only the lines you need. When several look-ups do not depend on each other (searches for different names, files you already know you need), make them together in one turn rather than one after another. Read only what the answer needs, and do not guess at code you have not read. When you name code, give its path and line. When the user asks you to change files of the workspace, propose each change with \`propose_edit\` (after reading the file); the user reviews and applies them.`;
 
 /**
  * Whether a reply wrote a tool call out as text instead of making it: some

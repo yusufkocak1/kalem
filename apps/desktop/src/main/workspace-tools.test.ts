@@ -8,6 +8,8 @@ import {
 	applyEdit,
 	globMatcher,
 	looksLikeToolText,
+	mapLimit,
+	ripgrepNeedle,
 	Workspace,
 	WorkspaceIndexes,
 } from "./workspace-tools.js";
@@ -174,8 +176,62 @@ describe("workspace index", () => {
 		expect(ascii).toContain("b.md:1");
 		const turkish = await workspace.run("search", { query: "istanbul", regex: false });
 		expect(turkish).toContain("b.md:1");
+		// ripgrep does not fold the Turkish way; the files it finds are searched the way Kalem does.
+		expect(turkish).toContain("a.md:1");
 		expect(await workspace.run("search", { query: "İSTANBUL" })).toContain("a.md:1");
 		expect(await workspace.run("search", { query: "an[kx]ara", regex: true })).toContain("c.md:1");
+	});
+});
+
+describe("searching quickly", () => {
+	it("gives ripgrep the part of the words it can be trusted with", () => {
+		expect(ripgrepNeedle("ÖzelHedefİşlem")).toBe("zelHedef");
+		expect(ripgrepNeedle("createJiraPane")).toBe("createJ");
+		expect(ripgrepNeedle("ııİ")).toBeNull();
+		expect(ripgrepNeedle("in")).toBe("n");
+	});
+
+	it("runs work a few at a time, the results in order", async () => {
+		let running = 0;
+		let most = 0;
+		const results = await mapLimit([5, 1, 4, 2, 3], 2, async (n) => {
+			running++;
+			most = Math.max(most, running);
+			await new Promise((resolve) => setTimeout(resolve, n));
+			running--;
+			return n * 10;
+		});
+		expect(results).toEqual([50, 10, 40, 20, 30]);
+		expect(most).toBe(2);
+	});
+
+	it("finds the lines in a large folder, in path order, and stops at enough", async () => {
+		const files: Record<string, string> = {};
+		for (let i = 0; i < 300; i++) {
+			const name = `src/f${String(i).padStart(3, "0")}.ts`;
+			files[name] =
+				i % 3 === 0 ? `const value = ${i};\nconst hedef${i} = true;\n` : `const value = ${i};\n`;
+		}
+		const root = await folder(files);
+		const workspace = new Workspace([root], new WorkspaceIndexes());
+		const found = await workspace.run("search", { query: "HEDEF", pattern: "*.ts" });
+		expect(found).toMatch(/^80 matches|stopped at 80/m);
+		const lines = found.split("\n").filter((line) => line.startsWith("src/"));
+		expect(lines[0]).toBe("src/f000.ts:2: const hedef0 = true;");
+		expect(lines[1]).toBe("src/f003.ts:2: const hedef3 = true;");
+		expect(await workspace.run("search", { query: "hedef", pattern: "*.md" })).toBe("No matches.");
+	});
+
+	it("answers with an older index while it makes a new one, and forgets it when a file is written", async () => {
+		const root = await folder({ "a.txt": "bir\n" });
+		const indexes = new WorkspaceIndexes();
+		const first = await indexes.get(root);
+		await writeFile(join(root, "b.txt"), "iki\n");
+		// Still fresh: the same index.
+		expect(await indexes.get(root)).toBe(first);
+		indexes.forget(join(root, "b.txt"));
+		const again = await indexes.get(root);
+		expect(again.files.map((file) => file.path)).toEqual(["a.txt", "b.txt"]);
 	});
 });
 
