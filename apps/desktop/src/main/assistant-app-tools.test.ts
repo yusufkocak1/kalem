@@ -56,6 +56,7 @@ function context(
 		confluenceClient: null,
 		jiraClient: null,
 		workspace: null,
+		templates: null,
 		document: null,
 		step: () => {},
 		emit: (event) => events.push(event),

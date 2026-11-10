@@ -31,6 +31,7 @@ export const SETTING_CATEGORIES = [
 	"assistant",
 	"connections",
 	"page",
+	"templates",
 	"system",
 ] as const;
 export type SettingCategory = (typeof SETTING_CATEGORIES)[number];
@@ -363,6 +364,15 @@ export const SETTINGS_SCHEMA: Schema = {
 		keywords: ["copilot", "mcp", "araç", "tool", "blok", "block"],
 		assistant: "read",
 	},
+	defaultTemplate: {
+		key: "defaultTemplate",
+		category: "templates",
+		label: null,
+		type: "string",
+		maxLength: 4096,
+		keywords: ["şablon", "template", "analiz", "analysis", "varsayılan", "default"],
+		assistant: "read",
+	},
 	confluenceSpace: {
 		key: "confluenceSpace",
 		category: "connections",
@@ -471,6 +481,7 @@ export const CATEGORY_LABELS: Readonly<Record<SettingCategory, StringKey>> = {
 	assistant: "settingsCatAssistant",
 	connections: "settingsCatConnections",
 	page: "settingsCatPage",
+	templates: "settingsCatTemplates",
 	system: "settingsCatSystem",
 };
 
@@ -483,6 +494,7 @@ export function permissionLabel(t: Strings, permission: string): string {
 	if (permission === "view") return t.permissionView;
 	if (permission === "commands") return t.permissionCommands;
 	if (permission === "document") return t.permissionDocument;
+	if (permission === "prompts") return t.permissionPrompts;
 	return permission;
 }
 

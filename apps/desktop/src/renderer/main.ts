@@ -33,6 +33,7 @@ import { createDiagramButton, isDiagramImage } from "./diagram-button.js";
 import { createDiagramEditor } from "./diagram-editor.js";
 import { diagramFromImage, diagramToPng } from "./diagram-image.js";
 import { createDocks } from "./docks.js";
+import { markQuotes, revealQuote } from "./document-marks.js";
 import { createDocumentTools } from "./document-tools.js";
 import { el, isTextFieldFocused } from "./dom.js";
 import type { TableContext, TableEdit } from "./edits.js";
@@ -53,6 +54,7 @@ import { ipcErrorMessage, Session } from "./session.js";
 import { createSettingsDialog } from "./settings-dialog.js";
 import { enableColumnResize } from "./table-styles.js";
 import { createTabStrip } from "./tabs.js";
+import { createTemplatePicker } from "./template-picker.js";
 import { measureDiagramText } from "./text-measure.js";
 import { createVersionHistory } from "./version-history.js";
 
@@ -194,6 +196,8 @@ const assistant = createAssistantPane({
 	},
 	close: () => updateSettings({ assistant: false }),
 	changeSettings: (patch) => updateSettings(patch),
+	markQuotes: (quotes) => markQuotes(canvas, quotes),
+	revealQuote: (quote) => revealQuote(canvas, quote),
 	errorText: ipcErrorMessage,
 });
 
@@ -273,6 +277,16 @@ const settingsDialog = createSettingsDialog({
 	onAccountChange: () => void refreshAccounts(),
 	assistantConfigured: (status, changed) => assistant.configured(status, changed),
 	openLink: (href) => bridge.openLink(href),
+	errorText: ipcErrorMessage,
+	activeDocument: async () => {
+		const context = await assistantContext();
+		return { name: context.name, text: context.text };
+	},
+});
+const templatePicker = createTemplatePicker({
+	t,
+	bridge,
+	defaultTemplate: () => settings.defaultTemplate,
 	errorText: ipcErrorMessage,
 });
 
@@ -774,6 +788,7 @@ const commands: Record<Command, () => void> = {
 	"confluence-open": () => void confluenceDialog.show(),
 	"jira-open": () => void jiraDialog.showSearch(),
 	settings: () => void settingsDialog.show(),
+	"new-from-template": () => void templatePicker.show(),
 	"move-tab": () => moveTab(session.id),
 	"case-upper": () => rewriteText((text) => changeCase(text, "upper", session.editor.getLang())),
 	"case-lower": () => rewriteText((text) => changeCase(text, "lower", session.editor.getLang())),

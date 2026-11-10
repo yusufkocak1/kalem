@@ -19,6 +19,7 @@ import { withoutRequests as withoutLookups } from "../shared/confluence-tool.js"
 import { diagramSvg, svgMarkup } from "../shared/diagram.js";
 import { outlineText } from "../shared/document-outline.js";
 import type { Finding } from "../shared/findings.js";
+import { addToQuestions, noteBlock, questionLine, withNoteAfter } from "../shared/findings.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type { Mode } from "../shared/modes.js";
@@ -31,6 +32,8 @@ import type { ApprovalRequest } from "../shared/tool-protocol.js";
 import { withoutToolCalls } from "../shared/tool-protocol.js";
 import type { ApprovalState, MadeChange, Usage } from "./assistant-agent.js";
 import { approvalCard, changeLine, planCard, usageText } from "./assistant-agent.js";
+import type { FindingState } from "./assistant-review.js";
+import { findingsCard } from "./assistant-review.js";
 import { createAssistantSettings } from "./assistant-settings.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
@@ -76,6 +79,10 @@ export interface AssistantHost {
 	runCommand(command: Command): void;
 	/** Changes settings, as the menus do (an assistant's change undone). */
 	changeSettings(patch: Partial<Settings>): void;
+	/** Marks the quotes in the document for this run; how many were found. */
+	markQuotes(quotes: readonly string[]): number;
+	/** Brings a quote of the document into view and selects it; `false` when it is not there. */
+	revealQuote(quote: string): boolean;
 	close(): void;
 	errorText(error: unknown): string;
 }
@@ -471,13 +478,17 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		children: MODES.map((value) => el("option", { text: t[MODE_LABELS[value]], attrs: { value } })),
 	});
 	modeSelect.value = mode;
-	modeSelect.addEventListener("change", () => {
-		if (isMode(modeSelect.value)) mode = modeSelect.value;
+	function setMode(next: Mode): void {
+		mode = next;
+		modeSelect.value = next;
 		try {
 			localStorage.setItem("kalem.assistant.mode", mode);
 		} catch {
 			// Kept for this run only.
 		}
+	}
+	modeSelect.addEventListener("change", () => {
+		if (isMode(modeSelect.value)) setMode(modeSelect.value);
 	});
 	const MORE_MODELS = "\u0000more";
 	modelSelect.addEventListener("change", async () => {
@@ -729,6 +740,31 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			run() {
 				input.value = "/";
 				updateMenu();
+			},
+		},
+		{
+			name: "review",
+			label: t.slashReview,
+			run() {
+				setMode("review");
+				ask(t.reviewPrompt);
+			},
+		},
+		{
+			name: "write",
+			label: t.slashWrite,
+			argument: t.slashWriteArgument,
+			run(arg) {
+				setMode("write");
+				ask(arg === "" ? t.writePrompt : format(t.writePromptAbout, arg));
+			},
+		},
+		{
+			name: "prompt",
+			label: t.slashPrompt,
+			run() {
+				setMode("prompt");
+				ask(t.promptPrompt);
 			},
 		},
 		{
@@ -1464,6 +1500,16 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				}),
 			);
 		}
+		if (message.findings !== undefined && message.findings.length > 0) {
+			nodes.push(
+				findingsCard(
+					t,
+					message.findings,
+					(finding) => findingStates.get(finding) ?? "open",
+					reviewActions(message),
+				),
+			);
+		}
 		for (const change of message.changes ?? []) {
 			nodes.push(changeLine(t, change, () => void undoChange(message, change)));
 		}
@@ -2021,10 +2067,110 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		}
 	});
 
-	/** A review's findings came: kept with the reply, shown in the review list. */
+	/** A review's findings came: kept with the reply, shown in the review list, marked in the document. */
 	function onFindings(_chatId: string, reply: Message, findings: readonly Finding[]): void {
 		reply.findings = [...(reply.findings ?? []), ...findings];
+		markOpen(reply);
 		scheduleRender(reply);
+	}
+
+	/** What became of each finding, for this run. */
+	const findingStates = new WeakMap<Finding, FindingState>();
+
+	const openFindings = (message: Message): Finding[] =>
+		(message.findings ?? []).filter((finding) => (findingStates.get(finding) ?? "open") === "open");
+
+	function markOpen(message: Message): number {
+		return host.markQuotes(
+			openFindings(message).flatMap((finding) => (finding.quote === "" ? [] : [finding.quote])),
+		);
+	}
+
+	/** Changes the document as the user asked from a finding; the change can be undone. */
+	async function changeDocument(
+		message: Message,
+		label: string,
+		change: (text: string) => DocumentAction[] | null,
+	): Promise<boolean> {
+		try {
+			const before = await host.context();
+			const actions = change(before.text);
+			if (actions === null) {
+				showNotice(t.reviewNotFound);
+				return false;
+			}
+			const made = await host.applyActions(actions);
+			if (made === 0) {
+				showNotice(t.reviewNotFound);
+				return false;
+			}
+			message.changes = [
+				...(message.changes ?? []),
+				{ label, document: { tabId: before.tabId, text: before.text } },
+			];
+			return true;
+		} catch (error) {
+			showNotice(format(t.assistantActionFailed, host.errorText(error)));
+			return false;
+		}
+	}
+
+	function reviewActions(message: Message) {
+		const settle = (finding: Finding, state: FindingState): void => {
+			findingStates.set(finding, state);
+			markOpen(message);
+			renderReply(message);
+		};
+		return {
+			show(finding: Finding) {
+				if (!host.revealQuote(finding.quote)) showNotice(t.reviewNotFound);
+			},
+			async fix(finding: Finding) {
+				const done = await changeDocument(message, `${finding.id}: ${t.reviewFix}`, () => [
+					{ type: "replace", find: finding.quote, replace: finding.suggestion, all: false },
+				]);
+				if (done) settle(finding, "fixed");
+			},
+			async ask(finding: Finding) {
+				const done = await changeDocument(message, `${finding.id}: ${t.reviewAsk}`, (text) => [
+					{
+						type: "document",
+						text: addToQuestions(text, questionLine(finding), t.reviewQuestionsHeading),
+					},
+				]);
+				if (done) settle(finding, "asked");
+			},
+			async note(finding: Finding) {
+				const done = await changeDocument(message, `${finding.id}: ${t.reviewNote}`, (text) => {
+					const next = withNoteAfter(text, finding.quote, noteBlock(finding, t.reviewNoteLabel));
+					return next === null ? null : [{ type: "document", text: next }];
+				});
+				if (done) settle(finding, "noted");
+			},
+			dismiss(finding: Finding) {
+				settle(finding, "dismissed");
+			},
+			markAll() {
+				showNotice(format(t.reviewMarked, markOpen(message)));
+			},
+			async askAll() {
+				const open = openFindings(message);
+				if (open.length === 0) return;
+				const done = await changeDocument(message, t.reviewAskAll, (text) => [
+					{
+						type: "document",
+						text: open.reduce(
+							(next, finding) =>
+								addToQuestions(next, questionLine(finding), t.reviewQuestionsHeading),
+							text,
+						),
+					},
+				]);
+				if (done) for (const finding of open) findingStates.set(finding, "asked");
+				markOpen(message);
+				renderReply(message);
+			},
+		};
 	}
 
 	/** What became of each question the user was asked. */

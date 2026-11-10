@@ -16,6 +16,7 @@ import type { WorklogContext, WorklogEntry } from "./jira-worklog.js";
 import type { PanePlaces, ToolPane } from "./panes.js";
 import { DEFAULT_PANE_PLACES } from "./panes.js";
 import type { AssistantConfig, AssistantUpdate, ChatMessage, ProviderId } from "./providers.js";
+import type { TemplateInfo } from "./templates.js";
 import type { ApprovalAnswer, ApprovalRequest } from "./tool-protocol.js";
 
 export type Theme = "system" | "light" | "dark";
@@ -98,6 +99,8 @@ export interface Settings {
 	readonly assistantPermissions: readonly string[];
 	/** How Copilot reaches Kalem's tools: through MCP, in blocks, or whichever works. */
 	readonly copilotTools: CopilotTools;
+	/** The analysis template new documents start from and reviews check against; empty for the built-in one. */
+	readonly defaultTemplate: string;
 }
 
 export type CopilotTools = "auto" | "mcp" | "block";
@@ -138,6 +141,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	navigationWidth: 248,
 	assistantPermissions: [],
 	copilotTools: "auto",
+	defaultTemplate: "",
 };
 
 export const MIN_ASSISTANT_WIDTH = 280;
@@ -636,6 +640,7 @@ export const COMMANDS = [
 	"format-code",
 	"format-all-code",
 	"assistant",
+	"new-from-template",
 ] as const;
 
 export type Command = (typeof COMMANDS)[number];
@@ -851,6 +856,23 @@ export interface KalemBridge {
 	/** Forgets the kinds of change allowed for this run of the app. */
 	assistantForgetPermissions(): Promise<void>;
 	onAssistantApproval(handler: (request: ApprovalRequest) => void): () => void;
+	/** The analysis templates: the team's, the user's, and the built-in one. */
+	templates(): Promise<readonly TemplateInfo[]>;
+	/** A new tab with a document made from the template. */
+	templateNew(id: string): Promise<void>;
+	/** Opens a template's file in a tab to edit it. */
+	templateOpen(id: string): Promise<void>;
+	/** A personal copy of the template, opened to edit. */
+	templateCopy(id: string): Promise<TemplateInfo>;
+	templateDelete(id: string): Promise<void>;
+	/** Keeps a document as a template, the user's own or the team's. */
+	templateSave(request: {
+		readonly name: string;
+		readonly text: string;
+		readonly where: "personal" | "workspace";
+	}): Promise<TemplateInfo>;
+	/** Brings a template in from a file; a Word file opens as a document first (`"word"`). */
+	templateImport(): Promise<TemplateInfo | "word" | null>;
 	onAssistantToolCall(handler: (call: AssistantToolCall) => void): () => void;
 	onAssistantEvent(handler: (chatId: string, event: ClaudeEvent) => void): () => void;
 }
@@ -962,6 +984,13 @@ export const CHANNEL = {
 	assistantApplyEdit: "kalem:assistant-apply-edit",
 	assistantEvent: "kalem:assistant-event",
 	assistantApproval: "kalem:assistant-approval",
+	templates: "kalem:templates",
+	templateNew: "kalem:template-new",
+	templateOpen: "kalem:template-open",
+	templateCopy: "kalem:template-copy",
+	templateDelete: "kalem:template-delete",
+	templateSave: "kalem:template-save",
+	templateImport: "kalem:template-import",
 	assistantApprove: "kalem:assistant-approve",
 	assistantToolCall: "kalem:assistant-tool-call",
 	assistantToolResult: "kalem:assistant-tool-result",

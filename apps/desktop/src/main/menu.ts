@@ -92,6 +92,7 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 				else windows.addTab(win, { kind: "empty" }, false);
 			},
 		},
+		{ label: t.newFromTemplate, click: send(ctx, "new-from-template") },
 		{ label: t.newWindow, accelerator: "CmdOrCtrl+Shift+N", click: () => void windows.open() },
 		{
 			label: t.quickNote,

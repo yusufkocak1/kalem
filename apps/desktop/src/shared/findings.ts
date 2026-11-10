@@ -93,3 +93,56 @@ export function noteBlock(finding: Finding, label: string): string {
 	if (finding.question !== "") lines.push(`? ${finding.question}`);
 	return lines.map((line) => `> ${line}`).join("\n>\n");
 }
+
+const QUESTION_HEADINGS =
+	/^(#{1,6})\s+(?:açık sorular|acik sorular|open questions|sorular|questions)\b.*$/imu;
+
+/**
+ * The document with a line added at the end of its open questions'
+ * section; a section is made at the end when there is none.
+ */
+export function addToQuestions(
+	markdown: string,
+	line: string,
+	heading: string,
+	named = "",
+): string {
+	const text = markdown.replace(/\r\n?/g, "\n");
+	const lines = text.split("\n");
+	const wanted = named.trim().toLocaleLowerCase("tr");
+	const at = lines.findIndex((candidate) => {
+		const title = /^(#{1,6})\s+(.*)$/.exec(candidate);
+		if (title === null) return false;
+		const name = (title[2] as string).trim().toLocaleLowerCase("tr");
+		return wanted !== "" ? name === wanted : QUESTION_HEADINGS.test(candidate);
+	});
+	if (at === -1) return `${text.replace(/\n+$/, "")}\n\n## ${heading}\n\n${line}\n`;
+	const level = (/^(#{1,6})/.exec(lines[at] as string)?.[1] ?? "#").length;
+	let end = lines.length;
+	for (let i = at + 1; i < lines.length; i++) {
+		const next = /^(#{1,6})\s/.exec(lines[i] as string);
+		if (next !== null && (next[1] as string).length <= level) {
+			end = i;
+			break;
+		}
+	}
+	// After the section's last line with something on it; an empty "- [ ]" placeholder is replaced.
+	let last = end - 1;
+	while (last > at && (lines[last] as string).trim() === "") last--;
+	if (/^\s*[-*+]\s+\[ \]\s*$/.test(lines[last] as string)) {
+		lines[last] = line;
+		return lines.join("\n");
+	}
+	lines.splice(last + 1, 0, ...(last === at ? ["", line] : [line]));
+	return lines.join("\n");
+}
+
+/** The document with a note after the paragraph that has the quote; `null` when it is not there. */
+export function withNoteAfter(markdown: string, quote: string, note: string): string | null {
+	const text = markdown.replace(/\r\n?/g, "\n");
+	const at = quote === "" ? -1 : text.indexOf(quote);
+	if (at === -1) return null;
+	const blank = text.indexOf("\n\n", at + quote.length);
+	const end = blank === -1 ? text.replace(/\n+$/, "").length : blank;
+	return `${text.slice(0, end)}\n\n${note}${text.slice(end) === "" ? "\n" : text.slice(end)}`;
+}

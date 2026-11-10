@@ -1,9 +1,9 @@
-import { chmod, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import type { Call } from "./fake-claude.js";
 import { fakeClaude } from "./fake-claude.js";
-import { clickMenu, launch, tempDir } from "./launch.js";
+import { clickMenu, launch, stubMessageBox, tempDir } from "./launch.js";
 
 /**
  * A stand-in for the GitHub Copilot CLI that answers by what the question
@@ -234,5 +234,144 @@ test("a Copilot that cannot start Kalem's MCP server is asked again with blocks"
 	await expect.poll(async () => (await copilot.calls()).length).toBe(3);
 	expect((await copilot.calls())[2]?.args).not.toContain("--additional-mcp-config");
 	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("a review lists the rules' and the model's findings, and the user fixes them in the document", async () => {
+	const folder = await tempDir("agent-review");
+	const doc = join(folder, "iptal.md");
+	await writeFile(
+		doc,
+		"# Sipariş İptali\n\n## Amaç ve Kapsam\n\nİptal hızlı yapılmalı.\n\n## Fonksiyonel Gereksinimler\n\n### FR-01: İptal\n\nKullanıcı iptal eder.\n",
+	);
+	const claude = await fakeClaude(folder, "İnceleme bitti: 2 sorun önemli.", [
+		{ name: "analysis_lint", input: {} },
+		{
+			name: "report_findings",
+			input: {
+				findings: [
+					{
+						severity: "high",
+						kind: "ambiguity",
+						section: "Amaç ve Kapsam",
+						quote: "İptal hızlı yapılmalı.",
+						problem: "Ölçülemez.",
+						suggestion: "İptal 2 saniye içinde onaylanmalı.",
+					},
+					{
+						severity: "medium",
+						kind: "missing",
+						section: "FR-01: İptal",
+						quote: "",
+						problem: "Kargodaki sipariş belirsiz.",
+						question: "Kargodaki sipariş iptal edilebilir mi?",
+					},
+				],
+			},
+		},
+	]);
+	const { app, page, errors } = await launch({
+		args: [doc],
+		settings: { assistant: true },
+		env: { KALEM_CLAUDE: claude.path },
+	});
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
+	await pane.locator(".assistant-mode").selectOption("review");
+	await pane.locator(".assistant-input").fill("İncele");
+	await pane.locator(".assistant-input").press("Enter");
+
+	const review = pane.locator(".assistant-review");
+	await expect(review.locator('[data-finding="F-01"]')).toContainText("Ölçülemez.");
+	// The rules found theirs too: the template's missing sections, the vague word, the criteria.
+	await expect(review.locator(".assistant-finding-rule").first()).toHaveText("rule");
+	await expect(review).toContainText("FR-01 has no acceptance criteria.");
+	await expect(review.locator(".assistant-review-head")).toContainText("Ready for development:");
+	// Marked in the document for this run, nothing written into it.
+	await expect
+		.poll(() => page.evaluate(() => CSS.highlights.get("kalem-findings")?.size ?? 0))
+		.toBeGreaterThan(0);
+
+	await review.locator('[data-finding="F-01"]').getByRole("button", { name: "Fix" }).click();
+	await expect(page.locator("#editor p", { hasText: "saniye" })).toHaveText(
+		"İptal 2 saniye içinde onaylanmalı.",
+	);
+	await expect(review.locator('[data-finding="F-01"]')).toContainText("Fixed");
+
+	await review
+		.locator('[data-finding="F-02"]')
+		.getByRole("button", { name: "Add to Open Questions" })
+		.click();
+	await expect(page.locator("#editor h2", { hasText: "Open Questions" })).toBeVisible();
+	await expect(page.locator("#editor li", { hasText: "F-02" })).toContainText(
+		"F-02: Kargodaki sipariş iptal edilebilir mi? (FR-01: İptal)",
+	);
+
+	const [call] = await claude.calls();
+	const system = call?.args[call.args.indexOf("--append-system-prompt") + 1] ?? "";
+	expect(system).toContain("## Mode: review an analysis document");
+	expect(call?.args).toContain("mcp__kalem__report_findings");
+	expect(call?.tools?.[0]?.text).toContain("Checked against the template");
+	expect(call?.tools?.[1]?.text).toBe("Reported 2 findings.");
+	expect(errors).toEqual([]);
+	// "Don't Save" for the changed document.
+	await stubMessageBox(app, 1);
+	await app.close();
+});
+
+test("templates: the team's and the user's own, a default, and new documents from them", async () => {
+	const folder = await tempDir("agent-templates");
+	await mkdir(join(folder, ".kalem", "templates"), { recursive: true });
+	await writeFile(
+		join(folder, ".kalem", "templates", "kurum.md"),
+		'---\nkalem-template: "Kurum Analiz Şablonu"\nrequired: [Amaç, Kapsam]\n---\n# {{title}}\n\n## Amaç\n\n## Kapsam\n',
+	);
+	const userData = await tempDir("profile");
+	await writeFile(
+		join(userData, "settings.json"),
+		JSON.stringify({
+			settings: { language: "en", theme: "light" },
+			welcomed: true,
+			workspaces: [folder],
+		}),
+	);
+	const { app, page, errors } = await launch({ userData });
+	await page.locator("#editor [contenteditable]").first().click();
+	await page.keyboard.type("# Benim Şablonum");
+
+	await clickMenu(app, "File", "Settings…");
+	const dialog = page.locator(".settings-dialog");
+	await dialog.locator('[data-category="templates"]').click();
+	const block = dialog.locator('[data-block="templates"]');
+	await expect(block.locator(".settings-template")).toHaveCount(2);
+	await expect(block.locator(".settings-template").first()).toContainText("Kurum Analiz Şablonu");
+	await expect(block.locator(".settings-template").first()).toContainText(
+		"Team (open folder) · 2 required sections",
+	);
+	await expect(block.locator(".settings-template").last()).toContainText(
+		"Software Analysis Document (best practice)",
+	);
+	await expect(block.locator(".settings-template").last()).toContainText("Default");
+
+	// The active document kept as the user's own template.
+	await block.getByRole("button", { name: "Keep the Active Document as a Template…" }).click();
+	await block.getByLabel("The template's name").fill("Benim Şablonum");
+	await block.getByRole("button", { name: "Save" }).click();
+	await expect(block.locator(".settings-template")).toHaveCount(3);
+	await expect(block.locator(".settings-template").nth(1)).toContainText("Mine");
+
+	// The team's is the default from now on.
+	await block.locator(".settings-template").first().locator('input[type="radio"]').check();
+	await dialog.getByRole("button", { name: "Done" }).click();
+
+	await clickMenu(app, "File", "New from Template…");
+	const picker = page.locator(".template-picker");
+	await expect(picker.locator(".template-item").first()).toContainText("Kurum Analiz Şablonu");
+	await expect(picker.locator(".template-item").first()).toContainText("Default");
+	await picker.locator(".template-item").first().click();
+	await expect(page.locator("#editor h1")).toHaveText("Untitled");
+	await expect(page.locator("#editor h2")).toHaveText(["Amaç", "Kapsam"]);
+	expect(errors).toEqual([]);
+	await stubMessageBox(app, 1);
 	await app.close();
 });

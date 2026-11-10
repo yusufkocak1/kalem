@@ -18,8 +18,10 @@ import {
 	settingDef,
 	valueLabel,
 } from "../shared/settings-schema.js";
+import type { TemplateInfo } from "../shared/templates.js";
 import { createAssistantSettings } from "./assistant-settings.js";
 import { el } from "./dom.js";
+import { sourceLabel } from "./template-picker.js";
 
 export interface SettingsDialogOptions {
 	readonly t: Strings;
@@ -38,6 +40,8 @@ export interface SettingsDialogOptions {
 	assistantConfigured(status: AssistantStatus, changed: boolean): void;
 	openLink(href: string): void;
 	errorText(error: unknown): string;
+	/** The active document's name and text, to keep as a template. */
+	activeDocument(): Promise<{ readonly name: string; readonly text: string }>;
 }
 
 export interface SettingsDialog {
@@ -375,6 +379,199 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		);
 	}
 
+	// --- Templates ---------------------------------------------------------------
+
+	const templateList = el("ul", { class: "template-list settings-templates" });
+	const templateError = el("p", { class: "assistant-error", attrs: { hidden: "", role: "alert" } });
+	const templateNote = el("p", { class: "confluence-hint", attrs: { hidden: "", role: "status" } });
+	const keepName = el("input", {
+		attrs: {
+			type: "text",
+			"aria-label": t.templateFromDocumentName,
+			placeholder: t.templateFromDocumentName,
+		},
+	});
+	const keepTeam = el("input", { attrs: { type: "checkbox" } });
+	const keepSave = el("button", {
+		class: "jira-button",
+		text: t.assistantSave,
+		attrs: { type: "button" },
+	});
+	const keepForm = el("div", {
+		class: "settings-template-keep",
+		attrs: { hidden: "" },
+		children: [
+			keepName,
+			el("label", { class: "settings-check", children: [keepTeam, t.templateForTeam] }),
+			keepSave,
+		],
+	});
+	const keepOpen = el("button", {
+		class: "jira-button",
+		text: t.templateFromDocument,
+		attrs: { type: "button" },
+	});
+	const importButton = el("button", {
+		class: "jira-button",
+		text: t.templateImport,
+		attrs: { type: "button" },
+	});
+	item(
+		"templates",
+		[
+			t.settingsCatTemplates,
+			t.templatesHint,
+			t.templateFromDocument,
+			t.templateImport,
+			...settingDef("defaultTemplate").keywords,
+		].join(" "),
+		el("div", {
+			class: "settings-block",
+			attrs: { "data-block": "templates" },
+			children: [
+				el("p", { class: "confluence-hint", text: t.templatesHint }),
+				templateList,
+				el("div", { class: "jira-actions", children: [keepOpen, importButton] }),
+				keepForm,
+				templateNote,
+				templateError,
+			],
+		}),
+	);
+
+	const templateFailed = (error: unknown): void => {
+		templateError.textContent = options.errorText(error);
+		templateError.hidden = false;
+	};
+	const templateAction = (label: string, run: () => Promise<unknown>): HTMLButtonElement => {
+		const action = el("button", {
+			class: "assistant-link",
+			text: label,
+			attrs: { type: "button" },
+		});
+		action.addEventListener("click", () => {
+			templateError.hidden = true;
+			run().then(() => renderTemplates(), templateFailed);
+		});
+		return action;
+	};
+
+	async function renderTemplates(): Promise<void> {
+		let templates: readonly TemplateInfo[];
+		try {
+			templates = await bridge.templates();
+		} catch (error) {
+			templateFailed(error);
+			return;
+		}
+		const preferred = options.settings().defaultTemplate;
+		const known = templates.some((template) => template.id === preferred);
+		templateList.replaceChildren(
+			...templates.map((template) => {
+				const isDefault =
+					template.id === preferred ||
+					(template.source === "builtin" && (preferred === "" || !known));
+				const radio = el("input", {
+					attrs: {
+						type: "radio",
+						name: "default-template",
+						"aria-label": `${t.templateDefault}: ${template.name}`,
+					},
+				});
+				radio.checked = isDefault;
+				radio.addEventListener("change", () => {
+					options.update({ defaultTemplate: template.source === "builtin" ? "" : template.id });
+				});
+				const actions: HTMLElement[] = [
+					templateAction(t.templateNewDoc, async () => {
+						await bridge.templateNew(template.id);
+						dialog.close();
+					}),
+				];
+				if (template.path !== null) {
+					actions.push(
+						templateAction(t.templateEdit, async () => {
+							await bridge.templateOpen(template.id);
+							dialog.close();
+						}),
+					);
+				}
+				actions.push(
+					templateAction(t.templateCopy, async () => {
+						await bridge.templateCopy(template.id);
+						dialog.close();
+					}),
+				);
+				if (template.path !== null) {
+					actions.push(
+						templateAction(t.templateDelete, async () => {
+							if (!window.confirm(format(t.templateDeleteConfirm, template.name))) return;
+							await bridge.templateDelete(template.id);
+							if (template.id === options.settings().defaultTemplate)
+								options.update({ defaultTemplate: "" });
+						}),
+					);
+				}
+				return el("li", {
+					class: "settings-template",
+					attrs: { "data-template": template.id },
+					children: [
+						radio,
+						el("div", {
+							class: "settings-template-text",
+							children: [
+								el("strong", { text: template.name }),
+								el("span", {
+									class: "template-meta",
+									text: `${sourceLabel(t, template)} · ${format(t.templateRequired, template.required.length)}${isDefault ? ` · ${t.templateDefault}` : ""}`,
+								}),
+							],
+						}),
+						el("div", { class: "settings-template-actions", children: actions }),
+					],
+				});
+			}),
+		);
+	}
+
+	keepOpen.addEventListener("click", async () => {
+		keepForm.hidden = !keepForm.hidden;
+		if (!keepForm.hidden) {
+			keepName.value = (await options.activeDocument().catch(() => ({ name: "" }))).name.replace(
+				/\.md$/i,
+				"",
+			);
+			keepName.focus();
+		}
+	});
+	keepSave.addEventListener("click", async () => {
+		templateError.hidden = true;
+		try {
+			const { text } = await options.activeDocument();
+			const name = keepName.value.trim();
+			if (name === "") return;
+			await bridge.templateSave({ name, text, where: keepTeam.checked ? "workspace" : "personal" });
+			keepForm.hidden = true;
+			await renderTemplates();
+		} catch (error) {
+			templateFailed(error);
+		}
+	});
+	importButton.addEventListener("click", async () => {
+		templateError.hidden = true;
+		templateNote.hidden = true;
+		try {
+			const imported = await bridge.templateImport();
+			if (imported === "word") {
+				templateNote.textContent = t.templateImportedWord;
+				templateNote.hidden = false;
+			}
+			await renderTemplates();
+		} catch (error) {
+			templateFailed(error);
+		}
+	});
+
 	// --- Connections -------------------------------------------------------------
 
 	const connections = el("div", { class: "settings-connections" });
@@ -499,7 +696,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 	}
 
 	async function refresh(): Promise<void> {
-		await renderConnections();
+		await Promise.all([renderConnections(), renderTemplates()]);
 		renderValues();
 		filter();
 	}

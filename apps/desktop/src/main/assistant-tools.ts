@@ -24,6 +24,7 @@ import { JIRA_TOOLS } from "./assistant-jira.js";
 import type { PermissionGate } from "./assistant-permissions.js";
 import type { ConfluenceClient } from "./confluence-client.js";
 import type { JiraClient } from "./jira-client.js";
+import type { TemplateStore } from "./templates.js";
 import type { ToolStep, Workspace } from "./workspace-tools.js";
 import { EDIT_TOOL, WORKSPACE_TOOLS } from "./workspace-tools.js";
 
@@ -58,6 +59,8 @@ export interface ToolContext {
 	readonly confluenceClient: ConfluenceClient | null;
 	readonly jiraClient: JiraClient | null;
 	readonly workspace: Workspace | null;
+	/** The analysis templates; `null` where there are none to read (tests). */
+	readonly templates: TemplateStore | null;
 	/** `null` when the user does not share the document. */
 	readonly document: DocumentSnapshot | null;
 	step(step: ToolStep): void;

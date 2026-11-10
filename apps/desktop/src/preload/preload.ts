@@ -156,6 +156,13 @@ const bridge: KalemBridge = {
 	assistantApprove: (id, answer) => ipcRenderer.invoke(CHANNEL.assistantApprove, id, answer),
 	assistantToolResult: (id, answer) => ipcRenderer.invoke(CHANNEL.assistantToolResult, id, answer),
 	assistantForgetPermissions: () => ipcRenderer.invoke(CHANNEL.assistantForgetPermissions),
+	templates: () => ipcRenderer.invoke(CHANNEL.templates),
+	templateNew: (id) => ipcRenderer.invoke(CHANNEL.templateNew, id),
+	templateOpen: (id) => ipcRenderer.invoke(CHANNEL.templateOpen, id),
+	templateCopy: (id) => ipcRenderer.invoke(CHANNEL.templateCopy, id),
+	templateDelete: (id) => ipcRenderer.invoke(CHANNEL.templateDelete, id),
+	templateSave: (request) => ipcRenderer.invoke(CHANNEL.templateSave, request),
+	templateImport: () => ipcRenderer.invoke(CHANNEL.templateImport),
 	onAssistantApproval: (handler) => listen<[ApprovalRequest]>(CHANNEL.assistantApproval, handler),
 	onAssistantToolCall: (handler) => listen<[AssistantToolCall]>(CHANNEL.assistantToolCall, handler),
 };

@@ -50,6 +50,7 @@ import { PermissionGate } from "./assistant-permissions.js";
 import type { DocumentSnapshot, ToolContext, ToolResult } from "./assistant-tools.js";
 import { approver, RendererCalls, runTool, toolsFor } from "./assistant-tools.js";
 import "./assistant-app-tools.js";
+import "./assistant-analysis-tools.js";
 import { blockResults, parseApprovalAnswer, toolCalls } from "../shared/tool-protocol.js";
 import { collectSources, MAX_SOURCES, SOURCE_BUDGET } from "./assistant-sources.js";
 import type { AssistantStore } from "./assistant-store.js";
@@ -59,6 +60,7 @@ import type { ConfluenceClient } from "./confluence-client.js";
 import type { JiraClient } from "./jira-client.js";
 import { askApi, listModels } from "./llm.js";
 import type { SettingsStore } from "./settings.js";
+import type { TemplateStore } from "./templates.js";
 import type { AppWindow } from "./windows.js";
 import { errorMessage } from "./windows.js";
 import type { KeptEdit, ToolStep } from "./workspace-tools.js";
@@ -86,6 +88,8 @@ export interface AssistantIpcContext {
 	changeSettings(patch: Partial<Settings>): void;
 	changeLanguage(language: Lang | null): void;
 	language(): Lang;
+	/** The analysis templates, for the assistant to follow and check against. */
+	readonly templates: TemplateStore;
 }
 
 /** How long an answer may wait for the user to allow a change, in ms. */
@@ -479,7 +483,10 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			chatId,
 			sender,
 			t,
-			excluded: modeExcluded(request.mode),
+			excluded:
+				program === null
+					? modeExcluded(request.mode)
+					: new Set([...modeExcluded(request.mode), "list_files", "search", "read_file"]),
 			settings: () => ctx.store.settings,
 			changeSettings: ctx.changeSettings,
 			changeLanguage: ctx.changeLanguage,
@@ -488,6 +495,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			confluenceClient,
 			jiraClient,
 			workspace,
+			templates: ctx.templates,
 			document: sentDocument(request.document),
 			// Claude Code's own stream says which tools it called: the steps are not said twice.
 			step: program === "claude" ? () => {} : step,

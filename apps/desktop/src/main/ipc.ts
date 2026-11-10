@@ -70,6 +70,8 @@ import { PACKAGE_ASSETS } from "./package.js";
 import { DOCUMENT_SCHEME } from "./protocol.js";
 import { relocateLinks } from "./relocate.js";
 import type { SettingsStore } from "./settings.js";
+import { TemplateStore } from "./templates.js";
+import { registerTemplateIpc } from "./templates-ipc.js";
 import type { AppWindow, WindowManager } from "./windows.js";
 import { errorMessage, pathKey } from "./windows.js";
 import { listWorkspace, searchWorkspace } from "./workspace.js";
@@ -938,7 +940,15 @@ export function registerIpc(ctx: IpcContext): void {
 		return credentials === null ? null : confluenceClient(credentials);
 	};
 
+	const templates = new TemplateStore({
+		folder: join(app.getPath("userData"), "templates"),
+		workspaces: () => ctx.store.state.workspaces,
+		language: ctx.language,
+	});
+	registerTemplateIpc({ templates, windows, strings: ctx.strings, senderOf });
+
 	assistant = registerAssistantIpc({
+		templates,
 		store: ctx.store,
 		assistant: ctx.assistant,
 		chats: ctx.chats,
