@@ -65,6 +65,7 @@ import {
 } from "./git.js";
 import type { VersionStore } from "./history.js";
 import { registerJiraIpc } from "./jira-ipc.js";
+import { paletteCommands, runPaletteCommand } from "./menu.js";
 import type { PackageStore } from "./package.js";
 import { PACKAGE_ASSETS } from "./package.js";
 import { DOCUMENT_SCHEME } from "./protocol.js";
@@ -208,6 +209,11 @@ export function registerIpc(ctx: IpcContext): void {
 		await windows.openPath(path, win);
 	});
 
+	ipcMain.handle(CHANNEL.recentFiles, () => ctx.store.state.recentFiles);
+	ipcMain.handle(CHANNEL.paletteCommands, () => paletteCommands());
+	on(CHANNEL.runPaletteCommand, (win, id) => {
+		if (typeof id === "string") runPaletteCommand(id, win.window);
+	});
 	ipcMain.handle(CHANNEL.importWord, (event) => windows.showWordDialog(senderOf(event)));
 	ipcMain.handle(CHANNEL.importConfluence, (event) =>
 		windows.showConfluenceDialog(senderOf(event)),

@@ -8,6 +8,8 @@ export interface QuickOpenOptions {
 	readonly lang: string;
 	workspace(): Promise<Workspace>;
 	open(path: string): void;
+	/** `>` typed first: the search is for a command, as in code editors. */
+	commands?(query: string): void;
 }
 
 export interface QuickOpenItem {
@@ -121,6 +123,12 @@ export function createQuickOpen(options: QuickOpenOptions): { show(): Promise<vo
 	}
 
 	input.addEventListener("input", () => {
+		if (input.value.startsWith(">") && options.commands !== undefined) {
+			const query = input.value.slice(1).trimStart();
+			dialog.close();
+			options.commands(query);
+			return;
+		}
 		selected = 0;
 		render();
 	});

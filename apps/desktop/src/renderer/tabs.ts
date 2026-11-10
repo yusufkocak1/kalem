@@ -1,4 +1,5 @@
 import { el } from "./dom.js";
+import { fileType } from "./file-types.js";
 import { icon } from "./icons.js";
 
 export interface TabStripOptions {
@@ -32,7 +33,10 @@ export interface TabStrip {
 
 /** The row of open documents. Tabs are identified by `data-document`. */
 export function createTabStrip(options: TabStripOptions): TabStrip {
-	const tabs = new Map<string, { tab: HTMLElement; title: HTMLElement }>();
+	const tabs = new Map<
+		string,
+		{ tab: HTMLElement; title: HTMLElement; mark: HTMLElement; kind: string }
+	>();
 
 	const list = el("div", {
 		class: "doc-tabs",
@@ -69,6 +73,11 @@ export function createTabStrip(options: TabStripOptions): TabStrip {
 
 		add(id) {
 			const title = el("span", { class: "doc-tab-title" });
+			// The kind of file, as the Files pane draws it: Markdown until a path says otherwise.
+			const mark = el("span", {
+				class: "doc-tab-icon files-icon",
+				attrs: { "aria-hidden": "true" },
+			});
 			const close = el("button", {
 				class: "doc-tab-close",
 				attrs: { type: "button", "aria-label": options.closeLabel, title: options.closeLabel },
@@ -88,7 +97,7 @@ export function createTabStrip(options: TabStripOptions): TabStrip {
 					tabindex: "-1",
 					draggable: "true",
 				},
-				children: [title, close],
+				children: [mark, title, close],
 			});
 			tab.addEventListener("contextmenu", (event) => {
 				event.preventDefault();
@@ -119,7 +128,7 @@ export function createTabStrip(options: TabStripOptions): TabStrip {
 				if (event.button === 1) options.onClose(id);
 			});
 
-			tabs.set(id, { tab, title });
+			tabs.set(id, { tab, title, mark, kind: "" });
 			list.append(tab);
 		},
 
@@ -132,6 +141,13 @@ export function createTabStrip(options: TabStripOptions): TabStrip {
 			const entry = tabs.get(id);
 			if (entry === undefined) return;
 			entry.title.textContent = info.title;
+			const type = fileType(info.path ?? "untitled.md");
+			const kind = `${type.icon} ${type.tone}`;
+			if (entry.kind !== kind) {
+				entry.mark.className = `doc-tab-icon files-icon tone-${type.tone}`;
+				entry.mark.replaceChildren(icon(type.icon));
+				tabs.set(id, { ...entry, kind });
+			}
 			entry.tab.title = info.path ?? info.title;
 			entry.tab.toggleAttribute("data-dirty", info.dirty);
 		},

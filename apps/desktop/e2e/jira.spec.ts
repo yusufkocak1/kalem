@@ -368,6 +368,7 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await expect(jira.locator(".jira-title")).toHaveText("Giriş zaman aşımı");
 	await expect(jira.locator(".jira-issue-head .jira-status")).toHaveText("In Progress");
 	await expect(jira.locator(".jira-fields")).toContainText("AssigneeAyşe Balcı");
+	await expect(jira.locator(".jira-fields")).toContainText("Spent 12h · Remaining 8h");
 	// The description kept as HTML is drawn as a page, not shown as code: the panel is an alert.
 	const description = jira.locator(".jira-markdown").first();
 	await expect(description.locator("blockquote")).toContainText(
@@ -488,11 +489,16 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	// Jira has a pane once it is connected: the user's issues.
 	await showPane(page, "jira");
 	await expect(page.locator(".dock-left .dock-title h2")).toHaveText("Jira");
-	// Sub-tasks under their parent, as a tree; a parent the search missed heads its own.
+	// Sub-tasks under their parent, as a tree, folded away until the parent is opened;
+	// a parent the search missed heads its own, open, since they are what was found.
 	const rows = page.locator(".jira-pane .jira-row");
-	await expect(rows.locator(".jira-key")).toHaveText(["QR-1", "QR-2", "QR-5", "QR-7", "QR-8"]);
-	await expect(page.locator(".jira-pane .jira-tree-child")).toHaveCount(3);
+	await expect(rows.locator(".jira-key")).toHaveText(["QR-1", "QR-7", "QR-8"]);
+	await expect(page.locator(".jira-pane .jira-tree-child")).toHaveCount(1);
 	await expect(page.locator('.jira-pane .jira-tree-context[data-key="QR-7"]')).toBeVisible();
+	await expect(page.locator('.jira-pane .jira-row[data-key="QR-1"]')).toHaveAttribute(
+		"aria-expanded",
+		"false",
+	);
 	// Escape empties the pane's search, as in the other panes.
 	const paneSearch = page.locator(".jira-pane-search");
 	await paneSearch.fill("oturum");
@@ -500,11 +506,13 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await paneSearch.press("Escape");
 	await expect(paneSearch).toHaveValue("");
 	await expect.poll(() => jiraServer.searches.at(-1)).not.toContain("oturum");
-	// The parent's toggle folds its sub-tasks away and back.
+	// The parent's toggle opens its drawer of sub-tasks, and folds it away again.
 	const toggle = page.locator('.jira-pane .jira-row[data-key="QR-1"] .jira-tree-toggle');
 	await toggle.click();
-	await expect(rows.locator(".jira-key")).toHaveText(["QR-1", "QR-7", "QR-8"]);
+	await expect(rows.locator(".jira-key")).toHaveText(["QR-1", "QR-2", "QR-5", "QR-7", "QR-8"]);
 	await expect(page.locator(".jira-dialog")).toBeHidden();
+	await page.locator('.jira-pane .jira-row[data-key="QR-1"] .jira-tree-toggle').click();
+	await expect(rows.locator(".jira-key")).toHaveText(["QR-1", "QR-7", "QR-8"]);
 	await page.locator('.jira-pane .jira-row[data-key="QR-1"] .jira-tree-toggle').click();
 	await expect(rows).toHaveCount(5);
 	expect(jiraServer.searches.at(-1)).toContain("assignee = currentUser()");

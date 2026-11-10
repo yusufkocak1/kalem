@@ -18,7 +18,13 @@
 	--app-error: #a3301c;
 	--app-error-bg: #fce6e1;
 	--app-ok: #1a7f5a;
-	--app-shadow: 0 1px 3px rgb(34 32 29 / 12%), 0 10px 30px rgb(34 32 29 / 10%);
+	--app-shadow:
+		0 1px 2px rgb(34 32 29 / 6%), 0 6px 16px rgb(34 32 29 / 7%),
+		0 18px 44px -12px rgb(34 32 29 / 16%);
+	--app-shadow-soft: 0 1px 2px rgb(34 32 29 / 5%), 0 4px 14px rgb(34 32 29 / 6%);
+	--app-scrollbar: rgb(34 32 29 / 22%);
+	--app-scrollbar-hover: rgb(34 32 29 / 38%);
+	--app-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -40,7 +46,11 @@
 		--app-error: #ff9b82;
 		--app-error-bg: #40211b;
 		--app-ok: #58d0a0;
-		--app-shadow: 0 1px 3px rgb(0 0 0 / 40%), 0 10px 30px rgb(0 0 0 / 35%);
+		--app-shadow:
+			0 1px 2px rgb(0 0 0 / 30%), 0 8px 20px rgb(0 0 0 / 28%), 0 24px 48px -12px rgb(0 0 0 / 40%);
+		--app-shadow-soft: 0 1px 2px rgb(0 0 0 / 25%), 0 4px 14px rgb(0 0 0 / 22%);
+		--app-scrollbar: rgb(232 230 225 / 20%);
+		--app-scrollbar-hover: rgb(232 230 225 / 34%);
 	}
 }
 
@@ -325,11 +335,14 @@ button {
 	height: 30px;
 	padding: 0 6px;
 	border: 1px solid transparent;
-	border-radius: 5px;
+	border-radius: 6px;
 	background: none;
 	color: inherit;
 	font: inherit;
 	white-space: nowrap;
+	transition:
+		background-color 120ms ease,
+		border-color 120ms ease;
 }
 
 .ribbon-button-labeled {
@@ -380,9 +393,12 @@ button {
 .ribbon-style {
 	height: 30px;
 	padding: 0 6px;
-	border: 1px solid var(--app-border);
-	border-radius: 5px;
-	background: var(--app-surface);
+	border: 1px solid color-mix(in srgb, var(--app-border) 70%, transparent);
+	border-radius: 6px;
+	background: var(--app-raised);
+	transition:
+		background-color 120ms ease,
+		box-shadow 120ms ease;
 	color: inherit;
 	font: inherit;
 	white-space: nowrap;
@@ -390,7 +406,9 @@ button {
 
 .ribbon-style[aria-pressed="true"] {
 	border-color: var(--app-accent);
-	box-shadow: inset 0 0 0 1px var(--app-accent);
+	box-shadow:
+		inset 0 0 0 1px var(--app-accent),
+		0 0 0 3px color-mix(in srgb, var(--app-accent) 14%, transparent);
 }
 
 .ribbon-style-heading-1 {
@@ -3419,9 +3437,11 @@ button {
 	/* The side margins shrink with a page narrower than 50em (a side panel open
 	   in a small window) instead of squeezing the text into a thin column. */
 	padding: 4.5em min(5.5em, 11%) 6em;
-	border-radius: 2px;
+	border-radius: 4px;
 	background: var(--app-page);
-	box-shadow: var(--app-shadow);
+	box-shadow:
+		0 0 0 1px color-mix(in srgb, var(--app-border) 60%, transparent),
+		var(--app-shadow-soft);
 	font-size: calc(16px * var(--zoom, 1));
 }
 
@@ -3501,7 +3521,7 @@ button {
 	height: 26px;
 	padding: 0 12px;
 	border-top: 1px solid var(--app-border);
-	background: var(--app-surface);
+	background: color-mix(in srgb, var(--app-surface) 70%, var(--app-desk));
 	color: var(--app-muted);
 	font-size: 12px;
 	user-select: none;
@@ -5594,13 +5614,23 @@ pre[data-confluence-kind="layout"]::before {
 }
 
 .jira-site {
-	flex: 1;
+	flex: 0 1 auto;
 	min-width: 0;
+	margin-right: auto;
+	padding: 1px 8px;
 	overflow: hidden;
+	border-radius: 999px;
+	background: var(--app-hover);
 	color: var(--app-muted);
-	font-size: 12px;
+	font-size: 11.5px;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+/* Not signed in: no pill, the space still pushes the buttons to the right. */
+.jira-site:empty {
+	padding: 0;
+	background: none;
 }
 
 .jira-icon-button {
@@ -5741,21 +5771,173 @@ pre[data-confluence-kind="layout"]::before {
 	color: var(--app-accent-text);
 }
 
+/* The issue's facts as small cards, two or three to a row as the dialog allows. */
 .jira-fields {
 	display: grid;
-	grid-template-columns: max-content 1fr;
-	gap: 4px 16px;
+	grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
 	margin: 0;
+	/* Clip, not hidden: a scroll container in the scrolling body may shrink to nothing. */
+	overflow: clip;
+	border: 1px solid var(--app-border);
+	border-radius: 10px;
+	background: var(--app-raised);
 	font-size: 13px;
+}
+
+.jira-fact {
+	display: grid;
+	align-content: start;
+	gap: 3px;
+	min-width: 0;
+	padding: 9px 12px;
+	/* The lines between cards, on their right and bottom; the frame clips the outer ones. */
+	box-shadow:
+		1px 0 0 var(--app-border),
+		0 1px 0 var(--app-border);
+}
+
+.jira-fact-wide {
+	grid-column: 1 / -1;
 }
 
 .jira-fields dt {
 	color: var(--app-muted);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
 }
 
 .jira-fields dd {
+	min-width: 0;
 	margin: 0;
 	overflow-wrap: anywhere;
+}
+
+.jira-person,
+.jira-priority {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	min-width: 0;
+}
+
+.jira-avatar-mark::before {
+	content: attr(data-initials);
+}
+
+.jira-person > .jira-avatar.jira-avatar-mark {
+	width: 22px;
+	height: 22px;
+	font-size: 9.5px;
+}
+
+.jira-muted {
+	color: var(--app-muted);
+}
+
+/* Priority: a coloured chevron that points up for urgent, down for when there is time. */
+.jira-priority-mark {
+	width: 0;
+	height: 0;
+	border-right: 5px solid transparent;
+	border-left: 5px solid transparent;
+}
+
+.jira-priority[data-level="highest"] .jira-priority-mark,
+.jira-priority[data-level="high"] .jira-priority-mark {
+	border-bottom: 7px solid #e5493a;
+}
+
+.jira-priority[data-level="highest"] .jira-priority-mark {
+	box-shadow: 0 -3px 0 -1px #e5493a;
+}
+
+.jira-priority[data-level="medium"] .jira-priority-mark {
+	width: 10px;
+	height: 3px;
+	border: 0;
+	border-radius: 2px;
+	background: #e2a03f;
+	box-shadow: 0 4px 0 #e2a03f;
+	transform: translateY(-2px);
+}
+
+.jira-priority[data-level="low"] .jira-priority-mark,
+.jira-priority[data-level="lowest"] .jira-priority-mark {
+	border-top: 7px solid #2a7de1;
+}
+
+.jira-time {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.jira-time-bar {
+	flex: 1;
+	max-width: 320px;
+	height: 6px;
+	overflow: hidden;
+	border: 0;
+	border-radius: 999px;
+	background: var(--app-hover);
+	appearance: none;
+}
+
+.jira-time-bar::-webkit-progress-bar {
+	border-radius: 999px;
+	background: var(--app-hover);
+}
+
+.jira-time-bar::-webkit-progress-value {
+	border-radius: 999px;
+	background: var(--app-accent);
+}
+
+.jira-time-text {
+	color: var(--app-muted);
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.jira-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.jira-chip {
+	padding: 1px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 999px;
+	background: var(--app-surface);
+	font-size: 12px;
+}
+
+/* Copy: one button, the key or the link from its menu. */
+.jira-copy {
+	position: relative;
+	display: inline-flex;
+}
+
+.jira-copy-toggle > svg:last-child {
+	width: 12px;
+	height: 12px;
+	transform: rotate(90deg);
+	opacity: 0.6;
+}
+
+.jira-copy > .jira-copy-menu {
+	position: absolute;
+	top: calc(100% + 4px);
+	left: 0;
+	z-index: 5;
+	min-width: 180px;
+}
+
+.jira-copy > .jira-copy-menu[hidden] {
+	display: none;
 }
 
 .jira-section h3 {
@@ -9058,4 +9240,779 @@ h3.mode-panel-name {
 .ribbon-panel[data-compact] .ribbon-style-heading-2,
 .ribbon-panel[data-compact] .ribbon-style-heading-3 {
 	font-size: 13px;
+}
+
+/* --- Start page: ways to begin and recent documents, under an empty page ---- */
+
+.start-page {
+	margin-top: 3em;
+	padding-top: 1.75em;
+	border-top: 1px solid var(--app-border);
+	color: var(--app-text);
+	font-size: 13px;
+	animation: start-in 220ms ease-out;
+}
+
+.start-page[hidden] {
+	display: none;
+}
+
+@keyframes start-in {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+}
+
+.start-title {
+	margin: 0 0 14px;
+	color: var(--app-muted);
+	font-size: 13px;
+}
+
+.start-actions {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+	gap: 8px;
+}
+
+.start-action {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+	padding: 10px 12px;
+	border: 1px solid var(--app-border);
+	border-radius: 10px;
+	background: var(--app-surface);
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+	transition:
+		border-color 120ms ease,
+		background 120ms ease,
+		transform 120ms ease,
+		box-shadow 120ms ease;
+}
+
+.start-action:hover {
+	border-color: color-mix(in srgb, var(--app-accent) 45%, var(--app-border));
+	background: var(--app-raised);
+	box-shadow: 0 2px 10px rgb(0 0 0 / 6%);
+	transform: translateY(-1px);
+}
+
+.start-action:focus-visible,
+.start-recent-item:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 1px;
+}
+
+.start-action-icon {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--app-accent) 12%, transparent);
+	color: var(--app-accent);
+}
+
+.start-action-icon > svg.icon {
+	width: 18px;
+	height: 18px;
+}
+
+.start-action-text {
+	display: grid;
+	min-width: 0;
+}
+
+.start-action-label {
+	font-weight: 600;
+}
+
+.start-action-hint {
+	color: var(--app-muted);
+	font-size: 12px;
+	line-height: 1.3;
+}
+
+.start-recent {
+	margin-top: 22px;
+}
+
+.start-recent[hidden] {
+	display: none;
+}
+
+.start-heading {
+	margin: 0 0 6px;
+	color: var(--app-muted);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.start-recent-list {
+	display: grid;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.start-recent-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	min-width: 0;
+	padding: 6px 8px;
+	border: 0;
+	border-radius: 6px;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.start-recent-item:hover {
+	background: var(--app-hover);
+}
+
+.start-recent-item svg.icon {
+	width: 16px;
+	height: 16px;
+}
+
+.start-recent-name {
+	flex: none;
+	max-width: 50%;
+	overflow: hidden;
+	font-weight: 500;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.start-recent-folder {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	color: var(--app-muted);
+	font-size: 12px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* --- Tabs: the kind of file before the name ---------------------------------- */
+
+.doc-tab-icon {
+	display: inline-flex;
+	flex: none;
+	margin-right: -2px;
+}
+
+.doc-tab-icon > svg.icon {
+	width: 14px;
+	height: 14px;
+}
+
+/* The open document's tab reads as the page it is: a line of the accent on top. */
+.doc-tab[aria-selected="true"] {
+	box-shadow: inset 0 2px 0 var(--app-accent);
+}
+
+/* --- Dialogs open with a short fade and rise; the window behind softens ------ */
+
+dialog[open] {
+	animation: dialog-in 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+dialog[open]::backdrop {
+	backdrop-filter: blur(2px);
+	animation: backdrop-in 160ms ease-out;
+}
+
+@keyframes dialog-in {
+	from {
+		opacity: 0;
+		transform: translateY(8px) scale(0.985);
+	}
+}
+
+@keyframes backdrop-in {
+	from {
+		opacity: 0;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.start-page,
+	dialog[open],
+	dialog[open]::backdrop {
+		animation: none;
+	}
+
+	.start-action {
+		transition: none;
+	}
+
+	.start-action:hover {
+		transform: none;
+	}
+}
+
+.files-empty-action {
+	display: inline-flex;
+	align-items: center;
+	align-self: flex-start;
+	gap: 6px;
+	margin: 0 12px 8px;
+	padding: 5px 12px 5px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.files-empty-action:hover {
+	border-color: var(--app-accent);
+}
+
+.files-empty-action:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 1px;
+}
+
+.files-empty-action > svg.icon {
+	width: 15px;
+	height: 15px;
+	color: var(--app-accent);
+}
+
+.files-empty-action[hidden] {
+	display: none;
+}
+
+/* --- Command palette (F1): the menu's commands by name --------------------------- */
+
+.command-palette {
+	width: min(640px, calc(100vw - 32px));
+	margin: 10vh auto auto;
+	padding: 6px;
+	border: 1px solid var(--app-border);
+	border-radius: 12px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: var(--app-shadow);
+}
+
+.command-palette::backdrop {
+	background: rgb(0 0 0 / 18%);
+}
+
+.palette-field {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 0 4px 0 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-surface);
+}
+
+.palette-field:focus-within {
+	border-color: var(--app-accent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 18%, transparent);
+}
+
+.palette-prompt {
+	color: var(--app-accent);
+	font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+	font-weight: 700;
+}
+
+.palette-input {
+	flex: 1;
+	min-width: 0;
+	padding: 8px 0;
+	border: 0;
+	background: none;
+	color: var(--app-text);
+	font: inherit;
+	font-size: 14px;
+	outline: none;
+}
+
+.palette-empty {
+	margin: 10px 4px 4px;
+	color: var(--app-muted);
+}
+
+.palette-empty[hidden] {
+	display: none;
+}
+
+.palette-list {
+	max-height: 50vh;
+	margin: 6px 0 0;
+	padding: 0;
+	overflow-y: auto;
+	list-style: none;
+}
+
+.palette-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 6px 10px;
+	border-radius: 6px;
+	cursor: pointer;
+}
+
+.palette-item[aria-selected="true"] {
+	background: var(--app-pressed);
+}
+
+.palette-item:hover:not([aria-selected="true"]) {
+	background: var(--app-hover);
+}
+
+.palette-check {
+	display: inline-flex;
+	flex: none;
+	width: 14px;
+	color: var(--app-accent);
+}
+
+.palette-check > svg.icon {
+	width: 14px;
+	height: 14px;
+}
+
+.palette-name {
+	flex: none;
+	font-weight: 500;
+}
+
+.palette-group {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	color: var(--app-muted);
+	font-size: 12px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.palette-key {
+	flex: none;
+	padding: 1px 6px;
+	border: 1px solid var(--app-border);
+	border-bottom-width: 2px;
+	border-radius: 5px;
+	background: var(--app-surface);
+	color: var(--app-muted);
+	font-family: inherit;
+	font-size: 11px;
+	white-space: nowrap;
+}
+
+/* --- Status bar: the branch, and a save status that saves --------------------- */
+
+.status-git {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	height: 20px;
+	margin-left: -6px;
+	padding: 0 6px;
+	border: 0;
+	border-radius: 4px;
+	background: none;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+}
+
+.status-git:hover {
+	background: var(--app-hover);
+	color: var(--app-text);
+}
+
+.status-git:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -2px;
+}
+
+.status-git[hidden] {
+	display: none;
+}
+
+.status-git > svg.icon {
+	width: 14px;
+	height: 14px;
+}
+
+.status-git-count {
+	font-variant-numeric: tabular-nums;
+}
+
+.status-git-changed {
+	color: var(--app-warning);
+	font-variant-numeric: tabular-nums;
+}
+
+.save-status[data-status="unsaved"],
+.save-status[data-status="error"] {
+	padding: 2px 8px;
+	border-radius: 999px;
+	cursor: pointer;
+}
+
+.save-status[data-status="unsaved"]:hover,
+.save-status[data-status="error"]:hover {
+	background: var(--app-hover);
+	color: var(--app-text);
+}
+
+/* The start page's lists side by side where the page is wide enough. */
+.start-lists {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+	gap: 0 28px;
+	margin-top: 22px;
+}
+
+.start-lists > .start-recent {
+	margin-top: 0;
+	margin-bottom: 18px;
+}
+
+.start-file {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	border-radius: 6px;
+}
+
+.start-file:hover {
+	background: var(--app-hover);
+}
+
+.start-file > .start-recent-item {
+	flex: 1;
+	min-width: 0;
+}
+
+.start-file > .start-recent-item:hover {
+	background: none;
+}
+
+.start-pin {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	margin-right: 2px;
+	padding: 0;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: var(--app-muted);
+	cursor: pointer;
+	opacity: 0;
+}
+
+.start-file:hover > .start-pin,
+.start-pin:focus-visible,
+.start-pin[aria-pressed="true"] {
+	opacity: 1;
+}
+
+.start-pin:hover {
+	background: var(--app-pressed);
+	color: var(--app-text);
+}
+
+.start-pin[aria-pressed="true"] {
+	color: var(--app-accent);
+}
+
+.start-pin > svg.icon {
+	width: 15px;
+	height: 15px;
+}
+
+.start-pin[aria-pressed="true"] > svg.icon {
+	fill: currentColor;
+}
+
+.start-pin:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -2px;
+}
+
+/* --- A lighter, more modern finish ------------------------------------------------
+   Thin scrollbars, softer depth, rounder corners and short transitions; nothing here
+   moves or resizes what the layout above sets. */
+
+body {
+	-webkit-font-smoothing: antialiased;
+	text-rendering: optimizeLegibility;
+}
+
+/* Thin, rounded scrollbars that keep out of the way until they are used. */
+::-webkit-scrollbar {
+	width: 12px;
+	height: 12px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	border: 3px solid transparent;
+	border-radius: 999px;
+	background: var(--app-scrollbar) padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: var(--app-scrollbar-hover) padding-box;
+}
+
+::-webkit-scrollbar-button {
+	display: none;
+}
+
+/* The File button as a rounded pill inside the title row, not a full-height block. */
+.ribbon-file {
+	margin: 4px 0 4px 6px;
+	padding: 0 16px;
+	border-radius: 7px;
+	box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+	transition: filter 120ms ease;
+}
+
+/* The tab underline as a short rounded bar under the label. */
+.ribbon-tab {
+	position: relative;
+	border-bottom-color: transparent;
+	transition: color 120ms ease;
+}
+
+.ribbon-tab[aria-selected="true"] {
+	border-bottom-color: transparent;
+}
+
+.ribbon-tab[aria-selected="true"]::after {
+	content: "";
+	position: absolute;
+	right: 10px;
+	bottom: 0;
+	left: 10px;
+	height: 3px;
+	border-radius: 3px 3px 0 0;
+	background: var(--app-accent);
+}
+
+/* Tabs: rounder, and the open one lifts a little off the strip. */
+.doc-tab {
+	border-radius: 8px 8px 0 0;
+}
+
+.doc-tab[aria-selected="true"] {
+	box-shadow:
+		inset 0 2px 0 var(--app-accent),
+		0 -1px 6px rgb(0 0 0 / 4%);
+}
+
+/* Dialogs and menus: rounder, with the layered shadow. */
+dialog {
+	border-radius: 12px;
+}
+
+.dock-menu,
+.files-menu,
+.jira-row-menu,
+.kalem-menu {
+	border-radius: 10px;
+	box-shadow: var(--app-shadow);
+}
+
+.dock-menu-item {
+	border-radius: 6px;
+}
+
+/* Buttons that do the main thing of their dialog: a gentle lift on hover. */
+.jira-button.primary {
+	box-shadow: 0 1px 2px rgb(0 0 0 / 14%);
+}
+
+.jira-button.primary:hover {
+	box-shadow: 0 2px 8px color-mix(in srgb, var(--app-accent) 35%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ribbon-file,
+	.ribbon-tab,
+	.ribbon-button,
+	.ribbon-style,
+	.icon-button,
+	.jira-button,
+	.doc-tab,
+	.stripe-button {
+		transition: none;
+	}
+}
+
+/* --- Settings: the colour palette ---------------------------------------------- */
+
+.palette-swatches {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+	gap: 10px;
+	margin: 10px 0 14px;
+}
+
+.palette-swatch {
+	display: grid;
+	gap: 6px;
+	padding: 6px 6px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 10px;
+	background: var(--app-surface);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 12px;
+	cursor: pointer;
+	transition:
+		border-color 120ms ease,
+		box-shadow 120ms ease;
+}
+
+.palette-swatch:hover {
+	border-color: color-mix(in srgb, var(--app-accent) 45%, var(--app-border));
+}
+
+.palette-swatch[aria-checked="true"] {
+	border-color: var(--app-accent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 18%, transparent);
+}
+
+.palette-swatch:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 2px;
+}
+
+.palette-swatch-name {
+	font-weight: 600;
+}
+
+.palette-swatch[aria-checked="true"] .palette-swatch-name::after {
+	content: " ✓";
+	color: var(--app-accent);
+}
+
+/* A small picture of the app in the palette: light half and dark half. */
+.palette-preview {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	height: 52px;
+	overflow: clip;
+	border-radius: 6px;
+	box-shadow: inset 0 0 0 1px rgb(0 0 0 / 10%);
+}
+
+.palette-preview-half {
+	display: grid;
+	grid-template-rows: 9px 1fr;
+	background: var(--p-desk);
+}
+
+.palette-preview-bar {
+	background: var(--p-surface);
+	box-shadow: inset 10px 0 0 var(--p-accent);
+}
+
+.palette-preview-page {
+	display: grid;
+	align-content: start;
+	gap: 4px;
+	margin: 6px 7px 0;
+	padding: 6px 5px;
+	border-radius: 2px 2px 0 0;
+	background: var(--p-page);
+}
+
+.palette-preview-line {
+	height: 3px;
+	border-radius: 2px;
+	background: var(--p-text);
+	opacity: 0.55;
+}
+
+.palette-preview-line:first-child {
+	width: 60%;
+	background: var(--p-accent);
+	opacity: 1;
+}
+
+.palette-preview-line.short {
+	width: 80%;
+}
+
+.palette-own-title {
+	margin: 0 0 6px;
+	font-size: 13px;
+}
+
+.palette-own {
+	display: grid;
+	grid-template-columns: max-content 64px 64px;
+	align-items: center;
+	gap: 6px 14px;
+	margin-bottom: 12px;
+}
+
+.palette-own-head {
+	color: var(--app-muted);
+	font-size: 11px;
+	font-weight: 600;
+	text-align: center;
+}
+
+.palette-own-name {
+	font-size: 13px;
+}
+
+.palette-color {
+	width: 64px;
+	height: 28px;
+	padding: 2px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-raised);
+	cursor: pointer;
+}
+
+.palette-color::-webkit-color-swatch-wrapper {
+	padding: 0;
+}
+
+.palette-color::-webkit-color-swatch {
+	border: 0;
+	border-radius: 4px;
 }

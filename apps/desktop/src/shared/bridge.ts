@@ -17,12 +17,13 @@ import type {
 import type { WorklogContext, WorklogEntry } from "./jira-worklog.js";
 import type { ModeSettings } from "./mode-config.js";
 import type { ModelOption } from "./models.js";
+import type { PaletteChoice, PaletteTheme } from "./palette.js";
+import { PALETTES } from "./palette.js";
 import type { PanePlaces, ToolPane } from "./panes.js";
 import { DEFAULT_PANE_PLACES } from "./panes.js";
 import type { AssistantConfig, AssistantUpdate, ChatMessage, ProviderId } from "./providers.js";
 import type { TemplateInfo } from "./templates.js";
 import type { ApprovalAnswer, ApprovalRequest } from "./tool-protocol.js";
-
 export type Theme = "system" | "light" | "dark";
 
 export const PAGE_SIZES = ["A4", "A3", "A5", "Letter", "Legal"] as const;
@@ -49,6 +50,10 @@ export const MARGIN_CM: Readonly<Record<PageMargins, readonly [number, number]>>
 
 export interface Settings {
 	readonly theme: Theme;
+	/** The app's colours: a made palette, or the user's own (`paletteCustom`). */
+	readonly palette: PaletteChoice;
+	/** The user's own colours, for each theme. */
+	readonly paletteCustom: PaletteTheme;
 	/** `null` follows the operating system. */
 	readonly language: Lang | null;
 	/** Document zoom in percent. */
@@ -81,6 +86,8 @@ export interface Settings {
 	readonly confluenceFavorites: readonly ConfluenceFavorite[];
 	/** Jira issues the user starred, newest first. */
 	readonly jiraFavorites: readonly JiraFavorite[];
+	/** Documents pinned to the start page, in the order they were pinned. */
+	readonly pinnedFiles: readonly string[];
 	/** Look for a new release once a day (a request to GitHub). */
 	readonly checkUpdates: boolean;
 	/** A notification-area icon and the system-wide quick note shortcut; the app stays there when its windows close. */
@@ -123,6 +130,8 @@ export type SidePane = ToolPane;
 
 export const DEFAULT_SETTINGS: Settings = {
 	theme: "system",
+	palette: "kalem",
+	paletteCustom: PALETTES.kalem,
 	language: null,
 	zoom: 100,
 	fullWidth: false,
@@ -144,6 +153,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	confluenceSpace: "",
 	confluenceFavorites: [],
 	jiraFavorites: [],
+	pinnedFiles: [],
 	checkUpdates: true,
 	tray: false,
 	gitAutoFetch: true,
@@ -683,7 +693,21 @@ export const COMMANDS = [
 	"format-all-code",
 	"assistant",
 	"new-from-template",
+	"command-palette",
 ] as const;
+
+/** A command of the application menu, as the command palette lists it. */
+export interface PaletteCommand {
+	/** Where it is in the menu; what it is run by. */
+	readonly id: string;
+	readonly label: string;
+	/** The menus it is under: "File › Export". */
+	readonly group: string;
+	/** As the menu shows it; empty when it has none. */
+	readonly accelerator: string;
+	/** For a check or radio item, whether it is on; `null` for the rest. */
+	readonly checked: boolean | null;
+}
 
 export type Command = (typeof COMMANDS)[number];
 
@@ -695,6 +719,12 @@ export interface KalemBridge {
 	newTab(): void;
 	showOpenDialog(): Promise<void>;
 	openPath(path: string): Promise<void>;
+	/** The documents opened last, newest first. */
+	recentFiles(): Promise<readonly string[]>;
+	/** The application menu's commands, for the command palette. */
+	paletteCommands(): Promise<readonly PaletteCommand[]>;
+	/** Runs one of them, in this window. */
+	runPaletteCommand(id: string): void;
 	importWord(): Promise<void>;
 	importConfluence(): Promise<void>;
 
@@ -937,6 +967,9 @@ export const CHANNEL = {
 	newTab: "kalem:new-tab",
 	showOpenDialog: "kalem:show-open-dialog",
 	openPath: "kalem:open-path",
+	recentFiles: "kalem:recent-files",
+	paletteCommands: "kalem:palette-commands",
+	runPaletteCommand: "kalem:run-palette-command",
 	importWord: "kalem:import-word",
 	importConfluence: "kalem:import-confluence",
 	confluenceAccount: "kalem:confluence-account",

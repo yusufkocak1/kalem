@@ -33,6 +33,8 @@ export interface FilesPaneOptions {
 	inform(text: string): void;
 	/** The folders were listed again (they may have been opened or closed). */
 	listed?(workspace: Workspace): void;
+	/** The single open folder's repository, as the pane's git bar shows it; `null` without one. */
+	gitChanged?(git: GitStatus | null): void;
 	readonly git: GitDialogs;
 	/** Whether open repositories are fetched in the background now and then. */
 	autoFetch(): boolean;
@@ -177,6 +179,14 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 		attrs: { role: "tree", "aria-label": t.filesTab },
 	});
 	const message = el("p", { class: "files-message" });
+	/** With no folder open, the way to open one, where the pane says so. */
+	const emptyOpen = el("button", {
+		class: "files-empty-action",
+		attrs: { type: "button" },
+		children: [icon("folderOpen"), el("span", { text: t.openFolder })],
+	});
+	emptyOpen.hidden = true;
+	emptyOpen.addEventListener("click", () => void bridge.openFolder());
 	/** The repository of a single open folder: its branch, what is pending, pull and push. */
 	const gitBar = el("div", { class: "files-git", attrs: { hidden: "" } });
 	const menu = el("div", { class: "files-menu", attrs: { role: "menu", hidden: "" } });
@@ -200,6 +210,7 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 			gitBar,
 			search,
 			message,
+			emptyOpen,
 			list,
 			menu,
 		],
@@ -297,6 +308,7 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 		}
 		search.disabled = roots.length === 0;
 		renderGitBar(only);
+		emptyOpen.hidden = roots.length > 0;
 
 		if (roots.length === 0) {
 			showMessage(t.noFolder);
@@ -683,6 +695,7 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 
 	function renderGitBar(only: WorkspaceRoot | undefined): void {
 		const git = only?.git ?? null;
+		options.gitChanged?.(only === undefined ? null : git);
 		if (only === undefined || git === null) {
 			gitBar.hidden = true;
 			gitBar.replaceChildren();

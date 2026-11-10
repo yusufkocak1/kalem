@@ -23,9 +23,9 @@ import { groupName } from "./favorites.js";
 import type { Strings } from "./i18n.js";
 import { format } from "./i18n.js";
 import { parseModeSettings } from "./mode-config.js";
-import { MAX_DOCK_SIZE, MIN_DOCK_SIZE, parsePanePlaces, TOOL_PANES } from "./panes.js";
-
 /** The Settings window's categories, in its order. */
+import { PALETTE_IDS, parsePaletteCustom } from "./palette.js";
+import { MAX_DOCK_SIZE, MIN_DOCK_SIZE, parsePanePlaces, TOOL_PANES } from "./panes.js";
 export const SETTING_CATEGORIES = [
 	"appearance",
 	"editor",
@@ -124,6 +124,19 @@ export function parseConfluenceFavorites(value: unknown): ConfluenceFavorite[] {
 		.slice(0, MAX_FAVORITES);
 }
 
+/** The pinned documents: absolute paths, each once, at most a few dozen. */
+export function parsePinnedFiles(value: unknown): string[] {
+	if (!Array.isArray(value)) return [];
+	const paths = value.filter(
+		(item): item is string =>
+			typeof item === "string" &&
+			item !== "" &&
+			item.length < 4096 &&
+			/^(\/|[A-Za-z]:[\\/]|\\\\)/.test(item),
+	);
+	return [...new Set(paths)].slice(0, 30);
+}
+
 export function parseJiraFavorites(value: unknown): JiraFavorite[] {
 	if (!Array.isArray(value)) return [];
 	const seen = new Set<string>();
@@ -202,6 +215,37 @@ export const SETTINGS_SCHEMA: Schema = {
 		valueLabels: ["themeSystem", "themeLight", "themeDark"],
 		keywords: ["tema", "theme", "koyu", "dark", "açık", "light", "gece", "night", "renk", "color"],
 		assistant: "write",
+	},
+	palette: {
+		key: "palette",
+		category: "appearance",
+		label: null,
+		type: "enum",
+		values: [...PALETTE_IDS, "custom"],
+		valueLabels: [
+			"paletteKalem",
+			"paletteOcean",
+			"paletteForest",
+			"paletteSunset",
+			"paletteViolet",
+			"paletteGraphite",
+			"paletteRose",
+			"paletteSand",
+			"paletteNord",
+			"paletteMidnight",
+			"paletteCustom",
+		],
+		keywords: ["renk paleti", "palette", "renk", "color", "colour", "vurgu", "accent", "tema"],
+		assistant: "write",
+	},
+	paletteCustom: {
+		key: "paletteCustom",
+		category: "appearance",
+		label: null,
+		type: "custom",
+		parse: parsePaletteCustom,
+		keywords: [],
+		assistant: "hidden",
 	},
 	language: {
 		key: "language",
@@ -467,6 +511,15 @@ export const SETTINGS_SCHEMA: Schema = {
 		label: null,
 		type: "custom",
 		parse: parseJiraFavorites,
+		keywords: [],
+		assistant: "hidden",
+	},
+	pinnedFiles: {
+		key: "pinnedFiles",
+		category: "system",
+		label: null,
+		type: "custom",
+		parse: parsePinnedFiles,
 		keywords: [],
 		assistant: "hidden",
 	},

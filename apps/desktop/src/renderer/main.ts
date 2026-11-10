@@ -4,7 +4,7 @@ import type { Caret, EditResult } from "@kalem-editor/editor";
 import { holderIn, indentItem, outdentItem, selectRange, toggleList } from "@kalem-editor/editor";
 import type { DocumentAction } from "../shared/actions.js";
 import { applyActions } from "../shared/actions.js";
-import type { Command, KalemBridge, Settings, TabDocument } from "../shared/bridge.js";
+import type { Command, GitStatus, KalemBridge, Settings, TabDocument } from "../shared/bridge.js";
 import { clampZoom, MAX_ZOOM, MIN_ZOOM, pageRule, ZOOM_STEP } from "../shared/bridge.js";
 import type { ContextDiagram, ReplyDiagram } from "../shared/claude.js";
 import { splitReply } from "../shared/claude.js";
@@ -13,6 +13,7 @@ import { attachmentName, linkedAttachment } from "../shared/confluence-common.js
 import type { Diagram } from "../shared/diagram.js";
 import { DIAGRAM_SUFFIX, serializeDiagram } from "../shared/diagram.js";
 import { format, stringsFor } from "../shared/i18n.js";
+import { paletteCss } from "../shared/palette.js";
 import type { ToolPane } from "../shared/panes.js";
 import { revealPane } from "../shared/panes.js";
 import {
@@ -26,6 +27,7 @@ import { withColumnWidth } from "../shared/table-style.js";
 import { changeCase, collapseSpaces, nextCase } from "../shared/text-case.js";
 import { createAssistantPane } from "./assistant-pane.js";
 import { createAttachmentCard } from "./attachment-card.js";
+import { createCommandPalette } from "./command-palette.js";
 import { createAttachmentsDialog, linkedAttachments } from "./confluence-attachments.js";
 import { createConfluenceDialog } from "./confluence-dialog.js";
 import { createConfluencePane } from "./confluence-pane.js";
@@ -53,6 +55,8 @@ import { createQuickOpen } from "./quick-open.js";
 import { createAppRibbon } from "./ribbon-layout.js";
 import { ipcErrorMessage, Session } from "./session.js";
 import { createSettingsDialog } from "./settings-dialog.js";
+import type { StartAction } from "./start-page.js";
+import { createStartPage } from "./start-page.js";
 import { enableColumnResize } from "./table-styles.js";
 import { createTabStrip } from "./tabs.js";
 import { createTemplatePicker } from "./template-picker.js";
@@ -105,6 +109,7 @@ const filesPane = createFilesPane({
 	inform: (text) => session.notices.show({ id: "files", kind: "info", text }),
 	// The open folders are the assistant's workspace.
 	listed: () => assistant.workspaceChanged(),
+	gitChanged: (git) => showGitStatus(git),
 	git: createGitDialogs(t, startup.language),
 	autoFetch: () => settings.gitAutoFetch,
 	setAutoFetch: (on) => updateSettings({ gitAutoFetch: on }),
@@ -166,6 +171,14 @@ const quickOpen = createQuickOpen({
 	lang: startup.language,
 	workspace: () => bridge.getWorkspace(),
 	open: (path) => void bridge.openPath(path),
+	commands: (query) => void commandPalette.show(query),
+});
+/** The menu's commands by name (F1, or `>` in Quick Open). */
+const commandPalette = createCommandPalette({
+	t,
+	lang: startup.language,
+	commands: () => bridge.paletteCommands(),
+	run: (id) => bridge.runPaletteCommand(id),
 });
 
 /** Where the caret last was in each tab's document, and the text last selected in it. */
@@ -350,10 +363,35 @@ const zoomSlider = el("input", {
 	},
 });
 const zoomValue = el("output", { class: "zoom-value" });
+/** The open folder's branch, what waits to be pushed and pulled, and what changed; a click shows the Files pane. */
+const gitStatus = el("button", {
+	class: "status-git",
+	attrs: { type: "button" },
+});
+gitStatus.hidden = true;
+gitStatus.addEventListener("click", () => {
+	if (!docks.shown().has("files")) updateSettings(revealPane(settings, "files"));
+});
+
+function showGitStatus(git: GitStatus | null): void {
+	gitStatus.hidden = git === null;
+	if (git === null) return;
+	const branch = git.branch ?? t.statusGitDetached;
+	const parts: (Node | string)[] = [icon("branch"), el("span", { text: branch })];
+	if (git.ahead > 0) parts.push(el("span", { class: "status-git-count", text: `↑${git.ahead}` }));
+	if (git.behind > 0) parts.push(el("span", { class: "status-git-count", text: `↓${git.behind}` }));
+	if (git.changed > 0) {
+		parts.push(el("span", { class: "status-git-changed", text: `●${git.changed}` }));
+	}
+	gitStatus.replaceChildren(...parts);
+	gitStatus.title = format(t.statusGitTitle, branch, git.changed, git.ahead, git.behind);
+}
+
 const statusBar = el("footer", {
 	class: "statusbar",
 	children: [
 		docks.stripes.bottom,
+		gitStatus,
 		wordCountArea,
 		el("span", { class: "status-spacer" }),
 		readOnlyBadge,
@@ -368,6 +406,10 @@ const exitFocus = el("button", {
 	attrs: { type: "button" },
 });
 const saveStatus = el("div", { class: "save-status", attrs: { role: "status" } });
+// Unsaved or failed: a click saves, as Ctrl+S does.
+saveStatus.addEventListener("click", () => {
+	if (session.status === "unsaved" || session.status === "error") commands.save();
+});
 // Publishing to Confluence, always at hand next to the save status while Confluence is connected.
 const publishButton = el("button", {
 	class: "ribbon-publish",
@@ -435,6 +477,60 @@ interface Tab {
 	readonly canvas: HTMLElement;
 	/** Everything that belongs to this tab and is shown only while it is active. */
 	readonly views: readonly HTMLElement[];
+	/** Shows or hides the start page, as the document is empty or not. */
+	showStart(): void;
+}
+
+/** The ways to start a document, offered under an empty page; Jira only once it is connected. */
+function startActions(): StartAction[] {
+	return [
+		{
+			id: "template",
+			icon: "new",
+			label: t.startTemplate,
+			hint: t.startTemplateHint,
+			run: () => commands["new-from-template"](),
+		},
+		{
+			id: "open",
+			icon: "open",
+			label: t.startOpen,
+			hint: t.startOpenHint,
+			run: () => void bridge.showOpenDialog(),
+		},
+		{
+			id: "folder",
+			icon: "folderOpen",
+			label: t.startFolder,
+			hint: t.startFolderHint,
+			run: () => void bridge.openFolder(),
+		},
+		{
+			id: "word",
+			icon: "word",
+			label: t.startWord,
+			hint: t.startWordHint,
+			run: () => void bridge.importWord(),
+		},
+		{
+			id: "confluence",
+			icon: "confluence",
+			label: t.startConfluence,
+			hint: t.startConfluenceHint,
+			run: () => commands["confluence-open"](),
+		},
+		...(accounts.jira
+			? [
+					{
+						id: "jira",
+						icon: "target",
+						label: t.startJira,
+						hint: t.startJiraHint,
+						run: () => commands["jira-open"](),
+					} satisfies StartAction,
+				]
+			: []),
+	];
 }
 
 const tabs = new Map<string, Tab>();
@@ -495,7 +591,10 @@ async function openFromFolder(path: string, query?: string): Promise<void> {
 function renderState(): void {
 	saveStatus.textContent = STATUS_TEXT[session.status];
 	saveStatus.dataset.status = session.status;
-	saveStatus.title = session.path ?? "";
+	saveStatus.title =
+		session.status === "unsaved" || session.status === "error"
+			? `${t.statusClickToSave}${session.path === null ? "" : `\n${session.path}`}`
+			: (session.path ?? "");
 	formatBadge.textContent = session.formatLabel;
 	readOnlyBadge.hidden = !session.readOnly;
 }
@@ -505,7 +604,21 @@ function createTab(id: string): Tab {
 	const tabCanvas = el("div", { class: "kalem-theme" });
 	// `kalem-theme` on the page too: the source-mode textarea is a sibling of
 	// the editor and would otherwise not inherit the theme tokens.
-	const page = el("div", { class: "page kalem-theme", children: [tabCanvas] });
+	const start = createStartPage({
+		t,
+		actions: startActions,
+		recent: () => bridge.recentFiles(),
+		pinned: () => settings.pinnedFiles,
+		setPinned: (paths) => updateSettings({ pinnedFiles: paths }),
+		open: (path) => void bridge.openPath(path),
+		confluence: () => (accounts.confluence ? bridge.confluenceSearch("", null) : null),
+		openConfluence: (pageId) => void bridge.confluenceOpenPage(pageId),
+	});
+	/** Once the document had something in it, the start page does not come back. */
+	let started = false;
+	/** The state changes before the document is loaded have nothing to show yet. */
+	let loaded = false;
+	const page = el("div", { class: "page kalem-theme", children: [tabCanvas, start.element] });
 	const desk = el("main", { class: "desk", children: [page] });
 	const outline = el("div", { class: "kalem-theme" });
 	const wordCount = el("div", { class: "kalem-theme" });
@@ -537,9 +650,21 @@ function createTab(id: string): Tab {
 				path: tabSession.path,
 			});
 			if (session === tabSession) renderState();
+			if (loaded) showStart();
 		},
 		onEditorChange: scheduleRibbonUpdate,
 	});
+
+	/** Called once the tab's document is loaded, and on each change of its state after. */
+	function showStart(): void {
+		if (!started && (tabSession.dirty || tabSession.status !== "new")) started = true;
+		start.show(
+			!started &&
+				!tabSession.isText &&
+				!tabSession.readOnly &&
+				tabSession.styledMarkdown().trim() === "",
+		);
+	}
 
 	enableColumnResize(tabCanvas, {
 		enabled: () => session === tabSession && canEdit(),
@@ -550,7 +675,15 @@ function createTab(id: string): Tab {
 		},
 	});
 
-	const tab: Tab = { session: tabSession, canvas: tabCanvas, views };
+	const tab: Tab = {
+		session: tabSession,
+		canvas: tabCanvas,
+		views,
+		showStart: () => {
+			loaded = true;
+			showStart();
+		},
+	};
 	tabs.set(id, tab);
 	tabStrip.add(id);
 	return tab;
@@ -584,6 +717,7 @@ function openDocument({ tabId, payload }: TabDocument): void {
 	const tab = tabs.get(tabId) ?? createTab(tabId);
 	// Load before activating: the ribbon reads editor state as soon as a tab is active.
 	tab.session.load(payload);
+	tab.showStart();
 	activateTab(tabId);
 	tab.session.focus();
 }
@@ -642,9 +776,12 @@ function cycleTab(step: 1 | -1): void {
 // --- Settings ---------------------------------------------------------------
 
 const pageSetup = document.head.appendChild(document.createElement("style"));
+/** The colour palette's variables, after the stylesheet so that they win. */
+const paletteStyle = document.head.appendChild(document.createElement("style"));
 
 function applySettings(): void {
 	pageSetup.textContent = pageRule(settings);
+	paletteStyle.textContent = paletteCss(settings.palette, settings.paletteCustom);
 	app.style.setProperty("--zoom", String(settings.zoom / 100));
 	app.toggleAttribute("data-full-width", settings.fullWidth);
 	placeAssistant();
@@ -832,6 +969,7 @@ const commands: Record<Command, () => void> = {
 	"format-code": () => (session.isText ? session.textView?.beautify() : tools.formatCode()),
 	"format-all-code": () => (session.isText ? session.textView?.beautify() : tools.formatAllCode()),
 	"quick-open": () => void quickOpen.show(),
+	"command-palette": () => void commandPalette.show(),
 	"confluence-open": () => void confluenceDialog.show(),
 	"publish-confluence": () => {
 		if (session.remote !== null) {

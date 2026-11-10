@@ -655,10 +655,11 @@ test("brings images along when a document is saved into another folder", async (
 	const { app, page, errors } = await launch({ args: [join(folder, "a", "rapor.md")] });
 	await stubSaveDialog(app, join(folder, "b", "kopya.md"));
 	await clickMenu(app, "File", "Save As…");
+	// The document was saved already: wait for the new file, not for the status.
+	await expect
+		.poll(() => readFile(join(folder, "b", "kopya.md"), "utf8").catch(() => ""))
+		.toBe("![grafik](kopya.assets/grafik.png)\n");
 	await expect(status(page)).toHaveText("Saved");
-	expect(await readFile(join(folder, "b", "kopya.md"), "utf8")).toBe(
-		"![grafik](kopya.assets/grafik.png)\n",
-	);
 	expect(await readdir(join(folder, "b", "kopya.assets"))).toEqual(["grafik.png"]);
 	await expect.poll(() => imageWidth(page)).toBe(1);
 	expect(errors).toEqual([]);
@@ -2015,6 +2016,142 @@ test("copies a styled table with its style and pastes it back styled", async () 
 	await expect(status(page)).toHaveText("Saved");
 	const saved = await readFile(path, "utf8");
 	expect(saved.match(/<!-- kalem:table color=green widths=150 -->/g)).toHaveLength(2);
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("offers ways to start and the recent documents under an empty page, until something is written", async () => {
+	const folder = await tempDir("start");
+	const plan = join(folder, "plan.md");
+	await writeFile(plan, "# Plan\n");
+	const { app, page, errors } = await launch({ args: [plan] });
+	await expect(page.locator("#editor h1")).toHaveText("Plan");
+	// A document with something in it has no start page.
+	await expect(page.locator(".start-page:visible")).toHaveCount(0);
+
+	await page.locator(".doc-tab-new").click();
+	const start = page.locator(".start-page:visible");
+	await expect(start).toBeVisible();
+	await expect(start.locator(".start-action-label")).toHaveText([
+		"From a template",
+		"Open a file",
+		"Open a folder",
+		"Import from Word",
+		"From Confluence",
+	]);
+	await expect(start.locator(".start-recent-name")).toHaveText(["plan.md"]);
+	// A pin moves it to the pinned documents, which stay at the top.
+	await start.locator(".start-file").hover();
+	await start.getByRole("button", { name: "Pin to the start page: plan.md" }).click();
+	await expect(start.locator(".start-pinned .start-recent-name")).toHaveText(["plan.md"]);
+	await expect(start.locator(".start-recent:not(.start-pinned):visible")).toHaveCount(0);
+	await start.getByRole("button", { name: "Unpin: plan.md" }).click();
+	await expect(start.locator(".start-pinned")).toBeHidden();
+	await start.locator(".start-file").hover();
+	await start.getByRole("button", { name: "Pin to the start page: plan.md" }).click();
+	// The tab says what kind of file it shows.
+	await expect(page.locator('.doc-tab[aria-selected="true"] .doc-tab-icon')).toHaveClass(
+		/tone-markdown/,
+	);
+
+	// Typing starts the document as before; the start page goes and does not come back.
+	await page.keyboard.type("Not");
+	await expect(start).toHaveCount(0);
+	await page.keyboard.press("Backspace");
+	await page.keyboard.press("Backspace");
+	await page.keyboard.press("Backspace");
+	await expect(page.locator(".start-page:visible")).toHaveCount(0);
+
+	// A recent document opens from another empty tab.
+	await page.locator(".doc-tab-new").click();
+	await page.locator(".start-page:visible .start-pinned .start-recent-item").click();
+	await expect(page.locator('.doc-tab[aria-selected="true"]')).toContainText("plan");
+	expect(errors).toEqual([]);
+	await discardAndClose(app);
+});
+
+test("runs a menu command by name from the command palette, and from > in Quick Open", async () => {
+	const { app, page, errors } = await launch();
+	await clickMenu(app, "View", "Command Palette…");
+	const palette = page.locator(".command-palette");
+	await expect(palette).toBeVisible();
+	const input = palette.locator(".palette-input");
+	await expect(input).toBeFocused();
+	// Every word must match the name or its menus; shortcuts and check marks are shown.
+	await input.fill("full width");
+	const items = palette.locator(".palette-item");
+	await expect(items.first().locator(".palette-name")).toHaveText("Full Width");
+	await expect(items.first().locator(".palette-group")).toHaveText("View");
+	await input.press("Enter");
+	await expect(palette).toBeHidden();
+	await expect(page.locator(".app")).toHaveAttribute("data-full-width", "");
+
+	await clickMenu(app, "View", "Command Palette…");
+	await input.fill("full width");
+	await expect(items.first().locator(".palette-check svg")).toHaveCount(1);
+	await input.fill("save as");
+	await expect(items.first().locator(".palette-key")).toHaveText(/Shift\+S$/);
+	await page.keyboard.press("Escape");
+
+	// In Quick Open, ">" turns the search into one for commands.
+	await clickMenu(app, "File", "Quick Open…");
+	await page.locator(".quick-open .quick-open-input").fill(">full");
+	await expect(palette).toBeVisible();
+	await expect(input).toHaveValue("full");
+	await input.press("Enter");
+	await expect(page.locator(".app")).not.toHaveAttribute("data-full-width", "");
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("saves from the save status when the document has unsaved changes", async () => {
+	const folder = await tempDir("save-status");
+	const path = join(folder, "not.md");
+	await writeFile(path, "Bir\n");
+	const { app, page, errors } = await launch({ args: [path] });
+	await expect(status(page)).toHaveText("Saved");
+	await page.locator("#editor p").first().click();
+	await page.keyboard.press("End");
+	await page.keyboard.type(" iki");
+	await expect(status(page)).toHaveText("Unsaved");
+	await expect(status(page)).toHaveAttribute("title", /Click to save/);
+	await status(page).click();
+	await expect(status(page)).toHaveText("Saved");
+	expect(await readFile(path, "utf8")).toBe("Bir iki\n");
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("picks a colour palette in the settings, or the user's own colours", async () => {
+	const { app, page, userData, errors } = await launch();
+	const accent = () =>
+		page.evaluate(() =>
+			getComputedStyle(document.documentElement).getPropertyValue("--app-accent").trim(),
+		);
+	expect(await accent()).toBe("#0f4e4a");
+	await clickMenu(app, "File", "Settings…");
+	const block = page.locator('.settings-dialog [data-block="palette"]');
+	await expect(block.locator(".palette-swatch")).toHaveCount(11);
+	await block.locator('[data-palette="forest"]').click();
+	await expect(block.locator('[data-palette="forest"]')).toHaveAttribute("aria-checked", "true");
+	await expect.poll(accent).toBe("#2f6b34");
+	// A colour changed makes the palette the user's own, starting from the one in use.
+	const color = block.locator('input[data-token="accent"][data-side="light"]');
+	await expect(color).toHaveValue("#2f6b34");
+	await color.evaluate((input: HTMLInputElement) => {
+		input.value = "#aa3300";
+		input.dispatchEvent(new Event("change", { bubbles: true }));
+	});
+	await expect(block.locator('[data-palette="custom"]')).toHaveAttribute("aria-checked", "true");
+	await expect.poll(accent).toBe("#aa3300");
+	await expect
+		.poll(async () => {
+			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
+			return [stored.settings.palette, stored.settings.paletteCustom.light.accent];
+		})
+		.toEqual(["custom", "#aa3300"]);
+	await block.getByRole("button", { name: "Back to Kalem's colours" }).click();
+	await expect.poll(accent).toBe("#0f4e4a");
 	expect(errors).toEqual([]);
 	await app.close();
 });
