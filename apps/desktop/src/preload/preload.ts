@@ -30,6 +30,7 @@ const bridge: KalemBridge = {
 	newTab: () => ipcRenderer.send(CHANNEL.newTab),
 	showOpenDialog: () => ipcRenderer.invoke(CHANNEL.showOpenDialog),
 	openPath: (path) => ipcRenderer.invoke(CHANNEL.openPath, path),
+	recentFiles: () => ipcRenderer.invoke(CHANNEL.recentFiles),
 	importWord: () => ipcRenderer.invoke(CHANNEL.importWord),
 	importConfluence: () => ipcRenderer.invoke(CHANNEL.importConfluence),
 	confluenceAccount: () => ipcRenderer.invoke(CHANNEL.confluenceAccount),

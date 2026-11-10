@@ -695,6 +695,8 @@ export interface KalemBridge {
 	newTab(): void;
 	showOpenDialog(): Promise<void>;
 	openPath(path: string): Promise<void>;
+	/** The documents opened last, newest first. */
+	recentFiles(): Promise<readonly string[]>;
 	importWord(): Promise<void>;
 	importConfluence(): Promise<void>;
 
@@ -937,6 +939,7 @@ export const CHANNEL = {
 	newTab: "kalem:new-tab",
 	showOpenDialog: "kalem:show-open-dialog",
 	openPath: "kalem:open-path",
+	recentFiles: "kalem:recent-files",
 	importWord: "kalem:import-word",
 	importConfluence: "kalem:import-confluence",
 	confluenceAccount: "kalem:confluence-account",

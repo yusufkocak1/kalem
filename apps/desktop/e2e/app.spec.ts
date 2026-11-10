@@ -2018,3 +2018,44 @@ test("copies a styled table with its style and pastes it back styled", async () 
 	expect(errors).toEqual([]);
 	await app.close();
 });
+
+test("offers ways to start and the recent documents under an empty page, until something is written", async () => {
+	const folder = await tempDir("start");
+	const plan = join(folder, "plan.md");
+	await writeFile(plan, "# Plan\n");
+	const { app, page, errors } = await launch({ args: [plan] });
+	await expect(page.locator("#editor h1")).toHaveText("Plan");
+	// A document with something in it has no start page.
+	await expect(page.locator(".start-page:visible")).toHaveCount(0);
+
+	await page.locator(".doc-tab-new").click();
+	const start = page.locator(".start-page:visible");
+	await expect(start).toBeVisible();
+	await expect(start.locator(".start-action-label")).toHaveText([
+		"From a template",
+		"Open a file",
+		"Open a folder",
+		"Import from Word",
+		"From Confluence",
+	]);
+	await expect(start.locator(".start-recent-name")).toHaveText(["plan.md"]);
+	// The tab says what kind of file it shows.
+	await expect(page.locator('.doc-tab[aria-selected="true"] .doc-tab-icon')).toHaveClass(
+		/tone-markdown/,
+	);
+
+	// Typing starts the document as before; the start page goes and does not come back.
+	await page.keyboard.type("Not");
+	await expect(start).toHaveCount(0);
+	await page.keyboard.press("Backspace");
+	await page.keyboard.press("Backspace");
+	await page.keyboard.press("Backspace");
+	await expect(page.locator(".start-page:visible")).toHaveCount(0);
+
+	// A recent document opens from another empty tab.
+	await page.locator(".doc-tab-new").click();
+	await page.locator(".start-page:visible .start-recent-item").click();
+	await expect(page.locator('.doc-tab[aria-selected="true"]')).toContainText("plan");
+	expect(errors).toEqual([]);
+	await discardAndClose(app);
+});

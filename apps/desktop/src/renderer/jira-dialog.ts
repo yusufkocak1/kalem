@@ -144,14 +144,17 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 	function updateHeader(): void {
 		back.hidden = history.length < 2;
 		searchButton.hidden = account === null;
+		// The site by its name, the whole address on hover: the scheme and path add nothing here.
+		const host = account === null ? "" : hostOf(account.site);
 		siteLabel.textContent =
 			account === null
 				? ""
 				: account.shared
-					? `${t.jiraSharedLogin} · ${account.site}`
+					? `${t.jiraSharedLogin} · ${host}`
 					: account.username === ""
-						? account.site
-						: `${account.username} · ${account.site}`;
+						? host
+						: `${account.username} · ${host}`;
+		siteLabel.title = account?.site ?? "";
 	}
 
 	function message(text: string, kind: "info" | "error" = "info"): HTMLElement {
@@ -740,4 +743,13 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 			await render();
 		},
 	};
+}
+
+/** A site's host name, as people call it ("jira.example.com"); the text itself when it is no URL. */
+function hostOf(site: string): string {
+	try {
+		return new URL(site).host;
+	} catch {
+		return site;
+	}
 }

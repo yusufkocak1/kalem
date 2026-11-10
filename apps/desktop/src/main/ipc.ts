@@ -208,6 +208,7 @@ export function registerIpc(ctx: IpcContext): void {
 		await windows.openPath(path, win);
 	});
 
+	ipcMain.handle(CHANNEL.recentFiles, () => ctx.store.state.recentFiles);
 	ipcMain.handle(CHANNEL.importWord, (event) => windows.showWordDialog(senderOf(event)));
 	ipcMain.handle(CHANNEL.importConfluence, (event) =>
 		windows.showConfluenceDialog(senderOf(event)),

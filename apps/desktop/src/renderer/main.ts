@@ -53,6 +53,8 @@ import { createQuickOpen } from "./quick-open.js";
 import { createAppRibbon } from "./ribbon-layout.js";
 import { ipcErrorMessage, Session } from "./session.js";
 import { createSettingsDialog } from "./settings-dialog.js";
+import type { StartAction } from "./start-page.js";
+import { createStartPage } from "./start-page.js";
 import { enableColumnResize } from "./table-styles.js";
 import { createTabStrip } from "./tabs.js";
 import { createTemplatePicker } from "./template-picker.js";
@@ -435,6 +437,60 @@ interface Tab {
 	readonly canvas: HTMLElement;
 	/** Everything that belongs to this tab and is shown only while it is active. */
 	readonly views: readonly HTMLElement[];
+	/** Shows or hides the start page, as the document is empty or not. */
+	showStart(): void;
+}
+
+/** The ways to start a document, offered under an empty page; Jira only once it is connected. */
+function startActions(): StartAction[] {
+	return [
+		{
+			id: "template",
+			icon: "new",
+			label: t.startTemplate,
+			hint: t.startTemplateHint,
+			run: () => commands["new-from-template"](),
+		},
+		{
+			id: "open",
+			icon: "open",
+			label: t.startOpen,
+			hint: t.startOpenHint,
+			run: () => void bridge.showOpenDialog(),
+		},
+		{
+			id: "folder",
+			icon: "folderOpen",
+			label: t.startFolder,
+			hint: t.startFolderHint,
+			run: () => void bridge.openFolder(),
+		},
+		{
+			id: "word",
+			icon: "word",
+			label: t.startWord,
+			hint: t.startWordHint,
+			run: () => void bridge.importWord(),
+		},
+		{
+			id: "confluence",
+			icon: "confluence",
+			label: t.startConfluence,
+			hint: t.startConfluenceHint,
+			run: () => commands["confluence-open"](),
+		},
+		...(accounts.jira
+			? [
+					{
+						id: "jira",
+						icon: "target",
+						label: t.startJira,
+						hint: t.startJiraHint,
+						run: () => commands["jira-open"](),
+					} satisfies StartAction,
+				]
+			: []),
+	];
 }
 
 const tabs = new Map<string, Tab>();
@@ -505,7 +561,17 @@ function createTab(id: string): Tab {
 	const tabCanvas = el("div", { class: "kalem-theme" });
 	// `kalem-theme` on the page too: the source-mode textarea is a sibling of
 	// the editor and would otherwise not inherit the theme tokens.
-	const page = el("div", { class: "page kalem-theme", children: [tabCanvas] });
+	const start = createStartPage({
+		t,
+		actions: startActions,
+		recent: () => bridge.recentFiles(),
+		open: (path) => void bridge.openPath(path),
+	});
+	/** Once the document had something in it, the start page does not come back. */
+	let started = false;
+	/** The state changes before the document is loaded have nothing to show yet. */
+	let loaded = false;
+	const page = el("div", { class: "page kalem-theme", children: [tabCanvas, start.element] });
 	const desk = el("main", { class: "desk", children: [page] });
 	const outline = el("div", { class: "kalem-theme" });
 	const wordCount = el("div", { class: "kalem-theme" });
@@ -537,9 +603,21 @@ function createTab(id: string): Tab {
 				path: tabSession.path,
 			});
 			if (session === tabSession) renderState();
+			if (loaded) showStart();
 		},
 		onEditorChange: scheduleRibbonUpdate,
 	});
+
+	/** Called once the tab's document is loaded, and on each change of its state after. */
+	function showStart(): void {
+		if (!started && (tabSession.dirty || tabSession.status !== "new")) started = true;
+		start.show(
+			!started &&
+				!tabSession.isText &&
+				!tabSession.readOnly &&
+				tabSession.styledMarkdown().trim() === "",
+		);
+	}
 
 	enableColumnResize(tabCanvas, {
 		enabled: () => session === tabSession && canEdit(),
@@ -550,7 +628,15 @@ function createTab(id: string): Tab {
 		},
 	});
 
-	const tab: Tab = { session: tabSession, canvas: tabCanvas, views };
+	const tab: Tab = {
+		session: tabSession,
+		canvas: tabCanvas,
+		views,
+		showStart: () => {
+			loaded = true;
+			showStart();
+		},
+	};
 	tabs.set(id, tab);
 	tabStrip.add(id);
 	return tab;
@@ -584,6 +670,7 @@ function openDocument({ tabId, payload }: TabDocument): void {
 	const tab = tabs.get(tabId) ?? createTab(tabId);
 	// Load before activating: the ribbon reads editor state as soon as a tab is active.
 	tab.session.load(payload);
+	tab.showStart();
 	activateTab(tabId);
 	tab.session.focus();
 }
