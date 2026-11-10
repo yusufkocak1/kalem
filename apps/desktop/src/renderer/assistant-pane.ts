@@ -767,6 +767,15 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				ask(t.promptPrompt);
 			},
 		},
+		{ name: "trace", label: t.slashTrace, run: () => ask(t.tracePrompt) },
+		{
+			name: "stories",
+			label: t.slashStories,
+			run() {
+				setMode("write");
+				ask(t.storiesPrompt);
+			},
+		},
 		{
 			name: "summarize",
 			label: t.assistantSuggestSummary,

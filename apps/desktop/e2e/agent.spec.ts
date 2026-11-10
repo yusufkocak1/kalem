@@ -1,4 +1,6 @@
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import type { Call } from "./fake-claude.js";
@@ -374,4 +376,120 @@ test("templates: the team's and the user's own, a default, and new documents fro
 	expect(errors).toEqual([]);
 	await stubMessageBox(app, 1);
 	await app.close();
+});
+
+/** A Jira that knows who is signed in, and keeps what it is sent. */
+async function fakeJira() {
+	const posted: { path: string; body: Record<string, unknown> }[] = [];
+	const server = createServer(async (request, response) => {
+		const url = new URL(request.url ?? "/", "http://localhost");
+		const reply = (status: number, body: unknown): void => {
+			response.writeHead(status, { "content-type": "application/json" });
+			response.end(JSON.stringify(body));
+		};
+		if (request.headers.authorization !== "Bearer jira-pat")
+			return reply(401, { errorMessages: ["Unauthorized"] });
+		if (request.method === "POST") {
+			let body = "";
+			for await (const chunk of request) body += chunk;
+			posted.push({ path: url.pathname, body: JSON.parse(body) });
+			if (url.pathname === "/rest/api/2/issue")
+				return reply(201, { key: `ABC-${10 + posted.length}` });
+			return reply(201, {});
+		}
+		if (url.pathname === "/rest/api/2/myself")
+			return reply(200, { displayName: "Ayşe", name: "ayse" });
+		return reply(200, { issues: [], total: 0 });
+	});
+	await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+	const { port } = server.address() as AddressInfo;
+	return { site: `http://127.0.0.1:${port}`, posted, close: () => server.close() };
+}
+
+test("nothing goes to Jira without the user's click; only the issues they pick are created", async () => {
+	const jira = await fakeJira();
+	const folder = await tempDir("agent-jira");
+	const claude = await fakeClaude(folder, "Story'leri oluşturdum.", [
+		{
+			name: "jira_create_issues",
+			input: {
+				project: "ABC",
+				issues: [
+					{
+						type: "Story",
+						summary: "FR-01 İptal talebi",
+						description: "**Kabul:** iptal 2 sn içinde onaylanır.",
+					},
+					{ type: "Story", summary: "FR-02 İade" },
+				],
+			},
+		},
+		{ name: "jira_add_comment", input: { key: "ABC-11", comment: "Analiz güncellendi." } },
+	]);
+	const { app, page, errors } = await launch({
+		settings: { assistant: true },
+		env: { KALEM_CLAUDE: claude.path },
+	});
+	await clickMenu(app, "File", "Settings…");
+	const settings = page.locator(".settings-dialog");
+	await settings.locator('[data-category="connections"]').click();
+	await settings
+		.locator('[data-connection="Jira"]')
+		.getByRole("button", { name: "Connect to Jira" })
+		.click();
+	const login = page.locator(".jira-dialog");
+	await login.locator('input[type="url"]').fill(jira.site);
+	await login.locator('input[type="password"]').fill("jira-pat");
+	await login.getByRole("button", { name: "Connect" }).click();
+	await expect(page.locator('.stripe-button[data-pane="jira"]')).toBeVisible();
+	await page.keyboard.press("Escape");
+
+	const pane = page.locator(".assistant");
+	await pane.locator(".assistant-input").fill("Gereksinimlerden story oluştur");
+	await pane.locator(".assistant-input").press("Enter");
+	const card = pane.locator(".assistant-approval").first();
+	await expect(card).toContainText(`Create 2 issue(s) in ABC (${jira.site})`);
+	await expect(card).toContainText("This is sent to the server; Kalem cannot undo it.");
+	// Online changes are allowed one at a time: no "always".
+	await expect(card.locator(".assistant-approval-scope")).toBeHidden();
+	await expect(card.locator(".assistant-approval-preview")).toContainText(
+		"**Kabul:** iptal 2 sn içinde onaylanır.",
+	);
+	// Nothing was sent while the card waits.
+	await page.waitForTimeout(300);
+	expect(jira.posted).toEqual([]);
+	await card.getByLabel("Story: FR-02 İade").uncheck();
+	await card.getByRole("button", { name: "Allow" }).click();
+
+	const comment = pane.locator(".assistant-approval").nth(1);
+	await expect(comment).toContainText("Comment on ABC-11");
+	await comment.getByRole("button", { name: "Deny" }).click();
+	await expect(pane.locator(".assistant-assistant .assistant-markdown").last()).toContainText(
+		"Story'leri oluşturdum.",
+	);
+
+	expect(jira.posted).toHaveLength(1);
+	expect(jira.posted[0]).toMatchObject({
+		path: "/rest/api/2/issue",
+		body: {
+			fields: {
+				project: { key: "ABC" },
+				issuetype: { name: "Story" },
+				summary: "FR-01 İptal talebi",
+			},
+		},
+	});
+	// Its description went as Jira's wiki markup.
+	expect(
+		(jira.posted[0]?.body.fields as { description?: string } | undefined)?.description,
+	).toContain("*Kabul:*");
+	const [call] = await claude.calls();
+	expect(call?.tools?.[0]?.text).toContain(
+		`Created ABC-11: FR-01 İptal talebi (${jira.site}/browse/ABC-11)`,
+	);
+	expect(call?.tools?.[0]?.text).toContain("The user left out 1 of them.");
+	expect(call?.tools?.[1]?.text).toContain("nothing was sent");
+	expect(errors).toEqual([]);
+	await app.close();
+	jira.close();
 });

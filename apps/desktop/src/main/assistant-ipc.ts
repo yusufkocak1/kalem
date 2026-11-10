@@ -51,6 +51,7 @@ import type { DocumentSnapshot, ToolContext, ToolResult } from "./assistant-tool
 import { approver, RendererCalls, runTool, toolsFor } from "./assistant-tools.js";
 import "./assistant-app-tools.js";
 import "./assistant-analysis-tools.js";
+import "./assistant-external-tools.js";
 import { blockResults, parseApprovalAnswer, toolCalls } from "../shared/tool-protocol.js";
 import { collectSources, MAX_SOURCES, SOURCE_BUDGET } from "./assistant-sources.js";
 import type { AssistantStore } from "./assistant-store.js";
