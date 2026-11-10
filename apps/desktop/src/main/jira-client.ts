@@ -43,6 +43,7 @@ import {
 } from "../shared/jira-worklog.js";
 import type { ConfluenceCredentials, Fetch } from "./confluence-client.js";
 import { isCloudHost } from "./confluence-client.js";
+import { RateGate, RateLimited, retryAfter } from "./jira-rate.js";
 
 /** Issues of one search's page. */
 export const JIRA_PAGE_SIZE = 25;
@@ -70,30 +71,8 @@ const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : [
  * installed) and status changes. Cloud searches with `/search/jql` (the older `/search` is gone
  * there), Server with `/search`.
  */
-/** Requests one Jira site is sent at the same time; the rest wait their turn. */
-const MAX_PARALLEL = 4;
-/** Times a request Jira turned away for its rate limit (429) is sent again. */
-const RATE_RETRIES = 3;
-/** The longest wait before sending again, whatever Jira says. */
-const MAX_RETRY_WAIT = 15_000;
-
-/** Each site's turns, shared by every client of it: a client is made for each request from a window. */
-const turns = new Map<string, { running: number; waiting: (() => void)[] }>();
-
-async function takeTurn(site: string): Promise<() => void> {
-	let state = turns.get(site);
-	if (state === undefined) {
-		state = { running: 0, waiting: [] };
-		turns.set(site, state);
-	}
-	const own = state;
-	if (own.running >= MAX_PARALLEL) await new Promise<void>((resolve) => own.waiting.push(resolve));
-	own.running++;
-	return () => {
-		own.running--;
-		own.waiting.shift()?.();
-	};
-}
+/** Every request to a Jira site goes through its gate: Jira's rate limit is the site's, not a window's. */
+const gate = new RateGate();
 
 /** Answers that seldom change, kept a while by site and login: who is signed in, Tempo's fields. */
 const kept = new Map<string, { until: number; value: Promise<unknown> }>();
@@ -112,17 +91,6 @@ function keep<T>(key: string, lifetime: number, make: () => Promise<T>): Promise
 }
 
 const MINUTE = 60_000;
-
-/** How long to wait before sending again, from Jira's `Retry-After` (seconds or a date). */
-export function retryWait(header: string | null, attempt: number): number {
-	let wait = Number.NaN;
-	if (header !== null && header.trim() !== "") {
-		const seconds = Number(header);
-		wait = Number.isFinite(seconds) ? seconds * 1000 : new Date(header).getTime() - Date.now();
-	}
-	if (!Number.isFinite(wait) || wait < 0) wait = 1000 * 2 ** attempt;
-	return Math.min(wait, MAX_RETRY_WAIT);
-}
 
 export class JiraClient {
 	readonly site: string;
@@ -147,12 +115,13 @@ export class JiraClient {
 		return this.#auth.startsWith("Bearer ");
 	}
 
-	async #json(path: string): Promise<Json> {
-		return asJson(await this.#get(path));
+	async #json(path: string, background = false): Promise<Json> {
+		return asJson(await this.#get(path, background));
 	}
 
-	async #get(path: string): Promise<unknown> {
-		return this.#send("GET", path);
+	/** `background`: asked without the user waiting for it (a card, a list's choices); not sent while Jira's limit lasts. */
+	async #get(path: string, background = false): Promise<unknown> {
+		return this.#send("GET", path, undefined, background);
 	}
 
 	/** What the kept answers of this site and login are filed under. */
@@ -160,10 +129,21 @@ export class JiraClient {
 		return `${this.site}\n${this.#auth}`;
 	}
 
-	async #send(method: "GET" | "POST", path: string, body?: unknown): Promise<unknown> {
+	async #send(
+		method: "GET" | "POST",
+		path: string,
+		body?: unknown,
+		background = false,
+	): Promise<unknown> {
 		let response: Response;
 		for (let attempt = 0; ; attempt++) {
-			const done = await takeTurn(this.site);
+			let done: () => void;
+			try {
+				done = await gate.enter(this.site, background);
+			} catch (error) {
+				if (error instanceof RateLimited) throw new JiraError(429, error.message);
+				throw error;
+			}
 			try {
 				response = await this.#fetch(`${this.site}${path}`, {
 					method,
@@ -174,20 +154,21 @@ export class JiraClient {
 					},
 					...(body === undefined ? {} : { body: JSON.stringify(body) }),
 				});
+				gate.record(this.site, response.headers);
 			} finally {
 				done();
 			}
-			// Jira's rate limit turned it away before doing anything: it is sent again after the wait asked.
-			if (response.status !== 429 || attempt >= RATE_RETRIES) break;
-			await new Promise((resolve) =>
-				setTimeout(resolve, retryWait(response.headers.get("Retry-After"), attempt)),
-			);
-		}
-		if (response.status === 429) {
-			throw new JiraError(
-				429,
-				"HTTP 429: Jira is limiting requests (rate limit); try again in a minute.",
-			);
+			if (response.status !== 429) break;
+			// Jira turned it away before doing anything: every request to the site stops for the time it asks.
+			const wait = retryAfter(response.headers.get("Retry-After"), 2000 * 2 ** attempt);
+			const seconds = gate.block(this.site, wait);
+			// It is sent once more after the wait, held by the gate until then: what the user
+			// asked for waits up to a minute, what is asked in the background a few seconds.
+			if (attempt > 0 || wait > (background ? 5_000 : 60_000)) {
+				throw new JiraError(429, new RateLimited(seconds).message);
+			}
+			// The gate would turn a background request away while the stop lasts: it waits here.
+			if (background) await new Promise((resolve) => setTimeout(resolve, wait));
 		}
 		if (!response.ok) {
 			let detail = "";
@@ -239,7 +220,7 @@ export class JiraClient {
 				`/rest/api/2/issue/${valid}?fields=${ISSUE_FIELDS.join(",")}&expand=renderedFields`,
 			),
 			// Links outside Jira (Confluence pages that mention it); an issue may have none to read.
-			this.#get(`/rest/api/2/issue/${valid}/remotelink`).catch(() => []),
+			this.#get(`/rest/api/2/issue/${valid}/remotelink`, true).catch(() => []),
 		]);
 		const issue = issueOf(body, this.site);
 		if (issue === null) throw new Error("Jira did not return the issue");
@@ -251,7 +232,9 @@ export class JiraClient {
 		const valid = issueKey(key);
 		if (valid === null) throw new Error("Invalid issue key");
 		const row = issueRowOf(
-			await this.#json(`/rest/api/2/issue/${valid}?fields=${ROW_FIELDS.join(",")}`),
+			await keep(`${this.#keptKey}\nrow\n${valid}`, 2 * MINUTE, () =>
+				this.#json(`/rest/api/2/issue/${valid}?fields=${ROW_FIELDS.join(",")}`, true),
+			),
 		);
 		if (row === null) throw new Error("Jira did not return the issue");
 		return row;
@@ -292,7 +275,7 @@ export class JiraClient {
 
 	/** Who is signed in: the key Tempo names a worker by, and the name. */
 	async #me(): Promise<{ key: string; name: string }> {
-		return keep(`${this.#keptKey}\nme`, 30 * MINUTE, async () => {
+		return keep(`${this.#keptKey}\nme`, 12 * 60 * MINUTE, async () => {
 			const me = await this.#json("/rest/api/2/myself");
 			// Server's user key; Cloud's account id.
 			return { key: asString(me.key) || asString(me.accountId), name: asString(me.name) };
@@ -302,7 +285,7 @@ export class JiraClient {
 	/** Tempo's work attributes as it lists them; `null` where Tempo is not installed. */
 	async #tempoRaw(): Promise<unknown[] | null> {
 		if (this.cloud) return null;
-		return keep(`${this.#keptKey}\ntempo`, 10 * MINUTE, async () => {
+		return keep(`${this.#keptKey}\ntempo`, 30 * MINUTE, async () => {
 			try {
 				const raw = await this.#get("/rest/tempo-core/1/work-attribute");
 				return Array.isArray(raw) ? raw : [];
@@ -317,7 +300,7 @@ export class JiraClient {
 	/** A request whose failure only means fewer choices; why it failed goes to the report. */
 	async #tryGet(path: string, report: string[], label: string): Promise<unknown> {
 		try {
-			return await keep(`${this.#keptKey}\nget\n${path}`, 10 * MINUTE, () => this.#get(path));
+			return await keep(`${this.#keptKey}\nget\n${path}`, 30 * MINUTE, () => this.#get(path, true));
 		} catch (error) {
 			report.push(`${label} ${path}: ${error instanceof Error ? error.message : String(error)}`);
 			return null;
@@ -410,13 +393,14 @@ export class JiraClient {
 		const to = new Date();
 		const from = new Date(to.getTime() - 120 * 24 * 3600 * 1000);
 		try {
-			return await keep(`${this.#keptKey}\nrecent`, 2 * MINUTE, async () =>
+			return await keep(`${this.#keptKey}\nrecent`, 30 * MINUTE, async () =>
 				recentAttributeValues(
-					await this.#send("POST", "/rest/tempo-timesheets/4/worklogs/search", {
-						from: day(from),
-						to: day(to),
-						worker: [worker],
-					}),
+					await this.#send(
+						"POST",
+						"/rest/tempo-timesheets/4/worklogs/search",
+						{ from: day(from), to: day(to), worker: [worker] },
+						true,
+					),
 				),
 			);
 		} catch (error) {
@@ -444,7 +428,7 @@ export class JiraClient {
 		const [raw, issue, logs, me] = await Promise.all([
 			this.#tempoRaw(),
 			this.#json(`/rest/api/2/issue/${valid}?fields=timetracking,project`),
-			this.#get(`/rest/api/2/issue/${valid}/worklog`).catch(() => ({})),
+			this.#get(`/rest/api/2/issue/${valid}/worklog`, true).catch(() => ({})),
 			this.#me(),
 		]);
 		const fields = asJson(issue.fields);
@@ -558,7 +542,9 @@ export class JiraClient {
 		if (!/^\d+$/.test(issueId)) throw new Error("Invalid issue id");
 		try {
 			return developmentSummaryOf(
-				await this.#get(`/rest/dev-status/1.0/issue/summary?issueId=${issueId}`),
+				await keep(`${this.#keptKey}\ndev\n${issueId}`, 5 * MINUTE, () =>
+					this.#get(`/rest/dev-status/1.0/issue/summary?issueId=${issueId}`, true),
+				),
 			);
 		} catch (error) {
 			if (error instanceof JiraError && (error.status === 404 || error.status === 403)) return null;
