@@ -2,6 +2,7 @@ import type { ChatSummary, StoredChat } from "./chats.js";
 import type { ClaudeEvent, PromptImage } from "./claude.js";
 import type { ConfluenceFormat } from "./confluence.js";
 import type { AtomDetails } from "./confluence-atoms.js";
+import type { JiraServer, MentionUser } from "./confluence-insert.js";
 import type { ConfluenceSearchRequest, ConfluenceSearchResults } from "./confluence-search.js";
 import type { CustomMode } from "./custom-modes.js";
 import type { TextFormat } from "./encoding.js";
@@ -713,6 +714,10 @@ export interface KalemBridge {
 	confluenceFind(request: ConfluenceSearchRequest): Promise<ConfluenceSearchResults>;
 	/** A kept atom of the tab's page described, with what the server knows (a user's name, Jira's address). */
 	confluenceAtom(tabId: string, xml: string): Promise<AtomDetails | null>;
+	/** Users of the connected site whose name matches, to mention. */
+	confluenceUsers(query: string): Promise<readonly MentionUser[]>;
+	/** The Jira server new Jira macros on the connected site name; `null` when it lists none. */
+	confluenceJiraServer(): Promise<JiraServer | null>;
 	/** The ids of the pages above a page, top first. */
 	confluenceAncestors(pageId: string): Promise<readonly string[]>;
 	confluenceSearch(
@@ -945,6 +950,8 @@ export const CHANNEL = {
 	confluenceFind: "kalem:confluence-find",
 	confluenceAncestors: "kalem:confluence-ancestors",
 	confluenceAtom: "kalem:confluence-atom",
+	confluenceUsers: "kalem:confluence-users",
+	confluenceJiraServer: "kalem:confluence-jira-server",
 	confluenceOpenPage: "kalem:confluence-open-page",
 	confluenceReloadPage: "kalem:confluence-reload-page",
 	confluenceSavePage: "kalem:confluence-save-page",

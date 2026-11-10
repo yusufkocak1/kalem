@@ -5202,6 +5202,31 @@ pre[data-confluence-locked]::before {
 	text-underline-offset: 0.15em;
 }
 
+/* A mention added while writing reads "@Name"; it needs no lock. */
+#editor a[href^="#confluence-keep-mention-"]::before {
+	content: none;
+}
+
+/* The `@` mention box and the Jira issue box: the slash menu's look, with a second line. */
+.atom-picker {
+	width: 20rem;
+}
+
+.atom-picker-text {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.atom-picker-detail {
+	overflow: hidden;
+	font-size: 11px;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	opacity: 0.75;
+}
+
 /* Layout column markers: a divider with a label, quieter than a macro box. */
 pre[data-confluence-kind="layout"] {
 	min-height: 1.6em;
@@ -6994,6 +7019,66 @@ details.jira-section > .jira-list {
 
 .jira-worklog-input.invalid {
 	border-color: var(--app-error);
+}
+
+/* A list chosen by typing (`combo-box.ts`): the box, and its matches below it. */
+.combo {
+	position: relative;
+	display: flex;
+	flex: 1 1 160px;
+	min-width: 0;
+	max-width: 360px;
+}
+
+.combo > .combo-input {
+	flex: 1;
+	max-width: none;
+}
+
+.combo-list {
+	position: absolute;
+	top: calc(100% + 4px);
+	right: 0;
+	left: 0;
+	z-index: 30;
+	max-height: 240px;
+	margin: 0;
+	padding: 4px;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	list-style: none;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+	font-size: 13px;
+}
+
+.combo-list[hidden] {
+	display: none;
+}
+
+.combo-option,
+.combo-empty {
+	padding: 5px 8px;
+	border-radius: 6px;
+}
+
+.combo-option {
+	cursor: pointer;
+}
+
+.combo-option[data-chosen] {
+	font-weight: 600;
+}
+
+.combo-option[aria-selected="true"] {
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+}
+
+.combo-empty {
+	color: var(--app-muted);
 }
 
 .jira-worklog-worked,

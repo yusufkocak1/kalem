@@ -42,6 +42,8 @@ const bridge: KalemBridge = {
 		ipcRenderer.invoke(CHANNEL.confluencePublish, tabId, request),
 	confluenceFind: (request) => ipcRenderer.invoke(CHANNEL.confluenceFind, request),
 	confluenceAtom: (tabId, xml) => ipcRenderer.invoke(CHANNEL.confluenceAtom, tabId, xml),
+	confluenceUsers: (query) => ipcRenderer.invoke(CHANNEL.confluenceUsers, query),
+	confluenceJiraServer: () => ipcRenderer.invoke(CHANNEL.confluenceJiraServer),
 	jiraAccount: () => ipcRenderer.invoke(CHANNEL.jiraAccount),
 	jiraConnect: (login) => ipcRenderer.invoke(CHANNEL.jiraConnect, login),
 	jiraDisconnect: () => ipcRenderer.invoke(CHANNEL.jiraDisconnect),

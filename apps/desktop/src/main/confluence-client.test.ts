@@ -495,6 +495,73 @@ describe("ConfluenceClient", () => {
 		expect(await cloudClient.jiraBase("")).toBe("https://acme.atlassian.net");
 	});
 
+	it("finds users to mention, falling back on Server to older searches", async () => {
+		const cloud = fakeFetch([
+			[
+				"/rest/api/search/user?",
+				{ results: [{ user: { accountId: "557", displayName: "Ali Veli", email: "a@acme.com" } }] },
+			],
+		]);
+		const cloudClient = new ConfluenceClient(
+			{ site: "https://acme.atlassian.net/wiki", username: "a@b.c", token: "t" },
+			cloud.fetch,
+		);
+		expect(await cloudClient.users("ali")).toEqual([
+			{ name: "Ali Veli", accountId: "557", detail: "a@acme.com" },
+		]);
+		expect(new URL(cloud.calls[0]?.url ?? "").searchParams.get("cql")).toBe(
+			'user.fullname ~ "ali*"',
+		);
+		expect(await cloudClient.users("  ")).toEqual([]);
+
+		// Server: /search/user is missing, CQL finds nobody, the old API does.
+		const server = fakeFetch([
+			["/rest/api/search/user?", {}, 404],
+			["/rest/api/search?", { results: [] }],
+			[
+				"/rest/prototype/1/search/user.json?",
+				{ result: [{ title: "Ayşe K", username: "ayse", userKey: "k1" }] },
+			],
+		]);
+		const serverClient = new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "", token: "t" },
+			server.fetch,
+		);
+		expect(await serverClient.users("ayş")).toEqual([
+			{ name: "Ayşe K", key: "k1", username: "ayse", detail: "ayse" },
+		]);
+		expect(server.calls).toHaveLength(3);
+
+		const failing = fakeFetch([["/rest/api/search", {}, 500]]);
+		await expect(
+			new ConfluenceClient(
+				{ site: "https://wiki.example.com", username: "", token: "t" },
+				failing.fetch,
+			).users("x"),
+		).rejects.toBeInstanceOf(ConfluenceError);
+	});
+
+	it("names the Jira server new Jira macros use", async () => {
+		const server = fakeFetch([
+			[
+				"/rest/jiraanywhere/1.0/servers",
+				[{ id: "s1", name: "Jira", url: "https://jira.example.com", selected: true }],
+			],
+		]);
+		const client = new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "", token: "t" },
+			server.fetch,
+		);
+		expect(await client.jiraServer(null)).toEqual({ id: "s1", name: "Jira" });
+		const none = fakeFetch([]);
+		expect(
+			await new ConfluenceClient(
+				{ site: "https://wiki.example.com", username: "", token: "t" },
+				none.fetch,
+			).jiraServer(null),
+		).toBeNull();
+	});
+
 	it("lists the pages above a page, top first", async () => {
 		const server = fakeFetch([
 			["/rest/api/content/42", { ancestors: [{ id: "1" }, { id: "41" }] }],
