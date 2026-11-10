@@ -21,6 +21,7 @@ import {
 import { groupName } from "./favorites.js";
 import type { Strings } from "./i18n.js";
 import { format } from "./i18n.js";
+import { parseModeSettings } from "./mode-config.js";
 import { MAX_DOCK_SIZE, MIN_DOCK_SIZE, parsePanePlaces, TOOL_PANES } from "./panes.js";
 
 /** The Settings window's categories, in its order. */
@@ -29,6 +30,7 @@ export const SETTING_CATEGORIES = [
 	"editor",
 	"panels",
 	"assistant",
+	"modes",
 	"connections",
 	"page",
 	"templates",
@@ -398,6 +400,29 @@ export const SETTINGS_SCHEMA: Schema = {
 		keywords: ["copilot", "mcp", "araç", "tool", "blok", "block"],
 		assistant: "read",
 	},
+	assistantModes: {
+		key: "assistantModes",
+		category: "modes",
+		label: null,
+		type: "custom",
+		parse: parseModeSettings,
+		keywords: [
+			"mod",
+			"mode",
+			"adım",
+			"step",
+			"inceleme",
+			"review",
+			"lint",
+			"kapsam",
+			"scope",
+			"otomatik",
+			"automatic",
+			"analiz",
+			"prompt",
+		],
+		assistant: "read",
+	},
 	defaultTemplate: {
 		key: "defaultTemplate",
 		category: "templates",
@@ -513,6 +538,7 @@ export const CATEGORY_LABELS: Readonly<Record<SettingCategory, StringKey>> = {
 	editor: "settingsCatEditor",
 	panels: "settingsCatPanels",
 	assistant: "settingsCatAssistant",
+	modes: "settingsCatModes",
 	connections: "settingsCatConnections",
 	page: "settingsCatPage",
 	templates: "settingsCatTemplates",

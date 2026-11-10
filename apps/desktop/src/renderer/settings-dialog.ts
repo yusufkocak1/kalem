@@ -21,6 +21,7 @@ import {
 import type { TemplateInfo } from "../shared/templates.js";
 import { createAssistantSettings } from "./assistant-settings.js";
 import { el } from "./dom.js";
+import { createModeEditor } from "./mode-settings.js";
 import { sourceLabel } from "./template-picker.js";
 
 export interface SettingsDialogOptions {
@@ -378,6 +379,20 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 			}),
 		);
 	}
+
+	// --- The assistant's modes --------------------------------------------------
+
+	const modeEditor = createModeEditor({
+		t,
+		settings: options.settings,
+		update: options.update,
+	});
+	item(
+		"modes",
+		[t.settingsCatModes, t.modesHint, ...settingDef("assistantModes").keywords].join(" "),
+		modeEditor.element,
+	);
+	refreshers.push(() => modeEditor.refresh());
 
 	// --- Templates ---------------------------------------------------------------
 

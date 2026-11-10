@@ -28,8 +28,11 @@ import type { Finding } from "../shared/findings.js";
 import { addToQuestions, noteBlock, questionLine, withNoteAfter } from "../shared/findings.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
-import type { Mode } from "../shared/modes.js";
-import { isMode, MODE_LABELS, MODES } from "../shared/modes.js";
+import type { ModeSettings } from "../shared/mode-config.js";
+import { resolveMode } from "../shared/mode-config.js";
+import { detectMode } from "../shared/mode-detect.js";
+import type { Mode, ModeChoice } from "../shared/modes.js";
+import { isMode, MODE_HINTS, MODE_LABELS, MODES } from "../shared/modes.js";
 import { clampDockSize, MIN_DOCK_SIZE } from "../shared/panes.js";
 import type { ProviderId } from "../shared/providers.js";
 import { isCli, PROVIDER_INFO, providerLabel, SUGGESTED_MODELS } from "../shared/providers.js";
@@ -43,7 +46,9 @@ import type { FindingState } from "./assistant-review.js";
 import { findingsCard } from "./assistant-review.js";
 import { createAssistantSettings } from "./assistant-settings.js";
 import { el } from "./dom.js";
+import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
+import { MODE_ICONS } from "./mode-settings.js";
 import type { Previews } from "./previews.js";
 import type { DocumentImage } from "./prompt-images.js";
 
@@ -97,6 +102,10 @@ export interface AssistantHost {
 	revealQuote(quote: string): boolean;
 	close(): void;
 	errorText(error: unknown): string;
+	/** The modes as the user shaped them in Settings. */
+	modes(): ModeSettings;
+	/** Opens Settings on the assistant's modes. */
+	openModeSettings(): void;
 }
 
 export interface AssistantPane {
@@ -595,31 +604,155 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		class: "assistant-model",
 		attrs: { "aria-label": t.assistantModel, title: t.assistantModel },
 	});
-	let mode: Mode = "ask";
+	/** An icon with a class of its own. */
+	const glyph = (name: IconName, className: string): Element => {
+		const svg = icon(name);
+		svg.classList.add(className);
+		return svg;
+	};
+	// The mode: one the user picked, or "auto" to pick one for each question.
+	let mode: ModeChoice = "auto";
 	try {
 		const kept = localStorage.getItem("kalem.assistant.mode");
-		if (isMode(kept)) mode = kept;
+		if (isMode(kept) || kept === "auto") mode = kept;
 	} catch {
 		// Storage may be unavailable: the default mode is fine.
 	}
-	const modeSelect = el("select", {
+	const modeLabel = (choice: ModeChoice): string =>
+		choice === "auto" ? t.modeAuto : t[MODE_LABELS[choice]];
+	const modeIcon = el("span", { class: "assistant-mode-icon" });
+	const modeText = el("span", { class: "assistant-mode-text" });
+	const modeButton = el("button", {
 		class: "assistant-mode",
-		attrs: { "aria-label": t.assistantMode, title: t.assistantMode },
-		children: MODES.map((value) => el("option", { text: t[MODE_LABELS[value]], attrs: { value } })),
+		attrs: {
+			type: "button",
+			"aria-haspopup": "menu",
+			"aria-expanded": "false",
+			"aria-label": t.assistantMode,
+		},
+		children: [modeIcon, modeText, glyph("chevron", "assistant-mode-chevron")],
 	});
-	modeSelect.value = mode;
-	function setMode(next: Mode): void {
+	const modeMenu = el("div", {
+		class: "assistant-mode-menu",
+		attrs: { role: "menu", "aria-label": t.assistantMode },
+	});
+	modeMenu.hidden = true;
+	const modePicker = el("div", {
+		class: "assistant-mode-picker",
+		children: [modeButton, modeMenu],
+	});
+
+	function drawModeButton(): void {
+		modeIcon.replaceChildren(glyph(MODE_ICONS[mode], "assistant-mode-glyph"));
+		modeText.textContent = modeLabel(mode);
+		modeButton.title = `${t.assistantMode}: ${modeLabel(mode)}`;
+		modeButton.dataset.mode = mode;
+	}
+
+	function closeModeMenu(focus = false): void {
+		modeMenu.hidden = true;
+		modeButton.setAttribute("aria-expanded", "false");
+		if (focus) modeButton.focus();
+	}
+
+	function openModeMenu(): void {
+		const settings = host.modes();
+		const choices: ModeChoice[] = [
+			"auto",
+			...MODES.filter((each) => resolveMode(each, settings).enabled || each === mode),
+		];
+		modeMenu.replaceChildren(
+			...choices.map((choice) => {
+				const steps =
+					choice === "auto"
+						? ""
+						: format(
+								t.modeSteps,
+								resolveMode(choice, settings).steps.filter((step) => step.on).length,
+							);
+				const item = el("button", {
+					class: "assistant-mode-item",
+					attrs: {
+						type: "button",
+						role: "menuitemradio",
+						"aria-checked": String(choice === mode),
+						"data-mode": choice,
+					},
+					children: [
+						el("span", {
+							class: "assistant-mode-item-icon",
+							children: [glyph(MODE_ICONS[choice], "assistant-mode-item-glyph")],
+						}),
+						el("span", {
+							class: "assistant-mode-item-text",
+							children: [
+								el("strong", { text: modeLabel(choice) }),
+								el("span", { text: choice === "auto" ? t.modeAutoHint : t[MODE_HINTS[choice]] }),
+							],
+						}),
+						...(steps === ""
+							? []
+							: [el("span", { class: "assistant-mode-item-steps", text: steps })]),
+					],
+				});
+				item.addEventListener("click", () => {
+					setMode(choice);
+					closeModeMenu(true);
+				});
+				return item;
+			}),
+			el("hr", { class: "assistant-mode-separator" }),
+			(() => {
+				const customize = el("button", {
+					class: "assistant-mode-customize",
+					attrs: { type: "button", role: "menuitem" },
+					children: [glyph("settings", "assistant-mode-customize-glyph"), t.modeCustomize],
+				});
+				customize.addEventListener("click", () => {
+					closeModeMenu();
+					host.openModeSettings();
+				});
+				return customize;
+			})(),
+		);
+		modeMenu.hidden = false;
+		modeButton.setAttribute("aria-expanded", "true");
+		modeMenu.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
+	}
+
+	modeButton.addEventListener("click", () => {
+		if (modeMenu.hidden) openModeMenu();
+		else closeModeMenu();
+	});
+	modeMenu.addEventListener("keydown", (event) => {
+		if (event.key === "Escape") {
+			event.stopPropagation();
+			closeModeMenu(true);
+			return;
+		}
+		if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+		event.preventDefault();
+		const items = [...modeMenu.querySelectorAll<HTMLElement>("button")];
+		const index = items.indexOf(document.activeElement as HTMLElement);
+		const step = event.key === "ArrowDown" ? 1 : -1;
+		items[(index + step + items.length) % items.length]?.focus();
+	});
+	document.addEventListener("mousedown", (event) => {
+		if (!modeMenu.hidden && !(event.target instanceof Node && modePicker.contains(event.target))) {
+			closeModeMenu();
+		}
+	});
+
+	function setMode(next: ModeChoice): void {
 		mode = next;
-		modeSelect.value = next;
+		drawModeButton();
 		try {
 			localStorage.setItem("kalem.assistant.mode", mode);
 		} catch {
 			// Kept for this run only.
 		}
 	}
-	modeSelect.addEventListener("change", () => {
-		if (isMode(modeSelect.value)) setMode(modeSelect.value);
-	});
+	drawModeButton();
 	const MORE_MODELS = "\u0000more";
 	modelSelect.addEventListener("change", async () => {
 		const picked = modelSelect.value;
@@ -710,7 +843,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 								],
 							}),
 							el("span", { class: "assistant-toolbar-space" }),
-							modeSelect,
+							modePicker,
 							modelSelect,
 							sendButton,
 						],
@@ -2515,6 +2648,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		render();
 
 		const notes: string[] = [];
+		/** The mode this question is asked in: the one picked, or the one chosen for it. */
+		let usedMode: Mode = mode === "auto" ? "ask" : mode;
 		let prompt: string;
 		// The sections added with "@" go with the question, whether or not the document is shared.
 		let withSections = question;
@@ -2550,6 +2685,16 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			if (sharing) notes.push(format(t.assistantSharedDocument, context.name));
 			if (selection.trim() !== "") notes.push(t.assistantSharedSelection);
 			const sources = chatSources(chat);
+			if (mode === "auto") {
+				const detected = detectMode(
+					question,
+					{ hasDocument: sharing, hasWorkspace: sources.length > 0 || chat.folder !== null },
+					host.modes(),
+				);
+				usedMode = detected.mode;
+				// A plain question stays a question: only a mode chosen for it is said.
+				if (usedMode !== "ask") notes.push(format(t.modeChosen, t[MODE_LABELS[usedMode]]));
+			}
 			if (sources.length > 0) {
 				notes.push(
 					sources.length === 1
@@ -2633,7 +2778,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					history: earlier,
 					images: images.map(({ label, mediaType, data }) => ({ label, mediaType, data })),
 					sources: chatSources(chat),
-					mode,
+					mode: usedMode,
 					...(fullPrompt === undefined ? {} : { fullPrompt }),
 					...(documentSnapshot === undefined ? {} : { document: documentSnapshot }),
 				});

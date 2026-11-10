@@ -686,10 +686,31 @@ verir.
 >   bölümü `document_read`/`document_search` ile okur. Yanıtın altında
 >   harcanan token gösterilir. API sohbetleri `/compact` ile özetlenebilir.
 >   Araç çağıramayan modeller eskisi gibi tüm talimatları ve belgeyi alır.
-> - **Modlar** (soru kutusunun altındaki seçici): *Sor*, *Analiz Yaz*,
->   *Analizi İncele*, *Prompt Hazırla*, *Kod*, *Uygulama*. Mod, talimatı ve
->   araçları belirler. `/review`, `/write`, `/prompt`, `/trace`, `/stories`
->   modu seçip hazır soruyu sorar.
+> - **Modlar** (soru kutusunun altındaki seçici): *Otomatik*, *Sor*, *Analiz
+>   Yaz*, *Analizi İncele*, *Prompt Hazırla*, *Kod*, *Uygulama*. Seçici her
+>   modu simgesi, ne işe yaradığı ve kaç adımı açık olduğuyla gösterir.
+>   Mod, modele verilen adımları ve araçları belirler. `/review`, `/write`,
+>   `/prompt`, `/trace`, `/stories` modu seçip hazır soruyu sorar.
+>   - **Otomatik** (varsayılan): her soru için modu sorunun sözlerinden
+>     seçer ("incele", "gözden geçir" → İnceleme; "analiz yaz", "taslak" →
+>     Yazma; "prompt", "Claude Code için" → Prompt; "kod", "bug", ".java" →
+>     Kod; "ayar", "tema" → Uygulama; açık belge ya da çalışma alanı da
+>     hesaba katılır). Model sorulmaz, anında seçer; seçilen mod sorunun
+>     üstünde "Mod: Analizi İncele (otomatik seçildi)" diye yazar.
+>   - **Dosya → Ayarlar → Asistan Modları** (ya da seçicideki **Modları
+>     özelleştir…**): her mod bir **adım listesidir** ve modele bu sırayla
+>     söylenir. Örneğin İnceleme: kural denetimi (lint), kapsam kontrolü,
+>     çelişkiler, hata ve uç durumlar, test edilebilirlik, güvenlik ve
+>     gizlilik, kodla karşılaştırma, bulguları kartta bildirme, kısa özet.
+>     Adımlar açılıp kapatılır, sıralanır, adı ve modele söylenen metni
+>     değiştirilir (**Kalem'in metnine dön** ile geri alınır); **Adım ekle**
+>     ile kendi adımlarınız eklenir. Bir araca bağlı adım kapatılınca araç da
+>     modele verilmez (ör. lint kapalıysa `analysis_lint` yok). Mod başına:
+>     seçicide/otomatikte sunulsun mu, **ayrıntı** (kısa/normal/ayrıntılı),
+>     **yanıt dili**, İncelemede **en düşük önem** ve **en çok bulgu**,
+>     otomatik seçtiren **ek kelimeler**, **ek talimat**; **Asistana
+>     söylenen** önizlemesi değiştikçe güncellenir; **Varsayılana döndür**.
+>     Ayarlar yalnızca varsayılandan farkı saklar (`assistantModes`).
 > - **Analiz şablonları:** **Dosya → Şablondan Yeni…** ve **Dosya → Ayarlar →
 >   Şablonlar**. Ekip şablonları açık klasörün `.kalem/templates/`
 >   klasöründe (Git ile paylaşılır; aynı adlı kişisel şablonun önüne geçer),

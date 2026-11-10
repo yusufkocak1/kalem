@@ -13,6 +13,7 @@ import type {
 	JiraTransition,
 } from "./jira-dev.js";
 import type { WorklogContext, WorklogEntry } from "./jira-worklog.js";
+import type { ModeSettings } from "./mode-config.js";
 import type { PanePlaces, ToolPane } from "./panes.js";
 import { DEFAULT_PANE_PLACES } from "./panes.js";
 import type { AssistantConfig, AssistantUpdate, ChatMessage, ProviderId } from "./providers.js";
@@ -101,6 +102,8 @@ export interface Settings {
 	readonly copilotTools: CopilotTools;
 	/** The analysis template new documents start from and reviews check against; empty for the built-in one. */
 	readonly defaultTemplate: string;
+	/** The assistant's modes as the user shaped them: steps, options; what is missing is the default. */
+	readonly assistantModes: ModeSettings;
 	/** Where the assistant's panel is: at the right (as before), at the left, or under the document. */
 	readonly assistantPlace: AssistantPlace;
 	/** The assistant panel's height under the document, in pixels. */
@@ -148,6 +151,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	assistantPermissions: [],
 	copilotTools: "auto",
 	defaultTemplate: "",
+	assistantModes: {},
 	assistantPlace: "right",
 	assistantHeight: 320,
 };

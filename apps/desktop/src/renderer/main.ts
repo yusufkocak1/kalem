@@ -210,6 +210,8 @@ const assistant = createAssistantPane({
 	markQuotes: (quotes) => markQuotes(canvas, quotes),
 	revealQuote: (quote) => revealQuote(canvas, quote),
 	errorText: ipcErrorMessage,
+	modes: () => settings.assistantModes,
+	openModeSettings: () => void settingsDialog.show("modes"),
 });
 
 // Always at the right edge, so the assistant is never hard to find.

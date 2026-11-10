@@ -486,8 +486,13 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			t,
 			excluded:
 				program === null
-					? modeExcluded(request.mode)
-					: new Set([...modeExcluded(request.mode), "list_files", "search", "read_file"]),
+					? modeExcluded(request.mode, ctx.store.settings.assistantModes)
+					: new Set([
+							...modeExcluded(request.mode, ctx.store.settings.assistantModes),
+							"list_files",
+							"search",
+							"read_file",
+						]),
 			settings: () => ctx.store.settings,
 			changeSettings: ctx.changeSettings,
 			changeLanguage: ctx.changeLanguage,
@@ -525,6 +530,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				jira: jiraLookups?.site ?? null,
 				tools: definitions,
 				mode: request.mode,
+				modes: ctx.store.settings.assistantModes,
 				document: tools.document,
 			});
 		let system = instructionsFor(way);
@@ -812,7 +818,15 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 					role: "user",
 					content: withSources(inlined.text, seen ? inlined.text : undefined, fullPrompt),
 				};
-				await ask(messages, false, assistantInstructions(t, { way: "none", mode: request.mode }));
+				await ask(
+					messages,
+					false,
+					assistantInstructions(t, {
+						way: "none",
+						mode: request.mode,
+						modes: ctx.store.settings.assistantModes,
+					}),
+				);
 			}
 			forward({ kind: "done" });
 		} catch (error) {
