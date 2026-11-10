@@ -389,6 +389,10 @@ const en = {
 	startJira: "Jira issues",
 	startJiraHint: "Search, read and log work",
 	startRecent: "Recent",
+	startPinned: "Pinned",
+	startPin: "Pin to the start page",
+	startUnpin: "Unpin",
+	startConfluenceRecent: "Changed lately on Confluence",
 	statusReadOnly: "Read only",
 	zoom: "Zoom",
 
@@ -1694,6 +1698,10 @@ const tr: Strings = {
 	startJira: "Jira kayıtları",
 	startJiraHint: "Arayın, okuyun, efor girin",
 	startRecent: "Son kullanılanlar",
+	startPinned: "Sabitlenenler",
+	startPin: "Başlangıç sayfasına sabitle",
+	startUnpin: "Sabitlemeyi kaldır",
+	startConfluenceRecent: "Confluence'ta son değişenler",
 	statusReadOnly: "Salt okunur",
 	zoom: "Yakınlık",
 

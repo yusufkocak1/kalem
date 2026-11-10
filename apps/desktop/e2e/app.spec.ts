@@ -2039,6 +2039,15 @@ test("offers ways to start and the recent documents under an empty page, until s
 		"From Confluence",
 	]);
 	await expect(start.locator(".start-recent-name")).toHaveText(["plan.md"]);
+	// A pin moves it to the pinned documents, which stay at the top.
+	await start.locator(".start-file").hover();
+	await start.getByRole("button", { name: "Pin to the start page: plan.md" }).click();
+	await expect(start.locator(".start-pinned .start-recent-name")).toHaveText(["plan.md"]);
+	await expect(start.locator(".start-recent:not(.start-pinned):visible")).toHaveCount(0);
+	await start.getByRole("button", { name: "Unpin: plan.md" }).click();
+	await expect(start.locator(".start-pinned")).toBeHidden();
+	await start.locator(".start-file").hover();
+	await start.getByRole("button", { name: "Pin to the start page: plan.md" }).click();
 	// The tab says what kind of file it shows.
 	await expect(page.locator('.doc-tab[aria-selected="true"] .doc-tab-icon')).toHaveClass(
 		/tone-markdown/,
@@ -2054,7 +2063,7 @@ test("offers ways to start and the recent documents under an empty page, until s
 
 	// A recent document opens from another empty tab.
 	await page.locator(".doc-tab-new").click();
-	await page.locator(".start-page:visible .start-recent-item").click();
+	await page.locator(".start-page:visible .start-pinned .start-recent-item").click();
 	await expect(page.locator('.doc-tab[aria-selected="true"]')).toContainText("plan");
 	expect(errors).toEqual([]);
 	await discardAndClose(app);

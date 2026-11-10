@@ -9621,3 +9621,82 @@ dialog[open]::backdrop {
 	background: var(--app-hover);
 	color: var(--app-text);
 }
+
+/* The start page's lists side by side where the page is wide enough. */
+.start-lists {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+	gap: 0 28px;
+	margin-top: 22px;
+}
+
+.start-lists > .start-recent {
+	margin-top: 0;
+	margin-bottom: 18px;
+}
+
+.start-file {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	border-radius: 6px;
+}
+
+.start-file:hover {
+	background: var(--app-hover);
+}
+
+.start-file > .start-recent-item {
+	flex: 1;
+	min-width: 0;
+}
+
+.start-file > .start-recent-item:hover {
+	background: none;
+}
+
+.start-pin {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	margin-right: 2px;
+	padding: 0;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: var(--app-muted);
+	cursor: pointer;
+	opacity: 0;
+}
+
+.start-file:hover > .start-pin,
+.start-pin:focus-visible,
+.start-pin[aria-pressed="true"] {
+	opacity: 1;
+}
+
+.start-pin:hover {
+	background: var(--app-pressed);
+	color: var(--app-text);
+}
+
+.start-pin[aria-pressed="true"] {
+	color: var(--app-accent);
+}
+
+.start-pin[aria-pressed="true"] > svg.icon {
+	fill: currentColor;
+}
+
+.start-pin > svg.icon {
+	width: 15px;
+	height: 15px;
+}
+
+.start-pin:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -2px;
+}

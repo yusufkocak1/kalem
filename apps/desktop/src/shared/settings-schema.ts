@@ -124,6 +124,19 @@ export function parseConfluenceFavorites(value: unknown): ConfluenceFavorite[] {
 		.slice(0, MAX_FAVORITES);
 }
 
+/** The pinned documents: absolute paths, each once, at most a few dozen. */
+export function parsePinnedFiles(value: unknown): string[] {
+	if (!Array.isArray(value)) return [];
+	const paths = value.filter(
+		(item): item is string =>
+			typeof item === "string" &&
+			item !== "" &&
+			item.length < 4096 &&
+			/^(\/|[A-Za-z]:[\\/]|\\\\)/.test(item),
+	);
+	return [...new Set(paths)].slice(0, 30);
+}
+
 export function parseJiraFavorites(value: unknown): JiraFavorite[] {
 	if (!Array.isArray(value)) return [];
 	const seen = new Set<string>();
@@ -467,6 +480,15 @@ export const SETTINGS_SCHEMA: Schema = {
 		label: null,
 		type: "custom",
 		parse: parseJiraFavorites,
+		keywords: [],
+		assistant: "hidden",
+	},
+	pinnedFiles: {
+		key: "pinnedFiles",
+		category: "system",
+		label: null,
+		type: "custom",
+		parse: parsePinnedFiles,
 		keywords: [],
 		assistant: "hidden",
 	},

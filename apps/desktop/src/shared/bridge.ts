@@ -81,6 +81,8 @@ export interface Settings {
 	readonly confluenceFavorites: readonly ConfluenceFavorite[];
 	/** Jira issues the user starred, newest first. */
 	readonly jiraFavorites: readonly JiraFavorite[];
+	/** Documents pinned to the start page, in the order they were pinned. */
+	readonly pinnedFiles: readonly string[];
 	/** Look for a new release once a day (a request to GitHub). */
 	readonly checkUpdates: boolean;
 	/** A notification-area icon and the system-wide quick note shortcut; the app stays there when its windows close. */
@@ -144,6 +146,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	confluenceSpace: "",
 	confluenceFavorites: [],
 	jiraFavorites: [],
+	pinnedFiles: [],
 	checkUpdates: true,
 	tray: false,
 	gitAutoFetch: true,

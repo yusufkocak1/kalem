@@ -607,7 +607,11 @@ function createTab(id: string): Tab {
 		t,
 		actions: startActions,
 		recent: () => bridge.recentFiles(),
+		pinned: () => settings.pinnedFiles,
+		setPinned: (paths) => updateSettings({ pinnedFiles: paths }),
 		open: (path) => void bridge.openPath(path),
+		confluence: () => (accounts.confluence ? bridge.confluenceSearch("", null) : null),
+		openConfluence: (pageId) => void bridge.confluenceOpenPage(pageId),
 	});
 	/** Once the document had something in it, the start page does not come back. */
 	let started = false;
