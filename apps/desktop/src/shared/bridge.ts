@@ -6,6 +6,7 @@ import type { ConfluenceSearchRequest, ConfluenceSearchResults } from "./conflue
 import type { TextFormat } from "./encoding.js";
 import type { Lang } from "./i18n.js";
 import type { JiraAccount, JiraIssue, JiraSearchResults } from "./jira.js";
+import type { WorklogContext, WorklogEntry } from "./jira-worklog.js";
 import type { PanePlaces, ToolPane } from "./panes.js";
 import { DEFAULT_PANE_PLACES } from "./panes.js";
 import type { AssistantConfig, AssistantUpdate, ChatMessage, ProviderId } from "./providers.js";
@@ -662,6 +663,10 @@ export interface KalemBridge {
 	jiraIssue(key: string): Promise<JiraIssue>;
 	/** A search by JQL, an issue key or words; `next` continues an earlier answer. */
 	jiraSearch(query: string, next: string | null): Promise<JiraSearchResults>;
+	/** What logging work on the issue asks for: Tempo's fields (when it is installed), the time spent and left. */
+	jiraWorklogContext(key: string): Promise<WorklogContext>;
+	/** Logs work on the issue; `offsetMinutes` is the local time zone's, for Jira's own work log. */
+	jiraLogWork(key: string, entry: WorklogEntry & { readonly offsetMinutes: number }): Promise<void>;
 	/** `package` proposes a `.kmd`; otherwise Markdown (or the tab's current type) comes first. */
 	/** `kind` "text": a text file, saved under any name with its own extension offered. */
 	chooseSavePath(
@@ -822,6 +827,8 @@ export const CHANNEL = {
 	jiraSuggestedSite: "kalem:jira-suggested-site",
 	jiraIssue: "kalem:jira-issue",
 	jiraSearch: "kalem:jira-search",
+	jiraWorklogContext: "kalem:jira-worklog-context",
+	jiraLogWork: "kalem:jira-log-work",
 	chooseSavePath: "kalem:choose-save-path",
 	writeDocument: "kalem:write-document",
 	reloadDocument: "kalem:reload-document",

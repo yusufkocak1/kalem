@@ -1,13 +1,16 @@
-import { ipcMain, net } from "electron";
+import { join } from "node:path";
+import { app, ipcMain, net } from "electron";
 import { CHANNEL } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
 import type { JiraAccount, JiraIssue } from "../shared/jira.js";
 import { searchJql } from "../shared/jira.js";
+import type { WorklogContext, WorklogEntry } from "../shared/jira-worklog.js";
 import type { ConfluenceCredentials } from "./confluence-client.js";
 import { isCloudHost, pageReference } from "./confluence-client.js";
 import { confluenceClient } from "./confluence-ipc.js";
 import type { ConfluenceStore } from "./confluence-store.js";
 import { JiraClient } from "./jira-client.js";
+import { WorklogDefaultsStore } from "./jira-worklog-store.js";
 
 export interface JiraIpcContext {
 	/** The Jira login, stored like Confluence's (the token encrypted). */
@@ -117,6 +120,42 @@ export function registerJiraIpc(ctx: JiraIpcContext): {
 			}),
 		);
 		return { ...issue, remoteLinks };
+	});
+
+	const worklogDefaults = new WorklogDefaultsStore(
+		join(app.getPath("userData"), "jira-worklog.json"),
+	);
+
+	ipcMain.handle(
+		CHANNEL.jiraWorklogContext,
+		async (_event, key: unknown): Promise<WorklogContext> => {
+			const client = await connected();
+			return client.worklogContext(text(key, "issue key"), await worklogDefaults.get(client.site));
+		},
+	);
+
+	ipcMain.handle(CHANNEL.jiraLogWork, async (_event, key: unknown, raw: unknown) => {
+		const client = await connected();
+		const given = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+		const attributes: Record<string, string> = {};
+		for (const [name, value] of Object.entries(
+			typeof given.attributes === "object" && given.attributes !== null ? given.attributes : {},
+		)) {
+			if (typeof value === "string") attributes[name] = value;
+		}
+		const remaining = given.remainingSeconds;
+		const entry: WorklogEntry = {
+			date: text(given.date, "date"),
+			seconds: typeof given.seconds === "number" ? Math.round(given.seconds) : 0,
+			remainingSeconds:
+				typeof remaining === "number" && remaining >= 0 ? Math.round(remaining) : null,
+			comment: typeof given.comment === "string" ? given.comment.slice(0, 5000) : "",
+			attributes,
+			remember: given.remember === true,
+		};
+		const offset = typeof given.offsetMinutes === "number" ? given.offsetMinutes : 0;
+		await client.logWork(text(key, "issue key"), entry, offset);
+		if (entry.remember) await worklogDefaults.set(client.site, attributes);
 	});
 
 	ipcMain.handle(CHANNEL.jiraSearch, async (_event, query: unknown, next: unknown) =>

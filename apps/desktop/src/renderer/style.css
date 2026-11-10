@@ -6669,3 +6669,269 @@ details.jira-section > .jira-list {
 		transition: none;
 	}
 }
+
+/* --- Logging work on an issue ---------------------------------------------------- */
+
+.jira-log-work[aria-expanded="true"] {
+	border-color: var(--app-accent);
+	background: var(--app-pressed);
+}
+
+.jira-worklog-slot:empty {
+	display: none;
+}
+
+.jira-worklog {
+	display: grid;
+	gap: 12px;
+	padding: 14px 16px;
+	border: 1px solid var(--app-border);
+	border-radius: 12px;
+	background: var(--app-surface);
+}
+
+.jira-worklog-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 4px 12px;
+}
+
+.jira-worklog-title {
+	margin: 0;
+	font-size: 14px;
+}
+
+.jira-worklog-summary {
+	color: var(--app-muted);
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+}
+
+.jira-worklog-quick,
+.jira-worklog-days {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.jira-worklog-chip {
+	min-width: 48px;
+	padding: 6px 12px;
+	border: 1px solid var(--app-border);
+	border-radius: 999px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 13px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	cursor: pointer;
+	transition:
+		background 120ms ease,
+		border-color 120ms ease;
+}
+
+.jira-worklog-chip:hover {
+	border-color: var(--app-accent);
+}
+
+.jira-worklog-chip:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 1px;
+}
+
+.jira-worklog-chip[aria-pressed="true"] {
+	border-color: var(--app-accent);
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+}
+
+.jira-worklog-days .jira-worklog-chip {
+	min-width: 0;
+	padding: 3px 10px;
+	font-size: 12px;
+	font-weight: 500;
+}
+
+.jira-worklog-grid,
+.jira-worklog-attributes {
+	display: grid;
+	gap: 8px;
+}
+
+.jira-worklog-attributes[hidden] {
+	display: none;
+}
+
+.jira-worklog-attributes {
+	padding-top: 10px;
+	border-top: 1px dashed var(--app-border);
+}
+
+.jira-worklog-field {
+	display: grid;
+	grid-template-columns: minmax(110px, 30%) 1fr;
+	align-items: center;
+	gap: 12px;
+	font-size: 13px;
+}
+
+.jira-worklog-label {
+	color: var(--app-muted);
+	text-align: right;
+}
+
+.jira-worklog-control {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+
+.jira-worklog-input {
+	flex: 1 1 160px;
+	min-width: 0;
+	max-width: 360px;
+	padding: 6px 9px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 13px;
+}
+
+.jira-worklog-input:focus {
+	border-color: var(--app-accent);
+	outline: none;
+	box-shadow: 0 0 0 3px var(--app-pressed);
+}
+
+.jira-worklog-input.invalid {
+	border-color: var(--app-error);
+}
+
+.jira-worklog-worked,
+.jira-worklog-remaining {
+	max-width: 140px;
+	font-variant-numeric: tabular-nums;
+}
+
+.jira-worklog-date {
+	flex: 0 1 160px;
+}
+
+textarea.jira-worklog-input {
+	max-width: none;
+	resize: vertical;
+}
+
+.jira-worklog-footer {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px 16px;
+}
+
+.jira-worklog-remember {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--app-muted);
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.jira-worklog-submit:disabled {
+	opacity: 0.6;
+	cursor: progress;
+}
+
+.jira-worklog-status {
+	margin: 0;
+	font-size: 12px;
+}
+
+.jira-worklog-status:empty {
+	display: none;
+}
+
+.jira-worklog-status[data-kind="error"] {
+	color: var(--app-error);
+}
+
+.jira-worklog-status[data-kind="ok"] {
+	color: var(--app-ok);
+	font-weight: 600;
+}
+
+.jira-worklog-history[hidden] {
+	display: none;
+}
+
+.jira-worklog-history h4 {
+	margin: 0 0 4px;
+	color: var(--app-muted);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.jira-worklog-mine {
+	display: grid;
+	gap: 2px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	font-size: 12px;
+}
+
+.jira-worklog-log {
+	display: grid;
+	grid-template-columns: auto 48px 1fr;
+	gap: 10px;
+	padding: 3px 0;
+	border-bottom: 1px solid var(--app-border);
+}
+
+.jira-worklog-log:last-child {
+	border-bottom: 0;
+}
+
+.jira-worklog-mine-day {
+	color: var(--app-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.jira-worklog-mine strong {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+.jira-worklog-mine-comment {
+	overflow: hidden;
+	color: var(--app-muted);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* A narrow dialog puts each label above its field. */
+@media (max-width: 560px) {
+	.jira-worklog-field {
+		grid-template-columns: 1fr;
+		gap: 4px;
+	}
+
+	.jira-worklog-label {
+		text-align: left;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.jira-worklog-chip {
+		transition: none;
+	}
+}

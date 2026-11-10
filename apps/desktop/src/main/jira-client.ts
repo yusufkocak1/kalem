@@ -8,6 +8,14 @@ import {
 	ROW_FIELDS,
 	remoteLinksOf,
 } from "../shared/jira.js";
+import type { WorkAttribute, WorklogContext, WorklogEntry } from "../shared/jira-worklog.js";
+import {
+	jiraWorklogRequest,
+	missingAttributes,
+	tempoWorklogBody,
+	workAttributesOf,
+	worklogsOf,
+} from "../shared/jira-worklog.js";
 import type { ConfluenceCredentials, Fetch } from "./confluence-client.js";
 import { isCloudHost } from "./confluence-client.js";
 
@@ -32,8 +40,9 @@ const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : [
 
 /**
  * Jira's REST API, version 2 on both Cloud and Server / Data Center: its
- * text fields are wiki markup, which Kalem reads like Confluence's. It only
- * reads. Cloud searches with `/search/jql` (the older `/search` is gone
+ * text fields are wiki markup, which Kalem reads like Confluence's. It
+ * reads, and writes only work logs (through Tempo Timesheets where it is
+ * installed). Cloud searches with `/search/jql` (the older `/search` is gone
  * there), Server with `/search`.
  */
 export class JiraClient {
@@ -64,8 +73,18 @@ export class JiraClient {
 	}
 
 	async #get(path: string): Promise<unknown> {
+		return this.#send("GET", path);
+	}
+
+	async #send(method: "GET" | "POST", path: string, body?: unknown): Promise<unknown> {
 		const response = await this.#fetch(`${this.site}${path}`, {
-			headers: { Accept: "application/json", Authorization: this.#auth },
+			method,
+			headers: {
+				Accept: "application/json",
+				Authorization: this.#auth,
+				...(body === undefined ? {} : { "Content-Type": "application/json" }),
+			},
+			...(body === undefined ? {} : { body: JSON.stringify(body) }),
 		});
 		if (!response.ok) {
 			let detail = "";
@@ -74,6 +93,8 @@ export class JiraClient {
 				detail =
 					asString(asArray(body.errorMessages)[0]) ||
 					asString(Object.values(asJson(body.errors))[0]) ||
+					// Tempo's: a list of errors, each with its message.
+					asString(asJson(asArray(body.errors)[0]).message) ||
 					asString(body.message);
 			} catch {}
 			throw new JiraError(
@@ -81,7 +102,8 @@ export class JiraClient {
 				detail === "" ? `HTTP ${response.status}` : `HTTP ${response.status}: ${detail}`,
 			);
 		}
-		return response.json();
+		const text = await response.text();
+		return text === "" ? null : JSON.parse(text);
 	}
 
 	/** Who is signed in; fails when the site or the login is wrong. */
@@ -164,6 +186,93 @@ export class JiraClient {
 			total,
 			next: issues.length > 0 && total !== null && end < total ? String(end) : null,
 		};
+	}
+
+	/** Who is signed in: the key Tempo names a worker by, and the name. */
+	async #me(): Promise<{ key: string; name: string }> {
+		this.#user ??= this.#json("/rest/api/2/myself").then((me) => ({
+			// Server's user key; Cloud's account id.
+			key: asString(me.key) || asString(me.accountId),
+			name: asString(me.name),
+		}));
+		try {
+			return await this.#user;
+		} catch (error) {
+			this.#user = null;
+			throw error;
+		}
+	}
+
+	#user: Promise<{ key: string; name: string }> | null = null;
+
+	/**
+	 * Tempo's work attributes; `null` where Tempo Timesheets is not
+	 * installed (or on Cloud, whose Tempo has its own API and login).
+	 */
+	async #tempoAttributes(): Promise<WorkAttribute[] | null> {
+		if (this.cloud) return null;
+		let raw: unknown;
+		try {
+			raw = await this.#get("/rest/tempo-core/1/work-attribute");
+		} catch (error) {
+			if (error instanceof JiraError && (error.status === 404 || error.status === 403)) return null;
+			throw error;
+		}
+		const accounts = Array.isArray(raw)
+			? raw.some((item) => JSON.stringify(item).includes('"ACCOUNT"'))
+				? await this.#get("/rest/tempo-accounts/1/account").catch(() => [])
+				: []
+			: [];
+		return workAttributesOf(raw, accounts);
+	}
+
+	/** What the work log form needs: Tempo's fields, the time spent and left, the user's own logs. */
+	async worklogContext(
+		key: string,
+		defaults: Readonly<Record<string, string>>,
+	): Promise<WorklogContext> {
+		const valid = issueKey(key);
+		if (valid === null) throw new Error("Invalid issue key");
+		const [attributes, issue, logs, me] = await Promise.all([
+			this.#tempoAttributes(),
+			this.#json(`/rest/api/2/issue/${valid}?fields=timetracking`),
+			this.#get(`/rest/api/2/issue/${valid}/worklog`).catch(() => ({})),
+			this.#me(),
+		]);
+		const tracking = asJson(asJson(issue.fields).timetracking);
+		const remaining = tracking.remainingEstimateSeconds;
+		return {
+			tempo: attributes !== null,
+			attributes: attributes ?? [],
+			defaults,
+			spentSeconds: Number(tracking.timeSpentSeconds) || 0,
+			remainingSeconds: typeof remaining === "number" ? remaining : null,
+			mine: worklogsOf(logs, me).slice(0, 5),
+		};
+	}
+
+	/** Logs work on an issue: through Tempo, with its work attributes, where it is installed. */
+	async logWork(key: string, entry: WorklogEntry, offsetMinutes: number): Promise<void> {
+		const valid = issueKey(key);
+		if (valid === null) throw new Error("Invalid issue key");
+		if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.date)) throw new Error("Invalid date");
+		if (!Number.isInteger(entry.seconds) || entry.seconds <= 0 || entry.seconds > 24 * 3600) {
+			throw new Error("Invalid time");
+		}
+		const attributes = await this.#tempoAttributes();
+		if (attributes !== null) {
+			const missing = missingAttributes(attributes, entry.attributes);
+			if (missing.length > 0) throw new Error(`Required: ${missing.join(", ")}`);
+			const me = await this.#me();
+			await this.#send(
+				"POST",
+				"/rest/tempo-timesheets/4/worklogs",
+				tempoWorklogBody(valid, me.key, entry, attributes),
+			);
+			return;
+		}
+		const request = jiraWorklogRequest(entry, offsetMinutes);
+		await this.#send("POST", `/rest/api/2/issue/${valid}/worklog?${request.query}`, request.body);
 	}
 }
 

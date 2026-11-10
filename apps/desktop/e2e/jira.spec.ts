@@ -44,14 +44,55 @@ const subtask = (key: string, summary: string, parent: string) => {
 /** Jira Server: who is signed in, two issues and a search. */
 async function fakeJira() {
 	const searches: string[] = [];
+	/** The work logs Tempo was sent. */
+	const worklogs: Record<string, unknown>[] = [];
 	/** Where the issue's "mentioned in" page is: set once the fake Confluence is up. */
 	const confluence = { site: "" };
-	const server = createServer((req, res) => {
+	const server = createServer(async (req, res) => {
 		const url = new URL(req.url ?? "/", "http://localhost");
 		if (req.headers.authorization !== `Bearer ${JIRA_TOKEN}`) {
 			return json(res, { errorMessages: ["Unauthorized"] }, 401);
 		}
-		if (url.pathname === "/rest/api/2/myself") return json(res, { displayName: "Ayşe Balcı" });
+		if (url.pathname === "/rest/api/2/myself") {
+			return json(res, { displayName: "Ayşe Balcı", key: "JIRAUSER1", name: "ayse" });
+		}
+		// Tempo Timesheets: its work attributes, its accounts, and a work log sent to it.
+		if (url.pathname === "/rest/tempo-core/1/work-attribute") {
+			return json(res, [
+				{
+					id: 1,
+					key: "_Sirket_",
+					name: "Faturalandırılacak Şirket",
+					type: { value: "STATIC_LIST" },
+					required: false,
+					staticListValues: [{ id: 1, name: "TKAO - Türk Hava Yolları A.O.", value: "TKAO" }],
+				},
+				{ id: 2, key: "_Servis_", name: "Servis", type: { value: "ACCOUNT" }, required: true },
+			]);
+		}
+		if (url.pathname === "/rest/tempo-accounts/1/account") {
+			return json(res, [
+				{ key: "QUICKRES", name: "Satış Kanalı (QuickRes) Uygulaması", status: "OPEN" },
+			]);
+		}
+		if (url.pathname === "/rest/tempo-timesheets/4/worklogs" && req.method === "POST") {
+			let body = "";
+			for await (const chunk of req) body += chunk;
+			worklogs.push(JSON.parse(body));
+			return json(res, [{ tempoWorklogId: worklogs.length }]);
+		}
+		if (url.pathname === "/rest/api/2/issue/QR-1/worklog") {
+			return json(res, {
+				worklogs: [
+					{
+						author: { key: "JIRAUSER1", displayName: "Ayşe Balcı" },
+						started: "2026-10-16T09:00:00.000+0300",
+						timeSpentSeconds: 21600,
+						comment: "Working on issue QR-1",
+					},
+				],
+			});
+		}
 		if (url.pathname === "/rest/api/2/issue/QR-1") {
 			const base = issue("QR-1", "Giriş zaman aşımı", "In Progress", "indeterminate");
 			return json(res, {
@@ -59,6 +100,11 @@ async function fakeJira() {
 				fields: {
 					...base.fields,
 					priority: { name: "High" },
+					timetracking: {
+						timeSpentSeconds:
+							12 * 3600 + worklogs.reduce((all, log) => all + Number(log.timeSpentSeconds), 0),
+						remainingEstimateSeconds: 8 * 3600,
+					},
 					reporter: { displayName: "Mehmet" },
 					// An HTML editor plug-in keeps the description as HTML, lines joined by backslashes.
 					description:
@@ -107,6 +153,7 @@ async function fakeJira() {
 	return {
 		site,
 		searches,
+		worklogs,
 		confluence,
 		close: () => new Promise<void>((done) => server.close(() => done())),
 	};
@@ -221,6 +268,40 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	const mentioned = jira.locator(".jira-link-group", { hasText: "mentioned in" });
 	await expect(mentioned.locator(".jira-remote")).toHaveText("Sprint Planı");
 	await expect(jira.locator(".jira-comment")).toContainText("Bende de oluyor.");
+	// Work is logged from the issue, through Tempo: a quick button, then its fields.
+	await jira.locator(".jira-log-work").click();
+	const worklog = jira.locator(".jira-worklog");
+	await expect(worklog.locator(".jira-worklog-summary")).toHaveText("Spent 12h · Remaining 8h");
+	await expect(worklog.locator(".jira-worklog-mine li")).toContainText("6h");
+	await worklog.locator('.jira-worklog-chip[data-hours="5"]').click();
+	await expect(worklog.locator(".jira-worklog-worked")).toHaveValue("5h");
+	await expect(worklog.locator(".jira-worklog-remaining")).toHaveValue("3h");
+	// Servis must be chosen; Tempo is not asked until it is.
+	await worklog.locator(".jira-worklog-submit").click();
+	await expect(worklog.locator(".jira-worklog-status")).toHaveText("Fill in: Servis");
+	expect(jiraServer.worklogs).toEqual([]);
+	await worklog.locator('select[data-attribute="_Servis_"]').selectOption("QUICKRES");
+	await worklog.locator('select[data-attribute="_Sirket_"]').selectOption("TKAO");
+	await worklog.locator(".jira-worklog-submit").click();
+	await expect(worklog.locator(".jira-worklog-status")).toHaveText("5h logged on QR-1.");
+	expect(jiraServer.worklogs[0]).toMatchObject({
+		worker: "JIRAUSER1",
+		originTaskId: "QR-1",
+		timeSpentSeconds: 5 * 3600,
+		remainingEstimate: 3 * 3600,
+		comment: "Working on issue QR-1",
+		attributes: {
+			_Servis_: { workAttributeId: 2, value: "QUICKRES" },
+			_Sirket_: { workAttributeId: 1, value: "TKAO" },
+		},
+	});
+	await expect(worklog.locator(".jira-worklog-summary")).toHaveText("Spent 17h · Remaining 8h");
+	// The choices are remembered: the form starts with them next time.
+	await expect
+		.poll(async () =>
+			JSON.parse(await readFile(join(userData, "jira-worklog.json"), "utf8").catch(() => "{}")),
+		)
+		.toEqual({ [jiraServer.site]: { _Sirket_: "TKAO", _Servis_: "QUICKRES" } });
 	// A sub-task opens in the same dialog, and Back returns.
 	await jira.locator('.jira-row[data-key="QR-2"]').click();
 	await expect(jira.locator(".jira-title")).toHaveText("Süreyi ayarla");

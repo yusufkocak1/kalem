@@ -16,6 +16,7 @@ import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
 import { jiraHtmlRoot } from "./jira-html.js";
+import { createWorklogForm } from "./jira-worklog.js";
 
 export interface JiraDialogOptions {
 	readonly t: Strings;
@@ -127,6 +128,8 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 	let fallback: string | null = null;
 	/** Answers that come after the dialog moved on are dropped. */
 	let shownId = 0;
+	/** Once opened, the work log form stays open for the next issue too. */
+	let worklogOpen = false;
 
 	const current = (): View | undefined => history.at(-1);
 
@@ -276,6 +279,26 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 			[t.jiraComponents, issue.components.join(", ")],
 			[t.jiraFixVersions, issue.fixVersions.join(", ")],
 		];
+		const worklogSlot = el("div", { class: "jira-worklog-slot" });
+		const logWork = button(t.jiraLogWork, "clock", () => toggleWorklog(!worklogOpen));
+		logWork.classList.add("jira-log-work");
+		const toggleWorklog = (open: boolean): void => {
+			worklogOpen = open;
+			logWork.setAttribute("aria-expanded", String(open));
+			if (!open) {
+				worklogSlot.replaceChildren();
+				return;
+			}
+			if (worklogSlot.childElementCount > 0) return;
+			const form = createWorklogForm({
+				t,
+				bridge,
+				issueKey: issue.key,
+				formatDate: (iso) => when(iso),
+			});
+			worklogSlot.replaceChildren(form);
+			form.querySelector<HTMLElement>(".jira-worklog-chip")?.focus();
+		};
 		const description = richText(issue.description, issue.descriptionHtml);
 		if (issue.description === "" && issue.descriptionHtml === null) {
 			description.append(message(t.jiraNoDescription));
@@ -299,10 +322,12 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 						() => options.openLink(issue.url),
 						"jira-button primary",
 					),
+					logWork,
 					copyButton(t.jiraCopyKey, issue.key),
 					copyButton(t.linkCopyUrl, issue.url),
 				],
 			}),
+			worklogSlot,
 			el("dl", {
 				class: "jira-fields",
 				children: facts
@@ -375,6 +400,7 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 		}
 		body.replaceChildren(...sections);
 		heading.textContent = issue.key;
+		toggleWorklog(worklogOpen);
 	}
 
 	/** A part of the issue that folds away, as Jira's own sections do. */
