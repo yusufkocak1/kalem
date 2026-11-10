@@ -265,9 +265,15 @@ export function missingAttributes(
 		.map((attribute) => attribute.name);
 }
 
-/** Tempo's work log (`POST /rest/tempo-timesheets/4/worklogs`) for the signed-in `worker`. */
+/**
+ * Tempo's work log (`POST /rest/tempo-timesheets/4/worklogs`) for the
+ * signed-in `worker`, as Tempo's own dialog sends it: the issue by its
+ * numeric id, the billable time left to Tempo (setting it takes Tempo's
+ * "Set Billable Hours" permission, refused with a 403 without it) and the
+ * remaining estimate only when it was given.
+ */
 export function tempoWorklogBody(
-	issueKey: string,
+	issueId: string,
 	worker: string,
 	entry: WorklogEntry,
 	attributes: readonly WorkAttribute[],
@@ -276,25 +282,20 @@ export function tempoWorklogBody(
 	for (const attribute of attributes) {
 		const value = (entry.attributes[attribute.key] ?? "").trim();
 		if (value === "") continue;
-		// As Tempo's own dialog sends it.
-		given[attribute.key] = {
-			key: attribute.key,
-			name: attribute.name,
-			type: attribute.type,
-			workAttributeId: attribute.id,
-			value,
-		};
+		given[attribute.key] = { name: attribute.name, workAttributeId: attribute.id, value };
 	}
 	return {
+		attributes: given,
+		billableSeconds: null,
+		originId: -1,
 		worker,
-		originTaskId: issueKey,
+		comment: entry.comment.trim() === "" ? null : entry.comment,
 		started: entry.date,
 		timeSpentSeconds: entry.seconds,
-		billableSeconds: entry.seconds,
-		comment: entry.comment,
+		originTaskId: issueId,
+		remainingEstimate: entry.remainingSeconds,
+		endDate: null,
 		includeNonWorkingDays: false,
-		...(entry.remainingSeconds === null ? {} : { remainingEstimate: entry.remainingSeconds }),
-		attributes: given,
 	};
 }
 
@@ -347,8 +348,9 @@ export function remainingAfter(remaining: number | null, seconds: number): numbe
 }
 
 /**
- * A quick log of `seconds` on `date` with the choices remembered: the
- * estimate counted down, the description Tempo would write. When a
+ * A quick log of `seconds` on `date` with the choices remembered, the
+ * description Tempo would write; the estimate is left to Jira to count
+ * down, as Tempo's own dialog leaves it. When a
  * required attribute has no remembered value, the names of those missing:
  * the full form has to ask.
  */
@@ -373,7 +375,7 @@ export function quickEntry(
 		entry: {
 			date,
 			seconds,
-			remainingSeconds: remainingAfter(context.remainingSeconds, seconds),
+			remainingSeconds: null,
 			comment: `Working on issue ${issueKey}`,
 			attributes,
 			remember: false,

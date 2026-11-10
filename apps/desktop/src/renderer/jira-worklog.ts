@@ -375,8 +375,10 @@ export function createWorklogForm(options: WorklogFormOptions): HTMLElement {
 			say(t.jiraWorkInvalidDate, "error");
 			return;
 		}
+		// Only what the user typed is sent: the figure filled in for them is
+		// what Jira counts down to by itself, and setting it can be refused.
 		let remainingSeconds: number | null = null;
-		if (remaining.value.trim() !== "") {
+		if (remainingTyped && remaining.value.trim() !== "") {
 			remainingSeconds = remaining.value.trim() === "0" ? 0 : parseDuration(remaining.value);
 			if (remainingSeconds === null) {
 				remaining.focus();
