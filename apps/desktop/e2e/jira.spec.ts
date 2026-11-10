@@ -385,7 +385,7 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await expect(development.locator(".jira-dev-count")).toHaveText([
 		"2 branches",
 		"8 commits",
-		"1 pull requests",
+		"1 pull request",
 	]);
 	await development.locator('.jira-dev-line[data-kind="pullRequests"]').click();
 	const pull = development.locator(".jira-dev-item");
@@ -395,6 +395,12 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	// The status opens the steps the issue can take; one that asks for more is taken in Jira.
 	await jira.locator(".jira-status-button").click();
 	const steps = jira.locator(".jira-transition-menu .jira-transition");
+	await expect(steps).toHaveCount(3);
+	// Escape closes the menu only, not the issue's dialog with it.
+	await page.keyboard.press("Escape");
+	await expect(jira.locator(".jira-transition-menu")).toBeHidden();
+	await expect(jira).toBeVisible();
+	await jira.locator(".jira-status-button").click();
 	await expect(steps).toHaveCount(3);
 	await expect(steps.nth(2)).toHaveAttribute("title", "Asks for Reason: opens in Jira");
 	await steps.filter({ hasText: "Test" }).click();
@@ -487,6 +493,13 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await expect(rows.locator(".jira-key")).toHaveText(["QR-1", "QR-2", "QR-5", "QR-7", "QR-8"]);
 	await expect(page.locator(".jira-pane .jira-tree-child")).toHaveCount(3);
 	await expect(page.locator('.jira-pane .jira-tree-context[data-key="QR-7"]')).toBeVisible();
+	// Escape empties the pane's search, as in the other panes.
+	const paneSearch = page.locator(".jira-pane-search");
+	await paneSearch.fill("oturum");
+	await expect.poll(() => jiraServer.searches.at(-1)).toContain("oturum");
+	await paneSearch.press("Escape");
+	await expect(paneSearch).toHaveValue("");
+	await expect.poll(() => jiraServer.searches.at(-1)).not.toContain("oturum");
 	// The parent's toggle folds its sub-tasks away and back.
 	const toggle = page.locator('.jira-pane .jira-row[data-key="QR-1"] .jira-tree-toggle');
 	await toggle.click();

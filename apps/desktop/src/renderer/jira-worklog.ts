@@ -185,6 +185,9 @@ export function createWorklogForm(options: WorklogFormOptions): HTMLElement {
 	const say = (text: string, kind: "info" | "error" | "ok" = "info"): void => {
 		status.textContent = text;
 		status.dataset.kind = kind;
+		// The message is under the button: brought into view, or an empty field
+		// shows only its red border while the reason is scrolled out of sight.
+		if (kind !== "info" && text !== "") status.scrollIntoView?.({ block: "nearest" });
 	};
 
 	function markQuick(): void {

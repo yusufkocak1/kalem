@@ -104,7 +104,9 @@ export function createJiraPane(options: JiraPaneOptions): {
 		class: "confluence-pane-search jira-pane-search",
 		attrs: {
 			type: "search",
-			placeholder: t.jiraSearchPlaceholder,
+			// The narrow pane's own, shorter hint; the full one is the tooltip.
+			placeholder: t.jiraPaneSearchPlaceholder,
+			title: t.jiraSearchPlaceholder,
 			"aria-label": t.jiraSearchPlaceholder,
 		},
 	});
@@ -679,6 +681,13 @@ export function createJiraPane(options: JiraPaneOptions): {
 		if (event.key === "ArrowDown") {
 			event.preventDefault();
 			rows.querySelector<HTMLElement>(".jira-pane-row")?.focus();
+		}
+		// As in the Files and Confluence panes: Escape empties the search, and the list comes back.
+		if (event.key === "Escape" && search.value !== "") {
+			event.stopPropagation();
+			clearTimeout(timer);
+			search.value = "";
+			void run(false);
 		}
 	});
 	list.addEventListener("change", () => {

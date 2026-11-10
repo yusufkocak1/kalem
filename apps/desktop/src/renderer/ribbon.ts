@@ -195,7 +195,28 @@ export function createRibbon(container: HTMLElement, options: RibbonOptions): Ri
 			tab.tabIndex = active ? 0 : -1;
 			panel.hidden = !active;
 		}
+		fit();
 	}
+
+	/**
+	 * A narrow window: the shown tab's buttons drop their labels (kept for
+	 * screen readers and in the tooltip) before its groups wrap onto a
+	 * second row; they come back once there is room.
+	 */
+	function fit(): void {
+		const panel = tabs.get(selected)?.panel;
+		if (panel === undefined || !panel.isConnected) return;
+		const wraps = (): boolean => {
+			const tops = new Set<number>();
+			for (const group of panel.children) {
+				tops.add(Math.round((group as HTMLElement).offsetTop));
+			}
+			return tops.size > 1;
+		};
+		delete panel.dataset.compact;
+		if (wraps()) panel.dataset.compact = "";
+	}
+	new ResizeObserver(() => fit()).observe(panels);
 
 	function update(): void {
 		for (const definition of options.tabs) {

@@ -463,7 +463,8 @@ test("searches inside pages with filters and more results, and finds the open pa
 	// Contents: every word inside the pages, with the text around it and where each page is.
 	await pane.getByRole("button", { name: "Contents" }).click();
 	const search = pane.locator(".confluence-pane-search");
-	await expect(search).toHaveAttribute("placeholder", /Search inside pages/);
+	await expect(search).toHaveAttribute("placeholder", /Words inside pages/);
+	await expect(search).toHaveAttribute("title", /Search inside pages/);
 	await search.fill("onay");
 	await expect
 		.poll(() => confluence.searches.at(-1))
