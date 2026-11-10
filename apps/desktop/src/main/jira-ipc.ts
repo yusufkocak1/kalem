@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { app, ipcMain, net } from "electron";
+import { app, ipcMain } from "electron";
 import { CHANNEL } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
 import type { JiraAccount, JiraIssue } from "../shared/jira.js";
@@ -7,7 +7,7 @@ import { searchJql } from "../shared/jira.js";
 import type { WorklogContext, WorklogEntry } from "../shared/jira-worklog.js";
 import type { ConfluenceCredentials } from "./confluence-client.js";
 import { isCloudHost, pageReference } from "./confluence-client.js";
-import { confluenceClient } from "./confluence-ipc.js";
+import { atlassianFetch, confluenceClient } from "./confluence-ipc.js";
 import type { ConfluenceStore } from "./confluence-store.js";
 import { JiraClient } from "./jira-client.js";
 import { WorklogDefaultsStore } from "./jira-worklog-store.js";
@@ -20,7 +20,7 @@ export interface JiraIpcContext {
 }
 
 export function jiraClient(credentials: ConfluenceCredentials): JiraClient {
-	return new JiraClient(credentials, (url, init) => net.fetch(url, init));
+	return new JiraClient(credentials, atlassianFetch);
 }
 
 /**
