@@ -52,6 +52,7 @@ const issue = {
 	assignee: "Ayşe",
 	priority: "High",
 	updated: "2026-11-01T10:00:00.000+0300",
+	id: "10007",
 	url: "https://jira.example.com/browse/DEV-7",
 	project: "Geliştirme",
 	reporter: "Mehmet",

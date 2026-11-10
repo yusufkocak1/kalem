@@ -135,6 +135,9 @@ const jiraDialog = createJiraDialog({
 		updateSettings({ jiraFavorites: favorites });
 		jiraPane.favoritesChanged();
 	},
+	onIssueChange: () => {
+		if (docks.shown().has("jira")) void jiraPane.refresh();
+	},
 });
 const confluencePane = createConfluencePane({
 	t,

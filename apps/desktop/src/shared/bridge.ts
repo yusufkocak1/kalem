@@ -6,6 +6,12 @@ import type { ConfluenceSearchRequest, ConfluenceSearchResults } from "./conflue
 import type { TextFormat } from "./encoding.js";
 import type { Lang } from "./i18n.js";
 import type { JiraAccount, JiraIssue, JiraSearchResults } from "./jira.js";
+import type {
+	DevelopmentItem,
+	DevelopmentKind,
+	DevelopmentSummary,
+	JiraTransition,
+} from "./jira-dev.js";
 import type { WorklogContext, WorklogEntry } from "./jira-worklog.js";
 import type { PanePlaces, ToolPane } from "./panes.js";
 import { DEFAULT_PANE_PLACES } from "./panes.js";
@@ -674,6 +680,13 @@ export interface KalemBridge {
 	jiraIssue(key: string): Promise<JiraIssue>;
 	/** A search by JQL, an issue key or words; `next` continues an earlier answer. */
 	jiraSearch(query: string, next: string | null): Promise<JiraSearchResults>;
+	/** The steps the issue can take from its status. */
+	jiraTransitions(key: string): Promise<JiraTransition[]>;
+	/** Moves the issue along its workflow. */
+	jiraTransition(key: string, transitionId: string): Promise<void>;
+	/** The issue's Development panel: branches, commits, pull requests; `null` where Jira has none. */
+	jiraDevelopment(issueId: string): Promise<DevelopmentSummary | null>;
+	jiraDevelopmentDetail(issueId: string, kind: DevelopmentKind): Promise<DevelopmentItem[]>;
 	/** What logging work on the issue asks for: Tempo's fields (when it is installed), the time spent and left. */
 	jiraWorklogContext(key: string): Promise<WorklogContext>;
 	/** Logs work on the issue; `offsetMinutes` is the local time zone's, for Jira's own work log. */
@@ -839,6 +852,10 @@ export const CHANNEL = {
 	jiraIssue: "kalem:jira-issue",
 	jiraSearch: "kalem:jira-search",
 	jiraWorklogContext: "kalem:jira-worklog-context",
+	jiraTransitions: "kalem:jira-transitions",
+	jiraTransition: "kalem:jira-transition",
+	jiraDevelopment: "kalem:jira-development",
+	jiraDevelopmentDetail: "kalem:jira-development-detail",
 	jiraLogWork: "kalem:jira-log-work",
 	chooseSavePath: "kalem:choose-save-path",
 	writeDocument: "kalem:write-document",

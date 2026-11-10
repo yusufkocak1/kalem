@@ -55,6 +55,8 @@ export interface JiraIssueLink {
 }
 
 export interface JiraIssue extends JiraIssueRow {
+	/** Jira's number for it, which its development information is asked by. */
+	readonly id: string;
 	/** Its address in the browser. */
 	readonly url: string;
 	readonly project: string;
@@ -442,6 +444,7 @@ export function issueOf(raw: unknown, site: string): JiraIssue | null {
 	});
 	return {
 		...row,
+		id: asString(asJson(raw).id),
 		url: issueUrl(site, row.key),
 		project: nameOf(fields.project),
 		reporter: nameOf(fields.reporter),

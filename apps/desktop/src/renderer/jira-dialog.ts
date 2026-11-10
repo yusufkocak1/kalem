@@ -15,6 +15,7 @@ import { issueKey, issueKeyFromUrl, normalizeJiraSite } from "../shared/jira.js"
 import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
+import { createDevelopmentSection, createStatusControl } from "./jira-development.js";
 import { jiraHtmlRoot } from "./jira-html.js";
 import { createWorklogForm } from "./jira-worklog.js";
 
@@ -25,6 +26,8 @@ export interface JiraDialogOptions {
 	openLink(url: string): void;
 	/** After a login or a disconnect. */
 	onAccountChange?(): void;
+	/** After the issue changed in Kalem (its status): lists showing it are read again. */
+	onIssueChange?(key: string): void;
 	/** The starred issues, of every Jira site. */
 	favorites(): readonly JiraFavorite[];
 	setFavorites(favorites: readonly JiraFavorite[]): void;
@@ -314,7 +317,20 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 				children: [
 					el("span", { class: "jira-key", text: issue.key }),
 					...(issue.type === "" ? [] : [el("span", { class: "jira-type", text: issue.type })]),
-					...(issue.status === "" ? [] : [statusLozenge(issue.status, issue.statusCategory)]),
+					...(issue.status === ""
+						? []
+						: [
+								createStatusControl({
+									t,
+									bridge,
+									issueKey: issue.key,
+									status: issue.status,
+									category: issue.statusCategory,
+									issueUrl: issue.url,
+									openLink: options.openLink,
+									onChanged: () => void refreshIssue(issue.key),
+								}),
+							]),
 				],
 			}),
 			el("h2", { class: "jira-title", text: issue.summary }),
@@ -341,6 +357,18 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 					.flatMap(([name, value]) => [el("dt", { text: name }), el("dd", { text: value })]),
 			}),
 		];
+		if (issue.id !== "") {
+			sections.push(
+				createDevelopmentSection({
+					t,
+					lang: options.lang,
+					bridge,
+					issueId: issue.id,
+					openLink: options.openLink,
+					fold,
+				}),
+			);
+		}
 		if (issue.parent !== null) {
 			sections.push(fold(t.jiraParent, [list([issueRow(issue.parent)])]));
 		}
@@ -592,6 +620,22 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 	}
 
 	// --- Showing --------------------------------------------------------------------
+	/** The issue read again where it is shown (after its status changed), keeping the place. */
+	async function refreshIssue(key: string): Promise<void> {
+		const id = ++shownId;
+		try {
+			const issue = await bridge.jiraIssue(key);
+			const view = current();
+			if (id !== shownId || view?.kind !== "issue" || view.key !== key) return;
+			const scroll = body.scrollTop;
+			renderIssue(issue);
+			body.scrollTop = scroll;
+			options.onIssueChange?.(key);
+		} catch {
+			// What is shown stays; the next look reads it again.
+		}
+	}
+
 	async function render(): Promise<void> {
 		const id = ++shownId;
 		const view = current();

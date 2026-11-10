@@ -7023,3 +7023,235 @@ textarea.jira-worklog-input {
 		transition: none;
 	}
 }
+
+/* --- Jira issue: changing its status, and its Development panel -------------------- */
+
+.jira-status-control {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.jira-status-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	padding: 2px 4px 2px 2px;
+	border: 1px solid transparent;
+	border-radius: 6px;
+	background: none;
+	color: var(--app-muted);
+	font: inherit;
+	cursor: pointer;
+}
+
+.jira-status-button:hover,
+.jira-status-button[aria-expanded="true"] {
+	border-color: var(--app-border);
+	background: var(--app-hover);
+}
+
+.jira-status-button:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 1px;
+}
+
+.jira-status-button:disabled {
+	cursor: progress;
+	opacity: 0.6;
+}
+
+.jira-status-chevron {
+	width: 14px;
+	height: 14px;
+	transform: rotate(90deg);
+}
+
+.jira-transition-menu {
+	position: absolute;
+	top: calc(100% + 4px);
+	left: 0;
+	min-width: 220px;
+}
+
+.jira-transition {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.jira-transition-arrow {
+	color: var(--app-muted);
+}
+
+.jira-transition-name {
+	overflow: hidden;
+	color: var(--app-muted);
+	font-size: 12px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.jira-transition-out {
+	width: 14px;
+	height: 14px;
+	margin-left: auto;
+	color: var(--app-muted);
+}
+
+.jira-transition-note {
+	font-size: 12px;
+	color: var(--app-muted);
+}
+
+.jira-transition-note[data-kind="error"] {
+	color: var(--app-error);
+}
+
+.jira-dev-section[hidden] {
+	display: none;
+}
+
+.jira-dev {
+	display: grid;
+	gap: 2px;
+	margin-left: 16px;
+}
+
+.jira-dev-line {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 6px 8px;
+	border: 0;
+	border-radius: 6px;
+	background: none;
+	color: var(--app-text);
+	font: inherit;
+	font-size: 13px;
+	text-align: left;
+	cursor: pointer;
+}
+
+.jira-dev-line:hover {
+	background: var(--app-hover);
+}
+
+.jira-dev-line:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -2px;
+}
+
+.jira-dev-chevron {
+	width: 14px;
+	height: 14px;
+	color: var(--app-muted);
+	transition: transform 150ms ease;
+}
+
+.jira-dev-line[aria-expanded="true"] .jira-dev-chevron {
+	transform: rotate(90deg);
+}
+
+.jira-dev-count {
+	color: var(--app-accent);
+	font-weight: 600;
+}
+
+.jira-dev-when {
+	margin-left: auto;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.jira-dev-state {
+	padding: 1px 6px;
+	border-radius: 4px;
+	background: #dfe1e6;
+	color: #42526e;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+}
+
+.jira-dev-state[data-state="MERGED"] {
+	background: #e3fcef;
+	color: #006644;
+}
+
+.jira-dev-state[data-state="OPEN"] {
+	background: #deebff;
+	color: #0747a6;
+}
+
+.jira-dev-state[data-state="DECLINED"] {
+	background: #ffebe6;
+	color: #bf2600;
+}
+
+.jira-dev-items {
+	display: grid;
+	gap: 4px;
+	margin: 2px 0 8px 30px;
+	padding: 0;
+	list-style: none;
+}
+
+.jira-dev-items[hidden] {
+	display: none;
+}
+
+.jira-dev-item {
+	display: grid;
+	gap: 2px;
+	padding: 6px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-surface);
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.jira-dev-item:hover,
+.jira-dev-item:focus-visible {
+	border-color: var(--app-accent);
+	outline: none;
+}
+
+.jira-dev-item-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.jira-dev-title {
+	overflow: hidden;
+	font-family: var(--app-mono, ui-monospace, monospace);
+	font-weight: 600;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.jira-dev-detail {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.jira-dev-meta,
+.jira-dev-note {
+	color: var(--app-muted);
+}
+
+.jira-dev-note {
+	padding: 4px 0;
+	font-size: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.jira-dev-chevron {
+		transition: none;
+	}
+}
