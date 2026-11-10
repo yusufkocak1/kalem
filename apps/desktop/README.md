@@ -462,7 +462,30 @@ verir.
   sürümler, açıklama ve yorumlar (Markdown olarak), üst kayıt, alt görevler ve
   bağlantılı kayıtlar. Bir alt göreve ya da bağlantılı kayda tıklamak onu aynı
   pencerede açar, **Geri** (`Alt+←`) döner; açıklamadaki Jira bağlantıları da
-  orada açılır. **Tarayıcıda Aç**, **Anahtarı Kopyala**, **Bağlantıyı Kopyala**.
+  orada açılır. **Tarayıcıda Aç**, **Efor gir**, **Favorilere ekle**,
+  **Anahtarı Kopyala**, **Bağlantıyı Kopyala**.
+- **Statü:** başlıktaki statü etiketine tıklamak kaydın o statüden
+  geçebileceği adımları listeler (Jira'nın geçişleri); birini seçmek kaydı
+  ilerletir. Çözüm (Resolution) isteyen adıma Done, Fixed, Tamamlandı ya da
+  sunulan ilk çözüm verilir; ekranı başka zorunlu alan isteyen adım 🔗 ile
+  işaretlidir ve kaydı Jira'da açar. Adım göndermeden önce Jira'dan yeniden
+  okunur; sonra kayıt ve Jira paneli yenilenir.
+- **Geliştirme:** kaydın dalları, commit'leri ve pull request'leri Jira'nın
+  "Development" bölümündeki gibi sayılır ("2 dal · geçen hafta güncellendi",
+  "1 pull request MERGED"); her satır açılınca listesi gelir (dal ve depo,
+  commit kimliği ve mesajı, PR'ın dalları ve durumu), öğe tarayıcıda açılır.
+  Bilgi Jira'nın `dev-status` API'sinden, bağlı tüm araçlardan (Bitbucket,
+  GitHub, GitLab…) okunur; bilgi yoksa bölüm görünmez.
+- **Efor gir:** süre **1h, 2h, 3h, 5h, 8h** düğmeleriyle ya da yazılarak
+  (`2h`, `1h 30m`, `90m`, `1,5`, `2s 15dk`); tarih (Bugün / Dün), kalan
+  tahmin (süre değiştikçe kendisi düşer) ve açıklama (boşsa "Working on
+  issue ANAHTAR"). **Tempo Timesheets** kuruluysa efor Tempo'ya
+  (`/rest/tempo-timesheets/4/worklogs`) iş özellikleriyle (ör.
+  "Faturalandırılacak Şirket", "Servis") gider; zorunlu olanlar
+  doldurulmadan gönderilmez. Seçilen özellikler Jira sitesi başına
+  hatırlanır (`jira-worklog.json`) ve form bir dahaki sefere onlarla açılır.
+  Tempo yoksa (ve Cloud'da) efor Jira'nın kendi iş kaydına girilir. Formda
+  harcanan/kalan süre ve kayda girdiğin son eforlar da görünür.
 - Açıklaması ve yorumları **HTML** olarak saklayan Jira'larda (ör. JEditor
   eklentisi) metin kod gibi değil, sayfa gibi çizilir: Jira'nın kendi
   çizimi (`expand=renderedFields`) kullanılır; uyarı/bilgi/fikir kutuları
@@ -478,11 +501,26 @@ verir.
   **Daha fazla sonuç göster**. Cloud'da `/rest/api/2/search/jql`, Server'da
   `/rest/api/2/search` kullanılır.
 - **Jira paneli** (bağlıyken): bana atanan açık kayıtlar, raporladıklarım,
-  izlediklerim, son güncellenenler ya da bir arama; kayda tıklamak onu açar.
-  Alt görevler üst kayıtlarının altında **ağaç** olarak gruplanır (sonuç
-  sırası korunur); üst kaydın ▾ düğmesi alt görevlerini katlar. Aramada
-  bulunmayan bir üst kayıt da alt görevlerinin başında soluk görünür.
-- Kalem Jira'da hiçbir şeyi değiştirmez; yalnızca okur.
+  izlediklerim, son güncellenenler, **★ Favoriler** ya da bir arama; kayda
+  tıklamak onu açar. Kayıtlar kart olarak çizilir: türün renkli simgesi,
+  anahtar, statü, iki satırlık özet ve atananın baş harfleri. Alt görevler
+  üst kayıtlarının altında **ağaç** olarak gruplanır (sonuç sırası korunur);
+  üst kart alt görevlerinden kaçının bittiğini gösterir ve ▸ düğmesi onları
+  katlar. Aramada bulunmayan bir üst kayıt da alt görevlerinin başında soluk
+  görünür. Ağaçta ↑/↓, Home/End gezinir; ← katlar, → açar.
+  - **Tür süzgeci:** listenin üstünde her kayıt türü için bir çip (kaçar
+    tane olduğuyla); birkaçı birlikte seçilebilir. Yüklenmiş sonuçları süzer.
+  - **Sağ tık** (ya da Menü tuşu / Shift+F10): **1h / 2h / 3h / 5h / 8h**
+    düğmeleri formda hatırlanan seçimlerle **bugüne** efor girer (sonuç
+    satırda görünür; zorunlu bir Tempo özelliği hiç seçilmemişse kayıt efor
+    formuyla açılır), **Efor gir…**, favorilere ekle/çıkar, **Aç**,
+    **Anahtarı kopyala**.
+  - **Favoriler:** satırdaki ☆ (üstüne gelince görünür), sağ tık menüsü ya
+    da kayıt penceresindeki düğmeyle eklenir; Jira sitesi başına ayarlarda
+    saklanır ve eklenme sırasıyla listelenir. Artık okunamayan bir favori
+    saklandığı haliyle görünür.
+- Kalem Jira'da yalnızca **efor girer** ve **statü değiştirir**; başka
+  hiçbir şeyi değiştirmez.
 
 **Paneller ve Ayarlar**
 
@@ -638,14 +676,20 @@ verir.
     (`.gitignore` kurallarına uyarak; `.github` gibi izlenen gizli
     klasörler dahil), değilse gizli ve `node_modules`/`target`/`build` gibi
     klasörler dışındakiler.
-  - **Hızlı arama:** bilgisayarda `ripgrep` (`rg`) varsa arama onunla
-    yapılır; yoksa dosyaların metni bellekte tutulur (en çok 64 MB) ve
-    değişmeyen dosya yeniden okunmaz.
+  - **Hızlı arama:** bilgisayarda `ripgrep` (`rg`) varsa aranacak dosyaları
+    o bulur; Türkçe karakterli aramalarda da (kelimenin `i`/`I` içermeyen en
+    uzun ASCII parçasıyla; dosya hangi kodlamada olursa olsun) ve sonra
+    Türkçe büyük/küçük harf kurallarıyla kesin aranır. Dosyalar aynı anda
+    birçoğu okunur, aranan metni hiç içermeyen dosya satır satır taranmaz;
+    dosyaların metni bellekte tutulur (en çok 64 MB) ve değişmeyen dosya
+    yeniden okunmaz. Dosya listesi biraz eskiyse (en çok 10 dakika) hemen
+    kullanılır, yenisi arkada hazırlanır.
   - **Claude Code / Copilot:** klasör `--add-dir` ile okunabilir yapılır;
     asistan kendi araçlarıyla (yalnızca okuma) arar ve okur.
   - **API'ler (Anthropic, OpenAI uyumlu…):** Kalem modele `search`,
     `list_files`, `read_file` ve `propose_edit` araçlarını verir; model bir
-    yanıtta en çok 30 tur araç çağırabilir.
+    yanıtta en çok 30 tur araç çağırabilir. Modelin aynı turda istediği
+    aramalar ve okumalar birlikte çalışır.
     - **Okunanlar hatırlanır:** bir yanıt için okunan dosyalar (en çok
       40 000 karakter) sohbetle birlikte sonraki sorulara da gider; model
       aynı dosyayı yeniden okumaz.
