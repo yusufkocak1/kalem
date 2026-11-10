@@ -9149,7 +9149,7 @@ h3.mode-panel-name {
 	color: var(--app-accent);
 }
 
-.start-action-icon .icon {
+.start-action-icon > svg.icon {
 	width: 18px;
 	height: 18px;
 }
@@ -9213,7 +9213,7 @@ h3.mode-panel-name {
 	background: var(--app-hover);
 }
 
-.start-recent-item .icon {
+.start-recent-item svg.icon {
 	width: 16px;
 	height: 16px;
 }
@@ -9245,7 +9245,7 @@ h3.mode-panel-name {
 	margin-right: -2px;
 }
 
-.doc-tab-icon .icon {
+.doc-tab-icon > svg.icon {
 	width: 14px;
 	height: 14px;
 }
@@ -9320,7 +9320,7 @@ dialog[open]::backdrop {
 	outline-offset: 1px;
 }
 
-.files-empty-action .icon {
+.files-empty-action > svg.icon {
 	width: 15px;
 	height: 15px;
 	color: var(--app-accent);
