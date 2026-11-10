@@ -38,7 +38,13 @@ async function fakeConfluence() {
 	/** How page 41's children fail: the heavy request only, or every way of asking. */
 	const failing = { children: "none" as "none" | "expand" | "all" };
 	/** Pages made through the API, under page 41. */
-	const created: { id: string; title: string; body: unknown }[] = [];
+	const created: {
+		id: string;
+		title: string;
+		body: unknown;
+		storage?: string;
+		files?: { name: string; bytes: Buffer }[];
+	}[] = [];
 
 	const json = (res: ServerResponse, body: unknown, status = 200) => {
 		res.writeHead(status, { "Content-Type": "application/json" });
@@ -110,12 +116,32 @@ async function fakeConfluence() {
 				_links: { webui: "/display/DEV/Ana" },
 			});
 		}
+		// A page made through the API takes attachments and new versions too.
+		const attachedTo = created.find(
+			(item) => url.pathname === `/rest/api/content/${item.id}/child/attachment`,
+		);
+		if (attachedTo !== undefined && req.method === "PUT") {
+			const form = await new Response(new Uint8Array(await raw(req)), {
+				headers: { "Content-Type": req.headers["content-type"] ?? "" },
+			}).formData();
+			const file = form.get("file") as File;
+			attachedTo.files = [
+				...(attachedTo.files ?? []),
+				{ name: file.name, bytes: Buffer.from(await file.arrayBuffer()) },
+			];
+			return json(res, { results: [] });
+		}
 		const made = created.find((item) => url.pathname === `/rest/api/content/${item.id}`);
+		if (made !== undefined && req.method === "PUT") {
+			const request = JSON.parse(await body(req));
+			made.storage = request.body.storage.value;
+			return json(res, { version: { number: request.version.number } });
+		}
 		if (made !== undefined && req.method === "GET") {
 			return json(res, {
 				title: made.title,
-				version: { number: 1 },
-				body: { storage: { value: "<p></p>" } },
+				version: { number: made.storage === undefined ? 1 : 2 },
+				body: { storage: { value: made.storage ?? "<p></p>" } },
 				space: { key: "DEV" },
 				_links: { webui: `/pages/${made.id}` },
 			});
@@ -1240,5 +1266,75 @@ test("puts favorites in groups: from a menu or by dragging, renamed, closed and 
 	await expect(pane.locator("[data-group]")).toHaveCount(0);
 	await expect(favorite("41")).toHaveAttribute("aria-level", "1");
 	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("publishes a local Markdown file as a new page where the user chooses, with its pictures", async () => {
+	const confluence = await fakeConfluence();
+	cleanup.push(confluence.close);
+	const folder = await tempDir("publish");
+	const { mkdir } = await import("node:fs/promises");
+	await mkdir(join(folder, "images"));
+	await writeFile(join(folder, "images", "akis.png"), PNG_1X1);
+	const doc = join(folder, "analiz.md");
+	await writeFile(
+		doc,
+		"# Koltuk Seçimi Analizi\n\nAkış:\n\n![akış](images/akis.png)\n\n![kayıp](images/yok.png)\n",
+	);
+	const { app, page, errors } = await launch({ args: [doc] });
+	await expect(page.locator(".doc-tab", { hasText: "analiz" })).toBeVisible();
+
+	// Connected first, as the dialog asks.
+	await clickMenu(app, "File", "Open from Confluence…");
+	const login = page.locator(".confluence-dialog");
+	await login.locator('input[type="url"]').fill(confluence.site);
+	await login.locator('input[type="password"]').fill(TOKEN);
+	await login.getByRole("button", { name: "Connect" }).click();
+	await expect(login.locator(".quick-open-item")).toHaveCount(1);
+	await page.keyboard.press("Escape");
+
+	// The button is at the ribbon's right end once Confluence is connected, on any of its tabs.
+	await page.locator(".doc-tab", { hasText: "analiz" }).click();
+	await page.locator(".ribbon-publish").click();
+	const dialog = page.locator(".publish-dialog");
+	await expect(dialog).toBeVisible();
+	// The opening heading is the title, and is not repeated on the page.
+	await expect(dialog.locator(".publish-field input").first()).toHaveValue("Koltuk Seçimi Analizi");
+	await expect(dialog.locator(".publish-check").first()).toBeVisible();
+	await expect(dialog.locator(".publish-files")).toHaveText(
+		"2 pictures and files of the document go with it as attachments.",
+	);
+	// The space's tree: the page goes under a page opened in it.
+	await expect(dialog.locator(".publish-where")).toHaveText("The new page goes to: Geliştirme");
+	await dialog.locator('.publish-node-label[data-page="41"]').click();
+	await expect(dialog.locator(".publish-where")).toHaveText(
+		"The new page goes to: Geliştirme › Ana Sayfa",
+	);
+	await dialog.getByRole("button", { name: "Publish", exact: true }).click();
+
+	await expect(dialog.locator(".publish-done-title")).toHaveText(
+		"Published: Koltuk Seçimi Analizi",
+	);
+	await expect(dialog.locator(".publish-files")).toHaveText("1 pictures and files attached.");
+	await expect(dialog.locator(".publish-status")).toHaveText(
+		"These could not be read and are missing on the page: images/yok.png",
+	);
+	const made = confluence.created[0];
+	expect(made?.body).toMatchObject({
+		type: "page",
+		title: "Koltuk Seçimi Analizi",
+		space: { key: "DEV" },
+		ancestors: [{ id: "41" }],
+	});
+	expect(made?.files?.map((file) => file.name)).toEqual(["akis.png"]);
+	expect(made?.storage).toContain('<ri:attachment ri:filename="akis.png" />');
+	expect(made?.storage).toContain("<p>Akış:</p>");
+	expect(made?.storage).not.toContain("<h1>");
+	// The new page opens in Kalem.
+	await dialog.locator(".publish-done").getByRole("button", { name: "Close" }).click();
+	await expect(dialog).toBeHidden();
+	await expect(page.locator(".doc-tab", { hasText: "Koltuk Seçimi Analizi" })).toBeVisible();
+	// The missing picture, and the new page's attachment the fake does not serve, are not found.
+	expect(errors.filter((error) => !error.includes("404"))).toEqual([]);
 	await app.close();
 });

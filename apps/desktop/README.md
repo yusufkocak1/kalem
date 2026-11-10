@@ -402,6 +402,27 @@ verir.
     sayfanın altı (`ancestor`). Yalnız bir filtre de arama sayılır (ör. "son
     bir haftada değişen sayfalarım").
 
+- **Confluence'ta yayımla:** yerel bir belge (ör. bir `.md` dosyası)
+  Confluence'ta **yeni bir sayfa** olarak açılır. Düğme, Confluence bağlıyken
+  şeridin sağ üstünde, kayıt durumunun yanındadır (her şerit sekmesinde
+  görünür); **Dosya → Confluence'ta Yayımla…** de aynı işi yapar. Pencerede:
+  - **Sayfa başlığı:** belge bir 1. düzey başlıkla açılıyorsa o, değilse
+    dosyanın adı. Başlık o başlıksa sayfada tekrarlanmaz (seçenek).
+  - **Alan** ve **konum:** alanın en üstü ya da ağaçta gezilerek (▸ ile alt
+    sayfalar açılır) veya başlığıyla aranarak bulunan bir sayfanın altı;
+    seçilen yer "Geliştirme › Ana Sayfa" gibi gösterilir. Seçilen alan
+    hatırlanır.
+  - Belgenin yerel **resimleri** ve göreli bağlantılarla verilen
+    **dosyaları** (ör. `images/akis.png`, `ekler/rapor.pdf`; yapıştırılmış
+    resimler de) sayfaya **ek** olarak yüklenir ve sayfa onları gösterir.
+    Farklı klasörlerdeki aynı adlı dosyalar ayrı adlar alır (`akis-2.png`);
+    okunamayan dosyalar yayımlandıktan sonra listelenir. Web adresleri ve
+    başka belgelere bağlantılar olduğu gibi kalır.
+  - **Yeni sayfayı Kalem'de aç** (varsayılan): sayfa bir sekmede açılır;
+    sonuç penceresinden tarayıcıda da açılabilir.
+  Zaten bir Confluence sayfası olan sekme yayımlanmaz; o **Kaydet** ile
+  kaydedilir.
+
 - **Dosya → Confluence'tan Aç** (ya da Ekle → İçe Aktar → **Confluence**):
   bir Confluence sitesine bağlanır, sayfaları başlığa ve alana göre arar.
   Arama kutusuna sayfa ID'si (`123456`) ya da tarayıcıdaki adresi de

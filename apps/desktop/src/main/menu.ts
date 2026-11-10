@@ -134,6 +134,7 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 			click: (_item, window) => void windows.showWordDialog(targetOf(ctx, window)),
 		},
 		{ label: t.confluenceOpen, click: send(ctx, "confluence-open") },
+		{ label: t.publishMenu, click: send(ctx, "publish-confluence") },
 		{ label: t.confluenceAttachmentsMenu, click: send(ctx, "confluence-attachments") },
 		{ label: t.jiraMenu, click: send(ctx, "jira-open") },
 		{

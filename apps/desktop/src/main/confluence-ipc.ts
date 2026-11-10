@@ -1,22 +1,26 @@
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { IpcMainInvokeEvent } from "electron";
 import { app, dialog, ipcMain, net, shell } from "electron";
 import type {
 	ConfluenceAccount,
+	ConfluencePublished,
 	ConfluenceSaveResult,
 	ConfluenceUpload,
 	ImageFile,
 	RemotePage,
 } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
+import { markdownToStorage } from "../shared/confluence.js";
 import { describeAtom, jiraUrl } from "../shared/confluence-atoms.js";
 import { fileUrl } from "../shared/confluence-common.js";
+import { publishPlan } from "../shared/confluence-publish.js";
 import { parseSearchRequest } from "../shared/confluence-search.js";
 import { diagramDataName } from "../shared/diagram.js";
 import type { Strings } from "../shared/i18n.js";
 import { format, lossLabel } from "../shared/i18n.js";
-import { fileNameKey, IMAGE_EXTENSIONS } from "../shared/images.js";
+import { fileNameKey, IMAGE_EXTENSIONS, parseDataUrl } from "../shared/images.js";
 import {
 	freeName,
 	isRunnable,
@@ -135,6 +139,75 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 		windows.openConfluencePage(await client.page(id), win);
 		return { id, title, hasChildren: false };
 	});
+
+	/**
+	 * A local document as a new page: the page is made where the user chose,
+	 * the document's local pictures and files become its attachments, and
+	 * its Markdown its content. Files that cannot be read are named back.
+	 */
+	ipcMain.handle(
+		CHANNEL.confluencePublish,
+		async (event, tabId: unknown, raw: unknown): Promise<ConfluencePublished> => {
+			const win = senderOf(event);
+			const tab = tabOf(win, tabId);
+			const request = (typeof raw === "object" && raw !== null ? raw : {}) as Record<
+				string,
+				unknown
+			>;
+			const title = text(request.title, "title").trim().slice(0, 255);
+			if (title === "") throw new Error("Missing title");
+			const space = text(request.space, "space").trim();
+			if (space === "") throw new Error("Missing space");
+			const parent = typeof request.parent === "string" ? request.parent : null;
+			const plan = publishPlan(text(request.markdown, "document"));
+			const client = await connected();
+
+			// The files first: what cannot be read is known before anything is made.
+			const base = tab.base ?? tab.path;
+			const files: { name: string; type: string; bytes: Uint8Array }[] = [];
+			const missing: string[] = [];
+			for (const file of plan.files) {
+				try {
+					if (/^data:/i.test(file.url)) {
+						const data = parseDataUrl(file.url);
+						if (data === null) throw new Error("unreadable");
+						files.push({ name: file.name, type: data.type, bytes: data.bytes });
+						continue;
+					}
+					const path = /^file:/i.test(file.url)
+						? fileURLToPath(file.url)
+						: base === null
+							? null
+							: resolve(dirname(base), decodeURIComponent(file.url.split(/[?#]/)[0] ?? ""));
+					if (path === null) throw new Error("no folder");
+					const info = await stat(path);
+					if (!info.isFile() || info.size > MAX_UPLOAD_MB * 1024 * 1024)
+						throw new Error("too large");
+					files.push({
+						name: file.name,
+						type: mediaTypeOf(file.name),
+						bytes: await readFile(path),
+					});
+				} catch {
+					missing.push(file.url.startsWith("data:") ? file.name : file.url);
+				}
+			}
+
+			const id = await client.create(space, parent, title);
+			for (const file of files) await client.attach(id, file.name, file.type, file.bytes);
+			const created = await client.page(id);
+			const saved = await client.update(created.page, markdownToStorage(plan.markdown));
+			if (request.open === true) windows.openConfluencePage(await client.page(id), win);
+			return {
+				id,
+				title: saved.title,
+				url: saved.webUrl,
+				spaceKey: saved.spaceKey,
+				attached: files.length,
+				missing,
+			};
+		},
+	);
 
 	ipcMain.handle(CHANNEL.confluenceFind, async (_event, raw: unknown) => {
 		const request = parseSearchRequest(raw);

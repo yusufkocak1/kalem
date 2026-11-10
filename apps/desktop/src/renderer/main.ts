@@ -29,6 +29,7 @@ import { createAttachmentCard } from "./attachment-card.js";
 import { createAttachmentsDialog, linkedAttachments } from "./confluence-attachments.js";
 import { createConfluenceDialog } from "./confluence-dialog.js";
 import { createConfluencePane } from "./confluence-pane.js";
+import { createPublishDialog } from "./confluence-publish-dialog.js";
 import { createDiagramButton, isDiagramImage } from "./diagram-button.js";
 import { createDiagramEditor } from "./diagram-editor.js";
 import { diagramFromImage, diagramToPng } from "./diagram-image.js";
@@ -125,6 +126,13 @@ const confluenceDialog = createConfluenceDialog({
 	onAccountChange: () => {
 		void refreshAccounts();
 	},
+});
+const publishDialog = createPublishDialog({
+	t,
+	bridge,
+	space: () => settings.confluenceSpace,
+	setSpace: (key) => updateSettings({ confluenceSpace: key }),
+	connect: () => void confluenceDialog.show(),
 });
 const jiraDialog = createJiraDialog({
 	t,
@@ -319,6 +327,7 @@ async function refreshAccounts(): Promise<void> {
 	]);
 	accounts.confluence = confluence !== null;
 	accounts.jira = jira !== null;
+	updatePublishButton();
 	docks.apply();
 	refreshShown(before);
 	void settingsDialog.refresh();
@@ -355,6 +364,24 @@ const exitFocus = el("button", {
 	attrs: { type: "button" },
 });
 const saveStatus = el("div", { class: "save-status", attrs: { role: "status" } });
+// Publishing to Confluence, always at hand next to the save status while Confluence is connected.
+const publishButton = el("button", {
+	class: "ribbon-publish",
+	attrs: { type: "button", title: t.publishTitleBar },
+	children: [icon("confluence"), el("span", { text: t.publishButton })],
+});
+publishButton.firstElementChild?.classList.add("ribbon-publish-mark");
+publishButton.hidden = true;
+publishButton.addEventListener("click", () => commands["publish-confluence"]());
+const ribbonTrailing = el("div", {
+	class: "ribbon-trailing",
+	children: [publishButton, saveStatus],
+});
+
+/** The publish button is there for a local document, once Confluence is connected. */
+function updatePublishButton(): void {
+	publishButton.hidden = !accounts.confluence || session.remote !== null || session.isText;
+}
 
 const tabStrip = createTabStrip({
 	label: t.openDocuments,
@@ -421,6 +448,7 @@ function scheduleRibbonUpdate(): void {
 	requestAnimationFrame(() => {
 		refreshQueued = false;
 		ribbon.update();
+		updatePublishButton();
 	});
 }
 
@@ -800,6 +828,17 @@ const commands: Record<Command, () => void> = {
 	"format-all-code": () => (session.isText ? session.textView?.beautify() : tools.formatAllCode()),
 	"quick-open": () => void quickOpen.show(),
 	"confluence-open": () => void confluenceDialog.show(),
+	"publish-confluence": () => {
+		if (session.remote !== null) {
+			session.notices.show({ id: "publish", text: t.publishNotHere });
+			return;
+		}
+		void publishDialog.show({
+			tabId: session.id,
+			name: session.name,
+			markdown: session.styledMarkdown(),
+		});
+	},
 	"jira-open": () => void jiraDialog.showSearch(),
 	settings: () => void settingsDialog.show(),
 	"new-from-template": () => void templatePicker.show(),
@@ -843,7 +882,7 @@ for (const document of startup.documents) openDocument(document);
 // The connections decide whether Confluence and Jira have panes; then they are filled.
 void refreshAccounts();
 
-const ribbon = createAppRibbon(ribbonHost, saveStatus, {
+const ribbon = createAppRibbon(ribbonHost, ribbonTrailing, {
 	t,
 	bridge,
 	platform: startup.platform,
