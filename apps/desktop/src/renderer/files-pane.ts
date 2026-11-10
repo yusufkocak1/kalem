@@ -33,6 +33,8 @@ export interface FilesPaneOptions {
 	inform(text: string): void;
 	/** The folders were listed again (they may have been opened or closed). */
 	listed?(workspace: Workspace): void;
+	/** The single open folder's repository, as the pane's git bar shows it; `null` without one. */
+	gitChanged?(git: GitStatus | null): void;
 	readonly git: GitDialogs;
 	/** Whether open repositories are fetched in the background now and then. */
 	autoFetch(): boolean;
@@ -693,6 +695,7 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 
 	function renderGitBar(only: WorkspaceRoot | undefined): void {
 		const git = only?.git ?? null;
+		options.gitChanged?.(only === undefined ? null : git);
 		if (only === undefined || git === null) {
 			gitBar.hidden = true;
 			gitBar.replaceChildren();

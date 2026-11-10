@@ -4,7 +4,7 @@ import type { Caret, EditResult } from "@kalem-editor/editor";
 import { holderIn, indentItem, outdentItem, selectRange, toggleList } from "@kalem-editor/editor";
 import type { DocumentAction } from "../shared/actions.js";
 import { applyActions } from "../shared/actions.js";
-import type { Command, KalemBridge, Settings, TabDocument } from "../shared/bridge.js";
+import type { Command, GitStatus, KalemBridge, Settings, TabDocument } from "../shared/bridge.js";
 import { clampZoom, MAX_ZOOM, MIN_ZOOM, pageRule, ZOOM_STEP } from "../shared/bridge.js";
 import type { ContextDiagram, ReplyDiagram } from "../shared/claude.js";
 import { splitReply } from "../shared/claude.js";
@@ -26,6 +26,7 @@ import { withColumnWidth } from "../shared/table-style.js";
 import { changeCase, collapseSpaces, nextCase } from "../shared/text-case.js";
 import { createAssistantPane } from "./assistant-pane.js";
 import { createAttachmentCard } from "./attachment-card.js";
+import { createCommandPalette } from "./command-palette.js";
 import { createAttachmentsDialog, linkedAttachments } from "./confluence-attachments.js";
 import { createConfluenceDialog } from "./confluence-dialog.js";
 import { createConfluencePane } from "./confluence-pane.js";
@@ -107,6 +108,7 @@ const filesPane = createFilesPane({
 	inform: (text) => session.notices.show({ id: "files", kind: "info", text }),
 	// The open folders are the assistant's workspace.
 	listed: () => assistant.workspaceChanged(),
+	gitChanged: (git) => showGitStatus(git),
 	git: createGitDialogs(t, startup.language),
 	autoFetch: () => settings.gitAutoFetch,
 	setAutoFetch: (on) => updateSettings({ gitAutoFetch: on }),
@@ -168,6 +170,14 @@ const quickOpen = createQuickOpen({
 	lang: startup.language,
 	workspace: () => bridge.getWorkspace(),
 	open: (path) => void bridge.openPath(path),
+	commands: (query) => void commandPalette.show(query),
+});
+/** The menu's commands by name (F1, or `>` in Quick Open). */
+const commandPalette = createCommandPalette({
+	t,
+	lang: startup.language,
+	commands: () => bridge.paletteCommands(),
+	run: (id) => bridge.runPaletteCommand(id),
 });
 
 /** Where the caret last was in each tab's document, and the text last selected in it. */
@@ -352,10 +362,35 @@ const zoomSlider = el("input", {
 	},
 });
 const zoomValue = el("output", { class: "zoom-value" });
+/** The open folder's branch, what waits to be pushed and pulled, and what changed; a click shows the Files pane. */
+const gitStatus = el("button", {
+	class: "status-git",
+	attrs: { type: "button" },
+});
+gitStatus.hidden = true;
+gitStatus.addEventListener("click", () => {
+	if (!docks.shown().has("files")) updateSettings(revealPane(settings, "files"));
+});
+
+function showGitStatus(git: GitStatus | null): void {
+	gitStatus.hidden = git === null;
+	if (git === null) return;
+	const branch = git.branch ?? t.statusGitDetached;
+	const parts: (Node | string)[] = [icon("branch"), el("span", { text: branch })];
+	if (git.ahead > 0) parts.push(el("span", { class: "status-git-count", text: `↑${git.ahead}` }));
+	if (git.behind > 0) parts.push(el("span", { class: "status-git-count", text: `↓${git.behind}` }));
+	if (git.changed > 0) {
+		parts.push(el("span", { class: "status-git-changed", text: `●${git.changed}` }));
+	}
+	gitStatus.replaceChildren(...parts);
+	gitStatus.title = format(t.statusGitTitle, branch, git.changed, git.ahead, git.behind);
+}
+
 const statusBar = el("footer", {
 	class: "statusbar",
 	children: [
 		docks.stripes.bottom,
+		gitStatus,
 		wordCountArea,
 		el("span", { class: "status-spacer" }),
 		readOnlyBadge,
@@ -370,6 +405,10 @@ const exitFocus = el("button", {
 	attrs: { type: "button" },
 });
 const saveStatus = el("div", { class: "save-status", attrs: { role: "status" } });
+// Unsaved or failed: a click saves, as Ctrl+S does.
+saveStatus.addEventListener("click", () => {
+	if (session.status === "unsaved" || session.status === "error") commands.save();
+});
 // Publishing to Confluence, always at hand next to the save status while Confluence is connected.
 const publishButton = el("button", {
 	class: "ribbon-publish",
@@ -551,7 +590,10 @@ async function openFromFolder(path: string, query?: string): Promise<void> {
 function renderState(): void {
 	saveStatus.textContent = STATUS_TEXT[session.status];
 	saveStatus.dataset.status = session.status;
-	saveStatus.title = session.path ?? "";
+	saveStatus.title =
+		session.status === "unsaved" || session.status === "error"
+			? `${t.statusClickToSave}${session.path === null ? "" : `\n${session.path}`}`
+			: (session.path ?? "");
 	formatBadge.textContent = session.formatLabel;
 	readOnlyBadge.hidden = !session.readOnly;
 }
@@ -919,6 +961,7 @@ const commands: Record<Command, () => void> = {
 	"format-code": () => (session.isText ? session.textView?.beautify() : tools.formatCode()),
 	"format-all-code": () => (session.isText ? session.textView?.beautify() : tools.formatAllCode()),
 	"quick-open": () => void quickOpen.show(),
+	"command-palette": () => void commandPalette.show(),
 	"confluence-open": () => void confluenceDialog.show(),
 	"publish-confluence": () => {
 		if (session.remote !== null) {

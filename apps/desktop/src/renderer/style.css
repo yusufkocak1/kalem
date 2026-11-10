@@ -5806,7 +5806,7 @@ pre[data-confluence-kind="layout"]::before {
 	content: attr(data-initials);
 }
 
-.jira-person .jira-avatar {
+.jira-person > .jira-avatar.jira-avatar-mark {
 	width: 22px;
 	height: 22px;
 	font-size: 9.5px;
@@ -9480,4 +9480,144 @@ dialog[open]::backdrop {
 
 .files-empty-action[hidden] {
 	display: none;
+}
+
+/* --- Command palette (F1): the menu's commands by name --------------------------- */
+
+.command-palette {
+	width: min(640px, calc(100vw - 32px));
+	margin-top: 10vh;
+	padding: 6px;
+	border-radius: 12px;
+}
+
+.palette-field {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 0 4px 0 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-surface);
+}
+
+.palette-field:focus-within {
+	border-color: var(--app-accent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 18%, transparent);
+}
+
+.palette-prompt {
+	color: var(--app-accent);
+	font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+	font-weight: 700;
+}
+
+.palette-field > .quick-open-input {
+	padding-left: 0;
+	border: 0;
+	background: none;
+}
+
+.palette-field > .quick-open-input:focus {
+	outline: none;
+}
+
+.palette-item {
+	align-items: center;
+	cursor: pointer;
+}
+
+.palette-item:hover:not([aria-selected="true"]) {
+	background: var(--app-hover);
+}
+
+.palette-check {
+	display: inline-flex;
+	flex: none;
+	width: 14px;
+	color: var(--app-accent);
+}
+
+.palette-check > svg.icon {
+	width: 14px;
+	height: 14px;
+}
+
+.palette-item > .quick-open-name {
+	font-weight: 500;
+}
+
+.palette-item > .quick-open-path {
+	flex: 1;
+}
+
+.palette-key {
+	flex: none;
+	padding: 1px 6px;
+	border: 1px solid var(--app-border);
+	border-bottom-width: 2px;
+	border-radius: 5px;
+	background: var(--app-surface);
+	color: var(--app-muted);
+	font-family: inherit;
+	font-size: 11px;
+	white-space: nowrap;
+}
+
+/* --- Status bar: the branch, and a save status that saves --------------------- */
+
+.status-git {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	height: 20px;
+	margin-left: -6px;
+	padding: 0 6px;
+	border: 0;
+	border-radius: 4px;
+	background: none;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+}
+
+.status-git:hover {
+	background: var(--app-hover);
+	color: var(--app-text);
+}
+
+.status-git:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -2px;
+}
+
+.status-git[hidden] {
+	display: none;
+}
+
+.status-git > svg.icon {
+	width: 14px;
+	height: 14px;
+}
+
+.status-git-count {
+	font-variant-numeric: tabular-nums;
+}
+
+.status-git-changed {
+	color: var(--app-warning);
+	font-variant-numeric: tabular-nums;
+}
+
+.save-status[data-status="unsaved"],
+.save-status[data-status="error"] {
+	padding: 2px 8px;
+	border-radius: 999px;
+	cursor: pointer;
+}
+
+.save-status[data-status="unsaved"]:hover,
+.save-status[data-status="error"]:hover {
+	background: var(--app-hover);
+	color: var(--app-text);
 }

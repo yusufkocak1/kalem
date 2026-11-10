@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { MenuItemConstructorOptions, WebContents } from "electron";
 import { app, BrowserWindow, Menu, session, shell } from "electron";
-import type { Command, Settings, TabDocument } from "../shared/bridge.js";
+import type { Command, PaletteCommand, Settings, TabDocument } from "../shared/bridge.js";
 import { CHANNEL, PAGE_SIZES } from "../shared/bridge.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
@@ -369,6 +369,8 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 		{
 			label: t.view,
 			submenu: [
+				{ label: t.commandPalette, accelerator: "F1", click: send(ctx, "command-palette") },
+				{ type: "separator" },
 				{
 					label: t.navigationPane,
 					type: "checkbox",
@@ -559,4 +561,59 @@ export function popupContextMenu(
 	if (items.length === 0) return;
 	const window = BrowserWindow.fromWebContents(contents);
 	Menu.buildFromTemplate(items).popup(window === null ? {} : { window });
+}
+
+/** An accelerator as the menu shows it on this system: "Ctrl+Shift+S", "Cmd+Shift+S". */
+function shownAccelerator(accelerator: string | null | undefined): string {
+	if (accelerator === undefined || accelerator === null) return "";
+	return accelerator
+		.replace(/CommandOrControl|CmdOrCtrl/g, isMac ? "Cmd" : "Ctrl")
+		.replace(/\bCommand\b/g, "Cmd")
+		.replace(/\bControl\b/g, "Ctrl")
+		.replace(/\bPlus\b/g, "+");
+}
+
+/**
+ * Every command of the application menu, for the command palette: the
+ * items that do something (not submenus, separators, hidden or disabled
+ * ones), each with the menus it is under and its shortcut. The id is its
+ * place in the menu, which `runPaletteCommand` finds it by.
+ */
+export function paletteCommands(): PaletteCommand[] {
+	const menu = Menu.getApplicationMenu();
+	if (menu === null) return [];
+	const found: PaletteCommand[] = [];
+	const walk = (items: readonly Electron.MenuItem[], path: string[], ids: number[]): void => {
+		items.forEach((item, index) => {
+			if (!item.visible || item.type === "separator") return;
+			const label = item.label.replace(/&/g, "");
+			if (item.submenu !== undefined && item.submenu !== null) {
+				walk(item.submenu.items, [...path, label], [...ids, index]);
+				return;
+			}
+			if (!item.enabled || label === "") return;
+			found.push({
+				id: [...ids, index].join("."),
+				label,
+				group: path.join(" › "),
+				accelerator: shownAccelerator(item.accelerator),
+				checked: item.type === "checkbox" || item.type === "radio" ? item.checked : null,
+			});
+		});
+	};
+	walk(menu.items, [], []);
+	return found;
+}
+
+/** Runs the menu item a palette command names, as a click on it in `window` would. */
+export function runPaletteCommand(id: string, window: BrowserWindow): void {
+	let items = Menu.getApplicationMenu()?.items ?? [];
+	let item: Electron.MenuItem | undefined;
+	for (const part of id.split(".")) {
+		item = items[Number(part)];
+		if (item === undefined) return;
+		items = item.submenu?.items ?? [];
+	}
+	if (item === undefined || !item.enabled || item.submenu) return;
+	item.click(undefined, window, window.webContents);
 }

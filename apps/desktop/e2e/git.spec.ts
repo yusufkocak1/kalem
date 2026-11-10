@@ -36,18 +36,23 @@ test("knows a folder with .git, commits, pushes, branches and clones", async () 
 	// The folder is a repository: its branch is shown without being asked.
 	await expect(bar.locator(".files-git-name")).toHaveText("main");
 	await expect(bar.locator(".files-git-state")).toHaveText("origin/main · Up to date");
+	// The status bar names the branch too.
+	const statusGit = page.locator(".statusbar .status-git");
+	await expect(statusGit).toHaveText("main");
 
 	// Commit everything that changed.
 	await writeFile(join(work, "more.md"), "More\n");
 	await page.locator(".files-toolbar").hover();
 	await page.locator(".files-toolbar").getByRole("button", { name: "Refresh" }).click();
 	await expect(bar.locator(".files-git-state")).toContainText("1 changed");
+	await expect(statusGit).toHaveText("main●1");
 	await bar.locator(".files-git-more").click();
 	await page.locator(".files-menu-item", { hasText: "Commit Changes…" }).click();
 	const form = page.locator(".git-dialog[open] .git-form");
 	await form.locator("textarea").fill("More notes");
 	await form.locator("button[type=submit]").click();
 	await expect(bar.locator(".files-git-state")).toContainText("1 to push");
+	await expect(statusGit).toHaveText("main↑1");
 	expect(git(work, "log", "-1", "--format=%s")).toBe("More notes");
 
 	await bar.getByRole("button", { name: "Push" }).click();

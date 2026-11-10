@@ -683,7 +683,21 @@ export const COMMANDS = [
 	"format-all-code",
 	"assistant",
 	"new-from-template",
+	"command-palette",
 ] as const;
+
+/** A command of the application menu, as the command palette lists it. */
+export interface PaletteCommand {
+	/** Where it is in the menu; what it is run by. */
+	readonly id: string;
+	readonly label: string;
+	/** The menus it is under: "File › Export". */
+	readonly group: string;
+	/** As the menu shows it; empty when it has none. */
+	readonly accelerator: string;
+	/** For a check or radio item, whether it is on; `null` for the rest. */
+	readonly checked: boolean | null;
+}
 
 export type Command = (typeof COMMANDS)[number];
 
@@ -697,6 +711,10 @@ export interface KalemBridge {
 	openPath(path: string): Promise<void>;
 	/** The documents opened last, newest first. */
 	recentFiles(): Promise<readonly string[]>;
+	/** The application menu's commands, for the command palette. */
+	paletteCommands(): Promise<readonly PaletteCommand[]>;
+	/** Runs one of them, in this window. */
+	runPaletteCommand(id: string): void;
 	importWord(): Promise<void>;
 	importConfluence(): Promise<void>;
 
@@ -940,6 +958,8 @@ export const CHANNEL = {
 	showOpenDialog: "kalem:show-open-dialog",
 	openPath: "kalem:open-path",
 	recentFiles: "kalem:recent-files",
+	paletteCommands: "kalem:palette-commands",
+	runPaletteCommand: "kalem:run-palette-command",
 	importWord: "kalem:import-word",
 	importConfluence: "kalem:import-confluence",
 	confluenceAccount: "kalem:confluence-account",

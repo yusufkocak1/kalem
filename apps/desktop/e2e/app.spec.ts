@@ -2059,3 +2059,55 @@ test("offers ways to start and the recent documents under an empty page, until s
 	expect(errors).toEqual([]);
 	await discardAndClose(app);
 });
+
+test("runs a menu command by name from the command palette, and from > in Quick Open", async () => {
+	const { app, page, errors } = await launch();
+	await clickMenu(app, "View", "Command Palette…");
+	const palette = page.locator(".command-palette");
+	await expect(palette).toBeVisible();
+	const input = palette.locator(".quick-open-input");
+	await expect(input).toBeFocused();
+	// Every word must match the name or its menus; shortcuts and check marks are shown.
+	await input.fill("full width");
+	const items = palette.locator(".palette-item");
+	await expect(items.first().locator(".quick-open-name")).toHaveText("Full Width");
+	await expect(items.first().locator(".quick-open-path")).toHaveText("View");
+	await input.press("Enter");
+	await expect(palette).toBeHidden();
+	await expect(page.locator(".app")).toHaveAttribute("data-full-width", "");
+
+	await clickMenu(app, "View", "Command Palette…");
+	await input.fill("full width");
+	await expect(items.first().locator(".palette-check svg")).toHaveCount(1);
+	await input.fill("save as");
+	await expect(items.first().locator(".palette-key")).toHaveText(/Shift\+S$/);
+	await page.keyboard.press("Escape");
+
+	// In Quick Open, ">" turns the search into one for commands.
+	await clickMenu(app, "File", "Quick Open…");
+	await page.locator(".quick-open:not(.command-palette) .quick-open-input").fill(">full");
+	await expect(palette).toBeVisible();
+	await expect(input).toHaveValue("full");
+	await input.press("Enter");
+	await expect(page.locator(".app")).not.toHaveAttribute("data-full-width", "");
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("saves from the save status when the document has unsaved changes", async () => {
+	const folder = await tempDir("save-status");
+	const path = join(folder, "not.md");
+	await writeFile(path, "Bir\n");
+	const { app, page, errors } = await launch({ args: [path] });
+	await expect(status(page)).toHaveText("Saved");
+	await page.locator("#editor p").first().click();
+	await page.keyboard.press("End");
+	await page.keyboard.type(" iki");
+	await expect(status(page)).toHaveText("Unsaved");
+	await expect(status(page)).toHaveAttribute("title", /Click to save/);
+	await status(page).click();
+	await expect(status(page)).toHaveText("Saved");
+	expect(await readFile(path, "utf8")).toBe("Bir iki\n");
+	expect(errors).toEqual([]);
+	await app.close();
+});
