@@ -7767,3 +7767,35 @@ textarea.jira-worklog-input {
 	height: 6px;
 	cursor: row-resize;
 }
+
+.jira-worklog-diagnostics[hidden] {
+	display: none;
+}
+
+.jira-worklog-diagnostics {
+	display: grid;
+	gap: 6px;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.jira-worklog-diagnostics-summary {
+	cursor: pointer;
+}
+
+.jira-worklog-diagnostics-hint {
+	margin: 4px 0;
+}
+
+.jira-worklog-diagnostics-text {
+	max-height: 180px;
+	margin: 0;
+	padding: 8px;
+	overflow: auto;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font-size: 11px;
+	white-space: pre-wrap;
+}

@@ -22,12 +22,23 @@ import {
 	transitionBody,
 	transitionsOf,
 } from "../shared/jira-dev.js";
-import type { WorkAttribute, WorklogContext, WorklogEntry } from "../shared/jira-worklog.js";
+import type {
+	IssuePlaceholders,
+	WorkAttribute,
+	WorkAttributeOption,
+	WorklogContext,
+	WorklogEntry,
+} from "../shared/jira-worklog.js";
 import {
+	externalPath,
 	jiraWorklogRequest,
 	missingAttributes,
+	parseJsonOrJsonp,
+	recentAttributeValues,
+	tempoOptionsOf,
 	tempoWorklogBody,
 	workAttributesOf,
+	workAttributeType,
 	worklogsOf,
 } from "../shared/jira-worklog.js";
 import type { ConfluenceCredentials, Fetch } from "./confluence-client.js";
@@ -59,6 +70,60 @@ const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : [
  * installed) and status changes. Cloud searches with `/search/jql` (the older `/search` is gone
  * there), Server with `/search`.
  */
+/** Requests one Jira site is sent at the same time; the rest wait their turn. */
+const MAX_PARALLEL = 4;
+/** Times a request Jira turned away for its rate limit (429) is sent again. */
+const RATE_RETRIES = 3;
+/** The longest wait before sending again, whatever Jira says. */
+const MAX_RETRY_WAIT = 15_000;
+
+/** Each site's turns, shared by every client of it: a client is made for each request from a window. */
+const turns = new Map<string, { running: number; waiting: (() => void)[] }>();
+
+async function takeTurn(site: string): Promise<() => void> {
+	let state = turns.get(site);
+	if (state === undefined) {
+		state = { running: 0, waiting: [] };
+		turns.set(site, state);
+	}
+	const own = state;
+	if (own.running >= MAX_PARALLEL) await new Promise<void>((resolve) => own.waiting.push(resolve));
+	own.running++;
+	return () => {
+		own.running--;
+		own.waiting.shift()?.();
+	};
+}
+
+/** Answers that seldom change, kept a while by site and login: who is signed in, Tempo's fields. */
+const kept = new Map<string, { until: number; value: Promise<unknown> }>();
+
+function keep<T>(key: string, lifetime: number, make: () => Promise<T>): Promise<T> {
+	const now = Date.now();
+	const found = kept.get(key);
+	if (found !== undefined && found.until > now) return found.value as Promise<T>;
+	const value = make();
+	kept.set(key, { until: now + lifetime, value });
+	// A failure is not kept: the next look asks again.
+	value.catch(() => {
+		if (kept.get(key)?.value === value) kept.delete(key);
+	});
+	return value;
+}
+
+const MINUTE = 60_000;
+
+/** How long to wait before sending again, from Jira's `Retry-After` (seconds or a date). */
+export function retryWait(header: string | null, attempt: number): number {
+	let wait = Number.NaN;
+	if (header !== null && header.trim() !== "") {
+		const seconds = Number(header);
+		wait = Number.isFinite(seconds) ? seconds * 1000 : new Date(header).getTime() - Date.now();
+	}
+	if (!Number.isFinite(wait) || wait < 0) wait = 1000 * 2 ** attempt;
+	return Math.min(wait, MAX_RETRY_WAIT);
+}
+
 export class JiraClient {
 	readonly site: string;
 	readonly cloud: boolean;
@@ -90,16 +155,40 @@ export class JiraClient {
 		return this.#send("GET", path);
 	}
 
+	/** What the kept answers of this site and login are filed under. */
+	get #keptKey(): string {
+		return `${this.site}\n${this.#auth}`;
+	}
+
 	async #send(method: "GET" | "POST", path: string, body?: unknown): Promise<unknown> {
-		const response = await this.#fetch(`${this.site}${path}`, {
-			method,
-			headers: {
-				Accept: "application/json",
-				Authorization: this.#auth,
-				...(body === undefined ? {} : { "Content-Type": "application/json" }),
-			},
-			...(body === undefined ? {} : { body: JSON.stringify(body) }),
-		});
+		let response: Response;
+		for (let attempt = 0; ; attempt++) {
+			const done = await takeTurn(this.site);
+			try {
+				response = await this.#fetch(`${this.site}${path}`, {
+					method,
+					headers: {
+						Accept: "application/json",
+						Authorization: this.#auth,
+						...(body === undefined ? {} : { "Content-Type": "application/json" }),
+					},
+					...(body === undefined ? {} : { body: JSON.stringify(body) }),
+				});
+			} finally {
+				done();
+			}
+			// Jira's rate limit turned it away before doing anything: it is sent again after the wait asked.
+			if (response.status !== 429 || attempt >= RATE_RETRIES) break;
+			await new Promise((resolve) =>
+				setTimeout(resolve, retryWait(response.headers.get("Retry-After"), attempt)),
+			);
+		}
+		if (response.status === 429) {
+			throw new JiraError(
+				429,
+				"HTTP 429: Jira is limiting requests (rate limit); try again in a minute.",
+			);
+		}
 		if (!response.ok) {
 			let detail = "";
 			try {
@@ -116,8 +205,7 @@ export class JiraClient {
 				detail === "" ? `HTTP ${response.status}` : `HTTP ${response.status}: ${detail}`,
 			);
 		}
-		const text = await response.text();
-		return text === "" ? null : JSON.parse(text);
+		return parseJsonOrJsonp(await response.text());
 	}
 
 	/** Who is signed in; fails when the site or the login is wrong. */
@@ -204,40 +292,146 @@ export class JiraClient {
 
 	/** Who is signed in: the key Tempo names a worker by, and the name. */
 	async #me(): Promise<{ key: string; name: string }> {
-		this.#user ??= this.#json("/rest/api/2/myself").then((me) => ({
+		return keep(`${this.#keptKey}\nme`, 30 * MINUTE, async () => {
+			const me = await this.#json("/rest/api/2/myself");
 			// Server's user key; Cloud's account id.
-			key: asString(me.key) || asString(me.accountId),
-			name: asString(me.name),
-		}));
+			return { key: asString(me.key) || asString(me.accountId), name: asString(me.name) };
+		});
+	}
+
+	/** Tempo's work attributes as it lists them; `null` where Tempo is not installed. */
+	async #tempoRaw(): Promise<unknown[] | null> {
+		if (this.cloud) return null;
+		return keep(`${this.#keptKey}\ntempo`, 10 * MINUTE, async () => {
+			try {
+				const raw = await this.#get("/rest/tempo-core/1/work-attribute");
+				return Array.isArray(raw) ? raw : [];
+			} catch (error) {
+				if (error instanceof JiraError && (error.status === 404 || error.status === 403))
+					return null;
+				throw error;
+			}
+		});
+	}
+
+	/** A request whose failure only means fewer choices; why it failed goes to the report. */
+	async #tryGet(path: string, report: string[], label: string): Promise<unknown> {
 		try {
-			return await this.#user;
+			return await keep(`${this.#keptKey}\nget\n${path}`, 10 * MINUTE, () => this.#get(path));
 		} catch (error) {
-			this.#user = null;
-			throw error;
+			report.push(`${label} ${path}: ${error instanceof Error ? error.message : String(error)}`);
+			return null;
 		}
 	}
 
-	#user: Promise<{ key: string; name: string }> | null = null;
+	/**
+	 * The choices of each list attribute, by key, from wherever Tempo keeps
+	 * them: a static list asked for on its own when the attribute list has
+	 * none, the project's accounts (all accounts are for administrators), a
+	 * dynamic drop-down's address on this Jira; then the values the user
+	 * gave in their own Tempo logs of the last months.
+	 */
+	async #tempoChoices(
+		raw: readonly unknown[],
+		issue: IssuePlaceholders,
+		recent: Readonly<Record<string, readonly string[]>>,
+		report: string[],
+	): Promise<Record<string, WorkAttributeOption[]>> {
+		const choices: Record<string, WorkAttributeOption[]> = {};
+		await Promise.all(
+			raw.map(async (item) => {
+				const attribute = asJson(item);
+				const key = asString(attribute.key);
+				const id = asString(attribute.id);
+				const type = workAttributeType(attribute);
+				const found: WorkAttributeOption[] = [];
+				// Where Tempo's own dialog asks: the attribute's `externalUrl` (an account's
+				// billing keys for the issue, a dynamic drop-down's endpoint).
+				const external = asString(attribute.externalUrl);
+				if (external !== "") {
+					const path = externalPath(external, this.site, issue);
+					if (path === null) {
+						report.push(`${key}: choices at another host, not asked: ${external}`);
+					} else {
+						// Tempo asks a dynamic drop-down with a JSONP callback; some endpoints answer only so.
+						const asked =
+							type === "DYNAMIC_DROPDOWN" && !/[?&]callback=/.test(path)
+								? `${path}${path.includes("?") ? "&" : "?"}callback=kalem`
+								: path;
+						found.push(...tempoOptionsOf(await this.#tryGet(asked, report, key)));
+					}
+				}
+				if (type === "STATIC_LIST" && tempoOptionsOf(attribute.staticListValues).length === 0) {
+					found.push(
+						...tempoOptionsOf(
+							await this.#tryGet(
+								`/rest/tempo-core/1/work-attribute/${id}/static-list-value`,
+								report,
+								key,
+							),
+						),
+					);
+				}
+				if (type === "ACCOUNT" && found.length === 0) {
+					const projectId = issue.projectId;
+					if (/^\d+$/.test(projectId)) {
+						found.push(
+							...tempoOptionsOf(
+								await this.#tryGet(
+									`/rest/tempo-accounts/1/account/project/${projectId}`,
+									report,
+									key,
+								),
+							),
+						);
+					}
+					if (found.length === 0) {
+						found.push(
+							...tempoOptionsOf(await this.#tryGet("/rest/tempo-accounts/1/account", report, key)),
+						);
+					}
+				}
+				if (type === "DYNAMIC_DROPDOWN" && external === "") {
+					report.push(`${key}: a dynamic drop-down without an address`);
+				}
+				const known = new Set(found.map((option) => option.value));
+				for (const value of recent[key] ?? []) {
+					if (!known.has(value)) found.push({ value, name: value });
+				}
+				choices[key] = found;
+			}),
+		);
+		return choices;
+	}
+
+	/** The work attribute values the user gave in Tempo in the last four months, latest first. */
+	async #recentValues(worker: string, report: string[]): Promise<Record<string, string[]>> {
+		const day = (date: Date): string => date.toISOString().slice(0, 10);
+		const to = new Date();
+		const from = new Date(to.getTime() - 120 * 24 * 3600 * 1000);
+		try {
+			return await keep(`${this.#keptKey}\nrecent`, 2 * MINUTE, async () =>
+				recentAttributeValues(
+					await this.#send("POST", "/rest/tempo-timesheets/4/worklogs/search", {
+						from: day(from),
+						to: day(to),
+						worker: [worker],
+					}),
+				),
+			);
+		} catch (error) {
+			report.push(`recent logs: ${error instanceof Error ? error.message : String(error)}`);
+			return {};
+		}
+	}
 
 	/**
 	 * Tempo's work attributes; `null` where Tempo Timesheets is not
 	 * installed (or on Cloud, whose Tempo has its own API and login).
 	 */
 	async #tempoAttributes(): Promise<WorkAttribute[] | null> {
-		if (this.cloud) return null;
-		let raw: unknown;
-		try {
-			raw = await this.#get("/rest/tempo-core/1/work-attribute");
-		} catch (error) {
-			if (error instanceof JiraError && (error.status === 404 || error.status === 403)) return null;
-			throw error;
-		}
-		const accounts = Array.isArray(raw)
-			? raw.some((item) => JSON.stringify(item).includes('"ACCOUNT"'))
-				? await this.#get("/rest/tempo-accounts/1/account").catch(() => [])
-				: []
-			: [];
-		return workAttributesOf(raw, accounts);
+		const raw = await this.#tempoRaw();
+		return raw === null ? null : workAttributesOf(raw);
 	}
 
 	/** What the work log form needs: Tempo's fields, the time spent and left, the user's own logs. */
@@ -247,21 +441,54 @@ export class JiraClient {
 	): Promise<WorklogContext> {
 		const valid = issueKey(key);
 		if (valid === null) throw new Error("Invalid issue key");
-		const [attributes, issue, logs, me] = await Promise.all([
-			this.#tempoAttributes(),
-			this.#json(`/rest/api/2/issue/${valid}?fields=timetracking`),
+		const [raw, issue, logs, me] = await Promise.all([
+			this.#tempoRaw(),
+			this.#json(`/rest/api/2/issue/${valid}?fields=timetracking,project`),
 			this.#get(`/rest/api/2/issue/${valid}/worklog`).catch(() => ({})),
 			this.#me(),
 		]);
-		const tracking = asJson(asJson(issue.fields).timetracking);
+		const fields = asJson(issue.fields);
+		const tracking = asJson(fields.timetracking);
 		const remaining = tracking.remainingEstimateSeconds;
+		const report: string[] = [];
+		let attributes: WorkAttribute[] = [];
+		let starting: Record<string, string> = { ...defaults };
+		if (raw !== null) {
+			const recent = await this.#recentValues(me.key, report);
+			const project = asJson(fields.project);
+			const choices = await this.#tempoChoices(
+				raw,
+				{
+					issueKey: valid,
+					issueId: asString(issue.id),
+					projectKey: asString(project.key),
+					projectId: asString(project.id),
+				},
+				recent,
+				report,
+			);
+			attributes = workAttributesOf(raw, choices);
+			// What was given last in Tempo starts the form when nothing was remembered here.
+			starting = Object.fromEntries(
+				attributes.flatMap((attribute) => {
+					const value = defaults[attribute.key] ?? recent[attribute.key]?.[0] ?? "";
+					return value === "" ? [] : [[attribute.key, value]];
+				}),
+			);
+			const described = attributes.map((attribute) => {
+				const own = asJson(raw.find((item) => asString(asJson(item).key) === attribute.key));
+				return `${attribute.name} (${attribute.key}): ${workAttributeType(own)}${attribute.required ? ", required" : ""}, ${attribute.options.length} choices; fields: ${Object.keys(own).join(", ")}`;
+			});
+			report.unshift(...described);
+		}
 		return {
-			tempo: attributes !== null,
-			attributes: attributes ?? [],
-			defaults,
+			tempo: raw !== null,
+			attributes,
+			defaults: starting,
 			spentSeconds: Number(tracking.timeSpentSeconds) || 0,
 			remainingSeconds: typeof remaining === "number" ? remaining : null,
 			mine: worklogsOf(logs, me).slice(0, 5),
+			diagnostics: report.join("\n"),
 		};
 	}
 

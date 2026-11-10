@@ -46,6 +46,10 @@ async function fakeJira() {
 	const searches: string[] = [];
 	/** The work logs Tempo was sent. */
 	const worklogs: Record<string, unknown>[] = [];
+	/** How often ScriptRunner's list was asked for. */
+	let serviceListAsked = 0;
+	/** The fake's own address, known once it listens. */
+	const base = { site: "" };
 	/** The status changes Jira was sent, and QR-1's status after them. */
 	const transitions: Record<string, unknown>[] = [];
 	let status = { name: "In Progress", category: "indeterminate" };
@@ -60,23 +64,49 @@ async function fakeJira() {
 			return json(res, { displayName: "Ayşe Balcı", key: "JIRAUSER1", name: "ayse" });
 		}
 		// Tempo Timesheets: its work attributes, its accounts, and a work log sent to it.
+		// As Tempo answers on Jira Server: an account whose billing keys are at its `externalUrl`
+		// for the issue, and a dynamic drop-down served by ScriptRunner on the same Jira.
 		if (url.pathname === "/rest/tempo-core/1/work-attribute") {
 			return json(res, [
 				{
-					id: 1,
+					id: 21,
 					key: "_Sirket_",
 					name: "Faturalandırılacak Şirket",
-					type: { value: "STATIC_LIST" },
+					externalUrl: "/rest/tempo-rest/1.0/accounts/json/billingKeyList/{IssueKey}",
+					type: { name: "Account", value: "ACCOUNT", systemType: false },
 					required: false,
-					staticListValues: [{ id: 1, name: "TKAO - Türk Hava Yolları A.O.", value: "TKAO" }],
+					sequence: 0,
 				},
-				{ id: 2, key: "_Servis_", name: "Servis", type: { value: "ACCOUNT" }, required: true },
+				{
+					id: 102,
+					key: "_Servis_",
+					name: "Servis",
+					externalUrl: `${base.site}/rest/scriptrunner/latest/custom/serviceList`,
+					type: { name: "Dynamic Dropdown", value: "DYNAMIC_DROPDOWN", systemType: false },
+					required: true,
+					sequence: 2,
+				},
 			]);
 		}
-		if (url.pathname === "/rest/tempo-accounts/1/account") {
-			return json(res, [
-				{ key: "QUICKRES", name: "Satış Kanalı (QuickRes) Uygulaması", status: "OPEN" },
-			]);
+		if (url.pathname === "/rest/tempo-rest/1.0/accounts/json/billingKeyList/QR-1") {
+			return json(res, { values: [{ key: "TKAO", value: "TKAO - Türk Hava Yolları A.O." }] });
+		}
+		if (url.pathname === "/rest/scriptrunner/latest/custom/serviceList") {
+			// Jira's rate limit turns the first ask away; Kalem waits and asks again.
+			if (serviceListAsked++ === 0) {
+				res.writeHead(429, { "Retry-After": "0", "Content-Type": "application/json" });
+				return res.end(JSON.stringify({ message: "Rate limit exceeded" }));
+			}
+			// ScriptRunner answers Tempo as JSONP, with the service's number as its key.
+			res.writeHead(200, { "Content-Type": "application/javascript" });
+			return res.end(
+				`${url.searchParams.get("callback")}(${JSON.stringify({
+					values: [{ key: "3351", value: "Satış Kanalı (QuickRes) Uygulaması" }],
+				})});`,
+			);
+		}
+		if (url.pathname === "/rest/tempo-timesheets/4/worklogs/search" && req.method === "POST") {
+			return json(res, []);
 		}
 		if (url.pathname === "/rest/tempo-timesheets/4/worklogs" && req.method === "POST") {
 			let body = "";
@@ -226,6 +256,7 @@ async function fakeJira() {
 		return json(res, { errorMessages: ["Not found"] }, 404);
 	});
 	const site = await listen(server);
+	base.site = site;
 	return {
 		site,
 		searches,
@@ -370,6 +401,16 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	const worklog = jira.locator(".jira-worklog");
 	await expect(worklog.locator(".jira-worklog-summary")).toHaveText("Spent 12h · Remaining 8h");
 	await expect(worklog.locator(".jira-worklog-mine li")).toContainText("6h");
+	// The choices come from each attribute's own address, as in Tempo's dialog.
+	await expect(worklog.locator('select[data-attribute="_Servis_"] option')).toHaveText([
+		"Choose…",
+		"Satış Kanalı (QuickRes) Uygulaması",
+	]);
+	await expect(worklog.locator('select[data-attribute="_Sirket_"] option')).toHaveText([
+		"Choose…",
+		"TKAO - Türk Hava Yolları A.O.",
+	]);
+	await expect(worklog.locator(".jira-worklog-diagnostics")).toBeHidden();
 	await worklog.locator('.jira-worklog-chip[data-hours="5"]').click();
 	await expect(worklog.locator(".jira-worklog-worked")).toHaveValue("5h");
 	await expect(worklog.locator(".jira-worklog-remaining")).toHaveValue("3h");
@@ -377,7 +418,7 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await worklog.locator(".jira-worklog-submit").click();
 	await expect(worklog.locator(".jira-worklog-status")).toHaveText("Fill in: Servis");
 	expect(jiraServer.worklogs).toEqual([]);
-	await worklog.locator('select[data-attribute="_Servis_"]').selectOption("QUICKRES");
+	await worklog.locator('select[data-attribute="_Servis_"]').selectOption("3351");
 	await worklog.locator('select[data-attribute="_Sirket_"]').selectOption("TKAO");
 	await worklog.locator(".jira-worklog-submit").click();
 	await expect(worklog.locator(".jira-worklog-status")).toHaveText("5h logged on QR-1.");
@@ -388,8 +429,8 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 		remainingEstimate: 3 * 3600,
 		comment: "Working on issue QR-1",
 		attributes: {
-			_Servis_: { workAttributeId: 2, value: "QUICKRES" },
-			_Sirket_: { workAttributeId: 1, value: "TKAO" },
+			_Servis_: { key: "_Servis_", type: "DYNAMIC_DROPDOWN", workAttributeId: 102, value: "3351" },
+			_Sirket_: { key: "_Sirket_", type: "ACCOUNT", workAttributeId: 21, value: "TKAO" },
 		},
 	});
 	await expect(worklog.locator(".jira-worklog-summary")).toHaveText("Spent 17h · Remaining 8h");
@@ -398,7 +439,7 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 		.poll(async () =>
 			JSON.parse(await readFile(join(userData, "jira-worklog.json"), "utf8").catch(() => "{}")),
 		)
-		.toEqual({ [jiraServer.site]: { _Sirket_: "TKAO", _Servis_: "QUICKRES" } });
+		.toEqual({ [jiraServer.site]: { _Sirket_: "TKAO", _Servis_: "3351" } });
 	// A sub-task opens in the same dialog, and Back returns.
 	await jira.locator('.jira-row[data-key="QR-2"]').click();
 	await expect(jira.locator(".jira-title")).toHaveText("Süreyi ayarla");
@@ -468,7 +509,7 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 		originTaskId: "QR-1",
 		timeSpentSeconds: 3 * 3600,
 		comment: "Working on issue QR-1",
-		attributes: { _Servis_: { value: "QUICKRES" }, _Sirket_: { value: "TKAO" } },
+		attributes: { _Servis_: { value: "3351" }, _Sirket_: { value: "TKAO" } },
 	});
 	await expect(page.locator(".jira-dialog")).toBeHidden();
 
