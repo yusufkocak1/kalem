@@ -13,6 +13,7 @@ import { attachmentName, linkedAttachment } from "../shared/confluence-common.js
 import type { Diagram } from "../shared/diagram.js";
 import { DIAGRAM_SUFFIX, serializeDiagram } from "../shared/diagram.js";
 import { format, stringsFor } from "../shared/i18n.js";
+import { paletteCss } from "../shared/palette.js";
 import type { ToolPane } from "../shared/panes.js";
 import { revealPane } from "../shared/panes.js";
 import {
@@ -775,9 +776,12 @@ function cycleTab(step: 1 | -1): void {
 // --- Settings ---------------------------------------------------------------
 
 const pageSetup = document.head.appendChild(document.createElement("style"));
+/** The colour palette's variables, after the stylesheet so that they win. */
+const paletteStyle = document.head.appendChild(document.createElement("style"));
 
 function applySettings(): void {
 	pageSetup.textContent = pageRule(settings);
+	paletteStyle.textContent = paletteCss(settings.palette, settings.paletteCustom);
 	app.style.setProperty("--zoom", String(settings.zoom / 100));
 	app.toggleAttribute("data-full-width", settings.fullWidth);
 	placeAssistant();

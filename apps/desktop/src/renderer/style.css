@@ -9877,3 +9877,142 @@ dialog {
 		transition: none;
 	}
 }
+
+/* --- Settings: the colour palette ---------------------------------------------- */
+
+.palette-swatches {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+	gap: 10px;
+	margin: 10px 0 14px;
+}
+
+.palette-swatch {
+	display: grid;
+	gap: 6px;
+	padding: 6px 6px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 10px;
+	background: var(--app-surface);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 12px;
+	cursor: pointer;
+	transition:
+		border-color 120ms ease,
+		box-shadow 120ms ease;
+}
+
+.palette-swatch:hover {
+	border-color: color-mix(in srgb, var(--app-accent) 45%, var(--app-border));
+}
+
+.palette-swatch[aria-checked="true"] {
+	border-color: var(--app-accent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 18%, transparent);
+}
+
+.palette-swatch:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 2px;
+}
+
+.palette-swatch-name {
+	font-weight: 600;
+}
+
+.palette-swatch[aria-checked="true"] .palette-swatch-name::after {
+	content: " ✓";
+	color: var(--app-accent);
+}
+
+/* A small picture of the app in the palette: light half and dark half. */
+.palette-preview {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	height: 52px;
+	overflow: clip;
+	border-radius: 6px;
+	box-shadow: inset 0 0 0 1px rgb(0 0 0 / 10%);
+}
+
+.palette-preview-half {
+	display: grid;
+	grid-template-rows: 9px 1fr;
+	background: var(--p-desk);
+}
+
+.palette-preview-bar {
+	background: var(--p-surface);
+	box-shadow: inset 10px 0 0 var(--p-accent);
+}
+
+.palette-preview-page {
+	display: grid;
+	align-content: start;
+	gap: 4px;
+	margin: 6px 7px 0;
+	padding: 6px 5px;
+	border-radius: 2px 2px 0 0;
+	background: var(--p-page);
+}
+
+.palette-preview-line {
+	height: 3px;
+	border-radius: 2px;
+	background: var(--p-text);
+	opacity: 0.55;
+}
+
+.palette-preview-line:first-child {
+	width: 60%;
+	background: var(--p-accent);
+	opacity: 1;
+}
+
+.palette-preview-line.short {
+	width: 80%;
+}
+
+.palette-own-title {
+	margin: 0 0 6px;
+	font-size: 13px;
+}
+
+.palette-own {
+	display: grid;
+	grid-template-columns: max-content 64px 64px;
+	align-items: center;
+	gap: 6px 14px;
+	margin-bottom: 12px;
+}
+
+.palette-own-head {
+	color: var(--app-muted);
+	font-size: 11px;
+	font-weight: 600;
+	text-align: center;
+}
+
+.palette-own-name {
+	font-size: 13px;
+}
+
+.palette-color {
+	width: 64px;
+	height: 28px;
+	padding: 2px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-raised);
+	cursor: pointer;
+}
+
+.palette-color::-webkit-color-swatch-wrapper {
+	padding: 0;
+}
+
+.palette-color::-webkit-color-swatch {
+	border: 0;
+	border-radius: 4px;
+}

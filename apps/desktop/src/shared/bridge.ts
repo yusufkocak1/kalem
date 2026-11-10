@@ -17,12 +17,13 @@ import type {
 import type { WorklogContext, WorklogEntry } from "./jira-worklog.js";
 import type { ModeSettings } from "./mode-config.js";
 import type { ModelOption } from "./models.js";
+import type { PaletteChoice, PaletteTheme } from "./palette.js";
+import { PALETTES } from "./palette.js";
 import type { PanePlaces, ToolPane } from "./panes.js";
 import { DEFAULT_PANE_PLACES } from "./panes.js";
 import type { AssistantConfig, AssistantUpdate, ChatMessage, ProviderId } from "./providers.js";
 import type { TemplateInfo } from "./templates.js";
 import type { ApprovalAnswer, ApprovalRequest } from "./tool-protocol.js";
-
 export type Theme = "system" | "light" | "dark";
 
 export const PAGE_SIZES = ["A4", "A3", "A5", "Letter", "Legal"] as const;
@@ -49,6 +50,10 @@ export const MARGIN_CM: Readonly<Record<PageMargins, readonly [number, number]>>
 
 export interface Settings {
 	readonly theme: Theme;
+	/** The app's colours: a made palette, or the user's own (`paletteCustom`). */
+	readonly palette: PaletteChoice;
+	/** The user's own colours, for each theme. */
+	readonly paletteCustom: PaletteTheme;
 	/** `null` follows the operating system. */
 	readonly language: Lang | null;
 	/** Document zoom in percent. */
@@ -125,6 +130,8 @@ export type SidePane = ToolPane;
 
 export const DEFAULT_SETTINGS: Settings = {
 	theme: "system",
+	palette: "kalem",
+	paletteCustom: PALETTES.kalem,
 	language: null,
 	zoom: 100,
 	fullWidth: false,

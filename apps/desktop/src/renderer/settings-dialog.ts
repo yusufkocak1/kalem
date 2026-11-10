@@ -1,6 +1,13 @@
 import type { AssistantStatus, KalemBridge, Settings } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
+import type {
+	PaletteChoice,
+	PaletteColors,
+	PaletteTheme,
+	PaletteToken,
+} from "../shared/palette.js";
+import { PALETTE_IDS, PALETTE_TOKENS, PALETTES, paletteColors } from "../shared/palette.js";
 import type { PanePlace, ToolPane } from "../shared/panes.js";
 import { movePane, PANE_PLACES, TOOL_PANES } from "../shared/panes.js";
 import { PROVIDERS, providerLabel } from "../shared/providers.js";
@@ -234,6 +241,158 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 			class: "settings-grid",
 			children: [el("label", { text: label, attrs: { for: id } }), control],
 		});
+	}
+
+	// --- Appearance: the colour palette ------------------------------------------
+
+	const PALETTE_NAMES: Readonly<Record<PaletteChoice, string>> = {
+		kalem: t.paletteKalem,
+		ocean: t.paletteOcean,
+		forest: t.paletteForest,
+		sunset: t.paletteSunset,
+		violet: t.paletteViolet,
+		graphite: t.paletteGraphite,
+		rose: t.paletteRose,
+		sand: t.paletteSand,
+		nord: t.paletteNord,
+		midnight: t.paletteMidnight,
+		custom: t.paletteCustom,
+	};
+	const TOKEN_NAMES: Readonly<Record<PaletteToken, string>> = {
+		accent: t.paletteAccent,
+		desk: t.paletteDesk,
+		surface: t.paletteSurface,
+		page: t.palettePage,
+		text: t.paletteText,
+	};
+	const swatches = el("div", {
+		class: "palette-swatches",
+		attrs: { role: "radiogroup", "aria-label": t.settingsPalette },
+	});
+	const ownColors = el("div", { class: "palette-own" });
+	const resetPalette = el("button", {
+		class: "jira-button",
+		text: t.settingsPaletteReset,
+		attrs: { type: "button" },
+	});
+	resetPalette.addEventListener("click", () => {
+		options.update({ palette: "kalem" });
+		renderValues();
+	});
+	item(
+		"appearance",
+		[
+			t.settingsPalette,
+			t.settingsPaletteOwn,
+			...Object.values(PALETTE_NAMES),
+			...Object.values(TOKEN_NAMES),
+			...settingDef("palette").keywords,
+		].join(" "),
+		el("div", {
+			class: "settings-block",
+			attrs: { "data-block": "palette" },
+			children: [
+				el("h4", { text: t.settingsPalette }),
+				el("p", { class: "confluence-hint", text: t.settingsPaletteHint }),
+				swatches,
+				el("h5", { class: "palette-own-title", text: t.settingsPaletteOwn }),
+				ownColors,
+				resetPalette,
+			],
+		}),
+	);
+
+	/** A palette's card: its page, panels and accent as a small picture of the app, both themes. */
+	function swatch(
+		choice: PaletteChoice,
+		colors: PaletteTheme,
+		current: PaletteChoice,
+	): HTMLElement {
+		const half = (side: PaletteColors): HTMLElement =>
+			el("span", {
+				class: "palette-preview-half",
+				attrs: {
+					style: `--p-desk:${side.desk};--p-surface:${side.surface};--p-page:${side.page};--p-accent:${side.accent};--p-text:${side.text}`,
+				},
+				children: [
+					el("span", { class: "palette-preview-bar" }),
+					el("span", {
+						class: "palette-preview-page",
+						children: [
+							el("span", { class: "palette-preview-line" }),
+							el("span", { class: "palette-preview-line short" }),
+						],
+					}),
+				],
+			});
+		const button = el("button", {
+			class: "palette-swatch",
+			attrs: {
+				type: "button",
+				role: "radio",
+				"aria-checked": String(choice === current),
+				"data-palette": choice,
+			},
+			children: [
+				el("span", {
+					class: "palette-preview",
+					children: [half(colors.light), half(colors.dark)],
+				}),
+				el("span", { class: "palette-swatch-name", text: PALETTE_NAMES[choice] }),
+			],
+		});
+		button.addEventListener("click", () => {
+			options.update({ palette: choice });
+			renderValues();
+		});
+		return button;
+	}
+
+	function renderPalette(): void {
+		const settings = options.settings();
+		const current = settings.palette;
+		swatches.replaceChildren(
+			...PALETTE_IDS.map((id) => swatch(id, PALETTES[id], current)),
+			swatch("custom", settings.paletteCustom, current),
+		);
+		// The colours shown are the palette's in use: changing one makes them the user's own.
+		const shown = paletteColors(current, settings.paletteCustom);
+		const column = (side: "light" | "dark"): HTMLElement[] =>
+			PALETTE_TOKENS.map((token) => {
+				const input = el("input", {
+					class: "palette-color",
+					attrs: {
+						type: "color",
+						"aria-label": `${TOKEN_NAMES[token]} · ${side === "light" ? t.settingsPaletteLight : t.settingsPaletteDark}`,
+						"data-token": token,
+						"data-side": side,
+					},
+				});
+				input.value = shown[side][token];
+				input.addEventListener("change", () => {
+					const now = options.settings();
+					const base = paletteColors(now.palette, now.paletteCustom);
+					options.update({
+						palette: "custom",
+						paletteCustom: { ...base, [side]: { ...base[side], [token]: input.value } },
+					});
+					renderValues();
+				});
+				return input;
+			});
+		const light = column("light");
+		const dark = column("dark");
+		ownColors.replaceChildren(
+			el("span"),
+			el("span", { class: "palette-own-head", text: t.settingsPaletteLight }),
+			el("span", { class: "palette-own-head", text: t.settingsPaletteDark }),
+			...PALETTE_TOKENS.flatMap((token, index) => [
+				el("span", { class: "palette-own-name", text: TOKEN_NAMES[token] }),
+				light[index] as HTMLElement,
+				dark[index] as HTMLElement,
+			]),
+		);
+		resetPalette.disabled = current === "kalem";
 	}
 
 	// --- Panels: where each one docks --------------------------------------------
@@ -707,6 +866,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 
 	function renderValues(): void {
 		for (const refresh of refreshers) refresh();
+		renderPalette();
 		renderPanes();
 		renderPermissions();
 	}

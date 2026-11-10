@@ -655,10 +655,11 @@ test("brings images along when a document is saved into another folder", async (
 	const { app, page, errors } = await launch({ args: [join(folder, "a", "rapor.md")] });
 	await stubSaveDialog(app, join(folder, "b", "kopya.md"));
 	await clickMenu(app, "File", "Save As…");
+	// The document was saved already: wait for the new file, not for the status.
+	await expect
+		.poll(() => readFile(join(folder, "b", "kopya.md"), "utf8").catch(() => ""))
+		.toBe("![grafik](kopya.assets/grafik.png)\n");
 	await expect(status(page)).toHaveText("Saved");
-	expect(await readFile(join(folder, "b", "kopya.md"), "utf8")).toBe(
-		"![grafik](kopya.assets/grafik.png)\n",
-	);
 	expect(await readdir(join(folder, "b", "kopya.assets"))).toEqual(["grafik.png"]);
 	await expect.poll(() => imageWidth(page)).toBe(1);
 	expect(errors).toEqual([]);
@@ -2117,6 +2118,40 @@ test("saves from the save status when the document has unsaved changes", async (
 	await status(page).click();
 	await expect(status(page)).toHaveText("Saved");
 	expect(await readFile(path, "utf8")).toBe("Bir iki\n");
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("picks a colour palette in the settings, or the user's own colours", async () => {
+	const { app, page, userData, errors } = await launch();
+	const accent = () =>
+		page.evaluate(() =>
+			getComputedStyle(document.documentElement).getPropertyValue("--app-accent").trim(),
+		);
+	expect(await accent()).toBe("#0f4e4a");
+	await clickMenu(app, "File", "Settings…");
+	const block = page.locator('.settings-dialog [data-block="palette"]');
+	await expect(block.locator(".palette-swatch")).toHaveCount(11);
+	await block.locator('[data-palette="forest"]').click();
+	await expect(block.locator('[data-palette="forest"]')).toHaveAttribute("aria-checked", "true");
+	await expect.poll(accent).toBe("#2f6b34");
+	// A colour changed makes the palette the user's own, starting from the one in use.
+	const color = block.locator('input[data-token="accent"][data-side="light"]');
+	await expect(color).toHaveValue("#2f6b34");
+	await color.evaluate((input: HTMLInputElement) => {
+		input.value = "#aa3300";
+		input.dispatchEvent(new Event("change", { bubbles: true }));
+	});
+	await expect(block.locator('[data-palette="custom"]')).toHaveAttribute("aria-checked", "true");
+	await expect.poll(accent).toBe("#aa3300");
+	await expect
+		.poll(async () => {
+			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
+			return [stored.settings.palette, stored.settings.paletteCustom.light.accent];
+		})
+		.toEqual(["custom", "#aa3300"]);
+	await block.getByRole("button", { name: "Back to Kalem's colours" }).click();
+	await expect.poll(accent).toBe("#0f4e4a");
 	expect(errors).toEqual([]);
 	await app.close();
 });
