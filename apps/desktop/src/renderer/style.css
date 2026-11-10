@@ -6073,70 +6073,7 @@ pre[data-confluence-kind="layout"]::before {
 	font-size: 14px;
 }
 
-/* --- Jira pane ------------------------------------------------------------------ */
-
-.jira-pane {
-	gap: 6px;
-	padding: 0 6px 8px;
-}
-
-.jira-pane-toolbar {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
-}
-
-.jira-pane-search {
-	flex: 1 1 140px;
-	min-width: 0;
-}
-
-.jira-pane-list {
-	flex: 1 1 120px;
-	min-width: 0;
-	padding: 4px 6px;
-	border: 1px solid var(--app-border);
-	border-radius: 6px;
-	background: var(--app-raised);
-	color: var(--app-text);
-	font: inherit;
-	font-size: 12px;
-}
-
-.jira-pane-message {
-	padding: 0 4px;
-	font-size: 12px;
-}
-
-.jira-pane-rows {
-	flex: 1;
-	min-height: 0;
-	overflow-y: auto;
-}
-
-.jira-pane-row {
-	flex-direction: column;
-	align-items: stretch;
-	gap: 2px;
-}
-
-.jira-pane-row-head {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 6px;
-}
-
-.jira-pane-row .jira-summary {
-	white-space: normal;
-	display: -webkit-box;
-	-webkit-line-clamp: 2;
-	-webkit-box-orient: vertical;
-}
-
-.jira-pane .jira-pane-search {
-	margin: 0;
-}
+/* The Jira pane's styles are at the end of the file. */
 
 /* The panes' tabs on the edges look like the assistant's. */
 .stripe-button .icon {
@@ -6215,21 +6152,415 @@ details.jira-section > .jira-list {
 	border: 1px solid var(--app-border);
 }
 
-/* Sub-tasks under their parent, as a tree. */
-.jira-tree-toggle {
-	flex: none;
-	width: 18px;
-	height: 18px;
-	margin-right: 2px;
-	padding: 0;
-	border: 0;
-	border-radius: 4px;
-	background: none;
+/* --- Jira pane: issues as cards, sub-tasks under their parent ------------------ */
+
+.jira-pane {
+	gap: 8px;
+	padding: 0 8px 8px;
+}
+
+.jira-pane-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.jira-pane-search-field {
+	position: relative;
+	display: flex;
+	flex: 1 1 150px;
+	align-items: center;
+	min-width: 0;
+}
+
+.jira-pane-search-field .icon {
+	position: absolute;
+	left: 9px;
+	width: 15px;
+	height: 15px;
 	color: var(--app-muted);
+	pointer-events: none;
+}
+
+.jira-pane .jira-pane-search {
+	flex: 1;
+	min-width: 0;
+	margin: 0;
+	padding: 6px 10px 6px 30px;
+	border-radius: 8px;
+	transition:
+		border-color 120ms ease,
+		box-shadow 120ms ease;
+}
+
+.jira-pane .jira-pane-search:focus {
+	border-color: var(--app-accent);
+	outline: none;
+	box-shadow: 0 0 0 3px var(--app-pressed);
+}
+
+.jira-pane-list {
+	flex: 1 1 120px;
+	min-width: 0;
+	padding: 6px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	color: var(--app-text);
 	font: inherit;
 	font-size: 12px;
-	line-height: 18px;
 	cursor: pointer;
+}
+
+.jira-pane-list:focus {
+	border-color: var(--app-accent);
+	outline: none;
+	box-shadow: 0 0 0 3px var(--app-pressed);
+}
+
+/* Issue types: a chip each, with how many there are; pressed ones are shown. */
+.jira-type-filter {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.jira-type-filter[hidden] {
+	display: none;
+}
+
+.jira-type-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	max-width: 100%;
+	padding: 3px 8px 3px 5px;
+	border: 1px solid var(--app-border);
+	border-radius: 999px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 12px;
+	cursor: pointer;
+	transition:
+		background 120ms ease,
+		border-color 120ms ease,
+		color 120ms ease;
+}
+
+.jira-type-chip:first-child {
+	padding-left: 9px;
+}
+
+.jira-type-chip:hover {
+	border-color: var(--app-muted);
+}
+
+.jira-type-chip:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 1px;
+}
+
+.jira-type-chip[aria-pressed="true"] {
+	border-color: var(--app-accent);
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+}
+
+.jira-type-chip-label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.jira-type-chip-count {
+	min-width: 16px;
+	padding: 0 5px;
+	border-radius: 999px;
+	background: var(--app-hover);
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	text-align: center;
+}
+
+.jira-type-chip[aria-pressed="true"] .jira-type-chip-count {
+	background: rgb(255 255 255 / 22%);
+}
+
+/* An issue type's mark, in Jira's colours for it. */
+.jira-type-badge {
+	--type-color: #6b778c;
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	border-radius: 5px;
+	background: var(--type-color);
+	color: #ffffff;
+}
+
+.jira-type-badge .icon {
+	width: 72%;
+	height: 72%;
+	stroke-width: 2.4;
+}
+
+.jira-type-badge[data-kind="bug"] {
+	--type-color: #e5493a;
+}
+
+.jira-type-badge[data-kind="story"] {
+	--type-color: #36b37e;
+}
+
+.jira-type-badge[data-kind="task"] {
+	--type-color: #4bade8;
+}
+
+.jira-type-badge[data-kind="subtask"] {
+	--type-color: #69b1e6;
+}
+
+.jira-type-badge[data-kind="epic"] {
+	--type-color: #904ee2;
+}
+
+.jira-type-badge[data-kind="feature"] {
+	--type-color: #2f9e8f;
+}
+
+.jira-type-badge[data-kind="improvement"] {
+	--type-color: #f79232;
+}
+
+.jira-type-badge[data-kind="story"] .icon,
+.jira-type-badge[data-kind="epic"] .icon {
+	fill: currentColor;
+	stroke-width: 1.2;
+}
+
+.jira-type-chip .jira-type-badge {
+	width: 14px;
+	height: 14px;
+	border-radius: 4px;
+}
+
+.jira-pane-message {
+	padding: 0 4px;
+	font-size: 12px;
+}
+
+.jira-pane-rows {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: 4px;
+	min-height: 0;
+	padding: 2px;
+	overflow-y: auto;
+}
+
+/* Each issue is a card: its type, key and status, its summary, who has it. */
+.jira-pane-row {
+	position: relative;
+	display: flex;
+	flex: none;
+	align-items: flex-start;
+	gap: 8px;
+	padding: 8px 10px 8px 6px;
+	border: 1px solid var(--app-border);
+	border-radius: 10px;
+	background: var(--app-raised);
+	transition:
+		border-color 120ms ease,
+		box-shadow 120ms ease,
+		background 120ms ease;
+}
+
+.jira-pane-row:hover {
+	border-color: color-mix(in srgb, var(--app-accent) 45%, var(--app-border));
+	background: var(--app-raised);
+	box-shadow:
+		0 1px 2px rgb(0 0 0 / 6%),
+		0 4px 12px rgb(0 0 0 / 6%);
+}
+
+.jira-pane-row:focus-visible,
+.jira-pane-row:focus {
+	border-color: var(--app-accent);
+	background: var(--app-raised);
+	outline: none;
+	box-shadow: 0 0 0 3px var(--app-pressed);
+}
+
+.jira-pane-row > .jira-type-badge {
+	margin-top: 1px;
+}
+
+.jira-pane-row-body {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: 3px;
+	min-width: 0;
+}
+
+.jira-pane-row-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 18px;
+}
+
+.jira-pane-row-head .jira-key {
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.01em;
+}
+
+.jira-pane-row-head .jira-status {
+	margin-left: auto;
+	padding: 1px 6px;
+	border-radius: 999px;
+	font-size: 10px;
+	letter-spacing: 0.02em;
+}
+
+.jira-pane-row .jira-summary {
+	display: -webkit-box;
+	color: var(--app-text);
+	font-size: 13px;
+	line-height: 1.35;
+	white-space: normal;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+}
+
+.jira-pane-row-meta {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 2px;
+}
+
+/* How many of a parent's sub-tasks are done. */
+.jira-progress {
+	display: inline-flex;
+	flex: 1;
+	align-items: center;
+	gap: 6px;
+	max-width: 140px;
+	margin-right: auto;
+	color: var(--app-muted);
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+}
+
+.jira-progress progress {
+	flex: 1;
+	min-width: 30px;
+	height: 4px;
+	border: 0;
+	border-radius: 999px;
+	background: var(--app-hover);
+	appearance: none;
+	overflow: hidden;
+}
+
+.jira-progress progress::-webkit-progress-bar {
+	border-radius: 999px;
+	background: var(--app-hover);
+}
+
+.jira-progress progress::-webkit-progress-value {
+	border-radius: 999px;
+	background: var(--app-ok);
+}
+
+/* Assignees as initials on a colour of their own. */
+.jira-avatar {
+	--avatar-color: #5e6c84;
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+	background: var(--avatar-color);
+	color: #ffffff;
+	font-size: 9px;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+}
+
+.jira-avatar[data-tone="0"] {
+	--avatar-color: #0f766e;
+}
+
+.jira-avatar[data-tone="1"] {
+	--avatar-color: #7c3aed;
+}
+
+.jira-avatar[data-tone="2"] {
+	--avatar-color: #c2410c;
+}
+
+.jira-avatar[data-tone="3"] {
+	--avatar-color: #2563eb;
+}
+
+.jira-avatar[data-tone="4"] {
+	--avatar-color: #be185d;
+}
+
+.jira-avatar[data-tone="5"] {
+	--avatar-color: #15803d;
+}
+
+.jira-avatar[data-tone="6"] {
+	--avatar-color: #a16207;
+}
+
+.jira-avatar[data-tone="7"] {
+	--avatar-color: #4338ca;
+}
+
+.jira-avatar-none {
+	border: 1px dashed var(--app-muted);
+	background: transparent;
+	color: var(--app-muted);
+}
+
+/* The fold: a chevron that turns, or the room for one. */
+.jira-tree-toggle {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	margin-top: 1px;
+	padding: 0;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: var(--app-muted);
+	cursor: pointer;
+}
+
+.jira-tree-toggle .icon {
+	width: 14px;
+	height: 14px;
+	stroke-width: 2;
+	transition: transform 150ms ease;
+}
+
+.jira-tree-toggle[aria-expanded="true"] .icon {
+	transform: rotate(90deg);
 }
 
 .jira-tree-toggle:hover {
@@ -6237,26 +6568,104 @@ details.jira-section > .jira-list {
 	color: var(--app-text);
 }
 
-.jira-pane-row-head {
-	justify-content: flex-start;
+.jira-tree-spacer {
+	cursor: default;
 }
 
-.jira-pane-row-head .jira-status {
-	margin-left: auto;
+/* A parent with its sub-tasks open joins them: one card, with a guide line down the side. */
+.jira-tree-parent[aria-expanded="true"] {
+	border-bottom-color: transparent;
+	border-radius: 10px 10px 0 0;
+	box-shadow: none;
 }
 
 .jira-tree-child {
-	margin-left: 18px;
-	border-left: 1px solid var(--app-border);
-	border-radius: 0 6px 6px 0;
+	margin-top: -4px;
+	padding: 6px 10px 6px 34px;
+	border-top-color: transparent;
+	border-radius: 0;
+	background: var(--app-surface);
+}
+
+.jira-tree-child.jira-tree-last {
+	border-radius: 0 0 10px 10px;
+}
+
+.jira-tree-child::before {
+	content: "";
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 15px;
+	border-left: 1.5px solid var(--app-border);
+}
+
+.jira-tree-child.jira-tree-last::before {
+	bottom: 50%;
+}
+
+.jira-tree-child::after {
+	content: "";
+	position: absolute;
+	top: 50%;
+	left: 15px;
+	width: 10px;
+	border-top: 1.5px solid var(--app-border);
+}
+
+.jira-tree-child > .jira-type-badge {
+	width: 16px;
+	height: 16px;
+}
+
+/* A sub-task: its key and status, then its summary with who has it. */
+.jira-tree-child .jira-pane-row-body {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 2px 8px;
+}
+
+.jira-tree-child .jira-pane-row-head {
+	grid-column: 1 / -1;
+}
+
+.jira-tree-child .jira-summary {
+	font-size: 12px;
+	-webkit-line-clamp: 1;
+}
+
+.jira-tree-child .jira-pane-row-meta {
+	margin-top: 0;
+}
+
+.jira-tree-child .jira-avatar {
+	width: 18px;
+	height: 18px;
+	font-size: 8px;
+}
+
+.jira-tree-child:hover,
+.jira-tree-child:focus {
+	z-index: 1;
+}
+
+/* A parent the list does not show for itself only heads its sub-tasks. */
+.jira-tree-context {
+	border-style: dashed;
+	background: var(--app-surface);
 }
 
 .jira-tree-context .jira-key,
-.jira-tree-context .jira-summary {
-	opacity: 0.65;
+.jira-tree-context .jira-summary,
+.jira-tree-context > .jira-type-badge {
+	opacity: 0.6;
 }
 
-/* Rows keep their height however few they are. */
-.jira-pane-rows {
-	align-content: start;
+@media (prefers-reduced-motion: reduce) {
+	.jira-pane-row,
+	.jira-type-chip,
+	.jira-tree-toggle .icon {
+		transition: none;
+	}
 }

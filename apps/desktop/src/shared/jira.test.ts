@@ -9,11 +9,13 @@ import {
 	issueOf,
 	issueRowOf,
 	issueText,
+	issueTypeKind,
 	looksLikeHtml,
 	normalizeJiraSite,
 	remoteLinksOf,
 	searchJql,
 	searchText,
+	typeCounts,
 } from "./jira.js";
 import { jiraRequestOf, jiraRequests } from "./jira-tool.js";
 
@@ -336,5 +338,44 @@ describe("Jira requests of a CLI", () => {
 			{ kind: "search", jql: "project = DEV" },
 		]);
 		expect(withoutRequests(reply).trim()).toBe("Bakıyorum.");
+	});
+});
+
+describe("issue types", () => {
+	it("knows the common types, in English and Turkish", () => {
+		expect(issueTypeKind("Bug")).toBe("bug");
+		expect(issueTypeKind("Hata")).toBe("bug");
+		expect(issueTypeKind("Story")).toBe("story");
+		expect(issueTypeKind("Task")).toBe("task");
+		expect(issueTypeKind("Görev")).toBe("task");
+		expect(issueTypeKind("Sub-task")).toBe("subtask");
+		expect(issueTypeKind("Alt Görev")).toBe("subtask");
+		expect(issueTypeKind("Epic")).toBe("epic");
+		expect(issueTypeKind("New Feature")).toBe("feature");
+		expect(issueTypeKind("İyileştirme")).toBe("improvement");
+		expect(issueTypeKind("IMPROVEMENT")).toBe("improvement");
+		expect(issueTypeKind("Değişiklik")).toBe("other");
+		expect(issueTypeKind("Spike")).toBe("other");
+		expect(issueTypeKind("")).toBe("other");
+	});
+
+	it("counts the types among rows, most first", () => {
+		const row = (key: string, type: string) => ({
+			key,
+			summary: "",
+			status: "",
+			statusCategory: "" as const,
+			type,
+			assignee: "",
+			priority: "",
+			updated: null,
+			parent: null,
+		});
+		expect(
+			typeCounts([row("A-1", "Task"), row("A-2", "Bug"), row("A-3", "Bug"), row("A-4", "")]),
+		).toEqual([
+			{ type: "Bug", count: 2 },
+			{ type: "Task", count: 1 },
+		]);
 	});
 });

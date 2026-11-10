@@ -254,6 +254,28 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await page.locator('.jira-pane .jira-row[data-key="QR-1"] .jira-tree-toggle').click();
 	await expect(rows).toHaveCount(5);
 	expect(jiraServer.searches.at(-1)).toContain("assignee = currentUser()");
+	// Issue types filter the list: a chip each, with how many there are.
+	const chips = page.locator(".jira-pane .jira-type-chip");
+	await expect(chips).toHaveText(["All4", "Bug3", "Sub-task1"]);
+	await chips.filter({ hasText: "Sub-task" }).click();
+	await expect(chips.first()).toHaveAttribute("aria-pressed", "false");
+	// The sub-task stays under its parent, which only heads it now.
+	await expect(rows.locator(".jira-key")).toHaveText(["QR-1", "QR-2"]);
+	await expect(page.locator('.jira-pane .jira-tree-context[data-key="QR-1"]')).toBeVisible();
+	await expect(page.locator(".jira-pane .jira-pane-message")).toHaveText("1 of 4 loaded issues");
+	await chips.first().click();
+	await expect(rows).toHaveCount(5);
+	await expect(chips.first()).toHaveAttribute("aria-pressed", "true");
+	// The keyboard walks the tree: down to the next row, left folds a parent.
+	await rows.first().focus();
+	await page.keyboard.press("ArrowDown");
+	await expect(page.locator('.jira-pane .jira-row[data-key="QR-2"]')).toBeFocused();
+	await page.keyboard.press("ArrowLeft");
+	await expect(page.locator('.jira-pane .jira-row[data-key="QR-1"]')).toBeFocused();
+	await page.keyboard.press("ArrowLeft");
+	await expect(rows).toHaveCount(3);
+	await page.keyboard.press("ArrowRight");
+	await expect(rows).toHaveCount(5);
 
 	// Settings: Jira goes to the right dock, the headings under the document.
 	await clickMenu(app, "View", "Settings…");
