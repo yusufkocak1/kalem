@@ -151,6 +151,9 @@ export class JiraClient {
 						Accept: "application/json",
 						Authorization: this.#auth,
 						...(body === undefined ? {} : { "Content-Type": "application/json" }),
+						// Electron's user agent reads as a browser's: without this, Jira's
+						// XSRF check refuses its writes with a 403.
+						...(method === "GET" ? {} : { "X-Atlassian-Token": "no-check" }),
 					},
 					...(body === undefined ? {} : { body: JSON.stringify(body) }),
 				});
@@ -589,11 +592,16 @@ export class JiraClient {
 		if (attributes !== null) {
 			const missing = missingAttributes(attributes, entry.attributes);
 			if (missing.length > 0) throw new Error(`Required: ${missing.join(", ")}`);
-			const me = await this.#me();
+			const [me, issue] = await Promise.all([
+				this.#me(),
+				this.#json(`/rest/api/2/issue/${valid}?fields=id`),
+			]);
+			// Tempo names the issue by its id, as its own dialog does.
+			const id = asString(issue.id);
 			await this.#send(
 				"POST",
 				"/rest/tempo-timesheets/4/worklogs",
-				tempoWorklogBody(valid, me.key, entry, attributes),
+				tempoWorklogBody(/^\d+$/.test(id) ? id : valid, me.key, entry, attributes),
 			);
 			return;
 		}

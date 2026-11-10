@@ -86,7 +86,7 @@ describe("Tempo's work attributes", () => {
 	it("go with the log Tempo is sent", () => {
 		const attributes = workAttributesOf(TEMPO_ATTRIBUTES, { _Servis_: tempoOptionsOf(ACCOUNTS) });
 		const body = tempoWorklogBody(
-			"QR-28278",
+			"2680585",
 			"JIRAUSER1",
 			{
 				date: "2026-11-10",
@@ -99,31 +99,42 @@ describe("Tempo's work attributes", () => {
 			attributes,
 		);
 		expect(body).toEqual({
-			worker: "JIRAUSER1",
-			originTaskId: "QR-28278",
-			started: "2026-11-10",
-			timeSpentSeconds: 28800,
-			billableSeconds: 28800,
-			comment: "Working on issue QR-28278",
-			includeNonWorkingDays: false,
-			remainingEstimate: 0,
 			attributes: {
 				_FaturalandirilacakSirket_: {
-					key: "_FaturalandirilacakSirket_",
 					name: "Faturalandırılacak Şirket",
-					type: "STATIC_LIST",
 					workAttributeId: 1,
 					value: "TKAO",
 				},
-				_Servis_: {
-					key: "_Servis_",
-					name: "Servis",
-					type: "ACCOUNT",
-					workAttributeId: 2,
-					value: "QUICKRES",
-				},
+				_Servis_: { name: "Servis", workAttributeId: 2, value: "QUICKRES" },
 			},
+			billableSeconds: null,
+			originId: -1,
+			worker: "JIRAUSER1",
+			comment: "Working on issue QR-28278",
+			started: "2026-11-10",
+			timeSpentSeconds: 28800,
+			originTaskId: "2680585",
+			remainingEstimate: 0,
+			endDate: null,
+			includeNonWorkingDays: false,
 		});
+		// An empty comment and an estimate left to Jira go as Tempo's dialog sends them.
+		const plain = tempoWorklogBody(
+			"2680585",
+			"JIRAUSER1",
+			{
+				date: "2026-11-10",
+				seconds: 3600,
+				remainingSeconds: null,
+				comment: " ",
+				attributes: {},
+				remember: false,
+			},
+			attributes,
+		);
+		expect(plain.comment).toBeNull();
+		expect(plain.remainingEstimate).toBeNull();
+		expect(plain.billableSeconds).toBeNull();
 	});
 });
 
@@ -193,7 +204,7 @@ describe("quick logs", () => {
 			entry: {
 				date: "2026-11-10",
 				seconds: 5 * 3600,
-				remainingSeconds: 0,
+				remainingSeconds: null,
 				comment: "Working on issue QR-1",
 				attributes: { _Servis_: "QUICKRES" },
 				remember: false,
