@@ -843,7 +843,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		running.delete(runKey);
 	});
 
-	return {
+	const service: AssistantService = {
 		async complete(system, prompt, sender) {
 			const t = ctx.strings();
 			const { provider, connection, key } = await ctx.assistant.active();
@@ -897,4 +897,36 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			return reply;
 		},
 	};
+
+	/**
+	 * Compacts an API chat: the messages so far become a summary the next
+	 * questions carry instead. A CLI keeps and compacts its own conversation.
+	 */
+	ipcMain.handle(
+		CHANNEL.assistantCompact,
+		async (event, sessionId: unknown): Promise<"done" | "cli" | "none"> => {
+			if (programOf((await ctx.assistant.active()).provider) !== null) return "cli";
+			const history = typeof sessionId === "string" ? histories.get(sessionId) : undefined;
+			if (history === undefined || history.length < 2) return "none";
+			const t = ctx.strings();
+			const said = history
+				.map(({ role, content }) => `<${role}>\n${content}\n</${role}>`)
+				.join("\n\n");
+			const summary = await service.complete(
+				"You keep the memory of a conversation between a user and Kalem's assistant.",
+				`${said}\n\n${t.assistantCompactPrompt}`,
+				event.sender,
+			);
+			histories.set(sessionId as string, [
+				{
+					role: "user",
+					content: `<conversation-summary>\n${summary.trim()}\n</conversation-summary>\nThis is where we are.`,
+				},
+				{ role: "assistant", content: "Understood; I will go on from there." },
+			]);
+			return "done";
+		},
+	);
+
+	return service;
 }

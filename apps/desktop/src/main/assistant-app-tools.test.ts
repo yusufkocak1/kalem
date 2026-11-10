@@ -163,6 +163,16 @@ describe("the assistant's app tools", () => {
 		expect(settings().bottomPane).toBe("jira");
 	});
 
+	it("moves its own panel under the document", async () => {
+		const { ctx, settings } = context(() => allow);
+		const moved = await runTool("pane_move", { pane: "assistant", place: "bottom" }, ctx);
+		expect(moved.text).toBe("Moved: Assistant: Right → Bottom.");
+		expect(settings().assistantPlace).toBe("bottom");
+		expect(
+			(await runTool("pane_move", { pane: "assistant", place: "hidden" }, ctx)).text,
+		).toContain("left, right or bottom");
+	});
+
 	it("changes the language through the app's own flow", async () => {
 		const { ctx, languages } = context(() => allow);
 		const set = await runTool("settings_set", { changes: [{ key: "language", value: "tr" }] }, ctx);

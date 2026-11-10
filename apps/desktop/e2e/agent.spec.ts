@@ -493,3 +493,47 @@ test("nothing goes to Jira without the user's click; only the issues they pick a
 	await app.close();
 	jira.close();
 });
+
+test("the assistant's panel moves left or under the document, and '@' adds a section to the question", async () => {
+	const folder = await tempDir("agent-ui");
+	const doc = join(folder, "analiz.md");
+	await writeFile(doc, "# Analiz\n\n## Amaç\n\nSiparişi iptal etmek.\n\n## Kapsam\n\nWeb.\n");
+	const claude = await fakeClaude(folder, "Tamam.");
+	const { app, page, errors } = await launch({
+		args: [doc],
+		settings: { assistant: true, assistantDocument: false },
+		env: { KALEM_CLAUDE: claude.path },
+	});
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
+
+	await clickMenu(app, "File", "Settings…");
+	const dialog = page.locator(".settings-dialog");
+	await dialog.locator('[data-category="assistant"]').click();
+	await dialog.locator('select[data-setting="assistantPlace"]').selectOption({ label: "Bottom" });
+	await expect(page.locator(".desk-column > .assistant")).toBeVisible();
+	await expect(pane).toHaveAttribute("data-place", "bottom");
+	await dialog.locator('select[data-setting="assistantPlace"]').selectOption({ label: "Left" });
+	await expect(page.locator(".body > .assistant")).toHaveAttribute("data-place", "left");
+	const paneBox = await pane.boundingBox();
+	const deskBox = await page.locator(".desk-column").boundingBox();
+	expect((paneBox?.x ?? 0) + (paneBox?.width ?? 0)).toBeLessThanOrEqual((deskBox?.x ?? 0) + 1);
+	await dialog.getByRole("button", { name: "Done" }).click();
+
+	// "@" lists the document's sections; the picked one goes with the question, the document is not shared.
+	const input = pane.locator(".assistant-input");
+	await input.fill("Bunu kısalt @Ama");
+	const mentions = pane.locator(".assistant-mention-menu");
+	await expect(mentions.locator(".assistant-command")).toHaveText(["§ Amaç"]);
+	await input.press("Enter");
+	await expect(pane.locator(".assistant-mention")).toHaveText("§ Amaç");
+	await expect(input).toHaveValue("Bunu kısalt ");
+	await input.press("Enter");
+	await expect(pane.locator(".assistant-assistant .assistant-markdown")).toHaveText("Tamam.");
+	await expect(pane.locator(".assistant-mention")).toHaveCount(0);
+	const [call] = await claude.calls();
+	expect(call?.prompt).toContain('<section heading="Amaç">\n## Amaç\n\nSiparişi iptal etmek.\n');
+	expect(call?.prompt).not.toContain("<document");
+	expect(errors).toEqual([]);
+	await app.close();
+});

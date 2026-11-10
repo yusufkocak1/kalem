@@ -91,11 +91,38 @@ function sectionAt(headings: readonly { title: string; line: number }[], line: n
 
 const DEFAULT_IDS: Readonly<Record<string, string>> = { BR: "BR-", FR: "FR-", NFR: "NFR-" };
 
+/** How the findings say what they found: `{0}`, `{1}` are filled in. English unless given. */
+export interface LintMessages {
+	readonly missingSection: string;
+	readonly emptySection: string;
+	readonly openPoint: string;
+	readonly notMeasurable: string;
+	readonly definedTwice: string;
+	readonly idsSkipped: string;
+	readonly noCriteria: string;
+	readonly brokenLink: string;
+}
+
+export const LINT_MESSAGES: LintMessages = {
+	missingSection: 'The template\'s section "{0}" is missing.',
+	emptySection: 'The section "{0}" is empty.',
+	openPoint: "An open point (TBD, TODO, ??) is still in the text.",
+	notMeasurable: "Not measurable: {0}.",
+	definedTwice: "{0} is defined {1} times (lines {2}).",
+	idsSkipped: "Ids skipped: {0}.",
+	noCriteria: "{0} has no acceptance criteria.",
+	brokenLink: 'The link goes to "#{0}", which no heading has.',
+};
+
+const fill = (text: string, ...values: readonly (string | number)[]): string =>
+	text.replace(/\{(\d+)\}/g, (all, n: string) => String(values[Number(n)] ?? all));
+
 /** Runs the rules; at most `max` findings, the most important first. */
 export function lintAnalysis(
 	markdown: string,
 	template: Pick<TemplateMeta, "required" | "ids"> | null,
 	max = 80,
+	say: LintMessages = LINT_MESSAGES,
 ): Finding[] {
 	const text = markdown.replace(/\r\n?/g, "\n");
 	const lines = text.split("\n");
@@ -134,7 +161,7 @@ export function lintAnalysis(
 				kind: "missing",
 				section: "",
 				quote: "",
-				problem: `The template's section "${required}" is missing.`,
+				problem: fill(say.missingSection, required),
 				suggestion: `## ${required}\n\n`,
 				question: "",
 			});
@@ -154,7 +181,7 @@ export function lintAnalysis(
 				kind: "missing",
 				section: heading.title,
 				quote: "",
-				problem: `The section "${heading.title}" is empty.`,
+				problem: fill(say.emptySection, heading.title),
 				suggestion: "",
 				question: "",
 			});
@@ -180,7 +207,7 @@ export function lintAnalysis(
 				kind: "missing",
 				section,
 				quote,
-				problem: "An open point (TBD, TODO, ??) is still in the text.",
+				problem: say.openPoint,
 				suggestion: "",
 				question: "",
 			});
@@ -193,7 +220,7 @@ export function lintAnalysis(
 				kind: "ambiguity",
 				section,
 				quote,
-				problem: `Not measurable: ${words.map((word) => `"${word}"`).join(", ")}.`,
+				problem: fill(say.notMeasurable, words.map((word) => `"${word}"`).join(", ")),
 				suggestion: "",
 				question: "",
 			});
@@ -227,7 +254,7 @@ export function lintAnalysis(
 			kind: "consistency",
 			section: sectionAt(headings, at[1] as number),
 			quote: quotable(lines[(at[1] as number) - 1] ?? ""),
-			problem: `${id} is defined ${at.length} times (lines ${at.join(", ")}).`,
+			problem: fill(say.definedTwice, id, at.length, at.join(", ")),
 			suggestion: "",
 			question: "",
 		});
@@ -247,7 +274,10 @@ export function lintAnalysis(
 				kind: "consistency",
 				section: "",
 				quote: "",
-				problem: `Ids skipped: ${missing.map((n) => `${prefix}${String(n).padStart(2, "0")}`).join(", ")}.`,
+				problem: fill(
+					say.idsSkipped,
+					missing.map((n) => `${prefix}${String(n).padStart(2, "0")}`).join(", "),
+				),
 				suggestion: "",
 				question: "",
 			});
@@ -268,7 +298,7 @@ export function lintAnalysis(
 				kind: "testability",
 				section: heading.title,
 				quote: "",
-				problem: `${heading.title.split(/[:\s]/)[0]} has no acceptance criteria.`,
+				problem: fill(say.noCriteria, heading.title.split(/[:\s]/)[0] ?? heading.title),
 				suggestion: "",
 				question: "",
 			});
@@ -287,7 +317,7 @@ export function lintAnalysis(
 				kind: "consistency",
 				section: sectionAt(headings, i + 1),
 				quote: match[0],
-				problem: `The link goes to "#${anchor}", which no heading has.`,
+				problem: fill(say.brokenLink, anchor),
 				suggestion: "",
 				question: "",
 			});

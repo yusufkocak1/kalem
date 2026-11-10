@@ -101,7 +101,13 @@ export interface Settings {
 	readonly copilotTools: CopilotTools;
 	/** The analysis template new documents start from and reviews check against; empty for the built-in one. */
 	readonly defaultTemplate: string;
+	/** Where the assistant's panel is: at the right (as before), at the left, or under the document. */
+	readonly assistantPlace: AssistantPlace;
+	/** The assistant panel's height under the document, in pixels. */
+	readonly assistantHeight: number;
 }
+
+export type AssistantPlace = "right" | "left" | "bottom";
 
 export type CopilotTools = "auto" | "mcp" | "block";
 
@@ -142,6 +148,8 @@ export const DEFAULT_SETTINGS: Settings = {
 	assistantPermissions: [],
 	copilotTools: "auto",
 	defaultTemplate: "",
+	assistantPlace: "right",
+	assistantHeight: 320,
 };
 
 export const MIN_ASSISTANT_WIDTH = 280;
@@ -855,6 +863,8 @@ export interface KalemBridge {
 	): Promise<void>;
 	/** Forgets the kinds of change allowed for this run of the app. */
 	assistantForgetPermissions(): Promise<void>;
+	/** Summarizes an API chat so far; a CLI compacts its own (`"cli"`). */
+	assistantCompact(sessionId: string): Promise<"done" | "cli" | "none">;
 	onAssistantApproval(handler: (request: ApprovalRequest) => void): () => void;
 	/** The analysis templates: the team's, the user's, and the built-in one. */
 	templates(): Promise<readonly TemplateInfo[]>;
@@ -995,4 +1005,5 @@ export const CHANNEL = {
 	assistantToolCall: "kalem:assistant-tool-call",
 	assistantToolResult: "kalem:assistant-tool-result",
 	assistantForgetPermissions: "kalem:assistant-forget-permissions",
+	assistantCompact: "kalem:assistant-compact",
 } as const;

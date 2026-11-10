@@ -173,6 +173,9 @@ const assistant = createAssistantPane({
 	setShareDocument: (share) => updateSettings({ assistantDocument: share }),
 	width: () => settings.assistantWidth,
 	setWidth: (width) => updateSettings({ assistantWidth: width }),
+	place: () => settings.assistantPlace,
+	height: () => settings.assistantHeight,
+	setHeight: (height) => updateSettings({ assistantHeight: height }),
 	context: () => assistantContext(),
 	images: () =>
 		documentImages([...canvas.querySelectorAll("img")].filter((image) => !isDiagramImage(image))),
@@ -265,6 +268,16 @@ const docks = createDocks({
 	openLayout: () => void settingsDialog.show("panels"),
 });
 const deskColumn = el("div", { class: "desk-column", children: [deskArea, docks.elements.bottom] });
+
+/** The assistant's panel where the settings put it; its button stays at the right edge. */
+function placeAssistant(): void {
+	const place = settings.assistantPlace;
+	if (assistant.element.dataset.place === place && assistant.element.isConnected) return;
+	if (place === "bottom") deskColumn.append(assistant.element);
+	else if (place === "left") docks.elements.left.after(assistant.element);
+	else assistantRail.before(assistant.element);
+	assistant.element.dataset.place = place;
+}
 assistantRail.prepend(docks.stripes.right);
 const settingsDialog = createSettingsDialog({
 	t,
@@ -601,6 +614,7 @@ function applySettings(): void {
 	pageSetup.textContent = pageRule(settings);
 	app.style.setProperty("--zoom", String(settings.zoom / 100));
 	app.toggleAttribute("data-full-width", settings.fullWidth);
+	placeAssistant();
 	assistant.element.hidden = !settings.assistant;
 	assistantToggle.setAttribute("aria-expanded", String(settings.assistant));
 	if (settings.assistant) assistant.show();

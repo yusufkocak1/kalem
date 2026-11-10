@@ -27,6 +27,19 @@
 
 ---
 
+## 0.1 Uygulama Durumu (Masaüstü 2.10.0)
+
+| Faz | Durum | Not |
+|---|---|---|
+| A — Ayar şeması, Dosya → Ayarlar | ✅ | `shared/settings-schema.ts`, kategoriler + arama + varsayılana dön |
+| B — Araç kayıt defteri, izin kapısı, MCP, Copilot | ✅ | `main/assistant-tools.ts`, `main/assistant-permissions.ts`; MCP her soruya özel çalıştırma; Copilot MCP/blok otomatik |
+| C — Uygulama araçları, token diyeti | ✅ | Kısa kimlik + `kalem_help`; uzun belge ana hattıyla; token sayacı |
+| D — Şablonlar, modlar, inceleme, prompt, kod | ✅ | `shared/templates.ts`, `shared/analysis-lint.ts`, inceleme kartı, oturumluk vurgu |
+| E — Jira/Confluence'a yazma | ✅ | Her seferinde onay; story seçimi kartta |
+| F — Agent UI | ✅ (kısmen) | Panel sol/sağ/alt, `@` bölüm çipleri, tümünü geri al, `/compact`. **Ayrı pencere** ve `assistant-pane.ts`'nin tamamen bölünmesi yapılmadı: yeni parçalar ayrı modüllerde (`assistant-agent.ts`, `assistant-review.ts`, `document-marks.ts`) |
+
+Testler: birim + e2e (masaüstü e2e'ye `e2e/agent.spec.ts` eklendi: onay kartları, Copilot blok/MCP düşmesi, inceleme, şablonlar, Jira'ya onaysız istek gitmemesi, panel yeri ve `@`).
+
 ## 1. Bugünkü Durum (kodda ne var)
 
 | Alan | Bugün | Dosya |

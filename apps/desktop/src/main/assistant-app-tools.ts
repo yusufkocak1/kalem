@@ -206,7 +206,7 @@ const SELF_TOOLS: readonly KalemTool[] = [
 				"Kalem desktop app.",
 				`Document: ${document}.`,
 				`Interface language: ${settings.language ?? "system"}; theme: ${settings.theme}; zoom: ${settings.zoom}%; full width: ${settings.fullWidth}.`,
-				`Panels: ${panes}. Docks open: left ${settings.navigation}, right ${settings.rightDock}, bottom ${settings.bottomDock}. Assistant panel: shown.`,
+				`Panels: ${panes}. Docks open: left ${settings.navigation}, right ${settings.rightDock}, bottom ${settings.bottomDock}. Your own (the assistant's) panel: ${settings.assistantPlace}.`,
 				`Confluence: ${ctx.confluence === null ? "not connected" : `connected to ${ctx.confluence.site}`}. Jira: ${ctx.jira === null ? "not connected" : `connected to ${ctx.jira.site}`}.`,
 				`Workspace: ${ctx.workspace === null ? "none" : ctx.workspace.roots.join(", ")}.`,
 				`Auto save: ${settings.autoSave}; spell check: ${settings.spellCheck}; page: ${settings.pageSize}${settings.landscape ? " landscape" : ""}, ${settings.margins} margins.`,
@@ -366,11 +366,11 @@ const SETTING_TOOLS: readonly KalemTool[] = [
 		definition: {
 			name: "pane_move",
 			description:
-				"Moves one of Kalem's panels (outline: the headings, files, confluence, jira) to the left, right or bottom dock, or hides it; the user is asked first.",
+				"Moves one of Kalem's panels (outline: the headings, files, confluence, jira, or assistant: your own panel) to the left, right or bottom dock, or hides it (not the assistant); the user is asked first.",
 			parameters: {
 				type: "object",
 				properties: {
-					pane: { type: "string", enum: [...TOOL_PANES] },
+					pane: { type: "string", enum: [...TOOL_PANES, "assistant"] },
 					place: { type: "string", enum: [...PANE_PLACES] },
 				},
 				required: ["pane", "place"],
@@ -379,9 +379,29 @@ const SETTING_TOOLS: readonly KalemTool[] = [
 		risk: "ui",
 		available: () => true,
 		async run(input, ctx) {
-			const pane = text(input, "pane") as ToolPane;
 			const place = text(input, "place") as PanePlace;
-			if (!TOOL_PANES.includes(pane)) return `No panel named ${pane}: ${TOOL_PANES.join(", ")}.`;
+			if (text(input, "pane") === "assistant") {
+				if (place !== "left" && place !== "right" && place !== "bottom") {
+					return "The assistant's panel goes left, right or bottom; the user closes it themselves.";
+				}
+				const now = ctx.settings().assistantPlace;
+				if (now === place) return "Your panel is already there.";
+				const line = `${ctx.t.assistantTitle}: ${placeLabel(ctx, now)} → ${placeLabel(ctx, place)}`;
+				const answer = await ctx.approve({
+					tool: "pane_move",
+					risk: "ui",
+					permission: "settings:panels",
+					title: ctx.t.approvalPanels,
+					lines: [line],
+				});
+				if (!answer.approved) return "The user did not allow it. Do not try again.";
+				applySettings(ctx, { assistantPlace: place }, line);
+				ctx.step({ tool: "pane_move", detail: line });
+				return `Moved: ${line}.`;
+			}
+			const pane = text(input, "pane") as ToolPane;
+			if (!TOOL_PANES.includes(pane))
+				return `No panel named ${pane}: ${TOOL_PANES.join(", ")}, assistant.`;
 			if (!PANE_PLACES.includes(place))
 				return `No place named ${place}: ${PANE_PLACES.join(", ")}.`;
 			const now = ctx.settings().panePlaces[pane];

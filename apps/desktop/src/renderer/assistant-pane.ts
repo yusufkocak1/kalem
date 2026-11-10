@@ -2,7 +2,13 @@ import { parse } from "@kalem-editor/core";
 import { renderToDOM } from "@kalem-editor/viewer";
 import type { AssistantAction, AssistantCommand, DocumentAction } from "../shared/actions.js";
 import { isDocumentAction } from "../shared/actions.js";
-import type { AssistantStatus, Command, KalemBridge, Settings } from "../shared/bridge.js";
+import type {
+	AssistantPlace,
+	AssistantStatus,
+	Command,
+	KalemBridge,
+	Settings,
+} from "../shared/bridge.js";
 import { clampAssistantWidth, DEFAULT_SETTINGS, MIN_ASSISTANT_WIDTH } from "../shared/bridge.js";
 import type { ChatSummary, StoredChat, StoredMessage } from "../shared/chats.js";
 import { chatTitle, historyOf } from "../shared/chats.js";
@@ -17,13 +23,14 @@ import type {
 import { composePrompt, lineDiff, splitReply } from "../shared/claude.js";
 import { withoutRequests as withoutLookups } from "../shared/confluence-tool.js";
 import { diagramSvg, svgMarkup } from "../shared/diagram.js";
-import { outlineText } from "../shared/document-outline.js";
+import { findHeading, outlineOf, outlineText } from "../shared/document-outline.js";
 import type { Finding } from "../shared/findings.js";
 import { addToQuestions, noteBlock, questionLine, withNoteAfter } from "../shared/findings.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type { Mode } from "../shared/modes.js";
 import { isMode, MODE_LABELS, MODES } from "../shared/modes.js";
+import { clampDockSize, MIN_DOCK_SIZE } from "../shared/panes.js";
 import type { ProviderId } from "../shared/providers.js";
 import { isCli, PROVIDER_INFO, providerLabel, SUGGESTED_MODELS } from "../shared/providers.js";
 import type { SlashEntry } from "../shared/slash.js";
@@ -58,6 +65,11 @@ export interface AssistantHost {
 	/** The panel's width; `setWidth` keeps it. */
 	width(): number;
 	setWidth(width: number): void;
+	/** Where the panel is: at the right, at the left, or under the document. */
+	place(): AssistantPlace;
+	/** The panel's height under the document; `setHeight` keeps it. */
+	height(): number;
+	setHeight(height: number): void;
 	context(): Promise<AssistantContext>;
 	/** The document's pictures, for the model to look at. */
 	images(): Promise<DocumentImage[]>;
@@ -311,6 +323,124 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	});
 	const sourceList = el("div", { class: "assistant-sources", attrs: { hidden: "" } });
 
+	// --- Mentions: "@" adds a part of the document to the next question ---
+
+	/** The headings of the sections added to the next question. */
+	let mentions: string[] = [];
+	const mentionList = el("div", {
+		class: "assistant-sources assistant-mentions",
+		attrs: { hidden: "" },
+	});
+	const mentionMenu = el("ul", {
+		class: "assistant-mention-menu",
+		attrs: { role: "listbox", hidden: "", "aria-label": t.mentionsTitle },
+	});
+	let mentionItems: { label: string; run: () => void }[] = [];
+	let mentionIndex = 0;
+
+	function renderMentions(): void {
+		mentionList.hidden = mentions.length === 0;
+		mentionList.replaceChildren(
+			...mentions.map((heading) => {
+				const remove = el("button", {
+					class: "assistant-chip-close",
+					attrs: { type: "button", "aria-label": format(t.mentionSection, heading) },
+					children: [icon("close")],
+				});
+				remove.addEventListener("click", () => {
+					mentions = mentions.filter((kept) => kept !== heading);
+					renderMentions();
+				});
+				return el("span", {
+					class: "assistant-chip assistant-mention",
+					children: [el("span", { class: "assistant-chip-text", text: `§ ${heading}` }), remove],
+				});
+			}),
+		);
+	}
+
+	/** The "@" word being typed before the caret; `null` when there is none. */
+	function mentionQuery(): { query: string; start: number } | null {
+		const before = input.value.slice(0, input.selectionStart ?? input.value.length);
+		const match = /(^|\s)@([^\s@]*)$/.exec(before);
+		if (match === null) return null;
+		const query = match[2] as string;
+		return { query, start: before.length - query.length - 1 };
+	}
+
+	function hideMentions(): void {
+		mentionMenu.hidden = true;
+		mentionItems = [];
+	}
+
+	function renderMentionMenu(): void {
+		mentionMenu.replaceChildren(
+			...mentionItems.map((item, index) => {
+				const row = el("li", {
+					class: `assistant-command${index === mentionIndex ? " active" : ""}`,
+					attrs: { role: "option", "aria-selected": String(index === mentionIndex) },
+					children: [el("span", { class: "assistant-command-label", text: item.label })],
+				});
+				row.addEventListener("mousedown", (event) => {
+					event.preventDefault();
+					item.run();
+				});
+				return row;
+			}),
+		);
+	}
+
+	async function updateMentions(): Promise<void> {
+		const typed = mentionQuery();
+		if (typed === null) {
+			hideMentions();
+			return;
+		}
+		const take = (): void => {
+			const end = input.selectionStart ?? input.value.length;
+			input.value = `${input.value.slice(0, typed.start)}${input.value.slice(end)}`;
+			hideMentions();
+			input.focus();
+		};
+		let headings: string[] = [];
+		try {
+			headings = outlineOf((await host.context()).text).map((entry) => entry.title);
+		} catch {
+			// No document: only the document's own choice.
+		}
+		const wanted = typed.query.toLocaleLowerCase(host.lang);
+		const fits = (label: string): boolean =>
+			wanted === "" || label.toLocaleLowerCase(host.lang).includes(wanted);
+		mentionItems = [
+			...(fits(t.mentionDocument)
+				? [
+						{
+							label: `@ ${t.mentionDocument}`,
+							run: () => {
+								take();
+								host.setShareDocument(true);
+								render();
+							},
+						},
+					]
+				: []),
+			...headings
+				.filter(fits)
+				.slice(0, 30)
+				.map((heading) => ({
+					label: `§ ${heading}`,
+					run: () => {
+						take();
+						if (!mentions.includes(heading)) mentions = [...mentions, heading];
+						renderMentions();
+					},
+				})),
+		];
+		mentionIndex = 0;
+		mentionMenu.hidden = mentionItems.length === 0;
+		renderMentionMenu();
+	}
+
 	function menuItem(label: string, name: Parameters<typeof icon>[0], run: () => void): HTMLElement {
 		const item = el("button", {
 			class: "assistant-add-item",
@@ -561,6 +691,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		children: [
 			context,
 			sourceList,
+			mentionList,
+			mentionMenu,
 			el("div", {
 				class: "assistant-box",
 				children: [
@@ -639,7 +771,10 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		if (href !== null && href !== "") host.openLink(href);
 	});
 
-	input.addEventListener("input", () => updateMenu());
+	input.addEventListener("input", () => {
+		updateMenu();
+		void updateMentions();
+	});
 	// Late, so a click on the menu still lands; not when the box has the focus back by then.
 	input.addEventListener("blur", () =>
 		setTimeout(() => {
@@ -647,6 +782,25 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		}, 150),
 	);
 	input.addEventListener("keydown", (event) => {
+		if (!mentionMenu.hidden && mentionItems.length > 0) {
+			const move = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
+			if (move !== 0) {
+				event.preventDefault();
+				mentionIndex = (mentionIndex + move + mentionItems.length) % mentionItems.length;
+				renderMentionMenu();
+				return;
+			}
+			if ((event.key === "Enter" && !event.shiftKey && !event.isComposing) || event.key === "Tab") {
+				event.preventDefault();
+				mentionItems[mentionIndex]?.run();
+				return;
+			}
+			if (event.key === "Escape") {
+				event.preventDefault();
+				hideMentions();
+				return;
+			}
+		}
 		if (!menu.hidden && menuItems.length > 0) {
 			const move = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
 			if (move !== 0) {
@@ -768,6 +922,20 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			},
 		},
 		{ name: "trace", label: t.slashTrace, run: () => ask(t.tracePrompt) },
+		{
+			name: "compact",
+			label: t.assistantCompact,
+			async run() {
+				if (active.sessionId === null) return;
+				try {
+					const done = await bridge.assistantCompact(active.sessionId);
+					if (done === "cli") showNotice(t.assistantCompactCli);
+					else if (done === "done") showNotice(t.assistantCompacted);
+				} catch (error) {
+					showNotice(format(t.assistantActionFailed, host.errorText(error)));
+				}
+			},
+		},
 		{
 			name: "stories",
 			label: t.slashStories,
@@ -939,8 +1107,25 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	const widest = (): number => Math.max(MIN_ASSISTANT_WIDTH, window.innerWidth - 360);
 	const fit = (width: number): number => Math.min(widest(), clampAssistantWidth(width));
 
+	const tallest = (): number => Math.max(MIN_DOCK_SIZE, window.innerHeight - 200);
+	const fitHeight = (height: number): number => Math.min(tallest(), clampDockSize(height, 320));
+
+	/** The panel's size where it is: a width at a side, a height under the document. */
 	function showWidth(width: number): void {
+		const place = host.place();
+		element.dataset.place = place;
+		if (place === "bottom") {
+			const height = fitHeight(host.height());
+			element.style.width = "";
+			element.style.height = `${height}px`;
+			resizer.setAttribute("aria-orientation", "horizontal");
+			resizer.setAttribute("aria-valuenow", String(height));
+			resizer.setAttribute("aria-valuemax", String(tallest()));
+			return;
+		}
+		element.style.height = "";
 		element.style.width = `${width}px`;
+		resizer.setAttribute("aria-orientation", "vertical");
 		resizer.setAttribute("aria-valuenow", String(width));
 		resizer.setAttribute("aria-valuemax", String(widest()));
 	}
@@ -949,11 +1134,18 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		if (event.button !== 0) return;
 		event.preventDefault();
 		resizer.setPointerCapture(event.pointerId);
-		const right = element.getBoundingClientRect().right;
+		const box = element.getBoundingClientRect();
+		const place = host.place();
 		let width = host.width();
+		let height = host.height();
 		element.classList.add("resizing");
 		const move = (moved: PointerEvent): void => {
-			width = fit(right - moved.clientX);
+			if (place === "bottom") {
+				height = fitHeight(box.bottom - moved.clientY);
+				element.style.height = `${height}px`;
+				return;
+			}
+			width = fit(place === "left" ? moved.clientX - box.left : box.right - moved.clientX);
 			showWidth(width);
 		};
 		const up = (): void => {
@@ -961,20 +1153,34 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			resizer.removeEventListener("pointerup", up);
 			resizer.removeEventListener("pointercancel", up);
 			element.classList.remove("resizing");
-			host.setWidth(width);
+			if (place === "bottom") host.setHeight(height);
+			else host.setWidth(width);
 		};
 		resizer.addEventListener("pointermove", move);
 		resizer.addEventListener("pointerup", up);
 		resizer.addEventListener("pointercancel", up);
 	});
 	resizer.addEventListener("keydown", (event) => {
-		const step =
-			event.key === "ArrowLeft" ? WIDTH_STEP : event.key === "ArrowRight" ? -WIDTH_STEP : 0;
+		const place = host.place();
+		if (place === "bottom") {
+			const step =
+				event.key === "ArrowUp" ? WIDTH_STEP : event.key === "ArrowDown" ? -WIDTH_STEP : 0;
+			if (step === 0) return;
+			event.preventDefault();
+			host.setHeight(fitHeight(host.height() + step));
+			return;
+		}
+		const grow = place === "left" ? "ArrowRight" : "ArrowLeft";
+		const shrink = place === "left" ? "ArrowLeft" : "ArrowRight";
+		const step = event.key === grow ? WIDTH_STEP : event.key === shrink ? -WIDTH_STEP : 0;
 		if (step === 0) return;
 		event.preventDefault();
 		host.setWidth(fit(host.width() + step));
 	});
-	resizer.addEventListener("dblclick", () => host.setWidth(fit(DEFAULT_SETTINGS.assistantWidth)));
+	resizer.addEventListener("dblclick", () => {
+		if (host.place() === "bottom") host.setHeight(DEFAULT_SETTINGS.assistantHeight);
+		else host.setWidth(fit(DEFAULT_SETTINGS.assistantWidth));
+	});
 	window.addEventListener("resize", () => {
 		if (!element.hidden) showWidth(fit(host.width()));
 	});
@@ -1500,15 +1706,6 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		if (message.plan !== undefined && message.plan.length > 0)
 			nodes.unshift(planCard(t, message.plan));
 		for (const proposed of message.edits ?? []) nodes.push(editCard(proposed));
-		for (const request of message.approvals ?? []) {
-			nodes.push(
-				approvalCard(t, request, approvalStates.get(request.id) ?? "waiting", (answer) => {
-					approvalStates.set(request.id, answer.approved ? "allowed" : "denied");
-					void bridge.assistantApprove(request.id, answer);
-					renderReply(message);
-				}),
-			);
-		}
 		if (message.findings !== undefined && message.findings.length > 0) {
 			nodes.push(
 				findingsCard(
@@ -1521,6 +1718,27 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		}
 		for (const change of message.changes ?? []) {
 			nodes.push(changeLine(t, change, () => void undoChange(message, change)));
+		}
+		const undoable = (message.changes ?? []).filter((change) => change.undone !== true);
+		if (message.done && undoable.length > 1) {
+			const all = el("button", {
+				class: "assistant-link",
+				text: t.assistantUndoAll,
+				attrs: { type: "button" },
+			});
+			all.addEventListener("click", async () => {
+				for (const change of [...undoable].reverse()) await undoChange(message, change);
+			});
+			nodes.push(el("div", { class: "assistant-change assistant-undo-all", children: [all] }));
+		}
+		for (const request of message.approvals ?? []) {
+			nodes.push(
+				approvalCard(t, request, approvalStates.get(request.id) ?? "waiting", (answer) => {
+					approvalStates.set(request.id, answer.approved ? "allowed" : "denied");
+					void bridge.assistantApprove(request.id, answer);
+					renderReply(message);
+				}),
+			);
 		}
 		if (!message.done && message.error === null) {
 			const lastStep = message.steps?.at(-1);
@@ -2194,7 +2412,13 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		}
 		reply.approvals = [...(reply.approvals ?? []), request];
 		if (chat === active) {
-			scheduleRender(reply);
+			// The question waits for the user: it is brought into view.
+			renderReply(reply);
+			shown
+				.get(reply)
+				?.element.querySelector(".assistant-approval:last-of-type")
+				?.scrollIntoView({ block: "nearest" });
+			log.scrollTop = log.scrollHeight;
 			if (!element.hidden) input.blur();
 		}
 		if (chat !== active || element.hidden) showNotice(t.approvalWaiting);
@@ -2292,6 +2516,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 		const notes: string[] = [];
 		let prompt: string;
+		// The sections added with "@" go with the question, whether or not the document is shared.
+		let withSections = question;
 		let tabId: string | null = null;
 		let images: DocumentImage[] = [];
 		let fullPrompt: string | undefined;
@@ -2301,6 +2527,23 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		try {
 			const context = await host.context();
 			tabId = context.tabId;
+			if (mentions.length > 0) {
+				const lines = context.text.split("\n");
+				const sections = mentions.flatMap((heading) => {
+					const found = findHeading(context.text, heading);
+					if (found === null) return [];
+					const body = lines.slice(found.line - 1, found.end).join("\n");
+					return [`<section heading="${heading.replace(/"/g, "&quot;")}">\n${body}\n</section>`];
+				});
+				if (sections.length > 0) {
+					withSections = `${sections.join("\n\n")}\n\n${question}`;
+					notes.push(
+						format(t.assistantMentioned, mentions.map((heading) => `§ ${heading}`).join(", ")),
+					);
+				}
+				mentions = [];
+				renderMentions();
+			}
 			const selection = droppedSelection === null ? host.selection() : "";
 			const sharing = host.shareDocument();
 			const unchanged = sharing && chat.sessionId !== null && chat.sharedText === context.text;
@@ -2323,7 +2566,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			// A long document goes as its outline: the model reads the parts it needs with the tools.
 			if (sharing && !unchanged && context.text.length > LARGE_DOCUMENT) {
 				fullPrompt = composePrompt({
-					question,
+					question: withSections,
 					document: { name: context.name, text: context.text },
 					diagrams: context.diagrams,
 					images,
@@ -2334,7 +2577,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					format(t.assistantDocumentOutline, context.name),
 				);
 				prompt = composePrompt({
-					question,
+					question: withSections,
 					outline: { name: context.name, text: outlineText(context.text) },
 					diagrams: context.diagrams,
 					selection,
@@ -2342,7 +2585,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				images = [];
 			} else
 				prompt = composePrompt({
-					question,
+					question: withSections,
 					...(sharing && !unchanged
 						? {
 								document: { name: context.name, text: context.text },

@@ -156,6 +156,7 @@ const bridge: KalemBridge = {
 	assistantApprove: (id, answer) => ipcRenderer.invoke(CHANNEL.assistantApprove, id, answer),
 	assistantToolResult: (id, answer) => ipcRenderer.invoke(CHANNEL.assistantToolResult, id, answer),
 	assistantForgetPermissions: () => ipcRenderer.invoke(CHANNEL.assistantForgetPermissions),
+	assistantCompact: (sessionId) => ipcRenderer.invoke(CHANNEL.assistantCompact, sessionId),
 	templates: () => ipcRenderer.invoke(CHANNEL.templates),
 	templateNew: (id) => ipcRenderer.invoke(CHANNEL.templateNew, id),
 	templateOpen: (id) => ipcRenderer.invoke(CHANNEL.templateOpen, id),

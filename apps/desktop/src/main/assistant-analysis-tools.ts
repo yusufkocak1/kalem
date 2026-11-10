@@ -88,7 +88,18 @@ const TOOLS: readonly KalemTool[] = [
 		async run(input, ctx) {
 			const document = ctx.document as NonNullable<ToolContext["document"]>;
 			const template = await templateFor(ctx, text(input, "template"));
-			const findings = lintAnalysis(document.text, template);
+			const t = ctx.t;
+			// The user reads them in the interface's language; the model reads either.
+			const findings = lintAnalysis(document.text, template, 80, {
+				missingSection: t.lintMissingSection,
+				emptySection: t.lintEmptySection,
+				openPoint: t.lintOpenPoint,
+				notMeasurable: t.lintNotMeasurable,
+				definedTwice: t.lintDefinedTwice,
+				idsSkipped: t.lintIdsSkipped,
+				noCriteria: t.lintNoCriteria,
+				brokenLink: t.lintBrokenLink,
+			});
 			ctx.step({ tool: "analysis_lint", detail: template?.name ?? "" });
 			if (findings.length > 0) ctx.emit({ kind: "findings", findings });
 			return `Checked against the template "${template?.name ?? "none"}". The user already sees these findings; do not report them again.\n${findingsText(findings)}`;

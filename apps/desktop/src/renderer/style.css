@@ -1523,6 +1523,7 @@ button {
 }
 
 /* The slash commands, above the input. */
+.assistant-mention-menu,
 .assistant-commands {
 	position: absolute;
 	right: 10px;
@@ -1540,6 +1541,7 @@ button {
 	list-style: none;
 }
 
+.assistant-mention-menu[hidden],
 .assistant-commands[hidden] {
 	display: none;
 }
@@ -7499,6 +7501,8 @@ textarea.jira-worklog-input {
 .assistant-change {
 	display: flex;
 	align-items: center;
+	align-self: stretch;
+	justify-content: flex-start;
 	gap: 8px;
 	margin: 4px 0;
 	color: var(--app-muted);
@@ -7735,4 +7739,31 @@ textarea.jira-worklog-input {
 
 .template-picker .template-list {
 	overflow-y: auto;
+}
+
+/* The assistant's panel at the left of the document, or under it. */
+.assistant[data-place="left"] {
+	border-right: 1px solid var(--app-border);
+	border-left: 0;
+}
+
+.assistant[data-place="left"] .assistant-resizer {
+	right: -3px;
+	left: auto;
+}
+
+.assistant[data-place="bottom"] {
+	width: auto;
+	border-top: 1px solid var(--app-border);
+	border-left: 0;
+}
+
+.assistant[data-place="bottom"] .assistant-resizer {
+	top: -3px;
+	right: 0;
+	bottom: auto;
+	left: 0;
+	width: auto;
+	height: 6px;
+	cursor: row-resize;
 }
