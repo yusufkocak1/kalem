@@ -89,6 +89,8 @@ export interface IpcContext {
 	strings(): Strings;
 	language(): Lang;
 	changeSettings(patch: Partial<Settings>): void;
+	/** Changes the interface's language; `null` follows the system. Offers a restart. */
+	changeLanguage(language: Lang | null): void;
 	showFileMenu(win: AppWindow, x: number, y: number): void;
 	showTabMenu(win: AppWindow, tabId: string, x: number, y: number): void;
 	showCaseMenu(win: AppWindow, x: number, y: number): void;
@@ -863,9 +865,16 @@ export function registerIpc(ctx: IpcContext): void {
 
 	on(CHANNEL.updateSettings, (_win, patch) => {
 		if (typeof patch !== "object" || patch === null) return;
-		// Language changes go through the menu flow, which offers a restart.
-		const { language: _language, ...rest } = patch as Partial<Settings>;
-		ctx.changeSettings(rest);
+		// Language changes go through the menu's flow, which offers a restart.
+		const { language, ...rest } = patch as Partial<Settings>;
+		if (Object.keys(rest).length > 0) ctx.changeSettings(rest);
+		if (
+			Object.hasOwn(patch, "language") &&
+			(language === null || language === "tr" || language === "en") &&
+			language !== ctx.store.settings.language
+		) {
+			ctx.changeLanguage(language);
+		}
 	});
 
 	on(CHANNEL.clipboard, (win, action) => {

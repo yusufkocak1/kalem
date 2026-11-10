@@ -5977,8 +5977,8 @@ pre[data-confluence-kind="layout"]::before {
 /* --- Settings ------------------------------------------------------------------ */
 
 .settings-dialog {
-	width: min(620px, calc(100vw - 32px));
-	max-height: 84vh;
+	width: min(860px, calc(100vw - 32px));
+	height: min(620px, 84vh);
 	margin: 6vh auto auto;
 	padding: 16px 18px;
 	border: 1px solid var(--app-border);
@@ -6003,18 +6003,150 @@ pre[data-confluence-kind="layout"]::before {
 	font-size: 17px;
 }
 
-.settings-body {
+.settings-head {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+}
+
+.settings-search {
+	flex: 1;
+	max-width: 320px;
+	margin-inline-start: auto;
+	padding: 6px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-surface);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 14px;
+}
+
+/* Categories at the left, the chosen one (or what the search found) at the right. */
+.settings-layout {
 	display: grid;
-	gap: 18px;
+	flex: 1;
+	grid-template-columns: 170px 1fr;
+	gap: 16px;
 	min-height: 0;
+}
+
+.settings-nav {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding-inline-end: 12px;
+	border-inline-end: 1px solid var(--app-border);
 	overflow-y: auto;
 }
 
+.settings-nav-item {
+	padding: 6px 10px;
+	border: 0;
+	border-radius: 6px;
+	background: none;
+	color: var(--app-text);
+	font: inherit;
+	font-size: 14px;
+	text-align: start;
+	cursor: pointer;
+}
+
+.settings-nav-item:hover {
+	background: var(--app-hover, rgb(127 127 127 / 12%));
+}
+
+.settings-nav-current {
+	background: var(--app-accent-soft, rgb(127 127 127 / 18%));
+	font-weight: 600;
+}
+
+.settings-nav-dim {
+	opacity: 0.45;
+}
+
+.settings-main {
+	min-height: 0;
+	overflow-y: auto;
+	padding-inline-end: 4px;
+}
+
+.settings-body {
+	display: grid;
+	gap: 22px;
+}
+
+.settings-section-head {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-bottom: 10px;
+}
+
 .settings-section h3 {
-	margin: 0 0 8px;
+	margin: 0;
 	font-size: 13px;
 	text-transform: uppercase;
 	color: var(--app-muted);
+}
+
+.settings-reset {
+	margin-inline-start: auto;
+}
+
+.settings-items {
+	display: grid;
+	gap: 12px;
+}
+
+.settings-items > [hidden],
+.settings-section[hidden],
+.settings-empty[hidden] {
+	display: none;
+}
+
+.settings-block h4 {
+	margin: 0 0 6px;
+	font-size: 14px;
+}
+
+.settings-block .assistant-settings {
+	padding: 0;
+	border: 0;
+	overflow: visible;
+}
+
+/* The block's own heading names the form. */
+.settings-block .assistant-settings > .assistant-empty-title {
+	display: none;
+}
+
+.settings-empty {
+	color: var(--app-muted);
+	font-size: 14px;
+}
+
+.settings-grid input[type="number"] {
+	padding: 5px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-surface);
+	color: var(--app-text);
+	font: inherit;
+}
+
+@media (max-width: 560px) {
+	.settings-layout {
+		grid-template-columns: 1fr;
+	}
+
+	.settings-nav {
+		flex-direction: row;
+		flex-wrap: wrap;
+		padding: 0 0 8px;
+		border-inline-end: 0;
+		border-bottom: 1px solid var(--app-border);
+	}
 }
 
 .settings-section .confluence-hint {

@@ -455,6 +455,8 @@ Kararlar (§0) gereği Jira/Confluence'a yazma ve Kod modu **ilk sürüm kapsam�
 
 ### Faz A — Ayar şeması ve Dosya → Ayarlar *(ilk iş; her şey buna dayanıyor)*
 
+> **Durum: tamamlandı** — `shared/settings-schema.ts`, yeni `renderer/settings-dialog.ts`, Dosya → Ayarlar; birim testleri ve e2e (masaüstü e2e 91/91) yeşil.
+
 | # | İş | Boyut | Dosyalar |
 |---|---|---|---|
 | A1 | `shared/settings-schema.ts`: tüm `Settings` alanları için tanım, i18n anahtarları, `keywords`, `assistant` erişimi | M | yeni + `i18n.ts` |

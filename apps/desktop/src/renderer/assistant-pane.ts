@@ -78,6 +78,8 @@ export interface AssistantPane {
 	refreshSelection(): void;
 	/** The folders open in the Files pane changed. */
 	workspaceChanged(): void;
+	/** The service was set in the Settings window; `changed` when it is another service. */
+	configured(status: AssistantStatus, changed: boolean): void;
 }
 
 interface Message {
@@ -219,13 +221,19 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		openLink: (href) => host.openLink(href),
 		errorText: host.errorText,
 		done(next, changed) {
-			if (next !== null) status = next;
-			// Another service does not know what was said so far: it gets a chat of its own.
-			if (changed && active.messages.length > 0) startChat();
-			else if (changed) active.provider = status?.provider ?? active.provider;
+			if (next !== null) configured(next, changed);
 			void setView("chat");
 		},
 	});
+
+	/** The service or model was set, here or in the Settings window. */
+	function configured(next: AssistantStatus, changed: boolean): void {
+		status = next;
+		// Another service does not know what was said so far: it gets a chat of its own.
+		if (changed && active.messages.length > 0) startChat();
+		else if (changed) active.provider = next.provider;
+		render();
+	}
 
 	const share = el("input", { attrs: { type: "checkbox" } });
 	share.addEventListener("change", () => host.setShareDocument(share.checked));
@@ -2054,5 +2062,6 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		},
 		refreshSelection,
 		workspaceChanged: () => renderSources(),
+		configured,
 	};
 }

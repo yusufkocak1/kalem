@@ -422,7 +422,7 @@ test("connects to an OpenAI-compatible service and to the Anthropic API with a k
 	await expect(form.locator(".assistant-field-note[role=status]")).toHaveText(
 		"2 models found; pick one in the model field.",
 	);
-	await expect(form.locator("#assistant-models option")).toHaveCount(2);
+	await expect(form.locator("datalist option")).toHaveCount(2);
 	await form.getByLabel("Model").fill("fake-large");
 	await form.getByRole("button", { name: "Save" }).click();
 	await expect(form).toBeHidden();

@@ -724,6 +724,68 @@ test("switches the theme and remembers it", async () => {
 	expect(stored.settings.theme).toBe("dark");
 });
 
+test("keeps every setting in File → Settings, by category and by search", async () => {
+	const { app, page, userData, errors } = await launch();
+	const menu = await app.evaluate(({ Menu }) => {
+		const labels = (name: string) =>
+			Menu.getApplicationMenu()
+				?.items.find((item) => item.label === name)
+				?.submenu?.items.map((item) => item.label) ?? [];
+		return { file: labels("File"), view: labels("View") };
+	});
+	expect(menu.file).toContain("Settings…");
+	expect(menu.view).not.toContain("Settings…");
+	// The menus keep their quick ways to the same settings.
+	expect(menu.view).toEqual(expect.arrayContaining(["Theme", "Full Width", "Spell Check"]));
+
+	await clickMenu(app, "File", "Settings…");
+	const dialog = page.locator(".settings-dialog");
+	await expect(dialog).toBeVisible();
+	await expect(dialog.locator(".settings-search")).toBeFocused();
+	// One category at a time: Appearance first.
+	await expect(dialog.locator('[data-section="appearance"]')).toBeVisible();
+	await expect(dialog.locator('[data-section="page"]')).toBeHidden();
+
+	await dialog.locator('[data-category="page"]').click();
+	await expect(dialog.locator('[data-section="page"]')).toBeVisible();
+	await dialog.locator('select[data-setting="pageSize"]').selectOption({ label: "A5" });
+
+	// The search looks through every category, in either language's words.
+	await dialog.locator(".settings-search").fill("dark");
+	await expect(dialog.locator('select[data-setting="theme"]')).toBeVisible();
+	await expect(dialog.locator('[data-section="page"]')).toBeHidden();
+	await expect(dialog.locator('input[data-setting="autoSave"]')).toBeHidden();
+	await dialog.locator('select[data-setting="theme"]').selectOption({ label: "Dark" });
+	await expect
+		.poll(() => page.evaluate(() => matchMedia("(prefers-color-scheme: dark)").matches))
+		.toBe(true);
+
+	await dialog.locator(".settings-search").fill("nothing like this");
+	await expect(dialog.locator(".settings-empty")).toContainText("nothing like this");
+
+	// A setting changed from the menu shows in the window at once.
+	await dialog.locator(".settings-search").fill("");
+	await dialog.locator('[data-category="editor"]').click();
+	const spellCheck = dialog.locator('input[data-setting="spellCheck"]');
+	await expect(spellCheck).toBeChecked();
+	await app.evaluate(({ Menu }) => {
+		const view = Menu.getApplicationMenu()?.items.find((item) => item.label === "View");
+		view?.submenu?.items.find((item) => item.label === "Spell Check")?.click();
+	});
+	await expect(spellCheck).not.toBeChecked();
+
+	// Reset puts the category back.
+	await dialog.locator('[data-category="page"]').click();
+	await dialog.locator('[data-section="page"] .settings-reset').click();
+	await expect(dialog.locator('select[data-setting="pageSize"]')).toHaveValue("0");
+
+	await dialog.getByRole("button", { name: "Done" }).click();
+	await app.close();
+	const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
+	expect(stored.settings).toMatchObject({ theme: "dark", spellCheck: false, pageSize: "A4" });
+	expect(errors).toEqual([]);
+});
+
 test("exports the document as HTML and PDF", async () => {
 	const folder = await tempDir("export");
 	const html = join(folder, "rapor.html");

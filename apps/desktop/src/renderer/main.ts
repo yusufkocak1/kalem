@@ -257,7 +257,7 @@ const docks = createDocks({
 	settings: () => settings,
 	update: (patch) => updateSettings(patch),
 	available: paneAvailable,
-	openLayout: () => void settingsDialog.show("panes"),
+	openLayout: () => void settingsDialog.show("panels"),
 });
 const deskColumn = el("div", { class: "desk-column", children: [deskArea, docks.elements.bottom] });
 assistantRail.prepend(docks.stripes.right);
@@ -270,6 +270,9 @@ const settingsDialog = createSettingsDialog({
 	connectConfluence: () => void confluenceDialog.show(),
 	connectJira: () => void jiraDialog.showLogin(),
 	onAccountChange: () => void refreshAccounts(),
+	assistantConfigured: (status, changed) => assistant.configured(status, changed),
+	openLink: (href) => bridge.openLink(href),
+	errorText: ipcErrorMessage,
 });
 
 /** The panes that came into view are filled: Confluence's tree, Jira's issues, the files. */
@@ -876,6 +879,8 @@ bridge.onSettings((next) => {
 	applySettings();
 	refreshShown(before);
 	scheduleRibbonUpdate();
+	// A setting changed from the menu shows in the Settings window at once.
+	void settingsDialog.refresh();
 });
 
 // --- Dropped files ----------------------------------------------------------

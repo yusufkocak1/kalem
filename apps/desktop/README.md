@@ -500,10 +500,19 @@ verir.
   (çift tık varsayılana döner); yerler ve boyutlar hatırlanır.
 - **Confluence ve Jira panelleri yalnızca bağlantı kurulunca görünür**;
   bağlantı kesilince kaybolur.
-- **Görünüm → Ayarlar…** (`Ctrl+,`): panellerin yerleri, Confluence ve Jira
-  bağlantıları (bağlan / bağlantıyı kes) ve genel ayarlar (tema, otomatik
-  kaydetme, yazım denetimi, güncelleme denetimi, bildirim alanı, Git'i
-  otomatik getirme).
+- **Dosya → Ayarlar…** (`Ctrl+,`; macOS'ta uygulama menüsünde de): bütün
+  ayarlar tek pencerede, solda kategoriler — **Görünüm** (tema, dil,
+  yakınlık, tam genişlik), **Düzenleyici** (otomatik kaydetme, yazım
+  denetimi), **Paneller** (panellerin yeri, yuvaların açıklığı ve
+  boyutları), **Asistan** (hizmet ve model, panel, belgeyi paylaşma),
+  **Bağlantılar** (Confluence ve Jira: bağlan / bağlantıyı kes), **Sayfa
+  Düzeni** (kâğıt, yönlendirme, kenar boşlukları, sayfa numarası) ve
+  **Sistem** (güncelleme denetimi, bildirim alanı, Git'i otomatik getirme).
+  Üstteki arama kutusu bütün kategorilerde arar; Türkçe ya da İngilizce
+  yazılabilir, harf ayrımı ve şapka/nokta farkı gözetmez ("koyu", "dark",
+  "kagit"). Her kategoride **Varsayılanlara Dön** düğmesi vardır. Menülerdeki
+  ve şeritteki hızlı ayarlar (tema, dil, sayfa düzeni…) yerinde durur;
+  oradan yapılan değişiklik açık pencerede hemen görünür.
 
 **Diyagramlar**
 
