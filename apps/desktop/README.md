@@ -402,6 +402,28 @@ verir.
     sayfanın altı (`ancestor`). Yalnız bir filtre de arama sayılır (ör. "son
     bir haftada değişen sayfalarım").
 
+- **Bahsetme ve Jira kaydı eklemek:** Confluence bağlıyken metnin içinde
+  bir kelimenin başına **`@`** yazınca kişi arama kutusu açılır; yazdıkça
+  sitenin kullanıcıları adlarına göre aranır (Cloud'da `/rest/api/search/user`,
+  Server / Data Center'da o, CQL kullanıcı araması ya da eski
+  `/rest/prototype/1/search/user.json`). `↑`/`↓`, `Enter` (ya da tıklama) seçer,
+  `Esc` kapatır. Seçilen kişi satırın içine **@Ad Soyad** olarak girer ve
+  kaydedince Confluence'ta gerçek bir bahsetme (`ri:user`) olur — kişiye
+  Confluence'ın bildirimi gider.
+  - **`/` menüsünde** de **Bir kişiden bahset** ve **Jira kaydı** vardır. Bu
+    ikisi bloğu değiştirmez: `/jira` yazıp seçince `/jira` silinir ve kutu
+    **imlecin olduğu yerde, satırın içinde** açılır; ardından yazılan arama
+    olur. Jira bağlıysa anahtar (`ABC-12`), kelime ya da JQL ile Jira'da
+    aranır ve kayıtlar özetleriyle listelenir; bağlı değilse yazılan anahtar
+    olduğu gibi eklenir.
+  - Jira kaydı Confluence'a `jira` makrosu olarak yazılır; makronun sunucusu
+    sitenin Jira listesinden (`/rest/jiraanywhere/1.0/servers`) Kalem'in
+    bağlı olduğu Jira'ya göre, yoksa varsayılan Jira olarak seçilir.
+    Confluence bağlı değil, yalnızca Jira bağlıysa kayıt `…/browse/ANAHTAR`
+    bağlantısı olarak eklenir.
+  - Eklenenler sayfadaki diğer korunan öğeler gibi görünür, üzerine gelince
+    kartı açılır; yerel bir belgede de yazılabilir, **Confluence'ta yayımla**
+    ile sayfaya gerçek bahsetme ve makro olarak gider.
 - **Confluence'ta yayımla:** yerel bir belge (ör. bir `.md` dosyası)
   Confluence'ta **yeni bir sayfa** olarak açılır. Düğme, Confluence bağlıyken
   şeridin sağ üstünde, kayıt durumunun yanındadır (her şerit sekmesinde
@@ -508,7 +530,11 @@ verir.
   `…/billingKeyList/{IssueKey}`'i ya da ScriptRunner'daki bir dinamik liste;
   JSONP yanıtı da okunur), yoksa statik liste ya da projenin hesapları; son
   4 ayda Tempo'ya girdiğin değerler de eklenir ve hiçbir şey hatırlanmamışsa
-  formu en son girdiğin değerler başlatır. Kullanıcı bilgisi yalnızca aynı
+  formu en son girdiğin değerler başlatır. Listeler **yazarak seçilir**: kutuya
+  yazılan her harf listeyi daraltır (`s` → `sa` → "Satış…"; önce adı yazılanla
+  başlayanlar, sonra bir kelimesi başlayanlar, sonra içinde geçenler; büyük/küçük
+  harf ve Türkçe harfler fark etmez). `↑`/`↓` gezer, `Enter` ya da tıklama seçer,
+  `Esc` kapatır; kutuyu boşaltmak seçimi kaldırır. Kullanıcı bilgisi yalnızca aynı
   Jira'daki adreslere gönderilir. Bir liste boş gelirse **Tempo
   ayrıntıları** Tempo'nun yanıtını kopyalanabilir biçimde gösterir. Seçilen
   özellikler Jira sitesi başına hatırlanır (`jira-worklog.json`) ve form bir

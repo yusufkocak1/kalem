@@ -30,6 +30,7 @@ import type {
 } from "../shared/bridge.js";
 import { confluenceToMarkdown } from "../shared/confluence.js";
 import { fileUrl } from "../shared/confluence-common.js";
+import { insertedAtomXml } from "../shared/confluence-insert.js";
 import { atomsOf, exportPage, importPage } from "../shared/confluence-sync.js";
 import type { TextFormat } from "../shared/encoding.js";
 import { DEFAULT_FORMAT, formatLabel, willConvertToUtf8 } from "../shared/encoding.js";
@@ -53,6 +54,8 @@ import {
 	isPlain,
 	renderStyledHtml,
 } from "../shared/table-style.js";
+import type { AtomPicker, PickerConnections } from "./atom-picker.js";
+import { createAtomPicker, pickerSlashItems } from "./atom-picker.js";
 import { decorateLocked } from "./confluence-locked.js";
 import { insertImageBlock, insertLink, insertTable } from "./edits.js";
 import type { Notices } from "./notices.js";
@@ -79,6 +82,8 @@ export interface SessionOptions {
 	/** Diagram and math previews; shared by the window's tabs. */
 	readonly previews: Previews;
 	settings(): Settings;
+	/** Which services are connected: mentions need Confluence, Jira issues Confluence or Jira. */
+	connections(): PickerConnections;
 	/** Name, path, format or save status changed. */
 	onStateChange(): void;
 	/** Selection or content changed. */
@@ -101,6 +106,10 @@ export class Session {
 	#find: FindReplacePlugin | null = null;
 	#source: SourceModePlugin | null = null;
 	#images: ImageUploadPlugin | null = null;
+	/** The `@` mention box and the Jira issue box of the `/` menu. */
+	#picker: AtomPicker | null = null;
+	/** The `/` menu items of the picker already in this editor's menu. */
+	readonly #pickerItems = new Set<string>();
 	/**
 	 * A text file that is not Markdown is shown here, as it is; the editor
 	 * is then empty, read only and out of sight, so the app's commands find
@@ -226,8 +235,22 @@ export class Session {
 		return this.#path === null && this.#remote === null ? "new" : "saved";
 	}
 
+	/** Confluence or Jira was connected: the `/` menu offers mentions and Jira issues from then on. */
+	connectionsChanged(): void {
+		const menu = this.#ui?.slashMenu;
+		if (menu === null || menu === undefined) return;
+		for (const item of pickerSlashItems(() => this.#picker, this.#o.t, this.#o.connections())) {
+			if (this.#pickerItems.has(item.id)) continue;
+			this.#pickerItems.add(item.id);
+			menu.register(item);
+		}
+	}
+
 	/** The XML of a kept Confluence atom by its link; `null` when this page has none such. */
 	atomSource(href: string): string | null {
+		// A mention or Jira issue added while writing names its own XML.
+		const inserted = insertedAtomXml(href);
+		if (inserted !== null) return inserted;
 		if (this.#storage === null) return null;
 		if (this.#atoms?.storage !== this.#storage) {
 			this.#atoms = { storage: this.#storage, map: atomsOf(this.#storage) };
@@ -568,6 +591,15 @@ export class Session {
 				},
 			],
 		});
+		this.#pickerItems.clear();
+		this.connectionsChanged();
+		this.#picker = createAtomPicker({
+			editor,
+			bridge: this.#o.bridge,
+			t,
+			connections: () => this.#o.connections(),
+			errorText: ipcErrorMessage,
+		});
 		editor.on("readonlychange", () => {
 			this.#o.onEditorChange();
 			this.#o.onStateChange();
@@ -624,6 +656,8 @@ export class Session {
 		this.#o.canvas.removeAttribute("data-text-file");
 		this.#o.canvas.parentElement?.classList.remove("text-page");
 		this.#o.wordCount.textContent = "";
+		this.#picker?.destroy();
+		this.#picker = null;
 		// UI first: it removes its own shortcut plugin from the editor.
 		this.#ui?.destroy();
 		this.#editor?.destroy();

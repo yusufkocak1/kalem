@@ -15,6 +15,7 @@ import { CHANNEL } from "../shared/bridge.js";
 import { markdownToStorage } from "../shared/confluence.js";
 import { describeAtom, jiraUrl } from "../shared/confluence-atoms.js";
 import { fileUrl } from "../shared/confluence-common.js";
+import type { JiraServer } from "../shared/confluence-insert.js";
 import { publishPlan } from "../shared/confluence-publish.js";
 import { parseSearchRequest } from "../shared/confluence-search.js";
 import { diagramDataName } from "../shared/diagram.js";
@@ -262,6 +263,28 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 			return { ...details, url, ...(issue === null ? {} : { issue }) };
 		}
 		return details;
+	});
+
+	ipcMain.handle(CHANNEL.confluenceUsers, async (_event, query: unknown) =>
+		(await connected()).users(text(query, "query").slice(0, 200)),
+	);
+
+	/** The Jira server new Jira macros name, by site and Jira; found once a run. */
+	const jiraServers = new Map<string, Promise<JiraServer | null>>();
+
+	ipcMain.handle(CHANNEL.confluenceJiraServer, async () => {
+		const client = await connected();
+		const jira = await ctx.jira().catch(() => null);
+		const host = jira === null ? null : new URL(jira.site).host;
+		const key = `${client.site}\n${host ?? ""}`;
+		let server = jiraServers.get(key);
+		if (server === undefined) {
+			server = client.jiraServer(host).catch(() => null);
+			jiraServers.set(key, server);
+		}
+		const found = await server;
+		if (found === null) jiraServers.delete(key);
+		return found;
 	});
 
 	ipcMain.handle(CHANNEL.confluenceAncestors, async (_event, pageId: unknown) =>

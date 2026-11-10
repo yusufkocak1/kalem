@@ -9,6 +9,7 @@ import {
 	QUICK_HOURS,
 	remainingAfter,
 } from "../shared/jira-worklog.js";
+import { createComboBox } from "./combo-box.js";
 import { el } from "./dom.js";
 
 export interface WorklogFormOptions {
@@ -175,8 +176,8 @@ export function createWorklogForm(options: WorklogFormOptions): HTMLElement {
 	});
 
 	let context: WorklogContext | null = null;
-	/** The attributes' controls, by key. */
-	const controls = new Map<string, HTMLInputElement | HTMLSelectElement>();
+	/** The attributes' controls, by key: what takes the focus and the value it holds. */
+	const controls = new Map<string, { readonly focus: () => void; readonly value: () => string }>();
 	/** Once the remaining estimate is typed, the time no longer changes it. */
 	let remainingTyped = false;
 
@@ -205,39 +206,45 @@ export function createWorklogForm(options: WorklogFormOptions): HTMLElement {
 	}
 
 	function attributeControl(attribute: WorkAttribute, chosen: string): HTMLElement {
-		let control: HTMLInputElement | HTMLSelectElement;
+		let control: HTMLElement;
+		let focusable: HTMLInputElement;
+		let read: () => string;
 		if (attribute.kind === "list") {
 			// A value chosen before that Tempo did not list is still offered, as it was given.
 			const options =
 				chosen === "" || attribute.options.some((option) => option.value === chosen)
 					? attribute.options
 					: [...attribute.options, { value: chosen, name: chosen }];
-			const select = el("select", {
-				class: "jira-worklog-input",
-				children: [
-					el("option", {
-						text: options.length === 0 ? t.jiraWorkNoChoices : t.jiraWorkChoose,
-						attrs: { value: "" },
-					}),
-					...options.map((option) =>
-						el("option", { text: option.name, attrs: { value: option.value } }),
-					),
-				],
+			// Typed into, it narrows the list letter by letter (a `<select>` only jumps by the last letter).
+			const combo = createComboBox({
+				options,
+				value: chosen,
+				placeholder: options.length === 0 ? t.jiraWorkNoChoices : t.jiraWorkChoose,
+				empty: t.jiraWorkNoMatch,
+				lang: document.documentElement.lang || navigator.language,
+				inputClass: "jira-worklog-input",
 			});
-			select.value = chosen;
-			control = select;
+			combo.input.dataset.attribute = attribute.key;
+			control = combo.element;
+			focusable = combo.input;
+			read = () => combo.value;
 		} else if (attribute.kind === "checkbox") {
-			control = el("input", { attrs: { type: "checkbox" } });
-			control.checked = chosen === "true";
+			const box = el("input", { attrs: { type: "checkbox" } });
+			box.checked = chosen === "true";
+			box.dataset.attribute = attribute.key;
+			control = focusable = box;
+			read = () => String(box.checked);
 		} else {
-			control = el("input", {
+			const input = el("input", {
 				class: "jira-worklog-input",
 				attrs: { type: attribute.kind === "number" ? "number" : "text" },
 			});
-			control.value = chosen;
+			input.value = chosen;
+			input.dataset.attribute = attribute.key;
+			control = focusable = input;
+			read = () => input.value;
 		}
-		control.dataset.attribute = attribute.key;
-		controls.set(attribute.key, control);
+		controls.set(attribute.key, { focus: () => focusable.focus(), value: read });
 		const row = field(`${attribute.name}${attribute.required ? " *" : ""}`, control);
 		row.dataset.attribute = attribute.key;
 		return row;
@@ -245,12 +252,7 @@ export function createWorklogForm(options: WorklogFormOptions): HTMLElement {
 
 	function attributeValues(): Record<string, string> {
 		const values: Record<string, string> = {};
-		for (const [key, control] of controls) {
-			values[key] =
-				control instanceof HTMLInputElement && control.type === "checkbox"
-					? String(control.checked)
-					: control.value;
-		}
+		for (const [key, control] of controls) values[key] = control.value();
 		return values;
 	}
 
