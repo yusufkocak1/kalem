@@ -585,7 +585,7 @@ verir.
 
 **Yapay Zekâ Asistanı**
 
-> **2.10'da yeni — analiz öncelikli ajan.** Asistan artık uygulamanın içinde
+> **3.0'da yeni — analiz öncelikli ajan.** Asistan artık uygulamanın içinde
 > olduğunu biliyor ve Kalem'i kendi araçlarıyla, **izin isteyerek** kullanıyor:
 >
 > - **Uygulamayı kullanma:** "koyu temaya geç", "Jira panelini alta taşı",

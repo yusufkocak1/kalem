@@ -27,7 +27,7 @@
 
 ---
 
-## 0.1 Uygulama Durumu (Masaüstü 2.10.0)
+## 0.1 Uygulama Durumu (Masaüstü 3.0.0)
 
 | Faz | Durum | Not |
 |---|---|---|
