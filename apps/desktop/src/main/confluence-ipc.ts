@@ -29,7 +29,7 @@ import {
 	MAX_UPLOAD_MB,
 	mediaTypeOf,
 } from "./confluence-attachments.js";
-import type { ConfluenceCredentials } from "./confluence-client.js";
+import type { ConfluenceCredentials, Fetch } from "./confluence-client.js";
 import { ConfluenceClient, ConfluenceError } from "./confluence-client.js";
 import type { ConfluenceStore } from "./confluence-store.js";
 import { checkDiagramBytes, checkDiagramData, diagramFileName } from "./diagram-files.js";
@@ -50,8 +50,24 @@ export interface ConfluenceIpcContext {
 	toImageFile(raw: unknown): ImageFile;
 }
 
+/**
+ * Requests to Atlassian with the token alone: no cookies (Jira's answers set
+ * a session cookie, which Electron would send back) and a user agent that
+ * does not read as a browser's. With either, Jira takes a write for one made
+ * from a web page and refuses it: "XSRF check failed", a 403.
+ */
+export const atlassianFetch: Fetch = (url, init) =>
+	net.fetch(url, {
+		...init,
+		credentials: "omit",
+		headers: {
+			...(init?.headers as Record<string, string> | undefined),
+			"User-Agent": `kalem-desktop/${app.getVersion()}`,
+		},
+	});
+
 export function confluenceClient(credentials: ConfluenceCredentials): ConfluenceClient {
-	return new ConfluenceClient(credentials, (url, init) => net.fetch(url, init));
+	return new ConfluenceClient(credentials, atlassianFetch);
 }
 
 function account(client: ConfluenceClient, username: string): ConfluenceAccount {

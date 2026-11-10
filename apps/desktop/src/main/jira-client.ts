@@ -175,15 +175,24 @@ export class JiraClient {
 		}
 		if (!response.ok) {
 			let detail = "";
+			let text = "";
 			try {
-				const body = asJson(await response.json());
+				text = await response.text();
+				const body = asJson(JSON.parse(text));
 				detail =
 					asString(asArray(body.errorMessages)[0]) ||
 					asString(Object.values(asJson(body.errors))[0]) ||
 					// Tempo's: a list of errors, each with its message.
 					asString(asJson(asArray(body.errors)[0]).message) ||
 					asString(body.message);
-			} catch {}
+			} catch {
+				// Not JSON: Jira's own refusals ("XSRF check failed") are plain text.
+				detail = text
+					.replace(/<[^>]*>/g, " ")
+					.replace(/\s+/g, " ")
+					.trim()
+					.slice(0, 200);
+			}
 			throw new JiraError(
 				response.status,
 				detail === "" ? `HTTP ${response.status}` : `HTTP ${response.status}: ${detail}`,
