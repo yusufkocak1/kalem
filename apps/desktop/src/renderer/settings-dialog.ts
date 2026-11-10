@@ -6,9 +6,11 @@ import { movePane, PANE_PLACES, TOOL_PANES } from "../shared/panes.js";
 import { PROVIDERS, providerLabel } from "../shared/providers.js";
 import type { SettingCategory, SettingDef } from "../shared/settings-schema.js";
 import {
+	CATEGORY_LABELS,
 	foldSearch,
 	matchesQuery,
 	parseSetting,
+	permissionLabel,
 	resetPatch,
 	SETTING_CATEGORIES,
 	SETTING_DEFS,
@@ -46,16 +48,6 @@ export interface SettingsDialog {
 }
 
 let fieldCount = 0;
-
-const CATEGORY_LABELS: Readonly<Record<SettingCategory, keyof Strings>> = {
-	appearance: "settingsCatAppearance",
-	editor: "settingsCatEditor",
-	panels: "settingsCatPanels",
-	assistant: "settingsCatAssistant",
-	connections: "settingsCatConnections",
-	page: "settingsCatPage",
-	system: "settingsCatSystem",
-};
 
 /**
  * The app's settings in one place, as in an IDE: categories at the left, a
@@ -333,6 +325,56 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		}),
 	);
 
+	// --- Assistant: what it may change without asking ------------------------------
+
+	const permissions = el("div", { class: "settings-permissions" });
+	const forgetSession = el("button", {
+		class: "jira-button",
+		text: t.settingsPermissionsSession,
+		attrs: { type: "button" },
+	});
+	forgetSession.addEventListener("click", () => void bridge.assistantForgetPermissions());
+	item(
+		"assistant",
+		[t.settingsPermissions, ...settingDef("assistantPermissions").keywords].join(" "),
+		el("div", {
+			class: "settings-block",
+			attrs: { "data-block": "permissions" },
+			children: [el("h4", { text: t.settingsPermissions }), permissions, forgetSession],
+		}),
+	);
+
+	function renderPermissions(): void {
+		const allowed = options.settings().assistantPermissions;
+		if (allowed.length === 0) {
+			permissions.replaceChildren(
+				el("p", { class: "confluence-hint", text: t.settingsPermissionsNone }),
+			);
+			return;
+		}
+		permissions.replaceChildren(
+			...allowed.map((permission) => {
+				const remove = el("button", {
+					class: "assistant-link",
+					text: t.settingsPermissionsForget,
+					attrs: { type: "button", "data-permission": permission },
+				});
+				remove.addEventListener("click", () => {
+					options.update({
+						assistantPermissions: options
+							.settings()
+							.assistantPermissions.filter((kept) => kept !== permission),
+					});
+					renderPermissions();
+				});
+				return el("div", {
+					class: "settings-permission",
+					children: [el("span", { text: permissionLabel(t, permission) }), remove],
+				});
+			}),
+		);
+	}
+
 	// --- Connections -------------------------------------------------------------
 
 	const connections = el("div", { class: "settings-connections" });
@@ -453,6 +495,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 	function renderValues(): void {
 		for (const refresh of refreshers) refresh();
 		renderPanes();
+		renderPermissions();
 	}
 
 	async function refresh(): Promise<void> {

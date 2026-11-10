@@ -7387,3 +7387,149 @@ textarea.jira-worklog-input {
 		transition: none;
 	}
 }
+
+/* --- The assistant's agent parts: approvals, plan, changes, usage, mode -------------- */
+
+.assistant-approval {
+	display: grid;
+	gap: 8px;
+	margin: 8px 0;
+	padding: 10px 12px;
+	border: 1px solid var(--app-accent);
+	border-radius: 8px;
+	background: var(--app-surface);
+	font-size: 13px;
+}
+
+.assistant-approval.approval-risk-external {
+	border-color: var(--app-warning);
+}
+
+.assistant-approval-title {
+	font-weight: 600;
+}
+
+.assistant-approval-lines {
+	margin: 0;
+	padding-inline-start: 18px;
+}
+
+.assistant-approval-reason,
+.assistant-approval-note {
+	margin: 0;
+	color: var(--app-muted);
+}
+
+.assistant-approval-warning {
+	margin: 0;
+	padding: 6px 8px;
+	border-radius: 6px;
+	background: var(--app-warning-bg);
+	color: var(--app-warning);
+}
+
+.assistant-approval-preview {
+	max-height: 220px;
+	margin: 0;
+	overflow: auto;
+}
+
+.assistant-approval-items {
+	display: grid;
+	gap: 4px;
+	max-height: 220px;
+	overflow: auto;
+}
+
+.assistant-approval-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+
+.assistant-approval-scope {
+	margin-inline-start: auto;
+	padding: 3px 6px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-surface);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 12px;
+}
+
+.assistant-approval-state {
+	margin: 0;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.assistant-plan {
+	margin: 0 0 8px;
+	padding: 8px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	font-size: 13px;
+}
+
+.assistant-plan-title {
+	margin-bottom: 4px;
+	color: var(--app-muted);
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+}
+
+.assistant-plan ol {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.assistant-plan .plan-done {
+	color: var(--app-muted);
+	text-decoration: line-through;
+}
+
+.assistant-plan .plan-active {
+	font-weight: 600;
+}
+
+.assistant-change {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 4px 0;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.assistant-reply-usage {
+	color: var(--app-muted);
+	font-size: 11px;
+}
+
+.assistant-mode {
+	max-width: 130px;
+	padding: 2px 4px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-surface);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 12px;
+}
+
+.settings-permissions {
+	display: grid;
+	gap: 6px;
+	margin-bottom: 8px;
+}
+
+.settings-permission {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	font-size: 14px;
+}

@@ -11,7 +11,8 @@ import { homedir } from "node:os";
 import { dirname, isAbsolute } from "node:path";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
 import { dialog, ipcMain } from "electron";
-import type { AssistantStatus } from "../shared/bridge.js";
+import { assistantInstructions } from "../shared/assistant-prompt.js";
+import type { AssistantStatus, Settings } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
 import { parseChat } from "../shared/chats.js";
 import type { ClaudeEvent, PromptImage } from "../shared/claude.js";
@@ -19,20 +20,17 @@ import {
 	claudeArgs,
 	claudeInputLine,
 	copilotArgs,
+	copilotTakesMcp,
 	isPromptImageType,
 	MAX_PROMPT_IMAGE_DATA,
 	MAX_PROMPT_IMAGES,
-	systemPrompt,
 	withInstructions,
 } from "../shared/claude.js";
 import type { LookupWay } from "../shared/confluence-tool.js";
-import {
-	confluenceInstructions,
-	confluenceRequests,
-	MAX_ROUNDS,
-} from "../shared/confluence-tool.js";
-import type { Strings } from "../shared/i18n.js";
-import { jiraInstructions, jiraRequests } from "../shared/jira-tool.js";
+import { confluenceRequests, MAX_ROUNDS } from "../shared/confluence-tool.js";
+import type { Lang, Strings } from "../shared/i18n.js";
+import { jiraRequests } from "../shared/jira-tool.js";
+import { modeExcluded } from "../shared/modes.js";
 import type { ChatMessage, ProviderId } from "../shared/providers.js";
 import {
 	checkBaseUrl,
@@ -44,10 +42,15 @@ import {
 	SUGGESTED_MODELS,
 } from "../shared/providers.js";
 import type { ChatStore } from "./assistant-chats.js";
-import { CONFLUENCE_TOOLS, ConfluenceLookups, isConfluenceTool } from "./assistant-confluence.js";
-import { isJiraTool, JIRA_TOOLS, JiraLookups } from "./assistant-jira.js";
+import { ConfluenceLookups } from "./assistant-confluence.js";
+import { JiraLookups } from "./assistant-jira.js";
 import type { AssistantToolServer } from "./assistant-mcp.js";
 import { mcpToolName } from "./assistant-mcp.js";
+import { PermissionGate } from "./assistant-permissions.js";
+import type { DocumentSnapshot, ToolContext, ToolResult } from "./assistant-tools.js";
+import { approver, RendererCalls, runTool, toolsFor } from "./assistant-tools.js";
+import "./assistant-app-tools.js";
+import { blockResults, parseApprovalAnswer, toolCalls } from "../shared/tool-protocol.js";
 import { collectSources, MAX_SOURCES, SOURCE_BUDGET } from "./assistant-sources.js";
 import type { AssistantStore } from "./assistant-store.js";
 import type { CliProgram } from "./cli.js";
@@ -61,10 +64,8 @@ import { errorMessage } from "./windows.js";
 import type { KeptEdit, ToolStep } from "./workspace-tools.js";
 import {
 	applyEdit,
-	EDIT_TOOL,
 	looksLikeToolText,
 	WORKSPACE_INSTRUCTIONS,
-	WORKSPACE_TOOLS,
 	Workspace,
 	WorkspaceIndexes,
 } from "./workspace-tools.js";
@@ -79,8 +80,27 @@ export interface AssistantIpcContext {
 	confluence(): Promise<ConfluenceClient | null>;
 	/** The connected Jira, for the assistant's look-ups; `null` when there is none. */
 	jira(): Promise<JiraClient | null>;
-	/** Kalem's tools for Claude Code, as an MCP server. */
+	/** Kalem's tools for a CLI, as an MCP server. */
 	readonly tools: AssistantToolServer;
+	/** Changes settings as the menus do: every window follows. */
+	changeSettings(patch: Partial<Settings>): void;
+	changeLanguage(language: Lang | null): void;
+	language(): Lang;
+}
+
+/** How long an answer may wait for the user to allow a change, in ms. */
+const APPROVAL_WAIT = 30 * 60 * 1000;
+
+/** The active document as the window sent it; `null` when it is not shared. */
+function sentDocument(raw: unknown): DocumentSnapshot | null {
+	const { tabId, name, text, selection } = record(raw);
+	if (typeof name !== "string" || typeof text !== "string") return null;
+	return {
+		tabId: typeof tabId === "string" ? tabId : null,
+		name: name.slice(0, 500),
+		text: text.slice(0, 2_000_000),
+		selection: typeof selection === "string" ? selection.slice(0, 200_000) : "",
+	};
 }
 
 /** How many past messages of a chat an API is sent again; older ones are dropped. */
@@ -224,6 +244,31 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 	const indexes = new WorkspaceIndexes();
 	/** Changes the models proposed in this run, until they are applied. */
 	const proposals = new Map<string, KeptEdit>();
+	/** The user's say over what the tools change. */
+	const gate = new PermissionGate({
+		always: () => ctx.store.settings.assistantPermissions,
+		setAlways: (permissions) => ctx.changeSettings({ assistantPermissions: permissions }),
+	});
+	/** Tool calls the windows run. */
+	const rendererCalls = new RendererCalls();
+	/** The Copilot CLIs that could not start Kalem's MCP server, by path. */
+	const noMcp = new Set<string>();
+	const copilotUsesMcp = async (): Promise<boolean> => {
+		const choice = ctx.store.settings.copilotTools;
+		if (choice === "block") return false;
+		if (choice === "mcp") return true;
+		await locate("copilot");
+		const launch = clis.copilot.launch;
+		return launch !== null && !noMcp.has(launch.path) && copilotTakesMcp(await clis.copilot.help());
+	};
+
+	ipcMain.handle(CHANNEL.assistantApprove, (_event, id: unknown, answer: unknown) => {
+		if (typeof id === "string") gate.answer(id, parseApprovalAnswer(answer));
+	});
+	ipcMain.handle(CHANNEL.assistantToolResult, (_event, id: unknown, answer: unknown) => {
+		if (typeof id === "string") rendererCalls.answer(id, answer);
+	});
+	ipcMain.handle(CHANNEL.assistantForgetPermissions, () => gate.forgetSession());
 
 	ipcMain.handle(CHANNEL.assistantApplyEdit, async (_event, id: unknown) => {
 		const kept = typeof id === "string" ? proposals.get(id) : undefined;
@@ -387,6 +432,11 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		if (typeof chatId !== "string" || typeof prompt !== "string" || prompt.trim() === "") {
 			throw new Error("Invalid question");
 		}
+		// With the whole document in it, for a model that cannot read it with the tools.
+		const fullPrompt =
+			typeof request.fullPrompt === "string" && request.fullPrompt.trim() !== ""
+				? request.fullPrompt
+				: prompt;
 		const sessionId =
 			typeof request.sessionId === "string" && /^[\w-]{1,100}$/.test(request.sessionId)
 				? request.sessionId
@@ -403,44 +453,13 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		};
 
 		const program = programOf(provider);
-		// The connected Confluence site: the model searches and reads it on its own.
-		const lookups = await ctx
-			.confluence()
-			.then((client) => (client === null ? null : new ConfluenceLookups(client)))
-			.catch(() => null);
-		// The connected Jira: the model reads the issues pages and documents name.
-		const jiraLookups = await ctx
-			.jira()
-			.then((client) => (client === null ? null : new JiraLookups(client)))
-			.catch(() => null);
-		const looksUp = lookups !== null || jiraLookups !== null;
-		// Claude Code gets the look-ups as real tools, from Kalem's MCP server; Copilot
-		// writes them in a block; an API calls them as its own tools.
-		const mcpConfig =
-			looksUp && program === "claude" ? await ctx.tools.config().catch(() => null) : null;
-		const mcp =
-			mcpConfig === null
-				? undefined
-				: {
-						config: mcpConfig,
-						tools: [
-							...(lookups === null ? [] : CONFLUENCE_TOOLS),
-							...(jiraLookups === null ? [] : JIRA_TOOLS),
-						].map((tool) => mcpToolName(tool.name)),
-					};
-		// The sites cannot be fetched without the user's sign-in: Kalem's tools reach them, WebFetch does not.
-		const denied =
-			mcp === undefined
-				? []
-				: [
-						...new Set(
-							[lookups?.site, jiraLookups?.site]
-								.filter((site): site is string => site !== undefined)
-								.map((site) => new URL(site).hostname),
-						),
-					].map((host) => `WebFetch(domain:${host})`);
-		const way: LookupWay = program === null ? "tools" : mcp === undefined ? "block" : "mcp";
-		const system = `${systemPrompt(t)}\n\n${confluenceInstructions(lookups?.site ?? null, way)}\n\n${jiraInstructions(jiraLookups?.site ?? null, way)}`;
+		// The connected Confluence site and Jira: the model searches and reads them on its own.
+		const [confluenceClient, jiraClient] = await Promise.all([
+			ctx.confluence().catch(() => null),
+			ctx.jira().catch(() => null),
+		]);
+		const lookups = confluenceClient === null ? null : new ConfluenceLookups(confluenceClient);
+		const jiraLookups = jiraClient === null ? null : new JiraLookups(jiraClient);
 		const step = (done: ToolStep): void => forward({ kind: "step", ...done });
 		// Folders are a workspace: the question says what they hold, and the model reads what it needs.
 		const collected = await collectSources(sources, {
@@ -456,6 +475,61 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 						const { absolute: _absolute, ...shown } = proposed;
 						forward({ kind: "edit", edit: shown });
 					});
+		const tools: ToolContext = {
+			chatId,
+			sender,
+			t,
+			excluded: modeExcluded(request.mode),
+			settings: () => ctx.store.settings,
+			changeSettings: ctx.changeSettings,
+			changeLanguage: ctx.changeLanguage,
+			confluence: lookups,
+			jira: jiraLookups,
+			confluenceClient,
+			jiraClient,
+			workspace,
+			document: sentDocument(request.document),
+			// Claude Code's own stream says which tools it called: the steps are not said twice.
+			step: program === "claude" ? () => {} : step,
+			emit: forward,
+			approve: (asked) => approve(asked),
+			renderer: (name, input) => rendererCalls.call(sender, chatId, name, input),
+			readExternal: false,
+		};
+		const approve = approver(gate, sender, chatId, () => tools.readExternal);
+		const offered = toolsFor(tools);
+		const definitions = offered.map((tool) => tool.definition);
+		const call = (name: string, input: unknown): Promise<ToolResult> => runTool(name, input, tools);
+
+		// Claude Code gets the tools from Kalem's MCP server; Copilot too when it takes one,
+		// else it writes them in blocks; an API calls them as its own tools.
+		const copilotMcp = program === "copilot" && definitions.length > 0 && (await copilotUsesMcp());
+		const mcpRun =
+			(program === "claude" || copilotMcp) && definitions.length > 0
+				? await ctx.tools.open(() => definitions, call).catch(() => null)
+				: null;
+		let way: LookupWay = program === null ? "tools" : mcpRun === null ? "block" : "mcp";
+		const instructionsFor = (lookupWay: LookupWay): string =>
+			assistantInstructions(t, {
+				way: lookupWay,
+				confluence: lookups?.site ?? null,
+				jira: jiraLookups?.site ?? null,
+				tools: definitions,
+				mode: request.mode,
+				document: tools.document,
+			});
+		let system = instructionsFor(way);
+		// The sites cannot be fetched without the user's sign-in: Kalem's tools reach them, WebFetch does not.
+		const denied =
+			mcpRun === null
+				? []
+				: [
+						...new Set(
+							[lookups?.site, jiraLookups?.site]
+								.filter((site): site is string => site !== undefined)
+								.map((site) => new URL(site).hostname),
+						),
+					].map((host) => `WebFetch(domain:${host})`);
 		const overview = await workspaceBlock(workspace, program !== null);
 		const files = {
 			...collected,
@@ -487,115 +561,163 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			await locate(program);
 			const launch = clis[program].launch;
 			if (launch === null) {
+				await mcpRun?.close();
 				send({
 					kind: "error",
 					message: program === "claude" ? t.claudeNotFound : t.copilotNotFound,
 				});
 				return;
 			}
+			const mcpTools = definitions.map((tool) => mcpToolName(tool.name));
+			// An answer may wait for the user to allow a change: Claude Code waits for the tool as long.
+			const env = program === "claude" ? { MCP_TOOL_TIMEOUT: String(APPROVAL_WAIT) } : {};
+			let copilotSession = sessionId ?? randomUUID();
+			const argsFor = (conversation: string | null, jsonInput = false): string[] =>
+				program === "claude"
+					? claudeArgs({
+							sessionId: conversation,
+							systemPrompt: system,
+							model: connection.model,
+							jsonInput,
+							folders: files.folders,
+							...(mcpRun === null
+								? {}
+								: { mcp: { config: mcpRun.claude, tools: mcpTools }, denied }),
+						})
+					: copilotArgs({
+							sessionId: conversation ?? copilotSession,
+							model: connection.model,
+							folders: files.folders,
+							...(way === "mcp" && mcpRun !== null ? { mcpConfig: mcpRun.copilot } : {}),
+						});
 			let args: string[];
 			let question = asked;
 			if (program === "claude") {
 				// Pictures need the question as a JSON line; without them it stays plain text.
 				const jsonInput = images.length > 0;
-				args = claudeArgs({
-					sessionId,
-					systemPrompt: system,
-					model: connection.model,
-					jsonInput,
-					folders: files.folders,
-					...(mcp === undefined ? {} : { mcp, denied }),
-				});
+				args = argsFor(sessionId, jsonInput);
 				if (jsonInput) question = claudeInputLine(asked, images);
 			} else {
 				// The Copilot CLI reads no pictures: the question names them only.
 				// Copilot takes the conversation's id from us, and its instructions with the first question.
-				const id = sessionId ?? randomUUID();
 				if (sessionId === null) question = withInstructions(system, asked);
-				send({ kind: "session", id });
-				args = copilotArgs({ sessionId: id, model: connection.model, folders: files.folders });
+				send({ kind: "session", id: copilotSession });
+				args = argsFor(copilotSession);
 			}
-			// Rounds of Confluence look-ups: the reply's requests are run and their
-			// results sent back in the same conversation, until it answers.
-			let conversation = sessionId;
+			// Rounds of look-ups and tool calls written in blocks: the reply's requests
+			// are run and their results sent back in the same conversation, until it answers.
+			let conversation = program === "copilot" ? copilotSession : sessionId;
 			let stopped = false;
 			running.set(runKey, () => {
 				stopped = true;
+				gate.cancel(sender, chatId);
 			});
-			for (let round = 0; ; round++) {
-				let said = "";
-				let ended: "done" | "error" | null = null;
-				const output = program === "claude" ? claudeOutput() : textOutput();
-				await runCli(
-					launch,
-					folder,
-					args,
-					question,
-					output,
-					(cliEvent) => {
-						if (cliEvent.kind === "session") conversation = cliEvent.id;
-						if (cliEvent.kind === "text") said += cliEvent.text;
-						// The answer is done only when no look-ups are left.
-						if (cliEvent.kind === "done") {
-							ended = "done";
-							return;
-						}
-						if (cliEvent.kind === "error") ended = "error";
-						send(cliEvent);
-					},
-					sender,
-					(child) => {
-						running.set(runKey, () => {
-							stopped = true;
-							child.kill();
-						});
-					},
-				);
-				const requests = lookups === null ? [] : confluenceRequests(said);
-				const jiraAsked = jiraLookups === null ? [] : jiraRequests(said);
-				if (
-					ended !== "done" ||
-					stopped ||
-					requests.length + jiraAsked.length === 0 ||
-					conversation === null ||
-					round >= MAX_ROUNDS ||
-					sender.isDestroyed()
-				) {
-					if (ended === "done") send({ kind: "done" });
-					break;
-				}
-				const found: string[] = [];
-				if (requests.length > 0)
-					found.push(await (lookups as ConfluenceLookups).runAll(requests, step));
-				if (jiraAsked.length > 0)
-					found.push(await (jiraLookups as JiraLookups).runAll(jiraAsked, step));
-				const results = found.join("\n\n");
-				if (stopped) {
-					send({ kind: "done" });
-					break;
-				}
-				// The last round may not look up more.
-				question =
-					round + 1 >= MAX_ROUNDS
-						? `${results}\n\nThis was the last look-up: answer now with what you found.`
-						: results;
-				send({ kind: "text", text: "\n\n" });
-				args =
-					program === "claude"
-						? claudeArgs({
-								sessionId: conversation,
-								systemPrompt: system,
-								model: connection.model,
-								folders: files.folders,
-								...(mcp === undefined ? {} : { mcp, denied }),
-							})
-						: copilotArgs({
-								sessionId: conversation,
-								model: connection.model,
-								folders: files.folders,
+			try {
+				for (let round = 0; ; round++) {
+					let said = "";
+					let ended: "done" | "error" | null = null;
+					let held: ClaudeEvent | null = null;
+					// A Copilot that cannot start Kalem's MCP server fails at once: it is asked again with blocks.
+					const trying = program === "copilot" && way === "mcp" && round === 0;
+					const output = program === "claude" ? claudeOutput() : textOutput();
+					await runCli(
+						launch,
+						folder,
+						args,
+						question,
+						output,
+						(cliEvent) => {
+							if (cliEvent.kind === "session") conversation = cliEvent.id;
+							if (cliEvent.kind === "text") said += cliEvent.text;
+							// The answer is done only when no look-ups are left.
+							if (cliEvent.kind === "done") {
+								ended = "done";
+								return;
+							}
+							if (cliEvent.kind === "error") {
+								ended = "error";
+								if (trying) {
+									held = cliEvent;
+									return;
+								}
+							}
+							send(cliEvent);
+						},
+						sender,
+						(child) => {
+							running.set(runKey, () => {
+								stopped = true;
+								gate.cancel(sender, chatId);
+								child.kill();
 							});
+						},
+						env,
+					);
+					if (trying && ended === "error" && said === "" && !stopped) {
+						noMcp.add(launch.path);
+						await mcpRun?.close();
+						way = "block";
+						system = instructionsFor(way);
+						copilotSession = randomUUID();
+						conversation = copilotSession;
+						send({ kind: "session", id: copilotSession });
+						question = withInstructions(system, asked);
+						args = argsFor(copilotSession);
+						round = -1;
+						continue;
+					}
+					if (held !== null) send(held);
+					const requests = lookups === null ? [] : confluenceRequests(said);
+					const jiraAsked = jiraLookups === null ? [] : jiraRequests(said);
+					const blockCalls = way === "block" ? toolCalls(said) : [];
+					if (
+						ended !== "done" ||
+						stopped ||
+						requests.length + jiraAsked.length + blockCalls.length === 0 ||
+						conversation === null ||
+						round >= MAX_ROUNDS ||
+						sender.isDestroyed()
+					) {
+						if (ended === "done") send({ kind: "done" });
+						break;
+					}
+					const found: string[] = [];
+					if (requests.length > 0) {
+						tools.readExternal = true;
+						found.push(await (lookups as ConfluenceLookups).runAll(requests, step));
+					}
+					if (jiraAsked.length > 0) {
+						tools.readExternal = true;
+						found.push(await (jiraLookups as JiraLookups).runAll(jiraAsked, step));
+					}
+					if (blockCalls.length > 0) {
+						const results: { tool: string; text: string }[] = [];
+						for (const blockCall of blockCalls) {
+							if (stopped) break;
+							results.push({
+								tool: blockCall.tool,
+								text: (await call(blockCall.tool, blockCall.input)).text,
+							});
+						}
+						found.push(blockResults(results));
+					}
+					const results = found.join("\n\n");
+					if (stopped) {
+						send({ kind: "done" });
+						break;
+					}
+					// The last round may not look up more.
+					question =
+						round + 1 >= MAX_ROUNDS
+							? `${results}\n\nThis was the last look-up: answer now with what you found.`
+							: results;
+					send({ kind: "text", text: "\n\n" });
+					args = argsFor(conversation);
+				}
+			} finally {
+				await mcpRun?.close();
+				running.delete(runKey);
 			}
-			running.delete(runKey);
 			return;
 		}
 
@@ -616,19 +738,26 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			{ role: "user", content: withSources(files.text, seen ? files.text : undefined, prompt) },
 		];
 		const controller = new AbortController();
-		running.set(runKey, () => controller.abort());
+		running.set(runKey, () => {
+			controller.abort();
+			gate.cancel(sender, chatId);
+		});
 		const stop = (): void => controller.abort();
 		sender.once("destroyed", stop);
 		let reply = "";
 		let looked = false;
 		/** The files read for this answer: kept with the question, so the next one need not read them again. */
 		const reads: string[] = [];
-		const ask = (asked: readonly ChatMessage[], withTools: boolean): Promise<void> =>
+		const ask = (
+			asked: readonly ChatMessage[],
+			withTools: boolean,
+			instructions: string,
+		): Promise<void> =>
 			askApi({
 				provider: info,
 				connection,
 				key,
-				system,
+				system: instructions,
 				messages: asked,
 				images,
 				signal: controller.signal,
@@ -636,67 +765,45 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 					reply += chunk;
 					forward({ kind: "text", text: chunk });
 				},
-				...((workspace === null && !looksUp) || !withTools
+				usage: (cost) => forward({ kind: "usage", ...cost }),
+				...(definitions.length === 0 || !withTools
 					? {}
 					: {
 							tools: {
-								definitions: [
-									...(workspace === null ? [] : [...WORKSPACE_TOOLS, EDIT_TOOL]),
-									...(lookups === null ? [] : CONFLUENCE_TOOLS),
-									...(jiraLookups === null ? [] : JIRA_TOOLS),
-								],
+								definitions,
 								run: async (name, input) => {
-									const looking = (done: ToolStep): void => {
-										looked = true;
-										step(done);
-									};
-									if (isJiraTool(name)) {
-										if (jiraLookups === null) return `${name} is not available.`;
-										return jiraLookups.runTool(name, input, looking);
-									}
-									if (isConfluenceTool(name)) {
-										if (lookups === null) return `${name} is not available.`;
-										return lookups.runTool(name, input, looking);
-									}
-									if (workspace === null) return `${name} is not available.`;
-									const result = await workspace.run(name, input, looking);
-									if (name === "read_file") reads.push(result);
-									return result;
+									looked = true;
+									const result = await call(name, input);
+									if (name === "read_file") reads.push(result.text);
+									return result.text;
 								},
 							},
 						}),
 			});
 		try {
 			try {
-				await ask(messages, true);
+				await ask(messages, true, system);
 				// It answered by writing a tool call out: it cannot use them.
-				if (workspace !== null && !looked && looksLikeToolText(reply)) {
+				if (definitions.length > 0 && !looked && looksLikeToolText(reply)) {
 					reply = "";
 					forward({ kind: "reset" });
 					throw new Error("Tools are not called");
 				}
 			} catch (error) {
-				// A model that cannot call tools is sent the folders' text instead, as before;
-				// without folders it is asked again without tools.
-				if (
-					(workspace === null && !looksUp) ||
-					reply !== "" ||
-					looked ||
-					controller.signal.aborted
-				) {
+				// A model that cannot call tools is sent the folders' text and the whole document
+				// instead, as before; without them it is asked again without tools.
+				if (definitions.length === 0 || reply !== "" || looked || controller.signal.aborted) {
 					throw error;
 				}
-				if (workspace !== null) {
-					const inlined = await collectSources(sources, {
-						budget: SOURCE_BUDGET.api,
-						listOnly: false,
-					});
-					messages[messages.length - 1] = {
-						role: "user",
-						content: withSources(inlined.text, undefined, prompt),
-					};
-				}
-				await ask(messages, false);
+				const inlined =
+					workspace === null
+						? files
+						: await collectSources(sources, { budget: SOURCE_BUDGET.api, listOnly: false });
+				messages[messages.length - 1] = {
+					role: "user",
+					content: withSources(inlined.text, seen ? inlined.text : undefined, fullPrompt),
+				};
+				await ask(messages, false, assistantInstructions(t, { way: "none", mode: request.mode }));
 			}
 			forward({ kind: "done" });
 		} catch (error) {

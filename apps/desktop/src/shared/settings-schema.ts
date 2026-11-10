@@ -20,6 +20,7 @@ import {
 } from "./bridge.js";
 import { groupName } from "./favorites.js";
 import type { Strings } from "./i18n.js";
+import { format } from "./i18n.js";
 import { MAX_DOCK_SIZE, MIN_DOCK_SIZE, parsePanePlaces, TOOL_PANES } from "./panes.js";
 
 /** The Settings window's categories, in its order. */
@@ -141,6 +142,18 @@ export function parseJiraFavorites(value: unknown): JiraFavorite[] {
 			];
 		})
 		.slice(0, MAX_FAVORITES);
+}
+
+/** The kinds of change allowed always: short names, no repeats. */
+export function parsePermissions(value: unknown): string[] {
+	if (!Array.isArray(value)) return [];
+	return [
+		...new Set(
+			value.filter(
+				(item): item is string => typeof item === "string" && /^[a-z][a-z:-]{0,63}$/.test(item),
+			),
+		),
+	].slice(0, 100);
 }
 
 const PANE_LABELS = ["outlineTab", "filesTab", "confluenceTab", "jiraTab"] as const;
@@ -330,6 +343,26 @@ export const SETTINGS_SCHEMA: Schema = {
 		keywords: [],
 		assistant: "hidden",
 	},
+	assistantPermissions: {
+		key: "assistantPermissions",
+		category: "assistant",
+		label: null,
+		type: "custom",
+		parse: parsePermissions,
+		keywords: ["izin", "permission", "onay", "approval", "her zaman"],
+		// The assistant may never widen what it is allowed.
+		assistant: "hidden",
+	},
+	copilotTools: {
+		key: "copilotTools",
+		category: "assistant",
+		label: "settingsCopilotTools",
+		type: "enum",
+		values: ["auto", "mcp", "block"],
+		valueLabels: ["copilotToolsAuto", "copilotToolsMcp", "copilotToolsBlock"],
+		keywords: ["copilot", "mcp", "araç", "tool", "blok", "block"],
+		assistant: "read",
+	},
 	confluenceSpace: {
 		key: "confluenceSpace",
 		category: "connections",
@@ -429,6 +462,29 @@ export const SETTINGS_SCHEMA: Schema = {
 		assistant: "write",
 	},
 };
+
+/** The categories' names in the interface. */
+export const CATEGORY_LABELS: Readonly<Record<SettingCategory, StringKey>> = {
+	appearance: "settingsCatAppearance",
+	editor: "settingsCatEditor",
+	panels: "settingsCatPanels",
+	assistant: "settingsCatAssistant",
+	connections: "settingsCatConnections",
+	page: "settingsCatPage",
+	system: "settingsCatSystem",
+};
+
+/** A kind of change the assistant may be allowed, as the user reads it. */
+export function permissionLabel(t: Strings, permission: string): string {
+	const category = permission.startsWith("settings:") ? permission.slice(9) : null;
+	if (category !== null && Object.hasOwn(CATEGORY_LABELS, category)) {
+		return format(t.permissionSettings, t[CATEGORY_LABELS[category as SettingCategory]]);
+	}
+	if (permission === "view") return t.permissionView;
+	if (permission === "commands") return t.permissionCommands;
+	if (permission === "document") return t.permissionDocument;
+	return permission;
+}
 
 /** Every setting's description, in the order of the type. */
 export const SETTING_DEFS: readonly SettingDef[] = Object.values(SETTINGS_SCHEMA) as SettingDef[];

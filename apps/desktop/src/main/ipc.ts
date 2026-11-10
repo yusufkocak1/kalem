@@ -949,10 +949,9 @@ export function registerIpc(ctx: IpcContext): void {
 		tools: new AssistantToolServer({
 			folder: join(app.getPath("userData"), "assistant-tools"),
 			node: process.execPath,
-			confluence: confluenceNow,
-			jira: jiraNow,
-			notConnected: () => ctx.strings().confluenceNotConnected,
-			jiraNotConnected: () => ctx.strings().jiraNotConnected,
 		}),
+		changeSettings: ctx.changeSettings,
+		changeLanguage: ctx.changeLanguage,
+		language: ctx.language,
 	});
 }

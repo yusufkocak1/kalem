@@ -193,6 +193,7 @@ const assistant = createAssistantPane({
 		commands[command]();
 	},
 	close: () => updateSettings({ assistant: false }),
+	changeSettings: (patch) => updateSettings(patch),
 	errorText: ipcErrorMessage,
 });
 

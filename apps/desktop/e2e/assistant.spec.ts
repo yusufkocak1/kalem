@@ -175,6 +175,11 @@ const TOOL_CALLS = [
 /** Which round of tool calls a request with tools is in (the results it carries); `null` without tools. */
 function toolRound(request: Received | undefined): number | null {
 	if (request === undefined || !Array.isArray(request.body.tools)) return null;
+	// Kalem's own tools come with every question: the script is for a workspace's.
+	const names = (request.body.tools as { name?: string; function?: { name?: string } }[]).map(
+		(tool) => tool.function?.name ?? tool.name,
+	);
+	if (!names.includes("search")) return null;
 	const messages = (request.body.messages ?? []) as { role: string; content: unknown }[];
 	return messages.filter(
 		(message) =>
@@ -443,7 +448,12 @@ test("connects to an OpenAI-compatible service and to the Anthropic API with a k
 	const sent = first?.body.messages as { role: string; content: string }[];
 	expect(sent.map((message) => message.role)).toEqual(["system", "user"]);
 	expect(sent[0]?.content).toContain("Kalem diagrams");
-	expect(sent[0]?.content).toContain('"File" → "Export"');
+	// The guides are not in every question: the model asks for one with kalem_help.
+	expect(sent[0]?.content).not.toContain('"File" → "Export"');
+	const offered = ((first?.body.tools ?? []) as { function: { name: string } }[]).map(
+		(tool) => tool.function.name,
+	);
+	expect(offered).toEqual(expect.arrayContaining(["kalem_help", "settings_set", "document_edit"]));
 	expect(sent[1]?.content).toContain('<document name="plan.md">');
 
 	// The service keeps no conversation: what was said goes again with the next question.

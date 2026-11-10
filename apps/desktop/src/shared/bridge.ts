@@ -16,6 +16,7 @@ import type { WorklogContext, WorklogEntry } from "./jira-worklog.js";
 import type { PanePlaces, ToolPane } from "./panes.js";
 import { DEFAULT_PANE_PLACES } from "./panes.js";
 import type { AssistantConfig, AssistantUpdate, ChatMessage, ProviderId } from "./providers.js";
+import type { ApprovalAnswer, ApprovalRequest } from "./tool-protocol.js";
 
 export type Theme = "system" | "light" | "dark";
 
@@ -93,7 +94,13 @@ export interface Settings {
 	readonly assistantWidth: number;
 	/** The navigation pane's width in pixels. */
 	readonly navigationWidth: number;
+	/** The kinds of change the user allowed the assistant always (`settings:appearance`, `document`…). */
+	readonly assistantPermissions: readonly string[];
+	/** How Copilot reaches Kalem's tools: through MCP, in blocks, or whichever works. */
+	readonly copilotTools: CopilotTools;
 }
+
+export type CopilotTools = "auto" | "mcp" | "block";
 
 export type SidePane = ToolPane;
 
@@ -129,6 +136,8 @@ export const DEFAULT_SETTINGS: Settings = {
 	copilotPath: "",
 	assistantWidth: 380,
 	navigationWidth: 248,
+	assistantPermissions: [],
+	copilotTools: "auto",
 };
 
 export const MIN_ASSISTANT_WIDTH = 280;
@@ -535,6 +544,25 @@ export interface AssistantRequest {
 	readonly images?: readonly PromptImage[];
 	/** Files and folders added to the chat, whose text goes with the question. */
 	readonly sources?: readonly string[];
+	/** The question with the whole document in it, when `prompt` has only its outline. */
+	readonly fullPrompt?: string;
+	/** The active document, for the tools to read and change; left out when it is not shared. */
+	readonly document?: {
+		readonly tabId: string;
+		readonly name: string;
+		readonly text: string;
+		readonly selection: string;
+	};
+	/** What the user is doing with the assistant: asking, writing, reviewing… */
+	readonly mode?: string;
+}
+
+/** A tool's part that the window runs: the document's change, a command. */
+export interface AssistantToolCall {
+	readonly id: string;
+	readonly chatId: string;
+	readonly name: string;
+	readonly input: unknown;
 }
 
 export interface DraftRequest {
@@ -813,6 +841,17 @@ export interface KalemBridge {
 	assistantPickSources(kind: "files" | "folder"): Promise<string[]>;
 	/** Writes a change the assistant proposed to a workspace file. */
 	assistantApplyEdit(id: string): Promise<void>;
+	/** The user's answer to a tool that asked before changing something. */
+	assistantApprove(id: string, answer: ApprovalAnswer): Promise<void>;
+	/** What the window did with a tool call it ran. */
+	assistantToolResult(
+		id: string,
+		answer: { readonly ok: boolean; readonly text: string; readonly document?: string },
+	): Promise<void>;
+	/** Forgets the kinds of change allowed for this run of the app. */
+	assistantForgetPermissions(): Promise<void>;
+	onAssistantApproval(handler: (request: ApprovalRequest) => void): () => void;
+	onAssistantToolCall(handler: (call: AssistantToolCall) => void): () => void;
 	onAssistantEvent(handler: (chatId: string, event: ClaudeEvent) => void): () => void;
 }
 
@@ -922,4 +961,9 @@ export const CHANNEL = {
 	assistantPickSources: "kalem:assistant-pick-sources",
 	assistantApplyEdit: "kalem:assistant-apply-edit",
 	assistantEvent: "kalem:assistant-event",
+	assistantApproval: "kalem:assistant-approval",
+	assistantApprove: "kalem:assistant-approve",
+	assistantToolCall: "kalem:assistant-tool-call",
+	assistantToolResult: "kalem:assistant-tool-result",
+	assistantForgetPermissions: "kalem:assistant-forget-permissions",
 } as const;

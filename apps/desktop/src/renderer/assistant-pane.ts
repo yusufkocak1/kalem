@@ -2,26 +2,35 @@ import { parse } from "@kalem-editor/core";
 import { renderToDOM } from "@kalem-editor/viewer";
 import type { AssistantAction, AssistantCommand, DocumentAction } from "../shared/actions.js";
 import { isDocumentAction } from "../shared/actions.js";
-import type { AssistantStatus, Command, KalemBridge } from "../shared/bridge.js";
+import type { AssistantStatus, Command, KalemBridge, Settings } from "../shared/bridge.js";
 import { clampAssistantWidth, DEFAULT_SETTINGS, MIN_ASSISTANT_WIDTH } from "../shared/bridge.js";
 import type { ChatSummary, StoredChat, StoredMessage } from "../shared/chats.js";
 import { chatTitle, historyOf } from "../shared/chats.js";
 import type {
 	ClaudeEvent,
 	ContextDiagram,
+	PlanStep,
 	ProposedEdit,
 	ReplyDiagram,
 	ReplyPart,
 } from "../shared/claude.js";
 import { composePrompt, lineDiff, splitReply } from "../shared/claude.js";
-import { withoutRequests } from "../shared/confluence-tool.js";
+import { withoutRequests as withoutLookups } from "../shared/confluence-tool.js";
 import { diagramSvg, svgMarkup } from "../shared/diagram.js";
+import { outlineText } from "../shared/document-outline.js";
+import type { Finding } from "../shared/findings.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
+import type { Mode } from "../shared/modes.js";
+import { isMode, MODE_LABELS, MODES } from "../shared/modes.js";
 import type { ProviderId } from "../shared/providers.js";
 import { isCli, PROVIDER_INFO, providerLabel, SUGGESTED_MODELS } from "../shared/providers.js";
 import type { SlashEntry } from "../shared/slash.js";
 import { findSlash, matchSlash, slashQuery } from "../shared/slash.js";
+import type { ApprovalRequest } from "../shared/tool-protocol.js";
+import { withoutToolCalls } from "../shared/tool-protocol.js";
+import type { ApprovalState, MadeChange, Usage } from "./assistant-agent.js";
+import { approvalCard, changeLine, planCard, usageText } from "./assistant-agent.js";
 import { createAssistantSettings } from "./assistant-settings.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
@@ -65,6 +74,8 @@ export interface AssistantHost {
 	openLink(href: string): void;
 	/** Runs one of the app's commands (save, export, insert a table…) on the active document. */
 	runCommand(command: Command): void;
+	/** Changes settings, as the menus do (an assistant's change undone). */
+	changeSettings(patch: Partial<Settings>): void;
 	close(): void;
 	errorText(error: unknown): string;
 }
@@ -94,7 +105,23 @@ interface Message {
 	steps?: string[];
 	/** Changes to workspace files it proposed, in this run. */
 	edits?: ProposedEdit[];
+	/** What it asked the user before changing something, in this run. */
+	approvals?: ApprovalRequest[];
+	/** Its plan for the answer. */
+	plan?: readonly PlanStep[];
+	/** What it changed, each with its undo. */
+	changes?: MadeChange[];
+	/** What the answer cost. */
+	usage?: Usage;
+	/** Problems a review found in the document. */
+	findings?: Finding[];
 }
+
+/** A reply's text as the user sees it: without the look-ups and tool calls written in it. */
+const withoutRequests = (text: string): string => withoutToolCalls(withoutLookups(text));
+
+/** Documents longer than this go to a model that reads them with tools as their outline only. */
+const LARGE_DOCUMENT = 24_000;
 
 /** A conversation, shown or not; a reply keeps coming in while another chat is shown. */
 interface Chat {
@@ -431,6 +458,27 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		class: "assistant-model",
 		attrs: { "aria-label": t.assistantModel, title: t.assistantModel },
 	});
+	let mode: Mode = "ask";
+	try {
+		const kept = localStorage.getItem("kalem.assistant.mode");
+		if (isMode(kept)) mode = kept;
+	} catch {
+		// Storage may be unavailable: the default mode is fine.
+	}
+	const modeSelect = el("select", {
+		class: "assistant-mode",
+		attrs: { "aria-label": t.assistantMode, title: t.assistantMode },
+		children: MODES.map((value) => el("option", { text: t[MODE_LABELS[value]], attrs: { value } })),
+	});
+	modeSelect.value = mode;
+	modeSelect.addEventListener("change", () => {
+		if (isMode(modeSelect.value)) mode = modeSelect.value;
+		try {
+			localStorage.setItem("kalem.assistant.mode", mode);
+		} catch {
+			// Kept for this run only.
+		}
+	});
 	const MORE_MODELS = "\u0000more";
 	modelSelect.addEventListener("change", async () => {
 		const picked = modelSelect.value;
@@ -519,6 +567,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 								],
 							}),
 							el("span", { class: "assistant-toolbar-space" }),
+							modeSelect,
 							modelSelect,
 							sendButton,
 						],
@@ -1364,7 +1413,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 	/** The start of a diagram or of actions still coming in: shown as a placeholder, not as JSON. */
 	const OPEN_BLOCK =
-		/^ {0,3}(?:`{3,}|~{3,})[ \t]*(kalem-diagram|kalem-actions|kalem-confluence|kalem-jira)[ \t]*$/m;
+		/^ {0,3}(?:`{3,}|~{3,})[ \t]*(kalem-diagram|kalem-actions|kalem-confluence|kalem-jira|kalem-tool)[ \t]*$/m;
 
 	function renderReply(message: Message): void {
 		const view = shown.get(message);
@@ -1385,11 +1434,13 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				pending =
 					open[1] === "kalem-actions"
 						? t.assistantPreparing
-						: open[1] === "kalem-confluence"
-							? t.assistantConfluenceLooking
-							: open[1] === "kalem-jira"
-								? t.assistantJiraLooking
-								: t.assistantDrawing;
+						: open[1] === "kalem-tool"
+							? t.assistantThinking
+							: open[1] === "kalem-confluence"
+								? t.assistantConfluenceLooking
+								: open[1] === "kalem-jira"
+									? t.assistantJiraLooking
+									: t.assistantDrawing;
 			}
 		}
 		const nodes: Node[] = parts.map((part, index) =>
@@ -1401,7 +1452,21 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		);
 		const steps = stepsView(message);
 		if (steps !== null) nodes.unshift(steps);
+		if (message.plan !== undefined && message.plan.length > 0)
+			nodes.unshift(planCard(t, message.plan));
 		for (const proposed of message.edits ?? []) nodes.push(editCard(proposed));
+		for (const request of message.approvals ?? []) {
+			nodes.push(
+				approvalCard(t, request, approvalStates.get(request.id) ?? "waiting", (answer) => {
+					approvalStates.set(request.id, answer.approved ? "allowed" : "denied");
+					void bridge.assistantApprove(request.id, answer);
+					renderReply(message);
+				}),
+			);
+		}
+		for (const change of message.changes ?? []) {
+			nodes.push(changeLine(t, change, () => void undoChange(message, change)));
+		}
 		if (!message.done && message.error === null) {
 			const lastStep = message.steps?.at(-1);
 			if (pending !== null) nodes.push(waiting(pending));
@@ -1445,12 +1510,32 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				return format(t.assistantStepJiraIssue, detail);
 			case "jira_search":
 				return format(t.assistantStepJiraSearch, detail);
+			case "kalem_help":
+				return format(t.assistantStepHelp, detail);
+			case "settings_find":
+				return format(t.assistantStepSettingsFind, detail);
+			case "settings_set":
+			case "pane_move":
+			case "pane_show":
+				return detail === "" ? t.assistantStepSettings : format(t.assistantChanged, detail);
+			case "app_command":
+				return format(t.assistantStepCommand, detail);
+			case "document_outline":
+				return t.assistantStepOutline;
+			case "document_read":
+				return format(t.assistantStepDocumentRead, detail);
+			case "document_search":
+				return format(t.assistantStepDocumentSearch, detail);
+			case "document_edit":
+				return t.assistantStepDocumentEdit;
 			case "list_files":
 			case "Glob":
 			case "LS":
 				return detail === "" ? t.assistantStepListAll : format(t.assistantStepList, detail);
-			default:
-				return detail === "" ? tool : `${tool}: ${detail}`;
+			default: {
+				const name = tool.replace(/^mcp__kalem__/, "");
+				return detail === "" ? name : `${name}: ${detail}`;
+			}
 		}
 	}
 
@@ -1839,6 +1924,14 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				...(message.model !== undefined && message.model !== ""
 					? [el("span", { class: "assistant-reply-model", text: message.model })]
 					: []),
+				...(message.usage === undefined
+					? []
+					: [
+							el("span", {
+								class: "assistant-reply-usage",
+								text: usageText(t, host.lang, message.usage),
+							}),
+						]),
 			],
 		});
 	}
@@ -1902,11 +1995,121 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				reply.steps = [...(reply.steps ?? []), stepLabel(event.tool, event.detail)];
 				if (chat === active) scheduleRender(reply);
 				return;
+			case "plan":
+				reply.plan = event.steps;
+				if (chat === active) scheduleRender(reply);
+				return;
+			case "changed":
+				reply.changes = [...(reply.changes ?? []), { label: event.label, settings: event.undo }];
+				if (chat === active) scheduleRender(reply);
+				return;
+			case "usage": {
+				const before = reply.usage ?? { input: 0, output: 0, cached: 0 };
+				reply.usage = {
+					input: before.input + event.input,
+					output: before.output + event.output,
+					cached: before.cached + event.cached,
+				};
+				return;
+			}
+			case "findings":
+				onFindings(chat.id, reply, event.findings);
+				return;
 			case "done":
 				chat.ended?.();
 				return;
 		}
 	});
+
+	/** A review's findings came: kept with the reply, shown in the review list. */
+	function onFindings(_chatId: string, reply: Message, findings: readonly Finding[]): void {
+		reply.findings = [...(reply.findings ?? []), ...findings];
+		scheduleRender(reply);
+	}
+
+	/** What became of each question the user was asked. */
+	const approvalStates = new Map<string, ApprovalState>();
+
+	bridge.onAssistantApproval((request) => {
+		const chat = chats.get(request.chatId);
+		const reply = chat?.reply;
+		if (chat === undefined || reply == null) {
+			void bridge.assistantApprove(request.id, { approved: false, scope: "once" });
+			return;
+		}
+		reply.approvals = [...(reply.approvals ?? []), request];
+		if (chat === active) {
+			scheduleRender(reply);
+			if (!element.hidden) input.blur();
+		}
+		if (chat !== active || element.hidden) showNotice(t.approvalWaiting);
+	});
+
+	/** A tool's part that works on the window: a command, a change to the document. */
+	bridge.onAssistantToolCall(async (call) => {
+		const answer = (ok: boolean, text: string, document?: string): void => {
+			void bridge.assistantToolResult(call.id, {
+				ok,
+				text,
+				...(document === undefined ? {} : { document }),
+			});
+		};
+		const input = (
+			typeof call.input === "object" && call.input !== null ? call.input : {}
+		) as Record<string, unknown>;
+		try {
+			if (call.name === "app_command" && typeof input.command === "string") {
+				host.runCommand(input.command as Command);
+				answer(true, "");
+				return;
+			}
+			if (call.name === "document_edit" && Array.isArray(input.actions)) {
+				const before = await host.context();
+				if (typeof input.tabId === "string" && input.tabId !== before.tabId) {
+					answer(false, "the user switched to another document; ask them to go back to it");
+					return;
+				}
+				const made = await host.applyActions(input.actions as DocumentAction[]);
+				const after = await host.context();
+				const reply = chats.get(call.chatId)?.reply;
+				if (reply != null) {
+					reply.changes = [
+						...(reply.changes ?? []),
+						{
+							label: format(t.approvalChanges, made),
+							document: { tabId: before.tabId, text: before.text },
+						},
+					];
+					scheduleRender(reply);
+				}
+				answer(true, `${made} changes`, after.text);
+				return;
+			}
+			answer(false, `the window cannot run ${call.name}`);
+		} catch (error) {
+			answer(false, host.errorText(error));
+		}
+	});
+
+	/** Puts back what the assistant changed. */
+	async function undoChange(message: Message, change: MadeChange): Promise<void> {
+		if (change.undone === true) return;
+		try {
+			if (change.settings !== undefined) host.changeSettings(change.settings as Partial<Settings>);
+			if (change.document !== undefined) {
+				const now = await host.context();
+				if (now.tabId !== change.document.tabId) {
+					showNotice(t.assistantUndoOtherTab);
+					return;
+				}
+				await host.applyActions([{ type: "document", text: change.document.text }]);
+			}
+			change.undone = true;
+			renderReply(message);
+		} catch (error) {
+			showNotice(format(t.assistantActionFailed, host.errorText(error)));
+		}
+	}
 
 	async function send(): Promise<void> {
 		const chat = active;
@@ -1936,6 +2139,10 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		let prompt: string;
 		let tabId: string | null = null;
 		let images: DocumentImage[] = [];
+		let fullPrompt: string | undefined;
+		let documentSnapshot:
+			| { tabId: string; name: string; text: string; selection: string }
+			| undefined;
 		try {
 			const context = await host.context();
 			tabId = context.tabId;
@@ -1955,18 +2162,42 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			// The pictures go with the document; an API, which keeps none, gets them every time.
 			const cli = isCli(PROVIDER_INFO[provider]);
 			if (sharing && (!unchanged || !cli)) images = await host.images();
-			prompt = composePrompt({
-				question,
-				...(sharing && !unchanged
-					? {
-							document: { name: context.name, text: context.text },
-							diagrams: context.diagrams,
-							images,
-						}
-					: {}),
-				documentUnchanged: unchanged,
-				selection,
-			});
+			documentSnapshot = sharing
+				? { tabId: context.tabId, name: context.name, text: context.text, selection }
+				: undefined;
+			// A long document goes as its outline: the model reads the parts it needs with the tools.
+			if (sharing && !unchanged && context.text.length > LARGE_DOCUMENT) {
+				fullPrompt = composePrompt({
+					question,
+					document: { name: context.name, text: context.text },
+					diagrams: context.diagrams,
+					images,
+					selection,
+				});
+				notes[0] = format(
+					t.assistantSharedDocument,
+					format(t.assistantDocumentOutline, context.name),
+				);
+				prompt = composePrompt({
+					question,
+					outline: { name: context.name, text: outlineText(context.text) },
+					diagrams: context.diagrams,
+					selection,
+				});
+				images = [];
+			} else
+				prompt = composePrompt({
+					question,
+					...(sharing && !unchanged
+						? {
+								document: { name: context.name, text: context.text },
+								diagrams: context.diagrams,
+								images,
+							}
+						: {}),
+					documentUnchanged: unchanged,
+					selection,
+				});
 			if (sharing) chat.sharedText = context.text;
 		} catch (error) {
 			chat.reply = null;
@@ -2004,6 +2235,9 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					history: earlier,
 					images: images.map(({ label, mediaType, data }) => ({ label, mediaType, data })),
 					sources: chatSources(chat),
+					mode,
+					...(fullPrompt === undefined ? {} : { fullPrompt }),
+					...(documentSnapshot === undefined ? {} : { document: documentSnapshot }),
 				});
 				await Promise.race([last, new Promise((resolve) => setTimeout(resolve, 5000))]);
 			} catch (error) {
