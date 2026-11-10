@@ -8,9 +8,9 @@
 import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, isAbsolute } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
-import { dialog, ipcMain } from "electron";
+import { app, dialog, ipcMain, net } from "electron";
 import { assistantInstructions } from "../shared/assistant-prompt.js";
 import type { AssistantStatus, Settings } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
@@ -28,9 +28,12 @@ import {
 } from "../shared/claude.js";
 import type { LookupWay } from "../shared/confluence-tool.js";
 import { confluenceRequests, MAX_ROUNDS } from "../shared/confluence-tool.js";
+import { claudeAllowed, claudeServers, copilotServers } from "../shared/custom-modes.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { jiraRequests } from "../shared/jira-tool.js";
-import { modeExcluded } from "../shared/modes.js";
+import type { ModelOption } from "../shared/models.js";
+import { claudeModelName, claudeModelOptions, copilotModelOptions } from "../shared/models.js";
+import { customModeOf, modeToolsExcluded } from "../shared/modes.js";
 import type { ChatMessage, ProviderId } from "../shared/providers.js";
 import {
 	checkBaseUrl,
@@ -48,7 +51,8 @@ import type { AssistantToolServer } from "./assistant-mcp.js";
 import { mcpToolName } from "./assistant-mcp.js";
 import { PermissionGate } from "./assistant-permissions.js";
 import type { DocumentSnapshot, ToolContext, ToolResult } from "./assistant-tools.js";
-import { approver, RendererCalls, runTool, toolsFor } from "./assistant-tools.js";
+import { allTools, approver, RendererCalls, runTool, toolsFor } from "./assistant-tools.js";
+import { ModelCatalog } from "./model-catalog.js";
 import "./assistant-app-tools.js";
 import "./assistant-analysis-tools.js";
 import "./assistant-external-tools.js";
@@ -247,6 +251,11 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 	const sentFiles = new Map<string, string>();
 	/** The workspace folders' file lists, shared by the chats. */
 	const indexes = new WorkspaceIndexes();
+	/** The models Claude Code's aliases answered with, and the GitHub account's Copilot models. */
+	const catalog = new ModelCatalog(
+		join(app.getPath("userData"), "assistant-models.json"),
+		(url, init) => net.fetch(url, init),
+	);
 	/** Changes the models proposed in this run, until they are applied. */
 	const proposals = new Map<string, KeptEdit>();
 	/** The user's say over what the tools change. */
@@ -351,16 +360,48 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		return status();
 	});
 
-	ipcMain.handle(CHANNEL.assistantModels, async (_event, raw: unknown) => {
+	ipcMain.handle(CHANNEL.assistantToolCatalog, () =>
+		allTools().map((tool) => ({
+			name: tool.definition.name,
+			// Its first sentence says what it does.
+			description: tool.definition.description.split(/(?<=\.)\s/)[0] ?? "",
+		})),
+	);
+
+	ipcMain.handle(CHANNEL.assistantModels, async (_event, raw: unknown): Promise<ModelOption[]> => {
 		const request = record(raw);
 		if (!isProvider(request.provider)) return [];
 		const provider = request.provider;
-		// A CLI names its models in its help; the well-known aliases come first.
 		const program = programOf(provider);
-		if (program !== null) {
+		if (program === "claude") {
+			// Claude Code lists no models: its aliases, named by what each answered with last;
+			// Anthropic's list when a key for it is kept; and what its help names.
 			await locate(program);
-			const listed = modelsFromHelp(await clis[program].help());
-			return [...new Set([...(SUGGESTED_MODELS[provider] ?? []), ...listed])];
+			const anthropicKey = await ctx.assistant.key("anthropic").catch(() => null);
+			const anthropic =
+				anthropicKey === null
+					? []
+					: await listModels(
+							PROVIDER_INFO.anthropic,
+							{ baseUrl: PROVIDER_INFO.anthropic.baseUrl, model: "" },
+							anthropicKey,
+						)
+							.then((ids) => ids.map((id) => ({ id, label: claudeModelName(id) })))
+							.catch(() => []);
+			return claudeModelOptions(
+				SUGGESTED_MODELS[provider] ?? [],
+				await catalog.learned(),
+				anthropic,
+				modelsFromHelp(await clis[program].help()),
+			);
+		}
+		if (program === "copilot") {
+			// The account's models, as VS Code lists them; the CLI's own choices when it has a fixed list.
+			await locate(program);
+			return copilotModelOptions(
+				modelsFromHelp(await clis[program].help()),
+				await catalog.copilotModels(),
+			);
 		}
 		const info = PROVIDER_INFO[provider];
 		// Without an address, the one the user set for the service.
@@ -373,7 +414,12 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			typeof request.key === "string" && request.key.trim() !== ""
 				? request.key.trim()
 				: await ctx.assistant.key(provider);
-		return listModels(info, { baseUrl, model: "" }, key);
+		const ids = await listModels(info, { baseUrl, model: "" }, key);
+		// Anthropic's ids are named as people say them; the others' ids are their names.
+		return ids.map((id) => ({
+			id,
+			label: info.protocol === "anthropic" ? `${claudeModelName(id)} (${id})` : id,
+		}));
 	});
 
 	ipcMain.handle(CHANNEL.assistantLocate, async (event) => {
@@ -480,19 +526,24 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 						const { absolute: _absolute, ...shown } = proposed;
 						forward({ kind: "edit", edit: shown });
 					});
+		// The mode: one of Kalem's, as the user shaped it, or one the user made (its tools and MCP servers).
+		const modeSettings = ctx.store.settings.assistantModes;
+		const customModes = ctx.store.settings.assistantCustomModes;
+		const ownMode = customModeOf(request.mode, customModes);
+		const modeExcluded = modeToolsExcluded(
+			request.mode,
+			modeSettings,
+			customModes,
+			allTools().map((tool) => tool.definition.name),
+		);
 		const tools: ToolContext = {
 			chatId,
 			sender,
 			t,
 			excluded:
 				program === null
-					? modeExcluded(request.mode, ctx.store.settings.assistantModes)
-					: new Set([
-							...modeExcluded(request.mode, ctx.store.settings.assistantModes),
-							"list_files",
-							"search",
-							"read_file",
-						]),
+					? modeExcluded
+					: new Set([...modeExcluded, "list_files", "search", "read_file"]),
 			settings: () => ctx.store.settings,
 			changeSettings: ctx.changeSettings,
 			changeLanguage: ctx.changeLanguage,
@@ -517,10 +568,21 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 
 		// Claude Code gets the tools from Kalem's MCP server; Copilot too when it takes one,
 		// else it writes them in blocks; an API calls them as its own tools.
-		const copilotMcp = program === "copilot" && definitions.length > 0 && (await copilotUsesMcp());
+		// The user's mode may bring MCP servers of its own, even with none of Kalem's tools.
+		const ownServers = ownMode?.mcp.some((server) => server.enabled) === true;
+		const needsMcp = definitions.length > 0 || ownServers;
+		const copilotMcp = program === "copilot" && needsMcp && (await copilotUsesMcp());
 		const mcpRun =
-			(program === "claude" || copilotMcp) && definitions.length > 0
-				? await ctx.tools.open(() => definitions, call).catch(() => null)
+			(program === "claude" || copilotMcp) && needsMcp
+				? await ctx.tools
+						.open(
+							() => definitions,
+							call,
+							ownMode === null
+								? undefined
+								: { claude: claudeServers(ownMode), copilot: copilotServers(ownMode) },
+						)
+						.catch(() => null)
 				: null;
 		let way: LookupWay = program === null ? "tools" : mcpRun === null ? "block" : "mcp";
 		const instructionsFor = (lookupWay: LookupWay): string =>
@@ -530,7 +592,8 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				jira: jiraLookups?.site ?? null,
 				tools: definitions,
 				mode: request.mode,
-				modes: ctx.store.settings.assistantModes,
+				modes: modeSettings,
+				custom: customModes,
 				document: tools.document,
 			});
 		let system = instructionsFor(way);
@@ -567,6 +630,9 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 					? dirname(tab.path)
 					: homedir());
 			const send = (cliEvent: ClaudeEvent): void => {
+				// The model an alias answered with names it in the model picker from now on.
+				if (cliEvent.kind === "model")
+					void catalog.learn(connection.model, cliEvent.model).catch(() => {});
 				if (cliEvent.kind === "session") {
 					folders.set(cliEvent.id, folder);
 					sentFiles.set(cliEvent.id, files.text);
@@ -583,7 +649,11 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				});
 				return;
 			}
-			const mcpTools = definitions.map((tool) => mcpToolName(tool.name));
+			// Kalem's tools, and the servers of the user's mode, are called without asking.
+			const mcpTools = [
+				...definitions.map((tool) => mcpToolName(tool.name)),
+				...(ownMode === null ? [] : claudeAllowed(ownMode)),
+			];
 			// An answer may wait for the user to allow a change: Claude Code waits for the tool as long.
 			const env = program === "claude" ? { MCP_TOOL_TIMEOUT: String(APPROVAL_WAIT) } : {};
 			let copilotSession = sessionId ?? randomUUID();
@@ -825,6 +895,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 						way: "none",
 						mode: request.mode,
 						modes: ctx.store.settings.assistantModes,
+						custom: ctx.store.settings.assistantCustomModes,
 					}),
 				);
 			}

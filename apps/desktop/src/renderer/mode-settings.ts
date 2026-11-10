@@ -1,4 +1,5 @@
 import type { Settings } from "../shared/bridge.js";
+import { newCustomMode } from "../shared/custom-modes.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type { Mode, ResolvedMode, ResolvedStep } from "../shared/mode-config.js";
@@ -13,6 +14,8 @@ import {
 	storeMode,
 } from "../shared/mode-config.js";
 import { MODE_HINTS, MODE_LABELS } from "../shared/modes.js";
+import type { ToolInfo } from "./custom-mode-editor.js";
+import { createCustomModeEditor } from "./custom-mode-editor.js";
 import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
@@ -32,6 +35,8 @@ export interface ModeEditorOptions {
 	readonly t: Strings;
 	settings(): Settings;
 	update(patch: Partial<Settings>): void;
+	/** Kalem's tools, for choosing a mode's of the user's. */
+	toolCatalog(): Promise<readonly ToolInfo[]>;
 }
 
 /** An icon with a class of its own. */
@@ -53,6 +58,9 @@ export function createModeEditor(options: ModeEditorOptions): {
 } {
 	const { t } = options;
 	let selected: Mode = "review";
+	/** The user's mode shown instead of one of Kalem's; `null` for Kalem's. */
+	let customId: string | null = null;
+	let catalog: Promise<readonly ToolInfo[]> | null = null;
 	let mode: ResolvedMode = resolveMode(selected, options.settings().assistantModes);
 	/** The step whose text is open for editing. */
 	let editing: string | null = null;
@@ -96,6 +104,49 @@ export function createModeEditor(options: ModeEditorOptions): {
 	}
 
 	function drawTabs(): void {
+		const custom = options.settings().assistantCustomModes;
+		const customTabs = custom.map((own) => {
+			const tab = el("button", {
+				class: "mode-tab mode-tab-custom",
+				attrs: {
+					type: "button",
+					role: "tab",
+					"aria-selected": String(own.id === customId),
+					"data-mode": own.id,
+					...(own.enabled ? {} : { "data-off": "" }),
+				},
+				children: [
+					mark(own.icon, "mode-tab-icon"),
+					el("span", { class: "mode-tab-label", text: own.name }),
+					el("span", {
+						class: "mode-tab-count",
+						text: format(t.modeSteps, own.steps.filter((step) => step.on).length),
+					}),
+				],
+			});
+			tab.addEventListener("click", () => {
+				customId = own.id;
+				editing = null;
+				draw();
+			});
+			return tab;
+		});
+		const add = el("button", {
+			class: "mode-tab mode-tab-new",
+			attrs: { type: "button" },
+			children: [
+				mark("plus", "mode-tab-icon"),
+				el("span", { class: "mode-tab-label", text: t.customNew }),
+			],
+		});
+		add.addEventListener("click", () => {
+			const all = options.settings().assistantCustomModes;
+			const made = newCustomMode(t.customNewName, all);
+			options.update({ assistantCustomModes: [...all, made] });
+			customId = made.id;
+			draw();
+			panel.querySelector<HTMLInputElement>(".mode-field input")?.select();
+		});
 		tabs.replaceChildren(
 			...MODES.map((each) => {
 				const resolved =
@@ -106,7 +157,7 @@ export function createModeEditor(options: ModeEditorOptions): {
 					attrs: {
 						type: "button",
 						role: "tab",
-						"aria-selected": String(each === selected),
+						"aria-selected": String(each === selected && customId === null),
 						"data-mode": each,
 						...(resolved.enabled ? {} : { "data-off": "" }),
 					},
@@ -117,7 +168,8 @@ export function createModeEditor(options: ModeEditorOptions): {
 					],
 				});
 				tab.addEventListener("click", () => {
-					if (each === selected) return;
+					if (each === selected && customId === null) return;
+					customId = null;
 					selected = each;
 					editing = null;
 					mode = resolveMode(each, options.settings().assistantModes);
@@ -125,7 +177,37 @@ export function createModeEditor(options: ModeEditorOptions): {
 				});
 				return tab;
 			}),
+			...customTabs,
+			add,
 		);
+	}
+
+	/** A mode of the user's in the panel: kept as it changes, and gone when deleted. */
+	function drawCustom(id: string): boolean {
+		const own = options.settings().assistantCustomModes.find((each) => each.id === id);
+		if (own === undefined) return false;
+		catalog ??= options.toolCatalog().catch(() => []);
+		panel.replaceChildren(
+			createCustomModeEditor({
+				t,
+				mode: own,
+				catalog,
+				save(next) {
+					const all = options.settings().assistantCustomModes;
+					if (next === null) {
+						customId = null;
+						options.update({ assistantCustomModes: all.filter((each) => each.id !== id) });
+						draw();
+						return;
+					}
+					options.update({
+						assistantCustomModes: all.map((each) => (each.id === id ? next : each)),
+					});
+					drawTabs();
+				},
+			}),
+		);
+		return true;
 	}
 
 	const preview = el("pre", { class: "mode-preview-text" });
@@ -319,6 +401,11 @@ export function createModeEditor(options: ModeEditorOptions): {
 
 	function draw(): void {
 		drawTabs();
+		if (customId !== null) {
+			if (drawCustom(customId)) return;
+			customId = null;
+			drawTabs();
+		}
 		const steps = el("ol", {
 			class: "mode-steps",
 			children: mode.steps.map((step, index) => stepRow(step, index)),
@@ -523,6 +610,8 @@ export function createModeEditor(options: ModeEditorOptions): {
 			) {
 				return;
 			}
+			// Clicks in the user's mode (a switch, a tool) keep their own drawing.
+			if (customId !== null && element.contains(document.activeElement)) return;
 			mode = resolveMode(selected, options.settings().assistantModes);
 			draw();
 		},

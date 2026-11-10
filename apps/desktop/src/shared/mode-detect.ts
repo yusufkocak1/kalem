@@ -4,6 +4,7 @@
  * it has to work on (an open document, a workspace). No model is asked:
  * it is instant, and the reply says which mode it chose. Pure.
  */
+import type { CustomMode } from "./custom-modes.js";
 import type { Mode, ModeSettings } from "./mode-config.js";
 import { MODES, resolveMode } from "./mode-config.js";
 
@@ -117,7 +118,8 @@ export interface DetectContext {
 }
 
 export interface Detected {
-	readonly mode: Mode;
+	/** One of Kalem's modes, or the id of one of the user's. */
+	readonly mode: Mode | string;
 	/** The words that chose it; empty when nothing pointed anywhere. */
 	readonly because: readonly string[];
 }
@@ -129,6 +131,7 @@ export function detectMode(
 	question: string,
 	context: DetectContext,
 	settings: ModeSettings = {},
+	custom: readonly CustomMode[] = [],
 ): Detected {
 	const text = ` ${fold(question)} `;
 	let best: Detected = { mode: "ask", because: [] };
@@ -150,6 +153,18 @@ export function detectMode(
 		if (score > bestScore) {
 			bestScore = score;
 			best = { mode, because: found };
+		}
+	}
+	// The user's own modes: their words, and their name.
+	for (const mode of custom) {
+		if (!mode.enabled) continue;
+		const words = [...mode.keywords, mode.name].map(fold);
+		const found = words.filter((word) => word !== "" && text.includes(word));
+		// The user's words say more than Kalem's guesses.
+		const score = found.reduce((sum, word) => sum + (word.includes(" ") ? 3 : 1.5), 0);
+		if (score > bestScore) {
+			bestScore = score;
+			best = { mode: mode.id, because: found };
 		}
 	}
 	return best;

@@ -12,6 +12,7 @@ import { ancestors, DIAGRAM_KEYWORD, parseDiagram } from "./diagram.js";
 import { boxOf, GROUP_PADDING, GROUP_TOP, layoutDiagram } from "./diagram-edit.js";
 import type { Finding } from "./findings.js";
 import type { Strings } from "./i18n.js";
+import { claudeInitModel } from "./models.js";
 import { TABLE_COLORS } from "./table-style.js";
 
 /** The code fence language of a Kalem diagram in a reply. */
@@ -363,6 +364,8 @@ export interface ProposedEdit {
 export type ClaudeEvent =
 	/** The conversation's id, and for a CLI the folder it runs in; the next question resumes it. */
 	| { readonly kind: "session"; readonly id: string; readonly folder?: string }
+	/** The model the CLI answers with, by its full name (Claude Code's `opus` is `claude-opus-…`). */
+	| { readonly kind: "model"; readonly model: string }
 	/** More of the reply. */
 	| { readonly kind: "text"; readonly text: string }
 	/** What came of the reply so far is dropped: it is asked again another way. */
@@ -471,6 +474,8 @@ export class ClaudeStreamReader {
 			this.#session = session;
 			events.push({ kind: "session", id: session });
 		}
+		const model = claudeInitModel(data);
+		if (model !== null) events.push({ kind: "model", model });
 		switch (data.type) {
 			case "stream_event": {
 				const event = isRecord(data.event) ? data.event : {};

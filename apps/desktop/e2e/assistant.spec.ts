@@ -748,7 +748,7 @@ test("picks the model from the panel and keeps the chat going; earlier chats are
 		"opus",
 		"sonnet",
 		"haiku",
-		"claude-sonnet-4-5-20250929",
+		"Sonnet 4.5",
 		"Other model…",
 	]);
 	await input.fill("Bir");
@@ -762,7 +762,11 @@ test("picks the model from the panel and keeps the chat going; earlier chats are
 	await expect(pane.getByRole("button", { name: "Insert", exact: true })).toHaveCount(2);
 	const second = (await claude.calls())[1];
 	expect(second?.args.join(" ")).toContain("--model sonnet --resume sess-1");
-	await expect(pane.locator(".assistant-reply-model")).toHaveText(["sonnet"]);
+	// Each reply names the model that answered, as Claude Code said it: the default's, then the alias's.
+	await expect(pane.locator(".assistant-reply-model")).toHaveText([
+		"Sonnet 5.5",
+		"sonnet · Sonnet 5.5",
+	]);
 
 	// An API service: its models are listed, and a new model goes on in the same chat.
 	await pane.getByRole("button", { name: "Connection settings" }).click();
@@ -801,7 +805,10 @@ test("picks the model from the panel and keeps the chat going; earlier chats are
 	await expect(recent.locator(".assistant-history-title")).toHaveText(["Üç", "Bir"]);
 	await recent.getByRole("button", { name: /^Bir/ }).click();
 	await expect(pane.locator(".assistant-user")).toHaveText([/Bir/, /İki/]);
-	await expect(pane.locator(".assistant-reply-model")).toHaveText(["sonnet"]);
+	await expect(pane.locator(".assistant-reply-model")).toHaveText([
+		"Sonnet 5.5",
+		"sonnet · Sonnet 5.5",
+	]);
 
 	expect(errors).toEqual([]);
 	await app.close();

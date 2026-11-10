@@ -18,6 +18,7 @@ import {
 	PAGE_SIZES,
 	ZOOM_STEP,
 } from "./bridge.js";
+import { parseCustomModes } from "./custom-modes.js";
 import { groupName } from "./favorites.js";
 import type { Strings } from "./i18n.js";
 import { format } from "./i18n.js";
@@ -422,6 +423,16 @@ export const SETTINGS_SCHEMA: Schema = {
 			"prompt",
 		],
 		assistant: "read",
+	},
+	assistantCustomModes: {
+		key: "assistantCustomModes",
+		category: "modes",
+		label: null,
+		type: "custom",
+		parse: parseCustomModes,
+		keywords: ["özel mod", "custom mode", "mcp", "araç", "tool", "prompt", "sunucu", "server"],
+		// It can run programs on this computer (an MCP server's command): never the assistant's to change.
+		assistant: "hidden",
 	},
 	defaultTemplate: {
 		key: "defaultTemplate",

@@ -22,6 +22,8 @@ import type {
 } from "../shared/claude.js";
 import { composePrompt, lineDiff, splitReply } from "../shared/claude.js";
 import { withoutRequests as withoutLookups } from "../shared/confluence-tool.js";
+import type { CustomMode } from "../shared/custom-modes.js";
+import { isCustomModeId } from "../shared/custom-modes.js";
 import { diagramSvg, svgMarkup } from "../shared/diagram.js";
 import { findHeading, outlineOf, outlineText } from "../shared/document-outline.js";
 import type { Finding } from "../shared/findings.js";
@@ -31,8 +33,10 @@ import { format } from "../shared/i18n.js";
 import type { ModeSettings } from "../shared/mode-config.js";
 import { resolveMode } from "../shared/mode-config.js";
 import { detectMode } from "../shared/mode-detect.js";
-import type { Mode, ModeChoice } from "../shared/modes.js";
-import { isMode, MODE_HINTS, MODE_LABELS, MODES } from "../shared/modes.js";
+import type { ModelOption } from "../shared/models.js";
+import { claudeModelName } from "../shared/models.js";
+import type { ModeChoice } from "../shared/modes.js";
+import { customModeOf, isMode, MODE_HINTS, MODE_LABELS, MODES } from "../shared/modes.js";
 import { clampDockSize, MIN_DOCK_SIZE } from "../shared/panes.js";
 import type { ProviderId } from "../shared/providers.js";
 import { isCli, PROVIDER_INFO, providerLabel, SUGGESTED_MODELS } from "../shared/providers.js";
@@ -104,6 +108,8 @@ export interface AssistantHost {
 	errorText(error: unknown): string;
 	/** The modes as the user shaped them in Settings. */
 	modes(): ModeSettings;
+	/** The modes the user made. */
+	customModes(): readonly CustomMode[];
 	/** Opens Settings on the assistant's modes. */
 	openModeSettings(): void;
 }
@@ -128,7 +134,7 @@ interface Message {
 	done: boolean;
 	readonly notes: readonly string[];
 	/** The model that answered; empty when the service chose. */
-	readonly model?: string;
+	model?: string;
 	/** What it looked up in the workspace while answering, in this run. */
 	steps?: string[];
 	/** Changes to workspace files it proposed, in this run. */
@@ -614,12 +620,33 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	let mode: ModeChoice = "auto";
 	try {
 		const kept = localStorage.getItem("kalem.assistant.mode");
-		if (isMode(kept) || kept === "auto") mode = kept;
+		if (isMode(kept) || kept === "auto" || isCustomModeId(kept)) mode = kept;
 	} catch {
 		// Storage may be unavailable: the default mode is fine.
 	}
+	/** The user's own mode a choice names; `null` for Kalem's, or one that was removed. */
+	const ownMode = (choice: ModeChoice): CustomMode | null =>
+		customModeOf(choice, host.customModes());
 	const modeLabel = (choice: ModeChoice): string =>
-		choice === "auto" ? t.modeAuto : t[MODE_LABELS[choice]];
+		choice === "auto"
+			? t.modeAuto
+			: isMode(choice)
+				? t[MODE_LABELS[choice]]
+				: (ownMode(choice)?.name ?? t.modeAsk);
+	const modeGlyphName = (choice: ModeChoice): IconName =>
+		choice === "auto" || isMode(choice) ? MODE_ICONS[choice] : (ownMode(choice)?.icon ?? "star");
+	const modeHint = (choice: ModeChoice): string =>
+		choice === "auto"
+			? t.modeAutoHint
+			: isMode(choice)
+				? t[MODE_HINTS[choice]]
+				: ownMode(choice)?.description || t.modeCustomHint;
+	const modeStepCount = (choice: ModeChoice): number | null => {
+		if (choice === "auto") return null;
+		if (isMode(choice))
+			return resolveMode(choice, host.modes()).steps.filter((step) => step.on).length;
+		return ownMode(choice)?.steps.filter((step) => step.on).length ?? null;
+	};
 	const modeIcon = el("span", { class: "assistant-mode-icon" });
 	const modeText = el("span", { class: "assistant-mode-text" });
 	const modeButton = el("button", {
@@ -643,7 +670,9 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	});
 
 	function drawModeButton(): void {
-		modeIcon.replaceChildren(glyph(MODE_ICONS[mode], "assistant-mode-glyph"));
+		// A mode of the user's that was removed is no longer chosen.
+		if (isCustomModeId(mode) && ownMode(mode) === null) mode = "auto";
+		modeIcon.replaceChildren(glyph(modeGlyphName(mode), "assistant-mode-glyph"));
 		modeText.textContent = modeLabel(mode);
 		modeButton.title = `${t.assistantMode}: ${modeLabel(mode)}`;
 		modeButton.dataset.mode = mode;
@@ -660,16 +689,15 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		const choices: ModeChoice[] = [
 			"auto",
 			...MODES.filter((each) => resolveMode(each, settings).enabled || each === mode),
+			...host
+				.customModes()
+				.filter((each) => each.enabled || each.id === mode)
+				.map((each) => each.id),
 		];
 		modeMenu.replaceChildren(
 			...choices.map((choice) => {
-				const steps =
-					choice === "auto"
-						? ""
-						: format(
-								t.modeSteps,
-								resolveMode(choice, settings).steps.filter((step) => step.on).length,
-							);
+				const count = modeStepCount(choice);
+				const steps = count === null ? "" : format(t.modeSteps, count);
 				const item = el("button", {
 					class: "assistant-mode-item",
 					attrs: {
@@ -681,13 +709,13 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					children: [
 						el("span", {
 							class: "assistant-mode-item-icon",
-							children: [glyph(MODE_ICONS[choice], "assistant-mode-item-glyph")],
+							children: [glyph(modeGlyphName(choice), "assistant-mode-item-glyph")],
 						}),
 						el("span", {
 							class: "assistant-mode-item-text",
 							children: [
 								el("strong", { text: modeLabel(choice) }),
-								el("span", { text: choice === "auto" ? t.modeAutoHint : t[MODE_HINTS[choice]] }),
+								el("span", { text: modeHint(choice) }),
 							],
 						}),
 						...(steps === ""
@@ -1391,18 +1419,26 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	// --- Models --------------------------------------------------------------------
 
 	/** The models offered for each service, asked for once. */
-	const modelLists = new Map<ProviderId, readonly string[]>();
+	const modelLists = new Map<ProviderId, readonly ModelOption[]>();
 
 	/** Fills the model picker from the service's list (fetched once), the model in use first. */
 	function renderModels(): void {
 		if (status === null) return;
 		const provider = status.provider;
 		const cli = isCli(PROVIDER_INFO[provider]);
-		const listed = modelLists.get(provider) ?? SUGGESTED_MODELS[provider] ?? [];
-		const names = [...new Set([...(status.model === "" ? [] : [status.model]), ...listed])];
+		const listed: readonly ModelOption[] =
+			modelLists.get(provider) ??
+			(SUGGESTED_MODELS[provider] ?? []).map((id) => ({ id, label: id }));
+		// The model chosen stays offered, named as the list names it.
+		const options = [
+			...(status.model === "" || listed.some((option) => option.id === status?.model)
+				? []
+				: [{ id: status.model, label: status.model }]),
+			...listed,
+		];
 		modelSelect.replaceChildren(
 			...(cli ? [el("option", { text: t.assistantDefaultModel, attrs: { value: "" } })] : []),
-			...names.map((name) => el("option", { text: name, attrs: { value: name } })),
+			...options.map((option) => el("option", { text: option.label, attrs: { value: option.id } })),
 			el("option", { text: t.assistantMoreModels, attrs: { value: MORE_MODELS } }),
 		);
 		modelSelect.value = status.model;
@@ -2409,6 +2445,16 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				reply.changes = [...(reply.changes ?? []), { label: event.label, settings: event.undo }];
 				if (chat === active) scheduleRender(reply);
 				return;
+			case "model": {
+				// The CLI said which model answered: the reply names it ("opus · Opus 5.5").
+				const name = claudeModelName(event.model);
+				const alias = reply.model ?? "";
+				reply.model = alias === "" || alias === event.model ? name : `${alias} · ${name}`;
+				// The picker names the alias by it too, the next time it is drawn.
+				modelLists.delete(status?.provider ?? "claude-code");
+				if (chat === active) scheduleRender(reply);
+				return;
+			}
 			case "usage": {
 				const before = reply.usage ?? { input: 0, output: 0, cached: 0 };
 				reply.usage = {
@@ -2649,7 +2695,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 		const notes: string[] = [];
 		/** The mode this question is asked in: the one picked, or the one chosen for it. */
-		let usedMode: Mode = mode === "auto" ? "ask" : mode;
+		let usedMode: ModeChoice = mode === "auto" ? "ask" : mode;
 		let prompt: string;
 		// The sections added with "@" go with the question, whether or not the document is shared.
 		let withSections = question;
@@ -2690,10 +2736,11 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					question,
 					{ hasDocument: sharing, hasWorkspace: sources.length > 0 || chat.folder !== null },
 					host.modes(),
+					host.customModes(),
 				);
 				usedMode = detected.mode;
 				// A plain question stays a question: only a mode chosen for it is said.
-				if (usedMode !== "ask") notes.push(format(t.modeChosen, t[MODE_LABELS[usedMode]]));
+				if (usedMode !== "ask") notes.push(format(t.modeChosen, modeLabel(usedMode)));
 			}
 			if (sources.length > 0) {
 				notes.push(

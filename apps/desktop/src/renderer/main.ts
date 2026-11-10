@@ -211,6 +211,7 @@ const assistant = createAssistantPane({
 	revealQuote: (quote) => revealQuote(canvas, quote),
 	errorText: ipcErrorMessage,
 	modes: () => settings.assistantModes,
+	customModes: () => settings.assistantCustomModes,
 	openModeSettings: () => void settingsDialog.show("modes"),
 });
 

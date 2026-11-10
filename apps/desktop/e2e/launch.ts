@@ -52,6 +52,8 @@ export async function launch(options: LaunchOptions = {}): Promise<Launched> {
 			KALEM_USER_DATA_DIR: userData,
 			KALEM_DEV_URL: "",
 			KALEM_VERSION_INTERVAL: "0",
+			// The account's Copilot models are not asked of GitHub in tests.
+			KALEM_COPILOT_MODELS: "off",
 			...options.env,
 		},
 		// Playwright forces a light colour scheme by default, which would hide the app's own theme.

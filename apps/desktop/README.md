@@ -711,6 +711,21 @@ verir.
 >     otomatik seçtiren **ek kelimeler**, **ek talimat**; **Asistana
 >     söylenen** önizlemesi değiştikçe güncellenir; **Varsayılana döndür**.
 >     Ayarlar yalnızca varsayılandan farkı saklar (`assistantModes`).
+>   - **Kendi modlarınız** (Asistan Modları → **Yeni mod**): ad, simge ve
+>     tek satırlık açıklama; asistana söylenen **talimat** (prompt); kendi
+>     **adımlarınız**; Kalem'in **araçlarından** hepsi ya da yalnızca
+>     seçilenler (aranabilir liste); ve **MCP sunucuları**: bu bilgisayarda
+>     çalışan bir program (stdio: komut, her satıra bir argüman,
+>     `ANAHTAR=değer` ortam değişkenleri) ya da bir adres (HTTP: adres ve
+>     başlıklar), her biri açılıp kapatılabilir ve kullanabileceği araçlar
+>     seçilebilir. Mod seçiliyken bu sunucular Claude Code'un
+>     `--mcp-config` ve Copilot CLI'ın `--additional-mcp-config`
+>     yapılandırmasına Kalem'in kendi sunucusunun yanına eklenir; Claude
+>     Code onları sormadan çağırabilir (`mcp__<ad>`). API hizmetleri MCP
+>     sunucusu kullanmaz. Kendi modlarınız seçicide ve otomatik seçimde
+>     (adları ve ek kelimeleriyle) görünür; ayrıntı ve yanıt dili de
+>     seçilir. Bir MCP sunucusu bu bilgisayarda program çalıştırabildiği
+>     için asistan bu ayarı göremez ve değiştiremez (`assistantCustomModes`).
 > - **Analiz şablonları:** **Dosya → Şablondan Yeni…** ve **Dosya → Ayarlar →
 >   Şablonlar**. Ekip şablonları açık klasörün `.kalem/templates/`
 >   klasöründe (Git ile paylaşılır; aynı adlı kişisel şablonun önüne geçer),
@@ -770,7 +785,23 @@ verir.
   | **Diğer (OpenAI uyumlu)** | Herhangi bir `…/v1` adresi (Groq, Mistral, DeepSeek, şirket içi sunucu…) |
 
   Her hizmetin adresi değiştirilebilir; **Modelleri getir** hizmetin
-  sunduğu modelleri listeler. Anahtarlar işletim sisteminin şifrelemesiyle
+  sunduğu modelleri listeler. Model seçicide modeller okunur adlarıyla
+  görünür:
+  - **Claude Code** model listelemez; takma adları (`opus`, `sonnet`,
+    `haiku`) her yanıtın başında bildirdiği gerçek modelle adlandırılır
+    ("opus · Opus 5.5") ve bu, sonraki açılışlar için hatırlanır
+    (`assistant-models.json`); her yanıtın altında da yanıtlayan model
+    yazar. Ayarlarda bir Anthropic API anahtarı varsa Anthropic'in tam
+    listesi de gelir (tam adlar Claude Code'a da verilebilir).
+  - **GitHub Copilot CLI:** hesabın modelleri VS Code'daki gibi GitHub'ın
+    Copilot sunucusundan alınır (kurumun açtığı modeller dahil). GitHub
+    girişi şu sırayla aranır: `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`,
+    `GITHUB_TOKEN`, Copilot eklentilerinin kayıtlı girişi
+    (`github-copilot/apps.json`), `gh auth token`; yalnızca GitHub'a
+    gönderilir. CLI'ın `--help`'i sabit bir model listesi veriyorsa CLI
+    yalnızca onları kabul ettiği için liste onunla sınırlanır, adları
+    hesabın listesinden gelir. Giriş bulunamazsa CLI'ın kendi listesi
+    kalır. Anahtarlar işletim sisteminin şifrelemesiyle
   (`safeStorage`) `%APPDATA%\kalem-desktop\assistant.json` içinde saklanır,
   arayüze hiç dönmez; şifreleme yoksa yalnızca uygulama açıkken bellekte
   tutulur. İstekler Electron'un ağ katmanından gider (sistem vekil sunucusu

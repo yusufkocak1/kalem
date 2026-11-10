@@ -185,7 +185,16 @@ export function createAssistantSettings(options: AssistantSettingsOptions): Assi
 				baseUrl: baseUrl.value,
 				...(key.value.trim() === "" ? {} : { key: key.value }),
 			});
-			models.replaceChildren(...found.map((id) => el("option", { attrs: { value: id } })));
+			models.replaceChildren(
+				...found.map((option) =>
+					el("option", {
+						attrs: {
+							value: option.id,
+							...(option.label === option.id ? {} : { label: option.label }),
+						},
+					}),
+				),
+			);
 			modelsNote.textContent =
 				found.length === 0 ? t.assistantModelsNone : format(t.assistantModelsFound, found.length);
 			if (found.length > 0 && model.value.trim() === "") model.focus();

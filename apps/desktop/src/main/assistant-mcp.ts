@@ -164,6 +164,14 @@ export class AssistantToolServer {
 	async open(
 		tools: () => readonly ToolDefinition[],
 		call: (name: string, input: unknown) => Promise<ToolResult>,
+		/** The servers of the user's mode, next to Kalem's: Claude Code's and Copilot's entries by name. */
+		extra: {
+			readonly claude: Record<string, unknown>;
+			readonly copilot: Record<string, unknown>;
+		} = {
+			claude: {},
+			copilot: {},
+		},
 	): Promise<McpRun> {
 		this.#started ??= this.#start().catch((error: unknown) => {
 			this.#started = null;
@@ -182,11 +190,15 @@ export class AssistantToolServer {
 		const claude = join(folder, `run-${id}.json`);
 		const copilot = join(folder, `copilot-${id}.json`);
 		await writePrivate(claude, {
-			mcpServers: { [MCP_SERVER]: { type: "stdio", command: node, args: [script], env } },
+			mcpServers: {
+				[MCP_SERVER]: { type: "stdio", command: node, args: [script], env },
+				...extra.claude,
+			},
 		});
 		await writePrivate(copilot, {
 			mcpServers: {
 				[MCP_SERVER]: { type: "local", command: node, args: [script], env, tools: ["*"] },
+				...extra.copilot,
 			},
 		});
 		return {

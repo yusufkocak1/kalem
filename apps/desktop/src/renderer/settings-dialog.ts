@@ -386,6 +386,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		t,
 		settings: options.settings,
 		update: options.update,
+		toolCatalog: () => bridge.assistantToolCatalog(),
 	});
 	item(
 		"modes",
