@@ -338,6 +338,28 @@ export function createWorklogForm(options: WorklogFormOptions): HTMLElement {
 		void send();
 	});
 
+	/** The countdown while Jira's rate limit lasts. */
+	let waiting: ReturnType<typeof setInterval> | undefined;
+
+	function waitOut(seconds: number): void {
+		let left = Math.max(1, seconds);
+		submit.disabled = true;
+		const tick = (): void => {
+			if (!form.isConnected || left <= 0) {
+				clearInterval(waiting);
+				waiting = undefined;
+				submit.disabled = false;
+				if (form.isConnected) say(t.jiraWorkLimitOver);
+				return;
+			}
+			say(format(t.jiraWorkLimited, left), "error");
+			left--;
+		};
+		clearInterval(waiting);
+		tick();
+		waiting = setInterval(tick, 1000);
+	}
+
 	async function send(): Promise<void> {
 		const seconds = parseDuration(worked.value);
 		if (seconds === null || seconds > 24 * 3600) {
@@ -386,9 +408,16 @@ export function createWorklogForm(options: WorklogFormOptions): HTMLElement {
 			options.onLogged?.();
 			await load();
 		} catch (error) {
-			say(format(t.jiraWorkFailed, errorText(error)), "error");
+			const text = errorText(error);
+			// Jira's rate limit: the button waits out the time Jira asked, counting down.
+			const limited = /allows them again in (\d+) s/.exec(text);
+			if (limited !== null) {
+				waitOut(Number(limited[1]));
+				return;
+			}
+			say(format(t.jiraWorkFailed, text), "error");
 		} finally {
-			submit.disabled = false;
+			if (waiting === undefined) submit.disabled = false;
 		}
 	}
 

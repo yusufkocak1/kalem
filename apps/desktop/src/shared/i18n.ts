@@ -931,6 +931,9 @@ const en = {
 	jiraWorkComment: "Description",
 	jiraWorkDefaultComment: "Working on issue {0}",
 	jiraWorkChoose: "Choose…",
+	jiraWorkLimited:
+		"Jira is limiting requests (rate limit): it allows them again in {0} s. Nothing was logged.",
+	jiraWorkLimitOver: "Jira allows requests again: log it now.",
 	jiraWorkNoChoices: "Tempo listed no choices",
 	jiraWorkDetails: "Tempo details",
 	jiraWorkDetailsHint: "A list came empty. Copy what Tempo answered to report it:",
@@ -2063,6 +2066,9 @@ const tr: Strings = {
 	jiraWorkComment: "Açıklama",
 	jiraWorkDefaultComment: "Working on issue {0}",
 	jiraWorkChoose: "Seçin…",
+	jiraWorkLimited:
+		"Jira istekleri sınırlıyor (rate limit): {0} sn sonra yeniden izin verir. Efor girilmedi.",
+	jiraWorkLimitOver: "Jira yeniden izin veriyor: şimdi girebilirsiniz.",
 	jiraWorkNoChoices: "Tempo seçenek vermedi",
 	jiraWorkDetails: "Tempo ayrıntıları",
 	jiraWorkDetailsHint: "Bir liste boş geldi. Bildirmek için Tempo'nun yanıtını kopyalayın:",

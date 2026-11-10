@@ -505,11 +505,19 @@ verir.
   bağlı Confluence sitesindeyse tıklamak onu Kalem'de bir sekmede açar
   (adresteki sayfa kimliğiyle ya da `/display/ALAN/Başlık` adresinden
   aranarak); değilse tarayıcıda açılır.
-- **İstek sınırı:** bir Jira sitesine aynı anda en çok 4 istek gider;
-  Jira'nın istek sınırı (HTTP 429, "rate limit exceeded") bir isteği
-  geri çevirirse Kalem `Retry-After` kadar (en çok 15 sn) bekleyip 3 kez
-  yeniden dener. Kim olduğun ve Tempo'nun alanları bir süre hatırlanır,
-  form her açılışta yeniden sormaz.
+- **İstek sınırı:** Jira Data Center jetonla ya da şifreyle gelen REST
+  çağrılarını sayar (tarayıcının kendi istekleri sayılmaz) ve hak bitince
+  HTTP 429 ("rate limit exceeded") ile geri çevirir. Kalem bu yüzden bir
+  Jira sitesine aynı anda en çok 2 istek gönderir; Jira'nın
+  `X-RateLimit-*` başlıklarından kalan hakkı okur ve hak azalınca
+  istekleri dolma hızına göre aralıklar. 429 gelince o siteye giden
+  **bütün** istekler Jira'nın istediği süre (`Retry-After`, en çok 2 dk)
+  kadar durur: o sırada arka plan okumaları (kartlar, Geliştirme paneli,
+  Tempo liste seçenekleri) hiç gönderilmez, senin istediğin bir kez
+  bekleyip yeniden dener (en çok 1 dk). Efor formu beklemeyi geri sayımla
+  gösterir; hiçbir şey kaydedilmemişse bunu söyler. Kim olduğun, Tempo'nun
+  alanları ve seçenekleri, son değerlerin yarım saat; Confluence'taki Jira
+  kartlarının bilgisi 2 dk, Geliştirme paneli 5 dk hatırlanır.
 - Arama: anahtar (`QR-123`), kelimeler (`text ~`) ya da JQL; 25'er sonuç,
   **Daha fazla sonuç göster**. Cloud'da `/rest/api/2/search/jql`, Server'da
   `/rest/api/2/search` kullanılır.
