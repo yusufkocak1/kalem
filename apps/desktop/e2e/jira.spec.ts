@@ -443,13 +443,16 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await expect(worklog.locator(".jira-worklog-status")).toHaveText("5h logged on QR-1.");
 	expect(jiraServer.worklogs[0]).toMatchObject({
 		worker: "JIRAUSER1",
-		originTaskId: "QR-1",
+		// As Tempo's own dialog sends it: the issue's numeric id, and no remaining
+		// estimate unless the user typed one.
+		originTaskId: "10001",
 		timeSpentSeconds: 5 * 3600,
-		remainingEstimate: 3 * 3600,
+		remainingEstimate: null,
+		billableSeconds: null,
 		comment: "Working on issue QR-1",
 		attributes: {
-			_Servis_: { key: "_Servis_", type: "DYNAMIC_DROPDOWN", workAttributeId: 102, value: "3351" },
-			_Sirket_: { key: "_Sirket_", type: "ACCOUNT", workAttributeId: 21, value: "TKAO" },
+			_Servis_: { name: "Servis", workAttributeId: 102, value: "3351" },
+			_Sirket_: { name: "Faturalandırılacak Şirket", workAttributeId: 21, value: "TKAO" },
 		},
 	});
 	await expect(worklog.locator(".jira-worklog-summary")).toHaveText("Spent 17h · Remaining 8h");
@@ -525,7 +528,7 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 		"✓ 3h",
 	);
 	expect(jiraServer.worklogs.at(-1)).toMatchObject({
-		originTaskId: "QR-1",
+		originTaskId: "10001",
 		timeSpentSeconds: 3 * 3600,
 		comment: "Working on issue QR-1",
 		attributes: { _Servis_: { value: "3351" }, _Sirket_: { value: "TKAO" } },

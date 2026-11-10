@@ -1364,6 +1364,32 @@ button {
 	flex: 1;
 }
 
+/* A narrow panel cannot hold the whole toolbar on one line: the mode, the model
+   and Send move to a second line instead of cutting the labels short. */
+.assistant-box {
+	container-type: inline-size;
+}
+
+@container (max-width: 430px) {
+	.assistant-toolbar {
+		flex-wrap: wrap;
+		row-gap: 4px;
+	}
+
+	.assistant-toolbar-space {
+		flex-basis: 100%;
+		height: 0;
+	}
+
+	.assistant-toolbar .assistant-mode-picker {
+		margin-left: auto;
+	}
+
+	.assistant-toolbar .assistant-model {
+		max-width: 55%;
+	}
+}
+
 .assistant-toolbar .assistant-share {
 	min-width: 0;
 	padding: 2px 8px 2px 4px;
@@ -3388,7 +3414,9 @@ button {
 	width: min(50em, 100%);
 	min-height: 64em;
 	margin: 0 auto;
-	padding: 4.5em 5.5em 6em;
+	/* The side margins shrink with a page narrower than 50em (a side panel open
+	   in a small window) instead of squeezing the text into a thin column. */
+	padding: 4.5em min(5.5em, 11%) 6em;
 	border-radius: 2px;
 	background: var(--app-page);
 	box-shadow: var(--app-shadow);
@@ -8947,4 +8975,18 @@ h3.mode-panel-name {
 
 .mcp-card-head .mode-icon-button {
 	margin-left: auto;
+}
+
+/* The empty document's hint wraps inside the page instead of running past its
+   right edge on a narrow page. It takes no height, so the caret stays on the
+   first line, held up by the paragraph's own line break. */
+.kalem-editor.kalem-empty > p.kalem-block:first-child::before {
+	display: block;
+	width: auto;
+	height: 0;
+	white-space: normal;
+}
+
+.kalem-editor.kalem-empty > p.kalem-block:first-child > br:only-child {
+	display: inline;
 }

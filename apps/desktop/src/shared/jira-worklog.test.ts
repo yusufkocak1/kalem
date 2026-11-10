@@ -5,6 +5,7 @@ import {
 	jiraWorklogRequest,
 	missingAttributes,
 	parseDuration,
+	parseEstimate,
 	parseJsonOrJsonp,
 	quickEntry,
 	recentAttributeValues,
@@ -22,6 +23,7 @@ describe("durations", () => {
 		expect(parseDuration("1h30m")).toBe(5400);
 		expect(parseDuration("90m")).toBe(5400);
 		expect(parseDuration("1,5")).toBe(5400);
+		expect(parseDuration("1,5h 1,5m")).toBe(5400 + 90);
 		expect(parseDuration("2")).toBe(7200);
 		expect(parseDuration("1d")).toBe(8 * 3600);
 		expect(parseDuration("2s 15dk")).toBe(2 * 3600 + 900);
@@ -30,6 +32,17 @@ describe("durations", () => {
 		expect(parseDuration("0")).toBeNull();
 		expect(parseDuration("iki saat")).toBeNull();
 		expect(parseDuration("2x")).toBeNull();
+	});
+
+	it("reads a remaining estimate of zero however it is written", () => {
+		// The form fills in "0h" itself once the estimate is used up.
+		for (const zero of ["0", "0h", "0m", "0g", "0 dk", "0,0", "0.0h", "0h 0m"]) {
+			expect(parseEstimate(zero)).toBe(0);
+		}
+		expect(parseEstimate("3h")).toBe(3 * 3600);
+		expect(parseEstimate("1h 0m")).toBe(3600);
+		expect(parseEstimate("")).toBeNull();
+		expect(parseEstimate("0x")).toBeNull();
 	});
 
 	it("writes it as Jira does", () => {
