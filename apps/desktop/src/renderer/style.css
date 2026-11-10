@@ -9687,13 +9687,13 @@ dialog[open]::backdrop {
 	color: var(--app-accent);
 }
 
-.start-pin[aria-pressed="true"] > svg.icon {
-	fill: currentColor;
-}
-
 .start-pin > svg.icon {
 	width: 15px;
 	height: 15px;
+}
+
+.start-pin[aria-pressed="true"] > svg.icon {
+	fill: currentColor;
 }
 
 .start-pin:focus-visible {
