@@ -8,6 +8,7 @@ import {
 	movePane,
 	panesIn,
 	parsePanePlaces,
+	placesFor,
 	revealPane,
 	shownPane,
 	togglePane,
@@ -48,7 +49,25 @@ describe("panes in docks", () => {
 		settings = apply(settings, movePane(settings, "files", "hidden"));
 		expect(panesIn(settings, "left", all)).toEqual(["confluence"]);
 		expect(shownPane(settings, "bottom", local)).toBe("outline");
-		expect(shownPane(settings, "right", local)).toBeNull();
+		// The notes are in the right dock from the start.
+		expect(shownPane(settings, "right", local)).toBe("notes");
+	});
+
+	it("keeps the notes beside the page: left or right, never at the bottom", () => {
+		expect(placesFor("notes")).toEqual(["left", "right", "hidden"]);
+		expect(placesFor("files")).toContain("bottom");
+		expect(movePane(DEFAULT_SETTINGS, "notes", "bottom")).toEqual({});
+		expect(movePane(DEFAULT_SETTINGS, "notes", "left")).toMatchObject({
+			navigation: true,
+			sidePane: "notes",
+		});
+		expect(parsePanePlaces({ notes: "bottom" }).notes).toBe("right");
+		// Hidden, it comes back on the right.
+		const hidden = apply(DEFAULT_SETTINGS, movePane(DEFAULT_SETTINGS, "notes", "hidden"));
+		expect(apply(hidden, revealPane(hidden, "notes"))).toMatchObject({
+			rightDock: true,
+			rightPane: "notes",
+		});
 	});
 
 	it("brings a pane into view, a hidden one in the left dock", () => {
@@ -75,6 +94,7 @@ describe("panes in docks", () => {
 			files: "left",
 			confluence: "left",
 			jira: "bottom",
+			notes: "right",
 		});
 		expect(parsePanePlaces(null).outline).toBe("left");
 		expect(clampDockSize(5000, 240)).toBe(900);

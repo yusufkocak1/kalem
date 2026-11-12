@@ -5,6 +5,7 @@ import type { Command, KalemBridge, Settings } from "../shared/bridge.js";
 import { MAX_ZOOM, MIN_ZOOM } from "../shared/bridge.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
+import { isPaneShown } from "../shared/panes.js";
 import type { SortDirection } from "../shared/table.js";
 import {
 	alignColumn,
@@ -507,7 +508,8 @@ export function createAppRibbon(
 							"notes-toggle",
 							t.notesShow,
 							"note",
-							() => ctx.settings().localNotes,
+							// The pane on the screen; the notes themselves are always kept.
+							() => isPaneShown(ctx.settings(), "notes", () => true),
 							ctx.commands["notes-toggle"],
 						),
 					],

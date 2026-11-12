@@ -9,7 +9,7 @@ import type {
 } from "../shared/palette.js";
 import { PALETTE_IDS, PALETTE_TOKENS, PALETTES, paletteColors } from "../shared/palette.js";
 import type { PanePlace, ToolPane } from "../shared/panes.js";
-import { movePane, PANE_PLACES, TOOL_PANES } from "../shared/panes.js";
+import { movePane, placesFor, TOOL_PANES } from "../shared/panes.js";
 import { PROVIDERS, providerLabel } from "../shared/providers.js";
 import type { SettingCategory, SettingDef } from "../shared/settings-schema.js";
 import {
@@ -430,7 +430,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 				const id = `settings-pane-${++fieldCount}`;
 				const control = el("select", {
 					attrs: { id, "data-pane": pane },
-					children: PANE_PLACES.map((place) =>
+					children: placesFor(pane).map((place) =>
 						el("option", { text: placeLabel[place], attrs: { value: place } }),
 					),
 				});

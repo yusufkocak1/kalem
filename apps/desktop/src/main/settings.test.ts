@@ -68,6 +68,7 @@ describe("parseStoredState", () => {
 			files: "left",
 			confluence: "left",
 			jira: "right",
+			notes: "right",
 		});
 		expect(settings).toMatchObject({
 			rightDock: true,

@@ -6,14 +6,14 @@ import { clickMenu, launch, tempDir } from "./launch.js";
 const TEXT =
 	"# Sipariş İptali\n\nKullanıcı siparişi kargoya verilmeden iptal eder.\n\nİade süreci finans ekibiyle konuşulacak.\n";
 
-test("notes of the user's own: a balloon beside the words, kept on this computer, never in the file", async () => {
+test("notes of the user's own: a card in the My Notes pane, kept on this computer, never in the file", async () => {
 	const folder = await tempDir("notes");
 	const doc = join(folder, "iptal.md");
 	await writeFile(doc, TEXT);
 	const first = await launch({ args: [doc] });
 	const { app, page } = first;
 
-	// A word is selected; the Review tab's New Note puts a balloon beside it.
+	// A word is selected; the Review tab's New Note opens the My Notes pane with a card for it.
 	await page.locator("#editor p", { hasText: "kargoya" }).waitFor();
 	await page.evaluate(() => {
 		const p = [...document.querySelectorAll("#editor p")].find((node) =>
@@ -31,8 +31,10 @@ test("notes of the user's own: a balloon beside the words, kept on this computer
 	await page.locator('.ribbon-tab:has-text("Review")').click();
 	await page.locator('[data-command="note-new"]').click();
 
-	const column = page.locator(".notes-column");
+	const column = page.locator(".notes-pane");
 	await expect(column).toBeVisible();
+	// The pane is in the right dock, beside the page; the page keeps its width.
+	await expect(page.locator(".tool-dock.dock-right .notes-pane")).toBeVisible();
 	await expect(column).toContainText("Only on this computer");
 	const balloon = column.locator(".note-balloon");
 	await expect(balloon).toHaveCount(1);
@@ -54,7 +56,7 @@ test("notes of the user's own: a balloon beside the words, kept on this computer
 	await expect(balloon).toHaveCount(2);
 	await page.keyboard.type("Finansla görüş");
 	await page.keyboard.press("ControlOrMeta+Enter");
-	// The second is under the first, as its words are.
+	// The second is under the first, as its words are in the page.
 	const boxes = await balloon.evaluateAll((items) =>
 		items.map(
 			(item) =>
@@ -87,7 +89,7 @@ test("notes of the user's own: a balloon beside the words, kept on this computer
 	await page.waitForTimeout(600);
 	await app.close();
 
-	// Opened again: the notes are back beside their words.
+	// Opened again: the notes are back, the pane where it was.
 	const again = await launch({ args: [doc], userData: first.userData });
 	const notes = again.page.locator(".note-balloon");
 	await expect(notes).toHaveCount(1);
@@ -99,9 +101,24 @@ test("notes of the user's own: a balloon beside the words, kept on this computer
 	await expect(notes).toHaveCount(0);
 	await again.page.locator(".notice").getByRole("button", { name: "Undo" }).click();
 	await expect(notes).toHaveCount(1);
-	// Hidden from the View menu: no margin and no tint.
-	await clickMenu(again.app, "View", "Show my notes");
-	await expect(again.page.locator(".notes-column")).toHaveCount(0);
+	// The tint off from the View menu: the words are plain, the notes stay in their pane.
+	await clickMenu(again.app, "View", "Tint my notes’ words in the text");
+	await expect
+		.poll(() => again.page.evaluate(() => CSS.highlights.get("kalem-note-attention")?.size ?? 0))
+		.toBe(0);
+	await expect(notes).toHaveCount(1);
+	// The ribbon's My Notes closes the pane, and opens it again.
+	await again.page.locator('.ribbon-tab:has-text("Review")').click();
+	await again.page.locator('[data-command="notes-toggle"]').click();
+	await expect(again.page.locator(".notes-pane")).toBeHidden();
+	await again.page.locator('[data-command="notes-toggle"]').click();
+	await expect(again.page.locator(".notes-pane")).toBeVisible();
+	// The pane goes left or right, never under the page.
+	await again.page.locator(".tool-dock.dock-right .dock-layout").click();
+	const menuItems = again.page.locator(".dock-menu-item");
+	await expect(menuItems.filter({ hasText: "Move to Left" })).toHaveCount(1);
+	await expect(menuItems.filter({ hasText: "Bottom" })).toHaveCount(0);
+	await again.page.keyboard.press("Escape");
 	expect(await readFile(doc, "utf8")).toBe(TEXT);
 	expect(first.errors).toEqual([]);
 	expect(again.errors).toEqual([]);
@@ -129,7 +146,7 @@ test("adding a note far down a long document keeps the page where it is", async 
 	await page.keyboard.type("Burada kalmalı");
 	await page.waitForTimeout(400);
 	const after = await desk.evaluate((element) => element.scrollTop);
-	// The page stays where it was (within a line or two), and the balloon is in view by its words.
+	// The page stays where it was (within a line or two), and the card is in view in its pane.
 	expect(Math.abs(after - before)).toBeLessThan(80);
 	await expect(balloon).toBeInViewport();
 	// Done with the note: back to the text, still in place.
@@ -137,7 +154,7 @@ test("adding a note far down a long document keeps the page where it is", async 
 	await page.waitForTimeout(300);
 	expect(Math.abs((await desk.evaluate((element) => element.scrollTop)) - before)).toBeLessThan(80);
 
-	// A full-width page and the margin fit the window: no sideways scroll.
+	// A full-width page and the pane fit the window: no sideways scroll.
 	await clickMenu(app, "View", "Full Width");
 	await expect(page.locator(".app")).toHaveAttribute("data-full-width", "");
 	await expect

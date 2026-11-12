@@ -1,26 +1,21 @@
 /**
  * The user's own notes on the open document, as Word's comments: the words
- * a note is about are tinted in its colour, and the note sits in a balloon
- * in the margin beside them. They live on this computer only (see
- * `shared/local-notes.ts`): nothing here changes the document.
+ * a note is about are tinted in its colour, and the note is a card in the
+ * "My Notes" pane (a side dock, left or right, like the assistant's), in
+ * the order of the page. They live on this computer only (see
+ * `shared/local-notes.ts`): nothing here changes the document, and the
+ * page keeps its width whatever the notes do.
  *
  * A note is one of four kinds — "I did not get this", "careful", "look
  * later", or a plain note — and can be resolved (kept, out of the way) or
- * deleted. Clicking tinted words opens their balloon; clicking a balloon
- * shows its words.
+ * deleted. Clicking tinted words picks their card; clicking a card shows
+ * its words.
  */
 import type { KalemBridge } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type { LocalNote, NoteKind } from "../shared/local-notes.js";
-import {
-	anchorAt,
-	locateNote,
-	NOTE_KINDS,
-	noteOrder,
-	reanchored,
-	stackBalloons,
-} from "../shared/local-notes.js";
+import { anchorAt, locateNote, NOTE_KINDS, noteOrder, reanchored } from "../shared/local-notes.js";
 import type { TextMap } from "./document-marks.js";
 import { textMap } from "./document-marks.js";
 import { el } from "./dom.js";
@@ -30,9 +25,6 @@ import { icon } from "./icons.js";
 /** The tab whose notes are shown. */
 export interface NotesTarget {
 	readonly id: string;
-	/** The page (positioned) the margin hangs on, and the scrolling desk around it. */
-	readonly page: HTMLElement;
-	readonly desk: HTMLElement;
 	/** The rendered document: where the notes' words are looked for. */
 	readonly canvas: HTMLElement;
 	/** Where the notes are kept; `null` for a document never saved (they wait in memory). */
@@ -45,14 +37,19 @@ export interface LocalNotesOptions {
 	readonly t: Strings;
 	readonly bridge: KalemBridge;
 	readonly lang: string;
-	/** Whether notes are shown (the setting). */
+	/** Whether the notes' words are tinted in the text (the setting). */
 	visible(): boolean;
-	setVisible(value: boolean): void;
+	/** Whether the My Notes pane is on the screen. */
+	shown(): boolean;
+	/** Brings the My Notes pane into view. */
+	reveal(): void;
 	/** Says something to the user, with buttons. */
 	notify(text: string, actions?: readonly { label: string; run(): void }[]): void;
 }
 
 export interface LocalNotes {
+	/** The My Notes pane's content, for its dock. */
+	readonly element: HTMLElement;
 	attach(target: NotesTarget): void;
 	/** The document or the page's size changed: the notes find their words again. */
 	refresh(): void;
@@ -73,7 +70,6 @@ const KIND_ICON: Readonly<Record<NoteKind, IconName>> = {
 
 const HIGHLIGHT = (kind: NoteKind): string => `kalem-note-${kind}`;
 const CURRENT = (kind: NoteKind): string => `kalem-note-current-${kind}`;
-const GAP = 8;
 const SAVE_DELAY = 400;
 
 interface TabNotes {
@@ -113,49 +109,44 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 	let lastKind: NoteKind = "question";
 	let placed = new Map<string, Placed>();
 	let refreshTimer: ReturnType<typeof setTimeout> | undefined;
-	let frame = 0;
 
-	// --- The margin --------------------------------------------------------------
+	// --- The pane -------------------------------------------------------------------
 
 	const countLabel = el("span", { class: "notes-count" });
+	const newButton = el("button", {
+		class: "notes-head-button notes-new",
+		attrs: { type: "button", title: `${t.noteNew} (Ctrl+Alt+M)` },
+		children: [icon("noteNew"), el("span", { text: t.noteNew })],
+	});
 	const resolvedToggle = el("button", {
 		class: "notes-head-button",
 		attrs: { type: "button" },
-	});
-	const hide = el("button", {
-		class: "notes-head-button",
-		attrs: { type: "button", title: t.notesHide, "aria-label": t.notesHide },
-		children: [icon("close")],
 	});
 	const head = el("div", {
 		class: "notes-head",
 		children: [
 			el("div", {
 				class: "notes-head-title",
-				children: [icon("note"), el("strong", { text: t.notesTitle }), countLabel],
+				children: [el("strong", { text: t.notesOpen }), countLabel],
 			}),
-			el("div", { class: "notes-head-actions", children: [resolvedToggle, hide] }),
+			el("div", { class: "notes-head-actions", children: [newButton, resolvedToggle] }),
 			el("p", { class: "notes-private", text: t.notesPrivate }),
 		],
 	});
-	const list = el("div", { class: "notes-list" });
-	const column = el("aside", {
-		class: "notes-column",
+	const list = el("div", { class: "notes-list", attrs: { role: "list" } });
+	const element = el("div", {
+		class: "notes-pane",
 		attrs: { "aria-label": t.notesTitle },
 		children: [head, list],
 	});
-	const svgNs = "http://www.w3.org/2000/svg";
-	const connector = document.createElementNS(svgNs, "svg");
-	connector.setAttribute("class", "notes-connector");
-	connector.setAttribute("aria-hidden", "true");
-	const line = document.createElementNS(svgNs, "polyline");
-	connector.append(line);
 
 	resolvedToggle.addEventListener("click", () => {
 		showResolved = !showResolved;
 		render();
 	});
-	hide.addEventListener("click", () => options.setVisible(false));
+	// Pressed with the mouse, the button must not take the selection out of the text first.
+	newButton.addEventListener("mousedown", (event) => event.preventDefault());
+	newButton.addEventListener("click", () => add());
 
 	const views = new Map<string, Balloon>();
 
@@ -285,9 +276,6 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 	}
 
 	function detach(): void {
-		column.remove();
-		connector.remove();
-		target?.desk.removeAttribute("data-notes");
 		clearHighlights();
 	}
 
@@ -303,8 +291,13 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 		const state = tabNotes(tab);
 		followKey(tab, state);
 		const shown = state.notes.filter((note) => showResolved || !note.resolved);
-		if (!options.visible() || !tab.available() || (state.notes.length === 0 && fresh === null)) {
+		if (!tab.available()) {
 			detach();
+			placed = new Map();
+			countLabel.textContent = "";
+			resolvedToggle.hidden = true;
+			list.replaceChildren(el("p", { class: "notes-empty", text: t.notesUnavailable }));
+			views.clear();
 			return;
 		}
 
@@ -323,8 +316,9 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 		});
 		if (moved) save(state);
 
-		const registry = highlights();
-		if (registry !== null) {
+		const registry = options.visible() ? highlights() : null;
+		if (registry === null) clearHighlights();
+		else {
 			for (const kind of NOTE_KINDS) {
 				const ranges = state.notes
 					.filter((note) => note.kind === kind && !note.resolved)
@@ -341,10 +335,6 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 				else registry.set(CURRENT(each), new Highlight(where.range));
 			}
 		}
-
-		if (column.parentElement !== tab.page) tab.page.append(column);
-		if (connector.parentElement !== tab.page) tab.page.append(connector);
-		tab.desk.dataset.notes = "";
 
 		const open = state.notes.filter((note) => !note.resolved).length;
 		const resolved = state.notes.length - open;
@@ -371,103 +361,21 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 			view.update(note, !placed.has(note.id), note.id === active);
 			return view;
 		});
-		// Moved only when the order changed: a balloon taken out of the page loses the focus.
+		// Moved only when the order changed: a card taken out of the pane loses the focus.
 		const wantedChildren: Element[] =
 			balloons.length === 0
-				? [el("p", { class: "notes-empty", text: t.notesEmpty })]
+				? [
+						el("p", {
+							class: "notes-empty",
+							text: state.notes.length === 0 ? t.notesEmptyHint : t.notesEmpty,
+						}),
+					]
 				: balloons.map((view) => view.element);
 		const same =
 			balloons.length > 0 &&
 			list.children.length === wantedChildren.length &&
 			wantedChildren.every((child, i) => list.children[i] === child);
 		if (!same) list.replaceChildren(...wantedChildren);
-		// Placed at once (a new balloon must not sit at the top while it takes the focus),
-		// and again once the text boxes have grown to their text.
-		position(ordered);
-		cancelAnimationFrame(frame);
-		frame = requestAnimationFrame(() => position(ordered));
-	}
-
-	/** Puts each balloon beside its words, and draws the line to the active one's. */
-	function position(ordered: readonly LocalNote[]): void {
-		const tab = target;
-		if (tab === null || column.parentElement !== tab.page) return;
-		// The editor drew its text again: the words are found anew (and placed from there).
-		for (const where of placed.values()) {
-			if (!where.range.startContainer.isConnected || !where.range.endContainer.isConnected) {
-				render();
-				return;
-			}
-		}
-		const pageBox = tab.page.getBoundingClientRect();
-		// Balloons are placed in the list, under the margin's head.
-		const offset = list.getBoundingClientRect().top - pageBox.top;
-		const start = 0;
-		const wanted = ordered.map((note) => {
-			const where = placed.get(note.id);
-			const view = views.get(note.id);
-			const height = view?.element.offsetHeight ?? 0;
-			const top =
-				where === undefined
-					? Number.POSITIVE_INFINITY
-					: where.range.getBoundingClientRect().top - pageBox.top - offset - 6;
-			return { top: Number.isFinite(top) ? top : 0, height, lost: where === undefined };
-		});
-		// The lost ones go under the rest.
-		const found = wanted.filter((item) => !item.lost);
-		const tops = stackBalloons(found, GAP, start);
-		let next =
-			found.length === 0
-				? start
-				: (tops[tops.length - 1] as number) + (found[found.length - 1]?.height ?? 0) + GAP;
-		let index = 0;
-		let bottom = start;
-		ordered.forEach((note, i) => {
-			const view = views.get(note.id);
-			const item = wanted[i];
-			if (view === undefined || item === undefined) return;
-			let y: number;
-			if (item.lost) {
-				y = next;
-				next += item.height + GAP;
-			} else {
-				y = tops[index++] as number;
-			}
-			view.element.style.top = `${y}px`;
-			// A new balloon appears at its place at once; it only glides when it moves after.
-			if (view.element.dataset.placed === undefined) {
-				void view.element.offsetHeight;
-				view.element.dataset.placed = "";
-			}
-			view.top = y;
-			bottom = Math.max(bottom, y + item.height);
-		});
-		list.style.height = `${bottom}px`;
-		drawConnector(pageBox, offset);
-	}
-
-	function drawConnector(pageBox: DOMRect, offset: number): void {
-		const where = active === null ? undefined : placed.get(active);
-		const view = active === null ? undefined : views.get(active);
-		if (where === undefined || view === undefined) {
-			connector.style.display = "none";
-			return;
-		}
-		const rects = where.range.getClientRects();
-		const last = rects[rects.length - 1];
-		if (last === undefined) {
-			connector.style.display = "none";
-			return;
-		}
-		connector.style.display = "";
-		const columnLeft = column.offsetLeft;
-		const x0 = last.right - pageBox.left;
-		const y0 = last.bottom - pageBox.top;
-		const y1 = offset + view.top + 16;
-		line.setAttribute("points", `${x0},${y0} ${pageBox.width},${y0} ${columnLeft},${y1}`);
-		connector.setAttribute("data-kind", view.kind);
-		connector.style.width = `${columnLeft + 2}px`;
-		connector.style.height = `${Math.max(y0, y1) + 2}px`;
 	}
 
 	// --- A balloon -----------------------------------------------------------------------
@@ -475,7 +383,6 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 	interface Balloon {
 		readonly element: HTMLElement;
 		kind: NoteKind;
-		top: number;
 		update(note: LocalNote, lost: boolean, isActive: boolean): void;
 		focus(): void;
 	}
@@ -514,9 +421,9 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 			kinds.append(button);
 			return { kind, button };
 		});
-		const element = el("article", {
+		const card = el("article", {
 			class: "note-balloon",
-			attrs: { "data-note": id, tabindex: "-1" },
+			attrs: { "data-note": id, tabindex: "-1", role: "listitem" },
 			children: [
 				el("header", {
 					class: "note-head",
@@ -538,22 +445,15 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 		textArea.addEventListener("input", () => {
 			grow();
 			change(id, { text: textArea.value });
-			// Its height may have changed: the ones below move.
-			cancelAnimationFrame(frame);
-			const state = current();
-			if (state !== null) {
-				const ordered = noteOrder(
-					state.notes.filter((note) => showResolved || !note.resolved),
-					(note) => placed.get(note.id)?.start ?? null,
-				);
-				frame = requestAnimationFrame(() => position(ordered));
-			}
 		});
 		textArea.addEventListener("keydown", (event) => {
 			if (event.key === "Escape") {
 				event.preventDefault();
-				if (fresh === id && textArea.value.trim() === "") deleteNote(id, false);
-				else leave();
+				if (fresh === id && textArea.value.trim() === "") {
+					const where = placed.get(id)?.range.cloneRange() ?? null;
+					deleteNote(id, false);
+					backToText(where);
+				} else leave();
 			} else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
 				event.preventDefault();
 				leave();
@@ -563,7 +463,7 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 		textArea.addEventListener("blur", () => {
 			if (fresh === id) fresh = null;
 		});
-		element.addEventListener("click", () => activate(id, true));
+		card.addEventListener("click", () => activate(id, true));
 		resolve.addEventListener("click", (event) => {
 			event.stopPropagation();
 			const note = current()?.notes.find((item) => item.id === id);
@@ -578,12 +478,11 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 		});
 
 		const view: Balloon = {
-			element,
+			element: card,
 			kind: "note",
-			top: 0,
 			update(note, lost, isActive) {
 				view.kind = note.kind;
-				element.className = `note-balloon kind-${note.kind}${isActive ? " active" : ""}${
+				card.className = `note-balloon kind-${note.kind}${isActive ? " active" : ""}${
 					note.resolved ? " resolved" : ""
 				}${lost ? " lost" : ""}`;
 				kindMark.replaceChildren(icon(KIND_ICON[note.kind]), kindLabel[note.kind]);
@@ -602,8 +501,9 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 				requestAnimationFrame(grow);
 			},
 			focus() {
-				// The balloon is already beside its words: the page must not move to it.
+				// The page must not move: the card is in its pane, the words stay where they are.
 				textArea.focus({ preventScroll: true });
+				card.scrollIntoView({ block: "nearest" });
 				const end = textArea.value.length;
 				textArea.setSelectionRange(end, end);
 			},
@@ -615,6 +515,7 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 		if (active === id) return;
 		active = id;
 		render();
+		if (id !== null) views.get(id)?.element.scrollIntoView({ block: "nearest" });
 		if (reveal && id !== null) {
 			const where = placed.get(id);
 			where?.range.startContainer.parentElement?.scrollIntoView({
@@ -627,10 +528,38 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 	/** Out of the balloon, back to the words. */
 	function leave(): void {
 		fresh = null;
-		const tab = target;
+		const where = active === null ? null : (placed.get(active)?.range.cloneRange() ?? null);
 		active = null;
 		render();
-		tab?.canvas.querySelector<HTMLElement>("[contenteditable]")?.focus({ preventScroll: true });
+		backToText(where);
+	}
+
+	/**
+	 * The focus back in the text, the caret just after the note's words (where
+	 * the user was), without moving the page. Without it the focus is lost and
+	 * what is typed next goes nowhere.
+	 */
+	function backToText(range: Range | null): void {
+		const tab = target;
+		if (tab === null) return;
+		const node = range?.endContainer ?? null;
+		const host =
+			node === null || !node.isConnected
+				? null
+				: (node instanceof Element ? node : node.parentElement)?.closest<HTMLElement>(
+						"[contenteditable='true']",
+					);
+		if (range === null || host === null || host === undefined) {
+			tab.canvas
+				.querySelector<HTMLElement>("[contenteditable='true']")
+				?.focus({ preventScroll: true });
+			return;
+		}
+		host.focus({ preventScroll: true });
+		range.collapse(false);
+		const selection = window.getSelection();
+		selection?.removeAllRanges();
+		selection?.addRange(range);
 	}
 
 	function deleteNote(id: string, undoable: boolean): void {
@@ -668,6 +597,7 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 			const note = current()?.notes.find((item) => item.id === id);
 			if (note === undefined || note.resolved) continue;
 			if (where.range.isPointInRange(caret.startContainer, caret.startOffset)) {
+				if (!options.shown()) options.reveal();
 				activate(id, false);
 				return;
 			}
@@ -675,9 +605,49 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 		if (active !== null) activate(null, false);
 	}
 
-	let observer: ResizeObserver | null = null;
+	/** A note on the selection, or the word at the caret; its card takes the focus. */
+	function add(): void {
+		const tab = target;
+		if (tab === null) return;
+		if (!tab.available()) {
+			options.notify(t.notesUnavailable);
+			return;
+		}
+		const map = textMap(tab.canvas);
+		const offsets = selectionOffsets(map, tab.canvas);
+		const anchor = offsets === null ? null : anchorAt(map.text, offsets[0], offsets[1]);
+		if (anchor === null) {
+			options.notify(t.notesSelectFirst);
+			return;
+		}
+		if (!options.shown()) options.reveal();
+		const now = Date.now();
+		const note: LocalNote = {
+			id: crypto.randomUUID(),
+			kind: lastKind,
+			text: "",
+			...anchor,
+			created: now,
+			updated: now,
+			resolved: false,
+		};
+		const state = tabNotes(tab);
+		state.notes = [...state.notes, note];
+		save(state);
+		fresh = note.id;
+		active = note.id;
+		render();
+		// At once: what is typed next is the note, not more of the document. A pane
+		// that is only now being shown takes it a frame later.
+		const view = views.get(note.id);
+		view?.focus();
+		if (view !== undefined && !view.element.contains(document.activeElement)) {
+			requestAnimationFrame(() => view.focus());
+		}
+	}
 
 	return {
+		element,
 		attach(next) {
 			if (target === next) {
 				refresh();
@@ -693,47 +663,11 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 			views.clear();
 			list.replaceChildren();
 			next.canvas.addEventListener("click", onCanvasClick);
-			observer?.disconnect();
-			observer = new ResizeObserver(() => refresh());
-			observer.observe(next.page);
 			tabNotes(next);
 			render();
 		},
 		refresh,
-		add() {
-			const tab = target;
-			if (tab === null) return;
-			if (!tab.available()) {
-				options.notify(t.notesUnavailable);
-				return;
-			}
-			const map = textMap(tab.canvas);
-			const offsets = selectionOffsets(map, tab.canvas);
-			const anchor = offsets === null ? null : anchorAt(map.text, offsets[0], offsets[1]);
-			if (anchor === null) {
-				options.notify(t.notesSelectFirst);
-				return;
-			}
-			if (!options.visible()) options.setVisible(true);
-			const now = Date.now();
-			const note: LocalNote = {
-				id: crypto.randomUUID(),
-				kind: lastKind,
-				text: "",
-				...anchor,
-				created: now,
-				updated: now,
-				resolved: false,
-			};
-			const state = tabNotes(tab);
-			state.notes = [...state.notes, note];
-			save(state);
-			fresh = note.id;
-			active = note.id;
-			render();
-			// At once: what is typed next is the note, not more of the document.
-			views.get(note.id)?.focus();
-		},
+		add,
 		go(direction) {
 			const state = current();
 			if (state === null) return;
@@ -745,7 +679,7 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 				options.notify(t.notesNone);
 				return;
 			}
-			if (!options.visible()) options.setVisible(true);
+			if (!options.shown()) options.reveal();
 			const index = ordered.findIndex((note) => note.id === active);
 			const next =
 				index === -1
@@ -755,7 +689,6 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 					: ordered[(index + direction + ordered.length) % ordered.length];
 			if (next !== undefined) {
 				activate(next.id, true);
-				views.get(next.id)?.element.scrollIntoView({ block: "nearest", behavior: "smooth" });
 			}
 		},
 		count() {
