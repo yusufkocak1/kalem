@@ -1062,6 +1062,7 @@ const en = {
 	tabReview: "Review",
 	groupNotes: "My Notes",
 	localNotes: "Show my notes",
+	restoreSession: "Continue where I left off: reopen my tabs, unsaved text included",
 	changesNotPage:
 		"This tab is not a Confluence page: open one from the Confluence pane to see its changes.",
 	reviewDismissed: "Dismissed",
@@ -2450,6 +2451,7 @@ const tr: Strings = {
 	tabReview: "Gözden Geçir",
 	groupNotes: "Notlarım",
 	localNotes: "Notlarımı göster",
+	restoreSession: "Kaldığım yerden devam et: sekmelerim, kaydedilmemiş metin de, yeniden açılsın",
 	changesNotPage:
 		"Bu sekme bir Confluence sayfası değil: değişikliklerini görmek için Confluence panelinden bir sayfa açın.",
 	reviewDismissed: "Yoksayıldı",

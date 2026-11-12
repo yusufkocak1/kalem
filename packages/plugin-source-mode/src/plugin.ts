@@ -28,21 +28,25 @@
  *    ve geçmişe anlamsız bir adım yazardı. Kullanıcı kaynağa bakıp
  *    hiçbir şey yapmadan döndüğünde hiçbir şey olmamalı.
  *
- * ## İmleç korunmuyor
+ * ## Okunan yer korunuyor
  *
- * Kaynağa geçerken imleç metnin başında, geri dönerken belgenin
- * başında. Korumak için model konumunu kaynak ofsetine çeviren bir
- * eşleme gerekiyor; serileştirici bunu üretmiyor (konum bilgisi
- * **ayrıştırmadan** geliyor, üretimden değil). Yanlış yere konan bir
- * imleç, hiç konmayandan kötü.
+ * Geçişte sayfa başa atlamıyor: ekranın üstündeki blok bulunuyor,
+ * kaynakta o bloğun başladığı satır aynı yüksekliğe getiriliyor ve imleç
+ * oraya konuyor; geri dönerken kaynağın ekranın üstündeki satırı hangi
+ * bloğa düşüyorsa o blok aynı yere getiriliyor. Eşleme blok düzeyinde:
+ * her bloğun kaynaktaki başlangıcı, belgenin o bloğa kadarki kısmı
+ * serileştirilerek bulunuyor (serileştirici konum üretmiyor). Blok
+ * içindeki imleç korunmuyor; yanlış yere konan bir imleç, hiç
+ * konmayandan kötü.
  */
+import type { Root } from "@kalem-editor/core";
 import { parse, serialize } from "@kalem-editor/core";
 import type { Plugin, PluginContext } from "@kalem-editor/editor";
-import { assignIds } from "@kalem-editor/editor";
+import { assignIds, ID_ATTR } from "@kalem-editor/editor";
 import type { SourceLabels } from "./labels.js";
 import { labelsFor } from "./labels.js";
 import type { SourceView } from "./view.js";
-import { createSourceView } from "./view.js";
+import { createSourceView, gorunurUst, kaydiranAta } from "./view.js";
 
 export interface SourceModeOptions {
 	/** Arayüz metinleri; verilmezse belgenin `lang`'ine göre seçiliyor. */
@@ -83,11 +87,49 @@ export function sourceModePlugin(options: SourceModeOptions = {}): SourceModePlu
 		return girisMetni !== null;
 	}
 
+	/** Belgenin üst düzey bloklarının kaynakta başladığı yerler, sırayla. */
+	function blokBaslari(doc: Root, metin: string): number[] {
+		return doc.children.map((_, i) => {
+			if (i === 0) return 0;
+			const once = serialize({ ...doc, children: doc.children.slice(0, i) }).trimEnd().length;
+			// Aradaki boş satırlar atlanıyor: blok, ilk dolu karakterinden başlıyor.
+			let at = Math.min(once, metin.length);
+			while (at < metin.length && /\s/.test(metin[at] as string)) at++;
+			return at;
+		});
+	}
+
+	/** Ekranın üstündeki (ya da en üstte kısmen görünen) blok ve görünür alanın tepesine uzaklığı. */
+	function ustBlok(): { index: number; delta: number } | null {
+		if (ctx === null) return null;
+		const ust = gorunurUst(ctx.element);
+		const doc = ctx.getDocument();
+		for (let i = 0; i < doc.children.length; i++) {
+			const eleman = blokElemani(doc, i);
+			if (eleman === null) continue;
+			const kutu = eleman.getBoundingClientRect();
+			if (kutu.bottom > ust + 1) return { index: i, delta: kutu.top - ust };
+		}
+		return null;
+	}
+
+	function blokElemani(doc: Root, i: number): HTMLElement | null {
+		const id = doc.children[i]?.id;
+		if (ctx === null || id === undefined) return null;
+		return ctx.element.querySelector<HTMLElement>(
+			`:scope > [${ID_ATTR}="${CSS.escape(String(id))}"]`,
+		);
+	}
+
 	function gir(): void {
 		if (ctx === null || view === null || kaynakta()) return;
-		const metin = serialize(ctx.getDocument());
+		const doc = ctx.getDocument();
+		const metin = serialize(doc);
+		const yer = ustBlok();
 		girisMetni = metin;
-		view.show(metin, ctx.isReadOnly());
+		const baslar = yer === null ? [] : blokBaslari(doc, metin);
+		const ofset = yer === null ? 0 : (baslar[yer.index] ?? 0);
+		view.show(metin, ctx.isReadOnly(), ofset, yer?.delta ?? 0);
 		options.onModeChange?.(true);
 	}
 
@@ -95,6 +137,8 @@ export function sourceModePlugin(options: SourceModeOptions = {}): SourceModePlu
 		if (ctx === null || view === null || !kaynakta()) return;
 		const metin = view.text();
 		const onceki = girisMetni;
+		// Kaynağın ekranın üstündeki yeri: dönüşte o blok aynı yere geliyor.
+		const ust = view.topOffset();
 		girisMetni = null;
 		view.hide();
 
@@ -107,13 +151,33 @@ export function sourceModePlugin(options: SourceModeOptions = {}): SourceModePlu
 		}
 
 		options.onModeChange?.(false);
-		odakla();
+		const blok = ust === null ? null : yerlestir(metin, ust.offset, ust.delta);
+		odakla(blok);
 	}
 
-	/** Odağı editörün ilk düzenlenebilir bloğuna verir. */
-	function odakla(): void {
-		const ilk = ctx?.element.firstElementChild;
-		if (ilk instanceof HTMLElement && ilk.isContentEditable) ilk.focus();
+	/** Kaynakta `ofset`te başlayan bloğu, görünür alanın tepesinden `delta` uzağa getirir. */
+	function yerlestir(metin: string, ofset: number, delta: number): HTMLElement | null {
+		if (ctx === null) return null;
+		const doc = ctx.getDocument();
+		const baslar = blokBaslari(doc, serialize(doc));
+		// Kaynak düzenlendiyse ofsetler kayabilir: oransal olarak eşleniyor.
+		const toplam = serialize(doc).length;
+		const hedef = metin.length === 0 ? 0 : Math.round((ofset / metin.length) * toplam);
+		let index = 0;
+		for (let i = 0; i < baslar.length; i++) if ((baslar[i] as number) <= hedef) index = i;
+		const eleman = blokElemani(doc, index);
+		if (eleman === null) return null;
+		const kaydiran = kaydiranAta(ctx.element);
+		const fark = eleman.getBoundingClientRect().top - gorunurUst(ctx.element) - delta;
+		kaydiran.scrollTop += fark;
+		return eleman;
+	}
+
+	/** Odağı okunan bloğa (yoksa ilk düzenlenebilir bloğa) verir; sayfa kaymadan. */
+	function odakla(blok: HTMLElement | null): void {
+		const hedef = blok?.isContentEditable === true ? blok : ctx?.element.firstElementChild;
+		if (hedef instanceof HTMLElement && hedef.isContentEditable)
+			hedef.focus({ preventScroll: true });
 	}
 
 	function degistir(): void {

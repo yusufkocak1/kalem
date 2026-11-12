@@ -299,6 +299,19 @@ verir.
     Sözcükler silinirse not "Sözcükleri artık yok" diye en altta kalır.
   - Kaydedilmemiş yeni bir belgedeki notlar, belge ilk kez kaydedilince
     onunla birlikte saklanır.
+- **Kaldığım yerden devam** (Notepad++ gibi; Ayarlar → Sistem, varsayılan
+  açık): uygulama kapanırken hiçbir şey sorulmaz. Açık sekmeler sırasıyla,
+  etkin sekme, her sekmenin kaydırma yeri ve pencerenin konumu/boyutu
+  `session.json`'a yazılır. **Kaydedilmemiş metin taslak olarak saklanır,
+  silinmez.** Sonraki açılışta hepsi aynen geri gelir: dosyalar diskten,
+  Confluence sayfaları Confluence'tan yeniden okunur, kaydedilmemiş sekmeler
+  "Kaydedilmedi" durumunda taslaklarıyla açılır.
+  - Bu davranış yalnızca uygulamanın kendisi kapanırken geçerlidir.
+    Birden çok pencere varken tek bir pencereyi kapatmak, bir sekmeyi
+    kapatmak ya da tepsi simgesi açıkken son pencereyi kapatmak eskisi
+    gibi kaydedilmemiş değişiklikleri sorar.
+  - Ayar kapatılırsa kapanışta yine "Kaydet / Kaydetme" sorulur ve
+    sekmeler geri gelmez.
 - Kaydedilmemiş değişiklikler kurtarma taslağına yazılır; uygulama
   çökerse sonraki açılışta belge geri gelir.
 - Dosya başka bir programda değişirse pencereye dönünce fark edilir.

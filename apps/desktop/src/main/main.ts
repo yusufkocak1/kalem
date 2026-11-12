@@ -12,7 +12,7 @@ import {
 	session,
 	shell,
 } from "electron";
-import type { Draft, Settings } from "../shared/bridge.js";
+import type { Draft, Settings, TabDocument } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format, pickLanguage, stringsFor } from "../shared/i18n.js";
@@ -39,6 +39,8 @@ import {
 import { PackageStore } from "./package.js";
 import { pathKey } from "./path-key.js";
 import { handleDocumentScheme, registerDocumentScheme } from "./protocol.js";
+import type { StoredSession } from "./session-store.js";
+import { SessionStore } from "./session-store.js";
 import { MAX_WORKSPACES, SettingsStore } from "./settings.js";
 import { TrayIcon } from "./tray.js";
 import { Updater } from "./updater.js";
@@ -82,6 +84,7 @@ function documentArguments(argv: readonly string[], cwd: string): string[] {
 function start(): void {
 	const store = new SettingsStore(join(app.getPath("userData"), "settings.json"));
 	const drafts = new DraftStore(join(app.getPath("userData"), "drafts"));
+	const sessions = new SessionStore(join(app.getPath("userData"), "session.json"));
 	const packages = new PackageStore(join(app.getPath("userData"), "packages"));
 	const secrets = {
 		encrypt: (text: string) =>
@@ -153,6 +156,8 @@ function start(): void {
 	const windows: WindowManager = new WindowManager({
 		store,
 		drafts,
+		sessions,
+		quitsOnLastWindow: () => process.platform !== "darwin" && !tray.enabled,
 		packages,
 		preloadPath: join(__dirname, "preload.cjs"),
 		devUrl: process.env.KALEM_DEV_URL || null,
@@ -402,6 +407,53 @@ function start(): void {
 		}
 	}
 
+	/**
+	 * Opens the windows of the last session: each tab from its draft (unsaved
+	 * text), its file, or its Confluence page, in order, the active one
+	 * active. A file that is gone or a page that cannot be fetched is left
+	 * out. Resolves with the drafts it used.
+	 */
+	async function restoreSession(
+		session: StoredSession,
+		recovered: readonly Draft[],
+	): Promise<Set<string>> {
+		const used = new Set<string>();
+		const credentials = await confluence.get().catch(() => null);
+		const client = credentials === null ? null : confluenceClient(credentials);
+		for (const saved of session.windows) {
+			const documents = await Promise.all(
+				saved.tabs.map(async (tab): Promise<TabDocument | null> => {
+					const view = { scroll: tab.scroll };
+					const draft = tab.draft ? recovered.find((item) => item.id === tab.id) : undefined;
+					if (draft !== undefined) {
+						used.add(draft.id);
+						return { tabId: tab.id, payload: { kind: "draft", draft, restored: true }, view };
+					}
+					try {
+						if (tab.path !== null) {
+							return {
+								tabId: tab.id,
+								payload: { kind: "file", file: await windows.read(tab.path) },
+								view,
+							};
+						}
+						if (tab.page !== null && client !== null && client.site === tab.page.site) {
+							const content = await client.page(tab.page.id);
+							return { tabId: tab.id, payload: { kind: "confluence-page", content }, view };
+						}
+					} catch {
+						// Gone, or out of reach: not opened.
+					}
+					return null;
+				}),
+			);
+			const opened = documents.filter((document): document is TabDocument => document !== null);
+			if (opened.length === 0) continue;
+			windows.open(opened, { bounds: saved.bounds, active: saved.active });
+		}
+		return used;
+	}
+
 	async function openDocuments(paths: readonly string[]): Promise<void> {
 		for (const path of paths) await windows.openPath(path, windows.focused());
 	}
@@ -514,7 +566,13 @@ function start(): void {
 		// would have no copy on disk until edited, and a second crash would lose it.
 		// Working folders of packages from the last session; nothing is open yet.
 		await packages.clear().catch(() => {});
-		const recovered = await Promise.all((await drafts.list()).map(withPackageBase));
+		let recovered = await Promise.all((await drafts.list()).map(withPackageBase));
+		// What was open when the app last closed comes back as it was; its drafts are its unsaved text.
+		const session = sessions.take();
+		if (session !== null && store.settings.restoreSession) {
+			const used = await restoreSession(session, recovered);
+			recovered = recovered.filter((draft) => !used.has(draft.id));
+		}
 		if (recovered.length > 0) {
 			windows.open(
 				recovered.map((draft) => ({ tabId: draft.id, payload: { kind: "draft", draft } })),

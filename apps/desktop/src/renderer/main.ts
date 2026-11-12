@@ -4,7 +4,14 @@ import type { Caret, EditResult } from "@kalem-editor/editor";
 import { holderIn, indentItem, outdentItem, selectRange, toggleList } from "@kalem-editor/editor";
 import type { DocumentAction } from "../shared/actions.js";
 import { applyActions } from "../shared/actions.js";
-import type { Command, GitStatus, KalemBridge, Settings, TabDocument } from "../shared/bridge.js";
+import type {
+	Command,
+	GitStatus,
+	KalemBridge,
+	SessionTab,
+	Settings,
+	TabDocument,
+} from "../shared/bridge.js";
 import { clampZoom, MAX_ZOOM, MIN_ZOOM, pageRule, ZOOM_STEP } from "../shared/bridge.js";
 import type { ContextDiagram, ReplyDiagram } from "../shared/claude.js";
 import { splitReply } from "../shared/claude.js";
@@ -527,6 +534,11 @@ interface Tab {
 	showStart(): void;
 	/** Where the user's own notes on it are drawn. */
 	readonly notes: NotesTarget;
+	/** The page's scroll, kept as it changes: a hidden tab's page reads 0. */
+	scroll: number;
+	/** A scroll to go back to once the tab is shown (a restored tab's). */
+	pendingScroll: number | null;
+	readonly desk: HTMLElement;
 }
 
 /** The ways to start a document, offered under an empty page; Jira only once it is connected. */
@@ -747,7 +759,17 @@ function createTab(id: string): Tab {
 			key: () => noteKey(tabSession.path, tabSession.remote),
 			available: () => !tabSession.isText && tabSession.source?.isSource() !== true,
 		},
+		scroll: 0,
+		pendingScroll: null,
+		desk,
 	};
+	desk.addEventListener(
+		"scroll",
+		() => {
+			if (!desk.hidden) tab.scroll = desk.scrollTop;
+		},
+		{ passive: true },
+	);
 	tabs.set(id, tab);
 	tabStrip.add(id);
 	return tab;
@@ -769,6 +791,17 @@ function activateTab(id: string): void {
 	for (const view of tab.views) view.hidden = false;
 	session.activate();
 	localNotes.attach(tab.notes);
+	if (tab.pendingScroll !== null) {
+		const scroll = tab.pendingScroll;
+		tab.pendingScroll = null;
+		// Once the page is laid out.
+		requestAnimationFrame(() =>
+			requestAnimationFrame(() => {
+				tab.desk.scrollTop = scroll;
+				tab.scroll = tab.desk.scrollTop;
+			}),
+		);
+	}
 
 	tabStrip.select(id);
 	bridge.tabActivated(id);
@@ -778,10 +811,11 @@ function activateTab(id: string): void {
 }
 
 /** Loads a document into its tab, creating the tab if it does not exist yet. */
-function openDocument({ tabId, payload }: TabDocument): void {
+function openDocument({ tabId, payload, view }: TabDocument): void {
 	const tab = tabs.get(tabId) ?? createTab(tabId);
 	// Load before activating: the ribbon reads editor state as soon as a tab is active.
 	tab.session.load(payload);
+	if (view !== undefined && view.scroll > 0) tab.pendingScroll = view.scroll;
 	tab.showStart();
 	activateTab(tabId);
 	tab.session.focus();
@@ -1109,6 +1143,24 @@ const commands: Record<Command, () => void> = {
 // The ribbon reads editor state as soon as it is built, so the documents come first.
 applySettings();
 for (const document of startup.documents) openDocument(document);
+// A restored window's active tab is not always its last.
+// (`activateTab` does nothing for the tab that is active already.)
+if (startup.active !== undefined && tabs.has(startup.active)) activateTab(startup.active);
+
+// As the app closes, what is open is kept to come back next time (`session-store.ts`).
+bridge.onSessionRequest(() => {
+	const result: Record<string, SessionTab> = {};
+	for (const [id, tab] of tabs) {
+		const dirty = tab.session.dirty;
+		result[id] = {
+			dirty,
+			name: tab.session.name,
+			...(dirty ? { text: tab.session.styledMarkdown(), format: tab.session.format } : {}),
+			scroll: tab.session === session ? tab.desk.scrollTop : tab.scroll,
+		};
+	}
+	return { order: tabStrip.order(), active: session.id, tabs: result };
+});
 // The connections decide whether Confluence and Jira have panes; then they are filled.
 void refreshAccounts();
 
