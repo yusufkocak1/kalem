@@ -477,6 +477,44 @@ export function createAppRibbon(
 			],
 		},
 		{
+			id: "review",
+			label: t.tabReview,
+			groups: [
+				{
+					label: t.groupNotes,
+					items: [
+						{
+							id: "note-new",
+							label: t.noteNew,
+							icon: "noteNew",
+							showLabel: true,
+							shortcut: `${MOD}+Alt+M`,
+							run: ctx.commands["note-new"],
+						},
+						{
+							id: "note-previous",
+							label: t.notePrevious,
+							icon: "notePrevious",
+							run: ctx.commands["note-previous"],
+						},
+						{
+							id: "note-next",
+							label: t.noteNext,
+							icon: "noteNext",
+							run: ctx.commands["note-next"],
+						},
+						toggle(
+							"notes-toggle",
+							t.notesShow,
+							"note",
+							() => ctx.settings().localNotes,
+							ctx.commands["notes-toggle"],
+						),
+					],
+				},
+			],
+		},
+		{
 			id: "view",
 			label: t.tabView,
 			groups: [

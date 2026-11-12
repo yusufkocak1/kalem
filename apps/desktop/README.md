@@ -281,6 +281,24 @@ verir.
   olarak koyar, Ctrl+Z önceki metne döndürür. Geçmiş belgenin yoluna
   bağlıdır: taşınan ya da yeniden adlandırılan belge yeni bir geçmişle
   başlar.
+- **Notlarım** (Word'ün açıklama balonları gibi; **Gözden Geçir → Yeni Not**,
+  **Ekle → Yeni Not**, sağ tık ya da `Ctrl+Alt+M`): seçili sözcüklere (seçim
+  yoksa imlecin olduğu sözcüğe) kendinize bir not bırakırsınız. Sözcükler
+  notun rengine boyanır, not sayfanın sağ kenarında bir balonda durur.
+  Notun dört türü vardır: **Anlamadım**, **Dikkat**, **Sonra bak** ve
+  **Not**. Balona tıklayınca sözcükleri, boyalı sözcüklere tıklayınca balonu
+  gösterir. Bir not **Çözüldü** ile kenara alınır (*Çözülenler* ile yine
+  görünür) ya da silinir; silme geri alınabilir. **Önceki / Sonraki Not**
+  notlar arasında gezer, **Görünüm → Notlarımı göster** hepsini gizler.
+  - Notlar **yalnızca bu bilgisayarda** saklanır
+    (`%APPDATA%\kalem-desktop\local-notes.json`, belge yoluna ya da
+    Confluence sayfasına göre). Markdown'a, Confluence'a, dışa aktarmaya ve
+    yazdırmaya hiç girmez; not eklemek belgeyi "kaydedilmemiş" yapmaz.
+  - Not sözcüklerinin kendisine ve çevresine bağlıdır: belgenin başka bir
+    yeri değişince yerini bulur, sözcükleri biraz değişince onları izler.
+    Sözcükler silinirse not "Sözcükleri artık yok" diye en altta kalır.
+  - Kaydedilmemiş yeni bir belgedeki notlar, belge ilk kez kaydedilince
+    onunla birlikte saklanır.
 - Kaydedilmemiş değişiklikler kurtarma taslağına yazılır; uygulama
   çökerse sonraki açılışta belge geri gelir.
 - Dosya başka bir programda değişirse pencereye dönünce fark edilir.
