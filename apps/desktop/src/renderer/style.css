@@ -262,6 +262,14 @@ button {
 	outline-offset: 2px;
 }
 
+/* A narrow window: the buttons keep their marks and lose their words, so the ribbon's head fits. */
+@media (max-width: 780px) {
+	.ribbon-publish > span,
+	.ribbon-changes > span {
+		display: none;
+	}
+}
+
 .ribbon-publish-mark {
 	width: 15px;
 	height: 15px;
@@ -2273,6 +2281,8 @@ button {
 	flex: 1;
 	flex-direction: column;
 	min-height: 0;
+	/* Whatever does not fit scrolls inside the pane; nothing runs over the status bar. */
+	overflow: hidden;
 }
 
 .files-pane[hidden],
@@ -5563,9 +5573,26 @@ pre[data-preview="error"]::after {
 
 .confluence-search-area {
 	display: flex;
+	/* A short pane: the open filters scroll in their box; they do not push the results out of the pane. */
+	flex: 0 1 auto;
 	flex-direction: column;
 	gap: 6px;
+	min-height: 0;
 	margin: 0 8px 6px;
+}
+
+.confluence-search-area > * {
+	flex: none;
+}
+
+.confluence-search-area > .confluence-filters {
+	flex: 0 1 auto;
+	min-height: 64px;
+	overflow-y: auto;
+}
+
+.confluence-pane > .confluence-pane-list {
+	min-height: 84px;
 }
 
 .confluence-search-area[hidden],
@@ -7461,6 +7488,7 @@ details.jira-section > .jira-list {
 	gap: 4px;
 	min-height: 0;
 	padding: 2px;
+	overflow-x: hidden;
 	overflow-y: auto;
 }
 
@@ -7511,8 +7539,11 @@ details.jira-section > .jira-list {
 
 .jira-pane-row-head {
 	display: flex;
+	/* A narrow pane: the status (and a note of work logged) go under the key, not out of the card. */
+	flex-wrap: wrap;
 	align-items: center;
-	gap: 6px;
+	gap: 3px 6px;
+	min-width: 0;
 	min-height: 18px;
 }
 
