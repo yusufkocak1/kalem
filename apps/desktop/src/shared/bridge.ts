@@ -84,6 +84,8 @@ export interface Settings {
 	readonly confluenceSpace: string;
 	/** Starred Confluence pages, shown at the top of the Confluence pane. */
 	readonly confluenceFavorites: readonly ConfluenceFavorite[];
+	/** Saving a Confluence page shows what changed in it first, to check before it is written. */
+	readonly confluenceReviewBeforeSave: boolean;
 	/** Jira issues the user starred, newest first. */
 	readonly jiraFavorites: readonly JiraFavorite[];
 	/** Documents pinned to the start page, in the order they were pinned. */
@@ -152,6 +154,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	bottomHeight: 240,
 	confluenceSpace: "",
 	confluenceFavorites: [],
+	confluenceReviewBeforeSave: true,
 	jiraFavorites: [],
 	pinnedFiles: [],
 	checkUpdates: true,
@@ -378,6 +381,8 @@ export interface ConfluenceSaveRequest {
 	readonly losses: readonly string[];
 	/** Save over a newer version on the server. */
 	readonly overwrite: boolean;
+	/** The user saved from the page's changes, having seen them: no second question. */
+	readonly reviewed?: boolean;
 }
 
 export type ConfluenceSaveResult =
@@ -674,6 +679,7 @@ export const COMMANDS = [
 	"export-confluence",
 	"export-confluence-wiki",
 	"publish-confluence",
+	"confluence-changes",
 	"confluence-open",
 	"quick-open",
 	"search-folder",

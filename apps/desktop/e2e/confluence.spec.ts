@@ -366,6 +366,74 @@ test("edits a Confluence page and saves it back as a new version", async () => {
 	await app.close();
 });
 
+test("shows a page's changes as a diff, undoes one, and saves the rest from there", async () => {
+	const confluence = await fakeConfluence();
+	cleanup.push(confluence.close);
+	const { app, page, errors } = await launch({ settings: { confluenceReviewBeforeSave: true } });
+
+	await clickMenu(app, "File", "Open from Confluence…");
+	const dialog = page.locator(".confluence-dialog");
+	await dialog.locator('input[type="url"]').fill(confluence.site);
+	await dialog.locator('input[type="password"]').fill(TOKEN);
+	await dialog.getByRole("button", { name: "Connect" }).click();
+	await dialog.locator(".quick-open-item", { hasText: "Sprint Planı" }).click();
+	await expect(page.locator("#editor h1").first()).toHaveText("Sprint Planı");
+
+	// Nothing changed yet: no button for it.
+	const button = page.locator(".ribbon-changes");
+	await expect(button).toBeHidden();
+	await page.locator("#editor p", { hasText: "Hedef" }).click();
+	await page.keyboard.press("End");
+	await page.keyboard.type(" eklendi");
+	await expect(button).toBeVisible();
+
+	await button.click();
+	const changes = page.locator("dialog.changes");
+	await expect(changes).toBeVisible();
+	await expect(changes.locator(".changes-title")).toHaveText("Changes to “Sprint Planı”");
+	await expect(changes.locator(".changes-summary")).toHaveText(
+		"1 lines added, 1 removed, in 1 places",
+	);
+	await expect(changes.locator(".changes-row.remove .changes-text")).toHaveText("Hedef");
+	await expect(changes.locator(".changes-row.add .changes-text")).toHaveText("Hedef eklendi");
+	// The words that changed are marked within the line.
+	await expect(changes.locator(".changes-row.add .changes-word")).toHaveText(" eklendi");
+	// Side by side: the old line beside the new one.
+	await changes.getByRole("button", { name: "Side by side" }).click();
+	await expect(changes.locator(".changes-rows.split .changes-text.remove")).toHaveText("Hedef");
+	await expect(changes.locator(".changes-rows.split .changes-text.add")).toHaveText(
+		"Hedef eklendi",
+	);
+
+	// That change is undone on its own: the editor has the page's text again.
+	await changes.getByRole("button", { name: "Undo this change" }).click();
+	await expect(changes.locator(".changes-summary")).toHaveText(
+		"No changes since the page was opened or last saved.",
+	);
+	await expect(page.locator("#editor p", { hasText: "Hedef" })).toHaveText("Hedef");
+	await expect(page.locator(".save-status")).toHaveText("Saved");
+	await changes.getByRole("button", { name: "Close", exact: true }).last().click();
+	await expect(changes).toBeHidden();
+
+	// Saving shows the changes first; saving from there asks nothing more.
+	await page.locator("#editor p", { hasText: "Hedef" }).click();
+	await page.keyboard.press("End");
+	await page.keyboard.type(" ikinci");
+	const asked = await recordMessageBoxes(app, 0);
+	await page.locator('[data-command="save"]').click();
+	await expect(changes).toBeVisible();
+	expect(confluence.saves).toHaveLength(0);
+	await changes.getByRole("button", { name: "Save to Confluence" }).click();
+	await expect(changes).toBeHidden();
+	await expect(page.locator(".save-status")).toHaveText("Saved");
+	expect(await asked()).toEqual([]);
+	expect(confluence.saves).toHaveLength(1);
+	expect(confluence.saves[0]?.storage).toContain("<p>Hedef ikinci</p>");
+	await expect(button).toBeHidden();
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
 test("browses a space's page tree in the side pane and stars a page", async () => {
 	const confluence = await fakeConfluence();
 	cleanup.push(confluence.close);

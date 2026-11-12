@@ -228,7 +228,8 @@ button {
 	margin-left: 0;
 }
 
-.ribbon-publish {
+.ribbon-publish,
+.ribbon-changes {
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
@@ -244,16 +245,19 @@ button {
 	cursor: pointer;
 }
 
-.ribbon-publish[hidden] {
+.ribbon-publish[hidden],
+.ribbon-changes[hidden] {
 	display: none;
 }
 
-.ribbon-publish:hover {
+.ribbon-publish:hover,
+.ribbon-changes:hover {
 	background: var(--app-accent);
 	color: var(--app-accent-text);
 }
 
-.ribbon-publish:focus-visible {
+.ribbon-publish:focus-visible,
+.ribbon-changes:focus-visible {
 	outline: 2px solid var(--app-accent);
 	outline-offset: 2px;
 }
@@ -4581,6 +4585,294 @@ button {
 	opacity: 0.5;
 }
 
+/* --- Confluence changes: a page's diff (see changes-dialog.ts) ------------- */
+
+.changes {
+	--diff-add: color-mix(in srgb, #16a34a 14%, transparent);
+	--diff-add-strong: color-mix(in srgb, #16a34a 34%, transparent);
+	--diff-remove: color-mix(in srgb, #dc2626 12%, transparent);
+	--diff-remove-strong: color-mix(in srgb, #dc2626 32%, transparent);
+	display: none;
+	flex-direction: column;
+	gap: 10px;
+	box-sizing: border-box;
+	width: min(1100px, calc(100vw - 48px));
+	height: min(760px, calc(100vh - 48px));
+	padding: 16px;
+	border: 1px solid var(--app-border);
+	border-radius: 10px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: var(--app-shadow);
+}
+
+.changes[open] {
+	display: flex;
+}
+
+.changes::backdrop {
+	background: rgb(0 0 0 / 18%);
+}
+
+.changes-head {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+}
+
+.changes-heading {
+	flex: 1;
+	min-width: 0;
+}
+
+.changes-title {
+	margin: 0;
+	overflow: hidden;
+	font-size: 15px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.changes-summary,
+.changes-status {
+	margin: 2px 0 0;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.changes-status:empty {
+	display: none;
+}
+
+.changes-layout {
+	display: inline-flex;
+	padding: 2px;
+	border: 1px solid var(--app-border);
+	border-radius: 7px;
+	background: var(--app-surface);
+}
+
+.changes-layout-button {
+	padding: 3px 10px;
+	border: 0;
+	border-radius: 5px;
+	background: transparent;
+	color: var(--app-muted);
+	font: inherit;
+	font-size: 12px;
+}
+
+.changes-layout-button[aria-pressed="true"] {
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: var(--app-shadow-soft);
+}
+
+.changes-body {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-surface);
+}
+
+.changes-body:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -2px;
+}
+
+.changes-empty {
+	margin: 0;
+	padding: 24px;
+	color: var(--app-muted);
+	text-align: center;
+}
+
+.changes-columns {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	display: grid;
+	padding: 6px 10px;
+	border-bottom: 1px solid var(--app-border);
+	background: var(--app-raised);
+	color: var(--app-muted);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.changes-columns.split {
+	grid-template-columns: 1fr 1fr;
+}
+
+.changes-hunk + .changes-hunk {
+	border-top: 1px solid var(--app-border);
+}
+
+.changes-hunk-head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 4px 10px;
+	background: color-mix(in srgb, var(--app-accent) 9%, var(--app-surface));
+	font-size: 12px;
+}
+
+.changes-hunk-range {
+	color: var(--app-accent);
+	font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.changes-hunk-heading {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	color: var(--app-muted);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.changes-hunk-undo {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	margin-inline-start: auto;
+	padding: 2px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 5px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.changes-hunk-undo svg {
+	width: 13px;
+	height: 13px;
+}
+
+.changes-hunk-undo:hover:not(:disabled) {
+	border-color: var(--app-error);
+	color: var(--app-error);
+}
+
+.changes-hunk-undo:disabled {
+	opacity: 0.5;
+}
+
+.changes-rows {
+	font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.changes-rows.unified .changes-row {
+	display: grid;
+	grid-template-columns: 44px 44px 18px 1fr;
+}
+
+.changes-rows.split .changes-row {
+	display: grid;
+	grid-template-columns: 44px 1fr 44px 1fr;
+}
+
+.changes-number {
+	padding-inline-end: 8px;
+	color: var(--app-muted);
+	text-align: right;
+	user-select: none;
+	font-variant-numeric: tabular-nums;
+}
+
+.changes-sign {
+	color: var(--app-muted);
+	user-select: none;
+}
+
+.changes-text {
+	padding-inline-end: 10px;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.changes-rows.split .changes-text:nth-child(2) {
+	border-inline-end: 1px solid var(--app-border);
+}
+
+.changes-row.add,
+.changes-text.add,
+.changes-number.add {
+	background: var(--diff-add);
+}
+
+.changes-row.remove,
+.changes-text.remove,
+.changes-number.remove {
+	background: var(--diff-remove);
+}
+
+.changes-row.add .changes-sign {
+	color: var(--app-ok);
+}
+
+.changes-row.remove .changes-sign {
+	color: var(--app-error);
+}
+
+.changes-text.empty,
+.changes-number.empty {
+	background: repeating-linear-gradient(
+		-45deg,
+		transparent 0 4px,
+		color-mix(in srgb, var(--app-border) 50%, transparent) 4px 5px
+	);
+}
+
+.changes-word {
+	border-radius: 2px;
+	color: inherit;
+}
+
+.add > .changes-word,
+.add .changes-word {
+	background: var(--diff-add-strong);
+}
+
+.remove > .changes-word,
+.remove .changes-word {
+	background: var(--diff-remove-strong);
+}
+
+.changes-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+
+.changes-always {
+	display: inline-flex;
+	flex: 1;
+	align-items: center;
+	gap: 6px;
+	min-width: 220px;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.changes-actions .dialog-button.primary {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.changes-actions .dialog-button.primary svg {
+	width: 15px;
+	height: 15px;
+}
+
 /* --- Diagram and math previews (see previews.ts) ---------------------------- */
 
 pre[data-preview="ready"]::after {
@@ -7959,8 +8251,12 @@ textarea.jira-worklog-input {
 	border-inline-start-color: var(--app-warning);
 }
 
-.assistant-finding:not(.finding-open) {
+.assistant-finding:not(.finding-open) > :not(.assistant-finding-actions) {
 	opacity: 0.6;
+}
+
+.assistant-finding:not(.finding-open) .assistant-finding-state {
+	font-style: italic;
 }
 
 .assistant-finding-head {

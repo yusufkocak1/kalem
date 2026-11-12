@@ -36,7 +36,13 @@ export async function launch(options: LaunchOptions = {}): Promise<Launched> {
 		await writeFile(
 			join(userData, "settings.json"),
 			JSON.stringify({
-				settings: { language: "en", theme: "light", ...options.settings },
+				// Saving a Confluence page saves at once, as before its changes' view; a test turns the view on.
+				settings: {
+					language: "en",
+					theme: "light",
+					confluenceReviewBeforeSave: false,
+					...options.settings,
+				},
 				welcomed: options.welcomed ?? true,
 			}),
 		);

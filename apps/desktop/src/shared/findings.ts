@@ -146,3 +146,76 @@ export function withNoteAfter(markdown: string, quote: string, note: string): st
 	const end = blank === -1 ? text.replace(/\n+$/, "").length : blank;
 	return `${text.slice(0, end)}\n\n${note}${text.slice(end) === "" ? "\n" : text.slice(end)}`;
 }
+
+/** What a finding's button did to the document, so it can be taken back on its own. */
+export type FindingEdit =
+	| {
+			readonly kind: "fixed";
+			readonly quote: string;
+			readonly suggestion: string;
+			readonly at: number;
+	  }
+	| { readonly kind: "noted"; readonly note: string }
+	| {
+			readonly kind: "asked";
+			readonly line: string;
+			readonly heading: string;
+			readonly madeHeading: boolean;
+	  };
+
+/**
+ * The document with one finding's change taken back, the rest of the
+ * document (later edits included) as it is; `null` when the change is no
+ * longer there (the user took it back in the document already).
+ */
+export function revertFindingEdit(markdown: string, edit: FindingEdit): string | null {
+	const text = markdown.replace(/\r\n?/g, "\n");
+	switch (edit.kind) {
+		case "fixed": {
+			if (edit.suggestion === "") return null;
+			// The suggestion nearest to where the quote was: the one the fix put there.
+			let best = -1;
+			for (
+				let at = text.indexOf(edit.suggestion);
+				at !== -1;
+				at = text.indexOf(edit.suggestion, at + 1)
+			) {
+				if (best === -1 || Math.abs(at - edit.at) < Math.abs(best - edit.at)) best = at;
+			}
+			if (best === -1) return null;
+			return text.slice(0, best) + edit.quote + text.slice(best + edit.suggestion.length);
+		}
+		case "noted": {
+			const at = text.indexOf(edit.note);
+			if (at === -1) return null;
+			// The blank line before the note goes with it.
+			let from = at;
+			while (from > 0 && text[from - 1] === "\n") from--;
+			const end = at + edit.note.length;
+			const rest = text.slice(end);
+			return from === 0
+				? rest.replace(/^\n+/, "")
+				: text.slice(0, from) + (rest === "" ? "\n" : rest);
+		}
+		case "asked": {
+			const lines = text.split("\n");
+			const at = lines.indexOf(edit.line);
+			if (at === -1) return null;
+			lines.splice(at, 1);
+			let next = lines.join("\n");
+			// A section that was made for it and has nothing left goes too.
+			if (edit.madeHeading) {
+				const empty = new RegExp(`\\n*#{1,6}\\s+${escapeRegExp(edit.heading)}\\s*$`, "u");
+				next = next.replace(empty, "\n");
+			}
+			return next;
+		}
+	}
+}
+
+/** Whether the document has an open questions' section already: `addToQuestions` then makes none. */
+export function hasQuestions(markdown: string): boolean {
+	return QUESTION_HEADINGS.test(markdown.replace(/\r\n?/g, "\n"));
+}
+
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

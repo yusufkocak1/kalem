@@ -193,4 +193,41 @@ describe("findings put into the document", () => {
 		expect(withNoteAfter("Son satır", "satır", "> not")).toBe("Son satır\n\n> not\n");
 		expect(withNoteAfter("x", "yok", "> not")).toBeNull();
 	});
+
+	it("are taken back one by one, later edits kept", async () => {
+		const { addToQuestions, revertFindingEdit, withNoteAfter } = await import("./findings.js");
+		// A note, with an edit made after it elsewhere.
+		const noted = `${withNoteAfter("# A\n\nBir iki\nüç.\n\nSon\n", "iki", "> not") ?? ""}Ek\n`;
+		expect(revertFindingEdit(noted, { kind: "noted", note: "> not" })).toBe(
+			"# A\n\nBir iki\nüç.\n\nSon\nEk\n",
+		);
+		expect(revertFindingEdit("# A\n", { kind: "noted", note: "> not" })).toBeNull();
+		// A fix: the suggestion nearest to where the quote was goes back.
+		expect(
+			revertFindingEdit("yeni x yeni", { kind: "fixed", quote: "eski", suggestion: "yeni", at: 7 }),
+		).toBe("yeni x eski");
+		expect(
+			revertFindingEdit("eski", { kind: "fixed", quote: "eski", suggestion: "yeni", at: 0 }),
+		).toBeNull();
+		// A question, with the section made for it.
+		const asked = addToQuestions("# A\n\nmetin\n", "- [ ] F-03: Neden?", "Open Questions");
+		expect(
+			revertFindingEdit(asked, {
+				kind: "asked",
+				line: "- [ ] F-03: Neden?",
+				heading: "Open Questions",
+				madeHeading: true,
+			}),
+		).toBe("# A\n\nmetin\n");
+		// A section that was there stays.
+		const kept = addToQuestions("# A\n\n## Sorular\n\n- [ ] eski\n", "- [ ] F-04: Ne?", "Sorular");
+		expect(
+			revertFindingEdit(kept, {
+				kind: "asked",
+				line: "- [ ] F-04: Ne?",
+				heading: "Sorular",
+				madeHeading: false,
+			}),
+		).toBe("# A\n\n## Sorular\n\n- [ ] eski\n");
+	});
 });

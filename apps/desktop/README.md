@@ -465,6 +465,16 @@ verir.
     tutulur.
   - Sayfanın ekli görselleri editörde görünür. Sayfaya eklenen yeni
     görseller kaydederken sayfaya ek olarak yüklenir.
+  - **Değişiklikler** (kaydedilmemiş değişiklik varken kaydetme durumunun
+    yanındaki düğme ya da **Dosya → Confluence Değişiklikleri…**): sayfanın
+    açıldığı ya da son kaydedildiği hâline göre neyin değiştiğini `git diff`
+    gibi gösterir — silinen satırlar kırmızı, eklenenler yeşil, satır içinde
+    değişen sözcükler vurgulu; **Birleşik** ya da **Yan yana** görünüm. Her
+    değişiklik **Bu değişikliği geri al** ile tek başına, ya da **Tümünü
+    Geri Al** ile hepsi birden geri alınır (editörde tek adım: `Ctrl+Z` geri
+    getirir). **Confluence'a Kaydet** buradan kaydeder ve ayrıca sormaz.
+    Varsayılan olarak **Kaydet** önce bu ekranı açar; Ayarlar → Düzenleyici →
+    *Confluence'a kaydetmeden önce değişiklikleri göster* ile kapatılır.
   - Siz açtıktan sonra sayfa Confluence'ta değiştiyse kaydetme durur;
     **Confluence Sürümünü Yükle** ya da **Üzerine Yaz** seçilir.
   - Sayfada Markdown karşılığı olmayan içerik varsa (makrolar, sayfa düzeni,
@@ -772,6 +782,15 @@ verir.
 >   **Düzelt**, **Açık Sorulara Ekle**, **Not Ekle** ya da **Yoksay** ile
 >   ele alınır. Bulgular belgede yalnızca **oturum boyunca** işaretlenir;
 >   Markdown'a ancak kullanıcı bir düğmeye basınca bir şey yazılır.
+>   **Not Ekle**, alıntılanan paragrafın hemen altına bir alıntı bloğu
+>   (`> 📝 **İnceleme F-01:** …`, Confluence'ta da görünür) koyar ve onu
+>   görünür yapar; **Açık Sorulara Ekle** "Açık Sorular" bölümüne bir görev
+>   satırı ekler (bölüm yoksa belgenin sonunda açılır). Ele alınmış bir
+>   bulgunun **Göster** düğmesi belgeye ne konduysa (düzeltme, not, soru)
+>   onu gösterir; **Geri Al** yalnızca o bulgunun değişikliğini geri alır
+>   (sonraki düzenlemeler kalır) ve bulguyu yeniden açar, düğmeleri yine
+>   çalışır. Değişiklik belgede zaten geri alındıysa (`Ctrl+Z`), Geri Al
+>   yalnızca bulguyu yeniden açar.
 > - **Prompt Hazırla:** belgeden (ya da seçili kısımdan) kodlama ajanı için
 >   prompt; istenirse `.kalem/prompts/` altına kaydedilir (onaylı).
 > - **Jira ve Confluence'a yazma:** gereksinimlerden toplu story
