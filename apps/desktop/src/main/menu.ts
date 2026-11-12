@@ -323,6 +323,10 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 				{ label: t.codeBlock, click: send(ctx, "code-block") },
 				{ label: t.quote, click: send(ctx, "quote") },
 				{ label: t.taskList, click: send(ctx, "task-list") },
+				{ type: "separator" },
+				{ label: t.noteNewMenu, accelerator: "CmdOrCtrl+Alt+M", click: send(ctx, "note-new") },
+				{ label: t.notePrevious, click: send(ctx, "note-previous") },
+				{ label: t.noteNext, click: send(ctx, "note-next") },
 			],
 		},
 		{
@@ -391,6 +395,12 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 					click: send(ctx, "source"),
 				},
 				{ label: t.readOnly, click: send(ctx, "read-only") },
+				{
+					label: t.localNotes,
+					type: "checkbox",
+					checked: settings.localNotes,
+					click: () => ctx.changeSettings({ localNotes: !settings.localNotes }),
+				},
 				{ label: t.focusMode, accelerator: "CmdOrCtrl+Shift+F", click: send(ctx, "focus") },
 				{ type: "separator" },
 				{ label: t.zoomIn, accelerator: "CmdOrCtrl+=", click: send(ctx, "zoom-in") },
@@ -557,6 +567,17 @@ export function popupContextMenu(
 		);
 	} else if (params.selectionText.trim() !== "") {
 		items.push({ label: t.copy, role: "copy" });
+	}
+	// A note of the user's own on the words: read-only documents take them too.
+	if (params.isEditable || params.selectionText.trim() !== "") {
+		items.push(
+			{ type: "separator" },
+			{
+				label: t.noteNewMenu,
+				accelerator: "CmdOrCtrl+Alt+M",
+				click: () => contents.send(CHANNEL.command, "note-new" satisfies Command),
+			},
+		);
 	}
 
 	if (items.length === 0) return;

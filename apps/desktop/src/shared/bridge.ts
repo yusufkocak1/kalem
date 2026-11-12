@@ -15,6 +15,7 @@ import type {
 	JiraTransition,
 } from "./jira-dev.js";
 import type { WorklogContext, WorklogEntry } from "./jira-worklog.js";
+import type { LocalNote } from "./local-notes.js";
 import type { ModeSettings } from "./mode-config.js";
 import type { ModelOption } from "./models.js";
 import type { PaletteChoice, PaletteTheme } from "./palette.js";
@@ -86,6 +87,8 @@ export interface Settings {
 	readonly confluenceFavorites: readonly ConfluenceFavorite[];
 	/** Saving a Confluence page shows what changed in it first, to check before it is written. */
 	readonly confluenceReviewBeforeSave: boolean;
+	/** The user's own notes (balloons beside the text, kept on this computer) are shown. */
+	readonly localNotes: boolean;
 	/** Jira issues the user starred, newest first. */
 	readonly jiraFavorites: readonly JiraFavorite[];
 	/** Documents pinned to the start page, in the order they were pinned. */
@@ -155,6 +158,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	confluenceSpace: "",
 	confluenceFavorites: [],
 	confluenceReviewBeforeSave: true,
+	localNotes: true,
 	jiraFavorites: [],
 	pinnedFiles: [],
 	checkUpdates: true,
@@ -680,6 +684,10 @@ export const COMMANDS = [
 	"export-confluence-wiki",
 	"publish-confluence",
 	"confluence-changes",
+	"note-new",
+	"note-next",
+	"note-previous",
+	"notes-toggle",
 	"confluence-open",
 	"quick-open",
 	"search-folder",
@@ -946,6 +954,10 @@ export interface KalemBridge {
 	/** Summarizes an API chat so far; a CLI compacts its own (`"cli"`). */
 	assistantCompact(sessionId: string): Promise<"done" | "cli" | "none">;
 	onAssistantApproval(handler: (request: ApprovalRequest) => void): () => void;
+	/** The user's own notes on a document (see `local-notes.ts`), by its key. */
+	localNotes(key: string): Promise<readonly LocalNote[]>;
+	/** Keeps a document's notes; none forgets the document. */
+	setLocalNotes(key: string, notes: readonly LocalNote[]): Promise<void>;
 	/** The analysis templates: the team's, the user's, and the built-in one. */
 	templates(): Promise<readonly TemplateInfo[]>;
 	/** A new tab with a document made from the template. */
@@ -1082,6 +1094,8 @@ export const CHANNEL = {
 	assistantEvent: "kalem:assistant-event",
 	assistantApproval: "kalem:assistant-approval",
 	templates: "kalem:templates",
+	localNotes: "kalem:local-notes",
+	setLocalNotes: "kalem:set-local-notes",
 	templateNew: "kalem:template-new",
 	templateOpen: "kalem:template-open",
 	templateCopy: "kalem:template-copy",

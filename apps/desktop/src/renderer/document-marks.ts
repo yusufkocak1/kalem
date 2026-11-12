@@ -20,14 +20,14 @@ export function plainQuote(quote: string): string {
 		.trim();
 }
 
-interface TextMap {
+export interface TextMap {
 	/** The text of the page, its spaces folded into one. */
 	readonly text: string;
 	/** For each character of `text`: its node and offset. */
 	readonly at: readonly { node: Text; offset: number }[];
 }
 
-function textMap(root: HTMLElement): TextMap {
+export function textMap(root: HTMLElement): TextMap {
 	const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
 	let text = "";
 	const at: { node: Text; offset: number }[] = [];

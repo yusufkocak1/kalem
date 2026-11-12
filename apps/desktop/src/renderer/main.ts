@@ -13,6 +13,7 @@ import { attachmentName, linkedAttachment } from "../shared/confluence-common.js
 import type { Diagram } from "../shared/diagram.js";
 import { DIAGRAM_SUFFIX, serializeDiagram } from "../shared/diagram.js";
 import { format, stringsFor } from "../shared/i18n.js";
+import { noteKey } from "../shared/local-notes.js";
 import { paletteCss } from "../shared/palette.js";
 import type { ToolPane } from "../shared/panes.js";
 import { revealPane } from "../shared/panes.js";
@@ -49,6 +50,8 @@ import { createImageViewer } from "./image-viewer.js";
 import { createJiraDialog } from "./jira-dialog.js";
 import { createJiraPane } from "./jira-pane.js";
 import { createLinkCard } from "./link-card.js";
+import type { NotesTarget } from "./local-notes.js";
+import { createLocalNotes } from "./local-notes.js";
 import { createNotices } from "./notices.js";
 import { Previews } from "./previews.js";
 import { documentImages } from "./prompt-images.js";
@@ -144,6 +147,16 @@ const changesDialog = createChangesDialog({
 	t,
 	reviewBeforeSave: () => settings.confluenceReviewBeforeSave,
 	setReviewBeforeSave: (value) => updateSettings({ confluenceReviewBeforeSave: value }),
+});
+// The user's own notes beside the text: on this computer only, never in the document.
+const localNotes = createLocalNotes({
+	t,
+	bridge,
+	lang: startup.language,
+	visible: () => settings.localNotes,
+	setVisible: (value) => updateSettings({ localNotes: value }),
+	notify: (text, actions) =>
+		session.notices.show({ id: "notes", text, ...(actions === undefined ? {} : { actions }) }),
 });
 const jiraDialog = createJiraDialog({
 	t,
@@ -512,6 +525,8 @@ interface Tab {
 	readonly views: readonly HTMLElement[];
 	/** Shows or hides the start page, as the document is empty or not. */
 	showStart(): void;
+	/** Where the user's own notes on it are drawn. */
+	readonly notes: NotesTarget;
 }
 
 /** The ways to start a document, offered under an empty page; Jira only once it is connected. */
@@ -683,10 +698,17 @@ function createTab(id: string): Tab {
 				dirty: tabSession.dirty,
 				path: tabSession.path,
 			});
-			if (session === tabSession) renderState();
+			if (session === tabSession) {
+				renderState();
+				// Saved for the first time, or under another name: its notes go with it.
+				localNotes.refresh();
+			}
 			if (loaded) showStart();
 		},
-		onEditorChange: scheduleRibbonUpdate,
+		onEditorChange: () => {
+			scheduleRibbonUpdate();
+			if (session === tabSession) localNotes.refresh();
+		},
 	});
 
 	/** Called once the tab's document is loaded, and on each change of its state after. */
@@ -717,6 +739,14 @@ function createTab(id: string): Tab {
 			loaded = true;
 			showStart();
 		},
+		notes: {
+			id,
+			page,
+			desk,
+			canvas: tabCanvas,
+			key: () => noteKey(tabSession.path, tabSession.remote),
+			available: () => !tabSession.isText && tabSession.source?.isSource() !== true,
+		},
 	};
 	tabs.set(id, tab);
 	tabStrip.add(id);
@@ -738,6 +768,7 @@ function activateTab(id: string): void {
 	assistant.refreshSelection();
 	for (const view of tab.views) view.hidden = false;
 	session.activate();
+	localNotes.attach(tab.notes);
 
 	tabStrip.select(id);
 	bridge.tabActivated(id);
@@ -825,6 +856,7 @@ function applySettings(): void {
 	docks.apply();
 	zoomSlider.value = String(settings.zoom);
 	zoomValue.textContent = `${settings.zoom}%`;
+	localNotes.refresh();
 }
 
 function updateSettings(patch: Partial<Settings>): void {
@@ -1033,6 +1065,10 @@ const commands: Record<Command, () => void> = {
 			session.notices.show({ id: "changes", text: t.changesNotPage });
 		}
 	},
+	"note-new": () => localNotes.add(),
+	"note-next": () => localNotes.go(1),
+	"note-previous": () => localNotes.go(-1),
+	"notes-toggle": () => updateSettings({ localNotes: !settings.localNotes }),
 	"jira-open": () => void jiraDialog.showSearch(),
 	settings: () => void settingsDialog.show(),
 	"new-from-template": () => void templatePicker.show(),

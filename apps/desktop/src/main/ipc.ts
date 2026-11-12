@@ -65,6 +65,7 @@ import {
 } from "./git.js";
 import type { VersionStore } from "./history.js";
 import { registerJiraIpc } from "./jira-ipc.js";
+import { LocalNotesStore } from "./local-notes-store.js";
 import { paletteCommands, runPaletteCommand } from "./menu.js";
 import type { PackageStore } from "./package.js";
 import { PACKAGE_ASSETS } from "./package.js";
@@ -952,6 +953,16 @@ export function registerIpc(ctx: IpcContext): void {
 		language: ctx.language,
 	});
 	registerTemplateIpc({ templates, windows, strings: ctx.strings, senderOf });
+
+	// The user's own notes on documents: in the app's data folder, never in a document.
+	const localNotes = new LocalNotesStore(join(app.getPath("userData"), "local-notes.json"));
+	ipcMain.handle(CHANNEL.localNotes, (_event, key: unknown) =>
+		typeof key === "string" && key !== "" ? localNotes.get(key) : [],
+	);
+	ipcMain.handle(CHANNEL.setLocalNotes, async (_event, key: unknown, notes: unknown) => {
+		if (typeof key !== "string" || key === "") return;
+		await localNotes.set(key, notes);
+	});
 
 	assistant = registerAssistantIpc({
 		templates,

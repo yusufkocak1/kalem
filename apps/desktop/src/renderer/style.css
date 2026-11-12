@@ -4585,6 +4585,403 @@ button {
 	opacity: 0.5;
 }
 
+/* --- My notes: balloons beside the text (see local-notes.ts) ------------------ */
+
+:root {
+	--note-question: #7c4dff;
+	--note-attention: #d9480f;
+	--note-later: #0b7bc4;
+	--note-note: var(--app-accent);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--note-question: #b49cff;
+		--note-attention: #ff9a5c;
+		--note-later: #5cb8f0;
+	}
+}
+
+::highlight(kalem-note-question) {
+	background-color: color-mix(in srgb, var(--note-question) 18%, transparent);
+}
+
+::highlight(kalem-note-attention) {
+	background-color: color-mix(in srgb, var(--note-attention) 18%, transparent);
+}
+
+::highlight(kalem-note-later) {
+	background-color: color-mix(in srgb, var(--note-later) 18%, transparent);
+}
+
+::highlight(kalem-note-note) {
+	background-color: color-mix(in srgb, var(--note-note) 16%, transparent);
+}
+
+::highlight(kalem-note-current-question) {
+	background-color: color-mix(in srgb, var(--note-question) 36%, transparent);
+}
+
+::highlight(kalem-note-current-attention) {
+	background-color: color-mix(in srgb, var(--note-attention) 36%, transparent);
+}
+
+::highlight(kalem-note-current-later) {
+	background-color: color-mix(in srgb, var(--note-later) 36%, transparent);
+}
+
+::highlight(kalem-note-current-note) {
+	background-color: color-mix(in srgb, var(--note-note) 32%, transparent);
+}
+
+/* The margin for the balloons is on the right of the page. */
+.desk[data-notes] {
+	padding-right: 312px;
+}
+
+.desk[data-notes] .page {
+	position: relative;
+}
+
+.notes-column {
+	position: absolute;
+	top: 0;
+	left: calc(100% + 28px);
+	width: 268px;
+	color: var(--app-text);
+	font-family: var(--app-font, system-ui, sans-serif);
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+.notes-head {
+	display: grid;
+	grid-template-columns: 1fr auto;
+	gap: 2px 8px;
+	align-items: center;
+	padding: 2px 2px 0;
+}
+
+.notes-head-title {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.notes-head-title .icon {
+	width: 16px;
+	height: 16px;
+	color: var(--app-accent);
+}
+
+.notes-count {
+	min-width: 18px;
+	padding: 0 6px;
+	border-radius: 999px;
+	background: var(--app-pressed);
+	color: var(--app-accent);
+	font-size: 11px;
+	font-weight: 600;
+	text-align: center;
+}
+
+.notes-head-actions {
+	display: flex;
+	gap: 4px;
+}
+
+.notes-head-button {
+	display: inline-flex;
+	align-items: center;
+	padding: 2px 6px;
+	border: 0;
+	border-radius: 5px;
+	background: transparent;
+	color: var(--app-muted);
+	font: inherit;
+	font-size: 12px;
+}
+
+.notes-head-button:hover {
+	background: var(--app-hover);
+	color: var(--app-text);
+}
+
+.notes-head-button[hidden] {
+	display: none;
+}
+
+.notes-head-button .icon {
+	width: 14px;
+	height: 14px;
+}
+
+.notes-private {
+	grid-column: 1 / -1;
+	margin: 0;
+	color: var(--app-muted);
+	font-size: 11px;
+}
+
+.notes-list {
+	position: relative;
+}
+
+.notes-empty {
+	margin: 8px 2px;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.note-balloon {
+	--kind: var(--note-note);
+	position: absolute;
+	top: 0;
+	right: 0;
+	left: 0;
+	box-sizing: border-box;
+	padding: 7px 10px 6px;
+	border: 1px solid var(--app-border);
+	border-inline-start: 3px solid var(--kind);
+	border-radius: 8px;
+	background: var(--app-raised);
+	box-shadow: var(--app-shadow-soft);
+	transition:
+		transform 160ms var(--app-ease),
+		box-shadow 160ms var(--app-ease);
+	cursor: default;
+}
+
+/* The balloon's tail, pointing at the text. */
+.note-balloon::before {
+	content: "";
+	position: absolute;
+	top: 12px;
+	left: -9px;
+	width: 0;
+	height: 0;
+	border-top: 6px solid transparent;
+	border-bottom: 6px solid transparent;
+	border-right: 6px solid var(--kind);
+}
+
+.note-balloon.kind-question {
+	--kind: var(--note-question);
+}
+
+.note-balloon.kind-attention {
+	--kind: var(--note-attention);
+}
+
+.note-balloon.kind-later {
+	--kind: var(--note-later);
+}
+
+.note-balloon.active {
+	z-index: 1;
+	border-color: color-mix(in srgb, var(--kind) 55%, var(--app-border));
+	box-shadow:
+		0 0 0 3px color-mix(in srgb, var(--kind) 14%, transparent),
+		var(--app-shadow);
+}
+
+.note-balloon.resolved {
+	opacity: 0.62;
+}
+
+.note-balloon.lost {
+	border-style: dashed;
+	border-inline-start-style: solid;
+}
+
+.note-balloon.lost::before {
+	display: none;
+}
+
+.note-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 22px;
+}
+
+.note-kind {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--kind);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.note-kind .icon,
+.note-kind-chip .icon,
+.note-action .icon {
+	width: 14px;
+	height: 14px;
+}
+
+.note-time {
+	color: var(--app-muted);
+	font-size: 11px;
+}
+
+.note-actions {
+	display: flex;
+	gap: 2px;
+	margin-inline-start: auto;
+	opacity: 0;
+	transition: opacity 120ms;
+}
+
+.note-balloon:hover .note-actions,
+.note-balloon.active .note-actions,
+.note-balloon:focus-within .note-actions {
+	opacity: 1;
+}
+
+.note-action {
+	display: inline-flex;
+	padding: 3px;
+	border: 0;
+	border-radius: 5px;
+	background: transparent;
+	color: var(--app-muted);
+}
+
+.note-action:hover {
+	background: var(--app-hover);
+	color: var(--app-text);
+}
+
+.note-quote {
+	display: none;
+	margin: 4px 0 2px;
+	padding-inline-start: 7px;
+	border-inline-start: 2px solid var(--app-border);
+	color: var(--app-muted);
+	font-size: 12px;
+	overflow-wrap: anywhere;
+}
+
+.note-balloon.lost .note-quote,
+.note-balloon.resolved .note-quote {
+	display: block;
+}
+
+.note-kinds {
+	display: none;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin: 4px 0;
+}
+
+.note-balloon.active .note-kinds {
+	display: flex;
+}
+
+.note-kind-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	padding: 2px 7px 2px 5px;
+	border: 1px solid var(--app-border);
+	border-radius: 999px;
+	background: var(--app-surface);
+	color: var(--app-muted);
+	font: inherit;
+	font-size: 11px;
+}
+
+.note-kind-chip.kind-question {
+	--kind: var(--note-question);
+}
+
+.note-kind-chip.kind-attention {
+	--kind: var(--note-attention);
+}
+
+.note-kind-chip.kind-later {
+	--kind: var(--note-later);
+}
+
+.note-kind-chip.kind-note {
+	--kind: var(--note-note);
+}
+
+.note-kind-chip:hover {
+	color: var(--kind);
+}
+
+.note-kind-chip[aria-checked="true"] {
+	border-color: var(--kind);
+	background: color-mix(in srgb, var(--kind) 12%, var(--app-raised));
+	color: var(--kind);
+	font-weight: 600;
+}
+
+.note-text {
+	display: block;
+	box-sizing: border-box;
+	width: 100%;
+	min-height: 22px;
+	margin: 2px 0 0;
+	padding: 2px 0;
+	border: 0;
+	background: transparent;
+	color: var(--app-text);
+	font: inherit;
+	overflow: hidden;
+	resize: none;
+}
+
+.note-text:focus {
+	outline: none;
+}
+
+.note-text::placeholder {
+	color: var(--app-muted);
+}
+
+.note-balloon.resolved .note-text {
+	text-decoration: line-through;
+}
+
+/* From the active note's words to its balloon. */
+.notes-connector {
+	position: absolute;
+	top: 0;
+	left: 0;
+	overflow: visible;
+	pointer-events: none;
+}
+
+.notes-connector polyline {
+	fill: none;
+	stroke: var(--note-note);
+	stroke-width: 1.2;
+	stroke-dasharray: 3 3;
+}
+
+.notes-connector[data-kind="question"] polyline {
+	stroke: var(--note-question);
+}
+
+.notes-connector[data-kind="attention"] polyline {
+	stroke: var(--note-attention);
+}
+
+.notes-connector[data-kind="later"] polyline {
+	stroke: var(--note-later);
+}
+
+@media print {
+	.notes-column,
+	.notes-connector {
+		display: none;
+	}
+}
+
 /* --- Confluence changes: a page's diff (see changes-dialog.ts) ------------- */
 
 .changes {
