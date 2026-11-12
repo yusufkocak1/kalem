@@ -442,7 +442,10 @@ export class Session {
 				this.#name = draft.name === "" ? t.untitled : draft.name;
 				this.#format = draft.format;
 				clean = false;
-				notices.show({ id: "recovered", kind: "warning", text: t.recovered });
+				// Kept on purpose when the app closed: no warning, it is just still unsaved.
+				if (payload.restored !== true) {
+					notices.show({ id: "recovered", kind: "warning", text: t.recovered });
+				}
 				break;
 			}
 			case "new-file":

@@ -4643,6 +4643,15 @@ button {
 	position: relative;
 }
 
+/* A full-width page leaves the margin its room too: no sideways scroll. */
+.app[data-full-width] .desk[data-notes] {
+	padding-right: 300px;
+}
+
+.app[data-full-width] .desk[data-notes] .notes-column {
+	left: calc(100% + 16px);
+}
+
 .notes-column {
 	position: absolute;
 	top: 0;
@@ -4746,13 +4755,18 @@ button {
 	border-radius: 8px;
 	background: var(--app-raised);
 	box-shadow: var(--app-shadow-soft);
+	/* Placed by `top`, not a transform: the browser keeps a text box's caret in view by its laid-out place. */
 	transition:
-		transform 160ms var(--app-ease),
+		top 160ms var(--app-ease),
 		box-shadow 160ms var(--app-ease);
 	cursor: default;
 }
 
 /* The balloon's tail, pointing at the text. */
+.note-balloon:not([data-placed]) {
+	transition: none;
+}
+
 .note-balloon::before {
 	content: "";
 	position: absolute;

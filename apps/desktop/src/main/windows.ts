@@ -10,12 +10,14 @@ import type {
 	MovedTab,
 	OpenedFile,
 	RemotePage,
+	SessionSnapshot,
 	Settings,
 	TabDocument,
 	WindowState,
 } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
 import type { LegacyEncoding } from "../shared/encoding.js";
+import { DEFAULT_FORMAT, toTextFormat } from "../shared/encoding.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import {
@@ -32,6 +34,7 @@ import type { DraftStore } from "./drafts.js";
 import { modifiedTime, readDocument } from "./files.js";
 import type { PackageStore } from "./package.js";
 import { pathKey } from "./path-key.js";
+import type { SessionStore, SessionTabEntry, SessionWindow } from "./session-store.js";
 import type { SettingsStore, WindowBounds } from "./settings.js";
 import { isTextFile } from "./text-files.js";
 import { readWord, WordError } from "./word.js";
@@ -71,11 +74,24 @@ export interface AppWindow {
 	closing: boolean;
 	/** Resolvers of save requests sent to the renderer, by tab id. */
 	readonly saveRequests: Map<string, (saved: boolean) => void>;
+	/** The answer to the question of what the tabs are, as the app closes. */
+	sessionRequest: ((snapshot: unknown) => void) | null;
+	/** Closed with the app: its drafts are kept, to come back next time. */
+	keepDrafts: boolean;
+}
+
+/** How a window is opened: where (a restored window's place) and which tab is active. */
+export interface OpenOptions {
+	readonly bounds?: WindowBounds | null;
+	readonly active?: string | null;
 }
 
 export interface WindowManagerOptions {
 	readonly store: SettingsStore;
 	readonly drafts: DraftStore;
+	readonly sessions: SessionStore;
+	/** Whether closing the last window ends the app (no tray icon, not macOS). */
+	quitsOnLastWindow(): boolean;
 	readonly packages: PackageStore;
 	readonly preloadPath: string;
 	readonly devUrl: string | null;
@@ -101,6 +117,8 @@ export class WindowManager {
 	readonly #options: WindowManagerOptions;
 	readonly #windows = new Map<number, AppWindow>();
 	#quitting = false;
+	/** The windows closed with the app so far, by window id, in the order they closed. */
+	readonly #session = new Map<number, SessionWindow>();
 
 	constructor(options: WindowManagerOptions) {
 		this.#options = options;
@@ -130,8 +148,10 @@ export class WindowManager {
 	// --- Windows ------------------------------------------------------------
 
 	/** Opens a window with the given documents as tabs; a single empty tab by default. */
-	open(documents: readonly TabDocument[] = []): AppWindow {
-		const bounds = this.#initialBounds();
+	open(documents: readonly TabDocument[] = [], options: OpenOptions = {}): AppWindow {
+		// A window opened after the app's last window closed (macOS, the tray) starts a new session.
+		if (!this.#quitting && this.#windows.size === 0) this.#session.clear();
+		const bounds = options.bounds ?? this.#initialBounds();
 		const window = new BrowserWindow({
 			width: bounds.width,
 			height: bounds.height,
@@ -162,6 +182,8 @@ export class WindowManager {
 			closeConfirmed: false,
 			closing: false,
 			saveRequests: new Map(),
+			sessionRequest: null,
+			keepDrafts: false,
 		};
 		const initial = documents.length > 0 ? documents : [this.#emptyDocument()];
 		for (const document of initial) {
@@ -169,6 +191,7 @@ export class WindowManager {
 			win.pending.push(document);
 			win.activeTabId = document.tabId;
 		}
+		if (options.active != null && win.tabs.has(options.active)) win.activeTabId = options.active;
 		this.#windows.set(window.webContents.id, win);
 		this.#updateTitle(win);
 
@@ -224,8 +247,18 @@ export class WindowManager {
 		window.on("focus", () => void this.#checkExternalChanges(win));
 
 		window.on("close", (event) => {
+			if (win.closeConfirmed) {
+				this.#saveBounds(window);
+				return;
+			}
+			// Closed with the app: its tabs are kept, unsaved text too, and nothing is asked.
+			if (this.#closesWithApp()) {
+				event.preventDefault();
+				void this.#closeForSession(win);
+				return;
+			}
 			const hasUnsaved = [...win.tabs.values()].some((tab) => tab.dirty);
-			if (win.closeConfirmed || !hasUnsaved) {
+			if (!hasUnsaved) {
 				this.#saveBounds(window);
 				return;
 			}
@@ -236,9 +269,10 @@ export class WindowManager {
 		window.on("closed", () => {
 			this.#windows.delete(id);
 			for (const tab of win.tabs.values()) {
-				void this.#options.drafts.delete(tab.id).catch(() => {});
+				if (!win.keepDrafts) void this.#options.drafts.delete(tab.id).catch(() => {});
 				this.#releasePackage(tab.path);
 			}
+			win.sessionRequest?.(null);
 			for (const resolveSave of win.saveRequests.values()) resolveSave(false);
 			if (this.#quitting && this.#windows.size > 0) app.quit();
 		});
@@ -255,6 +289,106 @@ export class WindowManager {
 
 	beginQuit(): void {
 		this.#quitting = true;
+	}
+
+	/** Whether a window closing now is closing with the app, to be opened again next time. */
+	#closesWithApp(): boolean {
+		if (!this.#options.store.settings.restoreSession) return false;
+		return this.#quitting || (this.#windows.size === 1 && this.#options.quitsOnLastWindow());
+	}
+
+	/** Asks the renderer for its tabs; `null` when it does not answer in time. */
+	#askSession(win: AppWindow): Promise<SessionSnapshot | null> {
+		return new Promise((resolveSnapshot) => {
+			const timer = setTimeout(() => done(null), 3000);
+			const done = (snapshot: unknown): void => {
+				clearTimeout(timer);
+				win.sessionRequest = null;
+				resolveSnapshot(parseSnapshot(snapshot));
+			};
+			win.sessionRequest = done;
+			if (!win.ready || win.window.isDestroyed()) done(null);
+			else win.window.webContents.send(CHANNEL.sessionRequest);
+		});
+	}
+
+	answerSession(win: AppWindow, snapshot: unknown): void {
+		win.sessionRequest?.(snapshot);
+	}
+
+	/**
+	 * Keeps the window for the next start: each unsaved tab's text as its
+	 * draft, the tabs in order, the active one and where each was scrolled.
+	 */
+	async #closeForSession(win: AppWindow): Promise<void> {
+		if (win.closing) return;
+		win.closing = true;
+		try {
+			const snapshot = await this.#askSession(win);
+			if (win.window.isDestroyed()) return;
+			const order = [
+				...(snapshot?.order.filter((id) => win.tabs.has(id)) ?? []),
+				...[...win.tabs.keys()].filter((id) => !snapshot?.order.includes(id)),
+			];
+			const drafts = this.#options.drafts;
+			const tabs: SessionTabEntry[] = [];
+			const writes: Promise<void>[] = [];
+			for (const id of order) {
+				const tab = win.tabs.get(id);
+				if (tab === undefined) continue;
+				const seen = snapshot?.tabs[id];
+				const dirty = seen?.dirty ?? tab.dirty;
+				const scroll = seen?.scroll ?? 0;
+				if (dirty && seen?.text !== undefined) {
+					writes.push(
+						drafts.write(
+							id,
+							{
+								name: seen.name,
+								text: seen.text,
+								format: seen.format ?? DEFAULT_FORMAT,
+								path: tab.path,
+								remote: tab.remote,
+								storage: tab.storage,
+							},
+							Date.now(),
+						),
+					);
+				}
+				// A dirty tab the renderer did not describe keeps the draft it wrote itself.
+				const entry: SessionTabEntry = {
+					id,
+					draft: dirty,
+					path: tab.path,
+					page: tab.remote === null ? null : { site: tab.remote.site, id: tab.remote.id },
+					scroll,
+				};
+				if (entry.draft || entry.path !== null || entry.page !== null) tabs.push(entry);
+			}
+			await Promise.allSettled(writes);
+			if (tabs.length > 0) {
+				const b = win.window.getNormalBounds();
+				this.#session.set(win.window.webContents.id, {
+					bounds: {
+						width: b.width,
+						height: b.height,
+						x: b.x,
+						y: b.y,
+						maximized: win.window.isMaximized(),
+					},
+					active: snapshot?.active ?? win.activeTabId,
+					tabs,
+				});
+			}
+			const windows = [...this.#session.values()];
+			if (windows.length > 0) this.#options.sessions.write({ windows });
+			else this.#options.sessions.clear();
+			win.keepDrafts = true;
+			win.closeConfirmed = true;
+			win.window.close();
+		} finally {
+			win.closing = false;
+		}
 	}
 
 	/** Asks what to do with an unsaved tab; a clean tab needs no question. */
@@ -874,4 +1008,27 @@ ${errorMessage(error)}`,
 			await this.openPath(target, win);
 		} else shell.showItemInFolder(target);
 	}
+}
+
+/** The renderer's answer, checked: it is another process. */
+function parseSnapshot(raw: unknown): SessionSnapshot | null {
+	if (typeof raw !== "object" || raw === null) return null;
+	const value = raw as Record<string, unknown>;
+	const order = Array.isArray(value.order)
+		? value.order.filter((id): id is string => typeof id === "string")
+		: [];
+	const tabs: Record<string, SessionSnapshot["tabs"][string]> = {};
+	const rawTabs = typeof value.tabs === "object" && value.tabs !== null ? value.tabs : {};
+	for (const [id, item] of Object.entries(rawTabs)) {
+		if (typeof item !== "object" || item === null) continue;
+		const tab = item as Record<string, unknown>;
+		const format = toTextFormat(tab.format);
+		tabs[id] = {
+			dirty: tab.dirty === true,
+			name: typeof tab.name === "string" ? tab.name : "",
+			...(typeof tab.text === "string" ? { text: tab.text, format } : {}),
+			scroll: typeof tab.scroll === "number" && Number.isFinite(tab.scroll) ? tab.scroll : 0,
+		};
+	}
+	return { order, active: typeof value.active === "string" ? value.active : null, tabs };
 }

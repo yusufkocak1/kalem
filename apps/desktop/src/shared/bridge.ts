@@ -87,6 +87,11 @@ export interface Settings {
 	readonly confluenceFavorites: readonly ConfluenceFavorite[];
 	/** Saving a Confluence page shows what changed in it first, to check before it is written. */
 	readonly confluenceReviewBeforeSave: boolean;
+	/**
+	 * Closing the app keeps the open tabs, unsaved text included, and opening
+	 * it brings them back as they were, as Notepad++ does; nothing is asked.
+	 */
+	readonly restoreSession: boolean;
 	/** The user's own notes (balloons beside the text, kept on this computer) are shown. */
 	readonly localNotes: boolean;
 	/** Jira issues the user starred, newest first. */
@@ -158,6 +163,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	confluenceSpace: "",
 	confluenceFavorites: [],
 	confluenceReviewBeforeSave: true,
+	restoreSession: true,
 	localNotes: true,
 	jiraFavorites: [],
 	pinnedFiles: [],
@@ -414,7 +420,8 @@ export type DocumentPayload =
 	| { readonly kind: "word"; readonly word: WordContent }
 	| { readonly kind: "confluence"; readonly confluence: ConfluenceContent }
 	| { readonly kind: "confluence-page"; readonly content: ConfluencePageContent }
-	| { readonly kind: "draft"; readonly draft: Draft }
+	/** Unsaved text: left by a crash, or kept when the app closed (`restored`, no warning then). */
+	| { readonly kind: "draft"; readonly draft: Draft; readonly restored?: boolean }
 	/** An empty document that saves to `path` without asking; the file appears on first save. */
 	| { readonly kind: "new-file"; readonly path: string; readonly name: string }
 	/** A tab moved over from another window, with its unsaved edits. */
@@ -425,6 +432,31 @@ export type DocumentPayload =
 export interface TabDocument {
 	readonly tabId: string;
 	readonly payload: DocumentPayload;
+	/** Where the tab was scrolled to when the app closed, brought back with it. */
+	readonly view?: TabView;
+}
+
+/** How a tab was being looked at. */
+export interface TabView {
+	/** The page's scroll from the top, in pixels. */
+	readonly scroll: number;
+}
+
+/** A window's tabs as the renderer has them, asked for when the app closes (see `session-store.ts`). */
+export interface SessionSnapshot {
+	/** Tab ids in the tab strip's order. */
+	readonly order: readonly string[];
+	readonly active: string | null;
+	readonly tabs: Readonly<Record<string, SessionTab>>;
+}
+
+export interface SessionTab {
+	readonly dirty: boolean;
+	readonly name: string;
+	/** The unsaved text, for a dirty tab: it is kept as the tab's draft. */
+	readonly text?: string;
+	readonly format?: TextFormat;
+	readonly scroll: number;
 }
 
 export interface Startup {
@@ -432,8 +464,9 @@ export interface Startup {
 	readonly language: Lang;
 	readonly platform: string;
 	readonly version: string;
-	/** One entry per tab; the last one is the active tab. */
+	/** One entry per tab; the last one is the active tab unless `active` says another. */
 	readonly documents: readonly TabDocument[];
+	readonly active?: string;
 	/** URL scheme that serves document-relative images. */
 	readonly documentScheme: string;
 }
@@ -832,6 +865,8 @@ export interface KalemBridge {
 	tabClosed(tabId: string): void;
 	/** Reply to `onSaveRequest`. */
 	answerSave(tabId: string, saved: boolean): void;
+	/** Answers the main process's question, as the app closes, of what the window's tabs are. */
+	onSessionRequest(handler: () => SessionSnapshot): () => void;
 
 	/** Writes the image next to the document; resolves with the relative URL for Markdown. */
 	writeImage(documentPath: string, image: ImageFile): Promise<string>;
@@ -1034,6 +1069,7 @@ export const CHANNEL = {
 	confirmCloseTab: "kalem:confirm-close-tab",
 	tabClosed: "kalem:tab-closed",
 	answerSave: "kalem:answer-save",
+	answerSession: "kalem:answer-session",
 	writeImage: "kalem:write-image",
 	pickImages: "kalem:pick-images",
 	pickAttachments: "kalem:pick-attachments",
@@ -1056,6 +1092,7 @@ export const CHANNEL = {
 	document: "kalem:document",
 	activateTab: "kalem:activate-tab",
 	saveRequest: "kalem:save-request",
+	sessionRequest: "kalem:session-request",
 	settings: "kalem:settings",
 	externalChange: "kalem:external-change",
 	getWorkspace: "kalem:get-workspace",

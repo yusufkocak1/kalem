@@ -192,6 +192,7 @@ export function registerIpc(ctx: IpcContext): void {
 			platform: process.platform,
 			version: app.getVersion(),
 			documents: await windows.takePending(win),
+			...(win.activeTabId === null ? {} : { active: win.activeTabId }),
 			documentScheme: DOCUMENT_SCHEME,
 		};
 	});
@@ -380,6 +381,8 @@ export function registerIpc(ctx: IpcContext): void {
 	on(CHANNEL.answerSave, (win, tabId, saved) => {
 		if (typeof tabId === "string") windows.answerSave(win, tabId, saved === true);
 	});
+
+	on(CHANNEL.answerSession, (win, snapshot) => windows.answerSession(win, snapshot));
 
 	// --- Images and attachments ---------------------------------------------
 

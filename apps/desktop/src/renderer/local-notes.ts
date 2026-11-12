@@ -253,10 +253,21 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 		}
 		if (start === -1) return null;
 		if (!range.collapsed) return [start, end];
-		// A caret: the word around it.
+		// A caret: the word around it; just after a word's end (". " at a line's end), that word.
 		const word = /[\p{L}\p{N}_-]/u;
-		let from = start;
-		let to = start;
+		let at = start;
+		for (
+			let steps = 0;
+			steps < 3 &&
+			at > 0 &&
+			!word.test(map.text[at] ?? " ") &&
+			!word.test(map.text[at - 1] as string);
+			steps++
+		) {
+			at--;
+		}
+		let from = at;
+		let to = at;
 		while (from > 0 && word.test(map.text[from - 1] as string)) from--;
 		while (to < map.text.length && word.test(map.text[to] as string)) to++;
 		return from < to ? [from, to] : null;
@@ -370,6 +381,9 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 			list.children.length === wantedChildren.length &&
 			wantedChildren.every((child, i) => list.children[i] === child);
 		if (!same) list.replaceChildren(...wantedChildren);
+		// Placed at once (a new balloon must not sit at the top while it takes the focus),
+		// and again once the text boxes have grown to their text.
+		position(ordered);
 		cancelAnimationFrame(frame);
 		frame = requestAnimationFrame(() => position(ordered));
 	}
@@ -378,6 +392,13 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 	function position(ordered: readonly LocalNote[]): void {
 		const tab = target;
 		if (tab === null || column.parentElement !== tab.page) return;
+		// The editor drew its text again: the words are found anew (and placed from there).
+		for (const where of placed.values()) {
+			if (!where.range.startContainer.isConnected || !where.range.endContainer.isConnected) {
+				render();
+				return;
+			}
+		}
 		const pageBox = tab.page.getBoundingClientRect();
 		// Balloons are placed in the list, under the margin's head.
 		const offset = list.getBoundingClientRect().top - pageBox.top;
@@ -412,7 +433,12 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 			} else {
 				y = tops[index++] as number;
 			}
-			view.element.style.transform = `translateY(${y}px)`;
+			view.element.style.top = `${y}px`;
+			// A new balloon appears at its place at once; it only glides when it moves after.
+			if (view.element.dataset.placed === undefined) {
+				void view.element.offsetHeight;
+				view.element.dataset.placed = "";
+			}
 			view.top = y;
 			bottom = Math.max(bottom, y + item.height);
 		});
@@ -483,7 +509,7 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 				lastKind = kind;
 				change(id, { kind });
 				render();
-				textArea.focus();
+				textArea.focus({ preventScroll: true });
 			});
 			kinds.append(button);
 			return { kind, button };
@@ -576,7 +602,8 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 				requestAnimationFrame(grow);
 			},
 			focus() {
-				textArea.focus();
+				// The balloon is already beside its words: the page must not move to it.
+				textArea.focus({ preventScroll: true });
 				const end = textArea.value.length;
 				textArea.setSelectionRange(end, end);
 			},
@@ -603,7 +630,7 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 		const tab = target;
 		active = null;
 		render();
-		tab?.canvas.focus();
+		tab?.canvas.querySelector<HTMLElement>("[contenteditable]")?.focus({ preventScroll: true });
 	}
 
 	function deleteNote(id: string, undoable: boolean): void {

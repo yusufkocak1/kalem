@@ -124,6 +124,16 @@ const bridge: KalemBridge = {
 	onDocumentMoved: (handler) => listen<[string, string]>(CHANNEL.documentMoved, handler),
 	onActivateTab: (handler) => listen<[string]>(CHANNEL.activateTab, handler),
 	onSaveRequest: (handler) => listen<[string]>(CHANNEL.saveRequest, handler),
+	onSessionRequest: (handler) =>
+		listen<[]>(CHANNEL.sessionRequest, () => {
+			let snapshot: unknown = null;
+			try {
+				snapshot = handler();
+			} catch {
+				// The main process closes with what it knows.
+			}
+			ipcRenderer.send(CHANNEL.answerSession, snapshot);
+		}),
 	onSettings: (handler) => listen<[Settings]>(CHANNEL.settings, handler),
 	onExternalChange: (handler) => listen<[string, number]>(CHANNEL.externalChange, handler),
 	getWorkspace: () => ipcRenderer.invoke(CHANNEL.getWorkspace),
