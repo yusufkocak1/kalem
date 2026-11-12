@@ -260,6 +260,17 @@ export class Session {
 
 	#atoms: { readonly storage: string; readonly map: ReadonlyMap<string, string> } | null = null;
 
+	/**
+	 * A Confluence page's text as it was opened or last saved: what its
+	 * changes are measured against. `null` for a tab that is not a page.
+	 */
+	remoteBaseline(): string | null {
+		if (this.#remote === null) return null;
+		if (this.#savedText !== null) return this.#savedText;
+		// A recovered draft: the page as it was stored when the draft was made.
+		return this.#storage === null ? null : importPage(this.#storage).markdown;
+	}
+
 	/** The document with its table style comments; in source mode, the source text. */
 	styledMarkdown(): string {
 		return this.#source?.isSource() === true ? this.#source.text() : this.#text();
@@ -738,6 +749,13 @@ export class Session {
 		);
 	}
 
+	/** Saves a Confluence page from its changes' view: the changes were seen, so it is not asked again. */
+	saveReviewed(): Promise<boolean> {
+		return this.#enqueue(() =>
+			this.#remote !== null ? this.#saveRemote(false, true) : this.#save(false),
+		);
+	}
+
 	#enqueue(task: () => Promise<boolean>): Promise<boolean> {
 		const result = this.#saveQueue.then(task);
 		this.#saveQueue = result.catch(() => false);
@@ -828,7 +846,7 @@ export class Session {
 	}
 
 	/** Writes the tab to its Confluence page as a new version. */
-	async #saveRemote(overwrite: boolean): Promise<boolean> {
+	async #saveRemote(overwrite: boolean, reviewed = false): Promise<boolean> {
 		const { bridge, t, notices } = this.#o;
 		const editor = this.editor;
 		if (this.#source?.isSource() === true) this.#source.exit();
@@ -853,6 +871,7 @@ export class Session {
 				version: remote.version,
 				losses: exported.losses,
 				overwrite,
+				reviewed,
 			});
 			if (!result.ok) {
 				if (result.reason === "conflict") {

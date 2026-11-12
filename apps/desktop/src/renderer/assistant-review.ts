@@ -2,7 +2,8 @@
  * A review's findings in a reply: how ready the document is, and each
  * problem with what can be done about it — show it in the document, fix
  * it with the suggestion, add it to the open questions, put a note under
- * its paragraph, or set it aside.
+ * its paragraph, or set it aside. Whatever was done can be taken back:
+ * the finding is open again and its buttons work as before.
  */
 import type { Finding, Severity } from "../shared/findings.js";
 import { readiness } from "../shared/findings.js";
@@ -14,11 +15,14 @@ import { el } from "./dom.js";
 export type FindingState = "open" | "fixed" | "asked" | "noted" | "dismissed";
 
 export interface ReviewActions {
+	/** Shows the finding in the document: its quote, or what was put there for it. */
 	show(finding: Finding): void;
 	fix(finding: Finding): void;
 	ask(finding: Finding): void;
 	note(finding: Finding): void;
 	dismiss(finding: Finding): void;
+	/** Takes back what was done for it, in the document too; the finding is open again. */
+	undo(finding: Finding): void;
 	/** Marks all of them in the document again. */
 	markAll(): void;
 	/** Adds every open one to the open questions. */
@@ -75,6 +79,17 @@ export function findingsCard(
 				noted: t.reviewNoted,
 				dismissed: t.reviewDismissed,
 			};
+			const done =
+				now === "open"
+					? null
+					: el("div", {
+							class: "assistant-finding-actions",
+							children: [
+								el("span", { class: "assistant-finding-state", text: states[now] }),
+								...(now === "dismissed" ? [] : [button(t.reviewShow, () => actions.show(finding))]),
+								button(t.reviewUndo, () => actions.undo(finding)),
+							],
+						});
 			return el("li", {
 				class: `assistant-finding severity-${finding.severity} finding-${now}`,
 				attrs: { "data-finding": finding.id },
@@ -102,9 +117,7 @@ export function findingsCard(
 					...(finding.question === ""
 						? []
 						: [el("p", { class: "assistant-finding-question", text: `? ${finding.question}` })]),
-					now === "open"
-						? el("div", { class: "assistant-finding-actions", children: buttons })
-						: el("p", { class: "assistant-finding-state", text: states[now] }),
+					done ?? el("div", { class: "assistant-finding-actions", children: buttons }),
 				],
 			});
 		});

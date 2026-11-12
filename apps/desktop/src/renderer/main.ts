@@ -27,6 +27,7 @@ import { withColumnWidth } from "../shared/table-style.js";
 import { changeCase, collapseSpaces, nextCase } from "../shared/text-case.js";
 import { createAssistantPane } from "./assistant-pane.js";
 import { createAttachmentCard } from "./attachment-card.js";
+import { createChangesDialog } from "./changes-dialog.js";
 import { createCommandPalette } from "./command-palette.js";
 import { createAttachmentsDialog, linkedAttachments } from "./confluence-attachments.js";
 import { createConfluenceDialog } from "./confluence-dialog.js";
@@ -138,6 +139,11 @@ const publishDialog = createPublishDialog({
 	space: () => settings.confluenceSpace,
 	setSpace: (key) => updateSettings({ confluenceSpace: key }),
 	connect: () => void confluenceDialog.show(),
+});
+const changesDialog = createChangesDialog({
+	t,
+	reviewBeforeSave: () => settings.confluenceReviewBeforeSave,
+	setReviewBeforeSave: (value) => updateSettings({ confluenceReviewBeforeSave: value }),
 });
 const jiraDialog = createJiraDialog({
 	t,
@@ -419,14 +425,41 @@ const publishButton = el("button", {
 publishButton.firstElementChild?.classList.add("ribbon-publish-mark");
 publishButton.hidden = true;
 publishButton.addEventListener("click", () => commands["publish-confluence"]());
+// A Confluence page's changes since it was opened or saved, as a diff: there while the page has some.
+const changesButton = el("button", {
+	class: "ribbon-changes",
+	attrs: { type: "button", title: t.changesCommand },
+	children: [icon("diff"), el("span", { text: t.changesButton })],
+});
+changesButton.firstElementChild?.classList.add("ribbon-publish-mark");
+changesButton.hidden = true;
+changesButton.addEventListener("click", () => commands["confluence-changes"]());
 const ribbonTrailing = el("div", {
 	class: "ribbon-trailing",
-	children: [publishButton, saveStatus],
+	children: [publishButton, changesButton, saveStatus],
 });
 
 /** The publish button is there for a local document, once Confluence is connected. */
 function updatePublishButton(): void {
 	publishButton.hidden = !accounts.confluence || session.remote !== null || session.isText;
+	changesButton.hidden = session.remote === null || !session.dirty;
+}
+
+/** Shows what changed in the active Confluence page; `false` for a tab that is not one. */
+function showConfluenceChanges(): boolean {
+	const tab = session;
+	const remote = tab.remote;
+	const base = tab.remoteBaseline();
+	if (remote === null || base === null) return false;
+	changesDialog.show({
+		title: remote.title,
+		base: () => tab.remoteBaseline() ?? base,
+		current: () => tab.styledMarkdown(),
+		editable: () => !tab.readOnly && tab.source?.isSource() !== true,
+		replace: (text) => tab.replaceText(text),
+		save: () => tab.saveReviewed(),
+	});
+	return true;
 }
 
 const tabStrip = createTabStrip({
@@ -597,6 +630,7 @@ function renderState(): void {
 			: (session.path ?? "");
 	formatBadge.textContent = session.formatLabel;
 	readOnlyBadge.hidden = !session.readOnly;
+	updatePublishButton();
 }
 
 function createTab(id: string): Tab {
@@ -912,7 +946,19 @@ function heading(depth: 1 | 2 | 3 | 4 | 5 | 6): () => void {
 }
 
 const commands: Record<Command, () => void> = {
-	save: () => void session.save(),
+	save: () => {
+		// A Confluence page is written for everyone to see: its changes are checked first.
+		if (
+			session.remote !== null &&
+			session.dirty &&
+			settings.confluenceReviewBeforeSave &&
+			!changesDialog.open &&
+			showConfluenceChanges()
+		) {
+			return;
+		}
+		void session.save();
+	},
 	"save-as": () => void session.save(true),
 	"save-as-package": () => void session.save(true, "package"),
 	"close-tab": () => void closeTab(session.id),
@@ -981,6 +1027,11 @@ const commands: Record<Command, () => void> = {
 			name: session.name,
 			markdown: session.styledMarkdown(),
 		});
+	},
+	"confluence-changes": () => {
+		if (!showConfluenceChanges()) {
+			session.notices.show({ id: "changes", text: t.changesNotPage });
+		}
 	},
 	"jira-open": () => void jiraDialog.showSearch(),
 	settings: () => void settingsDialog.show(),

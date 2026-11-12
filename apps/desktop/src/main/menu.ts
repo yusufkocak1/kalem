@@ -135,6 +135,7 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 		},
 		{ label: t.confluenceOpen, click: send(ctx, "confluence-open") },
 		{ label: t.publishMenu, click: send(ctx, "publish-confluence") },
+		{ label: t.changesCommand, click: send(ctx, "confluence-changes") },
 		{ label: t.confluenceAttachmentsMenu, click: send(ctx, "confluence-attachments") },
 		{ label: t.jiraMenu, click: send(ctx, "jira-open") },
 		{

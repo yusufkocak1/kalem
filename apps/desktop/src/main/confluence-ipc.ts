@@ -356,7 +356,7 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 					cancelId: 1,
 				});
 				if (response !== 0) return { ok: false, reason: "cancelled" };
-			} else if (request.overwrite !== true) {
+			} else if (request.overwrite !== true && request.reviewed !== true) {
 				// Every save is a new version on the shared page, so it is confirmed first.
 				// Overwriting after a conflict was already a deliberate choice; losses have their own question.
 				const { response } = await dialog.showMessageBox(win.window, {

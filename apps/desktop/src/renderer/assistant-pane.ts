@@ -26,8 +26,15 @@ import type { CustomMode } from "../shared/custom-modes.js";
 import { isCustomModeId } from "../shared/custom-modes.js";
 import { diagramSvg, svgMarkup } from "../shared/diagram.js";
 import { findHeading, outlineOf, outlineText } from "../shared/document-outline.js";
-import type { Finding } from "../shared/findings.js";
-import { addToQuestions, noteBlock, questionLine, withNoteAfter } from "../shared/findings.js";
+import type { Finding, FindingEdit } from "../shared/findings.js";
+import {
+	addToQuestions,
+	hasQuestions,
+	noteBlock,
+	questionLine,
+	revertFindingEdit,
+	withNoteAfter,
+} from "../shared/findings.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type { ModeSettings } from "../shared/mode-config.js";
@@ -2492,33 +2499,112 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		);
 	}
 
+	/** What a finding's button changed, to take it back on its own. */
+	interface FindingRecord {
+		readonly edit: FindingEdit;
+		readonly change: MadeChange;
+		readonly tabId: string;
+		/** The document before and after; the whole text goes back when nothing else changed since. */
+		readonly before: string;
+		readonly after: string;
+	}
+	const findingRecords = new WeakMap<Finding, FindingRecord>();
+	/** The findings a change of the reply was made for: undoing it reopens them. */
+	const changeFindings = new WeakMap<MadeChange, Finding[]>();
+
 	/** Changes the document as the user asked from a finding; the change can be undone. */
 	async function changeDocument(
 		message: Message,
 		label: string,
 		change: (text: string) => DocumentAction[] | null,
-	): Promise<boolean> {
+	): Promise<{ change: MadeChange; tabId: string; before: string; after: string } | null> {
 		try {
 			const before = await host.context();
 			const actions = change(before.text);
 			if (actions === null) {
 				showNotice(t.reviewNotFound);
-				return false;
+				return null;
 			}
 			const made = await host.applyActions(actions);
 			if (made === 0) {
 				showNotice(t.reviewNotFound);
-				return false;
+				return null;
 			}
-			message.changes = [
-				...(message.changes ?? []),
-				{ label, document: { tabId: before.tabId, text: before.text } },
-			];
-			return true;
+			const record: MadeChange = { label, document: { tabId: before.tabId, text: before.text } };
+			message.changes = [...(message.changes ?? []), record];
+			const after = await host.context();
+			return { change: record, tabId: before.tabId, before: before.text, after: after.text };
 		} catch (error) {
 			showNotice(format(t.assistantActionFailed, host.errorText(error)));
-			return false;
+			return null;
 		}
+	}
+
+	/** Where the finding is in the document now: its quote, or what was put there for it. */
+	function findingTarget(finding: Finding): string {
+		const record = findingRecords.get(finding);
+		const state = findingStates.get(finding) ?? "open";
+		if (record === undefined || state === "open" || state === "dismissed") return finding.quote;
+		switch (record.edit.kind) {
+			case "fixed":
+				return record.edit.suggestion;
+			case "noted":
+				return (record.edit.note.split("\n")[0] ?? "").replace(/^>\s*/, "");
+			case "asked":
+				return record.edit.line.replace(/^-\s*\[ \]\s*/, "");
+		}
+	}
+
+	/** Shows the finding in the document, after the editor has drawn a change made for it. */
+	function revealFinding(finding: Finding): void {
+		requestAnimationFrame(() => {
+			if (!host.revealQuote(findingTarget(finding))) showNotice(t.reviewNotFound);
+		});
+	}
+
+	/**
+	 * Takes back what was done for a finding: its own change in the
+	 * document (later edits stay), and the finding is open again. When the
+	 * user took the change back in the document already, it is only reopened.
+	 */
+	async function undoFinding(message: Message, finding: Finding): Promise<boolean> {
+		const record = findingRecords.get(finding);
+		const state = findingStates.get(finding) ?? "open";
+		if (state === "open") return true;
+		if (record !== undefined && state !== "dismissed") {
+			try {
+				const now = await host.context();
+				if (now.tabId !== record.tabId) {
+					showNotice(format(t.reviewUndoOtherTab, finding.id));
+					return false;
+				}
+				const shared = (changeFindings.get(record.change) ?? []).filter(
+					(other) => (findingStates.get(other) ?? "open") !== "open",
+				);
+				// Nothing changed since, and the change was for this finding alone: the old text back.
+				const next =
+					now.text === record.after && shared.length <= 1
+						? record.before
+						: revertFindingEdit(now.text, record.edit);
+				if (next === null) showNotice(format(t.reviewReopened, finding.id));
+				else await host.applyActions([{ type: "document", text: next }]);
+			} catch (error) {
+				showNotice(format(t.assistantActionFailed, host.errorText(error)));
+				return false;
+			}
+			findingRecords.delete(finding);
+		}
+		findingStates.set(finding, "open");
+		// A change all of whose findings are open again is undone.
+		if (record !== undefined) {
+			const all = changeFindings.get(record.change) ?? [];
+			if (all.every((other) => (findingStates.get(other) ?? "open") === "open")) {
+				record.change.undone = true;
+			}
+		}
+		markOpen(message);
+		renderReply(message);
+		return true;
 	}
 
 	function reviewActions(message: Message) {
@@ -2527,34 +2613,75 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			markOpen(message);
 			renderReply(message);
 		};
+		const remember = (
+			findings: readonly Finding[],
+			made: { change: MadeChange; tabId: string; before: string; after: string },
+			edit: (finding: Finding) => FindingEdit,
+		): void => {
+			changeFindings.set(made.change, [...findings]);
+			for (const finding of findings) {
+				findingRecords.set(finding, {
+					edit: edit(finding),
+					change: made.change,
+					tabId: made.tabId,
+					before: made.before,
+					after: made.after,
+				});
+			}
+		};
+		const asked = (finding: Finding, text: string): FindingEdit => ({
+			kind: "asked",
+			line: questionLine(finding),
+			heading: t.reviewQuestionsHeading,
+			madeHeading: !hasQuestions(text),
+		});
 		return {
 			show(finding: Finding) {
-				if (!host.revealQuote(finding.quote)) showNotice(t.reviewNotFound);
+				if (!host.revealQuote(findingTarget(finding))) showNotice(t.reviewNotFound);
 			},
 			async fix(finding: Finding) {
-				const done = await changeDocument(message, `${finding.id}: ${t.reviewFix}`, () => [
+				const made = await changeDocument(message, `${finding.id}: ${t.reviewFix}`, () => [
 					{ type: "replace", find: finding.quote, replace: finding.suggestion, all: false },
 				]);
-				if (done) settle(finding, "fixed");
+				if (made === null) return;
+				remember([finding], made, () => ({
+					kind: "fixed",
+					quote: finding.quote,
+					suggestion: finding.suggestion,
+					at: Math.max(0, made.before.indexOf(finding.quote)),
+				}));
+				settle(finding, "fixed");
+				revealFinding(finding);
 			},
 			async ask(finding: Finding) {
-				const done = await changeDocument(message, `${finding.id}: ${t.reviewAsk}`, (text) => [
+				const made = await changeDocument(message, `${finding.id}: ${t.reviewAsk}`, (text) => [
 					{
 						type: "document",
 						text: addToQuestions(text, questionLine(finding), t.reviewQuestionsHeading),
 					},
 				]);
-				if (done) settle(finding, "asked");
+				if (made === null) return;
+				remember([finding], made, () => asked(finding, made.before));
+				settle(finding, "asked");
+				revealFinding(finding);
 			},
 			async note(finding: Finding) {
-				const done = await changeDocument(message, `${finding.id}: ${t.reviewNote}`, (text) => {
-					const next = withNoteAfter(text, finding.quote, noteBlock(finding, t.reviewNoteLabel));
+				const note = noteBlock(finding, t.reviewNoteLabel);
+				const made = await changeDocument(message, `${finding.id}: ${t.reviewNote}`, (text) => {
+					const next = withNoteAfter(text, finding.quote, note);
 					return next === null ? null : [{ type: "document", text: next }];
 				});
-				if (done) settle(finding, "noted");
+				if (made === null) return;
+				remember([finding], made, () => ({ kind: "noted", note }));
+				settle(finding, "noted");
+				// The note is under the quoted paragraph: it is brought into view.
+				revealFinding(finding);
 			},
 			dismiss(finding: Finding) {
 				settle(finding, "dismissed");
+			},
+			undo(finding: Finding) {
+				void undoFinding(message, finding);
 			},
 			markAll() {
 				showNotice(format(t.reviewMarked, markOpen(message)));
@@ -2562,7 +2689,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			async askAll() {
 				const open = openFindings(message);
 				if (open.length === 0) return;
-				const done = await changeDocument(message, t.reviewAskAll, (text) => [
+				const made = await changeDocument(message, t.reviewAskAll, (text) => [
 					{
 						type: "document",
 						text: open.reduce(
@@ -2572,7 +2699,15 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 						),
 					},
 				]);
-				if (done) for (const finding of open) findingStates.set(finding, "asked");
+				if (made !== null) {
+					// The section is made once, for the first: undoing that one takes it away when it is empty.
+					const madeHeading = !hasQuestions(made.before);
+					remember(open, made, (finding) => ({
+						...(asked(finding, made.before) as Extract<FindingEdit, { kind: "asked" }>),
+						madeHeading,
+					}));
+					for (const finding of open) findingStates.set(finding, "asked");
+				}
 				markOpen(message);
 				renderReply(message);
 			},
@@ -2652,6 +2787,16 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	/** Puts back what the assistant changed. */
 	async function undoChange(message: Message, change: MadeChange): Promise<void> {
 		if (change.undone === true) return;
+		// A finding's change: taken back as the finding's undo does, and the finding reopens.
+		const findings = changeFindings.get(change);
+		if (findings !== undefined) {
+			for (const finding of [...findings].reverse()) {
+				if (!(await undoFinding(message, finding))) return;
+			}
+			change.undone = true;
+			renderReply(message);
+			return;
+		}
 		try {
 			if (change.settings !== undefined) host.changeSettings(change.settings as Partial<Settings>);
 			if (change.document !== undefined) {

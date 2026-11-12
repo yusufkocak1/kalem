@@ -302,6 +302,36 @@ test("a review lists the rules' and the model's findings, and the user fixes the
 	);
 	await expect(review.locator('[data-finding="F-01"]')).toContainText("Fixed");
 
+	// Changed one's mind: the fix is undone, and the finding can be fixed again.
+	const first = review.locator('[data-finding="F-01"]');
+	await first.getByRole("button", { name: "Undo" }).click();
+	await expect(page.locator("#editor p", { hasText: "İptal hızlı" })).toHaveText(
+		"İptal hızlı yapılmalı.",
+	);
+	await expect(first.getByRole("button", { name: "Fix" })).toBeEnabled();
+	// A note goes under the quoted paragraph; it can be undone too.
+	await first.getByRole("button", { name: "Add a Note" }).click();
+	await expect(first).toContainText("Note added under its paragraph");
+	const note = page.locator("#editor blockquote", { hasText: "Review F-01:" });
+	await expect(note).toContainText("Ölçülemez.");
+	await first.getByRole("button", { name: "Undo" }).click();
+	await expect(note).toHaveCount(0);
+	// The user takes a fix back in the document themselves: Undo only reopens the finding.
+	await first.getByRole("button", { name: "Fix" }).click();
+	await expect(page.locator("#editor p", { hasText: "saniye" })).toBeVisible();
+	await clickMenu(app, "Edit", "Undo");
+	await expect(page.locator("#editor p", { hasText: "İptal hızlı" })).toBeVisible();
+	await first.getByRole("button", { name: "Undo" }).click();
+	await expect(pane).toContainText("F-01 is open again.");
+	await expect(page.locator("#editor p", { hasText: "İptal hızlı" })).toHaveText(
+		"İptal hızlı yapılmalı.",
+	);
+	await first.getByRole("button", { name: "Fix" }).click();
+	await expect(page.locator("#editor p", { hasText: "saniye" })).toHaveText(
+		"İptal 2 saniye içinde onaylanmalı.",
+	);
+	await expect(first).toContainText("Fixed");
+
 	await review
 		.locator('[data-finding="F-02"]')
 		.getByRole("button", { name: "Add to Open Questions" })
