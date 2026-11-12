@@ -614,7 +614,13 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
 			return stored.settings.panePlaces;
 		})
-		.toEqual({ outline: "bottom", files: "right", confluence: "left", jira: "right" });
+		.toEqual({
+			outline: "bottom",
+			files: "right",
+			confluence: "left",
+			jira: "right",
+			notes: "right",
+		});
 	expect(errors).toEqual([]);
 	await app.close();
 });

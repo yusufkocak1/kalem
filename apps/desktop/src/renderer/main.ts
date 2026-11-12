@@ -23,7 +23,7 @@ import { format, stringsFor } from "../shared/i18n.js";
 import { noteKey } from "../shared/local-notes.js";
 import { paletteCss } from "../shared/palette.js";
 import type { ToolPane } from "../shared/panes.js";
-import { revealPane } from "../shared/panes.js";
+import { revealPane, togglePane } from "../shared/panes.js";
 import {
 	extension,
 	isEditablePath,
@@ -161,7 +161,12 @@ const localNotes = createLocalNotes({
 	bridge,
 	lang: startup.language,
 	visible: () => settings.localNotes,
-	setVisible: (value) => updateSettings({ localNotes: value }),
+	shown: () => docks.shown().has("notes"),
+	reveal: () => {
+		const before = docks.shown();
+		updateSettings(revealPane(settings, "notes"));
+		refreshShown(before);
+	},
 	notify: (text, actions) =>
 		session.notices.show({ id: "notes", text, ...(actions === undefined ? {} : { actions }) }),
 });
@@ -271,7 +276,8 @@ const assistantToggle = el("button", {
 assistantToggle.addEventListener("click", () => {
 	if (settings.assistant) {
 		updateSettings({ assistant: false });
-		session.focus();
+		// Back to where the caret was; a plain focus would jump to the document's top.
+		returnToDocument();
 	} else {
 		updateSettings({ assistant: true });
 		assistant.focus();
@@ -290,6 +296,7 @@ const PANE_LABELS: Readonly<Record<ToolPane, string>> = {
 	files: t.filesTab,
 	confluence: t.confluenceTab,
 	jira: t.jiraTab,
+	notes: t.notesTitle,
 };
 const jiraPane = createJiraPane({
 	t,
@@ -311,6 +318,7 @@ const docks = createDocks({
 			element: confluencePane.element,
 		},
 		{ id: "jira", label: t.jiraTab, icon: "target", element: jiraPane.element },
+		{ id: "notes", label: t.notesTitle, icon: "note", element: localNotes.element },
 	],
 	settings: () => settings,
 	update: (patch) => updateSettings(patch),
@@ -358,6 +366,7 @@ function refreshShown(before: ReadonlySet<ToolPane>): void {
 	const now = docks.shown();
 	if (now.has("confluence") && !before.has("confluence")) void confluencePane.refresh();
 	if (now.has("jira") && !before.has("jira")) void jiraPane.refresh();
+	if (now.has("notes") && !before.has("notes")) localNotes.refresh();
 }
 
 /** Asks which services are connected; a pane appears or goes with its connection. */
@@ -753,8 +762,6 @@ function createTab(id: string): Tab {
 		},
 		notes: {
 			id,
-			page,
-			desk,
 			canvas: tabCanvas,
 			key: () => noteKey(tabSession.path, tabSession.remote),
 			available: () => !tabSession.isText && tabSession.source?.isSource() !== true,
@@ -770,9 +777,103 @@ function createTab(id: string): Tab {
 		},
 		{ passive: true },
 	);
+	keepReadingPlace(desk, page, tabCanvas);
 	tabs.set(id, tab);
 	tabStrip.add(id);
 	return tab;
+}
+
+/**
+ * Keeps what is being read in place when the page's layout changes under
+ * it: a full-width page, zoom, the notes' margin, a pane or the window
+ * resized, focus mode. Lines wrap again and the text above gets taller or
+ * shorter; without this the paragraph on screen slides away (often
+ * thousands of pixels). The block at the top of the view and its distance
+ * from the top are noted as the user reads (scrolls, clicks, types); when
+ * the page's width or the view's height changes, that block is brought
+ * back to the same distance.
+ */
+function keepReadingPlace(desk: HTMLElement, page: HTMLElement, canvas: HTMLElement): void {
+	let place: { block: Element; offset: number } | null = null;
+	let frame = 0;
+	const blocks = (): Element[] =>
+		[...canvas.querySelectorAll("[data-kalem-id]")].filter(
+			(block) => block.parentElement?.closest("[data-kalem-id]") === null,
+		);
+	const note = (): void => {
+		if (desk.hidden) return;
+		const box = desk.getBoundingClientRect();
+		const all = blocks();
+		// The block with the caret, when it is in view: that is what is being read.
+		const selection = document.getSelection();
+		const caretNode = selection?.anchorNode ?? null;
+		const caretBlock =
+			caretNode !== null && canvas.contains(caretNode)
+				? all.find((block) => block.contains(caretNode))
+				: undefined;
+		const inView = (block: Element): boolean => {
+			const rect = block.getBoundingClientRect();
+			return rect.height > 0 && rect.bottom > box.top && rect.top < box.bottom;
+		};
+		// Otherwise the block a third down the view, where the eye usually is.
+		const line = box.top + desk.clientHeight / 3;
+		const chosen =
+			caretBlock !== undefined && inView(caretBlock)
+				? caretBlock
+				: all.find((block) => {
+						const rect = block.getBoundingClientRect();
+						return rect.height > 0 && rect.bottom > line;
+					});
+		place =
+			chosen === undefined
+				? null
+				: { block: chosen, offset: chosen.getBoundingClientRect().top - box.top };
+	};
+	const noteSoon = (): void => {
+		cancelAnimationFrame(frame);
+		frame = requestAnimationFrame(note);
+	};
+	/** The scroll this makes itself is not the user's: the place it keeps stays as noted. */
+	let ownScroll = false;
+	let width = 0;
+	let height = 0;
+	let fontSize = "";
+	const restore = (): void => {
+		const nowWidth = page.getBoundingClientRect().width;
+		const nowHeight = desk.clientHeight;
+		// Zoom changes the text's size; the page's width stays when it is capped by the window.
+		const nowFont = getComputedStyle(page).fontSize;
+		const changed =
+			Math.abs(nowWidth - width) > 0.5 ||
+			Math.abs(nowHeight - height) > 0.5 ||
+			nowFont !== fontSize;
+		width = nowWidth;
+		height = nowHeight;
+		fontSize = nowFont;
+		if (!changed || desk.hidden || place === null || !place.block.isConnected) return;
+		const top = desk.getBoundingClientRect().top;
+		const drift = place.block.getBoundingClientRect().top - top - place.offset;
+		if (Math.abs(drift) > 0.5) {
+			ownScroll = true;
+			desk.scrollTop += drift;
+		}
+	};
+	desk.addEventListener(
+		"scroll",
+		() => {
+			if (ownScroll) {
+				ownScroll = false;
+				return;
+			}
+			noteSoon();
+		},
+		{ passive: true },
+	);
+	canvas.addEventListener("pointerup", noteSoon);
+	canvas.addEventListener("keyup", noteSoon);
+	const observer = new ResizeObserver(restore);
+	observer.observe(page);
+	observer.observe(desk);
 }
 
 function activateTab(id: string): void {
@@ -878,6 +979,40 @@ const pageSetup = document.head.appendChild(document.createElement("style"));
 /** The colour palette's variables, after the stylesheet so that they win. */
 const paletteStyle = document.head.appendChild(document.createElement("style"));
 
+/**
+ * A window too narrow for every open side pane and a readable page: the
+ * left dock gives way first, then the right one, for as long as the window
+ * is that narrow. Nothing is saved; widened, they are back. (The assistant
+ * stays: it is what the user is working with.)
+ */
+const SIDE_PANE_MIN = 150;
+const PAGE_MIN = 300;
+function fitSidePanes(): void {
+	const shown = (element: HTMLElement): boolean => !element.hidden && element.isConnected;
+	const left = docks.elements.left;
+	const right = docks.elements.right;
+	const stripes = 2 * 34;
+	const assistantWidth =
+		!assistant.element.hidden && settings.assistantPlace !== "bottom" ? SIDE_PANE_MIN : 0;
+	const room = window.innerWidth - stripes - assistantWidth - PAGE_MIN;
+	const squeeze: string[] = [];
+	const panes = [shown(left) ? "left" : null, shown(right) ? "right" : null].filter(
+		(pane): pane is string => pane !== null,
+	);
+	let needed = panes.length * SIDE_PANE_MIN;
+	for (const pane of panes) {
+		if (needed <= room) break;
+		squeeze.push(pane);
+		needed -= SIDE_PANE_MIN;
+	}
+	const value = squeeze.join(" ");
+	if ((app.dataset.squeeze ?? "") !== value) {
+		if (value === "") delete app.dataset.squeeze;
+		else app.dataset.squeeze = value;
+	}
+}
+window.addEventListener("resize", fitSidePanes);
+
 function applySettings(): void {
 	pageSetup.textContent = pageRule(settings);
 	paletteStyle.textContent = paletteCss(settings.palette, settings.paletteCustom);
@@ -891,6 +1026,7 @@ function applySettings(): void {
 	zoomSlider.value = String(settings.zoom);
 	zoomValue.textContent = `${settings.zoom}%`;
 	localNotes.refresh();
+	fitSidePanes();
 }
 
 function updateSettings(patch: Partial<Settings>): void {
@@ -1102,7 +1238,11 @@ const commands: Record<Command, () => void> = {
 	"note-new": () => localNotes.add(),
 	"note-next": () => localNotes.go(1),
 	"note-previous": () => localNotes.go(-1),
-	"notes-toggle": () => updateSettings({ localNotes: !settings.localNotes }),
+	"notes-toggle": () => {
+		const before = docks.shown();
+		updateSettings(togglePane(settings, "notes", paneAvailable));
+		refreshShown(before);
+	},
 	"jira-open": () => void jiraDialog.showSearch(),
 	settings: () => void settingsDialog.show(),
 	"new-from-template": () => void templatePicker.show(),
@@ -1453,7 +1593,10 @@ function returnToDocument(): void {
 	const holder =
 		caret === undefined || element === undefined ? null : holderIn(element, caret.path);
 	if (caret === undefined || holder === null) {
-		editor.focus();
+		// No caret known yet: the document takes the focus where it is, not scrolled to its top.
+		(canvas.querySelector("[contenteditable='true']") as HTMLElement | null)?.focus({
+			preventScroll: true,
+		});
 		return;
 	}
 	selectRange(holder, caret.offset, caret.offset);
@@ -1463,12 +1606,13 @@ function returnToDocument(): void {
 function toggleAssistant(): void {
 	if (!settings.assistant) {
 		updateSettings({ assistant: true });
-		assistant.focus();
+		// Once the pane is in place: a pane still being laid out does not take the focus.
+		requestAnimationFrame(() => assistant.focus());
 	} else if (!assistant.element.contains(document.activeElement)) {
 		assistant.focus();
 	} else {
 		updateSettings({ assistant: false });
-		session.focus();
+		returnToDocument();
 	}
 }
 

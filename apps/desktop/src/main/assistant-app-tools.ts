@@ -24,7 +24,7 @@ import {
 } from "../shared/document-outline.js";
 import { format } from "../shared/i18n.js";
 import type { PanePlace, ToolPane } from "../shared/panes.js";
-import { movePane, PANE_PLACES, revealPane, TOOL_PANES } from "../shared/panes.js";
+import { movePane, PANE_PLACES, placesFor, revealPane, TOOL_PANES } from "../shared/panes.js";
 import type { SettingDef } from "../shared/settings-schema.js";
 import {
 	findSettings,
@@ -47,6 +47,7 @@ const PANE_LABEL_KEYS = {
 	files: "filesTab",
 	confluence: "confluenceTab",
 	jira: "jiraTab",
+	notes: "notesTitle",
 } as const satisfies Record<ToolPane, string>;
 
 const placeLabel = (ctx: ToolContext, place: PanePlace): string =>
@@ -404,6 +405,8 @@ const SETTING_TOOLS: readonly KalemTool[] = [
 				return `No panel named ${pane}: ${TOOL_PANES.join(", ")}, assistant.`;
 			if (!PANE_PLACES.includes(place))
 				return `No place named ${place}: ${PANE_PLACES.join(", ")}.`;
+			if (!placesFor(pane).includes(place))
+				return `The ${pane} panel cannot go there: ${placesFor(pane).join(", ")}.`;
 			const now = ctx.settings().panePlaces[pane];
 			if (now === place) return `The ${pane} panel is already there.`;
 			const line = `${ctx.t[PANE_LABEL_KEYS[pane]]}: ${placeLabel(ctx, now)} → ${placeLabel(ctx, place)}`;

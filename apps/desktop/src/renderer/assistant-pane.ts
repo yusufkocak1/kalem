@@ -230,6 +230,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	let active: Chat = blankChat();
 	chats.set(active.id, active);
 	let view: "chat" | "settings" | "history" = "chat";
+	/** The box was asked for the focus before it could take it. */
+	let focusWanted = false;
 	let restored = false;
 	/** A selection the user took off the next question. */
 	let droppedSelection: string | null = null;
@@ -1521,6 +1523,11 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		settings.element.hidden = view !== "settings";
 		composer.hidden = !chatting;
 		input.disabled = !ready;
+		// Asked for while the service was still being looked up: the box takes it now.
+		if (focusWanted && ready && chatting && !element.hidden) {
+			focusWanted = false;
+			input.focus();
+		}
 		addButton.disabled = !ready;
 		for (const item of quick.querySelectorAll("button")) item.disabled = !ready || busy;
 		log.classList.toggle("busy", busy);
@@ -3028,6 +3035,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		focus() {
 			if (view !== "chat") void setView("chat");
 			input.focus();
+			// A box still disabled (the service not known yet) cannot take it: it does once it is ready.
+			focusWanted = document.activeElement !== input;
 		},
 		refreshSelection,
 		workspaceChanged: () => renderSources(),

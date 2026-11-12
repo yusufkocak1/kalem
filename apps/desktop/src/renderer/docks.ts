@@ -11,6 +11,7 @@ import {
 	MIN_DOCK_SIZE,
 	movePane,
 	panesIn,
+	placesFor,
 	shownPane,
 	TOOL_PANES,
 	togglePane,
@@ -93,7 +94,7 @@ export function createDocks(options: DocksOptions): Docks {
 			return button;
 		};
 		menu.replaceChildren(
-			...(["left", "right", "bottom", "hidden"] as const)
+			...placesFor(pane)
 				.filter((target) => target !== place)
 				.map((target) =>
 					item(placeLabel[target], () =>

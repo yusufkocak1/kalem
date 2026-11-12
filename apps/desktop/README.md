@@ -281,24 +281,35 @@ verir.
   olarak koyar, Ctrl+Z önceki metne döndürür. Geçmiş belgenin yoluna
   bağlıdır: taşınan ya da yeniden adlandırılan belge yeni bir geçmişle
   başlar.
-- **Notlarım** (Word'ün açıklama balonları gibi; **Gözden Geçir → Yeni Not**,
+- **Notlarım** (Word'ün açıklamaları gibi; **Gözden Geçir → Yeni Not**,
   **Ekle → Yeni Not**, sağ tık ya da `Ctrl+Alt+M`): seçili sözcüklere (seçim
-  yoksa imlecin olduğu sözcüğe) kendinize bir not bırakırsınız. Sözcükler
-  notun rengine boyanır, not sayfanın sağ kenarında bir balonda durur.
-  Notun dört türü vardır: **Anlamadım**, **Dikkat**, **Sonra bak** ve
-  **Not**. Balona tıklayınca sözcükleri, boyalı sözcüklere tıklayınca balonu
-  gösterir. Bir not **Çözüldü** ile kenara alınır (*Çözülenler* ile yine
-  görünür) ya da silinir; silme geri alınabilir. **Önceki / Sonraki Not**
-  notlar arasında gezer, **Görünüm → Notlarımı göster** hepsini gizler.
+  yoksa imlecin olduğu ya da hemen solundaki sözcüğe) kendinize bir not
+  bırakırsınız. Sözcükler notun rengine boyanır, not **Notlarım panelinde**
+  bir kart olarak durur. Panel varsayılan olarak sağ yuvadadır, sola
+  taşınabilir; alta taşınamaz, çünkü kartlar alt alta okunur. Not eklemek
+  sayfanın genişliğini değiştirmez. Notun dört türü vardır: **Anlamadım**,
+  **Dikkat**, **Sonra bak** ve **Not**. Karta tıklayınca sözcükler, boyalı
+  sözcüklere tıklayınca kart gösterilir. Bir not **Çözüldü** ile kenara
+  alınır (*Çözülenler* ile yine görünür) ya da silinir; silme geri alınabilir.
+  **Önceki / Sonraki Not** notlar arasında gezer. Gözden Geçir şeridindeki
+  **Notlarım** paneli açıp kapatır; **Görünüm → Notlarımın sözcüklerini
+  metinde boya** boyamayı kapatır.
   - Notlar **yalnızca bu bilgisayarda** saklanır
     (`%APPDATA%\kalem-desktop\local-notes.json`, belge yoluna ya da
     Confluence sayfasına göre). Markdown'a, Confluence'a, dışa aktarmaya ve
     yazdırmaya hiç girmez; not eklemek belgeyi "kaydedilmemiş" yapmaz.
-  - Not sözcüklerinin kendisine ve çevresine bağlıdır: belgenin başka bir
+  - Not, sözcüklerine ve onların çevresine bağlıdır. Belgenin başka bir
     yeri değişince yerini bulur, sözcükleri biraz değişince onları izler.
-    Sözcükler silinirse not "Sözcükleri artık yok" diye en altta kalır.
+    Sözcükler silinirse not "Sözcükleri artık yok" diye listenin sonunda
+    kalır.
   - Kaydedilmemiş yeni bir belgedeki notlar, belge ilk kez kaydedilince
     onunla birlikte saklanır.
+- **Okunan yer korunur:** tam genişlik, yakınlaştırma, odak modu, panel
+  açıp kapama ve pencere boyutu satırları yeniden kırar. Uygulama okunan
+  bloğu (imlecin olduğu blok, imleç görünmüyorsa ekranın üçte birindeki
+  blok) aynı yerde tutar. Pencere açık yan panellere ve okunabilir bir
+  sayfaya yetmeyecek kadar darsa önce sol, gerekirse sağ yuva geçici olarak
+  gizlenir; pencere genişleyince geri gelir, ayar değişmez.
 - **Kaldığım yerden devam** (Notepad++ gibi; Ayarlar → Sistem, varsayılan
   açık): uygulama kapanırken hiçbir şey sorulmaz. Açık sekmeler sırasıyla,
   etkin sekme, her sekmenin kaydırma yeri ve pencerenin konumu/boyutu
@@ -1181,6 +1192,14 @@ e2e/            Playwright ile gerçek uygulamayı süren testler
   şema yalnızca görsel dosyalarını verir.
 - Kalem paketleri `apps/notlar` ve `apps/playground` gibi derlenmiş
   çıktıdan (`dist`) tüketilir.
+- **Keşif testi** (`e2e/explore.spec.ts`): uygulamayı belgeyi değiştirmemesi
+  gereken 40'a yakın eylemden geçirir (paneller, tam genişlik, odak modu,
+  kaynak görünümü, yakınlaştırma, diyaloglar, sekmeler, pencere boyutu,
+  notlar…). Her adımdan sonra okunan paragrafın yerinden kaymadığını, yana
+  taşma olmadığını, belgenin "kaydedilmemiş" olmadığını, Escape ile kapanan
+  diyaloglarda odağın belgeye döndüğünü ve hata kaydı düşmediğini denetler.
+  `KALEM_EXPLORE_SHOTS=<klasör>` her adımın ekran görüntüsünü,
+  `KALEM_EXPLORE_REPORT=<dosya>` bulguları (testi düşürmeden) yazar.
 
 ## Bilinen sınırlar
 
