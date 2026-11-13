@@ -6,6 +6,8 @@
 import type { CheckProgress, PlanStep } from "../shared/claude.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
+import type { FormField, FormValue } from "../shared/tool-form.js";
+import { checkField, checkForm } from "../shared/tool-form.js";
 import type { ApprovalAnswer, ApprovalRequest, ApprovalScope } from "../shared/tool-protocol.js";
 import { el } from "./dom.js";
 
@@ -13,6 +15,110 @@ import { el } from "./dom.js";
 export type ApprovalState = "waiting" | "allowed" | "denied";
 
 let cardCount = 0;
+
+/** A form field's input, how its value is read, and where its error shows. */
+interface FieldInput {
+	readonly field: FormField;
+	readonly element: HTMLElement;
+	readonly control: HTMLInputElement | HTMLSelectElement;
+	readonly error: HTMLElement;
+	read(): FormValue;
+}
+
+const INPUT_TYPES: Readonly<Record<string, string>> = {
+	text: "text",
+	url: "url",
+	email: "email",
+	secret: "password",
+	number: "number",
+};
+
+function fieldInput(t: Strings, card: number, field: FormField): FieldInput {
+	const id = `assistant-form-${card}-${field.name}`;
+	const error = el("span", {
+		class: "assistant-form-error",
+		attrs: { id: `${id}-error`, role: "alert" },
+	});
+	const hint =
+		field.hint === undefined
+			? null
+			: el("span", { class: "assistant-form-hint", attrs: { id: `${id}-hint` }, text: field.hint });
+	const described = [`${id}-error`, ...(hint === null ? [] : [`${id}-hint`])].join(" ");
+	if (field.type === "boolean") {
+		const box = el("input", {
+			attrs: { type: "checkbox", id, name: field.name, "aria-describedby": described },
+		});
+		box.checked = field.value === true;
+		return {
+			field,
+			control: box,
+			error,
+			read: () => box.checked,
+			element: el("div", {
+				class: "assistant-form-field assistant-form-check",
+				children: [
+					el("label", { class: "settings-check", children: [box, field.label] }),
+					...(hint === null ? [] : [hint]),
+					error,
+				],
+			}),
+		};
+	}
+	let control: HTMLInputElement | HTMLSelectElement;
+	if (field.type === "choice") {
+		control = el("select", {
+			attrs: { id, name: field.name, "aria-describedby": described },
+			children: (field.options ?? []).map((option) =>
+				el("option", { text: option.label, attrs: { value: option.value } }),
+			),
+		});
+		if (field.value !== undefined) control.value = String(field.value);
+	} else {
+		const attrs: Record<string, string> = {
+			id,
+			name: field.name,
+			type: INPUT_TYPES[field.type] ?? "text",
+			"aria-describedby": described,
+			autocomplete: field.type === "secret" ? "new-password" : "off",
+			spellcheck: "false",
+		};
+		if (field.placeholder !== undefined) attrs.placeholder = field.placeholder;
+		if (field.min !== undefined) attrs.min = String(field.min);
+		if (field.max !== undefined) attrs.max = String(field.max);
+		if (field.step !== undefined) attrs.step = String(field.step);
+		if (field.maxLength !== undefined) attrs.maxlength = String(field.maxLength);
+		control = el("input", { attrs });
+		if (field.value !== undefined && field.type !== "secret") control.value = String(field.value);
+	}
+	if (field.required) control.setAttribute("aria-required", "true");
+	const label = el("label", {
+		attrs: { for: id },
+		children: [
+			field.label,
+			...(field.required
+				? []
+				: [el("span", { class: "assistant-form-optional", text: ` (${t.formOptional})` })]),
+		],
+	});
+	return {
+		field,
+		control,
+		error,
+		read: () => control.value,
+		element: el("div", {
+			class: "assistant-form-field",
+			children: [label, control, ...(hint === null ? [] : [hint]), error],
+		}),
+	};
+}
+
+/** Shows a field's error, or clears it; whether the value is right. */
+function showCheck(t: Strings, input: FieldInput): boolean {
+	const checked = checkField(t, input.field, input.read());
+	input.error.textContent = checked.ok ? "" : checked.error;
+	input.control.setAttribute("aria-invalid", String(!checked.ok));
+	return checked.ok;
+}
 
 /** A card that asks the user before a tool changes something; `answer` sends what they chose. */
 export function approvalCard(
@@ -69,7 +175,80 @@ export function approvalCard(
 	if (request.afterExternal === true) {
 		children.push(el("p", { class: "assistant-approval-warning", text: t.approvalAfterExternal }));
 	}
-	if (state === "waiting") {
+	const form = request.fields;
+	if (form !== undefined) {
+		if (request.error !== undefined && request.error !== "" && state === "waiting") {
+			children.push(
+				el("p", {
+					class: "assistant-approval-warning",
+					attrs: { role: "alert" },
+					text: request.error,
+				}),
+			);
+		}
+		if (state !== "waiting") {
+			children.push(
+				el("p", {
+					class: `assistant-approval-state approval-${state}`,
+					text: state === "allowed" ? t.formSubmitted : t.formCancelled,
+				}),
+			);
+		} else {
+			const inputs = form.map((field) => fieldInput(t, id, field));
+			for (const input of inputs) {
+				const recheck = (): void => {
+					if (input.control.getAttribute("aria-invalid") !== null) showCheck(t, input);
+				};
+				input.control.addEventListener("input", recheck);
+				input.control.addEventListener("change", recheck);
+				input.control.addEventListener("blur", () => {
+					if (input.read() !== "" || input.field.type === "boolean") showCheck(t, input);
+				});
+			}
+			const submit = el("button", {
+				class: "assistant-primary",
+				text: t.formSubmit,
+				attrs: { type: "submit" },
+			});
+			const cancel = el("button", {
+				class: "assistant-action",
+				text: t.formCancel,
+				attrs: { type: "button" },
+			});
+			cancel.addEventListener("click", () => answer({ approved: false, scope: "once" }));
+			const element = el("form", {
+				class: "assistant-form",
+				attrs: { novalidate: "" },
+				children: [
+					...inputs.map((input) => input.element),
+					...(form.some((field) => field.type === "secret")
+						? [el("p", { class: "assistant-approval-note", text: t.formSecretNote })]
+						: []),
+					el("div", { class: "assistant-approval-actions", children: [submit, cancel] }),
+				],
+			});
+			element.addEventListener("submit", (event) => {
+				event.preventDefault();
+				const values: Record<string, FormValue> = {};
+				for (const input of inputs) values[input.field.name] = input.read();
+				const checked = checkForm(t, form, values);
+				if (!checked.ok) {
+					const wrong = inputs.filter((input) => !showCheck(t, input));
+					wrong[0]?.control.focus();
+					return;
+				}
+				answer({ approved: true, scope: "once", values: checked.values });
+			});
+			children.push(element);
+			// The first field to fill in takes the caret.
+			queueMicrotask(() => {
+				const first =
+					inputs.find((input) => input.field.type !== "boolean" && input.read() === "") ??
+					inputs[0];
+				first?.control.focus();
+			});
+		}
+	} else if (state === "waiting") {
 		const scopeLabels: Readonly<Record<ApprovalScope, string>> = {
 			once: t.approvalScopeOnce,
 			session: t.approvalScopeSession,

@@ -53,7 +53,11 @@ export class PermissionGate {
 	 * goes or the reply is stopped.
 	 */
 	ask(sender: WebContents, request: Omit<ApprovalRequest, "id">): Promise<ApprovalAnswer> {
-		if (request.items === undefined && this.allowed(request.permission, request.risk)) {
+		if (
+			request.items === undefined &&
+			request.fields === undefined &&
+			this.allowed(request.permission, request.risk)
+		) {
 			return Promise.resolve({ approved: true, scope: "once" });
 		}
 		if (sender.isDestroyed()) return Promise.resolve(DENIED);

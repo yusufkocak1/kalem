@@ -4,17 +4,20 @@ import {
 	ClaudeStreamReader,
 	claudeArgs,
 	claudeInputLine,
+	composePrompt as composeForCommand,
 	composePrompt,
 	copilotArgs,
 	DIAGRAM_FENCE,
 	diagramForPrompt,
 	diagramFromReply,
+	isSlashCommand,
 	LineSplitter,
 	lineDiff,
 	SYSTEM_PROMPT,
 	splitReply,
 	systemPrompt,
 	toolSteps,
+	withContext,
 	withInstructions,
 } from "./claude.js";
 import { ancestors, SHAPES } from "./diagram.js";
@@ -488,5 +491,17 @@ describe("the lines of a proposed change", () => {
 			{ kind: "+", text: "yeni" },
 			{ kind: "+", text: "dosya" },
 		]);
+	});
+});
+
+describe("slash commands for Claude Code", () => {
+	it("keeps a command at the start of the prompt, before the context", () => {
+		expect(isSlashCommand("/docs-kit:outline the intro")).toBe(true);
+		expect(isSlashCommand("what is /etc?")).toBe(false);
+		expect(
+			composeForCommand({ question: "/docs-kit:outline", document: { name: "a.md", text: "# A" } }),
+		).toBe('/docs-kit:outline\n\n<document name="a.md">\n# A\n</document>');
+		expect(withContext("<files/>", "/tone")).toBe("/tone\n\n<files/>");
+		expect(withContext("<files/>", "Hello")).toBe("<files/>\n\nHello");
 	});
 });

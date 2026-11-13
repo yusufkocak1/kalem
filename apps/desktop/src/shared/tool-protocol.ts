@@ -5,6 +5,8 @@
  * Pure: the main process runs the tools, the renderer shows the cards.
  */
 import { fenceBlock } from "./jira-tool.js";
+import type { FormField, FormValues } from "./tool-form.js";
+import { parseFormValues } from "./tool-form.js";
 
 /**
  * What a tool may change, and so how the user is asked:
@@ -50,6 +52,13 @@ export interface ApprovalRequest {
 	readonly scopes: readonly ApprovalScope[];
 	/** Content read from Jira or Confluence came before it in this answer: it may have asked for it. */
 	readonly afterExternal?: boolean;
+	/**
+	 * Fields the user fills in (a connection's address and token, settings):
+	 * the card is a form, and sending it is the approval. Asked every time.
+	 */
+	readonly fields?: readonly FormField[];
+	/** Why the last values sent did not work (the server refused the login). */
+	readonly error?: string;
 }
 
 export interface ApprovalAnswer {
@@ -57,6 +66,8 @@ export interface ApprovalAnswer {
 	readonly scope: ApprovalScope;
 	/** The items picked, by index; all of them when missing. */
 	readonly selected?: readonly number[];
+	/** What the user typed into the form's fields; never shown to the model as it is. */
+	readonly values?: FormValues;
 }
 
 export const DENIED: ApprovalAnswer = { approved: false, scope: "once" };
@@ -72,7 +83,13 @@ export function parseApprovalAnswer(raw: unknown): ApprovalAnswer {
 	const selected = Array.isArray(raw.selected)
 		? raw.selected.filter((n): n is number => Number.isInteger(n) && n >= 0).slice(0, 500)
 		: undefined;
-	return { approved: true, scope, ...(selected === undefined ? {} : { selected }) };
+	const values = parseFormValues(raw.values);
+	return {
+		approved: true,
+		scope,
+		...(selected === undefined ? {} : { selected }),
+		...(values === undefined ? {} : { values }),
+	};
 }
 
 /** The scopes a kind of change may be allowed for: anything online is asked every time. */

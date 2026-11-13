@@ -79,6 +79,25 @@ const text = (value: unknown, name: string): string => {
 	return value;
 };
 
+/** Checks the login with Confluence and keeps it. */
+export async function connectConfluence(
+	store: ConfluenceStore,
+	raw: unknown,
+): Promise<ConfluenceAccount> {
+	const login = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+	const credentials = {
+		site: text(login.site, "site").trim(),
+		username: text(login.username ?? "", "user name").trim(),
+		token: text(login.token, "token").trim(),
+	};
+	if (credentials.site === "" || credentials.token === "") throw new Error("Missing login");
+	const client = confluenceClient(credentials);
+	await client.verify();
+	const username = client.bearer ? "" : credentials.username;
+	await store.set({ ...credentials, username, site: client.site });
+	return account(client, username);
+}
+
 /** A version conflict: Confluence answers 409, some versions 400 with a message about it. */
 function isConflict(error: unknown): boolean {
 	return (
@@ -115,20 +134,9 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 		return account(confluenceClient(credentials), credentials.username);
 	});
 
-	ipcMain.handle(CHANNEL.confluenceConnect, async (_event, raw: unknown) => {
-		const login = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
-		const credentials = {
-			site: text(login.site, "site").trim(),
-			username: text(login.username, "user name").trim(),
-			token: text(login.token, "token").trim(),
-		};
-		if (credentials.site === "" || credentials.token === "") throw new Error("Missing login");
-		const client = confluenceClient(credentials);
-		await client.verify();
-		const username = client.bearer ? "" : credentials.username;
-		await ctx.confluence.set({ ...credentials, username, site: client.site });
-		return account(client, username);
-	});
+	ipcMain.handle(CHANNEL.confluenceConnect, (_event, raw: unknown) =>
+		connectConfluence(ctx.confluence, raw),
+	);
 
 	ipcMain.handle(CHANNEL.confluenceDisconnect, () => ctx.confluence.clear());
 

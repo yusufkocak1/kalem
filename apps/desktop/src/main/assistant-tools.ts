@@ -44,6 +44,30 @@ export interface RendererAnswer {
 	readonly document?: string;
 }
 
+/** A service Kalem signs in to. */
+export type ConnectionService = "jira" | "confluence";
+
+/** Where Kalem is signed in, as the user may see it: never the token. */
+export interface ConnectionAccount {
+	readonly site: string;
+	readonly username: string;
+	/** Jira reached with Confluence Cloud's login, not one of its own. */
+	readonly shared?: boolean;
+}
+
+/** Signing in to Jira and Confluence, as their panels do. */
+export interface Connections {
+	account(service: ConnectionService): Promise<ConnectionAccount | null>;
+	/** The address the service is likely at (Jira, from Confluence); `null` when unknown. */
+	suggestedSite(service: ConnectionService): Promise<string | null>;
+	/** Checks the login with the server and keeps it; throws with the server's answer. */
+	connect(
+		service: ConnectionService,
+		login: { site: string; username: string; token: string },
+	): Promise<ConnectionAccount>;
+	disconnect(service: ConnectionService): Promise<void>;
+}
+
 /** Everything a tool may use while one answer is given. */
 export interface ToolContext {
 	readonly chatId: string;
@@ -58,6 +82,8 @@ export interface ToolContext {
 	readonly jira: JiraLookups | null;
 	readonly confluenceClient: ConfluenceClient | null;
 	readonly jiraClient: JiraClient | null;
+	/** Signing in to Jira and Confluence; `null` where it cannot be done (tests). */
+	readonly connections: Connections | null;
 	readonly workspace: Workspace | null;
 	/** The analysis templates; `null` where there are none to read (tests). */
 	readonly templates: TemplateStore | null;

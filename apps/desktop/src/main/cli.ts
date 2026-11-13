@@ -110,7 +110,7 @@ async function launchFor(path: string): Promise<CliLaunch | null> {
 }
 
 /** `PATH` with the CLI's own folder and the usual ones, for a CLI that starts `node`. */
-function environment(launch: CliLaunch): NodeJS.ProcessEnv {
+export function environment(launch: CliLaunch): NodeJS.ProcessEnv {
 	const extra = [dirname(launch.path)];
 	if (isAbsolute(launch.command)) extra.push(dirname(launch.command));
 	if (process.platform !== "win32") extra.push("/opt/homebrew/bin", "/usr/local/bin");

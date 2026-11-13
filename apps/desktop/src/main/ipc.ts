@@ -39,7 +39,7 @@ import { registerAssistantIpc } from "./assistant-ipc.js";
 import { AssistantToolServer } from "./assistant-mcp.js";
 import type { AssistantStore } from "./assistant-store.js";
 import type { ConfluenceClient } from "./confluence-client.js";
-import { confluenceClient, registerConfluenceIpc } from "./confluence-ipc.js";
+import { confluenceClient, connectConfluence, registerConfluenceIpc } from "./confluence-ipc.js";
 import type { ConfluenceStore } from "./confluence-store.js";
 import {
 	checkDiagramBytes,
@@ -64,7 +64,7 @@ import {
 	toGitAction,
 } from "./git.js";
 import type { VersionStore } from "./history.js";
-import { registerJiraIpc } from "./jira-ipc.js";
+import { connectJira, jiraConnection, registerJiraIpc } from "./jira-ipc.js";
 import { LocalNotesStore } from "./local-notes-store.js";
 import { paletteCommands, runPaletteCommand } from "./menu.js";
 import type { PackageStore } from "./package.js";
@@ -976,6 +976,37 @@ export function registerIpc(ctx: IpcContext): void {
 		senderOf,
 		confluence: confluenceNow,
 		jira: jiraNow,
+		connections: {
+			async account(service) {
+				if (service === "confluence") {
+					const credentials = await ctx.confluence.get();
+					return credentials === null
+						? null
+						: { site: confluenceClient(credentials).site, username: credentials.username };
+				}
+				const connection = await jiraConnection(ctx);
+				return connection === null
+					? null
+					: {
+							site: connection.client.site,
+							username: connection.username,
+							shared: connection.shared,
+						};
+			},
+			async suggestedSite(service) {
+				if (service === "confluence") return null;
+				const credentials = await ctx.confluence.get();
+				return credentials === null ? null : confluenceClient(credentials).jiraBase("");
+			},
+			async connect(service, login) {
+				const account =
+					service === "jira"
+						? await connectJira(ctx, login)
+						: await connectConfluence(ctx.confluence, login);
+				return { site: account.site, username: account.username };
+			},
+			disconnect: (service) => (service === "jira" ? ctx.jira.clear() : ctx.confluence.clear()),
+		},
 		tools: new AssistantToolServer({
 			folder: join(app.getPath("userData"), "assistant-tools"),
 			node: process.execPath,
