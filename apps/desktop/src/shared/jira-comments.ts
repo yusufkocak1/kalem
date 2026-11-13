@@ -201,3 +201,72 @@ export function timeBar(spent: number, remaining: number | null, estimate: numbe
 	if (estimate !== null && estimate > spent) return { value: spent, max: estimate };
 	return { value: 1, max: 1 };
 }
+
+const BOT_NAME = /bot\b|\bbot|jira|admin|automation|system/i;
+
+export function isBotAuthor(name: string, id: string): boolean {
+	return BOT_NAME.test(parsePersonName(name).name) || BOT_NAME.test(id);
+}
+
+export function hasAttachment(body: string, html: string | null): boolean {
+	if (html !== null && /<img\b|\/secure\/attachment\//i.test(html)) return true;
+	return /![^!\s][^!\n]*!|\[\^[^\]]+\]|!\[[^\]]*\]\(/.test(body);
+}
+
+export interface CommentFilter {
+	readonly attachmentsOnly: boolean;
+	readonly humansOnly: boolean;
+	readonly person: string | null;
+	readonly team: string | null;
+}
+
+export const NO_COMMENT_FILTER: CommentFilter = {
+	attachmentsOnly: false,
+	humansOnly: false,
+	person: null,
+	team: null,
+};
+
+interface FilterableComment {
+	readonly author: string;
+	readonly authorId: string;
+	readonly body: string;
+	readonly html: string | null;
+}
+
+export function filterComments<T extends FilterableComment>(
+	comments: readonly T[],
+	filter: CommentFilter,
+): T[] {
+	return comments.filter((comment) => {
+		if (filter.humansOnly && isBotAuthor(comment.author, comment.authorId)) return false;
+		if (filter.attachmentsOnly && !hasAttachment(comment.body, comment.html)) return false;
+		const person = parsePersonName(comment.author);
+		if (filter.person !== null && person.name !== filter.person) return false;
+		if (filter.team !== null && person.team !== filter.team) return false;
+		return true;
+	});
+}
+
+export function commentPeople(comments: readonly FilterableComment[]): {
+	readonly people: string[];
+	readonly teams: string[];
+} {
+	const people = new Set<string>();
+	const teams = new Set<string>();
+	for (const comment of comments) {
+		const person = parsePersonName(comment.author);
+		people.add(person.name);
+		if (person.team !== "") teams.add(person.team);
+	}
+	const sort = (values: Set<string>): string[] =>
+		[...values].sort((a, b) => a.localeCompare(b, "tr"));
+	return { people: sort(people), teams: sort(teams) };
+}
+
+export function applyMentions(text: string, mentions: ReadonlyMap<string, string>): string {
+	let result = text;
+	const names = [...mentions.keys()].sort((a, b) => b.length - a.length);
+	for (const name of names) result = result.split(`@${name}`).join(mentions.get(name) ?? "");
+	return result;
+}

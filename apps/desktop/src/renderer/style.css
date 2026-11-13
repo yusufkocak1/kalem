@@ -10849,3 +10849,859 @@ dialog {
 	border: 0;
 	border-radius: 4px;
 }
+
+/* --- Jira issue popup: sticky head, tabs, editable fields ---------------------- */
+
+.jira-issue-top {
+	position: sticky;
+	top: -14px;
+	z-index: 4;
+	display: grid;
+	gap: 6px;
+	margin: -14px -16px 0;
+	padding: 12px 16px 0;
+	border-bottom: 1px solid var(--app-border);
+	background: var(--app-raised);
+}
+
+.jira-parent-link {
+	display: inline-flex;
+	align-items: center;
+	justify-self: start;
+	gap: 6px;
+	max-width: 100%;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--app-muted);
+	font: inherit;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.jira-parent-link:hover .jira-parent-summary {
+	text-decoration: underline;
+}
+
+.jira-parent-label {
+	flex: none;
+}
+
+.jira-parent-link .jira-key {
+	font-weight: 600;
+}
+
+.jira-parent-summary {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.jira-issue-top .jira-issue-head {
+	flex-wrap: nowrap;
+	min-width: 0;
+}
+
+.jira-head-spacer {
+	flex: 1;
+}
+
+.jira-head-actions {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: 2px;
+}
+
+.jira-icon-action {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 2px;
+	min-width: 28px;
+	height: 28px;
+	padding: 0 5px;
+	border: 0;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--app-muted);
+	cursor: pointer;
+}
+
+.jira-icon-action:hover,
+.jira-icon-action[aria-expanded="true"] {
+	background: var(--app-hover);
+	color: var(--app-text);
+}
+
+.jira-icon-action:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 1px;
+}
+
+.jira-icon-action svg {
+	width: 16px;
+	height: 16px;
+}
+
+.jira-icon-action.jira-copy-toggle > svg:last-child {
+	width: 10px;
+	height: 10px;
+	transform: rotate(90deg);
+}
+
+.jira-icon-action.copied {
+	color: var(--app-ok);
+}
+
+.jira-favorite[aria-pressed="true"] {
+	color: #e2a03f;
+}
+
+.jira-favorite[aria-pressed="true"] svg {
+	fill: currentColor;
+}
+
+.jira-issue-top .jira-title {
+	display: -webkit-box;
+	overflow: hidden;
+	font-size: 17px;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+}
+
+.jira-tabs {
+	display: flex;
+	gap: 2px;
+	margin-top: 2px;
+	overflow-x: auto;
+	scrollbar-width: none;
+}
+
+.jira-tab {
+	flex: none;
+	padding: 7px 10px 8px;
+	border: 0;
+	border-bottom: 2px solid transparent;
+	background: none;
+	color: var(--app-muted);
+	font: inherit;
+	font-size: 13px;
+	font-weight: 600;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.jira-tab:hover {
+	color: var(--app-text);
+}
+
+.jira-tab[aria-selected="true"] {
+	border-bottom-color: var(--app-accent);
+	color: var(--app-text);
+}
+
+.jira-tab:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -2px;
+}
+
+.jira-tab-panel {
+	display: grid;
+	align-content: start;
+	gap: 12px;
+	min-width: 0;
+}
+
+.jira-tab-panel[hidden] {
+	display: none;
+}
+
+.jira-detail {
+	display: grid;
+	gap: 12px;
+	min-width: 0;
+}
+
+.jira-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 14px;
+	color: var(--app-muted);
+	font-size: 12.5px;
+}
+
+.jira-meta:empty {
+	display: none;
+}
+
+.jira-meta-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	min-width: 0;
+	white-space: nowrap;
+}
+
+.jira-meta-item > svg {
+	width: 14px;
+	height: 14px;
+}
+
+.jira-meta-item .jira-type-badge {
+	transform: scale(0.85);
+}
+
+.jira-edit-error {
+	margin: 0;
+	padding: 6px 10px;
+	border-radius: 6px;
+	background: var(--app-error-bg);
+	color: var(--app-error);
+	font-size: 12.5px;
+}
+
+.jira-edit-error[hidden] {
+	display: none;
+}
+
+.jira-dialog .jira-fields {
+	display: grid;
+	grid-template-columns: minmax(70px, max-content) minmax(0, 1fr);
+	gap: 8px 14px;
+	align-items: center;
+	overflow: visible;
+	border: 0;
+	border-radius: 0;
+	background: none;
+}
+
+.jira-field-row {
+	display: contents;
+}
+
+.jira-dialog .jira-fields dt {
+	color: var(--app-muted);
+	font-size: 12.5px;
+	font-weight: 400;
+	letter-spacing: 0;
+	text-transform: none;
+}
+
+.jira-dialog .jira-fields dd {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+}
+
+.jira-field-chip-wrap {
+	position: relative;
+	display: inline-flex;
+	max-width: 100%;
+}
+
+.jira-field-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	max-width: 100%;
+	min-height: 28px;
+	padding: 2px 9px 2px 11px;
+	border: 1px solid var(--app-border);
+	border-radius: 999px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.jira-field-chip:hover,
+.jira-field-chip[aria-expanded="true"] {
+	border-color: color-mix(in srgb, var(--app-accent) 45%, var(--app-border));
+	background: var(--app-surface);
+}
+
+.jira-field-chip:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 1px;
+}
+
+.jira-field-chip.empty .jira-field-chip-text {
+	color: var(--app-muted);
+}
+
+.jira-field-chip-text {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.jira-field-chip-mark:empty {
+	display: none;
+}
+
+.jira-field-chip > svg {
+	flex: none;
+	width: 12px;
+	height: 12px;
+	opacity: 0.6;
+	transform: rotate(90deg);
+}
+
+.jira-field-chip.saving {
+	cursor: progress;
+}
+
+.jira-field-chip.saving > svg {
+	width: 12px;
+	height: 12px;
+	border: 2px solid var(--app-border);
+	border-top-color: var(--app-accent);
+	border-radius: 50%;
+	opacity: 1;
+	animation: jira-spin 0.8s linear infinite;
+}
+
+.jira-field-chip.saving > svg > * {
+	display: none;
+}
+
+@keyframes jira-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.jira-picker {
+	position: absolute;
+	top: calc(100% + 4px);
+	left: 0;
+	z-index: 6;
+	display: grid;
+	width: max-content;
+	min-width: 220px;
+	max-width: min(340px, 80vw);
+	overflow: hidden;
+	border: 1px solid var(--app-border);
+	border-radius: 10px;
+	background: var(--app-raised);
+	box-shadow: var(--app-shadow);
+}
+
+.jira-picker[hidden] {
+	display: none;
+}
+
+.jira-picker-search {
+	margin: 6px;
+	padding: 5px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-surface);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 13px;
+}
+
+.jira-picker-list {
+	max-height: 240px;
+	margin: 0;
+	padding: 0 0 4px;
+	overflow-y: auto;
+	list-style: none;
+}
+
+.jira-picker-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 7px 12px;
+	font-size: 13px;
+	cursor: pointer;
+}
+
+.jira-picker-item.active,
+.jira-picker-item:hover {
+	background: var(--app-hover);
+}
+
+.jira-picker-item[aria-selected="true"] {
+	background: var(--app-pressed);
+	color: var(--app-accent);
+}
+
+.jira-picker-item.muted .jira-picker-name {
+	color: var(--app-muted);
+}
+
+.jira-picker-name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.jira-picker-item > svg {
+	flex: none;
+	width: 15px;
+	height: 15px;
+}
+
+.jira-picker-status {
+	margin: 0;
+	padding: 8px 12px;
+	color: var(--app-muted);
+	font-size: 12.5px;
+}
+
+.jira-picker-status[hidden] {
+	display: none;
+}
+
+.jira-label-editor {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+}
+
+.jira-label-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	max-width: 100%;
+	min-height: 28px;
+	padding: 2px 6px 2px 11px;
+	border: 1px solid var(--app-border);
+	border-radius: 999px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 13px;
+}
+
+.jira-label-chip > span {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.jira-label-remove {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: none;
+	color: var(--app-muted);
+	cursor: pointer;
+}
+
+.jira-label-remove:hover {
+	background: var(--app-hover);
+	color: var(--app-text);
+}
+
+.jira-label-remove svg {
+	width: 12px;
+	height: 12px;
+}
+
+.jira-label-add {
+	padding-right: 11px;
+	border-style: dashed;
+	background: transparent;
+	color: var(--app-muted);
+	cursor: pointer;
+}
+
+.jira-label-add:hover {
+	color: var(--app-text);
+}
+
+.jira-label-add[hidden],
+.jira-label-adder[hidden] {
+	display: none;
+}
+
+.jira-label-add svg {
+	width: 13px;
+	height: 13px;
+}
+
+.jira-label-adder {
+	position: relative;
+	display: inline-flex;
+}
+
+.jira-label-input {
+	width: 150px;
+	min-height: 28px;
+	padding: 2px 11px;
+	border: 1px dashed var(--app-accent);
+	border-radius: 999px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 13px;
+	outline: none;
+}
+
+.jira-all-fields {
+	border-top: 1px solid var(--app-border);
+	padding-top: 8px;
+}
+
+.jira-all-fields[hidden] {
+	display: none;
+}
+
+.jira-all-fields > summary {
+	color: var(--app-muted);
+	font-size: 12.5px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.jira-all-fields-list {
+	display: grid;
+	grid-template-columns: minmax(90px, max-content) minmax(0, 1fr);
+	gap: 6px 14px;
+	margin: 8px 0 0;
+	font-size: 13px;
+}
+
+.jira-all-fields-list dt {
+	color: var(--app-muted);
+}
+
+.jira-all-fields-list dd {
+	min-width: 0;
+	margin: 0;
+	overflow-wrap: anywhere;
+}
+
+.jira-journey-wrap {
+	min-width: 0;
+	overflow-x: auto;
+	scrollbar-width: thin;
+}
+
+.jira-journey {
+	display: flex;
+	align-items: stretch;
+	gap: 0;
+	width: max-content;
+	min-width: 100%;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.jira-journey-step {
+	position: relative;
+	display: grid;
+	flex: 1 0 auto;
+	gap: 1px;
+	min-width: 72px;
+	padding: 5px 14px 5px 18px;
+	background: var(--app-surface);
+	color: var(--app-muted);
+	font-size: 12px;
+	clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 0 100%, 9px 50%);
+}
+
+.jira-journey-step:first-child {
+	padding-left: 12px;
+	border-radius: 6px 0 0 6px;
+	clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 0 100%);
+}
+
+.jira-journey-step + .jira-journey-step {
+	margin-left: -6px;
+}
+
+.jira-journey-step.current {
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+}
+
+.jira-journey-step.merge {
+	display: flex;
+	flex: 0 0 auto;
+	align-items: center;
+	gap: 5px;
+	min-width: 0;
+	background: color-mix(in srgb, var(--app-ok) 18%, var(--app-surface));
+	color: var(--app-ok);
+	font-weight: 600;
+}
+
+.jira-journey-step.merge svg {
+	width: 14px;
+	height: 14px;
+}
+
+.jira-journey-label {
+	overflow: hidden;
+	font-weight: 600;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.jira-journey-step:not(.current) .jira-journey-label {
+	color: var(--app-text);
+}
+
+.jira-journey-days {
+	font-size: 11px;
+	opacity: 0.85;
+}
+
+.jira-dialog .jira-section {
+	display: grid;
+	gap: 6px;
+	min-width: 0;
+}
+
+.jira-dialog section.jira-section > h3 {
+	margin: 0;
+	font-size: 12px;
+}
+
+.jira-comments {
+	display: grid;
+	gap: 8px;
+	min-width: 0;
+}
+
+.jira-comment-filters {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+}
+
+.jira-filter-chip {
+	padding: 3px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 999px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 12.5px;
+	cursor: pointer;
+}
+
+.jira-filter-chip:hover {
+	background: var(--app-hover);
+}
+
+.jira-filter-chip[aria-pressed="true"] {
+	border-color: var(--app-accent);
+	background: var(--app-pressed);
+	color: var(--app-accent);
+}
+
+.jira-filter-select {
+	max-width: 100%;
+	min-width: 0;
+	padding: 3px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 999px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 12.5px;
+}
+
+.jira-comment-list {
+	display: grid;
+	min-width: 0;
+}
+
+.jira-composer {
+	position: sticky;
+	bottom: -18px;
+	z-index: 3;
+	display: grid;
+	gap: 4px;
+	margin: 4px -16px -18px;
+	padding: 10px 16px 12px;
+	border-top: 1px solid var(--app-border);
+	background: var(--app-raised);
+}
+
+.jira-composer-row {
+	display: flex;
+	align-items: flex-end;
+	gap: 8px;
+}
+
+.jira-composer-input {
+	flex: 1;
+	min-width: 0;
+	min-height: 38px;
+	max-height: 200px;
+	padding: 8px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-surface);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 13px;
+	line-height: 1.45;
+	resize: none;
+}
+
+.jira-composer-input:focus {
+	border-color: var(--app-accent);
+	outline: none;
+}
+
+.jira-composer-send:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.jira-composer-status {
+	margin: 0;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.jira-composer-status:empty {
+	display: none;
+}
+
+.jira-composer-status.error {
+	color: var(--app-error);
+}
+
+.jira-composer > .jira-mention-picker {
+	top: auto;
+	bottom: calc(100% - 6px);
+	left: 16px;
+}
+
+.jira-thumb {
+	display: inline-block;
+	max-width: 100%;
+	margin: 4px 0;
+	padding: 0;
+	overflow: hidden;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-surface);
+	cursor: zoom-in;
+	vertical-align: top;
+}
+
+.jira-thumb img {
+	display: block;
+	min-width: 40px;
+	min-height: 32px;
+	max-width: min(220px, 100%);
+	max-height: 140px;
+	object-fit: contain;
+}
+
+.jira-attachment-missing {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	max-width: 100%;
+	margin: 4px 0;
+	padding: 6px 10px;
+	border: 1px dashed var(--app-border);
+	border-radius: 6px;
+	color: var(--app-muted);
+	font-size: 12.5px;
+}
+
+.jira-attachment-missing svg {
+	width: 15px;
+	height: 15px;
+}
+
+.jira-attachment-name {
+	min-width: 0;
+	overflow-wrap: anywhere;
+	color: var(--app-text);
+}
+
+.jira-link-card {
+	display: inline-flex;
+	align-items: center;
+	gap: 9px;
+	max-width: 100%;
+	margin: 2px 0;
+	padding: 6px 12px 6px 9px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-surface);
+	color: var(--app-text);
+	text-decoration: none;
+	vertical-align: middle;
+}
+
+.jira-link-card:hover {
+	border-color: color-mix(in srgb, var(--app-accent) 45%, var(--app-border));
+}
+
+.jira-link-card > svg {
+	flex: none;
+	width: 18px;
+	height: 18px;
+	color: var(--app-accent);
+}
+
+.jira-link-card-text {
+	display: grid;
+	min-width: 0;
+	line-height: 1.3;
+}
+
+.jira-link-card-title {
+	overflow: hidden;
+	font-size: 13px;
+	font-weight: 600;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.jira-link-card-subtitle {
+	overflow: hidden;
+	color: var(--app-muted);
+	font-size: 11.5px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.jira-link-card-subtitle:empty {
+	display: none;
+}
+
+.jira-dev-empty {
+	display: none;
+}
+
+.jira-development:has(> .jira-dev-plain[hidden]) > .jira-dev-empty {
+	display: block;
+}
+
+.jira-dev-plain[hidden] {
+	display: none;
+}

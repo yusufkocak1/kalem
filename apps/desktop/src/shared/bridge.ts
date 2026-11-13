@@ -7,13 +7,20 @@ import type { ConfluenceSearchRequest, ConfluenceSearchResults } from "./conflue
 import type { CustomMode } from "./custom-modes.js";
 import type { TextFormat } from "./encoding.js";
 import type { Lang } from "./i18n.js";
-import type { JiraAccount, JiraIssue, JiraSearchResults } from "./jira.js";
+import type { JiraAccount, JiraComment, JiraIssue, JiraSearchResults } from "./jira.js";
 import type {
 	DevelopmentItem,
 	DevelopmentKind,
 	DevelopmentSummary,
 	JiraTransition,
 } from "./jira-dev.js";
+import type {
+	JiraAttachment,
+	JiraEditableField,
+	JiraOption,
+	JiraSprint,
+	JiraUser,
+} from "./jira-fields.js";
 import type { WorklogContext, WorklogEntry } from "./jira-worklog.js";
 import type { LocalNote } from "./local-notes.js";
 import type { ModeSettings } from "./mode-config.js";
@@ -854,6 +861,17 @@ export interface KalemBridge {
 	jiraWorklogContext(key: string): Promise<WorklogContext>;
 	/** Logs work on the issue; `offsetMinutes` is the local time zone's, for Jira's own work log. */
 	jiraLogWork(key: string, entry: WorklogEntry & { readonly offsetMinutes: number }): Promise<void>;
+	jiraAssignableUsers(key: string, query: string): Promise<JiraUser[]>;
+	jiraAssign(key: string, userId: string | null): Promise<void>;
+	jiraMentionUsers(query: string): Promise<JiraUser[]>;
+	jiraSprints(key: string, boardId: string | null): Promise<JiraSprint[]>;
+	jiraMoveToSprint(key: string, sprintId: string | null): Promise<void>;
+	jiraFieldOptions(key: string, field: JiraEditableField): Promise<JiraOption[]>;
+	jiraSetField(key: string, field: JiraEditableField, option: JiraOption | null): Promise<void>;
+	jiraUpdateLabels(key: string, add: readonly string[], remove: readonly string[]): Promise<void>;
+	jiraLabelSuggestions(query: string): Promise<string[]>;
+	jiraAddComment(key: string, wiki: string): Promise<JiraComment>;
+	jiraUploadAttachment(key: string, file: ImageFile): Promise<JiraAttachment[]>;
 	/** `package` proposes a `.kmd`; otherwise Markdown (or the tab's current type) comes first. */
 	/** `kind` "text": a text file, saved under any name with its own extension offered. */
 	chooseSavePath(
@@ -1074,6 +1092,17 @@ export const CHANNEL = {
 	jiraDevelopment: "kalem:jira-development",
 	jiraDevelopmentDetail: "kalem:jira-development-detail",
 	jiraLogWork: "kalem:jira-log-work",
+	jiraAssignableUsers: "kalem:jira-assignable-users",
+	jiraAssign: "kalem:jira-assign",
+	jiraMentionUsers: "kalem:jira-mention-users",
+	jiraSprints: "kalem:jira-sprints",
+	jiraMoveToSprint: "kalem:jira-move-to-sprint",
+	jiraFieldOptions: "kalem:jira-field-options",
+	jiraSetField: "kalem:jira-set-field",
+	jiraUpdateLabels: "kalem:jira-update-labels",
+	jiraLabelSuggestions: "kalem:jira-label-suggestions",
+	jiraAddComment: "kalem:jira-add-comment",
+	jiraUploadAttachment: "kalem:jira-upload-attachment",
 	chooseSavePath: "kalem:choose-save-path",
 	writeDocument: "kalem:write-document",
 	reloadDocument: "kalem:reload-document",

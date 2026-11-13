@@ -61,8 +61,85 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 
 	await expect(jira.locator(".jira-title")).toHaveText("Giriş zaman aşımı");
 	await expect(jira.locator(".jira-issue-head .jira-status")).toHaveText("In Progress");
+	await expect(jira.locator(".jira-parent-link")).toContainText(
+		"FT-30468TK PNRı Olmayan Bilette PNR Alanının Dolu Gelmesi",
+	);
+	await expect(jira.locator(".jira-tab")).toHaveText([
+		"Details",
+		"Comments (4)",
+		"Development",
+		"Sub-tasks (1)",
+	]);
+	await expect(jira.locator(".jira-meta")).toContainText("Bug");
+	await expect(jira.locator(".jira-journey-step:not(.merge) .jira-journey-label")).toHaveText([
+		"Open",
+		"In Analysis",
+		"In Progress",
+	]);
+	await expect(jira.locator(".jira-journey-step.current")).toContainText("In Progress");
+	await expect(jira.locator(".jira-journey-step.merge")).toHaveText("PR merged");
 	await expect(jira.locator(".jira-fields")).toContainText("AssigneeAyşe Balcı");
 	await expect(jira.locator(".jira-fields")).toContainText("12h · 8h left");
+	await expect(jira.locator(".jira-fields")).toContainText("SprintKırmızı Sprint 27");
+	await expect(jira.locator(".jira-fields")).toContainText("TakımKırmızı");
+	await jira.locator(".jira-all-fields > summary").click();
+	const all = jira.locator(".jira-all-fields-list");
+	await expect(all).toContainText("Story OriginBusiness Requirement");
+	await expect(all).toContainText("TeamKırmızı");
+	await expect(all).toContainText("ReporterMehmet");
+	await expect(all).not.toContainText("Branch");
+	await expect(all).not.toContainText("Parent Link");
+
+	// The chips save at once; a failed save puts the old value back.
+	await jira.locator('.jira-field-chip[aria-label="Assignee"]').click();
+	await jira
+		.locator(".jira-picker:not([hidden]) .jira-picker-item", { hasText: "Yusuf Kocak" })
+		.click();
+	await expect(jira.locator('.jira-field-chip[aria-label="Assignee"]')).toHaveText("Yusuf Kocak");
+	await expect
+		.poll(() => jiraServer.edits.at(-1))
+		.toEqual({
+			method: "PUT",
+			path: "/rest/api/2/issue/QR-1/assignee",
+			body: { name: "yusuf" },
+		});
+	await jira.locator('.jira-field-chip[aria-label="Sprint"]').click();
+	await expect(
+		jira.locator(".jira-picker:not([hidden]) .jira-picker-item[aria-selected=true]"),
+	).toHaveText("Kırmızı Sprint 27");
+	await jira
+		.locator(".jira-picker:not([hidden]) .jira-picker-item", { hasText: "Kırmızı Sprint 28" })
+		.click();
+	await expect.poll(() => jiraServer.edits.at(-1)?.path).toBe("/rest/agile/1.0/sprint/28/issue");
+	jiraServer.editable.failNextEdit = true;
+	await jira.locator('.jira-field-chip[aria-label="Takım"]').click();
+	await jira.locator(".jira-picker:not([hidden]) .jira-picker-item", { hasText: "Mavi" }).click();
+	await expect(jira.locator(".jira-edit-error")).toContainText("Alan düzenlenemez");
+	await expect(jira.locator('.jira-field-chip[aria-label="Takım"]')).toHaveText("Kırmızı");
+	await jira.locator('.jira-field-chip[aria-label="Takım"]').click();
+	await jira.locator(".jira-picker:not([hidden]) .jira-picker-item", { hasText: "Mavi" }).click();
+	await expect
+		.poll(() => jiraServer.edits.at(-1)?.body)
+		.toEqual({
+			fields: { customfield_11: { id: "2" } },
+		});
+	await expect(jira.locator(".jira-edit-error")).toBeHidden();
+	// Labels: removed with ×, added from the suggestions.
+	await jira.locator('.jira-label-chip[data-label="oturum"] .jira-label-remove').click();
+	await expect
+		.poll(() => jiraServer.edits.at(-1)?.body)
+		.toEqual({
+			update: { labels: [{ remove: "oturum" }] },
+		});
+	await jira.locator(".jira-label-add").click();
+	await page.keyboard.type("Ana");
+	await jira.locator(".jira-label-picker .jira-picker-item", { hasText: "AnalizTamam" }).click();
+	await expect(jira.locator(".jira-label-chip[data-label]")).toHaveText(["AnalizTamam"]);
+	await expect
+		.poll(() => jiraServer.edits.at(-1)?.body)
+		.toEqual({
+			update: { labels: [{ add: "AnalizTamam" }] },
+		});
 	// The description kept as HTML is drawn as a page, not shown as code: the panel is an alert.
 	const description = jira.locator(".jira-markdown").first();
 	await expect(description.locator("blockquote")).toContainText(
@@ -74,6 +151,7 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	// Links are grouped by how they relate; a Confluence page that mentions it is among them.
 	const mentioned = jira.locator(".jira-link-group", { hasText: "mentioned in" });
 	await expect(mentioned.locator(".jira-remote")).toHaveText("Sprint Planı");
+	await jira.locator('.jira-tab[data-tab="comments"]').click();
 	const comments = jira.locator(".jira-comment");
 	await expect(comments.nth(0).locator(".jira-comment-author")).toHaveText("Gulden Baykara");
 	await expect(comments.nth(0).locator(".jira-team-badge")).toHaveText("Quickres Analist Takimi");
@@ -82,6 +160,40 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await expect(comments.nth(1)).toHaveClass(/jira-comment-short/);
 	await expect(comments.nth(1).locator(".jira-team-badge")).toHaveText("Gelir Yonetimi Bsk.");
 	await expect(comments.nth(2)).toContainText("Bende de oluyor.");
+	// An attached image comes through Kalem, signed in; one that is gone shows its name.
+	const image = comments.nth(3).locator(".jira-thumb img");
+	await expect(image).toHaveAttribute("src", "kalem-doc://jira/501/pastedImage_1.png");
+	await expect.poll(() => image.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBe(1);
+	await expect(comments.nth(3).locator(".jira-attachment-missing")).toContainText("kayip.png");
+	const linkCard = comments.nth(3).locator(".jira-link-card");
+	await expect(linkCard.locator(".jira-link-card-title")).toHaveText("TK PNRı Olmayan Bilette");
+	await expect(linkCard.locator(".jira-link-card-subtitle")).toHaveText(
+		"Doğrudan Satış · wiki.example.com",
+	);
+	// Filters: comments with attachments, a team.
+	await jira.locator(".jira-filter-chip", { hasText: "With attachments" }).click();
+	await expect(comments).toHaveCount(1);
+	await jira.locator(".jira-filter-chip", { hasText: "With attachments" }).click();
+	await jira.locator(".jira-filter-select").selectOption("team:Quickres Analist Takimi");
+	await expect(comments).toHaveCount(1);
+	await jira.locator(".jira-filter-select").selectOption("");
+	await expect(comments).toHaveCount(4);
+	// A quick reply, with a mention picked from Jira's users.
+	const reply = jira.locator(".jira-composer-input");
+	await reply.click();
+	await page.keyboard.type("Merhaba @isi");
+	await jira.locator(".jira-mention-picker .jira-picker-item", { hasText: "Isil Sen" }).click();
+	await page.keyboard.type("bakar mısınız?");
+	await expect(reply).toHaveValue("Merhaba @Isil Sen bakar mısınız?");
+	await jira.locator(".jira-composer-send").click();
+	await expect(comments).toHaveCount(5);
+	await expect(jira.locator('.jira-tab[data-tab="comments"]')).toHaveText("Comments (5)");
+	expect(jiraServer.edits.at(-1)).toMatchObject({
+		path: "/rest/api/2/issue/QR-1/comment",
+		body: { body: "Merhaba [~isil.sen] bakar mısınız?" },
+	});
+	await expect(reply).toHaveValue("");
+	await jira.locator('.jira-tab[data-tab="development"]').click();
 	// The Development panel: branches, commits and pull requests, each opening into its list.
 	const development = jira.locator(".jira-dev-section");
 	await expect(development.locator(".jira-dev-count")).toHaveText([
@@ -171,6 +283,7 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 		)
 		.toEqual({ [jiraServer.site]: { _Sirket_: "TKAO", _Servis_: "3351" } });
 	// A sub-task opens in the same dialog, and Back returns.
+	await jira.locator('.jira-tab[data-tab="subtasks"]').click();
 	await jira.locator('.jira-row[data-key="QR-2"]').click();
 	await expect(jira.locator(".jira-title")).toHaveText("Süreyi ayarla");
 	await jira.getByRole("button", { name: "Back" }).click();

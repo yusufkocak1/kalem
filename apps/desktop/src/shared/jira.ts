@@ -7,6 +7,16 @@
 import { wikiToMarkdown } from "./confluence-wiki.js";
 import type { JiraMention } from "./jira-comments.js";
 import { mentionsOf } from "./jira-comments.js";
+import type {
+	JiraAttachment,
+	JiraEditableField,
+	JiraFieldEntry,
+	JiraOption,
+	JiraParentLink,
+	JiraSprint,
+	JiraStatusChange,
+} from "./jira-fields.js";
+import { attachmentsOf, customFieldsOf, statusChangesOf } from "./jira-fields.js";
 
 /** Jira's three kinds of status, which give a status its colour. */
 export type StatusCategory = "new" | "indeterminate" | "done" | "";
@@ -84,6 +94,15 @@ export interface JiraIssue extends JiraIssueRow {
 	readonly comments: readonly JiraComment[];
 	/** How many comments the issue has in all. */
 	readonly commentTotal: number;
+	readonly assigneeId: string;
+	readonly attachments: readonly JiraAttachment[];
+	readonly sprintField: JiraEditableField | null;
+	readonly sprint: JiraSprint | null;
+	readonly teamField: JiraEditableField | null;
+	readonly team: JiraOption | null;
+	readonly parentLink: JiraParentLink | null;
+	readonly allFields: readonly JiraFieldEntry[];
+	readonly statusChanges: readonly JiraStatusChange[];
 	/** Time tracking, in seconds; `null` where Jira keeps none (or does not track time). */
 	readonly time: {
 		readonly spent: number | null;
@@ -109,30 +128,6 @@ export interface JiraAccount {
 	/** True when it is Confluence Cloud's own login, on the same Atlassian site. */
 	readonly shared: boolean;
 }
-
-/** The fields an issue is asked for with; the rest would only make the answer longer. */
-export const ISSUE_FIELDS = [
-	"summary",
-	"status",
-	"issuetype",
-	"priority",
-	"assignee",
-	"reporter",
-	"created",
-	"updated",
-	"duedate",
-	"resolution",
-	"labels",
-	"components",
-	"fixVersions",
-	"description",
-	"comment",
-	"subtasks",
-	"issuelinks",
-	"parent",
-	"project",
-	"timetracking",
-] as const;
 
 export const ROW_FIELDS = [
 	"summary",
@@ -440,6 +435,7 @@ export function issueOf(raw: unknown, site: string): JiraIssue | null {
 	const rendered = asJson(asJson(raw).renderedFields);
 	const renderedComments = asArray(asJson(rendered.comment).comments);
 	const description = textField(fields.description, rendered.description);
+	const custom = customFieldsOf(raw);
 	const links = asArray(fields.issuelinks).flatMap((item): JiraIssueLink[] => {
 		const link = asJson(item);
 		const type = asJson(link.type);
@@ -475,29 +471,42 @@ export function issueOf(raw: unknown, site: string): JiraIssue | null {
 		links,
 		remoteLinks: [],
 		comments: comments.slice(-MAX_COMMENTS).map((item, index) => {
-			const entry = asJson(item);
 			const at = comments.length - Math.min(MAX_COMMENTS, comments.length) + index;
-			const renderedBody = asJson(renderedComments[at]).body;
-			const body = textField(entry.body, renderedBody);
-			const author = asJson(entry.author);
-			return {
-				author: nameOf(entry.author),
-				authorId: asString(author.accountId) || asString(author.name) || asString(author.key),
-				created: date(entry.created),
-				body: body.text,
-				html: body.html,
-				mentions: mentionsOf(
-					typeof renderedBody === "string" ? renderedBody : null,
-					asString(entry.body),
-				),
-			};
+			return commentOf(item, asJson(renderedComments[at]).body);
 		}),
+		assigneeId: personId(fields.assignee),
+		attachments: attachmentsOf(fields.attachment),
+		sprintField: custom.sprint,
+		sprint: custom.sprintValue,
+		teamField: custom.team,
+		team: custom.teamValue,
+		parentLink: custom.parentLink,
+		allFields: custom.allFields,
+		statusChanges: statusChangesOf(raw),
 		commentTotal: typeof comment.total === "number" ? comment.total : comments.length,
 		time: {
 			spent: seconds(asJson(fields.timetracking).timeSpentSeconds),
 			remaining: seconds(asJson(fields.timetracking).remainingEstimateSeconds),
 			estimate: seconds(asJson(fields.timetracking).originalEstimateSeconds),
 		},
+	};
+}
+
+const personId = (value: unknown): string => {
+	const person = asJson(value);
+	return asString(person.accountId) || asString(person.name) || asString(person.key);
+};
+
+export function commentOf(raw: unknown, rendered: unknown): JiraComment {
+	const entry = asJson(raw);
+	const body = textField(entry.body, rendered);
+	return {
+		author: nameOf(entry.author),
+		authorId: personId(entry.author),
+		created: date(entry.created),
+		body: body.text,
+		html: body.html,
+		mentions: mentionsOf(typeof rendered === "string" ? rendered : null, asString(entry.body)),
 	};
 }
 

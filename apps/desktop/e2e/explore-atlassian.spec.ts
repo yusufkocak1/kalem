@@ -104,6 +104,10 @@ for (const theme of ["light", "dark"] as const) {
 		await explorer.scene("issue, middle");
 		await scrollIssue(1);
 		await explorer.scene("issue, bottom");
+		await jira.locator('.jira-tab[data-tab="comments"]').click();
+		await scrollIssue(1);
+		await explorer.scene("issue, comments");
+		await jira.locator('.jira-tab[data-tab="development"]').click();
 		const development = jira.locator(".jira-dev-section");
 		for (const kind of ["branches", "commits", "pullRequests"]) {
 			const line = development.locator(`.jira-dev-line[data-kind="${kind}"]`);
@@ -113,6 +117,7 @@ for (const theme of ["light", "dark"] as const) {
 			await page.waitForTimeout(300);
 			await explorer.scene(`issue, development ${kind}`);
 		}
+		await jira.locator('.jira-tab[data-tab="detail"]').click();
 		await scrollIssue(0);
 
 		// The status' steps.
@@ -148,6 +153,7 @@ for (const theme of ["light", "dark"] as const) {
 		await explorer.scene("worklog, logged");
 
 		// A sub-task, and back.
+		await jira.locator('.jira-tab[data-tab="subtasks"]').click();
 		await jira.locator('.jira-row[data-key="QR-2"]').scrollIntoViewIfNeeded();
 		await jira.locator('.jira-row[data-key="QR-2"]').click();
 		await expect(jira.locator(".jira-title")).toHaveText("Süreyi ayarla");

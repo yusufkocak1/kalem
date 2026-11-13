@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
+import type { CommentFilter } from "./jira-comments.js";
 import {
+	applyMentions,
+	commentPeople,
 	compactCommentHtml,
 	compactCommentText,
+	filterComments,
 	formatDurationShort,
+	hasAttachment,
+	isBotAuthor,
 	isShortComment,
 	mentionIdFromHref,
 	mentionsOf,
+	NO_COMMENT_FILTER,
 	parsePersonName,
 	shortDateTime,
 	timeBar,
@@ -102,5 +109,61 @@ describe("dates and durations", () => {
 		expect(timeBar(3600, 3600, null)).toEqual({ value: 3600, max: 7200 });
 		expect(timeBar(3600, null, 14400)).toEqual({ value: 3600, max: 14400 });
 		expect(timeBar(3600, 0, null)).toEqual({ value: 1, max: 1 });
+	});
+});
+
+describe("filters", () => {
+	const comments = [
+		{
+			author: "GULDEN BAYKARA - Quickres Analist Takimi",
+			authorId: "gulden",
+			body: "Analiz",
+			html: null,
+		},
+		{ author: "Ao.jiraadmin", authorId: "ao.jiraadmin", body: "Otomatik", html: null },
+		{
+			author: "YUSUF KOCAK - Quickres Gelistirme Takimi",
+			authorId: "yusuf",
+			body: "!shot.png!",
+			html: null,
+		},
+		{
+			author: "Can",
+			authorId: "can",
+			body: "x",
+			html: '<p><img src="/secure/attachment/1/a.png"></p>',
+		},
+	];
+
+	it("keeps people, attachments, a person or a team", () => {
+		const pick = (filter: Partial<CommentFilter>) =>
+			filterComments(comments, { ...NO_COMMENT_FILTER, ...filter }).map((c) => c.authorId);
+		expect(pick({ humansOnly: true })).toEqual(["gulden", "yusuf", "can"]);
+		expect(pick({ attachmentsOnly: true })).toEqual(["yusuf", "can"]);
+		expect(pick({ person: "Gulden Baykara" })).toEqual(["gulden"]);
+		expect(pick({ team: "Quickres Gelistirme Takimi" })).toEqual(["yusuf"]);
+	});
+
+	it("lists the people and teams", () => {
+		expect(commentPeople(comments).teams).toEqual([
+			"Quickres Analist Takimi",
+			"Quickres Gelistirme Takimi",
+		]);
+		expect(isBotAuthor("Automation for Jira", "")).toBe(true);
+		expect(isBotAuthor("Işıl Şen", "isil.sen")).toBe(false);
+		expect(hasAttachment("bkz [^rapor.pdf]", null)).toBe(true);
+		expect(hasAttachment("Merhaba! Nasılsın!", null)).toBe(false);
+	});
+});
+
+describe("applyMentions", () => {
+	it("turns chosen names into Jira's mention markup, longer names first", () => {
+		const mentions = new Map([
+			["Işıl Şen", "[~isil.sen]"],
+			["Işıl Şen Kaya", "[~isil.kaya]"],
+		]);
+		expect(applyMentions("@Işıl Şen Kaya ve @Işıl Şen bakar mısınız? @Can", mentions)).toBe(
+			"[~isil.kaya] ve [~isil.sen] bakar mısınız? @Can",
+		);
 	});
 });

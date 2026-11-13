@@ -5,6 +5,7 @@ import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type {
 	JiraAccount,
+	JiraComment,
 	JiraIssue,
 	JiraIssueRef,
 	JiraIssueRow,
@@ -12,13 +13,31 @@ import type {
 	StatusCategory,
 } from "../shared/jira.js";
 import { issueKey, issueKeyFromUrl, normalizeJiraSite } from "../shared/jira.js";
-import { formatDurationShort, timeBar } from "../shared/jira-comments.js";
+import type { CommentFilter } from "../shared/jira-comments.js";
+import {
+	commentPeople,
+	filterComments,
+	formatDurationShort,
+	NO_COMMENT_FILTER,
+	parsePersonName,
+	shortDateTime,
+	timeBar,
+} from "../shared/jira-comments.js";
+import type { JiraAttachment, JiraParentLink } from "../shared/jira-fields.js";
+import { isEmptyFieldText } from "../shared/jira-fields.js";
 import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
+import { createImageViewer } from "./image-viewer.js";
 import { commentView, personMark } from "./jira-comment-view.js";
+import { createComposer } from "./jira-composer.js";
 import { createDevelopmentSection, createStatusControl } from "./jira-development.js";
+import { createFieldChip } from "./jira-field-chip.js";
 import { jiraHtmlRoot } from "./jira-html.js";
+import { createJourneyBar } from "./jira-journey-bar.js";
+import { createLabelEditor } from "./jira-labels.js";
+import { typeBadge } from "./jira-pane.js";
+import { decorateImages, decorateLinkCards, holdImages } from "./jira-rich-content.js";
 import { createWorklogForm } from "./jira-worklog.js";
 
 export interface JiraDialogOptions {
@@ -47,6 +66,8 @@ export interface JiraDialog {
 }
 
 /** What the dialog shows; the back button returns to the one before. */
+type IssueTab = "detail" | "comments" | "development" | "subtasks";
+
 type View =
 	| { readonly kind: "issue"; readonly key: string }
 	| { readonly kind: "search"; query: string };
@@ -140,6 +161,10 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 	let shownId = 0;
 	/** Once opened, the work log form stays open for the next issue too. */
 	let worklogOpen = false;
+	let shownKey = "";
+	let activeTab: IssueTab = "detail";
+	let commentFilter: CommentFilter = NO_COMMENT_FILTER;
+	const viewer = createImageViewer({ t, readOnly: () => true, editAlt: () => {} });
 
 	const current = (): View | undefined => history.at(-1);
 
@@ -278,8 +303,13 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 
 	// --- Issue ------------------------------------------------------------------
 	function renderIssue(issue: JiraIssue): void {
+		if (shownKey !== issue.key) {
+			shownKey = issue.key;
+			activeTab = "detail";
+			commentFilter = NO_COMMENT_FILTER;
+		}
 		const worklogSlot = el("div", { class: "jira-worklog-slot" });
-		const logWork = button(t.jiraLogWork, "clock", () => toggleWorklog(!worklogOpen));
+		const logWork = iconAction(t.jiraLogWork, "clock", () => toggleWorklog(!worklogOpen));
 		logWork.classList.add("jira-log-work");
 		const toggleWorklog = (open: boolean): void => {
 			worklogOpen = open;
@@ -298,127 +328,545 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 			worklogSlot.replaceChildren(form);
 			form.querySelector<HTMLElement>(".jira-worklog-chip")?.focus();
 		};
-		const description = richText(issue.description, issue.descriptionHtml);
-		if (issue.description === "" && issue.descriptionHtml === null) {
-			description.append(message(t.jiraNoDescription));
-		}
-		const sections: HTMLElement[] = [
-			el("div", {
-				class: "jira-issue-head",
-				children: [
-					el("span", { class: "jira-key", text: issue.key }),
-					...(issue.type === "" ? [] : [el("span", { class: "jira-type", text: issue.type })]),
-					...(issue.status === ""
-						? []
-						: [
-								createStatusControl({
-									t,
-									bridge,
-									issueKey: issue.key,
-									status: issue.status,
-									category: issue.statusCategory,
-									issueUrl: issue.url,
-									openLink: options.openLink,
-									onChanged: () => void refreshIssue(issue.key),
-								}),
-							]),
-				],
+
+		let attachments: readonly JiraAttachment[] = issue.attachments;
+		const decorate = (root: HTMLElement): void => {
+			const rich = {
+				t,
+				bridge,
+				attachments,
+				issueUrl: issue.url,
+				viewer,
+				openLink: options.openLink,
+				onConfluencePageOpened: () => dialog.close(),
+			};
+			decorateImages(root, rich);
+			decorateLinkCards(root, rich);
+		};
+
+		const panels: { id: IssueTab; label: HTMLElement; panel: HTMLElement }[] = [];
+		const commentLabel = el("span", { text: format(t.jiraTabComments, issue.commentTotal) });
+		panels.push({
+			id: "detail",
+			label: el("span", { text: t.jiraTabDetail }),
+			panel: detailPanel(issue, decorate),
+		});
+		panels.push({
+			id: "comments",
+			label: commentLabel,
+			panel: commentsPanel(issue, decorate, (count, uploaded) => {
+				commentLabel.textContent = format(t.jiraTabComments, count);
+				attachments = [...attachments, ...uploaded];
 			}),
-			el("h2", { class: "jira-title", text: issue.summary }),
-			el("div", {
-				class: "jira-actions",
-				children: [
-					button(
-						t.linkOpenBrowser,
-						"open",
-						() => options.openLink(issue.url),
-						"jira-button primary",
-					),
-					logWork,
-					favoriteButton(issue),
-					copyMenu([
-						[t.jiraCopyKey, issue.key],
-						[t.linkCopyUrl, issue.url],
-					]),
-				],
-			}),
-			worklogSlot,
-			issueFacts(issue),
-		];
+		});
 		if (issue.id !== "") {
-			sections.push(
-				createDevelopmentSection({
+			panels.push({
+				id: "development",
+				label: el("span", { text: t.jiraDevelopment }),
+				panel: developmentPanel(issue),
+			});
+		}
+		if (issue.subtasks.length > 0) {
+			panels.push({
+				id: "subtasks",
+				label: el("span", { text: format(t.jiraTabSubtasks, issue.subtasks.length) }),
+				panel: el("div", {
+					children: [
+						list(
+							issue.subtasks.map((ref, index) => issueRow(ref, `${index + 1}.`)),
+							"jira-subtasks",
+						),
+					],
+				}),
+			});
+		}
+		if (!panels.some((entry) => entry.id === activeTab)) activeTab = "detail";
+
+		const tabBar = el("div", {
+			class: "jira-tabs",
+			attrs: { role: "tablist", "aria-label": issue.key },
+		});
+		const buttons = new Map<IssueTab, HTMLButtonElement>();
+		const select = (id: IssueTab): void => {
+			activeTab = id;
+			for (const entry of panels) {
+				const on = entry.id === id;
+				entry.panel.hidden = !on;
+				buttons.get(entry.id)?.setAttribute("aria-selected", String(on));
+				buttons.get(entry.id)?.setAttribute("tabindex", on ? "0" : "-1");
+			}
+		};
+		for (const entry of panels) {
+			const tabId = `jira-tab-${entry.id}`;
+			entry.panel.id = `${tabId}-panel`;
+			entry.panel.classList.add("jira-tab-panel");
+			entry.panel.setAttribute("role", "tabpanel");
+			entry.panel.setAttribute("aria-labelledby", tabId);
+			entry.panel.setAttribute("data-tab", entry.id);
+			const tab = el("button", {
+				class: "jira-tab",
+				attrs: {
+					type: "button",
+					role: "tab",
+					id: tabId,
+					"aria-controls": entry.panel.id,
+					"data-tab": entry.id,
+				},
+				children: [entry.label],
+			});
+			tab.addEventListener("click", () => select(entry.id));
+			buttons.set(entry.id, tab);
+			tabBar.append(tab);
+		}
+
+		const parent = issue.parentLink;
+		const top = el("div", {
+			class: "jira-issue-top",
+			children: [
+				...(parent === null ? [] : [parentButton(parent)]),
+				el("div", {
+					class: "jira-issue-head",
+					children: [
+						el("span", { class: "jira-key", text: issue.key }),
+						...(issue.status === ""
+							? []
+							: [
+									createStatusControl({
+										t,
+										bridge,
+										issueKey: issue.key,
+										status: issue.status,
+										category: issue.statusCategory,
+										issueUrl: issue.url,
+										openLink: options.openLink,
+										onChanged: () => void refreshIssue(issue.key),
+									}),
+								]),
+						el("span", { class: "jira-head-spacer" }),
+						el("div", {
+							class: "jira-head-actions",
+							children: [
+								iconAction(t.linkOpenBrowser, "open", () => options.openLink(issue.url)),
+								logWork,
+								favoriteButton(issue),
+								copyMenu([
+									[t.jiraCopyKey, issue.key],
+									[t.linkCopyUrl, issue.url],
+								]),
+							],
+						}),
+					],
+				}),
+				el("h2", { class: "jira-title", text: issue.summary, attrs: { title: issue.summary } }),
+				tabBar,
+			],
+		});
+		body.replaceChildren(top, worklogSlot, ...panels.map((entry) => entry.panel));
+		select(activeTab);
+		heading.textContent = issue.key;
+		toggleWorklog(worklogOpen);
+	}
+
+	function iconAction(
+		label: string,
+		name: IconName,
+		run: () => void | Promise<void>,
+	): HTMLButtonElement {
+		const element = el("button", {
+			class: "jira-icon-action",
+			attrs: { type: "button", title: label, "aria-label": label },
+			children: [icon(name)],
+		});
+		element.addEventListener("click", () => void run());
+		return element;
+	}
+
+	function parentButton(parent: JiraParentLink): HTMLElement {
+		const link = el("button", {
+			class: "jira-parent-link",
+			attrs: { type: "button", title: `${t.jiraParent}: ${parent.key} ${parent.summary}`.trim() },
+			children: [
+				el("span", { class: "jira-parent-label", text: t.jiraParent }),
+				el("span", { class: "jira-key", text: parent.key }),
+				...(parent.summary === ""
+					? []
+					: [el("span", { class: "jira-parent-summary", text: parent.summary })]),
+			],
+		});
+		link.addEventListener("click", () => go({ kind: "issue", key: parent.key }));
+		return link;
+	}
+
+	function section(title: string, children: readonly HTMLElement[]): HTMLElement {
+		return el("section", {
+			class: "jira-section",
+			children: [el("h3", { text: title }), ...children],
+		});
+	}
+
+	function detailPanel(issue: JiraIssue, decorate: (root: HTMLElement) => void): HTMLElement {
+		const editError = el("p", { class: "jira-edit-error", attrs: { role: "alert" } });
+		editError.hidden = true;
+		const onError = (text: string): void => {
+			editError.textContent = format(t.jiraSaveFailed, text);
+			editError.hidden = false;
+		};
+		const onSaved = (): void => {
+			editError.hidden = true;
+			options.onIssueChange?.(issue.key);
+		};
+
+		const meta: HTMLElement[] = [];
+		const metaItem = (mark: Node, text: string, title: string): HTMLElement =>
+			el("span", {
+				class: "jira-meta-item",
+				attrs: { title },
+				children: [mark, el("span", { text })],
+			});
+		if (issue.type !== "") meta.push(metaItem(typeBadge(issue.type), issue.type, t.jiraType));
+		if (issue.project !== "") meta.push(metaItem(icon("folderOpen"), issue.project, t.jiraProject));
+		if (issue.created !== null) {
+			const created = shortDateTime(issue.created, options.lang);
+			meta.push(
+				metaItem(icon("calendar"), when(issue.created), `${t.jiraCreated}: ${created.full}`),
+			);
+		}
+		if (issue.updated !== null) {
+			const updated = shortDateTime(issue.updated, options.lang);
+			meta.push(
+				metaItem(icon("refresh"), when(issue.updated), `${t.jiraUpdated}: ${updated.full}`),
+			);
+		}
+
+		const row = (label: string, value: Node): HTMLElement =>
+			el("div", {
+				class: "jira-field-row",
+				children: [el("dt", { text: label }), el("dd", { children: [value] })],
+			});
+		const rows: HTMLElement[] = [
+			row(
+				t.jiraAssignee,
+				createFieldChip({
+					t,
+					lang: options.lang,
+					label: t.jiraAssignee,
+					value: issue.assignee === "" ? null : { id: issue.assigneeId, name: issue.assignee },
+					emptyLabel: t.jiraUnassigned,
+					person: true,
+					remoteSearch: true,
+					load: (query) => bridge.jiraAssignableUsers(issue.key, query),
+					save: (option) => bridge.jiraAssign(issue.key, option?.id || null),
+					onSaved,
+					onError,
+				}),
+			),
+		];
+		const sprintField = issue.sprintField;
+		if (sprintField !== null) {
+			rows.push(
+				row(
+					sprintField.name || t.jiraSprint,
+					createFieldChip({
+						t,
+						lang: options.lang,
+						label: sprintField.name || t.jiraSprint,
+						value: issue.sprint,
+						emptyLabel: t.jiraBacklog,
+						load: async () => {
+							const sprints = await bridge.jiraSprints(issue.key, issue.sprint?.boardId ?? null);
+							const current = issue.sprint;
+							return current === null || sprints.some((sprint) => sprint.id === current.id)
+								? sprints
+								: [current, ...sprints];
+						},
+						save: (option) => bridge.jiraMoveToSprint(issue.key, option?.id || null),
+						onSaved,
+						onError,
+					}),
+				),
+			);
+		}
+		const teamField = issue.teamField;
+		if (teamField !== null) {
+			rows.push(
+				row(
+					teamField.name,
+					createFieldChip({
+						t,
+						lang: options.lang,
+						label: teamField.name,
+						value: issue.team,
+						emptyLabel: t.jiraNone,
+						load: () => bridge.jiraFieldOptions(issue.key, teamField),
+						save: (option) =>
+							bridge.jiraSetField(
+								issue.key,
+								teamField,
+								option === null || option.id === "" ? null : option,
+							),
+						onSaved,
+						onError,
+					}),
+				),
+			);
+		}
+		rows.push(
+			row(
+				t.jiraLabels,
+				createLabelEditor({
 					t,
 					lang: options.lang,
 					bridge,
-					issueId: issue.id,
-					openLink: options.openLink,
-					fold,
+					issueKey: issue.key,
+					labels: issue.labels,
+					onSaved,
+					onError,
 				}),
+			),
+		);
+		const { spent, remaining, estimate } = issue.time;
+		if (spent !== null && spent > 0) {
+			const duration = (seconds: number): string =>
+				formatDurationShort(seconds, t.jiraHourUnit, t.jiraMinuteUnit);
+			const range = timeBar(spent, remaining, estimate);
+			const text = [duration(spent)];
+			if (remaining !== null && remaining > 0) {
+				text.push(format(t.jiraTimeLeft, duration(remaining)));
+			}
+			rows.push(
+				row(
+					t.jiraTimeTracking,
+					el("span", {
+						class: "jira-time",
+						children: [
+							el("progress", {
+								class: "jira-time-bar",
+								attrs: { max: String(range.max), value: String(range.value) },
+							}),
+							el("span", { class: "jira-time-text", text: text.join(" · ") }),
+						],
+					}),
+				),
 			);
 		}
-		if (issue.parent !== null) {
-			sections.push(fold(t.jiraParent, [list([issueRow(issue.parent)])]));
+
+		const description = richText(issue.description, issue.descriptionHtml);
+		decorate(description);
+		if (issue.description === "" && issue.descriptionHtml === null) {
+			description.append(message(t.jiraNoDescription));
 		}
-		sections.push(fold(t.jiraDescription, [description]));
-		if (issue.subtasks.length > 0) {
-			sections.push(
-				fold(format(t.jiraSubtasks, issue.subtasks.length), [
-					list(
-						issue.subtasks.map((ref, index) => issueRow(ref, `${index + 1}.`)),
-						"jira-subtasks",
-					),
-				]),
-			);
-		}
-		// Links grouped by how they relate, as Jira's "Issue Links": issues and Confluence pages together.
+		const parts: HTMLElement[] = [
+			createJourneyBar({ t, lang: options.lang, bridge, issue }),
+			el("div", { class: "jira-meta", children: meta }),
+			editError,
+			el("dl", { class: "jira-fields", children: rows }),
+			allFields(issue),
+			section(t.jiraDescription, [description]),
+		];
+
 		const groups = new Map<string, HTMLElement[]>();
-		const add = (relation: string, row: HTMLElement): void => {
-			const rows = groups.get(relation) ?? [];
-			rows.push(row);
-			groups.set(relation, rows);
+		const add = (relation: string, item: HTMLElement): void => {
+			const items = groups.get(relation) ?? [];
+			items.push(item);
+			groups.set(relation, items);
 		};
 		for (const link of issue.links) add(link.relation, issueRow(link.issue));
 		for (const link of issue.remoteLinks) add(link.relation, remoteRow(link));
 		const linkCount = issue.links.length + issue.remoteLinks.length;
 		if (linkCount > 0) {
-			sections.push(
-				fold(
+			parts.push(
+				section(
 					format(t.jiraLinks, linkCount),
-					[...groups].map(([relation, rows]) =>
+					[...groups].map(([relation, items]) =>
 						el("div", {
 							class: "jira-link-group",
-							children: [el("h4", { text: relation }), list(rows)],
+							children: [el("h4", { text: relation }), list(items)],
 						}),
 					),
 				),
 			);
 		}
-		if (issue.comments.length > 0) {
-			const title =
-				issue.commentTotal > issue.comments.length
-					? format(t.jiraCommentsLatest, issue.commentTotal, issue.comments.length)
-					: format(t.jiraComments, issue.commentTotal);
-			sections.push(
-				fold(
-					title,
-					issue.comments.map((comment) => commentView(comment, { lang: options.lang, richText })),
-				),
-			);
-		}
-		body.replaceChildren(...sections);
-		heading.textContent = issue.key;
-		toggleWorklog(worklogOpen);
+		return el("div", { class: "jira-detail", children: parts });
 	}
 
-	/** A part of the issue that folds away, as Jira's own sections do. */
-	function fold(title: string, children: readonly HTMLElement[]): HTMLElement {
-		const part = el("details", {
-			class: "jira-section",
-			attrs: { open: "" },
-			children: [el("summary", { children: [el("h3", { text: title })] }), ...children],
+	function allFields(issue: JiraIssue): HTMLElement {
+		const entries: [string, Node | string][] = [];
+		const person = (name: string): HTMLElement => {
+			const short = parsePersonName(name);
+			return el("span", {
+				class: "jira-person",
+				attrs: { title: short.full },
+				children: [personMark(short.name), el("span", { text: short.name })],
+			});
+		};
+		if (issue.reporter !== "") entries.push([t.jiraReporter, person(issue.reporter)]);
+		if (issue.priority !== "") {
+			entries.push([
+				t.jiraPriority,
+				el("span", {
+					class: "jira-priority",
+					attrs: { "data-level": priorityLevel(issue.priority) },
+					children: [
+						el("span", { class: "jira-priority-mark", attrs: { "aria-hidden": "true" } }),
+						el("span", { text: issue.priority }),
+					],
+				}),
+			]);
+		}
+		if (!isEmptyFieldText(issue.resolution)) entries.push([t.jiraResolution, issue.resolution]);
+		if (issue.components.length > 0) entries.push([t.jiraComponents, issue.components.join(", ")]);
+		if (issue.fixVersions.length > 0) {
+			entries.push([t.jiraFixVersions, issue.fixVersions.join(", ")]);
+		}
+		if (issue.due !== null) entries.push([t.jiraDue, when(issue.due)]);
+		for (const field of issue.allFields) {
+			entries.push([
+				field.name,
+				/^\d{4}-\d{2}-\d{2}$/.test(field.value) ? when(field.value) : field.value,
+			]);
+		}
+		const fold = el("details", {
+			class: "jira-all-fields",
+			children: [
+				el("summary", { text: t.jiraAllFields }),
+				el("dl", {
+					class: "jira-all-fields-list",
+					children: entries.flatMap(([label, value]) => [
+						el("dt", { text: label }),
+						el("dd", { children: [value] }),
+					]),
+				}),
+			],
 		});
-		return part;
+		fold.hidden = entries.length === 0;
+		return fold;
+	}
+
+	function commentsPanel(
+		issue: JiraIssue,
+		decorate: (root: HTMLElement) => void,
+		onAdded: (count: number, uploaded: readonly JiraAttachment[]) => void,
+	): HTMLElement {
+		const comments: JiraComment[] = [...issue.comments];
+		let total = issue.commentTotal;
+		const listElement = el("div", { class: "jira-comment-list" });
+		const note = el("p", { class: "jira-message" });
+		const view = (comment: JiraComment): HTMLElement =>
+			commentView(comment, { lang: options.lang, richText, decorate });
+
+		const toggle = (label: string, key: "attachmentsOnly" | "humansOnly"): HTMLButtonElement => {
+			const button = el("button", {
+				class: "jira-filter-chip",
+				attrs: { type: "button", "aria-pressed": String(commentFilter[key]) },
+				text: label,
+			});
+			button.addEventListener("click", () => {
+				commentFilter = { ...commentFilter, [key]: !commentFilter[key] };
+				button.setAttribute("aria-pressed", String(commentFilter[key]));
+				draw();
+			});
+			return button;
+		};
+		const who = el("select", {
+			class: "jira-filter-select",
+			attrs: { "aria-label": t.jiraFilterWho },
+		});
+		const fillWho = (): void => {
+			const { people, teams } = commentPeople(comments);
+			const option = (value: string, label: string): HTMLOptionElement =>
+				el("option", { text: label, attrs: { value } });
+			const group = (label: string, values: readonly string[], prefix: string): HTMLElement =>
+				el("optgroup", {
+					attrs: { label },
+					children: values.map((value) => option(`${prefix}:${value}`, value)),
+				});
+			who.replaceChildren(
+				option("", t.jiraFilterEveryone),
+				...(people.length > 0 ? [group(t.jiraFilterPeople, people, "person")] : []),
+				...(teams.length > 0 ? [group(t.jiraFilterTeams, teams, "team")] : []),
+			);
+			who.value =
+				commentFilter.person !== null
+					? `person:${commentFilter.person}`
+					: commentFilter.team !== null
+						? `team:${commentFilter.team}`
+						: "";
+			if (who.selectedIndex < 0) who.value = "";
+		};
+		who.addEventListener("change", () => {
+			const [kind, ...rest] = who.value.split(":");
+			const value = rest.join(":");
+			commentFilter = {
+				...commentFilter,
+				person: kind === "person" ? value : null,
+				team: kind === "team" ? value : null,
+			};
+			draw();
+		});
+
+		function draw(): void {
+			const shown = filterComments(comments, commentFilter);
+			listElement.replaceChildren(
+				...(shown.length === 0
+					? [message(comments.length === 0 ? t.jiraNoComments : t.jiraNoMatchingComments)]
+					: shown.map(view)),
+			);
+			note.textContent =
+				total > comments.length ? format(t.jiraCommentsLatest, total, comments.length) : "";
+		}
+		fillWho();
+		draw();
+
+		const composer = createComposer({
+			t,
+			lang: options.lang,
+			bridge,
+			issueKey: issue.key,
+			cloud: account?.cloud ?? false,
+			onSent: (comment, uploaded) => {
+				comments.push(comment);
+				total++;
+				onAdded(total, uploaded);
+				fillWho();
+				draw();
+				listElement.lastElementChild?.scrollIntoView({ block: "nearest" });
+				options.onIssueChange?.(issue.key);
+			},
+		});
+		return el("div", {
+			class: "jira-comments",
+			children: [
+				el("div", {
+					class: "jira-comment-filters",
+					children: [
+						toggle(t.jiraFilterAttachments, "attachmentsOnly"),
+						toggle(t.jiraFilterHumans, "humansOnly"),
+						who,
+					],
+				}),
+				note,
+				listElement,
+				composer,
+			],
+		});
+	}
+
+	function developmentPanel(issue: JiraIssue): HTMLElement {
+		const development = createDevelopmentSection({
+			t,
+			lang: options.lang,
+			bridge,
+			issueId: issue.id,
+			openLink: options.openLink,
+			fold: (_title, children) => el("div", { class: "jira-dev-plain", children }),
+		});
+		return el("div", {
+			class: "jira-development",
+			children: [
+				development,
+				el("p", { class: "jira-message jira-dev-empty", text: t.jiraDevNone }),
+			],
+		});
 	}
 
 	function list(rows: readonly HTMLElement[], extra = ""): HTMLElement {
@@ -428,7 +876,7 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 	/** Text as Jira shows it: HTML drawn as a page (not as code), wiki markup as Markdown. */
 	function richText(markdown: string, html: string | null): HTMLElement {
 		const target = el("div", { class: "jira-markdown" });
-		renderToDOM(html === null ? parse(markdown) : jiraHtmlRoot(html), target, {
+		renderToDOM(holdImages(html === null ? parse(markdown) : jiraHtmlRoot(html)), target, {
 			containerClass: false,
 		});
 		return target;
@@ -469,10 +917,16 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 		const site = account?.site ?? null;
 		const starred = (): boolean =>
 			options.favorites().some((item) => item.site === site && item.key === issue.key);
-		const star = el("button", { class: "jira-button jira-favorite", attrs: { type: "button" } });
+		const star = el("button", {
+			class: "jira-icon-action jira-favorite",
+			attrs: { type: "button" },
+			children: [icon("star")],
+		});
 		const draw = (): void => {
 			const on = starred();
-			star.textContent = `${on ? "★" : "☆"} ${on ? t.jiraUnfavorite : t.jiraFavorite}`;
+			const label = on ? t.jiraUnfavorite : t.jiraFavorite;
+			star.title = label;
+			star.setAttribute("aria-label", label);
 			star.setAttribute("aria-pressed", String(on));
 		};
 		star.addEventListener("click", () => {
@@ -490,107 +944,19 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 		return star;
 	}
 
-	/**
-	 * The issue's facts as cards side by side: who (with their initials),
-	 * its kind and priority, its dates, the time logged against the time
-	 * left, and its labels, components and versions as chips. Empty ones
-	 * are left out.
-	 */
-	function issueFacts(issue: JiraIssue): HTMLElement {
-		const fact = (label: string, value: Node | string, wide = false): HTMLElement =>
-			el("div", {
-				class: wide ? "jira-fact jira-fact-wide" : "jira-fact",
-				children: [el("dt", { text: label }), el("dd", { children: [value] })],
-			});
-		const person = (name: string): HTMLElement =>
-			el("span", {
-				class: "jira-person",
-				children: [personMark(name), el("span", { text: name })],
-			});
-		const chips = (values: readonly string[]): HTMLElement =>
-			el("span", {
-				class: "jira-chips",
-				children: values.map((value) => el("span", { class: "jira-chip", text: value })),
-			});
-		const facts: HTMLElement[] = [];
-		facts.push(
-			fact(
-				t.jiraAssignee,
-				issue.assignee === ""
-					? el("span", { class: "jira-muted", text: t.jiraUnassigned })
-					: person(issue.assignee),
-			),
-		);
-		if (issue.reporter !== "") facts.push(fact(t.jiraReporter, person(issue.reporter)));
-		if (issue.priority !== "") {
-			facts.push(
-				fact(
-					t.jiraPriority,
-					el("span", {
-						class: "jira-priority",
-						attrs: { "data-level": priorityLevel(issue.priority) },
-						children: [
-							el("span", { class: "jira-priority-mark", attrs: { "aria-hidden": "true" } }),
-							el("span", { text: issue.priority }),
-						],
-					}),
-				),
-			);
-		}
-		if (issue.type !== "") facts.push(fact(t.jiraType, issue.type));
-		if (issue.project !== "") facts.push(fact(t.jiraProject, issue.project));
-		if (issue.resolution !== "") facts.push(fact(t.jiraResolution, issue.resolution));
-		for (const [label, value] of [
-			[t.jiraCreated, issue.created],
-			[t.jiraUpdated, issue.updated],
-			[t.jiraDue, issue.due],
-		] as const) {
-			if (value !== null) facts.push(fact(label, when(value)));
-		}
-		const { spent, remaining, estimate } = issue.time;
-		if (spent !== null && spent > 0) {
-			const duration = (seconds: number): string =>
-				formatDurationShort(seconds, t.jiraHourUnit, t.jiraMinuteUnit);
-			const range = timeBar(spent, remaining, estimate);
-			const text = [duration(spent)];
-			if (remaining !== null && remaining > 0) {
-				text.push(format(t.jiraTimeLeft, duration(remaining)));
-			}
-			facts.push(
-				fact(
-					t.jiraTimeTracking,
-					el("span", {
-						class: "jira-time",
-						children: [
-							el("progress", {
-								class: "jira-time-bar",
-								attrs: { max: String(range.max), value: String(range.value) },
-							}),
-							el("span", { class: "jira-time-text", text: text.join(" · ") }),
-						],
-					}),
-					true,
-				),
-			);
-		}
-		for (const [label, values] of [
-			[t.jiraLabels, issue.labels],
-			[t.jiraComponents, issue.components],
-			[t.jiraFixVersions, issue.fixVersions],
-		] as const) {
-			if (values.length > 0) facts.push(fact(label, chips(values), true));
-		}
-		return el("dl", { class: "jira-fields", children: facts });
-	}
-
 	/** One button that copies the issue's key or its link, from a small menu. */
 	function copyMenu(choices: readonly (readonly [string, string])[]): HTMLElement {
 		const toggle = el("button", {
-			class: "jira-button",
-			attrs: { type: "button", "aria-haspopup": "menu", "aria-expanded": "false" },
-			children: [icon("copy"), t.linkCopy, icon("chevron")],
+			class: "jira-icon-action jira-copy-toggle",
+			attrs: {
+				type: "button",
+				"aria-haspopup": "menu",
+				"aria-expanded": "false",
+				"aria-label": t.linkCopy,
+				title: t.linkCopy,
+			},
+			children: [icon("copy"), icon("chevron")],
 		});
-		toggle.classList.add("jira-copy-toggle");
 		const menu = el("div", { class: "dock-menu jira-copy-menu", attrs: { role: "menu" } });
 		menu.hidden = true;
 		const wrap = el("span", { class: "jira-copy", children: [toggle, menu] });
@@ -607,10 +973,11 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 			item.addEventListener("click", async () => {
 				close();
 				await navigator.clipboard.writeText(text);
-				const caption = toggle.childNodes[1];
-				if (caption !== undefined) caption.textContent = t.linkCopied;
+				toggle.classList.add("copied");
+				toggle.title = t.linkCopied;
 				setTimeout(() => {
-					if (toggle.childNodes[1] !== undefined) toggle.childNodes[1].textContent = t.linkCopy;
+					toggle.classList.remove("copied");
+					toggle.title = t.linkCopy;
 				}, 1200);
 				toggle.focus();
 			});

@@ -41,7 +41,7 @@ describe("JiraClient", () => {
 			url: "https://jira.example.com/browse/DEV-7",
 		});
 		expect(server.auth[0]).toBe("Bearer pat");
-		expect(server.calls[0]).toContain("description");
+		expect(server.calls[0]).toContain("fields=*all&expand=renderedFields,names,schema,changelog");
 		await expect(client.issue("../../admin")).rejects.toThrow("Invalid issue key");
 	});
 

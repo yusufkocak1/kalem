@@ -13,6 +13,7 @@ import { el } from "./dom.js";
 export interface CommentViewOptions {
 	readonly lang: string;
 	richText(markdown: string, html: string | null): HTMLElement;
+	decorate?(root: HTMLElement): void;
 }
 
 export function personMark(name: string): HTMLElement {
@@ -82,6 +83,7 @@ export function commentView(comment: JiraComment, options: CommentViewOptions): 
 		comment.html === null ? null : compactCommentHtml(comment.html),
 	);
 	decorateMentions(body, comment.mentions);
+	options.decorate?.(body);
 	dropEmptyBlocks(body);
 	const short = isShortComment(comment.body, comment.html);
 	const name = el("strong", {
