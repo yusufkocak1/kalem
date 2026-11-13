@@ -2,8 +2,8 @@ import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type { McpPreset } from "../shared/mcp-presets.js";
 import { MCP_PRESETS, presetServer } from "../shared/mcp-presets.js";
-import type { McpServer } from "../shared/mcp-servers.js";
-import { newMcpServer, RESERVED_SERVER, serverName } from "../shared/mcp-servers.js";
+import type { McpServer, McpToolList } from "../shared/mcp-servers.js";
+import { newMcpServer, RESERVED_SERVER, serverName, toggleTool } from "../shared/mcp-servers.js";
 import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
@@ -14,7 +14,21 @@ export interface McpSectionOptions {
 	servers(): readonly McpServer[];
 	/** Keeps the servers; `redraw` when the section's shape changes. */
 	change(servers: readonly McpServer[], redraw: boolean): void;
+	/** Starts a server and asks it which tools it has. */
+	listTools(server: McpServer): Promise<McpToolList>;
 }
+
+/**
+ * The tools each server gave, by how it is reached: kept while Settings is
+ * open, so a redraw or another mode with the same server shows them again.
+ */
+const listed = new Map<string, McpToolList>();
+const reachKey = (server: McpServer): string =>
+	JSON.stringify(
+		server.transport === "http"
+			? [server.transport, server.url, server.headers]
+			: [server.transport, server.command, server.args, server.env],
+	);
 
 function mark(name: IconName, className: string): Element {
 	const svg = icon(name);
@@ -205,18 +219,7 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 					],
 				}),
 				...fields,
-				input(
-					t.mcpTools,
-					server.tools.join(", "),
-					(value) =>
-						set({
-							tools: value
-								.split(",")
-								.map((tool) => tool.trim())
-								.filter(Boolean),
-						}),
-					{ placeholder: t.mcpToolsAll },
-				),
+				toolsField(index, set),
 				input(
 					t.mcpPurpose,
 					server.purpose,
@@ -225,6 +228,148 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 					true,
 				),
 				...cardGuide(server),
+			],
+		});
+	}
+
+	/**
+	 * The tools a server may use: typed by name, or listed from the server
+	 * itself and each turned on or off. All on is kept as “all of them”, so
+	 * tools the server adds later are on too.
+	 */
+	function toolsField(index: number, set: (next: Partial<McpServer>) => void): HTMLElement {
+		const now = (): McpServer | undefined => options.servers()[index];
+		const typed = el("input", {
+			class: "publish-input",
+			attrs: { type: "text", "aria-label": t.mcpTools, placeholder: t.mcpToolsAll },
+		});
+		typed.value = now()?.tools.join(", ") ?? "";
+		typed.addEventListener("input", () => {
+			set({
+				tools: typed.value
+					.split(",")
+					.map((tool) => tool.trim())
+					.filter(Boolean),
+			});
+			drawList();
+		});
+		const fetchButton = el("button", {
+			class: "assistant-link mcp-tools-fetch",
+			text: t.mcpToolsFetch,
+			attrs: { type: "button" },
+		});
+		const status = el("span", { class: "mcp-tools-status", attrs: { role: "status" } });
+		const list = el("div", { class: "mcp-tools-list" });
+
+		const choose = (tools: string[]): void => {
+			set({ tools });
+			typed.value = tools.join(", ");
+			drawList();
+		};
+
+		function drawList(): void {
+			const server = now();
+			const answer = server === undefined ? undefined : listed.get(reachKey(server));
+			status.textContent = "";
+			status.removeAttribute("data-error");
+			if (server === undefined || answer === undefined) {
+				list.replaceChildren();
+				return;
+			}
+			if (!answer.ok) {
+				status.textContent = format(t.mcpToolsFailed, answer.error);
+				status.setAttribute("data-error", "");
+				list.replaceChildren();
+				return;
+			}
+			if (answer.tools.length === 0) {
+				status.textContent = t.mcpToolsNone;
+				list.replaceChildren();
+				return;
+			}
+			const names = answer.tools.map((tool) => tool.name);
+			const isOn = (name: string): boolean =>
+				server.tools.length === 0 || server.tools.includes(name);
+			const missing = server.tools.filter((name) => !names.includes(name));
+			const onCount = names.filter(isOn).length;
+			const allOn = el("button", {
+				class: "assistant-link",
+				text: t.mcpToolsAllOn,
+				attrs: { type: "button" },
+			});
+			allOn.disabled = server.tools.length === 0;
+			allOn.addEventListener("click", () => choose([]));
+			const row = (name: string, description: string, gone: boolean): HTMLElement =>
+				el("div", {
+					class: "mcp-tool",
+					attrs: { "data-tool": name, ...(isOn(name) ? {} : { "data-off": "" }) },
+					children: [
+						switchOf(isOn(name), name, (on) => {
+							const next = toggleTool(now()?.tools ?? [], names, name, on);
+							if (next === null) {
+								drawList();
+								status.textContent = t.mcpToolsKeepOne;
+								return;
+							}
+							choose(next);
+						}),
+						el("span", {
+							class: "mcp-tool-text",
+							children: [
+								el("code", { class: "mcp-tool-name", text: name }),
+								el("span", {
+									class: "mcp-tool-description",
+									text: gone ? t.mcpToolsMissing : description,
+								}),
+							],
+						}),
+					],
+				});
+			list.replaceChildren(
+				el("div", {
+					class: "mcp-tools-head",
+					children: [
+						el("span", {
+							class: "mode-label",
+							text: format(t.mcpToolsCount, String(onCount), String(names.length)),
+						}),
+						allOn,
+					],
+				}),
+				...answer.tools.map((tool) => row(tool.name, tool.description, false)),
+				...missing.map((name) => row(name, "", true)),
+			);
+		}
+
+		fetchButton.addEventListener("click", () => {
+			const server = now();
+			if (server === undefined) return;
+			fetchButton.disabled = true;
+			status.removeAttribute("data-error");
+			status.textContent = t.mcpToolsFetching;
+			void options
+				.listTools(server)
+				.catch((error: unknown) => ({
+					ok: false as const,
+					error: error instanceof Error ? error.message : String(error),
+				}))
+				.then((answer) => {
+					listed.set(reachKey(server), answer);
+					fetchButton.disabled = false;
+					drawList();
+				});
+		});
+		drawList();
+		return el("div", {
+			class: "mode-field mcp-tools",
+			children: [
+				el("span", {
+					class: "mcp-tools-label",
+					children: [el("span", { class: "mode-label", text: t.mcpTools }), fetchButton],
+				}),
+				typed,
+				status,
+				list,
 			],
 		});
 	}

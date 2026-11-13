@@ -34,7 +34,12 @@ import { confluenceRequests, MAX_ROUNDS } from "../shared/confluence-tool.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import { jiraRequests } from "../shared/jira-tool.js";
-import { claudeAllowed, claudeServers, copilotServers } from "../shared/mcp-servers.js";
+import {
+	claudeAllowed,
+	claudeServers,
+	copilotServers,
+	parseMcpServer,
+} from "../shared/mcp-servers.js";
 import type { ModelOption } from "../shared/models.js";
 import { claudeModelName, claudeModelOptions, copilotModelOptions } from "../shared/models.js";
 import { modeServers, modeToolsExcluded } from "../shared/modes.js";
@@ -76,6 +81,7 @@ import { cliCommands } from "./cli-commands.js";
 import type { ConfluenceClient } from "./confluence-client.js";
 import type { JiraClient } from "./jira-client.js";
 import { askApi, listModels } from "./llm.js";
+import { listMcpTools } from "./mcp-probe.js";
 import type { SettingsStore } from "./settings.js";
 import type { TemplateStore } from "./templates.js";
 import type { AppWindow } from "./windows.js";
@@ -1281,6 +1287,12 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 					source: command.name.includes(":") ? (command.name.split(":")[0] ?? "") : "user",
 				})),
 		];
+	});
+
+	ipcMain.handle(CHANNEL.mcpListTools, async (_event, raw: unknown) => {
+		const server = parseMcpServer(raw);
+		if (server === null) return { ok: false, error: ctx.strings().mcpToolsInvalid };
+		return listMcpTools(server);
 	});
 
 	ipcMain.handle(

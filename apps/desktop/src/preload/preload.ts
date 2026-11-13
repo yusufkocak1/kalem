@@ -196,6 +196,7 @@ const bridge: KalemBridge = {
 	assistantForgetPermissions: () => ipcRenderer.invoke(CHANNEL.assistantForgetPermissions),
 	assistantCompact: (sessionId) => ipcRenderer.invoke(CHANNEL.assistantCompact, sessionId),
 	assistantCliCommands: (folders) => ipcRenderer.invoke(CHANNEL.assistantCliCommands, folders),
+	mcpListTools: (server) => ipcRenderer.invoke(CHANNEL.mcpListTools, server),
 	templates: () => ipcRenderer.invoke(CHANNEL.templates),
 	localNotes: (key) => ipcRenderer.invoke(CHANNEL.localNotes, key),
 	setLocalNotes: (key, notes) => ipcRenderer.invoke(CHANNEL.setLocalNotes, key, notes),

@@ -189,3 +189,46 @@ export function claudeAllowed(servers: readonly McpServer[]): string[] {
 			: server.tools.map((tool) => `mcp__${server.name}__${tool}`),
 	);
 }
+
+/** A tool a server says it has, as its `tools/list` answer gives it. */
+export interface McpToolInfo {
+	readonly name: string;
+	readonly description: string;
+}
+
+/** A server's tools as asked of it, or why it could not be asked. */
+export type McpToolList =
+	| { readonly ok: true; readonly tools: readonly McpToolInfo[] }
+	| { readonly ok: false; readonly error: string };
+
+/** The tools in a `tools/list` result, one of each name. */
+export function parseToolList(result: unknown): McpToolInfo[] {
+	const tools = (result as { tools?: unknown } | null)?.tools;
+	const seen = new Set<string>();
+	return (Array.isArray(tools) ? tools : []).flatMap((tool) => {
+		const name = text((tool as { name?: unknown } | null)?.name, 100);
+		if (name === "" || seen.has(name)) return [];
+		seen.add(name);
+		return [{ name, description: text((tool as { description?: unknown }).description, 1000) }];
+	});
+}
+
+/**
+ * The tools a server may use once one is turned on or off in the list it
+ * gave: empty (all of them) when every listed tool is on, `null` when none
+ * would be left (empty would mean all).
+ */
+export function toggleTool(
+	current: readonly string[],
+	listed: readonly string[],
+	tool: string,
+	on: boolean,
+): string[] | null {
+	const chosen = new Set(current.length === 0 ? listed : current);
+	if (on) chosen.add(tool);
+	else chosen.delete(tool);
+	if (chosen.size === 0) return null;
+	const extra = [...chosen].filter((name) => !listed.includes(name));
+	if (extra.length === 0 && listed.every((name) => chosen.has(name))) return [];
+	return [...listed.filter((name) => chosen.has(name)), ...extra];
+}

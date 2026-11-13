@@ -967,3 +967,68 @@ test("the assistant's panel moves left or under the document, and '@' adds a sec
 	expect(errors).toEqual([]);
 	await app.close();
 });
+
+test("a mode's MCP server lists its tools, and each is turned on or off", async () => {
+	const folder = await tempDir("agent-mcp-tools");
+	const doc = join(folder, "notlar.md");
+	await writeFile(doc, "# Notlar\n");
+	// A server on standard input and output, as MCP servers are: three tools.
+	const script = join(folder, "fake-mcp.cjs");
+	await writeFile(
+		script,
+		`require("node:readline").createInterface({ input: process.stdin }).on("line", (line) => {
+	const message = JSON.parse(line);
+	const reply = (result) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: message.id, result }) + "\\n");
+	if (message.method === "initialize") reply({ protocolVersion: "2025-06-18", capabilities: { tools: {} } });
+	if (message.method === "tools/list") reply({ tools: [
+		{ name: "execute_sql", description: "Runs any SQL" },
+		{ name: "get_parameter", description: "A parameter's value" },
+		{ name: "add_i18n_key", description: "Adds a key" },
+	] });
+});`,
+	);
+	const claude = await fakeClaude(folder, "Tamam.", []);
+	const { app, page, userData, errors } = await launch({
+		args: [doc],
+		settings: { assistant: true },
+		env: { KALEM_CLAUDE: claude.path },
+	});
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
+	await pane.locator(".assistant-mode").click();
+	await pane.getByRole("menuitem", { name: "Customize modes…" }).click();
+	const settings = page.locator(".settings-dialog");
+	await settings.locator('.mode-tab[data-mode="code"]').click();
+	await settings.getByRole("button", { name: "Add an MCP server" }).click();
+	const card = settings.locator(".mcp-card");
+	// Node itself runs the script: the app's executable would be Electron's.
+	await card.getByRole("textbox", { name: "Command" }).fill(process.execPath);
+	await card.getByRole("textbox", { name: "Arguments (one a line)" }).fill(script);
+
+	await card.getByRole("button", { name: "List its tools" }).click();
+	await expect(card.locator(".mcp-tool")).toHaveCount(3);
+	await expect(card.locator(".mcp-tools-head")).toContainText("3 of 3 tools on");
+	await expect(card.locator('.mcp-tool[data-tool="execute_sql"]')).toContainText("Runs any SQL");
+
+	// The free SQL tool off: the other two are named.
+	await card.getByRole("switch", { name: "execute_sql" }).uncheck();
+	await expect(card.locator(".mcp-tools-head")).toContainText("2 of 3 tools on");
+	await expect(card.getByRole("textbox", { name: "Tools it may use" })).toHaveValue(
+		"get_parameter, add_i18n_key",
+	);
+	// The last one stays on: none would mean all of them.
+	await card.getByRole("switch", { name: "get_parameter" }).uncheck();
+	await card.getByRole("switch", { name: "add_i18n_key" }).click();
+	await expect(card.getByRole("switch", { name: "add_i18n_key" })).toBeChecked();
+	await expect(card.locator(".mcp-tools-status")).toContainText("At least one tool stays on");
+
+	await settings.getByRole("button", { name: "Done" }).click();
+	await expect
+		.poll(async () => {
+			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
+			return stored.settings.assistantModes?.code?.mcp?.[0]?.tools;
+		})
+		.toEqual(["add_i18n_key"]);
+	expect(errors).toEqual([]);
+	await app.close();
+});

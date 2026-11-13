@@ -1,6 +1,7 @@
 import type { CustomIcon, CustomMode } from "../shared/custom-modes.js";
 import { CUSTOM_ICONS, customInstructions } from "../shared/custom-modes.js";
 import type { Strings } from "../shared/i18n.js";
+import type { McpServer, McpToolList } from "../shared/mcp-servers.js";
 import type { StoredStep } from "../shared/mode-config.js";
 import { DETAILS, REPLY_LANGUAGES } from "../shared/mode-config.js";
 import { el } from "./dom.js";
@@ -18,6 +19,8 @@ export interface CustomModeEditorOptions {
 	readonly mode: CustomMode;
 	/** Kalem's tools, for choosing the mode's. */
 	readonly catalog: Promise<readonly ToolInfo[]>;
+	/** Starts an MCP server and asks it which tools it has. */
+	mcpListTools(server: McpServer): Promise<McpToolList>;
 	/** Keeps the mode; `null` removes it. */
 	save(mode: CustomMode | null): void;
 }
@@ -414,6 +417,7 @@ export function createCustomModeEditor(options: CustomModeEditorOptions): HTMLEl
 				t,
 				servers: () => mode.mcp,
 				change: (mcp, redraw) => keep({ mcp }, redraw),
+				listTools: options.mcpListTools,
 			}),
 			section(
 				t.modeOptions,
