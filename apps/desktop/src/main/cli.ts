@@ -6,15 +6,28 @@
  */
 import type { ChildProcess } from "node:child_process";
 import { execFile, spawn } from "node:child_process";
-import { readFile, stat } from "node:fs/promises";
+import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, delimiter, dirname, join } from "node:path";
+import { basename, delimiter, dirname, isAbsolute, join, win32 } from "node:path";
 import type { WebContents } from "electron";
 import type { ClaudeEvent } from "../shared/claude.js";
 import { ClaudeStreamReader, LineSplitter } from "../shared/claude.js";
+import type { CliProgram, Host, ScanRoot } from "./cli-find.js";
+import {
+	Budget,
+	cliCandidates,
+	isAppFolder,
+	localHost,
+	ownRoots,
+	places,
+	placesNear,
+	sameKey,
+	scan,
+	sharedRoots,
+} from "./cli-find.js";
 import { errorMessage } from "./windows.js";
 
-export type CliProgram = "claude" | "copilot";
+export type { CliProgram } from "./cli-find.js";
 
 /** Whether a CLI was found, and where. */
 export type CliStatus =
@@ -30,182 +43,22 @@ export interface CliLaunch {
 }
 
 /**
- * Where a CLI may be, most likely first: `PATH`, then the places its
- * installers use. A GUI app on macOS does not get the shell's `PATH`, so
- * those places matter there.
+ * What an npm `.cmd` link starts: a script, which is run with Node, or
+ * (as Claude Code's package has it now) the program itself. Starting the
+ * link would need a shell, which would read the arguments (the question's
+ * instructions) as commands, and which a company's policy may forbid.
+ * npm writes the link's own folder as `%dp0%`, pnpm and Yarn as `%~dp0`.
  */
-export function cliCandidates(
-	program: CliProgram | "npm",
-	platform: NodeJS.Platform,
-	env: Readonly<Record<string, string | undefined>>,
-	home: string,
-): string[] {
-	// An override is the only place looked at (tests rely on this).
-	const override =
-		program === "claude" ? env.KALEM_CLAUDE : program === "copilot" ? env.KALEM_COPILOT : undefined;
-	if (override) return [override];
-	const windows = platform === "win32";
-	const names = windows ? [`${program}.exe`, `${program}.cmd`] : [program];
-	const join_ = windows
-		? (dir: string, name: string) => `${dir.replace(/[\\/]+$/, "")}\\${name}`
-		: join;
-	const dirs = (env.PATH ?? env.Path ?? "")
-		.split(windows ? ";" : delimiter)
-		.filter((dir) => dir !== "");
-	if (windows) {
-		dirs.push(`${home}\\.local\\bin`, `${home}\\.${program}\\local`);
-		if (env.APPDATA) dirs.push(`${env.APPDATA}\\npm`);
-		if (env.LOCALAPPDATA) {
-			dirs.push(
-				`${env.LOCALAPPDATA}\\Programs\\${program}`,
-				// WinGet puts its command-line programs' links here.
-				`${env.LOCALAPPDATA}\\Microsoft\\WinGet\\Links`,
-			);
-		}
-	} else {
-		dirs.push(
-			join(home, ".local", "bin"),
-			join(home, `.${program}`, "local"),
-			join(home, ".npm-global", "bin"),
-			join(home, ".bun", "bin"),
-			"/opt/homebrew/bin",
-			"/usr/local/bin",
-			"/usr/bin",
-		);
-	}
-	return [...new Set(dirs.flatMap((dir) => names.map((name) => join_(dir, name))))];
-}
-
-/** The npm package each CLI is installed from with `npm install -g`. */
-export const NPM_PACKAGES: Readonly<Record<CliProgram, string>> = {
-	claude: "@anthropic-ai/claude-code",
-	copilot: "@github/copilot",
-};
-
-/**
- * The folder npm puts global programs' links in, from what `npm root -g`
- * prints: `<prefix>/lib/node_modules` gives `<prefix>/bin`, and on Windows
- * `<prefix>\node_modules` gives `<prefix>`.
- */
-export function npmGlobalBin(root: string, platform: NodeJS.Platform): string {
-	if (platform === "win32") return root.replace(/[\\/]+$/, "").replace(/[\\/]node_modules$/i, "");
-	const prefix = dirname(dirname(root.replace(/\/+$/, "")));
-	return join(prefix, "bin");
-}
-
-/** The script a package's `package.json` runs as `program`, relative to the package. */
-export function packageBin(manifest: unknown, program: string): string | null {
-	if (typeof manifest !== "object" || manifest === null) return null;
-	const bin = (manifest as { bin?: unknown }).bin;
-	if (typeof bin === "string") return bin;
-	if (typeof bin !== "object" || bin === null) return null;
-	const script = (bin as Record<string, unknown>)[program];
-	return typeof script === "string" ? script : null;
-}
-
-/** The last line a command printed, or null when it failed. */
-function lastLine(
-	command: string,
-	args: readonly string[],
-	options: { shell?: boolean; env?: NodeJS.ProcessEnv },
-): Promise<string | null> {
-	return new Promise((resolve) => {
-		execFile(command, args, { timeout: 20_000, windowsHide: true, ...options }, (error, stdout) => {
-			if (error || typeof stdout !== "string") resolve(null);
-			else {
-				const lines = stdout.split(/\r?\n/).map((line) => line.trim());
-				resolve(lines.filter((line) => line !== "").pop() ?? null);
-			}
-		});
-	});
-}
-
-async function isDirectory(path: string): Promise<boolean> {
-	try {
-		return (await stat(path)).isDirectory();
-	} catch {
-		return false;
-	}
-}
-
-/** Where `npm root -g` says global packages are, and the npm that said it. */
-export interface NpmRoot {
-	readonly root: string;
-	/** The npm program that was asked; empty when a login shell was asked. */
-	readonly npm: string;
-}
-
-/**
- * Asks npm where its global packages are (`npm root -g`): first an npm
- * found on `PATH` or in the usual folders, then, outside Windows, the
- * user's login shell, which knows the `PATH` that nvm and the like set up.
- */
-export async function npmGlobalRoot(): Promise<NpmRoot | null> {
-	const windows = process.platform === "win32";
-	const dirs = cliCandidates("npm", process.platform, process.env, homedir()).filter(
-		(path) => !windows || /\.cmd$/i.test(path),
-	);
-	if (windows && process.env.ProgramFiles)
-		dirs.push(`${process.env.ProgramFiles}\\nodejs\\npm.cmd`);
-	for (const npm of [...new Set(dirs)]) {
-		if (!(await isFile(npm))) continue;
-		const env = { ...process.env, PATH: [dirname(npm), process.env.PATH ?? ""].join(delimiter) };
-		// A `.cmd` file only runs in a shell; the arguments are fixed, so that is safe.
-		const root = windows
-			? await lastLine(`"${npm}"`, ["root", "-g"], { shell: true })
-			: await lastLine(npm, ["root", "-g"], { env });
-		if (root !== null && (await isDirectory(root))) return { root, npm };
-	}
-	if (!windows) {
-		const shell = process.env.SHELL || "/bin/sh";
-		const root = await lastLine(shell, ["-ilc", "npm root -g"], {});
-		if (root !== null && (await isDirectory(root))) return { root, npm: "" };
+export function shimTarget(shim: string, content: string): string | null {
+	// The link's folder, read the Windows way whatever the platform the tests run on.
+	const folder = shim.replace(/[\\/][^\\/]*$/, "");
+	for (const match of content.matchAll(/"%(?:dp0%|~dp0)\\?([^"%]+?\.(?:[cm]?js|exe))"/gi)) {
+		const target = match[1];
+		// The Node next to the link is what runs the script, not what the link is for.
+		if (target === undefined || /(?:^|[\\/])node\.exe$/i.test(target)) continue;
+		return win32.normalize(`${folder}\\${target}`);
 	}
 	return null;
-}
-
-/**
- * Where a CLI installed with `npm install -g` may be: npm's link to it,
- * then its package's script, run with Node.
- */
-async function npmLaunches(program: CliProgram, found: NpmRoot): Promise<CliLaunch[]> {
-	const windows = process.platform === "win32";
-	const bin = npmGlobalBin(found.root, process.platform);
-	const launches: CliLaunch[] = [];
-	for (const name of windows ? [`${program}.cmd`, `${program}.exe`] : [program]) {
-		const launch = await launchFor(join(bin, name));
-		if (launch !== null) launches.push(launch);
-	}
-	const pkg = join(found.root, ...NPM_PACKAGES[program].split("/"));
-	const manifest: unknown = await readFile(join(pkg, "package.json"), "utf8")
-		.then((text) => JSON.parse(text) as unknown)
-		.catch(() => null);
-	const script = packageBin(manifest, program);
-	if (script !== null && (await isFile(join(pkg, script)))) {
-		const nodeName = windows ? "node.exe" : "node";
-		const nodes = [found.npm === "" ? "" : join(dirname(found.npm), nodeName), join(bin, nodeName)];
-		let node = "node";
-		for (const candidate of nodes) {
-			if (candidate !== "" && (await isFile(candidate))) {
-				node = candidate;
-				break;
-			}
-		}
-		launches.push({ command: node, prefix: [join(pkg, script)], path: join(pkg, script) });
-	}
-	return launches;
-}
-
-/**
- * The script an npm `.cmd` shim runs. Starting the shim itself would need
- * a shell, which would read the arguments (the question's instructions) as
- * commands; the script is run with Node instead.
- */
-export function shimScript(shim: string, content: string): string | null {
-	const match = /"%(?:~?dp0|dp0)%\\([^"]+?\.(?:c|m)?js)"/i.exec(content);
-	if (match?.[1] === undefined) return null;
-	// The shim's folder, read the Windows way whatever the platform the tests run on.
-	return `${shim.replace(/[\\/][^\\/]*$/, "")}\\${match[1]}`;
 }
 
 async function isFile(path: string): Promise<boolean> {
@@ -216,26 +69,59 @@ async function isFile(path: string): Promise<boolean> {
 	}
 }
 
+/**
+ * The Node a script is run with: the one in the folder its package was
+ * installed into, else one found on this computer, else whatever `node`
+ * the `PATH` gives.
+ */
+async function nodeFor(script: string): Promise<string> {
+	const name = process.platform === "win32" ? "node.exe" : "node";
+	const near = [dirname(script)];
+	const at = script.search(/[\\/]node_modules[\\/]/i);
+	if (at !== -1) {
+		// npm's folder: Node is in it on Windows, and in the `bin` beside its `lib` elsewhere.
+		const prefix = script.slice(0, at);
+		near.push(prefix, join(prefix, "bin"), join(dirname(prefix), "bin"));
+	}
+	const candidates = [
+		...near.map((dir) => join(dir, name)),
+		...cliCandidates("node", process.platform, process.env, homedir()).filter(
+			(path) => basename(path) === name,
+		),
+	];
+	for (const candidate of candidates) {
+		if (await isFile(candidate)) return candidate;
+	}
+	return "node";
+}
+
 async function launchFor(path: string): Promise<CliLaunch | null> {
-	if (!(await isFile(path))) return null;
-	if (!/\.(cmd|bat)$/i.test(path)) return { command: path, prefix: [], path };
-	const script = shimScript(path, await readFile(path, "utf8").catch(() => ""));
-	if (script === null || !(await isFile(script))) return null;
-	// npm puts a node.exe next to the shim when it installed one there.
-	const node = join(dirname(path), "node.exe");
-	return { command: (await isFile(node)) ? node : "node", prefix: [script], path };
+	if (/\.(cmd|bat)$/i.test(path)) {
+		const target = shimTarget(path, await readFile(path, "utf8").catch(() => ""));
+		if (target === null || !(await isFile(target))) return null;
+		if (/\.exe$/i.test(target)) return { command: target, prefix: [], path };
+		// npm puts a node.exe next to the link when it installed one there.
+		return { command: await nodeFor(path), prefix: [target], path };
+	}
+	if (/\.[cm]?js$/i.test(path)) return { command: await nodeFor(path), prefix: [path], path };
+	// A PowerShell script would need its shell, as a `.cmd` would.
+	if (/\.ps1$/i.test(path)) return null;
+	return { command: path, prefix: [], path };
 }
 
 /** `PATH` with the CLI's own folder and the usual ones, for a CLI that starts `node`. */
 function environment(launch: CliLaunch): NodeJS.ProcessEnv {
 	const extra = [dirname(launch.path)];
+	if (isAbsolute(launch.command)) extra.push(dirname(launch.command));
 	if (process.platform !== "win32") extra.push("/opt/homebrew/bin", "/usr/local/bin");
 	const key =
 		process.platform === "win32"
 			? // kalem-locale-ok: environment variable names are ASCII
 				(Object.keys(process.env).find((name) => name.toUpperCase() === "PATH") ?? "Path")
 			: "PATH";
-	const path = [...extra, process.env[key] ?? ""].filter((part) => part !== "").join(delimiter);
+	const path = [...new Set(extra), process.env[key] ?? ""]
+		.filter((part) => part !== "")
+		.join(delimiter);
 	return { ...process.env, [key]: path };
 }
 
@@ -265,16 +151,133 @@ function help(launch: CliLaunch): Promise<string> {
 	});
 }
 
+/** A program that answered, or why the file is not one; null when there is no such file. */
+type Started =
+	| { readonly launch: CliLaunch; readonly version: string }
+	| { readonly error: string };
+
+async function start(path: string, host: Host): Promise<Started | null> {
+	if (!(await host.isFile(path))) return null;
+	// A desktop app of the same name would open its window when asked for its version.
+	if (!/\.(cmd|bat|[cm]?js)$/i.test(path) && isAppFolder(await host.list(dirname(path)))) {
+		return { error: "a desktop app, not the command-line program" };
+	}
+	const launch = await launchFor(path);
+	if (launch === null) return { error: "what this link starts could not be read" };
+	try {
+		return { launch, version: await version(launch) };
+	} catch (error) {
+		return { error: errorMessage(error).replace(/\s+/g, " ").slice(0, 300) };
+	}
+}
+
+/** How often the user's folders are gone through unasked for a program that is not found. */
+const SEARCH_EVERY = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * When each program was last looked for folder by folder, and what was
+ * found. That takes seconds of reading the disk, so it is not done at
+ * every start of the app on a computer that simply does not have the
+ * program; what it found is offered again until then.
+ */
+export class SearchLog {
+	readonly #file: string;
+	readonly #now: () => number;
+
+	constructor(file: string, now: () => number = Date.now) {
+		this.#file = file;
+		this.#now = now;
+	}
+
+	async #read(): Promise<Record<string, { at: number; found: string[] }>> {
+		const searches: Record<string, { at: number; found: string[] }> = {};
+		try {
+			const kept: unknown = JSON.parse(await readFile(this.#file, "utf8"));
+			if (typeof kept !== "object" || kept === null) return searches;
+			for (const [name, value] of Object.entries(kept)) {
+				const { at, found } = (value ?? {}) as { at?: unknown; found?: unknown };
+				if (typeof at !== "number" || !Array.isArray(found)) continue;
+				searches[name] = {
+					at,
+					found: found.filter((path): path is string => typeof path === "string"),
+				};
+			}
+		} catch {}
+		return searches;
+	}
+
+	/** Whether it is time to go through the folders again. */
+	async due(program: CliProgram): Promise<boolean> {
+		const last = (await this.#read())[program]?.at;
+		const since = last === undefined ? Number.POSITIVE_INFINITY : this.#now() - last;
+		// A clock set back does not put the search off for ever.
+		return since < 0 || since >= SEARCH_EVERY;
+	}
+
+	/** What the last search found. */
+	async found(program: CliProgram): Promise<string[]> {
+		return (await this.#read())[program]?.found ?? [];
+	}
+
+	async note(program: CliProgram, found: readonly string[]): Promise<void> {
+		try {
+			const searches = { ...(await this.#read()), [program]: { at: this.#now(), found } };
+			await mkdir(dirname(this.#file), { recursive: true });
+			const temp = `${this.#file}.tmp`;
+			await writeFile(temp, JSON.stringify(searches, null, "\t"));
+			await rename(temp, this.#file);
+		} catch {
+			// Not kept: the folders are gone through again next time.
+		}
+	}
+}
+
+export interface CliOptions {
+	/** The program the user picked (or an earlier search kept); empty to look for it. */
+	configured(): string;
+	/**
+	 * Keeps a program that took more than a look to find (it was seen
+	 * running, or the user chose it from a search), so the next start has
+	 * it at once.
+	 */
+	remember?(path: string): void;
+	/** When the folders were last gone through; without it they are only gone through when asked. */
+	readonly searches?: SearchLog;
+	/** The computer to look on; this one unless a test says otherwise. */
+	readonly host?: Host;
+}
+
+/** How long going through the user's own folders may take when nobody asked, in ms. */
+const UNASKED_SEARCH = 10_000;
+/** How long each half of a search the user asked for may take, in ms. */
+const ASKED_SEARCH = 40_000;
+/** At most this many installations found in folders are offered. */
+const MOST_OFFERED = 4;
+
+/**
+ * The installation a file belongs to: npm's folder for a file in its
+ * `node_modules`, else the file's own folder. npm's link, the package's
+ * program and the one built for this computer are one installation.
+ */
+function installationOf(path: string): string {
+	const at = path.search(/[\\/]node_modules[\\/]/i);
+	return at === -1 ? dirname(path) : path.slice(0, at);
+}
+
 /** A CLI found on this computer (or picked by the user). */
 export class LocalCli {
 	readonly program: CliProgram;
-	readonly #configured: () => string;
+	readonly #options: CliOptions;
 	#found: { launch: CliLaunch; version: string } | null = null;
+	/** What the last search looked at and what each file there answered. */
+	#notes: string[] = [];
+	#looked = 0;
+	/** The installations that going through folders found, each one's files. */
+	#offered: string[][] = [];
 
-	/** `configured` is the program the user picked; empty to look for it. */
-	constructor(program: CliProgram, configured: () => string) {
+	constructor(program: CliProgram, options: CliOptions) {
 		this.program = program;
-		this.#configured = configured;
+		this.#options = options;
 	}
 
 	/** Its `--help` text, asked once per program found. */
@@ -298,38 +301,187 @@ export class LocalCli {
 			: { found: true, path: found.launch.path, version: found.version };
 	}
 
-	/** Whether the file starts the CLI; it is then the one used. */
-	async check(path: string): Promise<boolean> {
-		const launch = await launchFor(path);
-		return launch !== null && (await this.#try(launch));
+	/**
+	 * Files that may be the CLI, found by going through folders. None was
+	 * started: a file of that name in a folder nobody chose (a download,
+	 * say) is the user's to judge. `use` starts one.
+	 */
+	offered(): string[] {
+		return this.#found === null ? this.#offered.flatMap((files) => files.slice(0, 1)) : [];
 	}
 
-	async #try(launch: CliLaunch): Promise<boolean> {
-		try {
-			this.#found = { launch, version: await version(launch) };
-			return true;
-		} catch {
+	/**
+	 * What the last search did, for a person to send on when a program that
+	 * is on the computer was not found: the files that exist where it was
+	 * looked for, and what each answered.
+	 */
+	report(): string {
+		const host = this.#host();
+		const found = this.#found;
+		return [
+			`${this.program} · ${host.platform} ${host.arch}`,
+			found === null ? "not found" : `found: ${found.launch.path} (${found.version})`,
+			`places looked at: ${this.#looked}`,
+			...this.#notes,
+			...this.#offered.flat().map((path) => `offered: ${path}`),
+		].join("\n");
+	}
+
+	#host(): Host {
+		return this.#options.host ?? localHost();
+	}
+
+	#note(line: string): void {
+		if (this.#notes.length < 300) this.#notes.push(line);
+	}
+
+	/** Tries one file; it is then the one used. */
+	async #try(path: string, source: string, host: Host): Promise<boolean> {
+		this.#looked += 1;
+		const started = await start(path, host);
+		if (started === null) return false;
+		if ("error" in started) {
+			this.#note(`${source}: ${path} → ${started.error}`);
 			return false;
 		}
+		this.#found = started;
+		this.#note(`${source}: ${path} → ${started.version}`);
+		return true;
 	}
 
-	/** Looks for the CLI where the user put it, then where it is usually installed. */
-	async locate(): Promise<CliStatus> {
+	/** Tries a file the search has not tried yet. */
+	async #tryNew(path: string, source: string, host: Host, tried: Set<string>): Promise<boolean> {
+		const key = sameKey(path, host.platform);
+		if (tried.has(key)) return false;
+		tried.add(key);
+		return this.#try(path, source, host);
+	}
+
+	#keep(): void {
+		const path = this.#found?.launch.path;
+		if (path !== undefined) this.#options.remember?.(path);
+	}
+
+	/**
+	 * Whether the file starts the CLI, or a program in the folder does (a
+	 * folder of Node's or npm's, a `node_modules`, the package's own); it
+	 * is then the one used.
+	 */
+	async check(path: string): Promise<boolean> {
+		const host = this.#host();
+		const tried = new Set<string>();
+		for await (const near of placesNear(this.program, path, host)) {
+			if (await this.#tryNew(near, "given", host, tried)) return true;
+		}
+		return false;
+	}
+
+	/** Starts an offered file, or another of its installation; it is then the one used, and kept. */
+	async use(path: string): Promise<boolean> {
+		const host = this.#host();
+		const files = this.#offered.find((each) => each[0] === path);
+		if (files === undefined) return false;
+		for (const file of files) {
+			if (await this.#try(file, "offered", host)) {
+				this.#keep();
+				return true;
+			}
+		}
+		return false;
+	}
+
+	#override(host: Host): string {
+		return (this.program === "claude" ? host.env.KALEM_CLAUDE : host.env.KALEM_COPILOT) ?? "";
+	}
+
+	/** Where the user said it is, then every place it is usually in. */
+	async #quick(host: Host, tried: Set<string>): Promise<boolean> {
 		this.#found = null;
-		const configured = this.#configured();
-		if (configured !== "" && (await this.check(configured))) return this.status();
-		for (const path of cliCandidates(this.program, process.platform, process.env, homedir())) {
-			if (await this.check(path)) return this.status();
+		this.#notes = [];
+		this.#looked = 0;
+		this.#offered = [];
+		const override = this.#override(host);
+		// An override is the only place looked at (tests rely on this).
+		if (override !== "") return this.#tryNew(override, "override", host, tried);
+		const configured = this.#options.configured();
+		if (configured !== "" && (await this.#tryNew(configured, "kept", host, tried))) return true;
+		for await (const place of places(this.program, host)) {
+			if (await this.#tryNew(place.path, place.source, host, tried)) {
+				// A program seen running is gone from there when its editor closes.
+				if (place.source === "running" || place.source === "shell") this.#keep();
+				return true;
+			}
 		}
-		// Installed with npm somewhere the folders above miss: ask npm.
-		const override =
-			this.program === "claude" ? process.env.KALEM_CLAUDE : process.env.KALEM_COPILOT;
-		if (override) return this.status();
-		const npm = await npmGlobalRoot();
-		if (npm === null) return this.status();
-		for (const launch of await npmLaunches(this.program, npm)) {
-			if (await this.#try(launch)) return this.status();
+		return false;
+	}
+
+	/** Adds a file to what is offered, with its installation's other files; false when there is no room. */
+	async #offer(path: string, host: Host, tried: Set<string>): Promise<boolean> {
+		// A file the search started already did not answer.
+		if (tried.has(sameKey(path, host.platform)) || !(await host.isFile(path))) return true;
+		const installation = sameKey(installationOf(path), host.platform);
+		const files = this.#offered.find(
+			(each) => sameKey(installationOf(each[0] ?? ""), host.platform) === installation,
+		);
+		if (files !== undefined) {
+			if (!files.includes(path)) files.push(path);
+			return true;
 		}
+		if (this.#offered.length >= MOST_OFFERED) return false;
+		this.#offered.push([path]);
+		return true;
+	}
+
+	/** Goes through folders for files that may be the CLI; they are offered, not started. */
+	async #gather(
+		host: Host,
+		roots: readonly ScanRoot[],
+		budget: Budget,
+		tried: Set<string>,
+	): Promise<void> {
+		this.#note(`folder by folder: ${roots.map((root) => root.path).join(", ") || "nowhere"}`);
+		for await (const path of scan(this.program, host, roots, budget)) {
+			if (!(await this.#offer(path, host, tried))) return;
+		}
+		if (!budget.alive()) this.#note("folder by folder: stopped when its time was up");
+	}
+
+	/**
+	 * Looks for the CLI where the user put it, then where it is usually
+	 * installed. On Windows, where a company's installs end up in unusual
+	 * places, the user's own folders and the installed programs' are gone
+	 * through now and then as well, and what is there is offered.
+	 */
+	async locate(): Promise<CliStatus> {
+		const host = this.#host();
+		const tried = new Set<string>();
+		if ((await this.#quick(host, tried)) || this.#override(host) !== "") return this.status();
+		const searches = this.#options.searches;
+		if (host.platform !== "win32" || searches === undefined) return this.status();
+		if (await searches.due(this.program)) {
+			await this.#gather(host, ownRoots(host), new Budget(UNASKED_SEARCH), tried);
+			await searches.note(this.program, this.#offered.flat());
+		} else {
+			for (const path of await searches.found(this.program)) await this.#offer(path, host, tried);
+		}
+		return this.status();
+	}
+
+	/**
+	 * The search the user asks for: the usual places again, then this
+	 * computer's folders one by one, the user's own first and then the
+	 * rest of its disks. What is found there is offered.
+	 */
+	async search(): Promise<CliStatus> {
+		const host = this.#host();
+		const tried = new Set<string>();
+		if ((await this.#quick(host, tried)) || this.#override(host) !== "") return this.status();
+		const own = new Budget(ASKED_SEARCH);
+		await this.#gather(host, ownRoots(host), own, tried);
+		if (this.#offered.length < MOST_OFFERED) {
+			await this.#gather(host, await sharedRoots(host), new Budget(ASKED_SEARCH, own.seen), tried);
+		}
+		await this.#options.searches?.note(this.program, this.#offered.flat());
 		return this.status();
 	}
 }

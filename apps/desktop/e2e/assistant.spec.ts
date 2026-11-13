@@ -151,6 +151,65 @@ test("explains how to install Claude Code when it is not found", async () => {
 	await app.close();
 });
 
+test("uses the Claude Code in a pasted folder once the user says so, and copies what the search did", async () => {
+	const folder = await tempDir("assistant-path");
+	const install = join(folder, "somewhere", "unusual");
+	await mkdir(install, { recursive: true });
+	const claude = await fakeClaude(install);
+	const { app, page, userData } = await launch({
+		settings: { assistant: true },
+		env: { KALEM_CLAUDE: join(folder, "nothing-here") },
+	});
+	const pane = page.locator(".assistant");
+	const missing = pane.locator(".assistant-missing");
+	await expect(missing.getByRole("button", { name: "Search this computer" })).toBeVisible();
+	/** Answers the app's question with the button of that number, and keeps what was asked. */
+	const answerWith = (button: number): Promise<void> =>
+		app.evaluate(({ dialog }, response) => {
+			const kept = globalThis as unknown as { asked?: string[] };
+			kept.asked ??= [];
+			const asked = kept.asked;
+			dialog.showMessageBox = (async (...args: unknown[]) => {
+				const options = args.at(-1) as { message: string; detail?: string };
+				asked.push(`${options.message} ${options.detail ?? ""}`);
+				return { response, checkboxChecked: false };
+			}) as typeof dialog.showMessageBox;
+		}, button);
+
+	// The path comes from the page, so the app asks before it starts anything: "Cancel" leaves it be.
+	await answerWith(1);
+	await missing.locator(".assistant-path").fill(install);
+	await missing.locator(".assistant-path").press("Enter");
+	await expect
+		.poll(() => app.evaluate(() => (globalThis as unknown as { asked?: string[] }).asked))
+		.toEqual([`Use this as Claude Code? ${install}`]);
+	await expect(pane.locator(".assistant-input")).toBeDisabled();
+	expect(await claude.calls()).toEqual([]);
+
+	// What the search did, for whoever has to find out why the program was not found.
+	await missing.getByRole("button", { name: "Copy search details" }).click();
+	await expect
+		.poll(() => app.evaluate(({ clipboard }) => clipboard.readText()))
+		.toContain("claude · ");
+	expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toContain("not found");
+
+	// The folder is enough: the program in it is found, used and kept for the next start.
+	await answerWith(0);
+	await missing.locator(".assistant-path").fill(`"${install}"`);
+	await missing.getByRole("button", { name: "Use", exact: true }).click();
+	await expect(pane.locator(".assistant-input")).toBeEnabled();
+	await expect(missing).toBeHidden();
+	await expect
+		.poll(async () => {
+			const kept = JSON.parse(await readFile(join(userData, "settings.json"), "utf8")) as {
+				settings: { claudePath?: string };
+			};
+			return kept.settings.claudePath;
+		})
+		.toBe(claude.path);
+	await app.close();
+});
+
 interface Received {
 	readonly path: string;
 	readonly headers: IncomingMessage["headers"];

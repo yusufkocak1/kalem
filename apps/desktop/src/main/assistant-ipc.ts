@@ -60,7 +60,7 @@ import { blockResults, parseApprovalAnswer, toolCalls } from "../shared/tool-pro
 import { collectSources, MAX_SOURCES, SOURCE_BUDGET } from "./assistant-sources.js";
 import type { AssistantStore } from "./assistant-store.js";
 import type { CliProgram } from "./cli.js";
-import { claudeOutput, LocalCli, runCli, textOutput } from "./cli.js";
+import { claudeOutput, LocalCli, runCli, SearchLog, textOutput } from "./cli.js";
 import type { ConfluenceClient } from "./confluence-client.js";
 import type { JiraClient } from "./jira-client.js";
 import { askApi, listModels } from "./llm.js";
@@ -227,10 +227,18 @@ export interface AssistantService {
 }
 
 export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService {
-	const clis: Record<CliProgram, LocalCli> = {
-		claude: new LocalCli("claude", () => ctx.store.settings.claudePath),
-		copilot: new LocalCli("copilot", () => ctx.store.settings.copilotPath),
-	};
+	/** When this computer's folders were last gone through for each CLI. */
+	const searches = new SearchLog(join(app.getPath("userData"), "cli-search.json"));
+	const pathSetting = (program: CliProgram, path: string): Partial<Settings> =>
+		program === "claude" ? { claudePath: path } : { copilotPath: path };
+	const cli = (program: CliProgram): LocalCli =>
+		new LocalCli(program, {
+			configured: () =>
+				program === "claude" ? ctx.store.settings.claudePath : ctx.store.settings.copilotPath,
+			remember: (path) => ctx.store.updateSettings(pathSetting(program, path)),
+			searches,
+		});
+	const clis: Record<CliProgram, LocalCli> = { claude: cli("claude"), copilot: cli("copilot") };
 	/** Each search for a CLI; shared, so a second request does not find it missing half-way. */
 	const locating = new Map<CliProgram, Promise<unknown>>();
 	const locate = (program: CliProgram, again = false): Promise<unknown> => {
@@ -308,6 +316,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 					label: t.assistantNotFound,
 					detail: "",
 					missing: "cli",
+					offered: clis[program].offered(),
 				};
 			}
 			const label =
@@ -422,6 +431,21 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		}));
 	});
 
+	/** Uses the program at a path the user gave (a file, or a folder it is in); says so when it is not one. */
+	const usePath = async (win: AppWindow, program: CliProgram, path: string): Promise<void> => {
+		const t = ctx.strings();
+		await locate(program);
+		if (isAbsolute(path) && (await clis[program].check(path))) {
+			ctx.store.updateSettings(pathSetting(program, clis[program].launch?.path ?? path));
+			return;
+		}
+		await dialog.showMessageBox(win.window, {
+			type: "warning",
+			message: program === "claude" ? t.claudeLocateFailed : t.copilotLocateFailed,
+			detail: path,
+		});
+	};
+
 	ipcMain.handle(CHANNEL.assistantLocate, async (event) => {
 		const win = ctx.senderOf(event);
 		const t = ctx.strings();
@@ -435,21 +459,68 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				: {}),
 		});
 		const path = result.filePaths[0];
-		if (!result.canceled && path !== undefined) {
-			await locate(program);
-			if (await clis[program].check(path)) {
-				ctx.store.updateSettings(
-					program === "claude" ? { claudePath: path } : { copilotPath: path },
-				);
-			} else {
-				await dialog.showMessageBox(win.window, {
-					type: "warning",
-					message: program === "claude" ? t.claudeLocateFailed : t.copilotLocateFailed,
-					detail: path,
-				});
-			}
+		if (!result.canceled && path !== undefined) await usePath(win, program, path);
+		return status();
+	});
+
+	// A path typed or pasted: the file dialog cannot reach a drive that a company's policy hides.
+	ipcMain.handle(CHANNEL.assistantUsePath, async (event, raw: unknown) => {
+		const win = ctx.senderOf(event);
+		const t = ctx.strings();
+		const program = programOf((await ctx.assistant.active()).provider);
+		const path =
+			typeof raw === "string"
+				? raw
+						.trim()
+						.replace(/^"(.*)"$/, "$1")
+						.slice(0, 4096)
+				: "";
+		if (program === null || path === "") return status();
+		// The path came from the page, not from a dialog of the system's: the user says it is theirs.
+		const answer = await dialog.showMessageBox(win.window, {
+			type: "question",
+			message: program === "claude" ? t.claudeUseAsk : t.copilotUseAsk,
+			detail: path,
+			buttons: [t.assistantUse, t.cancel],
+			defaultId: 0,
+			cancelId: 1,
+		});
+		if (answer.response === 0) await usePath(win, program, path);
+		return status();
+	});
+
+	// Goes through this computer's folders; what it finds is offered, and started when the user picks it.
+	ipcMain.handle(CHANNEL.assistantSearch, async () => {
+		const program = programOf((await ctx.assistant.active()).provider);
+		if (program === null) return status();
+		const search = clis[program].search();
+		locating.set(program, search);
+		await search;
+		return status();
+	});
+
+	ipcMain.handle(CHANNEL.assistantUseFound, async (event, path: unknown) => {
+		const win = ctx.senderOf(event);
+		const t = ctx.strings();
+		const program = programOf((await ctx.assistant.active()).provider);
+		if (program === null || typeof path !== "string") return status();
+		await locate(program);
+		// Only a file the search itself offered: the page cannot name another.
+		if (!(await clis[program].use(path))) {
+			await dialog.showMessageBox(win.window, {
+				type: "warning",
+				message: program === "claude" ? t.claudeLocateFailed : t.copilotLocateFailed,
+				detail: path,
+			});
 		}
 		return status();
+	});
+
+	ipcMain.handle(CHANNEL.assistantSearchReport, async () => {
+		const program = programOf((await ctx.assistant.active()).provider);
+		if (program === null) return "";
+		await locate(program);
+		return `Kalem ${app.getVersion()}\n${clis[program].report()}`;
 	});
 
 	ipcMain.handle(CHANNEL.assistantPickSources, async (event, kind: unknown) => {

@@ -1053,20 +1053,64 @@ verir.
   yeniden oluştur** (hatada **Yeniden dene**) vardır. Boş kutuda `↑` son
   soruyu geri getirir; yukarı kaydırınca **Son mesaja git** düğmesi çıkar;
   **Sohbetler** listesi başlığa göre aranabilir.
-- **GitHub Copilot** seçiliyken uygulama `copilot`'ı aynı yerlerde (ayrıca
-  WinGet bağlantı klasöründe) arar; `KALEM_COPILOT` ortam değişkeni
-  verilirse yalnızca o dosya denenir. Copilot'a sistem talimatı
-  verilemediği için Kalem tanıtımı sohbetin ilk sorusuyla gider; araçlardan
-  komut çalıştırma ve dosya yazma kapalıdır (`--deny-tool shell`,
-  `--deny-tool write`).
-- **Claude Code** seçiliyken uygulama `claude`'u kendisi arar. Yoksa panel
-  kurulumu anlatır (`npm install -g @anthropic-ai/claude-code`, sonra
-  terminalde bir kez `claude` ile oturum açmak) ve API anahtarıyla bir
-  hizmete bağlanmayı önerir; alışılmadık bir yere kuruluysa **Konumu Seç…**
-  ile programı gösterilir. Aranan yerler: `PATH`, `~/.local/bin`,
-  `~/.claude/local`, `/opt/homebrew/bin`, `/usr/local/bin`, Windows'ta
-  `%APPDATA%\npm`. `KALEM_CLAUDE` ortam değişkeni verilirse yalnızca o
-  dosya denenir.
+- **Claude Code** ya da **GitHub Copilot** seçiliyken uygulama programı
+  (`claude`, `copilot`) kendisi bulur; ayar gerekmez. Sırayla, biri
+  `--version`'a yanıt verene kadar şuralara bakar (`src/main/cli-find.ts`):
+  1. Daha önce gösterilen ya da bir aramada seçilen program.
+  2. `PATH` ve kurulum araçlarının klasörleri: `~/.local/bin`,
+     `~/.claude/local`, `/opt/homebrew/bin`, `/usr/local/bin`; Windows'ta
+     `%APPDATA%\npm`, WinGet bağlantı klasörü, pnpm, Yarn, Volta, Bun, scoop,
+     `Program Files\nodejs`. Şirket bilgisayarlarında ev klasörü ağ sürücüsü
+     olabildiği için `USERPROFILE`, `HOME` ve `HOMEDRIVE`+`HOMEPATH` üçü de
+     denenir.
+  3. npm'in genel paket klasörleri. Bağlantı (`claude.cmd`) bir kabukla
+     çalıştırılmaz, neyi başlattığı okunur: betikse Node ile, güncel Claude
+     Code paketinde olduğu gibi programın kendisiyse (`bin\claude.exe`)
+     doğrudan çalıştırılır. Bağlantı yoksa ya da okunamıyorsa paketin içine
+     bakılır: önce bu bilgisayar için derlenmiş program
+     (`@anthropic-ai/claude-code-win32-x64\claude.exe`,
+     `@github/copilot-win32-x64\copilot.exe`; Node gerekmez), sonra paketin
+     `bin` alanındaki dosya. `.npmrc`'deki `prefix` ve nvm, fnm, nvs, Volta,
+     mise, asdf, nodenv'in sürüm klasörleri de bu gözle taranır.
+  4. Kendi kopyasını getirenler: VS Code, Cursor, Windsurf ve benzerlerinin
+     eklenti klasörü (`~/.vscode/extensions/anthropic.claude-code-*`; VS
+     Code'un `claude` hiçbir `PATH`'te yokken de çalışmasının nedeni bu),
+     Copilot eklentisinin paketleri, Claude masaüstü uygulamasının indirdiği
+     kopya, kurulum aracının `versions` klasörü, WinGet paket klasörü.
+  5. Windows'ta kayıt defterindeki güncel `PATH` ve ortam değişkenleri:
+     çalışan bir uygulama açıldığı andaki `PATH`'i taşır, sonradan kurulan
+     program yalnızca burada görünür.
+  6. npm'in kendi yanıtı (`npm root -g`): npm, `npm.cmd` ile değil Node'la
+     betik olarak çalıştırılır; komut istemi yasak olsa da çalışır.
+  7. Windows'ta bu oturumda çalışan `claude.exe`/`copilot.exe` (düzenleyici
+     onu açık tutuyorsa kurulu olduğu yerden çalışıyordur); diğer
+     sistemlerde giriş kabuğunun bulduğu yol (`command -v`).
+
+  Aynı adlı masaüstü uygulaması (`Claude.exe`) program sanılmaz: yanında
+  Chromium dosyaları olan klasördeki dosya çalıştırılmaz. `KALEM_CLAUDE` /
+  `KALEM_COPILOT` ortam değişkeni verilirse yalnızca o dosya denenir.
+- Program yine bulunamazsa panel kurulumu anlatır
+  (`npm install -g @anthropic-ai/claude-code`, sonra terminalde bir kez
+  `claude` ile oturum açmak), API anahtarıyla bir hizmete bağlanmayı önerir
+  ve şunları sunar:
+  - **Bilgisayarda Ara:** kullanıcının kendi klasörleri ve kurulu
+    programların klasörleri, ardından sabit disklerin geri kalanı klasör
+    klasör taranır (ağ sürücüleri hariç, süre sınırlı). Şirket politikasıyla
+    gizlenmiş bir sürücüyü dosya penceresi göstermez ama uygulama okuyabilir;
+    bu arama onun içindir. Windows'ta kullanıcının kendi klasörleri haftada
+    bir kendiliğinden de taranır. Taramada bulunan dosya **çalıştırılmaz**:
+    o adı taşıyan bir dosya (bir indirme, örneğin) her şey olabilir. Bulunanlar
+    panelde yollarıyla listelenir; **Kullan** denince denenir ve sonraki
+    açılışlar için saklanır.
+  - **Konumu Seç…** ya da yolu yapıştırmak: programın dosyası ya da içinde
+    bulunduğu klasör (Node'un klasörü, `node_modules`, paketin klasörü)
+    yeter. Yapıştırılan yol için uygulama önce onay sorar.
+  - **Arama ayrıntılarını kopyala:** nerelere bakıldığını ve var olan her
+    dosyanın ne yanıt verdiğini panoya koyar; "kurulu ama bulunmuyor"
+    durumunda nedeni buradan görülür.
+- Copilot'a sistem talimatı verilemediği için Kalem tanıtımı sohbetin ilk
+  sorusuyla gider; araçlardan komut çalıştırma ve dosya yazma kapalıdır
+  (`--deny-tool shell`, `--deny-tool write`).
 - **Belgeyi paylaş** açıkken her soruyla birlikte belgenin Markdown'ı,
   belgedeki Kalem diyagramlarının verisi ve belgede seçili metin gider
   (seçim, giriş kutusunun üstündeki etiketten çıkarılabilir). Belge önceki

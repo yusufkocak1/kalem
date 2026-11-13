@@ -1247,11 +1247,20 @@ const en = {
 	assistantMissing: "Claude Code was not found on this computer",
 	assistantMissingHint:
 		"The assistant uses Claude Code installed on this computer, with its own sign-in. Install it (Node.js 18 or later), for example:",
-	assistantMissingLogin:
-		"Then run “claude” once in a terminal and sign in. If it is installed somewhere unusual, pick its program.",
+	assistantMissingLogin: "Then run “claude” once in a terminal and sign in.",
 	assistantInstall: "Installation guide",
 	assistantLocate: "Locate…",
 	assistantRetry: "Try again",
+	assistantSearch: "Search this computer",
+	assistantSearching: "Searching…",
+	assistantSearchHint:
+		"Already installed? Kalem looks by itself where it is usually installed, inside the editors that bring their own copy (VS Code and the like) and among the running programs. If it is somewhere else, search this computer's folders, pick its program, or paste its path.",
+	assistantOffered:
+		"A search of this computer's folders found these. Use the one that is Claude Code:",
+	assistantUse: "Use",
+	assistantPathPlaceholder: "Path of the program or its folder",
+	assistantSearchReport: "Copy search details",
+	claudeUseAsk: "Use this as Claude Code?",
 	assistantInsert: "Insert",
 	assistantInserted: "Inserted",
 	assistantCopy: "Copy",
@@ -1316,12 +1325,14 @@ const en = {
 	providerCopilot: "GitHub Copilot (this computer)",
 	copilotLocateTitle: "Where is the GitHub Copilot CLI (copilot)?",
 	copilotLocateFailed: "This file does not start the GitHub Copilot CLI.",
+	copilotUseAsk: "Use this as the GitHub Copilot CLI?",
+	copilotOffered:
+		"A search of this computer's folders found these. Use the one that is the GitHub Copilot CLI:",
 	copilotNotFound: "The GitHub Copilot CLI was not found on this computer.",
 	copilotMissing: "The GitHub Copilot CLI was not found on this computer",
 	copilotMissingHint:
 		"The assistant can use the GitHub Copilot CLI with your Copilot subscription and its own sign-in. Install it, for example:",
-	copilotMissingLogin:
-		"Then run “copilot” once in a terminal and sign in with /login. If it is installed somewhere unusual, pick its program.",
+	copilotMissingLogin: "Then run “copilot” once in a terminal and sign in with /login.",
 	copilotCliNote:
 		"Uses the GitHub Copilot CLI installed on this computer, with your Copilot subscription and its own sign-in; no key is needed here.",
 	copilotModelPlaceholder: "Copilot's default model (or a model name)",
@@ -2639,11 +2650,20 @@ const tr: Strings = {
 	assistantMissing: "Bu bilgisayarda Claude Code bulunamadı",
 	assistantMissingHint:
 		"Asistan, bu bilgisayarda kurulu Claude Code'u kendi oturumuyla kullanır. Kurmak için (Node.js 18 ya da üstü), örneğin:",
-	assistantMissingLogin:
-		"Sonra bir terminalde bir kez “claude” çalıştırıp oturum açın. Alışılmadık bir yere kuruluysa programını gösterin.",
+	assistantMissingLogin: "Sonra bir terminalde bir kez “claude” çalıştırıp oturum açın.",
 	assistantInstall: "Kurulum rehberi",
 	assistantLocate: "Konumu Seç…",
 	assistantRetry: "Yeniden dene",
+	assistantSearch: "Bilgisayarda Ara",
+	assistantSearching: "Aranıyor…",
+	assistantSearchHint:
+		"Zaten kurulu mu? Kalem programı genelde kurulduğu yerlerde, kendi kopyasını getiren düzenleyicilerin (VS Code ve benzerleri) içinde ve çalışan programlar arasında kendisi arar. Başka bir yerdeyse bilgisayarın klasörlerinde aratın, programını gösterin ya da yolunu yapıştırın.",
+	assistantOffered:
+		"Bilgisayarın klasörlerinde yapılan aramada bunlar bulundu. Claude Code olanı kullanın:",
+	assistantUse: "Kullan",
+	assistantPathPlaceholder: "Programın ya da klasörünün yolu",
+	assistantSearchReport: "Arama ayrıntılarını kopyala",
+	claudeUseAsk: "Bu, Claude Code olarak kullanılsın mı?",
 	assistantInsert: "Belgeye Ekle",
 	assistantInserted: "Eklendi",
 	assistantCopy: "Kopyala",
@@ -2708,12 +2728,14 @@ const tr: Strings = {
 	providerCopilot: "GitHub Copilot (bu bilgisayar)",
 	copilotLocateTitle: "GitHub Copilot CLI (copilot) nerede?",
 	copilotLocateFailed: "Bu dosya GitHub Copilot CLI'ı başlatmıyor.",
+	copilotUseAsk: "Bu, GitHub Copilot CLI olarak kullanılsın mı?",
+	copilotOffered:
+		"Bilgisayarın klasörlerinde yapılan aramada bunlar bulundu. GitHub Copilot CLI olanı kullanın:",
 	copilotNotFound: "Bu bilgisayarda GitHub Copilot CLI bulunamadı.",
 	copilotMissing: "Bu bilgisayarda GitHub Copilot CLI bulunamadı",
 	copilotMissingHint:
 		"Asistan, GitHub Copilot CLI'ı Copilot aboneliğiniz ve kendi oturumuyla kullanabilir. Kurmak için, örneğin:",
-	copilotMissingLogin:
-		"Sonra bir terminalde bir kez “copilot” çalıştırıp /login ile oturum açın. Alışılmadık bir yere kuruluysa programını gösterin.",
+	copilotMissingLogin: "Sonra bir terminalde bir kez “copilot” çalıştırıp /login ile oturum açın.",
 	copilotCliNote:
 		"Bu bilgisayarda kurulu GitHub Copilot CLI'ı Copilot aboneliğinizle ve kendi oturumuyla kullanır; burada anahtar gerekmez.",
 	copilotModelPlaceholder: "Copilot'ın varsayılan modeli (ya da bir model adı)",
