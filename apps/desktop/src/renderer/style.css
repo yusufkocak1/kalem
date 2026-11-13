@@ -10408,6 +10408,67 @@ h3.mode-panel-name {
 	margin-left: auto;
 }
 
+.mcp-presets {
+	display: grid;
+	gap: 8px;
+}
+
+.mcp-presets-summary {
+	color: var(--app-accent);
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.mcp-preset-list {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: 8px;
+}
+
+.mcp-preset {
+	display: grid;
+	align-content: start;
+	gap: 4px;
+	padding: 10px 12px;
+	border: 1px solid var(--app-border);
+	border-radius: 10px;
+	background: var(--app-surface);
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.mcp-preset:hover {
+	border-color: var(--app-accent);
+	background: var(--app-pressed);
+}
+
+.mcp-preset-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--app-accent);
+}
+
+.mcp-preset-name {
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.mcp-preset-kind {
+	margin-left: auto;
+	color: var(--app-muted);
+	font-size: 11px;
+}
+
+.mcp-preset-text {
+	color: var(--app-muted);
+	font-size: 12px;
+	line-height: 1.4;
+}
+
 /* The empty document's hint wraps inside the page instead of running past its
    right edge on a narrow page. It takes no height, so the caret stays on the
    first line, held up by the paragraph's own line break. */

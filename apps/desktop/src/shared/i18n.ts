@@ -955,6 +955,27 @@ const en = {
 	mcpTools: "Tools it may use",
 	mcpToolsAll: "All of them (or names, separated by commas)",
 	mcpRemove: "Remove the server",
+	mcpPresets: "Ready-made servers",
+	mcpPresetsHint:
+		"Added filled in as they are commonly run, with what each is for. Fill in the words in angle brackets (<GITHUB_TOKEN>, <folder>). npx needs Node.js, uvx needs uv.",
+	mcpPresetDbParams:
+		"Answers “what is this parameter's value?” from your database with one fixed query (DBHub). Define get_parameter in dbhub.toml; read-only database user.",
+	mcpPresetDbI18n:
+		"Adds the i18n keys written in code to your database (DBHub). Define add_i18n_key (INSERT … ON CONFLICT DO NOTHING) in dbhub.toml.",
+	mcpPresetGithub:
+		"Issues, pull requests and code of your repositories, read-only. Needs a GitHub token in place of <GITHUB_TOKEN>.",
+	mcpPresetGit: "The repository's log, diffs and commits, read-only. Needs uv (uvx).",
+	mcpPresetFilesystem: "Reads files in a folder outside the workspace (shared specs, sample data).",
+	mcpPresetContext7:
+		"Up-to-date documentation of libraries (React, Spring, .NET…), so code follows their current API.",
+	mcpPresetPlaywright:
+		"A browser the assistant drives: opens your app's pages to check a change or reproduce a bug.",
+	mcpPresetSentry:
+		"Production errors and stack traces from Sentry. Needs an access token; SENTRY_HOST for your own server.",
+	mcpPresetFetch: "Reads a web page as text. Needs uv (uvx).",
+	mcpPresetMemory: "A memory kept between chats: the project's decisions, names and conventions.",
+	mcpPresetFigma:
+		"The frame selected in the Figma desktop app, for interface code. Turn on the Dev Mode MCP server in Figma.",
 	mcpPurpose: "What it is for (the assistant is told)",
 	mcpPurposeHint:
 		"e.g. The project's i18n database. When you add a new i18n key in code, add it here with add_i18n_key (tr and en texts) without being asked.",
@@ -2474,6 +2495,28 @@ const tr: Strings = {
 	mcpTools: "Kullanabileceği araçlar",
 	mcpToolsAll: "Hepsi (ya da virgülle ayrılmış adlar)",
 	mcpRemove: "Sunucuyu kaldır",
+	mcpPresets: "Hazır sunucular",
+	mcpPresetsHint:
+		"Yaygın kullanıldıkları gibi doldurulmuş ve ne için oldukları yazılmış olarak eklenir. Köşeli parantezdeki yerleri (<GITHUB_TOKEN>, <folder>) doldurun. npx için Node.js, uvx için uv gerekir.",
+	mcpPresetDbParams:
+		"“Bu parametrenin değeri ne?” sorusunu veritabanınızdan tek bir sabit sorguyla cevaplar (DBHub). get_parameter aracını dbhub.toml'da tanımlayın; salt okunur veritabanı kullanıcısı.",
+	mcpPresetDbI18n:
+		"Kodda yazılan i18n anahtarlarını veritabanınıza ekler (DBHub). add_i18n_key aracını (INSERT … ON CONFLICT DO NOTHING) dbhub.toml'da tanımlayın.",
+	mcpPresetGithub:
+		"Depolarınızın issue, pull request ve kodları, salt okunur. <GITHUB_TOKEN> yerine bir GitHub token'ı gerekir.",
+	mcpPresetGit: "Deponun geçmişi, farkları ve commit'leri, salt okunur. uv (uvx) gerekir.",
+	mcpPresetFilesystem:
+		"Çalışma alanı dışındaki bir klasörün dosyalarını okur (ortak dokümanlar, örnek veriler).",
+	mcpPresetContext7:
+		"Kütüphanelerin (React, Spring, .NET…) güncel dokümantasyonu; kod güncel API'ye göre yazılır.",
+	mcpPresetPlaywright:
+		"Asistanın kullandığı bir tarayıcı: bir değişikliği görmek ya da hatayı tekrar etmek için uygulamanızın sayfalarını açar.",
+	mcpPresetSentry:
+		"Sentry'deki canlı ortam hataları ve stack trace'ler. Erişim token'ı gerekir; kendi sunucunuz için SENTRY_HOST.",
+	mcpPresetFetch: "Bir web sayfasını metin olarak okur. uv (uvx) gerekir.",
+	mcpPresetMemory: "Sohbetler arasında kalan bir hafıza: projenin kararları, adları ve kuralları.",
+	mcpPresetFigma:
+		"Figma masaüstü uygulamasında seçili frame, arayüz kodu için. Figma'da Dev Mode MCP sunucusunu açın.",
 	mcpPurpose: "Ne için (asistana söylenir)",
 	mcpPurposeHint:
 		"örn. Projenin i18n veritabanı. Kodda yeni bir i18n anahtarı eklediğinde, sorulmadan add_i18n_key ile buraya da ekle (tr ve en metinleriyle).",

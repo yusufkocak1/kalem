@@ -687,9 +687,21 @@ test("one of Kalem's modes takes an MCP server too, and the model is told what i
 		.locator(".mcp-card")
 		.getByRole("textbox", { name: "What it is for (the assistant is told)" })
 		.fill("When you add an i18n key in code, add it to the database with add_i18n_key.");
+	// One of the ready-made servers, filled in.
+	await settings.locator(".mcp-presets summary").click();
+	await settings.locator('.mcp-preset[data-preset="context7"]').click();
+	await expect(settings.locator(".mcp-card")).toHaveCount(2);
+	await expect(
+		settings
+			.locator('.mcp-card[data-server="context7"]')
+			.getByRole("textbox", { name: "Arguments (one a line)" }),
+	).toHaveValue("-y\n@upstash/context7-mcp@latest");
 	await settings.locator(".mode-preview summary").click();
 	await expect(settings.locator(".mode-preview-text")).toContainText(
 		"- i18n-db (tools: add_i18n_key): When you add an i18n key in code",
+	);
+	await expect(settings.locator(".mode-preview-text")).toContainText(
+		"- context7: Up-to-date documentation",
 	);
 	await settings.getByRole("button", { name: "Done" }).click();
 	await expect
@@ -712,6 +724,7 @@ test("one of Kalem's modes takes an MCP server too, and the model is told what i
 	expect(system).toContain("add it to the database with add_i18n_key");
 	const allowed = call?.args.slice(call.args.indexOf("--allowedTools") + 1) ?? [];
 	expect(allowed).toContain("mcp__i18n-db__add_i18n_key");
+	expect(allowed).toContain("mcp__context7");
 	expect(call?.mcp?.mcpServers["i18n-db"]).toEqual({
 		type: "stdio",
 		command: "npx",

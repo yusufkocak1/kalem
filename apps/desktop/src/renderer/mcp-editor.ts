@@ -1,4 +1,5 @@
 import type { Strings } from "../shared/i18n.js";
+import { MCP_PRESETS, presetServer } from "../shared/mcp-presets.js";
 import type { McpServer } from "../shared/mcp-servers.js";
 import { newMcpServer, RESERVED_SERVER, serverName } from "../shared/mcp-servers.js";
 import { el } from "./dom.js";
@@ -238,6 +239,45 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 			el("p", { class: "mode-section-hint", text: t.mcpHint }),
 			el("div", { class: "mcp-list", children: options.servers().map(serverCard) }),
 			add,
+			presets(),
 		],
 	});
+
+	/** Servers to start from, filled in as they are commonly run: one click adds one. */
+	function presets(): HTMLElement {
+		return el("details", {
+			class: "mcp-presets",
+			children: [
+				el("summary", { class: "mcp-presets-summary", text: t.mcpPresets }),
+				el("p", { class: "mode-section-hint", text: t.mcpPresetsHint }),
+				el("div", {
+					class: "mcp-preset-list",
+					children: MCP_PRESETS.map((preset) => {
+						const button = el("button", {
+							class: "mcp-preset",
+							attrs: { type: "button", "data-preset": preset.id },
+							children: [
+								el("span", {
+									class: "mcp-preset-head",
+									children: [
+										mark("plus", "mode-icon"),
+										el("span", { class: "mcp-preset-name", text: preset.label }),
+										el("code", {
+											class: "mcp-preset-kind",
+											text: preset.server.transport === "http" ? "HTTP" : preset.server.command,
+										}),
+									],
+								}),
+								el("span", { class: "mcp-preset-text", text: t[preset.description] }),
+							],
+						});
+						button.addEventListener("click", () =>
+							options.change([...options.servers(), presetServer(preset, options.servers())], true),
+						);
+						return button;
+					}),
+				}),
+			],
+		});
+	}
 }
