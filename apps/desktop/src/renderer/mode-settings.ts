@@ -507,6 +507,9 @@ export function createModeEditor(options: ModeEditorOptions): {
 				const value = Math.max(0, Math.min(200, Math.round(Number(most.value) || 0)));
 				change({ maxFindings: value }, false);
 			});
+			const parallel = el("input", { attrs: { type: "checkbox" } });
+			parallel.checked = mode.parallel;
+			parallel.addEventListener("change", () => change({ parallel: parallel.checked }, false));
 			reviewOnly.push(
 				pills(
 					t.modeMinSeverity,
@@ -519,6 +522,7 @@ export function createModeEditor(options: ModeEditorOptions): {
 					class: "mode-field",
 					children: [el("span", { class: "mode-label", text: t.modeMaxFindings }), most],
 				}),
+				el("label", { class: "settings-check", children: [parallel, t.modeParallel] }),
 			);
 		}
 

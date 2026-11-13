@@ -660,6 +660,11 @@ export interface AssistantRequest {
 	readonly sources?: readonly string[];
 	/** The question with the whole document in it, when `prompt` has only its outline. */
 	readonly fullPrompt?: string;
+	/**
+	 * The question with the whole document in it, when it asks for a review that a
+	 * CLI may run side by side: each reviewer starts a conversation of its own.
+	 */
+	readonly reviewPrompt?: string;
 	/** The active document, for the tools to read and change; left out when it is not shared. */
 	readonly document?: {
 		readonly tabId: string;

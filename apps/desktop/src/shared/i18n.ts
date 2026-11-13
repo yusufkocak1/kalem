@@ -893,6 +893,7 @@ const en = {
 	replyAuto: "As the question",
 	modeMinSeverity: "Report findings from",
 	modeMaxFindings: "At most this many findings (0: no limit)",
+	modeParallel: "Run the checks side by side (Claude Code, Copilot): faster, uses more tokens",
 	modeKeywords: "More words that choose it automatically",
 	modeKeywordsHint: "Separate them with commas, e.g. bakar mısın, sanity check",
 	modeExtra: "More instructions",
@@ -2355,6 +2356,8 @@ const tr: Strings = {
 	replyAuto: "Soru hangi dildeyse",
 	modeMinSeverity: "Bildirilecek en düşük önem",
 	modeMaxFindings: "En çok bulgu sayısı (0: sınırsız)",
+	modeParallel:
+		"Kontrolleri yan yana çalıştır (Claude Code, Copilot): daha hızlı, daha çok token harcar",
 	modeKeywords: "Bu modu otomatik seçtiren ek kelimeler",
 	modeKeywordsHint: "Virgülle ayırın, ör. bakar mısın, sanity check",
 	modeExtra: "Ek talimat",

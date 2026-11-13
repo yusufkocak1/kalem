@@ -789,6 +789,20 @@ verir.
 >     otomatik seçtiren **ek kelimeler**, **ek talimat**; **Asistana
 >     söylenen** önizlemesi değiştikçe güncellenir; **Varsayılana döndür**.
 >     Ayarlar yalnızca varsayılandan farkı saklar (`assistantModes`).
+>   - **Yan yana inceleme** (Claude Code ve Copilot CLI; İnceleme modunda
+>     **Kontrolleri yan yana çalıştır**, varsayılan açık): inceleme
+>     istendiğinde Kalem kural denetimini kendisi çalıştırır, sonra her
+>     kontrol adımını (kapsam, çelişkiler, uç durumlar, test edilebilirlik,
+>     güvenlik, varsa kodla karşılaştırma ve kendi adımlarınız) ayrı bir
+>     **inceleyiciye** verir; hepsi aynı anda çalışır (en çok 6, fazlası
+>     paylaştırılır). Her inceleyici belgenin tamamını alır, yalnızca okuyan
+>     araçları kullanır ve sohbeti sürdürmez. Bulgular geldikçe tek listede
+>     toplanır (yeniden numaralanır, aynı cümle iki kez bildirilmez), plan
+>     kartı hangi kontrolün bittiğini gösterir; sohbetin kendisi sonda
+>     yalnızca özetler. Süre adımların toplamı yerine en uzun kontrol kadar
+>     olur, token harcaması artar. Önceki incelemeyle ilgili bir soru (yeni
+>     inceleme istemeyen) tek yanıt olarak kalır; hiçbir inceleyici
+>     çalışamazsa inceleme eskisi gibi tek yanıtta yapılır.
 >   - **Kendi modlarınız** (Asistan Modları → **Yeni mod**): ad, simge ve
 >     tek satırlık açıklama; asistana söylenen **talimat** (prompt); kendi
 >     **adımlarınız**; Kalem'in **araçlarından** hepsi ya da yalnızca

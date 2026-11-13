@@ -2929,6 +2929,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		let tabId: string | null = null;
 		let images: DocumentImage[] = [];
 		let fullPrompt: string | undefined;
+		let reviewPrompt: string | undefined;
 		let documentSnapshot:
 			| { tabId: string; name: string; text: string; selection: string }
 			| undefined;
@@ -3016,6 +3017,27 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					selection,
 				});
 			if (sharing) chat.sharedText = context.text;
+			// A review asked for now (not a question about an earlier one) may run side by side.
+			if (
+				usedMode === "review" &&
+				sharing &&
+				isCli(PROVIDER_INFO[provider]) &&
+				resolveMode("review", host.modes()).parallel &&
+				(chat.sessionId === null ||
+					detectMode(question, { hasDocument: true, hasWorkspace: false }, host.modes()).mode ===
+						"review")
+			) {
+				reviewPrompt =
+					fullPrompt ??
+					(unchanged
+						? composePrompt({
+								question: withSections,
+								document: { name: context.name, text: context.text },
+								diagrams: context.diagrams,
+								selection,
+							})
+						: prompt);
+			}
 		} catch (error) {
 			chat.reply = null;
 			input.value = question;
@@ -3054,6 +3076,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					sources: chatSources(chat),
 					mode: usedMode,
 					...(fullPrompt === undefined ? {} : { fullPrompt }),
+					...(reviewPrompt === undefined ? {} : { reviewPrompt }),
 					...(documentSnapshot === undefined ? {} : { document: documentSnapshot }),
 				});
 				await Promise.race([last, new Promise((resolve) => setTimeout(resolve, 5000))]);

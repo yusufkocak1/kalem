@@ -341,12 +341,38 @@ test("a review lists the rules' and the model's findings, and the user fixes the
 		"F-02: Kargodaki sipariş iptal edilebilir mi? (FR-01: İptal)",
 	);
 
-	const [call] = await claude.calls();
-	const system = call?.args[call.args.indexOf("--append-system-prompt") + 1] ?? "";
-	expect(system).toContain("## Mode: review an analysis document");
-	expect(call?.args).toContain("mcp__kalem__report_findings");
-	expect(call?.tools?.[0]?.text).toContain("Checked against the template");
-	expect(call?.tools?.[1]?.text).toBe("Reported 2 findings.");
+	// The checks ran side by side, a reviewer each; the conversation then summed up.
+	const calls = await claude.calls();
+	const systemOf = (call: Call | undefined): string =>
+		call?.args[call.args.indexOf("--append-system-prompt") + 1] ?? "";
+	const reviewers = calls.slice(0, -1);
+	expect(reviewers).toHaveLength(5);
+	for (const reviewer of reviewers) {
+		expect(systemOf(reviewer)).toContain("## Mode: review an analysis document");
+		expect(systemOf(reviewer)).toContain("one of several reviewers");
+		expect(reviewer.args).toContain("mcp__kalem__report_findings");
+		// A reviewer reads and reports: it cannot change the document, and starts no conversation to resume.
+		expect(reviewer.args).not.toContain("mcp__kalem__document_edit");
+		expect(reviewer.args).not.toContain("--resume");
+		expect(reviewer.prompt).toContain("İptal hızlı yapılmalı.");
+		// Kalem ran the rules itself, and told the reviewer what they found.
+		expect(reviewer.prompt).toContain("<already-found>");
+		expect(reviewer.tools?.[0]?.text).toBe("analysis_lint is not available now.");
+		expect(reviewer.tools?.[1]?.text).toBe("Reported 2 findings.");
+	}
+	expect(reviewers.map((reviewer) => systemOf(reviewer)).join("\n")).toContain(
+		"look for contradictions",
+	);
+	const summary = calls.at(-1);
+	expect(systemOf(summary)).toContain("do not check the document again");
+	expect(systemOf(summary)).not.toContain("look for contradictions");
+	expect(summary?.prompt).toContain("<review-findings");
+	expect(summary?.prompt).toContain("F-01 [high, ambiguity] §Amaç ve Kapsam: Ölçülemez.");
+	// What five reviewers and the answer all reported is listed once.
+	await expect(review.locator(".assistant-finding:not(:has(.assistant-finding-rule))")).toHaveCount(
+		2,
+	);
+	await expect(pane.locator(".assistant-plan li.plan-done")).toHaveCount(5);
 	expect(errors).toEqual([]);
 	// "Don't Save" for the changed document.
 	await stubMessageBox(app, 1);
@@ -406,13 +432,38 @@ test("modes: shaped in Settings (a step off, one of the user's own), and picked 
 		"Mode: Review analysis (chosen automatically)",
 	);
 	await expect(pane.locator(".assistant-assistant")).toContainText("Tamam.");
+	// The review's checks went to reviewers side by side: the user's own step to one of them.
+	const systems = (await claude.calls()).map(
+		(call) => call.args[call.args.indexOf("--append-system-prompt") + 1] ?? "",
+	);
+	expect(systems.length).toBeGreaterThan(2);
+	expect(systems.filter((system) => system.includes("Check the KVKK consent texts."))).toHaveLength(
+		1,
+	);
+	for (const system of systems) {
+		expect(system).toContain("## Mode: review an analysis document");
+		expect(system).not.toContain("First call analysis_lint");
+	}
 	const [call] = await claude.calls();
-	const system = call?.args[call.args.indexOf("--append-system-prompt") + 1] ?? "";
-	expect(system).toContain("## Mode: review an analysis document");
-	expect(system).toContain("Check the KVKK consent texts.");
-	expect(system).not.toContain("First call analysis_lint");
 	expect(call?.args).toContain("mcp__kalem__report_findings");
 	expect(call?.args.join(" ")).not.toContain("mcp__kalem__analysis_lint");
+
+	// Turned off in Settings, the review is one answer again, with every step in it.
+	await picker.click();
+	await pane.getByRole("menuitem", { name: "Customize modes…" }).click();
+	await settings.locator('.mode-tab[data-mode="review"]').click();
+	await settings.getByLabel(/Run the checks side by side/).uncheck();
+	await settings.getByRole("button", { name: "Done" }).click();
+	await pane.getByRole("button", { name: "New chat" }).first().click();
+	await pane.locator(".assistant-input").fill("Bu analizi geliştirme öncesi incele");
+	await pane.locator(".assistant-input").press("Enter");
+	await expect(pane.locator(".assistant-assistant")).toContainText("Tamam.");
+	await expect.poll(async () => (await claude.calls()).length).toBe(systems.length + 1);
+	const alone = (await claude.calls()).at(-1);
+	const whole = alone?.args[alone.args.indexOf("--append-system-prompt") + 1] ?? "";
+	expect(whole).toContain("Check the KVKK consent texts.");
+	expect(whole).toContain("Check the scope");
+	expect(whole).not.toContain("one of several reviewers");
 	expect(errors).toEqual([]);
 	await app.close();
 });

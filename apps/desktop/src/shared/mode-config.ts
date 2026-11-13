@@ -307,6 +307,8 @@ export interface StoredMode {
 	readonly minSeverity?: SeverityFloor;
 	/** Review: at most this many findings; 0 for no limit. */
 	readonly maxFindings?: number;
+	/** Review: a CLI runs the checks side by side, one reviewer each; on unless turned off. */
+	readonly parallel?: boolean;
 }
 
 export type ModeSettings = Readonly<Partial<Record<Mode, StoredMode>>>;
@@ -335,6 +337,7 @@ export interface ResolvedMode {
 	readonly keywords: readonly string[];
 	readonly minSeverity: SeverityFloor;
 	readonly maxFindings: number;
+	readonly parallel: boolean;
 }
 
 const MAX_STEPS = 40;
@@ -400,6 +403,7 @@ export function parseModeSettings(raw: unknown): ModeSettings {
 			...(keywords === undefined ? {} : { keywords }),
 			...(minSeverity === undefined ? {} : { minSeverity }),
 			...(maxFindings === undefined ? {} : { maxFindings }),
+			...(typeof stored.parallel === "boolean" ? { parallel: stored.parallel } : {}),
 		};
 	}
 	return result;
@@ -462,6 +466,7 @@ export function resolveMode(mode: Mode, settings: ModeSettings = {}): ResolvedMo
 		keywords: stored.keywords ?? [],
 		minSeverity: stored.minSeverity ?? "low",
 		maxFindings: stored.maxFindings ?? 0,
+		parallel: stored.parallel ?? true,
 	};
 }
 
@@ -502,6 +507,7 @@ export function storeMode(resolved: ResolvedMode): StoredMode {
 		...(resolved.keywords.length === 0 ? {} : { keywords: resolved.keywords }),
 		...(resolved.minSeverity === "low" ? {} : { minSeverity: resolved.minSeverity }),
 		...(resolved.maxFindings === 0 ? {} : { maxFindings: resolved.maxFindings }),
+		...(resolved.parallel ? {} : { parallel: false }),
 	};
 }
 

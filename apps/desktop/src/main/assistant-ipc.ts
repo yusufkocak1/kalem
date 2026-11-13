@@ -5,6 +5,8 @@
  * keeps no conversation, so the messages of each chat are kept here and
  * sent again with every question.
  */
+
+import type { ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -15,7 +17,7 @@ import { assistantInstructions } from "../shared/assistant-prompt.js";
 import type { AssistantStatus, Settings } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
 import { parseChat } from "../shared/chats.js";
-import type { ClaudeEvent, PromptImage } from "../shared/claude.js";
+import type { ClaudeEvent, PlanStep, PromptImage } from "../shared/claude.js";
 import {
 	claudeArgs,
 	claudeInputLine,
@@ -31,6 +33,7 @@ import { confluenceRequests, MAX_ROUNDS } from "../shared/confluence-tool.js";
 import { claudeAllowed, claudeServers, copilotServers } from "../shared/custom-modes.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { jiraRequests } from "../shared/jira-tool.js";
+import type { ResolvedStep } from "../shared/mode-config.js";
 import type { ModelOption } from "../shared/models.js";
 import { claudeModelName, claudeModelOptions, copilotModelOptions } from "../shared/models.js";
 import { customModeOf, modeToolsExcluded } from "../shared/modes.js";
@@ -44,10 +47,17 @@ import {
 	providerLabel,
 	SUGGESTED_MODELS,
 } from "../shared/providers.js";
+import type { ReviewPlan } from "../shared/review-plan.js";
+import {
+	FindingMerger,
+	reviewerQuestion,
+	reviewPlan,
+	summaryQuestion,
+} from "../shared/review-plan.js";
 import type { ChatStore } from "./assistant-chats.js";
 import { ConfluenceLookups } from "./assistant-confluence.js";
 import { JiraLookups } from "./assistant-jira.js";
-import type { AssistantToolServer } from "./assistant-mcp.js";
+import type { AssistantToolServer, McpRun } from "./assistant-mcp.js";
 import { mcpToolName } from "./assistant-mcp.js";
 import { PermissionGate } from "./assistant-permissions.js";
 import type { DocumentSnapshot, ToolContext, ToolResult } from "./assistant-tools.js";
@@ -56,6 +66,7 @@ import { ModelCatalog } from "./model-catalog.js";
 import "./assistant-app-tools.js";
 import "./assistant-analysis-tools.js";
 import "./assistant-external-tools.js";
+import type { ToolDefinition } from "../shared/tool-protocol.js";
 import { blockResults, parseApprovalAnswer, toolCalls } from "../shared/tool-protocol.js";
 import { collectSources, MAX_SOURCES, SOURCE_BUDGET } from "./assistant-sources.js";
 import type { AssistantStore } from "./assistant-store.js";
@@ -215,6 +226,149 @@ function withSources(sources: string, sent: string | undefined, prompt: string):
 		return `<files-unchanged>The sources are as I sent them above.</files-unchanged>\n\n${prompt}`;
 	}
 	return `${sources}\n\n${prompt}`;
+}
+
+/** Tools a reviewer has no use for: it reads and reports, and Kalem runs the rules itself. */
+const NOT_FOR_REVIEWERS: ReadonlySet<string> = new Set([
+	"plan_update",
+	"analysis_lint",
+	"propose_edit",
+	"app_state",
+	"settings_get",
+	"settings_find",
+	"kalem_tools",
+]);
+
+interface SideBySide {
+	readonly plan: ReviewPlan;
+	readonly t: Strings;
+	/** The answer's own tools: the reviewers get the ones among them that only read. */
+	readonly tools: ToolContext;
+	open(
+		definitions: readonly ToolDefinition[],
+		run: (name: string, input: unknown) => Promise<ToolResult>,
+	): Promise<McpRun>;
+	forward(event: ClaudeEvent): void;
+	/** What a reviewer is told, for its part of the review and its tools. */
+	instructions(modes: ReviewPlan["summary"], tools: readonly ToolDefinition[]): string;
+	/** The question with the whole document in it. */
+	readonly question: string;
+	/** Runs one reviewer to its end; its events go to `send`. */
+	ask(
+		system: string,
+		question: string,
+		run: McpRun,
+		tools: readonly string[],
+		send: (event: ClaudeEvent) => void,
+	): Promise<void>;
+	stopped(): boolean;
+}
+
+/**
+ * Runs a review's checks side by side: the rules first, then a reviewer
+ * for each check, all at once. Their findings reach the user as they come,
+ * as one list; the plan shows which checks are done. `null` when no
+ * reviewer could run: the review is then left to the answer itself.
+ */
+async function sideBySide(options: SideBySide): Promise<{
+	readonly merger: FindingMerger;
+	readonly checks: readonly string[];
+	readonly failed: readonly string[];
+} | null> {
+	const { plan, t, tools, forward } = options;
+	const merger = new FindingMerger(plan.maxFindings);
+	const derived = (emit: (event: ClaudeEvent) => void, excluded = tools.excluded): ToolContext => ({
+		...tools,
+		excluded,
+		emit,
+		// What a reviewer read from Jira or Confluence counts for the answer too.
+		get readExternal() {
+			return tools.readExternal;
+		},
+		set readExternal(value: boolean) {
+			tools.readExternal = value;
+		},
+	});
+	let lint = "";
+	if (plan.lint) {
+		const result = await runTool(
+			"analysis_lint",
+			{},
+			derived((event) => {
+				if (event.kind !== "findings") return;
+				merger.seed(event.findings);
+				forward(event);
+			}),
+		);
+		if (!result.isError) lint = result.text;
+	}
+	const allowed = new Set(
+		toolsFor(tools)
+			.filter((tool) => tool.risk === "read" && !NOT_FOR_REVIEWERS.has(tool.definition.name))
+			.map((tool) => tool.definition.name),
+	);
+	const context = derived(
+		(event) => {
+			if (event.kind !== "findings") return;
+			const added = merger.add(event.findings);
+			if (added.length > 0) forward({ kind: "findings", findings: added });
+		},
+		new Set(
+			allTools()
+				.map((tool) => tool.definition.name)
+				.filter((name) => !allowed.has(name)),
+		),
+	);
+	const definitions = toolsFor(context).map((tool) => tool.definition);
+	const names = definitions.map((tool) => tool.name);
+	if (!names.includes("report_findings")) return null;
+	const run = await options
+		.open(definitions, (name, input) => runTool(name, input, context))
+		.catch(() => null);
+	if (run === null) return null;
+	const title = (step: ResolvedStep): string =>
+		step.title ?? (step.titleKey === null ? step.id : t[step.titleKey]);
+	const checks = plan.reviewers.map((reviewer) => reviewer.steps.map(title).join(", "));
+	const status: PlanStep["status"][] = checks.map(() => "active");
+	const show = (): void =>
+		forward({
+			kind: "plan",
+			steps: checks.map((check, index) => ({ title: check, status: status[index] ?? "done" })),
+		});
+	show();
+	const question = reviewerQuestion(options.question, lint);
+	const before = merger.all.length;
+	try {
+		const failures = await Promise.all(
+			plan.reviewers.map(async (reviewer, index) => {
+				let failed = false;
+				if (!options.stopped()) {
+					await options.ask(
+						options.instructions(reviewer.modes, definitions),
+						question,
+						run,
+						names,
+						(event) => {
+							if (event.kind === "error") failed = true;
+							else if (event.kind === "step" || event.kind === "usage") forward(event);
+						},
+					);
+				}
+				status[index] = "done";
+				if (!options.stopped()) show();
+				return failed;
+			}),
+		);
+		// Nothing came of any of them: the CLI cannot be run this way.
+		if (failures.every((failed) => failed) && merger.all.length === before) return null;
+		return {
+			merger,
+			checks,
+			failed: checks.filter((_check, index) => failures[index] === true),
+		};
+	} finally {
+		await run.close();
+	}
 }
 
 /** What the rest of the app can ask the assistant directly, outside a chat. */
@@ -563,6 +717,11 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			typeof request.sessionId === "string" && /^[\w-]{1,100}$/.test(request.sessionId)
 				? request.sessionId
 				: null;
+		// A review a CLI may run side by side: the question as each reviewer is asked it.
+		const reviewPrompt =
+			typeof request.reviewPrompt === "string" && request.reviewPrompt.trim() !== ""
+				? request.reviewPrompt
+				: null;
 		const images = sentImages(request.images);
 		const sources = sentSources(request.sources);
 		const sender = event.sender;
@@ -607,6 +766,8 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			customModes,
 			allTools().map((tool) => tool.definition.name),
 		);
+		// What a tool sends the chat; after a review run side by side, findings join its one list.
+		let emit = forward;
 		const tools: ToolContext = {
 			chatId,
 			sender,
@@ -627,7 +788,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			document: sentDocument(request.document),
 			// Claude Code's own stream says which tools it called: the steps are not said twice.
 			step: program === "claude" ? () => {} : step,
-			emit: forward,
+			emit: (emitted) => emit(emitted),
 			approve: (asked) => approve(asked),
 			renderer: (name, input) => rendererCalls.call(sender, chatId, name, input),
 			readExternal: false,
@@ -656,6 +817,8 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 						.catch(() => null)
 				: null;
 		let way: LookupWay = program === null ? "tools" : mcpRun === null ? "block" : "mcp";
+		// The modes the answer is given in: a review run side by side leaves it only the summary.
+		let answerModes = modeSettings;
 		const instructionsFor = (lookupWay: LookupWay): string =>
 			assistantInstructions(t, {
 				way: lookupWay,
@@ -663,7 +826,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				jira: jiraLookups?.site ?? null,
 				tools: definitions,
 				mode: request.mode,
-				modes: modeSettings,
+				modes: answerModes,
 				custom: customModes,
 				document: tools.document,
 			});
@@ -686,7 +849,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		};
 		if (program !== null) {
 			const sent = sessionId === null ? undefined : sentFiles.get(sessionId);
-			const asked = withSources(files.text, sent, prompt);
+			let asked = withSources(files.text, sent, prompt);
 			const tab = typeof request.tabId === "string" ? win.tabs.get(request.tabId) : undefined;
 			// A CLI keeps a conversation with the folder it ran in, and resumes it
 			// only from there; a new one runs next to the active document.
@@ -746,6 +909,116 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 							folders: files.folders,
 							...(way === "mcp" && mcpRun !== null ? { mcpConfig: mcpRun.copilot } : {}),
 						});
+			let stopped = false;
+			// A review's checks, each by a reviewer of its own, all at once; the answer then sums up.
+			const plan =
+				request.mode === "review" &&
+				reviewPrompt !== null &&
+				tools.document !== null &&
+				mcpRun !== null &&
+				way === "mcp"
+					? reviewPlan(modeSettings, { hasWorkspace: workspace !== null })
+					: null;
+			if (plan !== null) {
+				const children = new Set<ChildProcess>();
+				running.set(runKey, () => {
+					stopped = true;
+					gate.cancel(sender, chatId);
+					for (const child of children) child.kill();
+				});
+				const reviewed = await sideBySide({
+					plan,
+					t,
+					tools,
+					open: (definitions, run) => ctx.tools.open(() => definitions, run),
+					forward,
+					instructions: (modes, reviewerTools) =>
+						assistantInstructions(t, {
+							way: "mcp",
+							confluence: lookups?.site ?? null,
+							jira: jiraLookups?.site ?? null,
+							tools: reviewerTools,
+							mode: "review",
+							modes,
+							custom: customModes,
+							document: tools.document,
+						}),
+					question: withSources(files.text, undefined, reviewPrompt ?? asked),
+					ask: async (system, question, run, reviewerTools, send) => {
+						const persist =
+							program === "claude" &&
+							(await clis.claude.help()).includes("--no-session-persistence")
+								? ["--no-session-persistence"]
+								: [];
+						const jsonInput = program === "claude" && images.length > 0;
+						await runCli(
+							launch,
+							folder,
+							program === "claude"
+								? [
+										...claudeArgs({
+											sessionId: null,
+											systemPrompt: system,
+											model: connection.model,
+											jsonInput,
+											folders: files.folders,
+											mcp: { config: run.claude, tools: reviewerTools.map(mcpToolName) },
+											denied,
+										}),
+										...persist,
+									]
+								: copilotArgs({
+										sessionId: randomUUID(),
+										model: connection.model,
+										folders: files.folders,
+										mcpConfig: run.copilot,
+									}),
+							program === "claude"
+								? jsonInput
+									? claudeInputLine(question, images)
+									: question
+								: withInstructions(system, question),
+							program === "claude" ? claudeOutput() : textOutput(),
+							(cliEvent) => {
+								if (cliEvent.kind === "model")
+									void catalog.learn(connection.model, cliEvent.model).catch(() => {});
+								send(cliEvent);
+							},
+							sender,
+							(child) => {
+								children.add(child);
+								child.once("close", () => children.delete(child));
+								if (stopped) child.kill();
+							},
+							env,
+						);
+					},
+					stopped: () => stopped || sender.isDestroyed(),
+				});
+				if (stopped) {
+					await mcpRun?.close();
+					running.delete(runKey);
+					send({ kind: "done" });
+					return;
+				}
+				// Reviewers that could not run (an older CLI, say) leave the review to the answer, as before.
+				if (reviewed !== null) {
+					asked = summaryQuestion(asked, {
+						findings: reviewed.merger.all,
+						checks: reviewed.checks,
+						failed: reviewed.failed,
+						hasSummary: plan.hasSummary,
+					});
+					// A finding the answer reports all the same is not listed twice.
+					emit = (emitted) => {
+						if (emitted.kind !== "findings") return forward(emitted);
+						const added = reviewed.merger.add(emitted.findings);
+						if (added.length > 0) forward({ kind: "findings", findings: added });
+					};
+					answerModes = plan.summary;
+					system = instructionsFor(way);
+				}
+			}
 			let args: string[];
 			let question = asked;
 			if (program === "claude") {
@@ -763,7 +1036,6 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			// Rounds of look-ups and tool calls written in blocks: the reply's requests
 			// are run and their results sent back in the same conversation, until it answers.
 			let conversation = program === "copilot" ? copilotSession : sessionId;
-			let stopped = false;
 			running.set(runKey, () => {
 				stopped = true;
 				gate.cancel(sender, chatId);
