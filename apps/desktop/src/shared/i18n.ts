@@ -978,6 +978,39 @@ const en = {
 	mcpPresetMemory: "A memory kept between chats: the project's decisions, names and conventions.",
 	mcpPresetFigma:
 		"The frame selected in the Figma desktop app, for interface code. Turn on the Dev Mode MCP server in Figma.",
+	mcpGuideOpen: "How to use",
+	mcpGuideTitle: "{0}: how to use",
+	mcpGuideAdd: "Add this server",
+	mcpPresetAdd: "Add",
+	mcpGuideSteps: "Steps",
+	mcpSampleSql: "Database user (PostgreSQL)",
+	mcpSampleToml: "dbhub.toml",
+	mcpSampleLogin: "Log in once (in a terminal)",
+	mcpSampleBase64: "The Authorization header's value",
+	mcpGuideDbhub:
+		"DBHub connects to your database (PostgreSQL, MySQL, SQL Server, MariaDB, SQLite). Here it opens only queries you wrote yourself, not free SQL: the assistant never writes SQL, it only gives values. One server answers “what is this parameter's value?” and adds the i18n keys written in code.\nIn the database, make a user for the assistant with only the rights it needs (the SQL below).\nSave the dbhub.toml below outside the repository (it holds a password), and change the connection address and the table and column names to yours.\nPress Add, then replace <path>/dbhub.toml in the last line of Arguments with the file's full path.\nLeave “Tools it may use” as get_parameter, add_i18n_key: DBHub's free SQL tool (execute_sql) stays closed.\nAdd your own rules to “What it is for”: what values mean (1 = on, durations in seconds) and how keys are named (screen.part.what).\nAdd the server to the Ask mode too: the automatic choice usually sends “what is X's value?” there.\nTry it: in Ask, “What is MAX_LOGIN_ATTEMPTS?”; in Code, “Add a wrong-password message to the login screen”. The panel shows an mcp__db__… step.",
+	mcpGuideGithub:
+		"GitHub's own MCP server: issues, pull requests and code of your repositories. The X-MCP-Readonly header keeps it read-only.\nOn GitHub: Settings → Developer settings → Personal access tokens → Fine-grained token; give it only the repositories it needs, with read access.\nPress Add, and in Headers replace <GITHUB_TOKEN> with the token.\nTry it: “What does issue #142 ask for?”",
+	mcpGuideGit:
+		"Reads the history of a repository on this computer: log, diffs and commits. Only the reading tools are open.\nInstall uv (docs.astral.sh/uv); uvx comes with it.\nPress Add, and replace <repository folder> in Arguments with the repository's folder.\nTry it: “In which commit did this file last change, and why?”",
+	mcpGuideFilesystem:
+		"Reads files in folders outside the workspace: shared specifications, sample data.\nPress Add, and replace <folder> in Arguments with the folder (one folder a line for several).\nIt can write files too: to keep it to reading, write only its reading tools in “Tools it may use” (ask the assistant to list the files server's tools to see their names).\nTry it: “Write it as the API contract in the shared folder says.”",
+	mcpGuideContext7:
+		"Up-to-date documentation of libraries and frameworks (React, Spring, .NET…), so code follows their current API instead of what the model remembers.\nPress Add; nothing to fill in. For higher limits, add --api-key and your key as two more lines in Arguments.\nTry it: “How do I do this in Spring Boot 3?”",
+	mcpGuidePlaywright:
+		"A browser the assistant drives: it opens your application's pages to check a change or reproduce a bug.\nPress Add. The first run may download a browser.\nTo watch it work, remove --headless from Arguments.\nTry it: “Open the login page; does the error message show?”",
+	mcpGuideSentry:
+		"Your application's errors in production, with their stack traces.\nIn Sentry: User settings → Auth Tokens → create a token with org:read, project:read and event:read.\nPress Add, and in Environment replace <token> with it. For your own Sentry server, set SENTRY_HOST to its address.\nTry it: “What was the most frequent error in the last 24 hours?”",
+	mcpGuideFortify:
+		"OpenText Fortify's fcli serves your security findings (Fortify SSC, or Fortify on Demand) over MCP.\nInstall fcli and log in once in a terminal (below): the assistant cannot log in by itself.\nPress Add. For Fortify on Demand, change --module=ssc to --module=fod.\nNewer fcli versions start it differently: make the Arguments ai, assist, mcp, start, stdio (fcli --help says which your version takes).\nTry it: “What open security findings does this class have? Fix them.”",
+	mcpGuideGraylog:
+		"Searches your logs. Graylog 7.0 and later serve MCP themselves at /api/mcp.\nIn Graylog, make a read-only user and an API token for it: the assistant works with that user's rights.\nTurn the token into the header's value (below).\nPress Add; in Address replace <graylog-host>, and in Headers write Basic and the value.\nIf it answers 401, try user:token instead of <API_TOKEN>:token.\nTry it: “Any errors in the payment service around 14:00 yesterday?”",
+	mcpGuideFetch:
+		"Reads a web page as text.\nInstall uv (docs.astral.sh/uv); uvx comes with it.\nPress Add; nothing to fill in.\nTry it: “Sum up the release notes at this address.”",
+	mcpGuideMemory:
+		"A memory kept between chats: the project's decisions, names and conventions you tell the assistant.\nPress Add, and replace <path> in Environment with a folder: the memory is kept in that file.\nTry it: “From now on we write service names in kebab-case; remember that.”",
+	mcpGuideFigma:
+		"The frame selected in the Figma desktop app, for interface code.\nIn the Figma desktop app: Figma menu → Preferences → Enable Dev Mode MCP Server.\nPress Add; the address is Figma's own.\nSelect a frame in Figma, then try: “Write the selected screen as a component.”",
 	mcpPurpose: "What it is for (the assistant is told)",
 	mcpPurposeHint:
 		"e.g. The project's i18n database. When you add a new i18n key in code, add it here with add_i18n_key (tr and en texts) without being asked.",
@@ -2521,6 +2554,39 @@ const tr: Strings = {
 	mcpPresetMemory: "Sohbetler arasında kalan bir hafıza: projenin kararları, adları ve kuralları.",
 	mcpPresetFigma:
 		"Figma masaüstü uygulamasında seçili frame, arayüz kodu için. Figma'da Dev Mode MCP sunucusunu açın.",
+	mcpGuideOpen: "Nasıl kullanılır?",
+	mcpGuideTitle: "{0}: nasıl kullanılır?",
+	mcpGuideAdd: "Bu sunucuyu ekle",
+	mcpPresetAdd: "Ekle",
+	mcpGuideSteps: "Adımlar",
+	mcpSampleSql: "Veritabanı kullanıcısı (PostgreSQL)",
+	mcpSampleToml: "dbhub.toml",
+	mcpSampleLogin: "Bir kez giriş yapın (terminalde)",
+	mcpSampleBase64: "Authorization başlığının değeri",
+	mcpGuideDbhub:
+		"DBHub veritabanınıza (PostgreSQL, MySQL, SQL Server, MariaDB, SQLite) bağlanır. Burada serbest SQL değil, yalnızca sizin yazdığınız sorgular açılır: asistan SQL yazmaz, sadece değer verir. Tek sunucu hem “bu parametrenin değeri ne?” sorusunu cevaplar hem de kodda yazılan i18n anahtarlarını ekler.\nVeritabanında asistana özel, yalnızca gereken yetkileri olan bir kullanıcı açın (aşağıdaki SQL).\nAşağıdaki dbhub.toml'u reponun dışına kaydedin (içinde şifre var); bağlantı adresini, tablo ve kolon adlarını kendinize göre değiştirin.\nEkle'ye basın; Argümanlar'ın son satırındaki <path>/dbhub.toml'u dosyanın tam yoluyla değiştirin.\n“Kullanabileceği araçlar” get_parameter, add_i18n_key olarak kalsın: DBHub'ın serbest SQL aracı (execute_sql) böylece kapalı kalır.\n“Ne için” metnine kendi kurallarınızı ekleyin: değerlerin anlamı (1 = açık, süreler saniye) ve anahtarların adlandırması (ekran.bölüm.ne).\nSunucuyu Sor moduna da ekleyin: otomatik seçim “X'in değeri ne?” sorularını genellikle oraya gönderir.\nDeneyin: Sor modunda “MAX_LOGIN_ATTEMPTS kaç?”, Kod modunda “Giriş ekranına şifre yanlış mesajı ekle”. Panelde bir mcp__db__… adımı görünür.",
+	mcpGuideGithub:
+		"GitHub'ın kendi MCP sunucusu: depolarınızın issue, pull request ve kodları. X-MCP-Readonly başlığı onu salt okunur tutar.\nGitHub'da: Settings → Developer settings → Personal access tokens → Fine-grained token; yalnızca gereken depolara, okuma izniyle.\nEkle'ye basın; Başlıklar'daki <GITHUB_TOKEN>'ı token ile değiştirin.\nDeneyin: “#142 numaralı issue ne istiyor?”",
+	mcpGuideGit:
+		"Bu bilgisayardaki bir deponun geçmişini okur: log, farklar, commit'ler. Yalnızca okuma araçları açıktır.\nuv'yi kurun (docs.astral.sh/uv); uvx onunla gelir.\nEkle'ye basın; Argümanlar'daki <repository folder>'ı deponun klasörüyle değiştirin.\nDeneyin: “Bu dosya en son hangi commit'te değişti, neden?”",
+	mcpGuideFilesystem:
+		"Çalışma alanı dışındaki klasörlerin dosyalarını okur: ortak dokümanlar, örnek veriler.\nEkle'ye basın; Argümanlar'daki <folder>'ı klasörle değiştirin (birden fazlası için her satıra bir klasör).\nDosya yazabilir de: yalnızca okusun istiyorsanız “Kullanabileceği araçlar”a okuma araçlarını yazın (adlarını görmek için asistana files sunucusunun araçlarını listelemesini söyleyin).\nDeneyin: “Ortak klasördeki API sözleşmesine göre yaz.”",
+	mcpGuideContext7:
+		"Kütüphanelerin ve framework'lerin (React, Spring, .NET…) güncel dokümantasyonu; kod, modelin hatırladığına değil güncel API'ye göre yazılır.\nEkle'ye basın; doldurulacak bir şey yok. Daha yüksek limit için Argümanlar'a iki satır ekleyin: --api-key ve anahtarınız.\nDeneyin: “Spring Boot 3'te bunu nasıl yaparım?”",
+	mcpGuidePlaywright:
+		"Asistanın kullandığı bir tarayıcı: bir değişikliği görmek ya da bir hatayı tekrarlamak için uygulamanızın sayfalarını açar.\nEkle'ye basın. İlk çalışmada bir tarayıcı indirebilir.\nÇalışırken izlemek için Argümanlar'dan --headless'ı silin.\nDeneyin: “Giriş sayfasını aç; hata mesajı görünüyor mu?”",
+	mcpGuideSentry:
+		"Uygulamanızın canlı ortamdaki hataları ve stack trace'leri.\nSentry'de: User settings → Auth Tokens → org:read, project:read ve event:read izinli bir token oluşturun.\nEkle'ye basın; Ortam değişkenleri'ndeki <token>'ı onunla değiştirin. Kendi Sentry sunucunuz varsa SENTRY_HOST'a adresini yazın.\nDeneyin: “Son 24 saatte en sık görülen hata ne?”",
+	mcpGuideFortify:
+		"OpenText Fortify'ın fcli aracı, güvenlik bulgularınızı (Fortify SSC ya da Fortify on Demand) MCP ile sunar.\nfcli'ı kurun ve bir kez terminalde giriş yapın (aşağıda): asistan kendisi giriş yapamaz.\nEkle'ye basın. Fortify on Demand için --module=ssc'yi --module=fod yapın.\nYeni fcli sürümlerinde başlatma komutu farklı: Argümanlar'ı ai, assist, mcp, start, stdio yapın (hangisinin geçerli olduğunu fcli --help söyler).\nDeneyin: “Bu sınıfta hangi açık güvenlik bulguları var? Düzelt.”",
+	mcpGuideGraylog:
+		"Loglarınızda arama yapar. Graylog 7.0 ve sonrası MCP'yi kendisi /api/mcp adresinde sunar.\nGraylog'da salt okunur bir kullanıcı ve ona bir API token'ı oluşturun: asistan o kullanıcının yetkileriyle çalışır.\nToken'ı başlığın değerine çevirin (aşağıda).\nEkle'ye basın; Adres'teki <graylog-host>'u değiştirin, Başlıklar'a Basic ve değeri yazın.\n401 alırsanız <API_TOKEN>:token yerine kullanıcı:token deneyin.\nDeneyin: “Dün 14:00 civarında ödeme servisinde hata var mı?”",
+	mcpGuideFetch:
+		"Bir web sayfasını metin olarak okur.\nuv'yi kurun (docs.astral.sh/uv); uvx onunla gelir.\nEkle'ye basın; doldurulacak bir şey yok.\nDeneyin: “Şu adresteki sürüm notlarını özetle.”",
+	mcpGuideMemory:
+		"Sohbetler arasında kalan bir hafıza: asistana söylediğiniz proje kararları, adlar ve kurallar.\nEkle'ye basın; Ortam değişkenleri'ndeki <path>'i bir klasörle değiştirin: hafıza o dosyada tutulur.\nDeneyin: “Bundan sonra servis adlarını kebab-case yazıyoruz; bunu hatırla.”",
+	mcpGuideFigma:
+		"Figma masaüstü uygulamasında seçili frame, arayüz kodu için.\nFigma masaüstü uygulamasında: Figma menüsü → Preferences → Enable Dev Mode MCP Server.\nEkle'ye basın; adres Figma'nın kendi adresidir.\nFigma'da bir frame seçin ve deneyin: “Seçili ekranı bir bileşen olarak yaz.”",
 	mcpPurpose: "Ne için (asistana söylenir)",
 	mcpPurposeHint:
 		"örn. Projenin i18n veritabanı. Kodda yeni bir i18n anahtarı eklediğinde, sorulmadan add_i18n_key ile buraya da ekle (tr ve en metinleriyle).",

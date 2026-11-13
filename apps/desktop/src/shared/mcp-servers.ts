@@ -22,6 +22,8 @@ export interface McpServer {
 	readonly tools: readonly string[];
 	/** What it is for and when to use it, in the user's words; the model is told. */
 	readonly purpose: string;
+	/** The ready-made server it was added from (its guide is shown with it); empty for none. */
+	readonly preset: string;
 	readonly enabled: boolean;
 }
 
@@ -80,6 +82,7 @@ export function parseMcpServer(raw: unknown): McpServer | null {
 		headers: pairs(server.headers, /^[A-Za-z0-9-]{1,100}$/),
 		tools: list(server.tools, 200, 100),
 		purpose: text(server.purpose, 2000),
+		preset: /^[a-z0-9-]{1,40}$/.test(text(server.preset, 40)) ? text(server.preset, 40) : "",
 		enabled: server.enabled !== false,
 	};
 }
@@ -112,6 +115,7 @@ export function newMcpServer(taken: readonly McpServer[]): McpServer {
 		headers: {},
 		tools: [],
 		purpose: "",
+		preset: "",
 		enabled: true,
 	};
 }

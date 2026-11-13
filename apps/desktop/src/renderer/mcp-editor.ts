@@ -1,4 +1,6 @@
 import type { Strings } from "../shared/i18n.js";
+import { format } from "../shared/i18n.js";
+import type { McpPreset } from "../shared/mcp-presets.js";
 import { MCP_PRESETS, presetServer } from "../shared/mcp-presets.js";
 import type { McpServer } from "../shared/mcp-servers.js";
 import { newMcpServer, RESERVED_SERVER, serverName } from "../shared/mcp-servers.js";
@@ -109,6 +111,8 @@ function pills<T extends string>(
  */
 export function createMcpSection(options: McpSectionOptions): HTMLElement {
 	const { t } = options;
+	const addPreset = (preset: McpPreset): void =>
+		options.change([...options.servers(), presetServer(preset, options.servers())], true);
 
 	function serverCard(server: McpServer, index: number): HTMLElement {
 		// Each change builds on the servers as they are now: fields typed one after another keep each other.
@@ -220,8 +224,24 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 					{ rows: "3", maxlength: "2000", placeholder: t.mcpPurposeHint },
 					true,
 				),
+				...cardGuide(server),
 			],
 		});
+	}
+
+	/** A server added from a ready-made one keeps its guide at hand. */
+	function cardGuide(server: McpServer): HTMLElement[] {
+		const preset = MCP_PRESETS.find((each) => each.id === server.preset);
+		if (preset === undefined) return [];
+		return [
+			el("details", {
+				class: "mcp-card-guide",
+				children: [
+					el("summary", { class: "mcp-guide-summary", text: t.mcpGuideOpen }),
+					guide(preset, false),
+				],
+			}),
+		];
 	}
 
 	const add = el("button", {
@@ -243,40 +263,129 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 		],
 	});
 
-	/** Servers to start from, filled in as they are commonly run: one click adds one. */
+	/**
+	 * How to set a ready-made server up: what it is, the steps, and the files
+	 * and commands to copy; with `offerAdd`, a button that adds it.
+	 */
+	function guide(preset: McpPreset, offerAdd: boolean): HTMLElement {
+		const [intro = "", ...steps] = t[preset.guide].split("\n");
+		const samples = (preset.samples ?? []).map((sample) => {
+			const copy = el("button", {
+				class: "assistant-link mcp-sample-copy",
+				text: t.copy,
+				attrs: { type: "button" },
+			});
+			copy.addEventListener("click", () => {
+				void navigator.clipboard.writeText(sample.text).then(() => {
+					copy.textContent = t.assistantCopied;
+					setTimeout(() => {
+						copy.textContent = t.copy;
+					}, 1500);
+				});
+			});
+			return el("div", {
+				class: "mcp-sample",
+				children: [
+					el("div", {
+						class: "mcp-sample-head",
+						children: [el("span", { class: "mode-label", text: t[sample.title] }), copy],
+					}),
+					el("pre", { class: "mcp-sample-text", text: sample.text }),
+				],
+			});
+		});
+		const children: HTMLElement[] = [
+			el("p", { class: "mcp-guide-intro", text: intro }),
+			el("span", { class: "mode-label", text: t.mcpGuideSteps }),
+			el("ol", {
+				class: "mcp-guide-steps",
+				children: steps.map((step) => el("li", { text: step })),
+			}),
+			...samples,
+		];
+		if (offerAdd) {
+			const add = el("button", {
+				class: "jira-button mcp-guide-add",
+				attrs: { type: "button" },
+				text: t.mcpGuideAdd,
+			});
+			add.addEventListener("click", () => addPreset(preset));
+			children.push(add);
+		}
+		return el("div", {
+			class: "mcp-guide",
+			attrs: { "data-guide": preset.id },
+			children,
+		});
+	}
+
+	/** Servers to start from, filled in as they are commonly run, each with how to set it up. */
 	function presets(): HTMLElement {
+		let open: { id: string; panel: HTMLElement } | null = null;
+		const list = el("div", { class: "mcp-preset-list" });
+		const cards = MCP_PRESETS.map((preset) => {
+			const add = el("button", {
+				class: "mcp-preset-add",
+				attrs: { type: "button", "aria-label": `${t.mcpPresetAdd}: ${preset.label}` },
+				children: [mark("plus", "mode-icon"), t.mcpPresetAdd],
+			});
+			add.addEventListener("click", () => addPreset(preset));
+			const help = el("button", {
+				class: "assistant-link mcp-preset-help",
+				text: t.mcpGuideOpen,
+				attrs: { type: "button", "aria-expanded": "false" },
+			});
+			const card = el("div", {
+				class: "mcp-preset",
+				attrs: { "data-preset": preset.id },
+				children: [
+					el("span", {
+						class: "mcp-preset-head",
+						children: [
+							el("span", { class: "mcp-preset-name", text: preset.label }),
+							el("code", {
+								class: "mcp-preset-kind",
+								text: preset.server.transport === "http" ? "HTTP" : preset.server.command,
+							}),
+						],
+					}),
+					el("span", { class: "mcp-preset-text", text: t[preset.description] }),
+					el("span", { class: "mcp-preset-actions", children: [add, help] }),
+				],
+			});
+			// The guide opens under its card, across the list; one at a time.
+			help.addEventListener("click", () => {
+				const wasOpen = open?.id === preset.id;
+				open?.panel.remove();
+				for (const each of list.querySelectorAll(".mcp-preset-help")) {
+					each.setAttribute("aria-expanded", "false");
+				}
+				open = null;
+				if (wasOpen) return;
+				const panel = el("div", {
+					class: "mcp-guide-panel",
+					children: [
+						el("h5", {
+							class: "mcp-guide-title",
+							text: format(t.mcpGuideTitle, preset.label),
+						}),
+						guide(preset, true),
+					],
+				});
+				card.after(panel);
+				help.setAttribute("aria-expanded", "true");
+				open = { id: preset.id, panel };
+				panel.scrollIntoView({ block: "nearest" });
+			});
+			return card;
+		});
+		list.replaceChildren(...cards);
 		return el("details", {
 			class: "mcp-presets",
 			children: [
 				el("summary", { class: "mcp-presets-summary", text: t.mcpPresets }),
 				el("p", { class: "mode-section-hint", text: t.mcpPresetsHint }),
-				el("div", {
-					class: "mcp-preset-list",
-					children: MCP_PRESETS.map((preset) => {
-						const button = el("button", {
-							class: "mcp-preset",
-							attrs: { type: "button", "data-preset": preset.id },
-							children: [
-								el("span", {
-									class: "mcp-preset-head",
-									children: [
-										mark("plus", "mode-icon"),
-										el("span", { class: "mcp-preset-name", text: preset.label }),
-										el("code", {
-											class: "mcp-preset-kind",
-											text: preset.server.transport === "http" ? "HTTP" : preset.server.command,
-										}),
-									],
-								}),
-								el("span", { class: "mcp-preset-text", text: t[preset.description] }),
-							],
-						});
-						button.addEventListener("click", () =>
-							options.change([...options.servers(), presetServer(preset, options.servers())], true),
-						);
-						return button;
-					}),
-				}),
+				list,
 			],
 		});
 	}

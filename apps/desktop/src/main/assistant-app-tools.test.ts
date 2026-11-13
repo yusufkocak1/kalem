@@ -150,6 +150,7 @@ describe("the assistant's app tools", () => {
 							headers: { Authorization: "Bearer header-secret" },
 							tools: ["search"],
 							purpose: "The team's GitHub.",
+							preset: "github",
 							enabled: true,
 						},
 					],

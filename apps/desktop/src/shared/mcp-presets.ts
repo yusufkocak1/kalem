@@ -13,8 +13,21 @@ export interface McpPreset {
 	readonly label: string;
 	/** What it does and what it needs, in the interface's language. */
 	readonly description: keyof Strings;
+	/**
+	 * How to set it up, in the interface's language: a line on what it is,
+	 * then a step on each line.
+	 */
+	readonly guide: keyof Strings;
+	/** Files and commands to copy while setting it up (not translated: code). */
+	readonly samples?: readonly McpSample[];
 	/** The server as it is added; its name is made unique in the mode. */
-	readonly server: Omit<McpServer, "enabled">;
+	readonly server: Omit<McpServer, "enabled" | "preset">;
+}
+
+export interface McpSample {
+	/** What it is, in the interface's language. */
+	readonly title: keyof Strings;
+	readonly text: string;
 }
 
 const stdio = (
@@ -23,7 +36,7 @@ const stdio = (
 	args: readonly string[],
 	purpose: string,
 	more: { env?: Record<string, string>; tools?: readonly string[] } = {},
-): Omit<McpServer, "enabled"> => ({
+): Omit<McpServer, "enabled" | "preset"> => ({
 	name,
 	transport: "stdio",
 	command,
@@ -40,7 +53,7 @@ const http = (
 	url: string,
 	purpose: string,
 	more: { headers?: Record<string, string>; tools?: readonly string[] } = {},
-): Omit<McpServer, "enabled"> => ({
+): Omit<McpServer, "enabled" | "preset"> => ({
 	name,
 	transport: "http",
 	command: "",
@@ -55,6 +68,17 @@ const http = (
 export const MCP_PRESETS: readonly McpPreset[] = [
 	{
 		id: "dbhub",
+		samples: [
+			{
+				title: "mcpSampleSql",
+				text: "-- PostgreSQL: a user for the assistant, with only what it needs\nCREATE VIEW v_parameter AS\n  SELECT code, value, description FROM parameters;\n\nCREATE USER kalem_assistant WITH PASSWORD 'a-strong-password';\nGRANT SELECT ON v_parameter TO kalem_assistant;\nGRANT SELECT, INSERT ON i18n TO kalem_assistant;  -- no UPDATE, no DELETE",
+			},
+			{
+				title: "mcpSampleToml",
+				text: '[[sources]]\nid  = "main"\ndsn = "postgres://kalem_assistant:a-strong-password@db-host:5432/app?sslmode=require"\n\n# 1) What is this parameter\'s value? (read-only)\n[[tools]]\nname        = "get_parameter"\nsource      = "main"\ndescription = "Returns a parameter\'s value and description. Give its code."\nstatement   = "SELECT code, value, description FROM v_parameter WHERE code = $1"\nreadonly    = true\nmax_rows    = 5\n\n[[tools.parameters]]\nname        = "code"\ntype        = "string"\ndescription = "The parameter\'s code, e.g. MAX_LOGIN_ATTEMPTS"\n\n# 2) Add an i18n key (leaves an existing one as it is)\n[[tools]]\nname        = "add_i18n_key"\nsource      = "main"\ndescription = "Adds an i18n key with its Turkish and English texts; an existing key is left as it is."\nstatement   = "INSERT INTO i18n (key, tr, en) VALUES ($1, $2, $3) ON CONFLICT (key) DO NOTHING"\n\n[[tools.parameters]]\nname        = "key"\ntype        = "string"\ndescription = "The key, e.g. login.error.wrongPassword"\n\n[[tools.parameters]]\nname        = "tr"\ntype        = "string"\ndescription = "Turkish text"\n\n[[tools.parameters]]\nname        = "en"\ntype        = "string"\ndescription = "English text"',
+			},
+		],
+		guide: "mcpGuideDbhub",
 		label: "DBHub",
 		description: "mcpPresetDbhub",
 		server: stdio(
@@ -67,6 +91,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
 	},
 	{
 		id: "github",
+		guide: "mcpGuideGithub",
 		label: "GitHub",
 		description: "mcpPresetGithub",
 		server: http(
@@ -78,6 +103,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
 	},
 	{
 		id: "git",
+		guide: "mcpGuideGit",
 		label: "Git",
 		description: "mcpPresetGit",
 		server: stdio(
@@ -100,6 +126,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
 	},
 	{
 		id: "filesystem",
+		guide: "mcpGuideFilesystem",
 		label: "Filesystem",
 		description: "mcpPresetFilesystem",
 		server: stdio(
@@ -111,6 +138,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
 	},
 	{
 		id: "context7",
+		guide: "mcpGuideContext7",
 		label: "Context7",
 		description: "mcpPresetContext7",
 		server: stdio(
@@ -122,6 +150,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
 	},
 	{
 		id: "playwright",
+		guide: "mcpGuidePlaywright",
 		label: "Playwright",
 		description: "mcpPresetPlaywright",
 		server: stdio(
@@ -133,6 +162,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
 	},
 	{
 		id: "sentry",
+		guide: "mcpGuideSentry",
 		label: "Sentry",
 		description: "mcpPresetSentry",
 		server: stdio(
@@ -145,6 +175,13 @@ export const MCP_PRESETS: readonly McpPreset[] = [
 	},
 	{
 		id: "fortify",
+		samples: [
+			{
+				title: "mcpSampleLogin",
+				text: "fcli ssc session login --url https://ssc.example.com --user <user>\n# Fortify on Demand instead:\n# fcli fod session login --url https://ams.fortify.com --client-id <id> --client-secret <secret>",
+			},
+		],
+		guide: "mcpGuideFortify",
 		label: "Fortify (fcli)",
 		description: "mcpPresetFortify",
 		server: stdio(
@@ -156,6 +193,13 @@ export const MCP_PRESETS: readonly McpPreset[] = [
 	},
 	{
 		id: "graylog",
+		samples: [
+			{
+				title: "mcpSampleBase64",
+				text: '# Linux / macOS\necho -n "<API_TOKEN>:token" | base64\n\n# Windows PowerShell\n[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("<API_TOKEN>:token"))',
+			},
+		],
+		guide: "mcpGuideGraylog",
 		label: "Graylog",
 		description: "mcpPresetGraylog",
 		server: http(
@@ -167,6 +211,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
 	},
 	{
 		id: "fetch",
+		guide: "mcpGuideFetch",
 		label: "Fetch",
 		description: "mcpPresetFetch",
 		server: stdio(
@@ -179,6 +224,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
 	},
 	{
 		id: "memory",
+		guide: "mcpGuideMemory",
 		label: "Memory",
 		description: "mcpPresetMemory",
 		server: stdio(
@@ -191,6 +237,7 @@ export const MCP_PRESETS: readonly McpPreset[] = [
 	},
 	{
 		id: "figma",
+		guide: "mcpGuideFigma",
 		label: "Figma",
 		description: "mcpPresetFigma",
 		server: http(
@@ -206,5 +253,5 @@ export function presetServer(preset: McpPreset, taken: readonly McpServer[]): Mc
 	const names = new Set(taken.map((server) => server.name));
 	let name = preset.server.name;
 	for (let n = 2; names.has(name); n++) name = `${preset.server.name}-${n}`;
-	return { ...preset.server, name, enabled: true };
+	return { ...preset.server, name, preset: preset.id, enabled: true };
 }

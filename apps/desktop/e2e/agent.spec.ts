@@ -689,13 +689,29 @@ test("one of Kalem's modes takes an MCP server too, and the model is told what i
 		.fill("When you add an i18n key in code, add it to the database with add_i18n_key.");
 	// One of the ready-made servers, filled in.
 	await settings.locator(".mcp-presets summary").click();
-	await settings.locator('.mcp-preset[data-preset="context7"]').click();
+	// Its guide first: what it is, the steps, and the files to copy.
+	await settings.locator('.mcp-preset[data-preset="dbhub"] .mcp-preset-help').click();
+	const guide = settings.locator('.mcp-guide-panel [data-guide="dbhub"]');
+	await expect(guide).toContainText("DBHub connects to your database");
+	await expect(guide.locator(".mcp-guide-steps li").first()).toContainText("make a user");
+	await expect(guide.locator(".mcp-sample-text")).toHaveCount(2);
+	await expect(guide.locator(".mcp-sample-text").last()).toContainText(
+		'name        = "get_parameter"',
+	);
+	// Closed again by the same button.
+	await settings.locator('.mcp-preset[data-preset="dbhub"] .mcp-preset-help').click();
+	await expect(settings.locator(".mcp-guide-panel")).toHaveCount(0);
+	await settings.locator('.mcp-preset[data-preset="context7"] .mcp-preset-add').click();
 	await expect(settings.locator(".mcp-card")).toHaveCount(2);
 	await expect(
 		settings
 			.locator('.mcp-card[data-server="context7"]')
 			.getByRole("textbox", { name: "Arguments (one a line)" }),
 	).toHaveValue("-y\n@upstash/context7-mcp@latest");
+	// Added from a ready-made server, it keeps its guide.
+	const kept = settings.locator('.mcp-card[data-server="context7"] .mcp-card-guide');
+	await kept.locator("summary").click();
+	await expect(kept).toContainText("Up-to-date documentation");
 	await settings.locator(".mode-preview summary").click();
 	await expect(settings.locator(".mode-preview-text")).toContainText(
 		"- i18n-db (tools: add_i18n_key): When you add an i18n key in code",
