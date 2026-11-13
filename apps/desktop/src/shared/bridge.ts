@@ -25,6 +25,7 @@ import type { IssueLayout } from "./jira-layout.js";
 import { DEFAULT_ISSUE_LAYOUT } from "./jira-layout.js";
 import type { WorklogContext, WorklogEntry } from "./jira-worklog.js";
 import type { LocalNote } from "./local-notes.js";
+import type { McpServer, McpToolList } from "./mcp-servers.js";
 import type { ModeSettings } from "./mode-config.js";
 import type { ModelOption } from "./models.js";
 import type { PaletteChoice, PaletteTheme } from "./palette.js";
@@ -1053,6 +1054,8 @@ export interface KalemBridge {
 	assistantCompact(sessionId: string): Promise<"done" | "cli" | "none">;
 	/** Claude Code's own slash commands on this computer: the user's, the folders', the plugins'. */
 	assistantCliCommands(folders: readonly string[]): Promise<readonly CliCommandInfo[]>;
+	/** Starts a mode's MCP server and asks it which tools it has. */
+	mcpListTools(server: McpServer): Promise<McpToolList>;
 	onAssistantApproval(handler: (request: ApprovalRequest) => void): () => void;
 	/** The user's own notes on a document (see `local-notes.ts`), by its key. */
 	localNotes(key: string): Promise<readonly LocalNote[]>;
@@ -1227,4 +1230,5 @@ export const CHANNEL = {
 	assistantForgetPermissions: "kalem:assistant-forget-permissions",
 	assistantCompact: "kalem:assistant-compact",
 	assistantCliCommands: "kalem:assistant-cli-commands",
+	mcpListTools: "kalem:mcp-list-tools",
 } as const;

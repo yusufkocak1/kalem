@@ -2,6 +2,7 @@ import type { Settings } from "../shared/bridge.js";
 import { newCustomMode } from "../shared/custom-modes.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
+import type { McpServer, McpToolList } from "../shared/mcp-servers.js";
 import type { Mode, ResolvedMode, ResolvedStep } from "../shared/mode-config.js";
 import {
 	DETAILS,
@@ -38,6 +39,8 @@ export interface ModeEditorOptions {
 	update(patch: Partial<Settings>): void;
 	/** Kalem's tools, for choosing a mode's of the user's. */
 	toolCatalog(): Promise<readonly ToolInfo[]>;
+	/** Starts an MCP server and asks it which tools it has. */
+	mcpListTools(server: McpServer): Promise<McpToolList>;
 }
 
 /** An icon with a class of its own. */
@@ -193,6 +196,7 @@ export function createModeEditor(options: ModeEditorOptions): {
 				t,
 				mode: own,
 				catalog,
+				mcpListTools: options.mcpListTools,
 				save(next) {
 					const all = options.settings().assistantCustomModes;
 					if (next === null) {
@@ -601,6 +605,7 @@ export function createModeEditor(options: ModeEditorOptions): {
 				t,
 				servers: () => mode.mcp,
 				change: (mcp, redraw) => change({ mcp }, redraw),
+				listTools: options.mcpListTools,
 			}),
 			el("details", {
 				class: "mode-preview",

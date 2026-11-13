@@ -564,6 +564,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		settings: options.settings,
 		update: options.update,
 		toolCatalog: () => bridge.assistantToolCatalog(),
+		mcpListTools: (server) => bridge.mcpListTools(server),
 	});
 	item(
 		"modes",

@@ -10509,6 +10509,71 @@ h3.mode-panel-name {
 	margin-left: auto;
 }
 
+.mcp-tools-label {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 10px;
+}
+
+.mcp-tools-status {
+	color: var(--app-muted);
+	font-size: 12px;
+	white-space: pre-wrap;
+}
+
+.mcp-tools-status:empty {
+	display: none;
+}
+
+.mcp-tools-status[data-error] {
+	color: var(--app-error);
+}
+
+.mcp-tools-list {
+	display: grid;
+	gap: 6px;
+	max-height: 320px;
+	overflow-y: auto;
+}
+
+.mcp-tools-list:empty {
+	display: none;
+}
+
+.mcp-tools-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+}
+
+.mcp-tool {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+}
+
+.mcp-tool[data-off] .mcp-tool-text {
+	opacity: 0.6;
+}
+
+.mcp-tool-text {
+	display: grid;
+	gap: 2px;
+	min-width: 0;
+}
+
+.mcp-tool-name {
+	font-size: 12px;
+}
+
+.mcp-tool-description {
+	color: var(--app-muted);
+	font-size: 12px;
+	overflow-wrap: anywhere;
+}
+
 .mcp-presets {
 	display: grid;
 	gap: 8px;
