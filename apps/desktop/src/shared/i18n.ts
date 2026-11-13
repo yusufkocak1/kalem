@@ -1033,6 +1033,9 @@ const en = {
 	changesReadOnly: "The document is read only: changes cannot be undone here.",
 	changesCommand: "Confluence Changes…",
 	notesTitle: "My Notes",
+	notesOpen: "Open",
+	notesEmptyHint:
+		"No notes yet. Select words in the text and press Ctrl+Alt+M (or New Note) to leave yourself one: “I did not get this”, “careful”, “look later”…",
 	notesPrivate: "Only on this computer — never saved into the document or Confluence.",
 	notesHide: "Hide my notes",
 	notesShowResolved: "Resolved ({0})",
@@ -1061,7 +1064,7 @@ const en = {
 	noteLost: "Its words are gone: “{0}”",
 	tabReview: "Review",
 	groupNotes: "My Notes",
-	localNotes: "Show my notes",
+	localNotes: "Tint my notes’ words in the text",
 	restoreSession: "Continue where I left off: reopen my tabs, unsaved text included",
 	changesNotPage:
 		"This tab is not a Confluence page: open one from the Confluence pane to see its changes.",
@@ -2433,6 +2436,9 @@ const tr: Strings = {
 	changesReadOnly: "Belge salt okunur: değişiklikler burada geri alınamaz.",
 	changesCommand: "Confluence Değişiklikleri…",
 	notesTitle: "Notlarım",
+	notesOpen: "Açık",
+	notesEmptyHint:
+		"Henüz not yok. Metinde sözcükleri seçip Ctrl+Alt+M’ye (ya da Yeni Not’a) basarak kendinize not bırakın: “anlamadım”, “dikkat”, “sonra bak”…",
 	notesPrivate: "Yalnızca bu bilgisayarda — belgeye ya da Confluence'a hiç yazılmaz.",
 	notesHide: "Notlarımı gizle",
 	notesShowResolved: "Çözülenler ({0})",
@@ -2461,7 +2467,7 @@ const tr: Strings = {
 	noteLost: "Sözcükleri artık yok: “{0}”",
 	tabReview: "Gözden Geçir",
 	groupNotes: "Notlarım",
-	localNotes: "Notlarımı göster",
+	localNotes: "Notlarımın sözcüklerini metinde boya",
 	restoreSession: "Kaldığım yerden devam et: sekmelerim, kaydedilmemiş metin de, yeniden açılsın",
 	changesNotPage:
 		"Bu sekme bir Confluence sayfası değil: değişikliklerini görmek için Confluence panelinden bir sayfa açın.",

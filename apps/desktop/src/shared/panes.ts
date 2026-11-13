@@ -7,7 +7,7 @@
  */
 import type { Settings } from "./bridge.js";
 
-export const TOOL_PANES = ["outline", "files", "confluence", "jira"] as const;
+export const TOOL_PANES = ["outline", "files", "confluence", "jira", "notes"] as const;
 export type ToolPane = (typeof TOOL_PANES)[number];
 
 export const DOCKS = ["left", "right", "bottom"] as const;
@@ -23,7 +23,17 @@ export const DEFAULT_PANE_PLACES: PanePlaces = {
 	files: "left",
 	confluence: "left",
 	jira: "left",
+	// The user's own notes sit beside the page, as Word's comments do.
+	notes: "right",
 };
+
+/**
+ * Where a pane can go. The notes are cards read beside the text, one under
+ * the other: a short, wide strip under the page has no room for them.
+ */
+export function placesFor(pane: ToolPane): readonly PanePlace[] {
+	return pane === "notes" ? PANE_PLACES.filter((place) => place !== "bottom") : PANE_PLACES;
+}
 
 export const isToolPane = (value: unknown): value is ToolPane =>
 	TOOL_PANES.includes(value as ToolPane);
@@ -33,7 +43,7 @@ export function parsePanePlaces(value: unknown): PanePlaces {
 	const places = { ...DEFAULT_PANE_PLACES };
 	for (const pane of TOOL_PANES) {
 		const place = raw[pane];
-		if (PANE_PLACES.includes(place as PanePlace)) places[pane] = place as PanePlace;
+		if (placesFor(pane).includes(place as PanePlace)) places[pane] = place as PanePlace;
 	}
 	return places;
 }
@@ -115,10 +125,10 @@ export function isPaneShown(
 	return dockState(settings, place).open && shownPane(settings, place, available) === pane;
 }
 
-/** The settings that bring a pane into view; a hidden one goes to the left dock. */
+/** The settings that bring a pane into view; a hidden one goes to the left dock (the notes to the right). */
 export function revealPane(settings: Settings, pane: ToolPane): Partial<Settings> {
 	const place = settings.panePlaces[pane];
-	const dock: Dock = place === "hidden" ? "left" : place;
+	const dock: Dock = place === "hidden" ? (pane === "notes" ? "right" : "left") : place;
 	return {
 		...(place === "hidden" ? { panePlaces: { ...settings.panePlaces, [pane]: dock } } : {}),
 		...dockPatch(dock, { open: true, pane }),
@@ -127,6 +137,7 @@ export function revealPane(settings: Settings, pane: ToolPane): Partial<Settings
 
 /** The settings that move a pane to another dock, or hide it; a moved pane is shown there. */
 export function movePane(settings: Settings, pane: ToolPane, place: PanePlace): Partial<Settings> {
+	if (!placesFor(pane).includes(place)) return {};
 	const panePlaces = { ...settings.panePlaces, [pane]: place };
 	if (place === "hidden") return { panePlaces };
 	return { panePlaces, ...dockPatch(place, { open: true, pane }) };

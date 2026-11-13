@@ -262,6 +262,14 @@ button {
 	outline-offset: 2px;
 }
 
+/* A narrow window: the buttons keep their marks and lose their words, so the ribbon's head fits. */
+@media (max-width: 780px) {
+	.ribbon-publish > span,
+	.ribbon-changes > span {
+		display: none;
+	}
+}
+
 .ribbon-publish-mark {
 	width: 15px;
 	height: 15px;
@@ -874,17 +882,23 @@ button {
 
 .assistant-title {
 	display: flex;
+	flex: 1 1 auto;
 	align-items: center;
 	gap: 6px;
 	min-width: 0;
+	overflow: hidden;
 	color: var(--app-accent);
 }
 
 .assistant-title h2 {
 	margin: 0;
+	/* A narrow pane: the name is cut short, not run under the buttons. */
+	overflow: hidden;
 	color: var(--app-text);
 	font-size: 13px;
 	font-weight: 600;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .assistant-subtitle {
@@ -2314,6 +2328,8 @@ button {
 	flex: 1;
 	flex-direction: column;
 	min-height: 0;
+	/* Whatever does not fit scrolls inside the pane; nothing runs over the status bar. */
+	overflow: hidden;
 }
 
 .files-pane[hidden],
@@ -3478,6 +3494,8 @@ button {
 	min-width: 0;
 	padding: 28px 28px 72px;
 	overflow: auto;
+	/* The reading place is kept by `keepReadingPlace` (main.ts); the browser's own anchoring would fight it. */
+	overflow-anchor: none;
 }
 
 /* Everything on the page is sized in em, so zoom is a single font-size. */
@@ -4681,53 +4699,32 @@ button {
 	background-color: color-mix(in srgb, var(--note-note) 32%, transparent);
 }
 
-/* The margin for the balloons is on the right of the page. */
-.desk[data-notes] {
-	padding-right: 312px;
-}
-
-.desk[data-notes] .page {
-	position: relative;
-}
-
-/* A full-width page leaves the margin its room too: no sideways scroll. */
-.app[data-full-width] .desk[data-notes] {
-	padding-right: 300px;
-}
-
-.app[data-full-width] .desk[data-notes] .notes-column {
-	left: calc(100% + 16px);
-}
-
-.notes-column {
-	position: absolute;
-	top: 0;
-	left: calc(100% + 28px);
-	width: 268px;
+/* The My Notes pane: cards in the order of the page. */
+.notes-pane {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: 8px;
+	min-height: 0;
+	padding: 8px 10px 12px;
+	overflow-y: auto;
 	color: var(--app-text);
-	font-family: var(--app-font, system-ui, sans-serif);
 	font-size: 13px;
 	line-height: 1.4;
 }
 
 .notes-head {
-	display: grid;
-	grid-template-columns: 1fr auto;
-	gap: 2px 8px;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 8px;
 	align-items: center;
-	padding: 2px 2px 0;
+	justify-content: space-between;
 }
 
 .notes-head-title {
 	display: flex;
 	align-items: center;
 	gap: 6px;
-}
-
-.notes-head-title .icon {
-	width: 16px;
-	height: 16px;
-	color: var(--app-accent);
 }
 
 .notes-count {
@@ -4741,26 +4738,41 @@ button {
 	text-align: center;
 }
 
+.notes-count:empty {
+	display: none;
+}
+
 .notes-head-actions {
 	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
 	gap: 4px;
 }
 
 .notes-head-button {
 	display: inline-flex;
 	align-items: center;
-	padding: 2px 6px;
-	border: 0;
-	border-radius: 5px;
+	gap: 4px;
+	padding: 3px 8px;
+	border: 1px solid transparent;
+	border-radius: 6px;
 	background: transparent;
 	color: var(--app-muted);
 	font: inherit;
 	font-size: 12px;
+	white-space: nowrap;
 }
 
 .notes-head-button:hover {
 	background: var(--app-hover);
 	color: var(--app-text);
+}
+
+.notes-head-button.notes-new {
+	border-color: var(--app-border);
+	background: var(--app-raised);
+	color: var(--app-accent);
+	font-weight: 600;
 }
 
 .notes-head-button[hidden] {
@@ -4773,14 +4785,16 @@ button {
 }
 
 .notes-private {
-	grid-column: 1 / -1;
+	flex-basis: 100%;
 	margin: 0;
 	color: var(--app-muted);
 	font-size: 11px;
 }
 
 .notes-list {
-	position: relative;
+	display: grid;
+	gap: 8px;
+	align-content: start;
 }
 
 .notes-empty {
@@ -4791,10 +4805,6 @@ button {
 
 .note-balloon {
 	--kind: var(--note-note);
-	position: absolute;
-	top: 0;
-	right: 0;
-	left: 0;
 	box-sizing: border-box;
 	padding: 7px 10px 6px;
 	border: 1px solid var(--app-border);
@@ -4802,28 +4812,7 @@ button {
 	border-radius: 8px;
 	background: var(--app-raised);
 	box-shadow: var(--app-shadow-soft);
-	/* Placed by `top`, not a transform: the browser keeps a text box's caret in view by its laid-out place. */
-	transition:
-		top 160ms var(--app-ease),
-		box-shadow 160ms var(--app-ease);
 	cursor: default;
-}
-
-/* The balloon's tail, pointing at the text. */
-.note-balloon:not([data-placed]) {
-	transition: none;
-}
-
-.note-balloon::before {
-	content: "";
-	position: absolute;
-	top: 12px;
-	left: -9px;
-	width: 0;
-	height: 0;
-	border-top: 6px solid transparent;
-	border-bottom: 6px solid transparent;
-	border-right: 6px solid var(--kind);
 }
 
 .note-balloon.kind-question {
@@ -4839,11 +4828,10 @@ button {
 }
 
 .note-balloon.active {
-	z-index: 1;
 	border-color: color-mix(in srgb, var(--kind) 55%, var(--app-border));
 	box-shadow:
 		0 0 0 3px color-mix(in srgb, var(--kind) 14%, transparent),
-		var(--app-shadow);
+		var(--app-shadow-soft);
 }
 
 .note-balloon.resolved {
@@ -4853,10 +4841,6 @@ button {
 .note-balloon.lost {
 	border-style: dashed;
 	border-inline-start-style: solid;
-}
-
-.note-balloon.lost::before {
-	display: none;
 }
 
 .note-head {
@@ -5006,41 +4990,6 @@ button {
 
 .note-balloon.resolved .note-text {
 	text-decoration: line-through;
-}
-
-/* From the active note's words to its balloon. */
-.notes-connector {
-	position: absolute;
-	top: 0;
-	left: 0;
-	overflow: visible;
-	pointer-events: none;
-}
-
-.notes-connector polyline {
-	fill: none;
-	stroke: var(--note-note);
-	stroke-width: 1.2;
-	stroke-dasharray: 3 3;
-}
-
-.notes-connector[data-kind="question"] polyline {
-	stroke: var(--note-question);
-}
-
-.notes-connector[data-kind="attention"] polyline {
-	stroke: var(--note-attention);
-}
-
-.notes-connector[data-kind="later"] polyline {
-	stroke: var(--note-later);
-}
-
-@media print {
-	.notes-column,
-	.notes-connector {
-		display: none;
-	}
 }
 
 /* --- Confluence changes: a page's diff (see changes-dialog.ts) ------------- */
@@ -5671,9 +5620,26 @@ pre[data-preview="error"]::after {
 
 .confluence-search-area {
 	display: flex;
+	/* A short pane: the open filters scroll in their box; they do not push the results out of the pane. */
+	flex: 0 1 auto;
 	flex-direction: column;
 	gap: 6px;
+	min-height: 0;
 	margin: 0 8px 6px;
+}
+
+.confluence-search-area > * {
+	flex: none;
+}
+
+.confluence-search-area > .confluence-filters {
+	flex: 0 1 auto;
+	min-height: 64px;
+	overflow-y: auto;
+}
+
+.confluence-pane > .confluence-pane-list {
+	min-height: 84px;
 }
 
 .confluence-search-area[hidden],
@@ -6839,6 +6805,28 @@ pre[data-confluence-kind="layout"]::before {
 	border-left: 1px solid var(--app-border);
 }
 
+/*
+ * A narrow window: the side panes give way before the document does. Each
+ * keeps its width while there is room; when there is not, they shrink
+ * (down to a usable minimum) so the page keeps a readable column.
+ */
+.tool-dock.dock-left,
+.tool-dock.dock-right,
+.assistant:not([data-place="bottom"]) {
+	flex: 0 1 auto;
+	min-width: 150px;
+}
+
+.desk-column {
+	min-width: min(360px, 45vw);
+}
+
+/* Squeezed out by a window too narrow for them (`fitSidePanes` in main.ts); their stripe buttons stay. */
+.app[data-squeeze~="left"] .tool-dock.dock-left,
+.app[data-squeeze~="right"] .tool-dock.dock-right {
+	display: none;
+}
+
 .tool-dock.dock-bottom {
 	height: 240px;
 	border-top: 1px solid var(--app-border);
@@ -7547,6 +7535,7 @@ details.jira-section > .jira-list {
 	gap: 4px;
 	min-height: 0;
 	padding: 2px;
+	overflow-x: hidden;
 	overflow-y: auto;
 }
 
@@ -7597,8 +7586,11 @@ details.jira-section > .jira-list {
 
 .jira-pane-row-head {
 	display: flex;
+	/* A narrow pane: the status (and a note of work logged) go under the key, not out of the card. */
+	flex-wrap: wrap;
 	align-items: center;
-	gap: 6px;
+	gap: 3px 6px;
+	min-width: 0;
 	min-height: 18px;
 }
 
