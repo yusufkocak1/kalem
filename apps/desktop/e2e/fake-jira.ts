@@ -47,6 +47,7 @@ export async function fakeJira() {
 	let serviceListAsked = 0;
 	/** The fake's own address, known once it listens. */
 	const base = { site: "" };
+	const jiraSite = (): string => base.site;
 	/** The status changes Jira was sent, and QR-1's status after them. */
 	const transitions: Record<string, unknown>[] = [];
 	let status = { name: "In Progress", category: "indeterminate" };
@@ -219,8 +220,28 @@ export async function fakeJira() {
 					labels: ["oturum"],
 					subtasks: [issue("QR-2", "Süreyi ayarla", "Done", "done")],
 					comment: {
-						total: 1,
-						comments: [{ author: { displayName: "Can" }, body: "Bende de oluyor." }],
+						total: 3,
+						comments: [
+							{
+								author: { name: "gulden", displayName: "GULDEN BAYKARA - Quickres Analist Takimi" },
+								created: "2026-10-07T11:56:00.000+0300",
+								body: `<p>Merhaba <a href="${jiraSite()}/secure/ViewProfile.jspa?name=isil.sen" class="user-hover" rel="isil.sen">ISIL SEN (Gelir Yonetimi Bsk. (Dogrudan Dagitim Kanallari Md.) - Bassorumlu)</a> ,</p><p>&nbsp;</p><p>Analizi tamamladım. Kontrol edebilir misiniz?</p><p><br></p><p>Teşekkürler.</p><p>&nbsp;</p><p>&nbsp;</p>`,
+							},
+							{
+								author: {
+									name: "isil.sen",
+									displayName:
+										"ISIL SEN (Gelir Yonetimi Bsk. (Dogrudan Dagitim Kanallari Md.) - Bassorumlu)",
+								},
+								created: "2026-10-08T07:47:00.000+0300",
+								body: "<p>Uygundur</p><p>&nbsp;</p>",
+							},
+							{
+								author: { name: "can", displayName: "Can" },
+								created: "2026-11-09T17:45:00.000+0300",
+								body: "Bende de oluyor.",
+							},
+						],
 					},
 				},
 			});

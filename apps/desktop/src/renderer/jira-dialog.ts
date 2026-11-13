@@ -12,10 +12,11 @@ import type {
 	StatusCategory,
 } from "../shared/jira.js";
 import { issueKey, issueKeyFromUrl, normalizeJiraSite } from "../shared/jira.js";
-import { formatDuration } from "../shared/jira-worklog.js";
+import { formatDurationShort, timeBar } from "../shared/jira-comments.js";
 import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
+import { commentView, personMark } from "./jira-comment-view.js";
 import { createDevelopmentSection, createStatusControl } from "./jira-development.js";
 import { jiraHtmlRoot } from "./jira-html.js";
 import { createWorklogForm } from "./jira-worklog.js";
@@ -401,21 +402,7 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 			sections.push(
 				fold(
 					title,
-					issue.comments.map((comment) =>
-						el("article", {
-							class: "jira-comment",
-							children: [
-								el("div", {
-									class: "jira-comment-head",
-									children: [
-										el("strong", { text: comment.author }),
-										el("span", { text: when(comment.created, true) }),
-									],
-								}),
-								richText(comment.body, comment.html),
-							],
-						}),
-					),
+					issue.comments.map((comment) => commentView(comment, { lang: options.lang, richText })),
 				),
 			);
 		}
@@ -560,29 +547,26 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 		] as const) {
 			if (value !== null) facts.push(fact(label, when(value)));
 		}
-		const { spent, remaining } = issue.time;
-		if (spent !== null || remaining !== null) {
-			const used = spent ?? 0;
-			const left = remaining ?? 0;
-			const bar = el("progress", {
-				class: "jira-time-bar",
-				attrs: { max: String(Math.max(1, used + left)), value: String(used) },
-			});
+		const { spent, remaining, estimate } = issue.time;
+		if (spent !== null && spent > 0) {
+			const duration = (seconds: number): string =>
+				formatDurationShort(seconds, t.jiraHourUnit, t.jiraMinuteUnit);
+			const range = timeBar(spent, remaining, estimate);
+			const text = [duration(spent)];
+			if (remaining !== null && remaining > 0) {
+				text.push(format(t.jiraTimeLeft, duration(remaining)));
+			}
 			facts.push(
 				fact(
 					t.jiraTimeTracking,
 					el("span", {
 						class: "jira-time",
 						children: [
-							bar,
-							el("span", {
-								class: "jira-time-text",
-								text: format(
-									t.jiraWorkSpent,
-									formatDuration(used),
-									remaining === null ? "—" : formatDuration(left),
-								),
+							el("progress", {
+								class: "jira-time-bar",
+								attrs: { max: String(range.max), value: String(range.value) },
 							}),
+							el("span", { class: "jira-time-text", text: text.join(" · ") }),
 						],
 					}),
 					true,
@@ -889,21 +873,4 @@ function priorityLevel(name: string): string {
 	if (/lowest|trivial|en düşük/i.test(name)) return "lowest";
 	if (/low|minor|düşük/i.test(name)) return "low";
 	return "medium";
-}
-
-/**
- * A person's initials on a colour of their own; drawn from its attribute,
- * so the name beside it is the only text the row reads as.
- */
-function personMark(name: string): HTMLElement {
-	const words = name.trim().split(/\s+/).filter(Boolean);
-	const initials = [words[0], words.length > 1 ? words.at(-1) : undefined]
-		.map((word) => (word === undefined ? "" : (Array.from(word)[0] ?? "")))
-		.join("");
-	let hash = 0;
-	for (const char of name) hash = (hash * 31 + (char.codePointAt(0) ?? 0)) >>> 0;
-	return el("span", {
-		class: "jira-avatar jira-avatar-mark",
-		attrs: { "aria-hidden": "true", "data-initials": initials, "data-tone": String(hash % 8) },
-	});
 }

@@ -5,6 +5,8 @@
  * words become. Pure: the main process asks the server.
  */
 import { wikiToMarkdown } from "./confluence-wiki.js";
+import type { JiraMention } from "./jira-comments.js";
+import { mentionsOf } from "./jira-comments.js";
 
 /** Jira's three kinds of status, which give a status its colour. */
 export type StatusCategory = "new" | "indeterminate" | "done" | "";
@@ -31,11 +33,13 @@ export interface JiraIssueRow extends JiraIssueRef {
 
 export interface JiraComment {
 	readonly author: string;
+	readonly authorId: string;
 	readonly created: string | null;
 	/** As Markdown (for HTML, its text). */
 	readonly body: string;
 	/** The comment as HTML, when Jira keeps it so (an HTML editor plug-in); `null` for wiki markup. */
 	readonly html: string | null;
+	readonly mentions: readonly JiraMention[];
 }
 
 /** A link to something outside Jira: a Confluence page that mentions the issue, a web page. */
@@ -473,12 +477,19 @@ export function issueOf(raw: unknown, site: string): JiraIssue | null {
 		comments: comments.slice(-MAX_COMMENTS).map((item, index) => {
 			const entry = asJson(item);
 			const at = comments.length - Math.min(MAX_COMMENTS, comments.length) + index;
-			const body = textField(entry.body, asJson(renderedComments[at]).body);
+			const renderedBody = asJson(renderedComments[at]).body;
+			const body = textField(entry.body, renderedBody);
+			const author = asJson(entry.author);
 			return {
 				author: nameOf(entry.author),
+				authorId: asString(author.accountId) || asString(author.name) || asString(author.key),
 				created: date(entry.created),
 				body: body.text,
 				html: body.html,
+				mentions: mentionsOf(
+					typeof renderedBody === "string" ? renderedBody : null,
+					asString(entry.body),
+				),
 			};
 		}),
 		commentTotal: typeof comment.total === "number" ? comment.total : comments.length,

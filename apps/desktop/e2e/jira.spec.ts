@@ -62,7 +62,7 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await expect(jira.locator(".jira-title")).toHaveText("Giriş zaman aşımı");
 	await expect(jira.locator(".jira-issue-head .jira-status")).toHaveText("In Progress");
 	await expect(jira.locator(".jira-fields")).toContainText("AssigneeAyşe Balcı");
-	await expect(jira.locator(".jira-fields")).toContainText("Spent 12h · Remaining 8h");
+	await expect(jira.locator(".jira-fields")).toContainText("12h · 8h left");
 	// The description kept as HTML is drawn as a page, not shown as code: the panel is an alert.
 	const description = jira.locator(".jira-markdown").first();
 	await expect(description.locator("blockquote")).toContainText(
@@ -74,7 +74,14 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	// Links are grouped by how they relate; a Confluence page that mentions it is among them.
 	const mentioned = jira.locator(".jira-link-group", { hasText: "mentioned in" });
 	await expect(mentioned.locator(".jira-remote")).toHaveText("Sprint Planı");
-	await expect(jira.locator(".jira-comment")).toContainText("Bende de oluyor.");
+	const comments = jira.locator(".jira-comment");
+	await expect(comments.nth(0).locator(".jira-comment-author")).toHaveText("Gulden Baykara");
+	await expect(comments.nth(0).locator(".jira-team-badge")).toHaveText("Quickres Analist Takimi");
+	await expect(comments.nth(0).locator(".jira-mention")).toHaveText("@Isil Sen");
+	await expect(comments.nth(0).locator(".jira-markdown p")).toHaveCount(3);
+	await expect(comments.nth(1)).toHaveClass(/jira-comment-short/);
+	await expect(comments.nth(1).locator(".jira-team-badge")).toHaveText("Gelir Yonetimi Bsk.");
+	await expect(comments.nth(2)).toContainText("Bende de oluyor.");
 	// The Development panel: branches, commits and pull requests, each opening into its list.
 	const development = jira.locator(".jira-dev-section");
 	await expect(development.locator(".jira-dev-count")).toHaveText([
