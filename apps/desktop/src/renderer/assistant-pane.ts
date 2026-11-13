@@ -53,6 +53,7 @@ import type { ProviderId } from "../shared/providers.js";
 import { isCli, PROVIDER_INFO, providerLabel, SUGGESTED_MODELS } from "../shared/providers.js";
 import type { SlashEntry } from "../shared/slash.js";
 import { findSlash, matchSlash, slashQuery } from "../shared/slash.js";
+import type { TemplateInfo } from "../shared/templates.js";
 import type { ApprovalRequest } from "../shared/tool-protocol.js";
 import { withoutToolCalls } from "../shared/tool-protocol.js";
 import type { ApprovalState, ChecksView, MadeChange, Usage } from "./assistant-agent.js";
@@ -73,6 +74,7 @@ import { icon } from "./icons.js";
 import { MODE_ICONS } from "./mode-settings.js";
 import type { Previews } from "./previews.js";
 import type { DocumentImage } from "./prompt-images.js";
+import { sourceLabel } from "./template-picker.js";
 
 /** What the assistant knows of the active document when a question is sent. */
 export interface AssistantContext {
@@ -365,6 +367,112 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	});
 	const sourceList = el("div", { class: "assistant-sources", attrs: { hidden: "" } });
 
+	// --- The document template the questions are asked by, whatever the mode ---
+
+	/** The document template picked in the composer; `null` for none. */
+	let pickedTemplate: { id: string; name: string } | null = null;
+	try {
+		const kept = JSON.parse(localStorage.getItem("kalem.assistant.template") ?? "null") as unknown;
+		if (
+			typeof kept === "object" &&
+			kept !== null &&
+			typeof (kept as { id?: unknown }).id === "string" &&
+			typeof (kept as { name?: unknown }).name === "string"
+		)
+			pickedTemplate = kept as { id: string; name: string };
+	} catch {
+		// Storage may be unavailable: no template is picked.
+	}
+	const templateList = el("div", {
+		class: "assistant-sources assistant-template",
+		attrs: { hidden: "" },
+	});
+
+	function setTemplate(next: { id: string; name: string } | null): void {
+		pickedTemplate = next;
+		try {
+			if (next === null) localStorage.removeItem("kalem.assistant.template");
+			else localStorage.setItem("kalem.assistant.template", JSON.stringify(next));
+		} catch {
+			// Kept for this run only.
+		}
+		renderTemplate();
+	}
+
+	function renderTemplate(): void {
+		templateList.hidden = pickedTemplate === null;
+		if (pickedTemplate === null) {
+			templateList.replaceChildren();
+			return;
+		}
+		const { name } = pickedTemplate;
+		const remove = el("button", {
+			class: "assistant-chip-close",
+			attrs: {
+				type: "button",
+				title: format(t.assistantRemoveTemplate, name),
+				"aria-label": format(t.assistantRemoveTemplate, name),
+			},
+			children: [icon("close")],
+		});
+		remove.addEventListener("click", () => {
+			setTemplate(null);
+			input.focus();
+		});
+		templateList.replaceChildren(
+			el("span", {
+				class: "assistant-chip assistant-template-chip",
+				attrs: { title: format(t.assistantTemplateChip, name), "data-template": pickedTemplate.id },
+				children: [
+					icon("file"),
+					el("span", { class: "assistant-chip-text", text: format(t.assistantTemplateChip, name) }),
+					remove,
+				],
+			}),
+		);
+	}
+
+	/** The add menu turned into the list of document templates to pick from. */
+	async function showTemplateMenu(): Promise<void> {
+		let templates: readonly TemplateInfo[] = [];
+		try {
+			templates = await bridge.templates();
+		} catch (error) {
+			showNotice(format(t.assistantActionFailed, host.errorText(error)));
+			return;
+		}
+		addMenu.replaceChildren(
+			el("div", { class: "assistant-add-heading", text: t.assistantTemplateMenuTitle }),
+			...(templates.length === 0
+				? [el("div", { class: "assistant-add-empty", text: t.assistantTemplateNone })]
+				: templates.map((template) => {
+						const item = el("button", {
+							class: "assistant-add-item",
+							attrs: {
+								type: "button",
+								role: "menuitemradio",
+								"aria-checked": String(template.id === pickedTemplate?.id),
+								"data-template": template.id,
+								title: `${template.name} · ${sourceLabel(t, template)}`,
+							},
+							children: [icon("file"), template.name],
+						});
+						item.addEventListener("click", () => {
+							hideAddMenu();
+							setTemplate({ id: template.id, name: template.name });
+							input.focus();
+						});
+						return item;
+					})),
+		);
+		addMenu.hidden = false;
+		addButton.setAttribute("aria-expanded", "true");
+		(
+			(addMenu.querySelector('[aria-checked="true"]') ??
+				addMenu.querySelector("button")) as HTMLElement | null
+		)?.focus();
+	}
+
 	// --- Mentions: "@" adds a part of the document to the next question ---
 
 	/** The headings of the sections added to the next question. */
@@ -511,6 +619,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 						renderSources();
 					}),
 				),
+			menuItem(t.assistantUseTemplate, "file", () => void showTemplateMenu()),
 		);
 		addMenu.hidden = false;
 		addButton.setAttribute("aria-expanded", "true");
@@ -879,6 +988,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		children: [
 			context,
 			sourceList,
+			templateList,
 			mentionList,
 			mentionMenu,
 			el("div", {
@@ -1993,6 +2103,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		for (const message of active.messages) appendMessage(message);
 		log.scrollTop = log.scrollHeight;
 		renderSources();
+		renderTemplate();
 		render();
 	}
 
@@ -3202,6 +3313,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		const notes: string[] = [];
 		/** The mode this question is asked in: the one picked, or the one chosen for it. */
 		let usedMode: ModeChoice = mode === "auto" ? "ask" : mode;
+		/** The document template the question is asked by, whatever the mode. */
+		const usedTemplate = pickedTemplate;
 		let prompt: string;
 		// The sections added with "@" go with the question, whether or not the document is shared.
 		let withSections = question;
@@ -3327,6 +3440,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 		// What an API is sent again when this run has not seen the chat (picked up from disk).
 		const earlier = isCli(PROVIDER_INFO[provider]) ? [] : historyOf(chat.messages);
+		if (usedTemplate !== null) notes.push(format(t.assistantTemplateUsed, usedTemplate.name));
 		const asked: Message = { role: "user", text: question, error: null, done: true, notes };
 		chat.messages.push(asked, reply);
 		if (chat.title === "") chat.title = chatTitle(question);
@@ -3354,6 +3468,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					images: images.map(({ label, mediaType, data }) => ({ label, mediaType, data })),
 					sources: chatSources(chat),
 					mode: usedMode,
+					...(usedTemplate === null ? {} : { template: usedTemplate.id }),
 					...(fullPrompt === undefined ? {} : { fullPrompt }),
 					...(reviewPrompt === undefined ? {} : { reviewPrompt }),
 					...(documentSnapshot === undefined ? {} : { document: documentSnapshot }),

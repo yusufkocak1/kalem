@@ -107,7 +107,7 @@ export interface AssistantIpcContext {
 	changeSettings(patch: Partial<Settings>): void;
 	changeLanguage(language: Lang | null): void;
 	language(): Lang;
-	/** The analysis templates, for the assistant to follow and check against. */
+	/** The document templates, for the assistant to follow and check against. */
 	readonly templates: TemplateStore;
 }
 
@@ -636,6 +636,18 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		const modeSettings = ctx.store.settings.assistantModes;
 		const customModes = ctx.store.settings.assistantCustomModes;
 		const servers = modeServers(request.mode, modeSettings, customModes);
+		// The document template picked for this question, whatever the mode: the model works by it.
+		const pickedTemplate =
+			typeof request.template === "string" && request.template !== ""
+				? await ctx.templates
+						.find(request.template)
+						.then((info) => (info === null ? null : ctx.templates.read(info.id)))
+						.catch(() => null)
+				: null;
+		const templateGiven =
+			pickedTemplate === null
+				? null
+				: { name: pickedTemplate.info.name, text: pickedTemplate.text };
 		const modeExcluded = modeToolsExcluded(
 			request.mode,
 			modeSettings,
@@ -662,6 +674,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			connections: ctx.connections,
 			workspace,
 			templates: ctx.templates,
+			template: pickedTemplate?.info.id ?? null,
 			document: sentDocument(request.document),
 			// Claude Code's own stream says which tools it called: the steps are not said twice.
 			step: program === "claude" ? () => {} : step,
@@ -706,6 +719,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				modes: answerModes,
 				custom: customModes,
 				document: tools.document,
+				template: templateGiven,
 			});
 		let system = instructionsFor(way);
 		// The sites cannot be fetched without the user's sign-in: Kalem's tools reach them, WebFetch does not.
@@ -820,6 +834,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 							modes,
 							custom: customModes,
 							document: tools.document,
+							template: templateGiven,
 						}),
 					question: withSources(files.text, undefined, reviewPrompt ?? asked),
 					ask: async (system, question, run, reviewerTools, send, isStopped) => {
@@ -1154,6 +1169,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 						mode: request.mode,
 						modes: ctx.store.settings.assistantModes,
 						custom: ctx.store.settings.assistantCustomModes,
+						template: templateGiven,
 					}),
 				);
 			}

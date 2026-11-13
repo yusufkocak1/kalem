@@ -87,8 +87,10 @@ export interface ToolContext {
 	/** Signing in to Jira and Confluence; `null` where it cannot be done (tests). */
 	readonly connections: Connections | null;
 	readonly workspace: Workspace | null;
-	/** The analysis templates; `null` where there are none to read (tests). */
+	/** The document templates; `null` where there are none to read (tests). */
 	readonly templates: TemplateStore | null;
+	/** The document template the user picked for this question (its id); the default without it. */
+	readonly template?: string | null;
 	/** `null` when the user does not share the document. */
 	readonly document: DocumentSnapshot | null;
 	step(step: ToolStep): void;

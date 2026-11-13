@@ -1,5 +1,5 @@
 /**
- * The assistant's tools for analysis work: the templates it follows, the
+ * The assistant's tools for analysis work: the document templates it follows, the
  * rule checks a review starts with, the findings it reports to the review
  * list, the plan it keeps while it works, and the prompts it keeps for a
  * coding agent.
@@ -18,10 +18,11 @@ import type { TemplateStore } from "./templates.js";
 const text = (input: Record<string, unknown>, key: string): string =>
 	typeof input[key] === "string" ? (input[key] as string) : "";
 
-/** The template a review checks against: the one named, else the user's default. */
+/** The template a tool works by: the one named, else the one picked for the question, else the user's default. */
 async function templateFor(ctx: ToolContext, named: string) {
 	const store = ctx.templates as TemplateStore;
-	const wanted = named !== "" ? named : ctx.settings().defaultTemplate;
+	const picked = ctx.template ?? "";
+	const wanted = named !== "" ? named : picked !== "" ? picked : ctx.settings().defaultTemplate;
 	return (
 		(wanted === "" ? null : await store.find(wanted)) ?? (await store.find("builtin:best-practice"))
 	);
@@ -34,7 +35,7 @@ const TOOLS: readonly KalemTool[] = [
 		definition: {
 			name: "analysis_templates",
 			description:
-				"Lists the user's analysis templates (the team's, their own, the built-in one) with the sections each requires; the default one is marked.",
+				"Lists the user's document templates (the team's, their own, the built-in one: analyses, reports, notes, plans…) with the sections each requires; the default one and the one picked for this question are marked.",
 			parameters: { type: "object", properties: {}, required: [] },
 		},
 		risk: "read",
@@ -42,11 +43,12 @@ const TOOLS: readonly KalemTool[] = [
 		async run(_input, ctx) {
 			const all = await (ctx.templates as TemplateStore).list();
 			const preferred = ctx.settings().defaultTemplate;
+			const picked = ctx.template ?? "";
 			ctx.step({ tool: "analysis_templates", detail: "" });
 			return all
 				.map(
 					(template) =>
-						`- "${template.name}" (id ${template.id}; ${template.source}${template.id === preferred || (preferred === "" && template.source === "builtin") ? "; the user's default" : ""}): requires ${template.required.join(", ") || "nothing"}`,
+						`- "${template.name}" (id ${template.id}; ${template.source}${template.id === preferred || (preferred === "" && template.source === "builtin") ? "; the user's default" : ""}${template.id === picked ? "; picked for this question" : ""}): requires ${template.required.join(", ") || "nothing"}`,
 				)
 				.join("\n");
 		},
@@ -55,7 +57,7 @@ const TOOLS: readonly KalemTool[] = [
 		definition: {
 			name: "analysis_template",
 			description:
-				"Reads a template's Markdown by its name or id (the user's default without either): follow its sections, order and <!-- guide --> comments when writing.",
+				"Reads a document template's Markdown by its name or id (without either: the one picked for this question, else the user's default): follow its sections, order and <!-- guide --> comments when writing, and check, analyse or report by it.",
 			parameters: { type: "object", properties: { template: { type: "string" } }, required: [] },
 		},
 		risk: "read",
@@ -77,7 +79,8 @@ const TOOLS: readonly KalemTool[] = [
 				properties: {
 					template: {
 						type: "string",
-						description: "A template's name or id; the default without it.",
+						description:
+							"A document template's name or id; the one picked for this question, else the default, without it.",
 					},
 				},
 				required: [],

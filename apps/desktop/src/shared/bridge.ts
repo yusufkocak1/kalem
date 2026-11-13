@@ -133,7 +133,7 @@ export interface Settings {
 	readonly assistantToolPolicies: Readonly<Record<string, ToolPolicy>>;
 	/** How Copilot reaches Kalem's tools: through MCP, in blocks, or whichever works. */
 	readonly copilotTools: CopilotTools;
-	/** The analysis template new documents start from and reviews check against; empty for the built-in one. */
+	/** The document template new documents start from and reviews check against; empty for the built-in one. */
 	readonly defaultTemplate: string;
 	/** The assistant's modes as the user shaped them: steps, options; what is missing is the default. */
 	readonly assistantModes: ModeSettings;
@@ -677,6 +677,8 @@ export interface AssistantRequest {
 	};
 	/** What the user is doing with the assistant: asking, writing, reviewing… */
 	readonly mode?: string;
+	/** The document template the user picked for this question (its id), whatever the mode. */
+	readonly template?: string;
 }
 
 /** A tool's part that the window runs: the document's change, a command. */
@@ -1056,7 +1058,7 @@ export interface KalemBridge {
 	localNotes(key: string): Promise<readonly LocalNote[]>;
 	/** Keeps a document's notes; none forgets the document. */
 	setLocalNotes(key: string, notes: readonly LocalNote[]): Promise<void>;
-	/** The analysis templates: the team's, the user's, and the built-in one. */
+	/** The document templates: the team's, the user's, and the built-in one. */
 	templates(): Promise<readonly TemplateInfo[]>;
 	/** A new tab with a document made from the template. */
 	templateNew(id: string): Promise<void>;

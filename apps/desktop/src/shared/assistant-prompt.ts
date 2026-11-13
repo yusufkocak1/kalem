@@ -37,6 +37,28 @@ export interface PromptOptions {
 	/** The modes the user made. */
 	readonly custom?: readonly CustomMode[];
 	readonly document?: { readonly name: string } | null;
+	/** The document template the user picked for this question, whatever the mode. */
+	readonly template?: { readonly name: string; readonly text: string } | null;
+}
+
+/** The longest template text that goes in the instructions; the rest is read with analysis_template. */
+const TEMPLATE_BUDGET = 30_000;
+
+/** What the model is told about a document template the user picked for the question. */
+export function templateInstructions(
+	template: { readonly name: string; readonly text: string } | null | undefined,
+): string {
+	if (template === null || template === undefined) return "";
+	const cut = template.text.length > TEMPLATE_BUDGET;
+	return [
+		`## Document template: "${template.name}"`,
+		"The user picked this document template for this request: whatever the mode, do the work by it. Writing or drafting: follow its sections, their order, its ids and its <!-- guide --> comments, and fill {{title}}. Reviewing or checking: check the document against it (missing or empty sections, its ids, what its guides ask for). Analysing or reporting: give the result in its shape, section by section. Answering: answer in its terms. It is the template to pass to analysis_template and analysis_lint.",
+		`<template name="${template.name.replace(/"/g, "&quot;")}">`,
+		cut
+			? `${template.text.slice(0, TEMPLATE_BUDGET)}\n… (cut: read the rest with analysis_template)`
+			: template.text,
+		"</template>",
+	].join("\n");
 }
 
 /** Who the assistant is, in a few lines: every question carries it. */
@@ -87,7 +109,12 @@ Keep it self-contained: the agent has not read the document.`;
 /** Everything the model is told for one question. */
 export function assistantInstructions(t: Strings, options: PromptOptions): string {
 	const tools = options.tools ?? [];
-	const mode = modePrompt(options.mode, options.modes, options.custom);
+	const mode = [
+		modePrompt(options.mode, options.modes, options.custom),
+		templateInstructions(options.template),
+	]
+		.filter((part) => part !== "")
+		.join("\n\n");
 	if (options.way === "none" || tools.length === 0) {
 		return [systemPrompt(t), mode].filter((part) => part !== "").join("\n\n");
 	}

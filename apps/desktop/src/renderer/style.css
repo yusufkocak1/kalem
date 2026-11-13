@@ -1375,6 +1375,28 @@ button {
 	height: 14px;
 }
 
+.assistant-add-item[aria-checked="true"] {
+	font-weight: 600;
+}
+
+.assistant-add-heading,
+.assistant-add-empty {
+	padding: 4px 8px;
+	color: var(--app-muted);
+	font-size: 11px;
+}
+
+.assistant-add-menu:has(.assistant-add-heading) {
+	max-height: 50vh;
+	overflow-y: auto;
+}
+
+.assistant-template-chip .icon {
+	flex: none;
+	width: 12px;
+	height: 12px;
+}
+
 .assistant-sources {
 	display: flex;
 	flex-wrap: wrap;

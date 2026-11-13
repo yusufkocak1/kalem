@@ -108,6 +108,26 @@ describe("the assistant's instructions", () => {
 		expect(assistantInstructions(t, { way: "block", tools: [tool] })).toContain("```kalem-tool");
 	});
 
+	it("carry the document template picked for the question, in any mode", () => {
+		const template = { name: "Weekly Report", text: "# {{title}}\n\n## Done\n\n## Next\n" };
+		for (const mode of ["ask", "review", undefined]) {
+			for (const way of ["tools", "none"] as const) {
+				const said = assistantInstructions(t, { way, tools: [tool], mode, template });
+				expect(said).toContain('## Document template: "Weekly Report"');
+				expect(said).toContain("## Next");
+			}
+		}
+		expect(assistantInstructions(t, { way: "tools", tools: [tool] })).not.toContain(
+			"## Document template",
+		);
+		const long = assistantInstructions(t, {
+			way: "tools",
+			tools: [tool],
+			template: { name: "Long", text: "x".repeat(40_000) },
+		});
+		expect(long).toContain("read the rest with analysis_template");
+	});
+
 	it("follow the mode, which leaves out the tools it does not need", () => {
 		expect(assistantInstructions(t, { way: "tools", tools: [tool], mode: "review" })).toContain(
 			"## Mode: review an analysis document",
