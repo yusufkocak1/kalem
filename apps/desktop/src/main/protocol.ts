@@ -49,6 +49,8 @@ function served(name: string): boolean {
 /** Images of a Confluence page tab: `kalem-doc://confluence/<page id>/<file name>`. */
 export const CONFLUENCE_HOST = "confluence";
 
+export const JIRA_HOST = "jira";
+
 export type AttachmentLoader = (pageId: string, name: string) => Promise<Response | null>;
 
 async function serveAttachment(url: URL, load: AttachmentLoader): Promise<Response> {
@@ -87,10 +89,13 @@ function uncached(url: URL, response: Response): Response {
 }
 
 /** Must run after the app is ready. */
-export function handleDocumentScheme(loadAttachment: AttachmentLoader): void {
+export function handleDocumentScheme(
+	loadAttachment: AttachmentLoader,
+	loadJiraAttachment: AttachmentLoader,
+): void {
 	protocol.handle(DOCUMENT_SCHEME, async (request) => {
 		const url = new URL(request.url);
-		return uncached(url, await serve(request, url, loadAttachment));
+		return uncached(url, await serve(request, url, loadAttachment, loadJiraAttachment));
 	});
 }
 
@@ -98,9 +103,11 @@ async function serve(
 	request: Request,
 	url: URL,
 	loadAttachment: AttachmentLoader,
+	loadJiraAttachment: AttachmentLoader,
 ): Promise<Response> {
 	if (request.method !== "GET") return new Response(null, { status: 405 });
 	if (url.hostname === CONFLUENCE_HOST) return serveAttachment(url, loadAttachment);
+	if (url.hostname === JIRA_HOST) return serveAttachment(url, loadJiraAttachment);
 	const path = urlPathToFilePath(url.pathname, process.platform === "win32");
 	if (path === null || !served(path)) {
 		return new Response(null, { status: 403 });

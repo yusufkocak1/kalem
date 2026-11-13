@@ -27,6 +27,7 @@ import { DraftStore } from "./drafts.js";
 import { backgroundFetch } from "./git.js";
 import { VersionStore } from "./history.js";
 import { registerIpc } from "./ipc.js";
+import { jiraConnection } from "./jira-ipc.js";
 import type { MenuContext } from "./menu.js";
 import {
 	installMenu,
@@ -532,10 +533,18 @@ function start(): void {
 
 		nativeTheme.themeSource = store.settings.theme;
 		watcher.watch(store.state.workspaces);
-		handleDocumentScheme(async (pageId, name) => {
-			const credentials = await confluence.get();
-			return credentials === null ? null : confluenceClient(credentials).attachment(pageId, name);
-		});
+		handleDocumentScheme(
+			async (pageId, name) => {
+				const credentials = await confluence.get();
+				return credentials === null ? null : confluenceClient(credentials).attachment(pageId, name);
+			},
+			async (id, name) => {
+				const connection = await jiraConnection({ jira, confluence });
+				if (connection === null) return null;
+				const response = await connection.client.attachment(id, name);
+				return response.ok ? response : null;
+			},
+		);
 		applySpellCheck();
 		installUserTasks();
 		registerIpc({

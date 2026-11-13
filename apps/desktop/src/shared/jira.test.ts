@@ -271,8 +271,10 @@ describe("Jira fields kept as HTML", () => {
 		expect(issue?.descriptionHtml).toBe("<div>Jira'nın çizdiği</div>");
 		expect(issue?.description).toBe("Jira'nın çizdiği");
 		expect(issue?.comments[0]).toMatchObject({
+			authorId: "can",
 			body: "Tamam oldu",
 			html: "<p>Tamam <b>oldu</b></p>",
+			mentions: [],
 		});
 	});
 

@@ -6,6 +6,9 @@ import type { AddressInfo } from "node:net";
 export const CONFLUENCE_TOKEN = "confluence-pat";
 export const JIRA_TOKEN = "jira-pat";
 
+const PNG =
+	"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
 const json = (res: ServerResponse, body: unknown, status = 200) => {
 	res.writeHead(status, { "Content-Type": "application/json" });
 	res.end(JSON.stringify(body));
@@ -47,15 +50,140 @@ export async function fakeJira() {
 	let serviceListAsked = 0;
 	/** The fake's own address, known once it listens. */
 	const base = { site: "" };
+	const jiraSite = (): string => base.site;
 	/** The status changes Jira was sent, and QR-1's status after them. */
 	const transitions: Record<string, unknown>[] = [];
 	let status = { name: "In Progress", category: "indeterminate" };
 	/** Where the issue's "mentioned in" page is: set once the fake Confluence is up. */
 	const confluence = { site: "" };
+	const edits: { method: string; path: string; body: unknown }[] = [];
+	const editable = {
+		assignee: { name: "ayse", displayName: "Ayşe Balcı" } as {
+			name: string;
+			displayName: string;
+		} | null,
+		labels: ["oturum"],
+		team: { id: "1", value: "Kırmızı" } as { id: string; value: string } | null,
+		sprint:
+			"com.atlassian.greenhopper.service.sprint.Sprint@a1[id=27,rapidViewId=5,state=ACTIVE,name=Kırmızı Sprint 27,goal=]",
+		failNextEdit: false,
+	};
+	const addedComments: Record<string, unknown>[] = [];
+	const readJson = async (req: AsyncIterable<unknown>): Promise<unknown> => {
+		let body = "";
+		for await (const chunk of req) body += String(chunk);
+		return body === "" ? null : JSON.parse(body);
+	};
 	const server = createServer(async (req, res) => {
 		const url = new URL(req.url ?? "/", "http://localhost");
 		if (req.headers.authorization !== `Bearer ${JIRA_TOKEN}`) {
 			return json(res, { errorMessages: ["Unauthorized"] }, 401);
+		}
+		const noContent = () => {
+			res.writeHead(204);
+			res.end();
+		};
+		const record = async () => {
+			const body = await readJson(req);
+			edits.push({ method: req.method ?? "", path: url.pathname, body });
+			return body as Record<string, unknown> | null;
+		};
+		const failing = () => {
+			if (!editable.failNextEdit) return false;
+			editable.failNextEdit = false;
+			json(res, { errorMessages: ["Alan düzenlenemez"] }, 400);
+			return true;
+		};
+		if (url.pathname === "/secure/attachment/501/pastedImage_1.png") {
+			res.writeHead(200, { "Content-Type": "image/png" });
+			return res.end(Buffer.from(PNG, "base64"));
+		}
+		if (url.pathname === "/rest/api/2/issue/FT-30468") {
+			return json(
+				res,
+				issue("FT-30468", "TK PNRı Olmayan Bilette PNR Alanının Dolu Gelmesi", "Open", "new"),
+			);
+		}
+		if (url.pathname === "/rest/api/2/user/assignable/search") {
+			return json(res, [
+				{ name: "ayse", displayName: "Ayşe Balcı" },
+				{ name: "yusuf", displayName: "YUSUF KOCAK - Quickres Gelistirme Takimi" },
+			]);
+		}
+		if (url.pathname === "/rest/api/2/issue/QR-1/assignee" && req.method === "PUT") {
+			if (failing()) return;
+			const body = await record();
+			editable.assignee =
+				body?.name === "yusuf"
+					? { name: "yusuf", displayName: "YUSUF KOCAK - Quickres Gelistirme Takimi" }
+					: null;
+			return noContent();
+		}
+		if (url.pathname === "/rest/agile/1.0/board/5/sprint") {
+			return json(res, {
+				values: [
+					{ id: 27, name: "Kırmızı Sprint 27", state: "active" },
+					{ id: 28, name: "Kırmızı Sprint 28", state: "future" },
+				],
+			});
+		}
+		if (
+			(url.pathname.startsWith("/rest/agile/1.0/sprint/") ||
+				url.pathname === "/rest/agile/1.0/backlog/issue") &&
+			req.method === "POST"
+		) {
+			if (failing()) return;
+			await record();
+			return noContent();
+		}
+		if (url.pathname === "/rest/api/2/issue/QR-1/editmeta") {
+			return json(res, {
+				fields: {
+					customfield_11: {
+						allowedValues: [
+							{ id: "1", value: "Kırmızı" },
+							{ id: "2", value: "Mavi" },
+						],
+					},
+				},
+			});
+		}
+		if (url.pathname === "/rest/api/2/issue/QR-1" && req.method === "PUT") {
+			if (failing()) return;
+			const body = await record();
+			const update = (body?.update ?? {}) as { labels?: { add?: string; remove?: string }[] };
+			for (const step of update.labels ?? []) {
+				if (step.add !== undefined) editable.labels.push(step.add);
+				if (step.remove !== undefined) {
+					editable.labels = editable.labels.filter((label) => label !== step.remove);
+				}
+			}
+			return noContent();
+		}
+		if (url.pathname === "/rest/api/1.0/labels/suggest") {
+			return json(res, { suggestions: [{ label: "AnalizTamam" }, { label: "Trophy" }] });
+		}
+		if (url.pathname === "/rest/api/2/user/picker") {
+			return json(res, {
+				users: [
+					{
+						name: "isil.sen",
+						displayName:
+							"ISIL SEN (Gelir Yonetimi Bsk. (Dogrudan Dagitim Kanallari Md.) - Bassorumlu)",
+					},
+				],
+			});
+		}
+		if (url.pathname === "/rest/api/2/issue/QR-1/comment" && req.method === "POST") {
+			const body = (await record()) as { body: string };
+			const comment = {
+				id: String(100 + addedComments.length),
+				author: { name: "ayse", displayName: "Ayşe Balcı" },
+				created: "2026-11-13T09:30:00.000+0300",
+				body: body.body,
+			};
+			addedComments.push(comment);
+			return json(res, { ...comment, renderedBody: `<p>${body.body}</p>` }, 201);
 		}
 		if (url.pathname === "/rest/api/2/myself") {
 			return json(res, { displayName: "Ayşe Balcı", key: "JIRAUSER1", name: "ayse" });
@@ -204,6 +332,30 @@ export async function fakeJira() {
 			return json(res, {
 				id: "10001",
 				...base,
+				names: {
+					customfield_10: "Sprint",
+					customfield_11: "Takım",
+					customfield_12: "Team",
+					customfield_13: "Story Origin",
+					customfield_14: "Parent Link",
+					customfield_15: "Branch",
+				},
+				schema: {
+					customfield_10: { custom: "com.pyxis.greenhopper.jira:gh-sprint" },
+					customfield_11: { custom: "com.atlassian.jira.plugin.system.customfieldtypes:select" },
+				},
+				changelog: {
+					histories: [
+						{
+							created: "2026-10-01T09:00:00.000+0300",
+							items: [{ field: "status", fromString: "Open", toString: "In Analysis" }],
+						},
+						{
+							created: "2026-10-08T09:00:00.000+0300",
+							items: [{ field: "status", fromString: "In Analysis", toString: status.name }],
+						},
+					],
+				},
 				fields: {
 					...base.fields,
 					priority: { name: "High" },
@@ -213,14 +365,56 @@ export async function fakeJira() {
 						remainingEstimateSeconds: 8 * 3600,
 					},
 					reporter: { displayName: "Mehmet" },
+					created: "2026-09-28T09:00:00.000+0300",
+					assignee: editable.assignee,
+					customfield_10: [editable.sprint],
+					customfield_11: editable.team,
+					customfield_12: { value: "Kırmızı" },
+					customfield_13: { value: "Business Requirement" },
+					customfield_14: "FT-30468",
+					customfield_15: "None",
+					attachment: [
+						{
+							id: 501,
+							filename: "pastedImage_1.png",
+							mimeType: "image/png",
+							content: `${jiraSite()}/secure/attachment/501/pastedImage_1.png`,
+						},
+					],
 					// An HTML editor plug-in keeps the description as HTML, lines joined by backslashes.
 					description:
 						'<div class="jePanel_warning" style="border:1px solid #d4a19e">\\\n<p dir="auto"><b>HATA</b>: Oturum <u>30 sn</u> sonra düşüyor.</p>\\\n</div><ul>\\\n<li>Chrome</li><li>Edge</li></ul>',
-					labels: ["oturum"],
+					labels: [...editable.labels],
 					subtasks: [issue("QR-2", "Süreyi ayarla", "Done", "done")],
 					comment: {
-						total: 1,
-						comments: [{ author: { displayName: "Can" }, body: "Bende de oluyor." }],
+						total: 4 + addedComments.length,
+						comments: [
+							{
+								author: { name: "gulden", displayName: "GULDEN BAYKARA - Quickres Analist Takimi" },
+								created: "2026-10-07T11:56:00.000+0300",
+								body: `<p>Merhaba <a href="${jiraSite()}/secure/ViewProfile.jspa?name=isil.sen" class="user-hover" rel="isil.sen">ISIL SEN (Gelir Yonetimi Bsk. (Dogrudan Dagitim Kanallari Md.) - Bassorumlu)</a> ,</p><p>&nbsp;</p><p>Analizi tamamladım. Kontrol edebilir misiniz?</p><p><br></p><p>Teşekkürler.</p><p>&nbsp;</p><p>&nbsp;</p>`,
+							},
+							{
+								author: {
+									name: "isil.sen",
+									displayName:
+										"ISIL SEN (Gelir Yonetimi Bsk. (Dogrudan Dagitim Kanallari Md.) - Bassorumlu)",
+								},
+								created: "2026-10-08T07:47:00.000+0300",
+								body: "<p>Uygundur</p><p>&nbsp;</p>",
+							},
+							{
+								author: { name: "can", displayName: "Can" },
+								created: "2026-11-09T17:45:00.000+0300",
+								body: "Bende de oluyor.",
+							},
+							{
+								author: { name: "yusuf", displayName: "YUSUF KOCAK - Quickres Gelistirme Takimi" },
+								created: "2026-11-09T17:45:00.000+0300",
+								body: "Geliştirme yaptım.\n\n!pastedImage_1.png!\n\n!kayip.png!\n\n[TK PNRı Olmayan Bilette - Doğrudan Satış - Confluence|https://wiki.example.com/pages/viewpage.action?pageId=77]",
+							},
+							...addedComments,
+						],
 					},
 				},
 			});
@@ -264,6 +458,8 @@ export async function fakeJira() {
 		worklogs,
 		transitions,
 		confluence,
+		edits,
+		editable,
 		close: () => new Promise<void>((done) => server.close(() => done())),
 	};
 }

@@ -60,6 +60,19 @@ const bridge: KalemBridge = {
 	jiraDevelopmentDetail: (issueId, kind) =>
 		ipcRenderer.invoke(CHANNEL.jiraDevelopmentDetail, issueId, kind),
 	jiraLogWork: (key, entry) => ipcRenderer.invoke(CHANNEL.jiraLogWork, key, entry),
+	jiraAssignableUsers: (key, query) => ipcRenderer.invoke(CHANNEL.jiraAssignableUsers, key, query),
+	jiraAssign: (key, userId) => ipcRenderer.invoke(CHANNEL.jiraAssign, key, userId),
+	jiraMentionUsers: (query) => ipcRenderer.invoke(CHANNEL.jiraMentionUsers, query),
+	jiraSprints: (key, boardId) => ipcRenderer.invoke(CHANNEL.jiraSprints, key, boardId),
+	jiraMoveToSprint: (key, sprintId) => ipcRenderer.invoke(CHANNEL.jiraMoveToSprint, key, sprintId),
+	jiraFieldOptions: (key, field) => ipcRenderer.invoke(CHANNEL.jiraFieldOptions, key, field),
+	jiraSetField: (key, field, option) =>
+		ipcRenderer.invoke(CHANNEL.jiraSetField, key, field, option),
+	jiraUpdateLabels: (key, add, remove) =>
+		ipcRenderer.invoke(CHANNEL.jiraUpdateLabels, key, add, remove),
+	jiraLabelSuggestions: (query) => ipcRenderer.invoke(CHANNEL.jiraLabelSuggestions, query),
+	jiraAddComment: (key, wiki) => ipcRenderer.invoke(CHANNEL.jiraAddComment, key, wiki),
+	jiraUploadAttachment: (key, file) => ipcRenderer.invoke(CHANNEL.jiraUploadAttachment, key, file),
 	confluenceAncestors: (pageId) => ipcRenderer.invoke(CHANNEL.confluenceAncestors, pageId),
 	confluenceSearch: (query, spaceKey) =>
 		ipcRenderer.invoke(CHANNEL.confluenceSearch, query, spaceKey),

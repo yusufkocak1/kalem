@@ -4,6 +4,7 @@ import { CHANNEL } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
 import type { JiraAccount, JiraIssue } from "../shared/jira.js";
 import { searchJql } from "../shared/jira.js";
+import type { JiraEditableField, JiraOption } from "../shared/jira-fields.js";
 import type { WorklogContext, WorklogEntry } from "../shared/jira-worklog.js";
 import type { ConfluenceCredentials } from "./confluence-client.js";
 import { isCloudHost, pageReference } from "./confluence-client.js";
@@ -175,6 +176,81 @@ export function registerJiraIpc(ctx: JiraIpcContext): {
 			throw new Error("Invalid kind");
 		}
 		return (await connected()).developmentDetail(text(issueId, "issue id"), kind);
+	});
+
+	const optionalId = (value: unknown, name: string): string | null => {
+		if (value === null) return null;
+		const id = text(value, name);
+		if (id.length > 200) throw new Error(`Invalid ${name}`);
+		return id;
+	};
+	const field = (raw: unknown): JiraEditableField => {
+		const given = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+		return {
+			fieldId: text(given.fieldId, "field"),
+			name: typeof given.name === "string" ? given.name : "",
+			custom: typeof given.custom === "string" ? given.custom : "",
+		};
+	};
+	const option = (raw: unknown): JiraOption | null => {
+		if (raw === null) return null;
+		const given = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+		return { id: text(given.id, "option"), name: typeof given.name === "string" ? given.name : "" };
+	};
+	const labels = (raw: unknown): string[] =>
+		(Array.isArray(raw) ? raw : []).filter(
+			(label): label is string => typeof label === "string" && label.length < 256,
+		);
+
+	ipcMain.handle(CHANNEL.jiraAssignableUsers, async (_event, key: unknown, query: unknown) =>
+		(await connected()).assignableUsers(text(key, "issue key"), text(query, "query").slice(0, 200)),
+	);
+	ipcMain.handle(CHANNEL.jiraAssign, async (_event, key: unknown, userId: unknown) =>
+		(await connected()).assign(text(key, "issue key"), optionalId(userId, "user")),
+	);
+	ipcMain.handle(CHANNEL.jiraMentionUsers, async (_event, query: unknown) =>
+		(await connected()).mentionUsers(text(query, "query").slice(0, 200)),
+	);
+	ipcMain.handle(CHANNEL.jiraSprints, async (_event, key: unknown, boardId: unknown) =>
+		(await connected()).sprints(text(key, "issue key"), optionalId(boardId, "board")),
+	);
+	ipcMain.handle(CHANNEL.jiraMoveToSprint, async (_event, key: unknown, sprintId: unknown) =>
+		(await connected()).moveToSprint(text(key, "issue key"), optionalId(sprintId, "sprint")),
+	);
+	ipcMain.handle(CHANNEL.jiraFieldOptions, async (_event, key: unknown, raw: unknown) =>
+		(await connected()).fieldOptions(text(key, "issue key"), field(raw)),
+	);
+	ipcMain.handle(CHANNEL.jiraSetField, async (_event, key: unknown, raw: unknown, value: unknown) =>
+		(await connected()).setField(text(key, "issue key"), field(raw), option(value)),
+	);
+	ipcMain.handle(
+		CHANNEL.jiraUpdateLabels,
+		async (_event, key: unknown, add: unknown, remove: unknown) =>
+			(await connected()).updateLabels(text(key, "issue key"), labels(add), labels(remove)),
+	);
+	ipcMain.handle(CHANNEL.jiraLabelSuggestions, async (_event, query: unknown) =>
+		(await connected()).labelSuggestions(text(query, "query").slice(0, 200)),
+	);
+	ipcMain.handle(CHANNEL.jiraAddComment, async (_event, key: unknown, wiki: unknown) =>
+		(await connected()).addCommentWiki(
+			text(key, "issue key"),
+			text(wiki, "comment").slice(0, 32000),
+		),
+	);
+	ipcMain.handle(CHANNEL.jiraUploadAttachment, async (_event, key: unknown, raw: unknown) => {
+		const given = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+		const bytes = given.bytes;
+		if (!(bytes instanceof Uint8Array) || bytes.byteLength > 20 * 1024 * 1024) {
+			throw new Error("Invalid file");
+		}
+		const type = text(given.type, "type");
+		if (!/^image\/(png|jpeg|gif|webp)$/.test(type)) throw new Error("Invalid file type");
+		return (await connected()).uploadAttachment(
+			text(key, "issue key"),
+			text(given.name, "name").slice(0, 120),
+			bytes,
+			type,
+		);
 	});
 
 	ipcMain.handle(CHANNEL.jiraSearch, async (_event, query: unknown, next: unknown) =>

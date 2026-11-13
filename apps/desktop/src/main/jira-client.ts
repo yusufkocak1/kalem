@@ -1,7 +1,7 @@
 import { markdownToWiki } from "../shared/confluence-wiki.js";
-import type { JiraIssue, JiraIssueRow, JiraSearchResults } from "../shared/jira.js";
+import type { JiraComment, JiraIssue, JiraIssueRow, JiraSearchResults } from "../shared/jira.js";
 import {
-	ISSUE_FIELDS,
+	commentOf,
 	issueKey,
 	issueOf,
 	issueRowOf,
@@ -22,6 +22,21 @@ import {
 	transitionBody,
 	transitionsOf,
 } from "../shared/jira-dev.js";
+import type {
+	JiraAttachment,
+	JiraEditableField,
+	JiraOption,
+	JiraSprint,
+	JiraUser,
+} from "../shared/jira-fields.js";
+import {
+	assigneeBody,
+	attachmentsOf,
+	fieldValueBody,
+	labelsBody,
+	optionsOf,
+	userOf,
+} from "../shared/jira-fields.js";
 import type {
 	IssuePlaceholders,
 	WorkAttribute,
@@ -130,7 +145,7 @@ export class JiraClient {
 	}
 
 	async #send(
-		method: "GET" | "POST",
+		method: "GET" | "POST" | "PUT",
 		path: string,
 		body?: unknown,
 		background = false,
@@ -229,14 +244,20 @@ export class JiraClient {
 		// Jira's own rendering too: a site with an HTML editor plug-in keeps its fields as HTML.
 		const [body, remote] = await Promise.all([
 			this.#json(
-				`/rest/api/2/issue/${valid}?fields=${ISSUE_FIELDS.join(",")}&expand=renderedFields`,
+				`/rest/api/2/issue/${valid}?fields=*all&expand=renderedFields,names,schema,changelog`,
 			),
 			// Links outside Jira (Confluence pages that mention it); an issue may have none to read.
 			this.#get(`/rest/api/2/issue/${valid}/remotelink`, true).catch(() => []),
 		]);
 		const issue = issueOf(body, this.site);
 		if (issue === null) throw new Error("Jira did not return the issue");
-		return { ...issue, remoteLinks: remoteLinksOf(remote) };
+		let parentLink = issue.parentLink;
+		if (parentLink !== null && parentLink.summary === "") {
+			const key = parentLink.key;
+			const row = await this.row(key).catch(() => null);
+			parentLink = { key, summary: row?.summary ?? "" };
+		}
+		return { ...issue, parentLink, remoteLinks: remoteLinksOf(remote) };
 	}
 
 	/** An issue's key facts, for a card: summary, status, type, assignee. */
@@ -538,6 +559,157 @@ export class JiraClient {
 		const key = asString(body.key);
 		if (issueKey(key) === null) throw new Error("Jira did not return the new issue");
 		return { key, url: `${this.site}/browse/${key}` };
+	}
+
+	#valid(key: string): string {
+		const valid = issueKey(key);
+		if (valid === null) throw new Error("Invalid issue key");
+		return valid;
+	}
+
+	async attachment(id: string, name: string): Promise<Response> {
+		if (!/^\d+$/.test(id)) throw new Error("Invalid attachment id");
+		return this.#fetch(`${this.site}/secure/attachment/${id}/${encodeURIComponent(name)}`, {
+			headers: { Accept: "*/*", Authorization: this.#auth },
+		});
+	}
+
+	async assignableUsers(key: string, query: string): Promise<JiraUser[]> {
+		const params = new URLSearchParams({
+			issueKey: this.#valid(key),
+			maxResults: "20",
+			[this.cloud ? "query" : "username"]: query,
+		});
+		const raw = await this.#get(`/rest/api/2/user/assignable/search?${params.toString()}`);
+		return asArray(raw).flatMap((item) => {
+			const user = userOf(item, this.cloud);
+			return user === null ? [] : [user];
+		});
+	}
+
+	async assign(key: string, userId: string | null): Promise<void> {
+		await this.#send(
+			"PUT",
+			`/rest/api/2/issue/${this.#valid(key)}/assignee`,
+			assigneeBody(userId, this.cloud),
+		);
+	}
+
+	async mentionUsers(query: string): Promise<JiraUser[]> {
+		const params = new URLSearchParams({ query, maxResults: "10" });
+		const raw = await this.#json(`/rest/api/2/user/picker?${params.toString()}`);
+		return asArray(raw.users).flatMap((item) => {
+			const user = userOf(item, this.cloud);
+			return user === null ? [] : [user];
+		});
+	}
+
+	async sprints(key: string, boardId: string | null): Promise<JiraSprint[]> {
+		const valid = this.#valid(key);
+		let board = boardId;
+		if (board === null) {
+			const project = valid.slice(0, valid.lastIndexOf("-"));
+			const boards = await this.#json(
+				`/rest/agile/1.0/board?projectKeyOrId=${encodeURIComponent(project)}&type=scrum`,
+			);
+			const first = asJson(asArray(boards.values)[0]).id;
+			board = first === undefined ? null : String(first);
+		}
+		if (board === null || !/^\d+$/.test(board)) return [];
+		const raw = await this.#json(
+			`/rest/agile/1.0/board/${board}/sprint?state=active,future&maxResults=50`,
+		);
+		const found = board;
+		return asArray(raw.values).flatMap((item) => {
+			const sprint = asJson(item);
+			const id = String(sprint.id ?? "");
+			if (id === "") return [];
+			return [{ id, name: asString(sprint.name), state: asString(sprint.state), boardId: found }];
+		});
+	}
+
+	async moveToSprint(key: string, sprintId: string | null): Promise<void> {
+		const issues = [this.#valid(key)];
+		if (sprintId === null) {
+			await this.#send("POST", "/rest/agile/1.0/backlog/issue", { issues });
+			return;
+		}
+		if (!/^\d+$/.test(sprintId)) throw new Error("Invalid sprint id");
+		await this.#send("POST", `/rest/agile/1.0/sprint/${sprintId}/issue`, { issues });
+	}
+
+	async fieldOptions(key: string, field: JiraEditableField): Promise<JiraOption[]> {
+		const meta = await this.#json(`/rest/api/2/issue/${this.#valid(key)}/editmeta`);
+		const options = optionsOf(asJson(asJson(meta.fields)[field.fieldId]).allowedValues);
+		if (options.length > 0 || !/tempo-teams/i.test(field.custom)) return options;
+		return optionsOf(await this.#get("/rest/tempo-teams/2/team"));
+	}
+
+	async setField(key: string, field: JiraEditableField, option: JiraOption | null): Promise<void> {
+		if (!/^customfield_\d+$/.test(field.fieldId)) throw new Error("Invalid field");
+		await this.#send("PUT", `/rest/api/2/issue/${this.#valid(key)}`, {
+			fields: { [field.fieldId]: fieldValueBody(field, option) },
+		});
+	}
+
+	async updateLabels(
+		key: string,
+		add: readonly string[],
+		remove: readonly string[],
+	): Promise<void> {
+		await this.#send("PUT", `/rest/api/2/issue/${this.#valid(key)}`, labelsBody(add, remove));
+	}
+
+	async labelSuggestions(query: string): Promise<string[]> {
+		if (this.cloud) {
+			const params = new URLSearchParams({ fieldName: "labels", fieldValue: query });
+			const raw = await this.#json(
+				`/rest/api/2/jql/autocompletedata/suggestions?${params.toString()}`,
+			);
+			return asArray(raw.results)
+				.map((item) => asString(asJson(item).value))
+				.filter(Boolean);
+		}
+		const raw = await this.#json(`/rest/api/1.0/labels/suggest?query=${encodeURIComponent(query)}`);
+		return asArray(raw.suggestions)
+			.map((item) => asString(asJson(item).label))
+			.filter(Boolean);
+	}
+
+	async addCommentWiki(key: string, wiki: string): Promise<JiraComment> {
+		const raw = await this.#send(
+			"POST",
+			`/rest/api/2/issue/${this.#valid(key)}/comment?expand=renderedBody`,
+			{ body: wiki },
+		);
+		return commentOf(raw, asJson(raw).renderedBody);
+	}
+
+	async uploadAttachment(
+		key: string,
+		name: string,
+		data: Uint8Array,
+		mediaType: string,
+	): Promise<JiraAttachment[]> {
+		const valid = this.#valid(key);
+		const boundary = `----kalem${Date.now().toString(16)}`;
+		const safeName = name.replace(/["\r\n]/g, "_");
+		const head = Buffer.from(
+			`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${safeName}"\r\nContent-Type: ${mediaType}\r\n\r\n`,
+		);
+		const tail = Buffer.from(`\r\n--${boundary}--\r\n`);
+		const response = await this.#fetch(`${this.site}/rest/api/2/issue/${valid}/attachments`, {
+			method: "POST",
+			headers: {
+				Accept: "application/json",
+				Authorization: this.#auth,
+				"Content-Type": `multipart/form-data; boundary=${boundary}`,
+				"X-Atlassian-Token": "no-check",
+			},
+			body: Buffer.concat([head, Buffer.from(data), tail]),
+		});
+		if (!response.ok) throw new JiraError(response.status, `HTTP ${response.status}`);
+		return attachmentsOf(parseJsonOrJsonp(await response.text()));
 	}
 
 	/** Adds a comment; the text is Markdown, sent as Jira's wiki markup. */

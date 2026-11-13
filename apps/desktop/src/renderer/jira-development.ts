@@ -2,6 +2,7 @@ import type { KalemBridge } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type { StatusCategory } from "../shared/jira.js";
+import { shortDateTime } from "../shared/jira-comments.js";
 import type {
 	DevelopmentCount,
 	DevelopmentItem,
@@ -189,29 +190,12 @@ export function createDevelopmentSection(options: DevelopmentOptions): HTMLEleme
 	section.classList.add("jira-dev-section");
 	section.hidden = true;
 
-	const relative = new Intl.RelativeTimeFormat(options.lang, { numeric: "auto" });
 	const dateTime = new Intl.DateTimeFormat(options.lang, {
 		dateStyle: "medium",
 		timeStyle: "short",
 	});
-	const ago = (iso: string | null): string => {
-		if (iso === null) return "";
-		const date = new Date(iso);
-		if (Number.isNaN(date.getTime())) return "";
-		const seconds = (date.getTime() - Date.now()) / 1000;
-		const units: [Intl.RelativeTimeFormatUnit, number][] = [
-			["year", 365 * 86400],
-			["month", 30 * 86400],
-			["week", 7 * 86400],
-			["day", 86400],
-			["hour", 3600],
-			["minute", 60],
-		];
-		for (const [unit, size] of units) {
-			if (Math.abs(seconds) >= size) return relative.format(Math.round(seconds / size), unit);
-		}
-		return relative.format(0, "minute");
-	};
+	const ago = (iso: string | null): string =>
+		iso === null ? "" : shortDateTime(iso, options.lang).short;
 
 	function line(
 		kind: DevelopmentKind,
