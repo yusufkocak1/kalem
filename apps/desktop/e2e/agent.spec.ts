@@ -372,6 +372,8 @@ test("a review lists the rules' and the model's findings, and the user fixes the
 	await expect(review.locator(".assistant-finding:not(:has(.assistant-finding-rule))")).toHaveCount(
 		2,
 	);
+	// The rules' findings too, though the answer ran the rules again.
+	await expect(review.locator(".assistant-finding:has(.assistant-finding-rule)")).toHaveCount(9);
 	await expect(pane.locator(".assistant-plan li.plan-done")).toHaveCount(5);
 	expect(errors).toEqual([]);
 	// "Don't Save" for the changed document.

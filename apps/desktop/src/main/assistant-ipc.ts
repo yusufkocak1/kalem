@@ -1012,7 +1012,10 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 					// A finding the answer reports all the same is not listed twice.
 					emit = (emitted) => {
 						if (emitted.kind !== "findings") return forward(emitted);
-						const added = reviewed.merger.add(emitted.findings);
+						// The rules ran already: what they found is in the list.
+						const added = reviewed.merger.add(
+							emitted.findings.filter((finding) => finding.rule !== true),
+						);
 						if (added.length > 0) forward({ kind: "findings", findings: added });
 					};
 					answerModes = plan.summary;
