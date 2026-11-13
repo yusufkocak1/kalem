@@ -38,8 +38,14 @@ export interface JiraParentLink {
 }
 
 export interface JiraFieldEntry {
+	readonly id: string;
 	readonly name: string;
+	readonly kind: "text" | "person" | "duration" | "date";
 	readonly value: string;
+	readonly durationMs: number | null;
+	readonly empty: boolean;
+	readonly field: JiraEditableField | null;
+	readonly option: JiraOption | null;
 }
 
 export interface JiraStatusChange {
@@ -49,7 +55,7 @@ export interface JiraStatusChange {
 }
 
 export const SPRINT_SCHEMA = "com.pyxis.greenhopper.jira:gh-sprint";
-const TEAM_FIELD = /^(takım|takim)$/i;
+const TEAM_FIELD = /^(?:takım|takim|TAKIM)$/i;
 const PARENT_LINK_FIELD = /^parent link$/i;
 const EPIC_LINK_FIELD = /^epic link$/i;
 
@@ -237,30 +243,71 @@ function parentLinkOf(value: unknown): JiraParentLink | null {
 	return { key, summary };
 }
 
-export function customFieldsOf(raw: unknown): IssueCustomFields {
+export interface TimeInStatusValue {
+	readonly ms: number;
+	readonly running: boolean;
+	readonly updated: number;
+}
+
+export function timeInStatusOf(value: unknown): TimeInStatusValue | null {
+	if (typeof value !== "string") return null;
+	const match = /^\s*TimeInStatus\((.*)\)\s*$/.exec(value);
+	if (match === null) return null;
+	const pairs = new Map<string, string>();
+	for (const part of (match[1] ?? "").split(",")) {
+		const [key, ...rest] = part.split("=");
+		if (key !== undefined) pairs.set(key.trim(), rest.join("=").trim());
+	}
+	const ms = Number(pairs.get("timeInStatus"));
+	const updated = Number(pairs.get("updateTime"));
+	return {
+		ms: Number.isFinite(ms) && ms > 0 ? ms : 0,
+		running: pairs.get("running") === "true",
+		updated: Number.isFinite(updated) ? updated : 0,
+	};
+}
+
+const INTERNAL_VALUE = /^[\w$.]+@[0-9a-f]{4,}\b|^[A-Z]\w*\(\w+=.*\)$|_\*:\*_/;
+
+function isEmptyValue(value: unknown): boolean {
+	if (value === null || value === undefined) return true;
+	if (Array.isArray(value)) return value.length === 0;
+	if (typeof value === "string") return isEmptyFieldText(value);
+	return false;
+}
+
+const isPerson = (value: unknown): boolean => {
+	const record = asJson(value);
+	return (
+		asString(record.displayName) !== "" &&
+		(asString(record.name) !== "" || asString(record.accountId) !== "" || "emailAddress" in record)
+	);
+};
+
+export function customFieldsOf(raw: unknown, now = Date.now()): IssueCustomFields {
 	const issue = asJson(raw);
 	const fields = asJson(issue.fields);
 	const names = asJson(issue.names);
 	const schema = asJson(issue.schema);
+	const editmeta = asJson(asJson(issue.editmeta).fields);
 	const nameOf = (id: string): string => asString(names[id]) || id;
 	const customOf = (id: string): string => asString(asJson(schema[id]).custom);
+	const typeOf = (id: string): string => asString(asJson(schema[id]).type);
+	const allowedOf = (id: string): JiraOption[] => optionsOf(asJson(editmeta[id]).allowedValues);
 
-	let sprint: JiraEditableField | null = null;
-	let team: JiraEditableField | null = null;
+	const sprintIds: string[] = [];
+	const teamIds: string[] = [];
 	let parentLink: JiraParentLink | null = null;
 	let epicLink: JiraParentLink | null = null;
 	const used = new Set<string>();
 	for (const id of Object.keys(fields)) {
-		const name = nameOf(id);
+		const name = nameOf(id).trim().normalize("NFC");
 		const custom = customOf(id);
-		if (
-			sprint === null &&
-			(custom === SPRINT_SCHEMA || (custom === "" && /^sprint$/i.test(name)))
-		) {
-			sprint = { fieldId: id, name, custom };
+		if (custom === SPRINT_SCHEMA || (custom === "" && /^sprint$/i.test(name))) {
+			sprintIds.push(id);
 			used.add(id);
-		} else if (team === null && TEAM_FIELD.test(name.trim())) {
-			team = { fieldId: id, name, custom };
+		} else if (TEAM_FIELD.test(name)) {
+			teamIds.push(id);
 			used.add(id);
 		} else if (PARENT_LINK_FIELD.test(name)) {
 			parentLink = parentLinkOf(fields[id]) ?? parentLink;
@@ -269,6 +316,21 @@ export function customFieldsOf(raw: unknown): IssueCustomFields {
 			epicLink = parentLinkOf(fields[id]);
 		}
 	}
+	const pick = (ids: readonly string[]): string | null =>
+		ids.find((id) => !isEmptyValue(fields[id])) ?? ids[0] ?? null;
+	const sprintId = pick(sprintIds);
+	const teamId = pick(teamIds);
+	const editable = (id: string): JiraEditableField => ({
+		fieldId: id,
+		name: nameOf(id),
+		custom: customOf(id),
+	});
+	const optionWithName = (id: string, value: unknown): JiraOption | null => {
+		const option = optionOf(value);
+		if (option === null || option.name !== option.id) return option;
+		return allowedOf(id).find((allowed) => allowed.id === option.id) ?? option;
+	};
+
 	const parentField = asJson(fields.parent);
 	const parent =
 		parentLink ??
@@ -284,18 +346,51 @@ export function customFieldsOf(raw: unknown): IssueCustomFields {
 		if (used.has(id) || SHOWN_ELSEWHERE.has(id)) continue;
 		const name = nameOf(id);
 		if (/^rank\b/i.test(name) || name === id) continue;
+		const custom = customOf(id);
+		const type = typeOf(id);
+		const selectable =
+			allowedOf(id).length > 0 && (type === "option" || /tempo-teams/i.test(custom));
+		const base = {
+			id,
+			name,
+			field: selectable ? editable(id) : null,
+			option: selectable ? optionWithName(id, value) : null,
+		};
+		const time = timeInStatusOf(value);
+		if (time !== null) {
+			const ms = time.ms + (time.running && time.updated > 0 ? Math.max(0, now - time.updated) : 0);
+			allFields.push({ ...base, kind: "duration", value: "", durationMs: ms, empty: ms === 0 });
+			continue;
+		}
+		if ((type === "user" || isPerson(value)) && !Array.isArray(value)) {
+			const text = fieldText(value);
+			allFields.push({
+				...base,
+				kind: "person",
+				value: text,
+				durationMs: null,
+				empty: text === "",
+			});
+			continue;
+		}
 		const text = fieldText(value);
-		if (isEmptyFieldText(text)) continue;
-		if (/^\d{4}-\d{2}-\d{2}T/.test(text)) continue;
-		allFields.push({ name, value: text });
+		const internal = INTERNAL_VALUE.test(text);
+		const date = type === "date" || type === "datetime" || /^\d{4}-\d{2}-\d{2}(T|$)/.test(text);
+		allFields.push({
+			...base,
+			kind: date ? "date" : "text",
+			value: internal ? "" : text,
+			durationMs: null,
+			empty: internal || isEmptyFieldText(text),
+		});
 	}
 	allFields.sort((a, b) => a.name.localeCompare(b.name, "tr"));
 
 	return {
-		sprint,
-		sprintValue: sprint === null ? null : sprintOf(fields[sprint.fieldId]),
-		team,
-		teamValue: team === null ? null : optionOf(fields[team.fieldId]),
+		sprint: sprintId === null ? null : editable(sprintId),
+		sprintValue: sprintId === null ? null : sprintOf(fields[sprintId]),
+		team: teamId === null ? null : editable(teamId),
+		teamValue: teamId === null ? null : optionWithName(teamId, fields[teamId]),
 		parentLink: parent,
 		allFields,
 	};

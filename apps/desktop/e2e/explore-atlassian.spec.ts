@@ -117,7 +117,6 @@ for (const theme of ["light", "dark"] as const) {
 			await page.waitForTimeout(300);
 			await explorer.scene(`issue, development ${kind}`);
 		}
-		await jira.locator('.jira-tab[data-tab="detail"]').click();
 		await scrollIssue(0);
 
 		// The status' steps.

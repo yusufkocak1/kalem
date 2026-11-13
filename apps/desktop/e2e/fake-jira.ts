@@ -333,6 +333,10 @@ export async function fakeJira() {
 				id: "10001",
 				...base,
 				names: {
+					customfield_9: "Takım",
+					customfield_18: "Time In Open",
+					customfield_19: "Time In Test",
+					customfield_20: "Analist",
 					customfield_10: "Sprint",
 					customfield_11: "Takım",
 					customfield_12: "Team",
@@ -342,7 +346,31 @@ export async function fakeJira() {
 				},
 				schema: {
 					customfield_10: { custom: "com.pyxis.greenhopper.jira:gh-sprint" },
-					customfield_11: { custom: "com.atlassian.jira.plugin.system.customfieldtypes:select" },
+					customfield_11: {
+						type: "option",
+						custom: "com.atlassian.jira.plugin.system.customfieldtypes:select",
+					},
+					customfield_13: {
+						type: "option",
+						custom: "com.atlassian.jira.plugin.system.customfieldtypes:select",
+					},
+					customfield_20: { type: "user" },
+				},
+				editmeta: {
+					fields: {
+						customfield_11: {
+							allowedValues: [
+								{ id: "1", value: "Kırmızı" },
+								{ id: "2", value: "Mavi" },
+							],
+						},
+						customfield_13: {
+							allowedValues: [
+								{ id: "7", value: "Business Requirement" },
+								{ id: "8", value: "Technical Debt" },
+							],
+						},
+					},
 				},
 				changelog: {
 					histories: [
@@ -367,12 +395,17 @@ export async function fakeJira() {
 					reporter: { displayName: "Mehmet" },
 					created: "2026-09-28T09:00:00.000+0300",
 					assignee: editable.assignee,
+					customfield_9: null,
 					customfield_10: [editable.sprint],
 					customfield_11: editable.team,
 					customfield_12: { value: "Kırmızı" },
-					customfield_13: { value: "Business Requirement" },
+					customfield_13: { id: "7", value: "Business Requirement" },
 					customfield_14: "FT-30468",
 					customfield_15: "None",
+					customfield_18:
+						"TimeInStatus(running=false, updateTime=1794560819397, timeInStatus=469176000)",
+					customfield_19: "TimeInStatus(running=false, updateTime=1794560819397, timeInStatus=0)",
+					customfield_20: { name: "kubra", displayName: "KUBRA DANIS - Quickres Analist Takimi" },
 					attachment: [
 						{
 							id: 501,

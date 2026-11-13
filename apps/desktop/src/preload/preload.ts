@@ -70,6 +70,7 @@ const bridge: KalemBridge = {
 		ipcRenderer.invoke(CHANNEL.jiraSetField, key, field, option),
 	jiraUpdateLabels: (key, add, remove) =>
 		ipcRenderer.invoke(CHANNEL.jiraUpdateLabels, key, add, remove),
+	jiraSetDescription: (key, value) => ipcRenderer.invoke(CHANNEL.jiraSetDescription, key, value),
 	jiraLabelSuggestions: (query) => ipcRenderer.invoke(CHANNEL.jiraLabelSuggestions, query),
 	jiraAddComment: (key, wiki) => ipcRenderer.invoke(CHANNEL.jiraAddComment, key, wiki),
 	jiraUploadAttachment: (key, file) => ipcRenderer.invoke(CHANNEL.jiraUploadAttachment, key, file),

@@ -21,6 +21,8 @@ import type {
 	JiraSprint,
 	JiraUser,
 } from "./jira-fields.js";
+import type { IssueLayout } from "./jira-layout.js";
+import { DEFAULT_ISSUE_LAYOUT } from "./jira-layout.js";
 import type { WorklogContext, WorklogEntry } from "./jira-worklog.js";
 import type { LocalNote } from "./local-notes.js";
 import type { ModeSettings } from "./mode-config.js";
@@ -103,6 +105,8 @@ export interface Settings {
 	readonly localNotes: boolean;
 	/** Jira issues the user starred, newest first. */
 	readonly jiraFavorites: readonly JiraFavorite[];
+	/** How the Jira issue popup lays out its fields: columns, and which fields in what order. */
+	readonly jiraIssueLayout: IssueLayout;
 	/** Documents pinned to the start page, in the order they were pinned. */
 	readonly pinnedFiles: readonly string[];
 	/** Look for a new release once a day (a request to GitHub). */
@@ -173,6 +177,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	restoreSession: true,
 	localNotes: true,
 	jiraFavorites: [],
+	jiraIssueLayout: DEFAULT_ISSUE_LAYOUT,
 	pinnedFiles: [],
 	checkUpdates: true,
 	tray: false,
@@ -868,6 +873,7 @@ export interface KalemBridge {
 	jiraMoveToSprint(key: string, sprintId: string | null): Promise<void>;
 	jiraFieldOptions(key: string, field: JiraEditableField): Promise<JiraOption[]>;
 	jiraSetField(key: string, field: JiraEditableField, option: JiraOption | null): Promise<void>;
+	jiraSetDescription(key: string, value: string): Promise<void>;
 	jiraUpdateLabels(key: string, add: readonly string[], remove: readonly string[]): Promise<void>;
 	jiraLabelSuggestions(query: string): Promise<string[]>;
 	jiraAddComment(key: string, wiki: string): Promise<JiraComment>;
@@ -1100,6 +1106,7 @@ export const CHANNEL = {
 	jiraFieldOptions: "kalem:jira-field-options",
 	jiraSetField: "kalem:jira-set-field",
 	jiraUpdateLabels: "kalem:jira-update-labels",
+	jiraSetDescription: "kalem:jira-set-description",
 	jiraLabelSuggestions: "kalem:jira-label-suggestions",
 	jiraAddComment: "kalem:jira-add-comment",
 	jiraUploadAttachment: "kalem:jira-upload-attachment",

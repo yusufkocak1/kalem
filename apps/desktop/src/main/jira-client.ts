@@ -244,7 +244,7 @@ export class JiraClient {
 		// Jira's own rendering too: a site with an HTML editor plug-in keeps its fields as HTML.
 		const [body, remote] = await Promise.all([
 			this.#json(
-				`/rest/api/2/issue/${valid}?fields=*all&expand=renderedFields,names,schema,changelog`,
+				`/rest/api/2/issue/${valid}?fields=*all&expand=renderedFields,names,schema,changelog,editmeta`,
 			),
 			// Links outside Jira (Confluence pages that mention it); an issue may have none to read.
 			this.#get(`/rest/api/2/issue/${valid}/remotelink`, true).catch(() => []),
@@ -257,7 +257,14 @@ export class JiraClient {
 			const row = await this.row(key).catch(() => null);
 			parentLink = { key, summary: row?.summary ?? "" };
 		}
-		return { ...issue, parentLink, remoteLinks: remoteLinksOf(remote) };
+		let team = issue.team;
+		if (team !== null && /^\d+$/.test(team.name) && issue.teamField !== null) {
+			const id = team.id;
+			const found = await this.#json(`/rest/tempo-teams/2/team/${id}`, true).catch(() => null);
+			const name = found === null ? "" : asString(found.name);
+			if (name !== "") team = { id, name };
+		}
+		return { ...issue, parentLink, team, remoteLinks: remoteLinksOf(remote) };
 	}
 
 	/** An issue's key facts, for a card: summary, status, type, assignee. */
@@ -649,6 +656,12 @@ export class JiraClient {
 		if (!/^customfield_\d+$/.test(field.fieldId)) throw new Error("Invalid field");
 		await this.#send("PUT", `/rest/api/2/issue/${this.#valid(key)}`, {
 			fields: { [field.fieldId]: fieldValueBody(field, option) },
+		});
+	}
+
+	async setDescription(key: string, value: string): Promise<void> {
+		await this.#send("PUT", `/rest/api/2/issue/${this.#valid(key)}`, {
+			fields: { description: value },
 		});
 	}
 
