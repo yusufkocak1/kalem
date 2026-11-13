@@ -1,11 +1,12 @@
-import type { CustomIcon, CustomMode, McpServer } from "../shared/custom-modes.js";
-import { CUSTOM_ICONS, customInstructions, serverName } from "../shared/custom-modes.js";
+import type { CustomIcon, CustomMode } from "../shared/custom-modes.js";
+import { CUSTOM_ICONS, customInstructions } from "../shared/custom-modes.js";
 import type { Strings } from "../shared/i18n.js";
 import type { StoredStep } from "../shared/mode-config.js";
 import { DETAILS, REPLY_LANGUAGES } from "../shared/mode-config.js";
 import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
+import { createMcpSection } from "./mcp-editor.js";
 
 export interface ToolInfo {
 	readonly name: string;
@@ -26,22 +27,6 @@ function mark(name: IconName, className: string): Element {
 	svg.classList.add(className);
 	return svg;
 }
-
-/** `KEY=value` lines as pairs, and back. */
-const parsePairs = (text: string, separator: "=" | ":"): Record<string, string> =>
-	Object.fromEntries(
-		text
-			.split("\n")
-			.map((line) => {
-				const at = line.indexOf(separator);
-				return at <= 0 ? null : [line.slice(0, at).trim(), line.slice(at + 1).trim()];
-			})
-			.filter((pair): pair is [string, string] => pair !== null && pair[0] !== ""),
-	);
-const writePairs = (pairs: Readonly<Record<string, string>>, separator: "=" | ": "): string =>
-	Object.entries(pairs)
-		.map(([key, value]) => `${key}${separator}${value}`)
-		.join("\n");
 
 /**
  * A mode of the user's in Settings: its name, icon and line, the
@@ -313,146 +298,6 @@ export function createCustomModeEditor(options: CustomModeEditorOptions): HTMLEl
 		return section(t.customToolsTitle, t.customToolsHint, choice, count, filter, list);
 	}
 
-	// --- MCP servers ---------------------------------------------------------------------
-
-	function serverCard(server: McpServer, index: number): HTMLElement {
-		// Each change builds on the mode as it is now: fields typed one after another keep each other.
-		const set = (next: Partial<McpServer>, redraw = false): void =>
-			keep({ mcp: mode.mcp.map((each, i) => (i === index ? { ...each, ...next } : each)) }, redraw);
-		const http = server.transport === "http";
-		const fields: HTMLElement[] = http
-			? [
-					input(t.mcpUrl, server.url, (value) => set({ url: value.trim() }), {
-						placeholder: "https://mcp.example.com/mcp",
-					}),
-					input(
-						t.mcpHeaders,
-						writePairs(server.headers, ": "),
-						(value) => set({ headers: parsePairs(value, ":") }),
-						{
-							placeholder: "Authorization: Bearer …",
-						},
-						true,
-					),
-				]
-			: [
-					input(t.mcpCommand, server.command, (value) => set({ command: value.trim() }), {
-						placeholder: "npx",
-					}),
-					input(
-						t.mcpArgs,
-						server.args.join("\n"),
-						(value) =>
-							set({
-								args: value
-									.split("\n")
-									.map((arg) => arg.trim())
-									.filter(Boolean),
-							}),
-						{ placeholder: "-y\n@modelcontextprotocol/server-filesystem\nC:\\\\projects" },
-						true,
-					),
-					input(
-						t.mcpEnv,
-						writePairs(server.env, "="),
-						(value) => set({ env: parsePairs(value, "=") }),
-						{
-							placeholder: "API_KEY=…",
-						},
-						true,
-					),
-				];
-		return el("div", {
-			class: "mcp-card",
-			attrs: { "data-server": server.name, ...(server.enabled ? {} : { "data-off": "" }) },
-			children: [
-				el("div", {
-					class: "mcp-card-head",
-					children: [
-						switchOf(server.enabled, server.name, (enabled) => set({ enabled }, true)),
-						(() => {
-							const name = el("input", {
-								class: "publish-input mcp-name",
-								attrs: { type: "text", "aria-label": t.mcpName, maxlength: "40" },
-							});
-							name.value = server.name;
-							name.addEventListener("change", () => {
-								const value = serverName(name.value);
-								if (value === "" || value.toLocaleLowerCase("en") === "kalem") {
-									name.value = server.name;
-									return;
-								}
-								set({ name: value }, true);
-							});
-							return name;
-						})(),
-						pills(
-							t.mcpTransport,
-							["stdio", "http"] as const,
-							server.transport,
-							(value) => (value === "stdio" ? t.mcpStdio : t.mcpHttp),
-							(transport) => set({ transport }, true),
-						),
-						iconButton("close", t.mcpRemove, () =>
-							keep({ mcp: mode.mcp.filter((_, i) => i !== index) }, true),
-						),
-					],
-				}),
-				...fields,
-				input(
-					t.mcpTools,
-					server.tools.join(", "),
-					(value) =>
-						set({
-							tools: value
-								.split(",")
-								.map((tool) => tool.trim())
-								.filter(Boolean),
-						}),
-					{ placeholder: t.mcpToolsAll },
-				),
-			],
-		});
-	}
-
-	function mcpSection(): HTMLElement {
-		const add = el("button", {
-			class: "mode-add",
-			attrs: { type: "button" },
-			children: [mark("plus", "mode-icon"), t.mcpAdd],
-		});
-		add.addEventListener("click", () => {
-			const names = new Set(mode.mcp.map((server) => server.name));
-			let n = mode.mcp.length + 1;
-			while (names.has(`server-${n}`)) n++;
-			keep(
-				{
-					mcp: [
-						...mode.mcp,
-						{
-							name: `server-${n}`,
-							transport: "stdio",
-							command: "npx",
-							args: [],
-							env: {},
-							url: "",
-							headers: {},
-							tools: [],
-							enabled: true,
-						},
-					],
-				},
-				true,
-			);
-		});
-		return section(
-			t.mcpTitle,
-			t.mcpHint,
-			el("div", { class: "mcp-list", children: mode.mcp.map(serverCard) }),
-			add,
-		);
-	}
-
 	// --- The whole -------------------------------------------------------------------
 
 	function draw(): void {
@@ -565,7 +410,11 @@ export function createCustomModeEditor(options: CustomModeEditorOptions): HTMLEl
 			),
 			stepsSection(),
 			toolsSection(),
-			mcpSection(),
+			createMcpSection({
+				t,
+				servers: () => mode.mcp,
+				change: (mcp, redraw) => keep({ mcp }, redraw),
+			}),
 			section(
 				t.modeOptions,
 				"",

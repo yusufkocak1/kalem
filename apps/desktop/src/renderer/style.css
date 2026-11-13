@@ -10487,6 +10487,168 @@ h3.mode-panel-name {
 	margin-left: auto;
 }
 
+.mcp-presets {
+	display: grid;
+	gap: 8px;
+}
+
+.mcp-presets-summary {
+	color: var(--app-accent);
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.mcp-preset-list {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: 8px;
+}
+
+.mcp-preset {
+	display: grid;
+	align-content: start;
+	gap: 4px;
+	padding: 10px 12px;
+	border: 1px solid var(--app-border);
+	border-radius: 10px;
+	background: var(--app-surface);
+}
+
+.mcp-preset:has(.mcp-preset-help[aria-expanded="true"]) {
+	border-color: var(--app-accent);
+}
+
+.mcp-preset-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--app-accent);
+}
+
+.mcp-preset-name {
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.mcp-preset-kind {
+	margin-left: auto;
+	color: var(--app-muted);
+	font-size: 11px;
+}
+
+.mcp-preset-text {
+	color: var(--app-muted);
+	font-size: 12px;
+	line-height: 1.4;
+}
+
+.mcp-preset-actions {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-top: auto;
+	padding-top: 4px;
+}
+
+.mcp-preset-add {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 3px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 999px;
+	background: none;
+	color: var(--app-accent);
+	font: inherit;
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.mcp-preset-add:hover {
+	border-color: var(--app-accent);
+	background: var(--app-pressed);
+}
+
+.mcp-preset-help {
+	font-size: 12px;
+}
+
+.mcp-guide-panel {
+	grid-column: 1 / -1;
+	display: grid;
+	gap: 8px;
+	padding: 12px 14px;
+	border: 1px solid var(--app-accent);
+	border-radius: 10px;
+	background: var(--app-surface);
+}
+
+.mcp-guide-title {
+	margin: 0;
+	font-size: 14px;
+}
+
+.mcp-guide {
+	display: grid;
+	gap: 8px;
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.mcp-guide-intro {
+	margin: 0;
+}
+
+.mcp-guide-steps {
+	display: grid;
+	gap: 4px;
+	margin: 0;
+	padding-left: 20px;
+}
+
+.mcp-sample {
+	display: grid;
+	gap: 4px;
+}
+
+.mcp-sample-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.mcp-sample-text {
+	margin: 0;
+	max-height: 260px;
+	padding: 8px 10px;
+	overflow: auto;
+	border: 1px solid var(--app-border);
+	border-radius: 7px;
+	background: var(--app-raised);
+	font-family: ui-monospace, monospace;
+	font-size: 12px;
+	line-height: 1.45;
+	white-space: pre;
+}
+
+.mcp-guide-add {
+	justify-self: start;
+}
+
+.mcp-card-guide {
+	display: grid;
+	gap: 8px;
+}
+
+.mcp-guide-summary {
+	color: var(--app-accent);
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
 /* The empty document's hint wraps inside the page instead of running past its
    right edge on a narrow page. It takes no height, so the caret stays on the
    first line, held up by the paragraph's own line break. */

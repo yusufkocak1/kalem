@@ -19,6 +19,7 @@ import { createCustomModeEditor } from "./custom-mode-editor.js";
 import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
+import { createMcpSection } from "./mcp-editor.js";
 
 /** Each mode's mark, in the picker and in Settings. */
 export const MODE_ICONS: Readonly<Record<Mode | "auto", IconName>> = {
@@ -595,6 +596,11 @@ export function createModeEditor(options: ModeEditorOptions): {
 						children: [el("span", { class: "mode-label", text: t.modeExtra }), extra],
 					}),
 				],
+			}),
+			createMcpSection({
+				t,
+				servers: () => mode.mcp,
+				change: (mcp, redraw) => change({ mcp }, redraw),
 			}),
 			el("details", {
 				class: "mode-preview",

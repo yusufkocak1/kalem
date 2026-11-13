@@ -499,7 +499,7 @@ test("modes: shaped in Settings (a step off, one of the user's own), and picked 
 	await settings.locator('.mode-tab[data-mode="review"]').click();
 	await settings.locator('.mode-step[data-step="lint"] .mode-switch-input').uncheck();
 	await expect(settings.locator('.mode-step[data-step="lint"]')).toHaveAttribute("data-off", "");
-	await settings.locator(".mode-add").click();
+	await settings.getByRole("button", { name: "Add a step" }).click();
 	const added = settings.locator('.mode-step[data-step="custom-1"]');
 	await added.getByRole("textbox", { name: "Step name" }).fill("KVKK");
 	await added.locator("textarea").fill("Check the KVKK consent texts.");
@@ -648,6 +648,104 @@ test("a mode of the user's own: its instructions, its tools and its MCP server g
 		command: "npx",
 		args: ["-y", "mcp-files", "/tmp"],
 		env: { TOKEN: "abc" },
+	});
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("one of Kalem's modes takes an MCP server too, and the model is told what it is for", async () => {
+	const folder = await tempDir("agent-mode-mcp");
+	const doc = join(folder, "notlar.md");
+	await writeFile(doc, "# Notlar\n");
+	const claude = await fakeClaude(folder, "Anahtar eklendi.", []);
+	const { app, page, userData, errors } = await launch({
+		args: [doc],
+		settings: { assistant: true },
+		env: { KALEM_CLAUDE: claude.path },
+	});
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
+	await pane.locator(".assistant-mode").click();
+	await pane.getByRole("menuitem", { name: "Customize modes…" }).click();
+	const settings = page.locator(".settings-dialog");
+
+	// The Code mode: a database server, one tool of it, and what it is for.
+	await settings.locator('.mode-tab[data-mode="code"]').click();
+	await settings.getByRole("button", { name: "Add an MCP server" }).click();
+	const server = settings.locator(".mcp-card");
+	await server.getByRole("textbox", { name: "Server name" }).fill("i18n-db");
+	await server.getByRole("textbox", { name: "Server name" }).press("Tab");
+	await settings
+		.locator(".mcp-card")
+		.getByRole("textbox", { name: "Arguments (one a line)" })
+		.fill("-y\n@bytebase/dbhub\n--config\n/home/me/dbhub.toml");
+	await settings
+		.locator(".mcp-card")
+		.getByRole("textbox", { name: "Tools it may use" })
+		.fill("add_i18n_key");
+	await settings
+		.locator(".mcp-card")
+		.getByRole("textbox", { name: "What it is for (the assistant is told)" })
+		.fill("When you add an i18n key in code, add it to the database with add_i18n_key.");
+	// One of the ready-made servers, filled in.
+	await settings.locator(".mcp-presets summary").click();
+	// Its guide first: what it is, the steps, and the files to copy.
+	await settings.locator('.mcp-preset[data-preset="dbhub"] .mcp-preset-help').click();
+	const guide = settings.locator('.mcp-guide-panel [data-guide="dbhub"]');
+	await expect(guide).toContainText("DBHub connects to your database");
+	await expect(guide.locator(".mcp-guide-steps li").first()).toContainText("make a user");
+	await expect(guide.locator(".mcp-sample-text")).toHaveCount(2);
+	await expect(guide.locator(".mcp-sample-text").last()).toContainText(
+		'name        = "get_parameter"',
+	);
+	// Closed again by the same button.
+	await settings.locator('.mcp-preset[data-preset="dbhub"] .mcp-preset-help').click();
+	await expect(settings.locator(".mcp-guide-panel")).toHaveCount(0);
+	await settings.locator('.mcp-preset[data-preset="context7"] .mcp-preset-add').click();
+	await expect(settings.locator(".mcp-card")).toHaveCount(2);
+	await expect(
+		settings
+			.locator('.mcp-card[data-server="context7"]')
+			.getByRole("textbox", { name: "Arguments (one a line)" }),
+	).toHaveValue("-y\n@upstash/context7-mcp@latest");
+	// Added from a ready-made server, it keeps its guide.
+	const kept = settings.locator('.mcp-card[data-server="context7"] .mcp-card-guide');
+	await kept.locator("summary").click();
+	await expect(kept).toContainText("Up-to-date documentation");
+	await settings.locator(".mode-preview summary").click();
+	await expect(settings.locator(".mode-preview-text")).toContainText(
+		"- i18n-db (tools: add_i18n_key): When you add an i18n key in code",
+	);
+	await expect(settings.locator(".mode-preview-text")).toContainText(
+		"- context7: Up-to-date documentation",
+	);
+	await settings.getByRole("button", { name: "Done" }).click();
+	await expect
+		.poll(async () => {
+			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
+			return stored.settings.assistantModes?.code?.mcp?.[0]?.tools;
+		})
+		.toEqual(["add_i18n_key"]);
+
+	await pane.locator(".assistant-mode").click();
+	await pane.locator('.assistant-mode-item[data-mode="code"]').click();
+	await pane.locator(".assistant-input").fill("Giriş ekranına hata mesajı ekle");
+	await pane.locator(".assistant-input").press("Enter");
+	await expect(pane.locator(".assistant-assistant")).toContainText("Anahtar eklendi.");
+
+	const [call] = await claude.calls();
+	const system = call?.args[call.args.indexOf("--append-system-prompt") + 1] ?? "";
+	expect(system).toContain("## Mode: code");
+	expect(system).toContain("Use them on your own");
+	expect(system).toContain("add it to the database with add_i18n_key");
+	const allowed = call?.args.slice(call.args.indexOf("--allowedTools") + 1) ?? [];
+	expect(allowed).toContain("mcp__i18n-db__add_i18n_key");
+	expect(allowed).toContain("mcp__context7");
+	expect(call?.mcp?.mcpServers["i18n-db"]).toEqual({
+		type: "stdio",
+		command: "npx",
+		args: ["-y", "@bytebase/dbhub", "--config", "/home/me/dbhub.toml"],
+		env: {},
 	});
 	expect(errors).toEqual([]);
 	await app.close();

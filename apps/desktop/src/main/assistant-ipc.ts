@@ -31,13 +31,13 @@ import {
 } from "../shared/claude.js";
 import type { LookupWay } from "../shared/confluence-tool.js";
 import { confluenceRequests, MAX_ROUNDS } from "../shared/confluence-tool.js";
-import { claudeAllowed, claudeServers, copilotServers } from "../shared/custom-modes.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import { jiraRequests } from "../shared/jira-tool.js";
+import { claudeAllowed, claudeServers, copilotServers } from "../shared/mcp-servers.js";
 import type { ModelOption } from "../shared/models.js";
 import { claudeModelName, claudeModelOptions, copilotModelOptions } from "../shared/models.js";
-import { customModeOf, modeToolsExcluded } from "../shared/modes.js";
+import { modeServers, modeToolsExcluded } from "../shared/modes.js";
 import type { ChatMessage, ProviderId } from "../shared/providers.js";
 import {
 	checkBaseUrl,
@@ -64,6 +64,7 @@ import "./assistant-form-tools.js";
 import "./assistant-analysis-tools.js";
 import "./assistant-external-tools.js";
 import "./assistant-jira-tools.js";
+import "./assistant-mode-tools.js";
 import "./assistant-confluence-tools.js";
 import { blockResults, parseApprovalAnswer, toolCalls } from "../shared/tool-protocol.js";
 import { collectSources, MAX_SOURCES, SOURCE_BUDGET } from "./assistant-sources.js";
@@ -634,7 +635,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		// The mode: one of Kalem's, as the user shaped it, or one the user made (its tools and MCP servers).
 		const modeSettings = ctx.store.settings.assistantModes;
 		const customModes = ctx.store.settings.assistantCustomModes;
-		const ownMode = customModeOf(request.mode, customModes);
+		const servers = modeServers(request.mode, modeSettings, customModes);
 		const modeExcluded = modeToolsExcluded(
 			request.mode,
 			modeSettings,
@@ -676,8 +677,8 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 
 		// Claude Code gets the tools from Kalem's MCP server; Copilot too when it takes one,
 		// else it writes them in blocks; an API calls them as its own tools.
-		// The user's mode may bring MCP servers of its own, even with none of Kalem's tools.
-		const ownServers = ownMode?.mcp.some((server) => server.enabled) === true;
+		// The mode may bring MCP servers of the user's, even with none of Kalem's tools.
+		const ownServers = servers.some((server) => server.enabled);
 		const needsMcp = definitions.length > 0 || ownServers;
 		const copilotMcp = program === "copilot" && needsMcp && (await copilotUsesMcp());
 		const mcpRun =
@@ -686,9 +687,9 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 						.open(
 							() => definitions,
 							call,
-							ownMode === null
-								? undefined
-								: { claude: claudeServers(ownMode), copilot: copilotServers(ownMode) },
+							ownServers
+								? { claude: claudeServers(servers), copilot: copilotServers(servers) }
+								: undefined,
 						)
 						.catch(() => null)
 				: null;
@@ -762,7 +763,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			// Kalem's tools, and the servers of the user's mode, are called without asking.
 			const mcpTools = [
 				...definitions.map((tool) => mcpToolName(tool.name)),
-				...(ownMode === null ? [] : claudeAllowed(ownMode)),
+				...claudeAllowed(servers),
 			];
 			// An answer may wait for the user to allow a change: Claude Code waits for the tool as long.
 			const env = program === "claude" ? { MCP_TOOL_TIMEOUT: String(APPROVAL_WAIT) } : {};

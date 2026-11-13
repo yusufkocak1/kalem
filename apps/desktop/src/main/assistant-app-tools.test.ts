@@ -134,6 +134,37 @@ describe("the assistant's app tools", () => {
 		expect(all.text).not.toContain("claudePath");
 	});
 
+	it("never shows the model how a mode's MCP server runs: its tokens stay out", async () => {
+		const { ctx } = context(() => allow);
+		ctx.changeSettings({
+			assistantModes: {
+				code: {
+					mcp: [
+						{
+							name: "github",
+							transport: "http",
+							command: "",
+							args: ["--secret-arg"],
+							env: { TOKEN: "env-secret" },
+							url: "https://mcp.example.com/mcp",
+							headers: { Authorization: "Bearer header-secret" },
+							tools: ["search"],
+							purpose: "The team's GitHub.",
+							preset: "github",
+							enabled: true,
+						},
+					],
+				},
+			},
+		});
+		const read = await runTool("settings_get", { keys: ["assistantModes"] }, ctx);
+		expect(read.text).toContain('"name":"github"');
+		expect(read.text).toContain("The team's GitHub.");
+		for (const secret of ["header-secret", "env-secret", "--secret-arg", "mcp.example.com"]) {
+			expect(read.text).not.toContain(secret);
+		}
+	});
+
 	it("does not ask again what was allowed for the session or always", async () => {
 		const { ctx, asked, always } = context((request) =>
 			request.permission === "settings:appearance"
