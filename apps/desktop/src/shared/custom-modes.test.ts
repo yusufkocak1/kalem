@@ -1,14 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-	claudeAllowed,
-	claudeServers,
-	copilotServers,
 	customExcluded,
 	customInstructions,
 	newCustomMode,
 	parseCustomModes,
 	serverName,
 } from "./custom-modes.js";
+import { claudeAllowed, claudeServers, copilotServers } from "./mcp-servers.js";
 import { detectMode } from "./mode-detect.js";
 import { modePrompt, modeToolsExcluded } from "./modes.js";
 
@@ -83,7 +81,7 @@ describe("modes the user makes", () => {
 			"report_findings",
 		]);
 		expect(customExcluded({ ...mode, tools: "all" }, all).size).toBe(0);
-		expect(claudeServers(mode)).toEqual({
+		expect(claudeServers(mode.mcp)).toEqual({
 			files: {
 				type: "stdio",
 				command: "npx",
@@ -96,11 +94,11 @@ describe("modes the user makes", () => {
 				headers: { Authorization: "Bearer t" },
 			},
 		});
-		expect(copilotServers(mode)).toMatchObject({
+		expect(copilotServers(mode.mcp)).toMatchObject({
 			files: { type: "local", command: "npx", tools: ["*"] },
 			web: { type: "http", tools: ["search"] },
 		});
-		expect(claudeAllowed(mode)).toEqual(["mcp__files", "mcp__web__search"]);
+		expect(claudeAllowed(mode.mcp)).toEqual(["mcp__files", "mcp__web__search"]);
 	});
 
 	it("are chosen automatically by their words", () => {

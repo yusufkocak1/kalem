@@ -7,6 +7,8 @@
  * off. Untouched, a mode says what it always said. Pure.
  */
 import type { Strings } from "./i18n.js";
+import type { McpServer } from "./mcp-servers.js";
+import { mcpInstructions, parseMcpServers } from "./mcp-servers.js";
 
 export const MODES = ["ask", "write", "review", "prompt", "code", "app"] as const;
 export type Mode = (typeof MODES)[number];
@@ -309,6 +311,8 @@ export interface StoredMode {
 	readonly maxFindings?: number;
 	/** Review: a CLI runs the checks side by side, one reviewer each; on unless turned off. */
 	readonly parallel?: boolean;
+	/** MCP servers Claude Code and the Copilot CLI connect to in this mode. */
+	readonly mcp?: readonly McpServer[];
 }
 
 export type ModeSettings = Readonly<Partial<Record<Mode, StoredMode>>>;
@@ -338,6 +342,7 @@ export interface ResolvedMode {
 	readonly minSeverity: SeverityFloor;
 	readonly maxFindings: number;
 	readonly parallel: boolean;
+	readonly mcp: readonly McpServer[];
 }
 
 const MAX_STEPS = 40;
@@ -394,6 +399,7 @@ export function parseModeSettings(raw: unknown): ModeSettings {
 			typeof stored.maxFindings === "number" && Number.isFinite(stored.maxFindings)
 				? Math.max(0, Math.min(200, Math.round(stored.maxFindings)))
 				: undefined;
+		const mcp = parseMcpServers(stored.mcp);
 		result[name] = {
 			...(typeof stored.enabled === "boolean" ? { enabled: stored.enabled } : {}),
 			...(steps === undefined ? {} : { steps }),
@@ -404,6 +410,7 @@ export function parseModeSettings(raw: unknown): ModeSettings {
 			...(minSeverity === undefined ? {} : { minSeverity }),
 			...(maxFindings === undefined ? {} : { maxFindings }),
 			...(typeof stored.parallel === "boolean" ? { parallel: stored.parallel } : {}),
+			...(mcp.length === 0 ? {} : { mcp }),
 		};
 	}
 	return result;
@@ -467,6 +474,7 @@ export function resolveMode(mode: Mode, settings: ModeSettings = {}): ResolvedMo
 		minSeverity: stored.minSeverity ?? "low",
 		maxFindings: stored.maxFindings ?? 0,
 		parallel: stored.parallel ?? true,
+		mcp: stored.mcp ?? [],
 	};
 }
 
@@ -508,6 +516,7 @@ export function storeMode(resolved: ResolvedMode): StoredMode {
 		...(resolved.minSeverity === "low" ? {} : { minSeverity: resolved.minSeverity }),
 		...(resolved.maxFindings === 0 ? {} : { maxFindings: resolved.maxFindings }),
 		...(resolved.parallel ? {} : { parallel: false }),
+		...(resolved.mcp.length === 0 ? {} : { mcp: resolved.mcp }),
 	};
 }
 
@@ -579,6 +588,8 @@ export function modeInstructions(mode: unknown, settings: ModeSettings = {}): st
 	const language = LANGUAGE_LINES[resolved.language];
 	if (language !== "") lines.push(language);
 	if (resolved.extra !== "") lines.push(resolved.extra);
+	const servers = mcpInstructions(resolved.mcp);
+	if (servers !== "") lines.push(servers);
 	if (lines.length === 0) return INTRO[current];
 	return [INTRO[current], ...lines].filter((part) => part !== "").join("\n");
 }

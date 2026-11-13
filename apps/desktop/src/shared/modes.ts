@@ -9,8 +9,9 @@
 import type { CustomMode } from "./custom-modes.js";
 import { customExcluded, customInstructions, isCustomModeId } from "./custom-modes.js";
 import type { Strings } from "./i18n.js";
+import type { McpServer } from "./mcp-servers.js";
 import type { Mode, ModeSettings } from "./mode-config.js";
-import { modeExcluded, modeInstructions } from "./mode-config.js";
+import { isMode, modeExcluded, modeInstructions, resolveMode } from "./mode-config.js";
 
 export type { Mode } from "./mode-config.js";
 export { isMode, MODES, modeExcluded, modeInstructions } from "./mode-config.js";
@@ -61,4 +62,15 @@ export function modeToolsExcluded(
 ): ReadonlySet<string> {
 	const own = customModeOf(mode, custom);
 	return own === null ? modeExcluded(mode, modes) : customExcluded(own, allTools);
+}
+
+/** The MCP servers a mode connects the CLI to: one of Kalem's, as the user shaped it, or one of the user's. */
+export function modeServers(
+	mode: unknown,
+	modes: ModeSettings = {},
+	custom: readonly CustomMode[] = [],
+): readonly McpServer[] {
+	const own = customModeOf(mode, custom);
+	if (own !== null) return own.mcp;
+	return resolveMode(isMode(mode) ? mode : "ask", modes).mcp;
 }

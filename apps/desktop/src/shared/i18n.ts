@@ -955,6 +955,9 @@ const en = {
 	mcpTools: "Tools it may use",
 	mcpToolsAll: "All of them (or names, separated by commas)",
 	mcpRemove: "Remove the server",
+	mcpPurpose: "What it is for (the assistant is told)",
+	mcpPurposeHint:
+		"e.g. The project's i18n database. When you add a new i18n key in code, add it here with add_i18n_key (tr and en texts) without being asked.",
 	assistantUsage: "{0} in · {1} out · {2} cached tokens",
 	assistantPlan: "Plan",
 	assistantDocumentOutline: "the outline of “{0}”",
@@ -2471,6 +2474,9 @@ const tr: Strings = {
 	mcpTools: "Kullanabileceği araçlar",
 	mcpToolsAll: "Hepsi (ya da virgülle ayrılmış adlar)",
 	mcpRemove: "Sunucuyu kaldır",
+	mcpPurpose: "Ne için (asistana söylenir)",
+	mcpPurposeHint:
+		"örn. Projenin i18n veritabanı. Kodda yeni bir i18n anahtarı eklediğinde, sorulmadan add_i18n_key ile buraya da ekle (tr ve en metinleriyle).",
 	assistantUsage: "{0} giriş · {1} çıkış · {2} önbellek token",
 	assistantPlan: "Plan",
 	assistantDocumentOutline: "“{0}” ana hattı",
