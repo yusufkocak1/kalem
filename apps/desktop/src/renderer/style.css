@@ -8946,6 +8946,85 @@ textarea.jira-worklog-input {
 	font-size: 14px;
 }
 
+/* --- The assistant's tools in Settings: each on, off, asked about or not ---------- */
+
+.tool-settings-filter {
+	width: 100%;
+	max-width: 320px;
+	margin-bottom: 10px;
+}
+
+.tool-settings-list {
+	display: grid;
+	gap: 14px;
+	margin-bottom: 10px;
+}
+
+.tool-settings-group {
+	display: grid;
+	gap: 2px;
+}
+
+.tool-settings-group[hidden],
+.tool-setting[hidden] {
+	display: none;
+}
+
+.tool-settings-group h5 {
+	margin: 0 0 4px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--app-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.tool-setting {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 6px 8px;
+	border-radius: 7px;
+	font-size: 12px;
+}
+
+.tool-setting:hover {
+	background: var(--app-hover);
+}
+
+.tool-setting[data-policy="off"] .tool-setting-text {
+	opacity: 0.55;
+}
+
+.tool-setting-text {
+	display: grid;
+	gap: 1px;
+	min-width: 0;
+}
+
+.tool-setting-name {
+	color: var(--app-accent);
+	font-weight: 600;
+}
+
+.tool-setting-description {
+	color: var(--app-muted);
+}
+
+.tool-setting-warning {
+	color: var(--app-warning);
+}
+
+.tool-setting-warning[hidden] {
+	display: none;
+}
+
+.tool-setting select {
+	flex: none;
+	max-width: 240px;
+}
+
 /* --- Review findings, marked in the document for this run --------------------------- */
 
 ::highlight(kalem-findings) {

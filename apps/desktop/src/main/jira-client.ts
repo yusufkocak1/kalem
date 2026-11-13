@@ -65,11 +65,14 @@ export const JIRA_PAGE_SIZE = 25;
 
 export class JiraError extends Error {
 	readonly status: number;
+	/** What Jira said about each field it refused, by field id. */
+	readonly fields: Readonly<Record<string, string>>;
 
-	constructor(status: number, message: string) {
+	constructor(status: number, message: string, fields: Readonly<Record<string, string>> = {}) {
 		super(message);
 		this.name = "JiraError";
 		this.status = status;
+		this.fields = fields;
 	}
 }
 
@@ -191,9 +194,15 @@ export class JiraClient {
 		if (!response.ok) {
 			let detail = "";
 			let text = "";
+			let fieldErrors: Record<string, string> = {};
 			try {
 				text = await response.text();
 				const body = asJson(JSON.parse(text));
+				fieldErrors = Object.fromEntries(
+					Object.entries(asJson(body.errors)).filter(
+						(entry): entry is [string, string] => typeof entry[1] === "string",
+					),
+				);
 				detail =
 					asString(asArray(body.errorMessages)[0]) ||
 					asString(Object.values(asJson(body.errors))[0]) ||
@@ -208,9 +217,13 @@ export class JiraClient {
 					.trim()
 					.slice(0, 200);
 			}
+			const all = Object.entries(fieldErrors);
 			throw new JiraError(
 				response.status,
-				detail === "" ? `HTTP ${response.status}` : `HTTP ${response.status}: ${detail}`,
+				detail === ""
+					? `HTTP ${response.status}`
+					: `HTTP ${response.status}: ${all.length > 1 ? all.map(([id, message]) => `${id}: ${message}`).join("; ") : detail}`,
+				fieldErrors,
 			);
 		}
 		return parseJsonOrJsonp(await response.text());
@@ -566,6 +579,98 @@ export class JiraClient {
 		const key = asString(body.key);
 		if (issueKey(key) === null) throw new Error("Jira did not return the new issue");
 		return { key, url: `${this.site}/browse/${key}` };
+	}
+
+	/** An issue as Jira gives it, with field names, schema and edit screen: what a clone copies. */
+	async rawIssue(key: string): Promise<Json> {
+		return this.#json(
+			`/rest/api/2/issue/${this.#valid(key)}?fields=*all&expand=names,schema,editmeta`,
+		);
+	}
+
+	/** The projects the user can see: key and name. */
+	async projects(): Promise<{ key: string; name: string; id: string }[]> {
+		const raw = await this.#get("/rest/api/2/project");
+		return asArray(raw).flatMap((item) => {
+			const project = asJson(item);
+			const key = asString(project.key);
+			return key === ""
+				? []
+				: [{ key, name: asString(project.name), id: String(project.id ?? "") }];
+		});
+	}
+
+	/** A project's issue types: id and name. */
+	async issueTypes(project: string): Promise<{ id: string; name: string; subtask: boolean }[]> {
+		if (!/^[A-Z][A-Z0-9_]*$/i.test(project)) throw new Error("Invalid project key");
+		const raw = await this.#json(`/rest/api/2/project/${encodeURIComponent(project)}`);
+		return asArray(raw.issueTypes).flatMap((item) => {
+			const type = asJson(item);
+			const id = String(type.id ?? "");
+			return id === "" ? [] : [{ id, name: asString(type.name), subtask: type.subtask === true }];
+		});
+	}
+
+	/**
+	 * The create screen of a type in a project. Jira 8.4+ and Cloud list it
+	 * at `createmeta/{project}/issuetypes/{type}`; older servers only at
+	 * `createmeta?…&expand=projects.issuetypes.fields`.
+	 */
+	async createMeta(project: string, typeId: string): Promise<unknown> {
+		if (!/^[A-Z][A-Z0-9_]*$/i.test(project)) throw new Error("Invalid project key");
+		if (!/^\d+$/.test(typeId)) throw new Error("Invalid issue type");
+		const key = encodeURIComponent(project.toLocaleUpperCase("en"));
+		try {
+			const fields: unknown[] = [];
+			let start = 0;
+			for (let round = 0; round < 10; round++) {
+				const page = await this.#json(
+					`/rest/api/2/issue/createmeta/${key}/issuetypes/${typeId}?startAt=${start}&maxResults=100`,
+				);
+				const values = asArray(page.values ?? page.fields);
+				fields.push(...values);
+				start += values.length;
+				const total = typeof page.total === "number" ? page.total : start;
+				if (values.length === 0 || start >= total || page.isLast === true) break;
+			}
+			return { values: fields };
+		} catch (error) {
+			if (!(error instanceof JiraError) || (error.status !== 404 && error.status !== 405))
+				throw error;
+			return this.#json(
+				`/rest/api/2/issue/createmeta?projectKeys=${key}&issuetypeIds=${typeId}&expand=projects.issuetypes.fields`,
+			);
+		}
+	}
+
+	/** An issue's edit screen. */
+	async editMeta(key: string): Promise<unknown> {
+		return this.#json(`/rest/api/2/issue/${this.#valid(key)}/editmeta`);
+	}
+
+	/** Creates an issue from its fields as Jira takes them. */
+	async createWithFields(fields: Record<string, unknown>): Promise<{ key: string; url: string }> {
+		const body = asJson(await this.#send("POST", "/rest/api/2/issue", { fields }));
+		const key = asString(body.key);
+		if (issueKey(key) === null) throw new Error("Jira did not return the new issue");
+		return { key, url: `${this.site}/browse/${key}` };
+	}
+
+	/** Sets an issue's fields, as Jira takes them. */
+	async updateFields(key: string, fields: Record<string, unknown>): Promise<void> {
+		await this.#send("PUT", `/rest/api/2/issue/${this.#valid(key)}`, { fields });
+	}
+
+	/** The kinds of link between issues. */
+	async linkTypes(): Promise<unknown> {
+		return keep(`${this.#keptKey}\nlinktypes`, 30 * MINUTE, () =>
+			this.#get("/rest/api/2/issueLinkType"),
+		);
+	}
+
+	/** Links two issues; `body` as `linkBody` makes it. */
+	async link(body: Record<string, unknown>): Promise<void> {
+		await this.#send("POST", "/rest/api/2/issueLink", body);
 	}
 
 	#valid(key: string): string {

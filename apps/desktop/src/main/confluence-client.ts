@@ -140,6 +140,26 @@ const asJson = (value: unknown): Json =>
 const asString = (value: unknown): string => (typeof value === "string" ? value : "");
 const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
+/** One result of a CQL search. */
+export interface ConfluenceCqlResult {
+	readonly id: string;
+	/** page, blogpost, comment, attachment… */
+	readonly type: string;
+	readonly title: string;
+	readonly space: string;
+	readonly url: string;
+	readonly excerpt: string;
+	readonly modified: string | null;
+}
+
+/** A comment under a page. */
+export interface ConfluenceComment {
+	readonly id: string;
+	readonly author: string;
+	readonly created: string | null;
+	readonly storage: string;
+}
+
 /**
  * Confluence's REST API. Cloud uses the v2 API where one exists (pages,
  * spaces) and v1 for search and attachment upload; Server / Data Center
@@ -741,6 +761,93 @@ export class ConfluenceClient {
 					}),
 				);
 		return { ...page, version: Number(asJson(body.version).number) || version };
+	}
+
+	/** A CQL search as it is written: pages, blog posts, comments, attachments. */
+	async searchCql(cql: string, limit = 25): Promise<ConfluenceCqlResult[]> {
+		const query = new URLSearchParams({ cql, limit: String(Math.min(Math.max(limit, 1), 50)) });
+		const body = await this.#json(`/rest/api/search?${query.toString()}`);
+		return asArray(body.results).flatMap((item): ConfluenceCqlResult[] => {
+			const result = asJson(item);
+			const content = asJson(result.content);
+			const id = asString(content.id);
+			const title = asString(content.title) || asString(result.title);
+			if (id === "" && title === "") return [];
+			const link = asString(result.url) || asString(asJson(content._links).webui);
+			return [
+				{
+					id,
+					type: asString(content.type) || asString(result.entityType),
+					title,
+					space: asString(asJson(result.resultGlobalContainer).title),
+					url: link === "" ? "" : this.#webUrl(link.startsWith("/") ? link : `/${link}`),
+					excerpt: asString(result.excerpt)
+						.replace(/@@@(?:end)?hl@@@/g, "")
+						.replace(/<[^>]*>/g, "")
+						.replace(/\s+/g, " ")
+						.trim(),
+					modified: asString(result.lastModified) || null,
+				},
+			];
+		});
+	}
+
+	/** A page's comments, oldest first: who, when, and the text in storage format. */
+	async comments(pageId: string): Promise<ConfluenceComment[]> {
+		if (!/^\d+$/.test(pageId)) throw new Error("Invalid page id");
+		const comments: ConfluenceComment[] = [];
+		let next: string | null =
+			`/rest/api/content/${pageId}/child/comment?expand=body.storage,history&depth=all&limit=50`;
+		for (let round = 0; next !== null && round < 4; round++) {
+			const body: Json = await this.#json(next);
+			for (const item of asArray(body.results)) {
+				const comment = asJson(item);
+				const history = asJson(comment.history);
+				comments.push({
+					id: asString(comment.id),
+					author: asString(asJson(history.createdBy).displayName),
+					created: asString(history.createdDate) || null,
+					storage: asString(asJson(asJson(comment.body).storage).value),
+				});
+			}
+			const link = asString(asJson(body._links).next);
+			next = link === "" ? null : this.#relative(link);
+		}
+		return comments;
+	}
+
+	/** Adds a comment under a page; `storage` is the comment in storage format. */
+	async addComment(pageId: string, storage: string): Promise<string> {
+		if (!/^\d+$/.test(pageId)) throw new Error("Invalid page id");
+		const body = await this.#json("/rest/api/content", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				type: "comment",
+				container: { id: pageId, type: "page" },
+				body: { storage: { value: storage, representation: "storage" } },
+			}),
+		});
+		return asString(body.id);
+	}
+
+	/** A page's labels. */
+	async labels(pageId: string): Promise<string[]> {
+		if (!/^\d+$/.test(pageId)) throw new Error("Invalid page id");
+		const body = await this.#json(`/rest/api/content/${pageId}/label?limit=200`);
+		return asArray(body.results)
+			.map((item) => asString(asJson(item).name))
+			.filter((name) => name !== "");
+	}
+
+	/** Adds labels to a page. */
+	async addLabels(pageId: string, labels: readonly string[]): Promise<void> {
+		if (!/^\d+$/.test(pageId)) throw new Error("Invalid page id");
+		await this.#request(`/rest/api/content/${pageId}/label`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json", "X-Atlassian-Token": "no-check" },
+			body: JSON.stringify(labels.map((name) => ({ prefix: "global", name }))),
+		});
 	}
 
 	/** Creates or replaces the attachment `name` on the page. */

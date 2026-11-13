@@ -2,7 +2,8 @@
  * The user's say over what the assistant's tools change: kinds of change
  * allowed for this run of the app, kinds allowed always (kept in the
  * settings), and the questions waiting for an answer in a window. Anything
- * online is asked every time, whatever was allowed.
+ * online is asked every time, whatever was allowed, unless the user set
+ * that tool to run without asking in Settings.
  */
 import type { WebContents } from "electron";
 import { CHANNEL } from "../shared/bridge.js";
@@ -10,6 +11,7 @@ import type {
 	ApprovalAnswer,
 	ApprovalRequest,
 	ApprovalScope,
+	ToolPolicy,
 	ToolRisk,
 } from "../shared/tool-protocol.js";
 import { DENIED } from "../shared/tool-protocol.js";
@@ -18,6 +20,8 @@ export interface PermissionStore {
 	/** The kinds of change allowed always. */
 	always(): readonly string[];
 	setAlways(permissions: readonly string[]): void;
+	/** What the user set for a tool in Settings; `undefined` for its risk's way. */
+	toolPolicy?(tool: string): ToolPolicy | undefined;
 }
 
 export class PermissionGate {
@@ -53,13 +57,22 @@ export class PermissionGate {
 	 * goes or the reply is stopped.
 	 */
 	ask(sender: WebContents, request: Omit<ApprovalRequest, "id">): Promise<ApprovalAnswer> {
+		const policy = this.#store.toolPolicy?.(request.tool);
+		if (policy === "off") return Promise.resolve(DENIED);
+		// Set to run without asking: everything is allowed, a form to fill in excepted.
+		if (policy === "auto" && request.fields === undefined) {
+			return Promise.resolve({ approved: true, scope: "once" });
+		}
+		const everyTime = policy === "ask" || request.everyTime === true;
 		if (
+			!everyTime &&
 			request.items === undefined &&
 			request.fields === undefined &&
 			this.allowed(request.permission, request.risk)
 		) {
 			return Promise.resolve({ approved: true, scope: "once" });
 		}
+		if (everyTime) request = { ...request, scopes: ["once"], everyTime: true };
 		if (sender.isDestroyed()) return Promise.resolve(DENIED);
 		const id = `approval-${Date.now().toString(36)}-${++this.#count}`;
 		return new Promise((resolve) => {

@@ -30,6 +30,7 @@ import { createAssistantSettings } from "./assistant-settings.js";
 import { el } from "./dom.js";
 import { createModeEditor } from "./mode-settings.js";
 import { sourceLabel } from "./template-picker.js";
+import { createToolSettings } from "./tool-settings.js";
 
 export interface SettingsDialogOptions {
 	readonly t: Strings;
@@ -538,6 +539,23 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 			}),
 		);
 	}
+
+	// --- Assistant: each tool on, off, asked about or not -----------------------
+
+	const toolSettings = createToolSettings({
+		t,
+		settings: options.settings,
+		update: options.update,
+		catalog: () => bridge.assistantToolCatalog(),
+	});
+	item(
+		"assistant",
+		[t.toolSettingsTitle, t.toolSettingsHint, ...settingDef("assistantToolPolicies").keywords].join(
+			" ",
+		),
+		toolSettings.element,
+	);
+	refreshers.push(() => toolSettings.refresh());
 
 	// --- The assistant's modes --------------------------------------------------
 
