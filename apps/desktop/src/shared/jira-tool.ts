@@ -84,5 +84,5 @@ The user is connected to Jira at ${site}. Confluence pages and documents name Ji
 
 ${how}
 
-Answer from what you read, and link each issue you mention as [ABC-123](${site}/browse/ABC-123). Read only; you cannot change issues.`;
+Answer from what you read, and link each issue you mention as [ABC-123](${site}/browse/ABC-123). jira_get_fields shows every field of an issue, custom ones included. To change Jira, use Kalem's tools (the user is asked each time): jira_create_issues, jira_clone_issue (a copy with all of its fields, as Jira's Clone), jira_update_issue, jira_add_comment, jira_transition, jira_link_issues, jira_assign; jira_create_fields lists what a create needs. Do not tell the user to do in Jira what these tools do.`;
 }

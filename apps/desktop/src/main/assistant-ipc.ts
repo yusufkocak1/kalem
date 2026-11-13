@@ -32,6 +32,7 @@ import {
 import type { LookupWay } from "../shared/confluence-tool.js";
 import { confluenceRequests, MAX_ROUNDS } from "../shared/confluence-tool.js";
 import type { Lang, Strings } from "../shared/i18n.js";
+import { format } from "../shared/i18n.js";
 import { jiraRequests } from "../shared/jira-tool.js";
 import { claudeAllowed, claudeServers, copilotServers } from "../shared/mcp-servers.js";
 import type { ModelOption } from "../shared/models.js";
@@ -62,6 +63,8 @@ import "./assistant-app-tools.js";
 import "./assistant-form-tools.js";
 import "./assistant-analysis-tools.js";
 import "./assistant-external-tools.js";
+import "./assistant-jira-tools.js";
+import "./assistant-confluence-tools.js";
 import { blockResults, parseApprovalAnswer, toolCalls } from "../shared/tool-protocol.js";
 import { collectSources, MAX_SOURCES, SOURCE_BUDGET } from "./assistant-sources.js";
 import type { AssistantStore } from "./assistant-store.js";
@@ -287,6 +290,8 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 	const gate = new PermissionGate({
 		always: () => ctx.store.settings.assistantPermissions,
 		setAlways: (permissions) => ctx.changeSettings({ assistantPermissions: permissions }),
+		toolPolicy: (tool) =>
+			ctx.store.settings.assistantToolPolicies[tool.replace(/^mcp__kalem__/, "")],
 	});
 	/** Tool calls the windows run. */
 	const rendererCalls = new RendererCalls();
@@ -389,6 +394,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 	ipcMain.handle(CHANNEL.assistantToolCatalog, () =>
 		allTools().map((tool) => ({
 			name: tool.definition.name,
+			risk: tool.risk,
 			// Its first sentence says what it does.
 			description: tool.definition.description.split(/(?<=\.)\s/)[0] ?? "",
 		})),
@@ -985,13 +991,46 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 						break;
 					}
 					const found: string[] = [];
-					if (requests.length > 0) {
-						tools.readExternal = true;
-						found.push(await (lookups as ConfluenceLookups).runAll(requests, step));
+					// The look-ups in blocks are Kalem's tools too: off, or asked about, as the user set them.
+					const refused: string[] = [];
+					const lookupAllowed = async (tool: string, detail: string): Promise<boolean> => {
+						const policy = ctx.store.settings.assistantToolPolicies[tool];
+						if (policy === "off") {
+							refused.push(`The user turned ${tool} off in Settings: ${detail} was not looked up.`);
+							return false;
+						}
+						if (policy !== "ask") return true;
+						const answer = await approve({
+							tool,
+							risk: "external",
+							permission: `tool:${tool}`,
+							title: format(t.approvalUseTool, tool),
+							lines: [detail],
+							everyTime: true,
+						});
+						if (!answer.approved) refused.push(`The user did not allow ${tool}: ${detail}.`);
+						return answer.approved;
+					};
+					const confluenceAllowed: typeof requests = [];
+					for (const lookup of requests) {
+						const tool = lookup.kind === "search" ? "confluence_search" : "confluence_read_page";
+						const detail = lookup.kind === "search" ? lookup.query : `page ${lookup.id}`;
+						if (await lookupAllowed(tool, detail)) confluenceAllowed.push(lookup);
 					}
-					if (jiraAsked.length > 0) {
+					const jiraAllowed: typeof jiraAsked = [];
+					for (const lookup of jiraAsked) {
+						const tool = lookup.kind === "search" ? "jira_search" : "jira_get_issue";
+						const detail = lookup.kind === "search" ? lookup.jql : lookup.key;
+						if (await lookupAllowed(tool, detail)) jiraAllowed.push(lookup);
+					}
+					if (refused.length > 0) found.push(refused.join("\n"));
+					if (confluenceAllowed.length > 0) {
 						tools.readExternal = true;
-						found.push(await (jiraLookups as JiraLookups).runAll(jiraAsked, step));
+						found.push(await (lookups as ConfluenceLookups).runAll(confluenceAllowed, step));
+					}
+					if (jiraAllowed.length > 0) {
+						tools.readExternal = true;
+						found.push(await (jiraLookups as JiraLookups).runAll(jiraAllowed, step));
 					}
 					if (blockCalls.length > 0) {
 						const results: { tool: string; text: string }[] = [];

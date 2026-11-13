@@ -33,7 +33,7 @@ import type { PanePlaces, ToolPane } from "./panes.js";
 import { DEFAULT_PANE_PLACES } from "./panes.js";
 import type { AssistantConfig, AssistantUpdate, ChatMessage, ProviderId } from "./providers.js";
 import type { TemplateInfo } from "./templates.js";
-import type { ApprovalAnswer, ApprovalRequest } from "./tool-protocol.js";
+import type { ApprovalAnswer, ApprovalRequest, ToolPolicy, ToolRisk } from "./tool-protocol.js";
 export type Theme = "system" | "light" | "dark";
 
 export const PAGE_SIZES = ["A4", "A3", "A5", "Letter", "Legal"] as const;
@@ -129,6 +129,8 @@ export interface Settings {
 	readonly navigationWidth: number;
 	/** The kinds of change the user allowed the assistant always (`settings:appearance`, `document`…). */
 	readonly assistantPermissions: readonly string[];
+	/** What the user set for each of Kalem's tools: asked every time, run without asking, or off. */
+	readonly assistantToolPolicies: Readonly<Record<string, ToolPolicy>>;
 	/** How Copilot reaches Kalem's tools: through MCP, in blocks, or whichever works. */
 	readonly copilotTools: CopilotTools;
 	/** The analysis template new documents start from and reviews check against; empty for the built-in one. */
@@ -189,6 +191,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	assistantWidth: 380,
 	navigationWidth: 248,
 	assistantPermissions: [],
+	assistantToolPolicies: {},
 	copilotTools: "auto",
 	defaultTemplate: "",
 	assistantModes: {},
@@ -999,7 +1002,12 @@ export interface KalemBridge {
 	/** The models a service offers; without `key`, the kept one is used. */
 	/** Kalem's tools the assistant can be given, for choosing a mode's tools. */
 	assistantToolCatalog(): Promise<
-		readonly { readonly name: string; readonly description: string }[]
+		readonly {
+			readonly name: string;
+			readonly description: string;
+			/** What it may change: `read`, `ui`, `document` or `external` (Jira, Confluence). */
+			readonly risk?: ToolRisk;
+		}[]
 	>;
 	assistantModels(request: {
 		readonly provider: ProviderId;
