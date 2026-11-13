@@ -85,12 +85,18 @@ function fakeJira(refuseReviewer = false) {
 	return { client, created, links, updates };
 }
 
-function context(jira: unknown, answers: ApprovalAnswer[], confluence: unknown = null) {
+function context(
+	jira: unknown,
+	answers: ApprovalAnswer[],
+	confluence: unknown = null,
+	policies: Record<string, string> = {},
+) {
 	const asked: Omit<ApprovalRequest, "id" | "chatId" | "scopes">[] = [];
 	const ctx = {
 		chatId: "c",
 		t: stringsFor("en"),
 		excluded: new Set<string>(),
+		settings: () => ({ assistantToolPolicies: policies }),
 		confluence: null,
 		jira: null,
 		jiraClient: jira,
@@ -229,5 +235,25 @@ describe("Confluence tools", () => {
 		const names = toolsFor(ctx).map((tool) => tool.definition.name);
 		expect(names).not.toContain("jira_clone_issue");
 		expect(names).not.toContain("confluence_cql");
+	});
+});
+
+describe("the tools as the user set them", () => {
+	it("leaves out a tool turned off, and refuses its call", async () => {
+		const jira = fakeJira();
+		const { ctx } = context(jira.client, [YES], null, { jira_clone_issue: "off" });
+		expect(toolsFor(ctx).map((tool) => tool.definition.name)).not.toContain("jira_clone_issue");
+		const result = await runTool("jira_clone_issue", { key: "QR-1" }, ctx);
+		expect(result.isError).toBe(true);
+		expect(jira.created).toEqual([]);
+	});
+
+	it("asks before a tool that only reads, when set so", async () => {
+		const { ctx, asked } = context(fakeJira().client, [{ approved: false, scope: "once" }], null, {
+			jira_get_fields: "ask",
+		});
+		const result = await runTool("jira_get_fields", { key: "QR-48204" }, ctx);
+		expect(asked[0]).toMatchObject({ tool: "jira_get_fields", everyTime: true });
+		expect(result.text).toContain("did not allow");
 	});
 });

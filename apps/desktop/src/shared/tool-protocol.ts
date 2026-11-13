@@ -18,6 +18,30 @@ import { parseFormValues } from "./tool-form.js";
  */
 export type ToolRisk = "read" | "ui" | "document" | "external";
 
+/**
+ * What the user set for one tool in Settings:
+ * - `ask`: asked before every call, even one that only reads;
+ * - `auto`: runs without asking, even one that changes Jira or Confluence
+ *   (a form the user fills in is still shown);
+ * - `off`: never offered to the model.
+ * A tool the user set nothing for keeps its risk's way.
+ */
+export type ToolPolicy = "ask" | "auto" | "off";
+
+export const TOOL_POLICIES: readonly ToolPolicy[] = ["ask", "auto", "off"];
+
+/** The tools' settings from the settings file, made safe. */
+export function parseToolPolicies(value: unknown): Record<string, ToolPolicy> {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
+	const policies: Record<string, ToolPolicy> = {};
+	for (const [name, policy] of Object.entries(value).slice(0, 300)) {
+		if (!/^[a-z][a-z0-9_]{0,63}$/.test(name)) continue;
+		if (typeof policy === "string" && (TOOL_POLICIES as readonly string[]).includes(policy))
+			policies[name] = policy as ToolPolicy;
+	}
+	return policies;
+}
+
 /** How long an approval holds. */
 export type ApprovalScope = "once" | "session" | "always";
 
@@ -59,6 +83,8 @@ export interface ApprovalRequest {
 	readonly fields?: readonly FormField[];
 	/** Why the last values sent did not work (the server refused the login). */
 	readonly error?: string;
+	/** The user set the tool to be asked about every time: nothing allowed before counts. */
+	readonly everyTime?: boolean;
 }
 
 export interface ApprovalAnswer {

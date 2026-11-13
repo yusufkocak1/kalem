@@ -10,10 +10,12 @@ import type { Settings } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
 import type { ClaudeEvent } from "../shared/claude.js";
 import type { Lang, Strings } from "../shared/i18n.js";
+import { format } from "../shared/i18n.js";
 import type {
 	ApprovalAnswer,
 	ApprovalRequest,
 	ToolDefinition,
+	ToolPolicy,
 	ToolRisk,
 } from "../shared/tool-protocol.js";
 import { scopesFor } from "../shared/tool-protocol.js";
@@ -167,10 +169,28 @@ export function allTools(): readonly KalemTool[] {
 export const toolNamed = (name: string): KalemTool | undefined =>
 	registry.find((tool) => tool.definition.name === name);
 
-/** The tools the model is given in this answer. */
-export function toolsFor(ctx: ToolContext): KalemTool[] {
-	return registry.filter((tool) => !ctx.excluded.has(tool.definition.name) && tool.available(ctx));
+/** What the user set for a tool in Settings; `undefined` for its risk's way. */
+export function toolPolicy(ctx: ToolContext, name: string): ToolPolicy | undefined {
+	const settings = typeof ctx.settings === "function" ? ctx.settings() : undefined;
+	const policies = settings?.assistantToolPolicies;
+	return policies !== undefined && Object.hasOwn(policies, name) ? policies[name] : undefined;
 }
+
+/** The tools the model is given in this answer: not the mode's left out, nor those the user turned off. */
+export function toolsFor(ctx: ToolContext): KalemTool[] {
+	return registry.filter(
+		(tool) =>
+			!ctx.excluded.has(tool.definition.name) &&
+			toolPolicy(ctx, tool.definition.name) !== "off" &&
+			tool.available(ctx),
+	);
+}
+
+/** A call's input in a line, for the card that asks about it. */
+const inputLine = (input: Record<string, unknown>): string => {
+	const text = JSON.stringify(input);
+	return text.length > 300 ? `${text.slice(0, 300)}…` : text;
+};
 
 export interface ToolResult {
 	readonly text: string;
@@ -181,11 +201,33 @@ export interface ToolResult {
 export async function runTool(name: string, input: unknown, ctx: ToolContext): Promise<ToolResult> {
 	const tool = toolNamed(name);
 	if (tool === undefined) return { text: `There is no tool named ${name}.`, isError: true };
+	const policy = toolPolicy(ctx, name);
+	if (policy === "off") {
+		return { text: `The user turned ${name} off in Settings: do not call it.`, isError: true };
+	}
 	if (ctx.excluded.has(name) || !tool.available(ctx)) {
 		return { text: `${name} is not available now.`, isError: true };
 	}
 	try {
-		return { text: await tool.run(record(input), ctx), isError: false };
+		const given = record(input);
+		// A tool that only reads asks nothing of its own: it is asked about here when the user wants.
+		if (policy === "ask" && tool.risk === "read") {
+			const answer = await ctx.approve({
+				tool: name,
+				risk: /^(?:jira|confluence)_/.test(name) ? "external" : "ui",
+				permission: `tool:${name}`,
+				title: format(ctx.t.approvalUseTool, name),
+				lines: Object.keys(given).length === 0 ? [] : [inputLine(given)],
+				everyTime: true,
+			});
+			if (!answer.approved) {
+				return {
+					text: "The user did not allow it: nothing was read. Do not try again unless they ask.",
+					isError: false,
+				};
+			}
+		}
+		return { text: await tool.run(given, ctx), isError: false };
 	} catch (error) {
 		return {
 			text: `Error: ${error instanceof Error ? error.message : String(error)}`,

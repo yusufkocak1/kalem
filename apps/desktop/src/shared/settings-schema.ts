@@ -27,6 +27,7 @@ import { parseModeSettings } from "./mode-config.js";
 /** The Settings window's categories, in its order. */
 import { PALETTE_IDS, parsePaletteCustom } from "./palette.js";
 import { MAX_DOCK_SIZE, MIN_DOCK_SIZE, parsePanePlaces, TOOL_PANES } from "./panes.js";
+import { parseToolPolicies } from "./tool-protocol.js";
 export const SETTING_CATEGORIES = [
 	"appearance",
 	"editor",
@@ -433,6 +434,27 @@ export const SETTINGS_SCHEMA: Schema = {
 		type: "custom",
 		parse: parsePermissions,
 		keywords: ["izin", "permission", "onay", "approval", "her zaman"],
+		// The assistant may never widen what it is allowed.
+		assistant: "hidden",
+	},
+	assistantToolPolicies: {
+		key: "assistantToolPolicies",
+		category: "assistant",
+		label: null,
+		type: "custom",
+		parse: parseToolPolicies,
+		keywords: [
+			"araç",
+			"araçlar",
+			"tool",
+			"tools",
+			"onay",
+			"approval",
+			"kapalı",
+			"off",
+			"jira",
+			"confluence",
+		],
 		// The assistant may never widen what it is allowed.
 		assistant: "hidden",
 	},
