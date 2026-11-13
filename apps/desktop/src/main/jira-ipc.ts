@@ -228,6 +228,12 @@ export function registerJiraIpc(ctx: JiraIpcContext): {
 		async (_event, key: unknown, add: unknown, remove: unknown) =>
 			(await connected()).updateLabels(text(key, "issue key"), labels(add), labels(remove)),
 	);
+	ipcMain.handle(CHANNEL.jiraSetDescription, async (_event, key: unknown, value: unknown) =>
+		(await connected()).setDescription(
+			text(key, "issue key"),
+			text(value, "description").slice(0, 200_000),
+		),
+	);
 	ipcMain.handle(CHANNEL.jiraLabelSuggestions, async (_event, query: unknown) =>
 		(await connected()).labelSuggestions(text(query, "query").slice(0, 200)),
 	);

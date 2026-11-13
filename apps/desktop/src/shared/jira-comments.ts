@@ -270,3 +270,16 @@ export function applyMentions(text: string, mentions: ReadonlyMap<string, string
 	for (const name of names) result = result.split(`@${name}`).join(mentions.get(name) ?? "");
 	return result;
 }
+
+export function formatDurationLong(
+	seconds: number,
+	dayUnit: string,
+	hourUnit: string,
+	minuteUnit: string,
+): string {
+	const total = Math.max(0, Math.round(seconds / 60));
+	const days = Math.floor(total / 1440);
+	if (days === 0) return formatDurationShort(seconds, hourUnit, minuteUnit);
+	const hours = Math.floor((total % 1440) / 60);
+	return hours === 0 ? `${days}${dayUnit}` : `${days}${dayUnit} ${hours}${hourUnit}`;
+}

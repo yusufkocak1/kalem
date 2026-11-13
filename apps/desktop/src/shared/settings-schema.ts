@@ -22,6 +22,7 @@ import { parseCustomModes } from "./custom-modes.js";
 import { groupName } from "./favorites.js";
 import type { Strings } from "./i18n.js";
 import { format } from "./i18n.js";
+import { parseIssueLayout } from "./jira-layout.js";
 import { parseModeSettings } from "./mode-config.js";
 /** The Settings window's categories, in its order. */
 import { PALETTE_IDS, parsePaletteCustom } from "./palette.js";
@@ -566,6 +567,15 @@ export const SETTINGS_SCHEMA: Schema = {
 		label: null,
 		type: "custom",
 		parse: parseJiraFavorites,
+		keywords: [],
+		assistant: "hidden",
+	},
+	jiraIssueLayout: {
+		key: "jiraIssueLayout",
+		category: "connections",
+		label: null,
+		type: "custom",
+		parse: parseIssueLayout,
 		keywords: [],
 		assistant: "hidden",
 	},

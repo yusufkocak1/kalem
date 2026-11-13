@@ -181,6 +181,8 @@ const jiraDialog = createJiraDialog({
 		updateSettings({ jiraFavorites: favorites });
 		jiraPane.favoritesChanged();
 	},
+	layout: () => settings.jiraIssueLayout,
+	setLayout: (layout) => updateSettings({ jiraIssueLayout: layout }),
 	onIssueChange: () => {
 		if (docks.shown().has("jira")) void jiraPane.refresh();
 	},

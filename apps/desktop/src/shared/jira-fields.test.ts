@@ -59,9 +59,9 @@ describe("custom fields", () => {
 		expect(fields.team?.fieldId).toBe("customfield_2");
 		expect(fields.teamValue).toEqual({ id: "12", name: "Quickres Kırmızı" });
 		expect(fields.parentLink).toEqual({ key: "FT-30468", summary: "" });
-		expect(fields.allFields).toEqual([
-			{ name: "Story Origin", value: "Business Requirement" },
-			{ name: "Team", value: "Kırmızı" },
+		expect(fields.allFields.filter((entry) => !entry.empty).map((e) => [e.name, e.value])).toEqual([
+			["Story Origin", "Business Requirement"],
+			["Team", "Kırmızı"],
 		]);
 	});
 
@@ -82,6 +82,86 @@ describe("custom fields", () => {
 		expect(fieldText({ value: "A", child: { value: "B" } })).toBe("A › B");
 		expect(fieldText(["x", { name: "y" }])).toBe("x, y");
 		expect(fieldText("{summaryBean=...}")).toBe("");
+	});
+});
+
+describe("field values", () => {
+	it("takes the field that has a value when two share a name", () => {
+		const fields = customFieldsOf({
+			names: {
+				customfield_1: "Takım",
+				customfield_2: "Takım",
+				customfield_3: "Sprint",
+				customfield_4: "Sprint",
+			},
+			schema: {
+				customfield_3: { custom: "com.pyxis.greenhopper.jira:gh-sprint" },
+				customfield_4: { custom: "com.pyxis.greenhopper.jira:gh-sprint" },
+			},
+			editmeta: {
+				fields: { customfield_2: { allowedValues: [{ id: 12, name: "Quickres Kırmızı" }] } },
+			},
+			fields: {
+				customfield_1: null,
+				customfield_2: 12,
+				customfield_3: [],
+				customfield_4: [{ id: 5, name: "S5", state: "active", boardId: 3 }],
+			},
+		});
+		expect(fields.team?.fieldId).toBe("customfield_2");
+		expect(fields.teamValue).toEqual({ id: "12", name: "Quickres Kırmızı" });
+		expect(fields.sprintValue?.name).toBe("S5");
+	});
+
+	it("reads time in status, people, dates and select fields", () => {
+		const fields = customFieldsOf(
+			{
+				names: {
+					customfield_1: "Time In Open",
+					customfield_2: "Time In Test",
+					customfield_3: "Analist",
+					customfield_4: "Story Origin",
+					customfield_5: "Odd",
+					customfield_6: "Running",
+				},
+				schema: {
+					customfield_3: { type: "user" },
+					customfield_4: { type: "option", custom: "x:select" },
+				},
+				editmeta: {
+					fields: {
+						customfield_4: { allowedValues: [{ id: "1", value: "Business Requirement" }] },
+					},
+				},
+				fields: {
+					customfield_1:
+						"TimeInStatus(running=false, updateTime=1794560819397, timeInStatus=469176000)",
+					customfield_2: "TimeInStatus(running=false, updateTime=1794560819419, timeInStatus=0)",
+					customfield_3: { name: "kubra", displayName: "KUBRA DANIS - Quickres Analist Takimi" },
+					customfield_4: { id: "1", value: "Business Requirement" },
+					customfield_5: "com.example.Thing@1a2b3c",
+					customfield_6: "TimeInStatus(running=true, updateTime=1000, timeInStatus=500)",
+				},
+			},
+			3000,
+		);
+		const byName = new Map(fields.allFields.map((entry) => [entry.name, entry]));
+		expect(byName.get("Time In Open")).toMatchObject({
+			kind: "duration",
+			durationMs: 469176000,
+			empty: false,
+		});
+		expect(byName.get("Time In Test")?.empty).toBe(true);
+		expect(byName.get("Running")?.durationMs).toBe(2500);
+		expect(byName.get("Analist")).toMatchObject({
+			kind: "person",
+			value: "KUBRA DANIS - Quickres Analist Takimi",
+		});
+		expect(byName.get("Story Origin")).toMatchObject({
+			field: { fieldId: "customfield_4" },
+			option: { id: "1", name: "Business Requirement" },
+		});
+		expect(byName.get("Odd")?.empty).toBe(true);
 	});
 });
 

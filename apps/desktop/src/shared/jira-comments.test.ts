@@ -6,6 +6,7 @@ import {
 	compactCommentHtml,
 	compactCommentText,
 	filterComments,
+	formatDurationLong,
 	formatDurationShort,
 	hasAttachment,
 	isBotAuthor,
@@ -97,6 +98,12 @@ describe("dates and durations", () => {
 		expect(shortDateTime("2025-10-07T11:56:00", "tr", now).short).toContain("2025");
 		expect(shortDateTime("2026-10-07T11:56:00", "tr", now).full).toContain("2026");
 		expect(shortDateTime(null, "tr", now)).toEqual({ short: "", full: "" });
+	});
+
+	it("writes long durations in days and hours", () => {
+		expect(formatDurationLong(469176, "g", "s", "dk")).toBe("5g 10s");
+		expect(formatDurationLong(2 * 86400, "d", "h", "m")).toBe("2d");
+		expect(formatDurationLong(3900, "d", "h", "m")).toBe("1h 5m");
 	});
 
 	it("writes durations with the language's units", () => {

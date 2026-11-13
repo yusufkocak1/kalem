@@ -65,10 +65,10 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 		"FT-30468TK PNRı Olmayan Bilette PNR Alanının Dolu Gelmesi",
 	);
 	await expect(jira.locator(".jira-tab")).toHaveText([
-		"Details",
 		"Comments (4)",
 		"Development",
 		"Sub-tasks (1)",
+		"Linked issues (1)",
 	]);
 	await expect(jira.locator(".jira-meta")).toContainText("Bug");
 	await expect(jira.locator(".jira-journey-step:not(.merge) .jira-journey-label")).toHaveText([
@@ -87,6 +87,40 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await expect(all).toContainText("Story OriginBusiness Requirement");
 	await expect(all).toContainText("TeamKırmızı");
 	await expect(all).toContainText("ReporterMehmet");
+	await expect(all).toContainText("AnalistKubra Danis");
+	await expect(all).toContainText("Time In Open5d 10h");
+	await expect(all).not.toContainText("Time In Test");
+	await expect(all).not.toContainText("TimeInStatus");
+	// The fields shown at the top, their order and the columns are the user's.
+	await all.locator('.jira-field-cell[data-field="customfield_13"] .jira-field-pin').click();
+	const grid = jira.locator(".jira-fields");
+	await expect(grid.locator(".jira-field-cell").last()).toHaveAttribute(
+		"data-field",
+		"customfield_13",
+	);
+	await expect(grid.locator('.jira-field-chip[aria-label="Story Origin"]')).toHaveText(
+		"Business Requirement",
+	);
+	await jira.locator(".jira-layout-toggle").click();
+	await jira.locator('.jira-layout-column[data-columns="2"]').click();
+	await expect(grid).toHaveAttribute("data-columns", "2");
+	await jira.locator('.jira-layout-row[data-field="customfield_13"] .jira-layout-small.up').click();
+	await expect(grid.locator(".jira-field-cell").nth(4)).toHaveAttribute(
+		"data-field",
+		"customfield_13",
+	);
+	await page.keyboard.press("Escape");
+	await expect(jira.locator(".jira-layout-menu")).toBeHidden();
+	await expect
+		.poll(
+			async () =>
+				JSON.parse(await readFile(join(userData, "settings.json"), "utf8")).settings
+					.jiraIssueLayout,
+		)
+		.toEqual({
+			columns: "2",
+			fields: ["assignee", "sprint", "team", "labels", "customfield_13", "time"],
+		});
 	await expect(all).not.toContainText("Branch");
 	await expect(all).not.toContainText("Parent Link");
 
@@ -148,9 +182,29 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await expect(description.locator("li")).toHaveText(["Chrome", "Edge"]);
 	await expect(description).not.toContainText("<div");
 	await expect(description).not.toContainText("\\");
+	await jira.locator('.jira-tab[data-tab="links"]').click();
 	// Links are grouped by how they relate; a Confluence page that mentions it is among them.
 	const mentioned = jira.locator(".jira-link-group", { hasText: "mentioned in" });
 	await expect(mentioned.locator(".jira-remote")).toHaveText("Sprint Planı");
+	// The copy menu opens inside the dialog, toward its left.
+	await jira.locator(".jira-copy-toggle").click();
+	const menuBox = await jira.locator(".jira-copy-menu").boundingBox();
+	const dialogBox = await jira.boundingBox();
+	expect((menuBox?.x ?? 0) + (menuBox?.width ?? 0)).toBeLessThanOrEqual(
+		(dialogBox?.x ?? 0) + (dialogBox?.width ?? 0),
+	);
+	await page.keyboard.press("Escape");
+	// The description is edited in place, with Kalem's editor, and saved as the field keeps it.
+	await jira.locator(".jira-description-edit").click();
+	const editorBox = jira.locator('.jira-description-host [contenteditable="true"]').first();
+	await expect(editorBox).toBeFocused();
+	await page.keyboard.press("Control+End");
+	await page.keyboard.press("Enter");
+	await page.keyboard.type("Firefox");
+	await jira.locator(".jira-description-editor .jira-button.primary").click();
+	await expect.poll(() => jiraServer.edits.at(-1)?.path).toBe("/rest/api/2/issue/QR-1");
+	expect(JSON.stringify(jiraServer.edits.at(-1)?.body)).toContain("<p>Firefox</p>");
+	await expect(jira.locator(".jira-description-editor")).toHaveCount(0);
 	await jira.locator('.jira-tab[data-tab="comments"]').click();
 	const comments = jira.locator(".jira-comment");
 	await expect(comments.nth(0).locator(".jira-comment-author")).toHaveText("Gulden Baykara");
@@ -291,6 +345,7 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await jira.getByRole("button", { name: "Open in Browser" }).click();
 	await expect.poll(opened).toEqual([`${jiraServer.site}/browse/QR-1`]);
 	// The page opens in Kalem, and the dialog closes.
+	await jira.locator('.jira-tab[data-tab="links"]').click();
 	await mentioned.locator(".jira-remote").click();
 	await expect(jira).toBeHidden();
 	await expect(page.locator(".doc-tab", { hasText: "Sprint Planı" })).toHaveCount(1);
