@@ -2033,7 +2033,7 @@ test("offers ways to start and the recent documents under an empty page, until s
 	const start = page.locator(".start-page:visible");
 	await expect(start).toBeVisible();
 	await expect(start.locator(".start-action-label")).toHaveText([
-		"From a template",
+		"From a document template",
 		"Open a file",
 		"Open a folder",
 		"Import from Word",

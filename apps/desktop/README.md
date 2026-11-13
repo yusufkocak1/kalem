@@ -850,8 +850,12 @@ verir.
 >     hatırlanmaz; araç Ayarlar'da "sormadan çalıştır" yapılsa da sorulur.
 >     Değişiklik o moddaki bir sonraki sorudan itibaren geçerlidir.
 >     Ayrıntılı kullanım: [`docs/05-mcp-sunuculari.md`](../../docs/05-mcp-sunuculari.md).
-> - **Analiz şablonları:** **Dosya → Şablondan Yeni…** ve **Dosya → Ayarlar →
->   Şablonlar**. Ekip şablonları açık klasörün `.kalem/templates/`
+> - **Doküman şablonları:** **Dosya → Doküman Şablonundan Yeni…** ve
+>   **Dosya → Ayarlar → Doküman Şablonları**. Şablonlar yalnız analiz için
+>   değildir (rapor, toplantı notu, test planı…): asistanda **+ → Doküman
+>   Şablonu Kullan** ile seçilen şablon, hangi modda olunursa olsun soruyla
+>   gider; asistan o şablona göre yazar, inceler, analiz eder ya da rapor
+>   verir (seçim kaldırılana kadar kalır). Ekip şablonları açık klasörün `.kalem/templates/`
 >   klasöründe (Git ile paylaşılır; aynı adlı kişisel şablonun önüne geçer),
 >   kişisel şablonlar uygulama verisinde durur; Kalem ile bir *best practice*
 >   şablonu gelir (salt okunur, **Kopyala ve Uyarla** ile kişiselleştirilir).

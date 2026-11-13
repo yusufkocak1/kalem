@@ -786,8 +786,10 @@ test("templates: the team's and the user's own, a default, and new documents fro
 	await expect(block.locator(".settings-template").last()).toContainText("Default");
 
 	// The active document kept as the user's own template.
-	await block.getByRole("button", { name: "Keep the Active Document as a Template…" }).click();
-	await block.getByLabel("The template's name").fill("Benim Şablonum");
+	await block
+		.getByRole("button", { name: "Keep the Active Document as a Document Template…" })
+		.click();
+	await block.getByLabel("The document template's name").fill("Benim Şablonum");
 	await block.getByRole("button", { name: "Save" }).click();
 	await expect(block.locator(".settings-template")).toHaveCount(3);
 	await expect(block.locator(".settings-template").nth(1)).toContainText("Mine");
@@ -796,7 +798,7 @@ test("templates: the team's and the user's own, a default, and new documents fro
 	await block.locator(".settings-template").first().locator('input[type="radio"]').check();
 	await dialog.getByRole("button", { name: "Done" }).click();
 
-	await clickMenu(app, "File", "New from Template…");
+	await clickMenu(app, "File", "New from Document Template…");
 	const picker = page.locator(".template-picker");
 	await expect(picker.locator(".template-item").first()).toContainText("Kurum Analiz Şablonu");
 	await expect(picker.locator(".template-item").first()).toContainText("Default");
@@ -805,6 +807,66 @@ test("templates: the team's and the user's own, a default, and new documents fro
 	await expect(page.locator("#editor h2")).toHaveText(["Amaç", "Kapsam"]);
 	expect(errors).toEqual([]);
 	await stubMessageBox(app, 1);
+	await app.close();
+});
+
+test("document templates in the assistant: picked in any mode, the question is asked by it", async () => {
+	const folder = await tempDir("agent-template-pick");
+	const doc = join(folder, "notlar.md");
+	await writeFile(doc, "# Sprint 12\n\nGiriş ekranı bitti.\n");
+	const claude = await fakeClaude(folder, "Rapor hazır.", []);
+	const userData = await tempDir("profile");
+	await mkdir(join(userData, "templates"), { recursive: true });
+	await writeFile(
+		join(userData, "templates", "haftalik.md"),
+		'---\nkalem-template: "Haftalık Rapor"\nrequired: [Bu Hafta, Gelecek Hafta]\n---\n# {{title}}\n\n## Bu Hafta\n\n## Gelecek Hafta\n',
+	);
+	await writeFile(
+		join(userData, "settings.json"),
+		JSON.stringify({
+			settings: { language: "en", theme: "light", restoreSession: false, assistant: true },
+			welcomed: true,
+		}),
+	);
+	const { app, page, errors } = await launch({
+		userData,
+		args: [doc],
+		env: { KALEM_CLAUDE: claude.path },
+	});
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
+
+	// + → Use a Document Template lists them all; one is picked for the questions.
+	await pane.locator(".assistant-add").click();
+	await pane.getByRole("menuitem", { name: "Use a Document Template" }).click();
+	const items = pane.locator(".assistant-add-menu .assistant-add-item");
+	await expect(items).toHaveText(["Haftalık Rapor", "Software Analysis Document (best practice)"]);
+	await items.first().click();
+	const chip = pane.locator(".assistant-template-chip");
+	await expect(chip).toHaveText("Template: Haftalık Rapor");
+
+	// A plain question (no analysis mode) is asked by it too.
+	await pane.locator(".assistant-input").fill("Bu haftanın raporunu yaz");
+	await pane.locator(".assistant-input").press("Enter");
+	await expect(pane.locator(".assistant-user .assistant-notes")).toContainText(
+		"By the document template “Haftalık Rapor”",
+	);
+	await expect(pane.locator(".assistant-assistant")).toContainText("Rapor hazır.");
+	const systemOf = (call: Call | undefined): string =>
+		call?.args[call.args.indexOf("--append-system-prompt") + 1] ?? "";
+	const first = systemOf((await claude.calls()).at(-1));
+	expect(first).toContain('## Document template: "Haftalık Rapor"');
+	expect(first).toContain("## Gelecek Hafta");
+
+	// Taken off, the next question goes without it.
+	await chip.getByRole("button").click();
+	await expect(chip).toHaveCount(0);
+	await pane.getByRole("button", { name: "New chat" }).first().click();
+	await pane.locator(".assistant-input").fill("Teşekkürler");
+	await pane.locator(".assistant-input").press("Enter");
+	await expect.poll(async () => (await claude.calls()).length).toBe(2);
+	expect(systemOf((await claude.calls()).at(-1))).not.toContain("## Document template");
+	expect(errors).toEqual([]);
 	await app.close();
 });
 
