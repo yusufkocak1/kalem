@@ -13,6 +13,7 @@ import { clampAssistantWidth, DEFAULT_SETTINGS, MIN_ASSISTANT_WIDTH } from "../s
 import type { ChatSummary, StoredChat, StoredMessage } from "../shared/chats.js";
 import { chatTitle, historyOf } from "../shared/chats.js";
 import type {
+	CheckProgress,
 	ClaudeEvent,
 	ContextDiagram,
 	PlanStep,
@@ -30,10 +31,13 @@ import type { Finding, FindingEdit } from "../shared/findings.js";
 import {
 	addToQuestions,
 	hasQuestions,
+	hasSection,
 	noteBlock,
 	questionLine,
 	revertFindingEdit,
+	sectionHeading,
 	withNoteAfter,
+	withSections,
 } from "../shared/findings.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
@@ -51,10 +55,17 @@ import type { SlashEntry } from "../shared/slash.js";
 import { findSlash, matchSlash, slashQuery } from "../shared/slash.js";
 import type { ApprovalRequest } from "../shared/tool-protocol.js";
 import { withoutToolCalls } from "../shared/tool-protocol.js";
-import type { ApprovalState, MadeChange, Usage } from "./assistant-agent.js";
-import { approvalCard, changeLine, planCard, usageText } from "./assistant-agent.js";
-import type { FindingState } from "./assistant-review.js";
-import { findingsCard } from "./assistant-review.js";
+import type { ApprovalState, ChecksView, MadeChange, Usage } from "./assistant-agent.js";
+import {
+	approvalCard,
+	changeLine,
+	checksCard,
+	duration,
+	planCard,
+	usageText,
+} from "./assistant-agent.js";
+import type { FindingState, ReviewView } from "./assistant-review.js";
+import { findingsCard, reviewView } from "./assistant-review.js";
 import { createAssistantSettings } from "./assistant-settings.js";
 import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
@@ -156,6 +167,11 @@ interface Message {
 	usage?: Usage;
 	/** Problems a review found in the document. */
 	findings?: Finding[];
+	/** The review run side by side that this reply ran: its id, and how its checks went. */
+	review?: string;
+	checks?: readonly CheckProgress[];
+	/** Whether Kalem ran the rule checks before them. */
+	rulesRan?: boolean;
 }
 
 /** A reply's text as the user sees it: without the look-ups and tool calls written in it. */
@@ -1963,6 +1979,20 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		if (steps !== null) nodes.unshift(steps);
 		if (message.plan !== undefined && message.plan.length > 0)
 			nodes.unshift(planCard(t, message.plan));
+		const review = message.review;
+		if (message.checks !== undefined && message.checks.length > 0 && review !== undefined) {
+			nodes.unshift(
+				checksCard(t, host.lang, {
+					checks: message.checks,
+					rules: message.rulesRan === true,
+					done: message.done,
+					now: Date.now(),
+					view: checksViewOf(message),
+					step: stepLabel,
+					retry: (index) => void bridge.assistantRetryCheck(review, index),
+				}),
+			);
+		}
 		for (const proposed of message.edits ?? []) nodes.push(editCard(proposed));
 		if (message.findings !== undefined && message.findings.length > 0) {
 			nodes.push(
@@ -1971,6 +2001,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					message.findings,
 					(finding) => findingStates.get(finding) ?? "open",
 					reviewActions(message),
+					viewOf(message),
 				),
 			);
 		}
@@ -2494,10 +2525,36 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 	// --- Asking --------------------------------------------------------------------
 
+	/** The reply that ran a review: it keeps its events after it ended (a check run again). */
+	function reviewReply(chat: Chat, review: string): Message | null {
+		for (let i = chat.messages.length - 1; i >= 0; i--) {
+			const message = chat.messages[i] as Message;
+			if (message.review === review) return message;
+		}
+		if (chat.reply !== null && chat.reply.review === undefined) {
+			chat.reply.review = review;
+			return chat.reply;
+		}
+		return null;
+	}
+
 	bridge.onAssistantEvent((id, event: ClaudeEvent) => {
 		const chat = chats.get(id);
-		const reply = chat?.reply;
-		if (chat === undefined || reply == null) return;
+		if (chat === undefined) return;
+		if (event.kind === "checks" || (event.kind === "findings" && event.review !== undefined)) {
+			const ran = reviewReply(chat, event.review as string);
+			if (ran === null) return;
+			if (event.kind === "findings") onFindings(chat.id, ran, event.findings);
+			else {
+				ran.checks = event.checks;
+				ran.rulesRan = event.rules;
+				if (event.checks.some((check) => check.status === "running")) tickChecks();
+				if (chat === active) scheduleRender(ran);
+			}
+			return;
+		}
+		const reply = chat.reply;
+		if (reply == null) return;
 		switch (event.kind) {
 			case "session":
 				chat.sessionId = event.id;
@@ -2569,8 +2626,52 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		scheduleRender(reply);
 	}
 
+	/** Whether each finished review's checks are shown opened. */
+	const checksViews = new WeakMap<Message, ChecksView>();
+	const checksViewOf = (message: Message): ChecksView => {
+		let view = checksViews.get(message);
+		if (view === undefined) {
+			view = { open: null };
+			checksViews.set(message, view);
+		}
+		return view;
+	};
+
+	/**
+	 * The running checks' times count up in place, once a second, without
+	 * drawing the reply again (which would take a click half-way).
+	 */
+	let checksTicker: ReturnType<typeof setInterval> | null = null;
+	function tickChecks(): void {
+		if (checksTicker !== null) return;
+		checksTicker = setInterval(() => {
+			const times = log.querySelectorAll<HTMLElement>(".assistant-check-time[data-started]");
+			const now = Date.now();
+			for (const time of times) time.textContent = duration(now - Number(time.dataset.started));
+			const running = [...chats.values()].some((chat) =>
+				chat.messages.some((message) =>
+					(message.checks ?? []).some((check) => check.status === "running"),
+				),
+			);
+			if (!running && checksTicker !== null) {
+				clearInterval(checksTicker);
+				checksTicker = null;
+			}
+		}, 1000);
+	}
+
 	/** What became of each finding, for this run. */
 	const findingStates = new WeakMap<Finding, FindingState>();
+	/** How each reply's findings are shown: the filters, what is opened. */
+	const reviewViews = new WeakMap<Message, ReviewView>();
+	const viewOf = (message: Message): ReviewView => {
+		let view = reviewViews.get(message);
+		if (view === undefined) {
+			view = reviewView();
+			reviewViews.set(message, view);
+		}
+		return view;
+	};
 
 	const openFindings = (message: Message): Finding[] =>
 		(message.findings ?? []).filter((finding) => (findingStates.get(finding) ?? "open") === "open");
@@ -2634,6 +2735,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				return (record.edit.note.split("\n")[0] ?? "").replace(/^>\s*/, "");
 			case "asked":
 				return record.edit.line.replace(/^-\s*\[ \]\s*/, "");
+			case "added":
+				return record.edit.heading.replace(/^#{1,6}\s+/, "");
 		}
 	}
 
@@ -2761,6 +2864,46 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			},
 			dismiss(finding: Finding) {
 				settle(finding, "dismissed");
+			},
+			async addSections(findings: readonly Finding[]) {
+				const adding = findings.filter(
+					(finding) =>
+						finding.missingSection !== undefined &&
+						(findingStates.get(finding) ?? "open") === "open",
+				);
+				if (adding.length === 0) return;
+				const names = adding.map((finding) => finding.missingSection as string);
+				const label =
+					adding.length === 1 ? `${adding[0]?.id}: ${t.reviewAddSection}` : t.reviewAddSections;
+				// A section the document has by now is not added again, nor taken away on undo.
+				let text: string;
+				try {
+					text = (await host.context()).text;
+				} catch (error) {
+					showNotice(format(t.assistantActionFailed, host.errorText(error)));
+					return;
+				}
+				const added = adding.filter(
+					(finding) => !hasSection(text, finding.missingSection as string),
+				);
+				if (added.length > 0) {
+					const made = await changeDocument(message, label, (now) => [
+						{ type: "document", text: withSections(now, names) },
+					]);
+					if (made === null) return;
+					remember(added, made, (finding) => ({
+						kind: "added",
+						heading: sectionHeading(finding.missingSection as string),
+					}));
+				}
+				for (const finding of adding) findingStates.set(finding, "fixed");
+				markOpen(message);
+				renderReply(message);
+				const first = adding[0];
+				if (first !== undefined) revealFinding(first);
+			},
+			redraw() {
+				renderReply(message);
 			},
 			undo(finding: Finding) {
 				void undoFinding(message, finding);

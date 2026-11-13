@@ -296,14 +296,20 @@ test("a review lists the rules' and the model's findings, and the user fixes the
 		.poll(() => page.evaluate(() => CSS.highlights.get("kalem-findings")?.size ?? 0))
 		.toBeGreaterThan(0);
 
-	await review.locator('[data-finding="F-01"]').getByRole("button", { name: "Fix" }).click();
+	// Each finding is one line, with its kind; opening it shows what can be done.
+	const first = review.locator('[data-finding="F-01"]');
+	await expect(first.locator(".assistant-finding-kind")).toHaveText("Ambiguity");
+	await expect(first.getByRole("button", { name: "Fix" })).toHaveCount(0);
+	await first.locator(".assistant-finding-row").click();
+	await expect(first.locator(".assistant-finding-row")).toHaveAttribute("aria-expanded", "true");
+	await first.getByRole("button", { name: "Fix" }).click();
 	await expect(page.locator("#editor p", { hasText: "saniye" })).toHaveText(
 		"İptal 2 saniye içinde onaylanmalı.",
 	);
-	await expect(review.locator('[data-finding="F-01"]')).toContainText("Fixed");
+	// What was just done stays in sight, with its undo.
+	await expect(first).toContainText("Fixed");
 
 	// Changed one's mind: the fix is undone, and the finding can be fixed again.
-	const first = review.locator('[data-finding="F-01"]');
 	await first.getByRole("button", { name: "Undo" }).click();
 	await expect(page.locator("#editor p", { hasText: "İptal hızlı" })).toHaveText(
 		"İptal hızlı yapılmalı.",
@@ -332,10 +338,9 @@ test("a review lists the rules' and the model's findings, and the user fixes the
 	);
 	await expect(first).toContainText("Fixed");
 
-	await review
-		.locator('[data-finding="F-02"]')
-		.getByRole("button", { name: "Add to Open Questions" })
-		.click();
+	const second = review.locator('[data-finding="F-02"]');
+	await second.locator(".assistant-finding-row").click();
+	await second.getByRole("button", { name: "Add to Open Questions" }).click();
 	await expect(page.locator("#editor h2", { hasText: "Open Questions" })).toBeVisible();
 	await expect(page.locator("#editor li", { hasText: "F-02" })).toContainText(
 		"F-02: Kargodaki sipariş iptal edilebilir mi? (FR-01: İptal)",
@@ -372,12 +377,99 @@ test("a review lists the rules' and the model's findings, and the user fixes the
 	await expect(review.locator(".assistant-finding:not(:has(.assistant-finding-rule))")).toHaveCount(
 		2,
 	);
-	// The rules' findings too, though the answer ran the rules again.
-	await expect(review.locator(".assistant-finding:has(.assistant-finding-rule)")).toHaveCount(9);
-	await expect(pane.locator(".assistant-plan li.plan-done")).toHaveCount(5);
+	// The rules' findings too, though the answer ran the rules again: the seven missing
+	// sections as one item, the vague word and the criteria.
+	await expect(review.locator(".assistant-finding:has(.assistant-finding-rule)")).toHaveCount(3);
+	const sections = review.locator('[data-sections="7"]');
+	await expect(sections).toContainText("7 sections of the template are missing");
+	await sections.locator(".assistant-finding-row").click();
+	await sections.getByRole("button", { name: "Add All Sections" }).click();
+	await expect(page.locator("#editor h2", { hasText: "Glossary" })).toBeVisible();
+	// Open Questions was there by now (F-02): it is not added twice.
+	await expect(page.locator("#editor h2", { hasText: "Open Questions" })).toHaveCount(1);
+	await expect(sections.locator(".assistant-section.finding-fixed")).toHaveCount(7);
+	// Closed, what was dealt with goes under its own heading at the end.
+	await sections.locator(".assistant-finding-row").click();
+	await first.locator(".assistant-finding-row").click();
+	await second.locator(".assistant-finding-row").click();
+	await expect(review.locator(".assistant-review-done > summary")).toHaveText("Dealt with (9)");
+	// The counts filter the list.
+	await expect(review.getByRole("button", { name: "Medium 1" })).toBeEnabled();
+	await review.getByRole("button", { name: "Medium 1" }).click();
+	await expect(review.getByRole("button", { name: "Medium 1" })).toHaveAttribute(
+		"aria-pressed",
+		"true",
+	);
+	await expect(review.locator(".assistant-review-hidden")).toContainText("9 hidden by the filter");
+	await review.getByRole("button", { name: "Show all" }).click();
+	await expect(review.locator(".assistant-review-hidden")).toHaveCount(0);
+
+	// The checks: one line once all is done, opening to each with its time.
+	const checks = pane.locator(".assistant-checks-done");
+	await expect(checks.locator("summary")).toContainText("5 checks · 2 findings ·");
+	await checks.locator("summary").click();
+	await expect(checks.locator(".assistant-check.check-done")).toHaveCount(5);
+	await expect(checks.locator(".assistant-check").first()).toContainText("Scope check");
 	expect(errors).toEqual([]);
 	// "Don't Save" for the changed document.
 	await stubMessageBox(app, 1);
+	await app.close();
+});
+
+test("a review's check that failed says why, and runs again on its own", async () => {
+	const folder = await tempDir("agent-review-retry");
+	const doc = join(folder, "iptal.md");
+	await writeFile(doc, "# Sipariş İptali\n\n## Amaç ve Kapsam\n\nİptal hızlı yapılmalı.\n");
+	const claude = await fakeClaude(
+		folder,
+		"İnceleme bitti.",
+		[
+			{
+				name: "report_findings",
+				input: {
+					findings: [{ severity: "high", quote: "İptal hızlı yapılmalı.", problem: "Ölçülemez." }],
+				},
+			},
+		],
+		{ failOnce: "Look for missing security" },
+	);
+	const { app, page, errors } = await launch({
+		args: [doc],
+		settings: { assistant: true },
+		env: { KALEM_CLAUDE: claude.path },
+	});
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
+	await pane.locator(".assistant-mode").click();
+	await pane.locator('.assistant-mode-item[data-mode="review"]').click();
+	await pane.locator(".assistant-input").fill("İncele");
+	await pane.locator(".assistant-input").press("Enter");
+	await expect(pane.locator(".assistant-assistant")).toContainText("İnceleme bitti.");
+
+	// A failed check keeps the card open, with why.
+	const checks = pane.locator(".assistant-checks-done");
+	await expect(checks).toHaveAttribute("open", "");
+	await expect(checks.locator("summary")).toContainText("1 failed");
+	const failed = checks.locator(".assistant-check.check-failed");
+	await expect(failed).toHaveCount(1);
+	await expect(failed).toContainText("Security, privacy and permissions");
+	await expect(failed).toContainText("Could not finish: rate limited");
+	// The answer was told, and summed up the others.
+	const before = await claude.calls();
+	expect(before.at(-1)?.prompt).toContain("These checks could not be made, say so: Security");
+
+	await failed.getByRole("button", { name: "Try Again" }).click();
+	await expect(checks.locator(".assistant-check.check-failed")).toHaveCount(0);
+	await expect(checks.locator(".assistant-check.check-done")).toHaveCount(5);
+	await expect(checks.locator("summary")).not.toContainText("failed");
+	const after = await claude.calls();
+	expect(after).toHaveLength(before.length + 1);
+	expect(after.at(-1)?.args.join(" ")).toContain("Look for missing security");
+	// Only one reviewer ran again, and no conversation was resumed for it.
+	expect(after.at(-1)?.args).not.toContain("--resume");
+	// What it reported was in the list already: it is not listed twice.
+	await expect(pane.locator('.assistant-finding[data-finding="F-01"]')).toHaveCount(1);
+	expect(errors).toEqual([]);
 	await app.close();
 });
 

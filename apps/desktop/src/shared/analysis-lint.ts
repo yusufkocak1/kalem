@@ -164,6 +164,7 @@ export function lintAnalysis(
 				problem: fill(say.missingSection, required),
 				suggestion: `## ${required}\n\n`,
 				question: "",
+				missingSection: required.trim(),
 			});
 		}
 	}

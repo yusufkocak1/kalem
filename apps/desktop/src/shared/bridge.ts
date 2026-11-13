@@ -1015,6 +1015,8 @@ export interface KalemBridge {
 	/** Asks the assistant; resolves when the reply has ended. */
 	assistantAsk(request: AssistantRequest): Promise<void>;
 	assistantStop(chatId: string): Promise<void>;
+	/** Runs a check of a review run side by side again, one that failed. */
+	assistantRetryCheck(review: string, index: number): Promise<void>;
 	/** Asks for files or a folder to add to a chat; empty when cancelled. */
 	assistantPickSources(kind: "files" | "folder"): Promise<string[]>;
 	/** Writes a change the assistant proposed to a workspace file. */
@@ -1184,6 +1186,7 @@ export const CHANNEL = {
 	assistantDeleteChat: "kalem:assistant-delete-chat",
 	assistantAsk: "kalem:assistant-ask",
 	assistantStop: "kalem:assistant-stop",
+	assistantRetryCheck: "kalem:assistant-retry-check",
 	assistantPickSources: "kalem:assistant-pick-sources",
 	assistantApplyEdit: "kalem:assistant-apply-edit",
 	assistantEvent: "kalem:assistant-event",
