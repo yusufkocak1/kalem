@@ -1033,11 +1033,23 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 	// --- Commands ------------------------------------------------------------------
 
+	interface CommandChoice {
+		readonly value: string;
+		readonly label: string;
+		/** The one in use now: marked, and first. */
+		readonly current?: boolean;
+		pick(): void;
+	}
+
 	interface ChatCommand extends SlashEntry {
 		/** What the argument is, for a command that takes one. */
 		readonly argument?: string;
 		/** One of Claude Code's (a plugin's, the user's), which Claude Code runs. */
 		readonly cli?: boolean;
+		/** The values its argument takes, listed in the menu once its name is typed (the models). */
+		choices?(): readonly CommandChoice[];
+		/** What the menu shows instead of `/name <argument>`: a choice's name. */
+		readonly shown?: string;
 		run(arg: string): void;
 	}
 
@@ -1060,11 +1072,13 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			name: "model",
 			label: t.slashModel,
 			argument: t.assistantModel,
+			choices: () => modelChoices(),
 			run(arg) {
 				if (arg !== "") void setModel(arg);
 				else {
-					modelSelect.focus();
-					modelSelect.showPicker?.();
+					input.value = "/model ";
+					input.focus();
+					updateMenu();
 				}
 			},
 		},
@@ -1255,18 +1269,42 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 	function updateMenu(fresh = true): void {
 		const query = slashQuery(input.value);
-		if (query === null || query.complete) {
+		if (query === null) {
 			hideMenu();
 			return;
 		}
-		if (fresh) refreshCliCommands();
-		const keep = menuItems[menuIndex]?.name;
-		menuItems = matchSlash(allCommands(), query.name, host.lang);
+		const keep = menuItems[menuIndex]?.shown ?? menuItems[menuIndex]?.name;
+		if (query.complete) {
+			// A command whose argument has values to pick from lists them as it is typed.
+			const command = findSlash(allCommands(), query.name, host.lang);
+			if (command?.choices === undefined) {
+				hideMenu();
+				return;
+			}
+			const typed = query.arg.toLocaleLowerCase(host.lang);
+			menuItems = command
+				.choices()
+				.filter(
+					(choice) =>
+						typed === "" ||
+						choice.value.toLocaleLowerCase(host.lang).includes(typed) ||
+						choice.label.toLocaleLowerCase(host.lang).includes(typed),
+				)
+				.map((choice) => ({
+					name: command.name,
+					shown: `${choice.current === true ? "✓ " : ""}${choice.label}`,
+					label: choice.value === choice.label ? "" : choice.value,
+					run: () => choice.pick(),
+				}));
+		} else {
+			if (fresh) refreshCliCommands();
+			menuItems = matchSlash(allCommands(), query.name, host.lang);
+		}
 		menuIndex = fresh
 			? 0
 			: Math.max(
 					0,
-					menuItems.findIndex((command) => command.name === keep),
+					menuItems.findIndex((command) => (command.shown ?? command.name) === keep),
 				);
 		if (menuItems.length === 0) {
 			hideMenu();
@@ -1281,7 +1319,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		menu.replaceChildren(
 			...menuItems.map((command, index) => {
 				const item = el("li", {
-					class: "assistant-command",
+					class: `assistant-command${command.shown === undefined ? "" : " assistant-command-choice"}`,
 					attrs: {
 						id: `assistant-command-${index}`,
 						role: "option",
@@ -1290,7 +1328,9 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					children: [
 						el("span", {
 							class: "assistant-command-name",
-							text: `/${command.name}${command.argument === undefined ? "" : ` <${command.argument}>`}`,
+							text:
+								command.shown ??
+								`/${command.name}${command.argument === undefined ? "" : ` <${command.argument}>`}`,
 						}),
 						el("span", { class: "assistant-command-label", text: command.label }),
 						...(command.cli === true
@@ -1323,6 +1363,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		if (command.argument !== undefined) {
 			input.value = `/${command.name} `;
 			input.focus();
+			// Its values, if it has some to pick from, are listed at once.
+			if (command.choices !== undefined) updateMenu();
 			return;
 		}
 		input.value = "";
@@ -1505,6 +1547,34 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	/** The models offered for each service, asked for once. */
 	const modelLists = new Map<ProviderId, readonly ModelOption[]>();
 
+	/** The models to pick from with /model: the one in use first, then the service's list. */
+	function modelChoices(): CommandChoice[] {
+		if (status === null) return [];
+		renderModels();
+		const now = status.model;
+		const provider = status.provider;
+		const listed: readonly ModelOption[] = modelLists.get(provider)?.length
+			? (modelLists.get(provider) as readonly ModelOption[])
+			: (SUGGESTED_MODELS[provider] ?? []).map((id) => ({ id, label: id }));
+		const options: ModelOption[] = [
+			...(isCli(PROVIDER_INFO[provider]) ? [{ id: "", label: t.assistantDefaultModel }] : []),
+			...(now === "" || listed.some((option) => option.id === now)
+				? []
+				: [{ id: now, label: now }]),
+			...listed,
+		];
+		const choices = options.map((option) => ({
+			value: option.id,
+			label: option.label,
+			current: option.id === now,
+			pick: () => void setModel(option.id),
+		}));
+		return [
+			...choices.filter((choice) => choice.current),
+			...choices.filter((choice) => !choice.current),
+		];
+	}
+
 	/** Fills the model picker from the service's list (fetched once), the model in use first. */
 	function renderModels(): void {
 		if (status === null) return;
@@ -1533,6 +1603,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			.then((found) => {
 				modelLists.set(provider, found);
 				if (status?.provider === provider) renderModels();
+				// A /model menu open now shows the whole list.
+				if (!menu.hidden && slashQuery(input.value)?.complete === true) updateMenu(false);
 			})
 			.catch(() => {});
 	}
