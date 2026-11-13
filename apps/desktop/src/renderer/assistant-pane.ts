@@ -1460,7 +1460,13 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			.catch(() => {});
 	}
 
+	/** What the "not found" view was last drawn for; drawn again only when that changes, so a path being typed stays. */
+	let missingFor = "";
+
 	function renderMissing(): void {
+		const drawnFor = JSON.stringify([status?.missing, status?.provider, status?.offered ?? []]);
+		if (drawnFor === missingFor) return;
+		missingFor = drawnFor;
 		const setUp = button(t.assistantSetUp, { class: "assistant-primary" });
 		setUp.addEventListener("click", () => void setView("settings"));
 		if (status?.missing === "setup") {
@@ -1473,19 +1479,75 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		}
 		const copilot = status?.provider === "copilot";
 		const install = INSTALL[copilot ? "copilot" : "claude-code"];
+		/** Asks the main process, then draws the answer; the view is drawn anew even when nothing changed. */
+		const ask = async (request: () => Promise<AssistantStatus>): Promise<void> => {
+			try {
+				status = await request();
+			} catch {
+				// The view is drawn again as it was, with its buttons to press again.
+			}
+			missingFor = "";
+			render();
+		};
 		const guide = button(t.assistantInstall, { class: "assistant-link" });
 		guide.addEventListener("click", () => host.openLink(install.url));
 		const locate = button(t.assistantLocate);
-		locate.addEventListener("click", async () => {
-			status = await bridge.assistantLocate();
-			render();
-		});
+		locate.addEventListener("click", () => void ask(() => bridge.assistantLocate()));
 		const retry = button(t.assistantRetry);
-		retry.addEventListener("click", async () => {
+		retry.addEventListener("click", () => {
 			retry.disabled = true;
-			status = await bridge.assistantStatus(true);
-			retry.disabled = false;
-			render();
+			void ask(() => bridge.assistantStatus(true));
+		});
+		// Through this computer's folders: where a company's policy hides a drive, the file dialog cannot show the program.
+		const search = button(t.assistantSearch, { class: "assistant-primary" });
+		search.addEventListener("click", () => {
+			search.disabled = true;
+			search.textContent = t.assistantSearching;
+			void ask(() => bridge.assistantSearch());
+		});
+		// What going through the folders found; none was started.
+		const offered = (status?.offered ?? []).map((path) => {
+			const use = button(t.assistantUse);
+			use.addEventListener("click", () => {
+				use.disabled = true;
+				void ask(() => bridge.assistantUseFound(path));
+			});
+			return el("div", {
+				class: "assistant-offered",
+				children: [el("code", { class: "assistant-offered-path", text: path }), use],
+			});
+		});
+		const path = el("input", {
+			class: "assistant-path",
+			attrs: {
+				type: "text",
+				spellcheck: "false",
+				placeholder: t.assistantPathPlaceholder,
+				"aria-label": t.assistantPathPlaceholder,
+			},
+		});
+		const usePath = button(t.assistantUse);
+		const submit = (): void => {
+			const typed = path.value.trim();
+			if (typed === "") return;
+			usePath.disabled = true;
+			void ask(() => bridge.assistantUsePath(typed));
+		};
+		usePath.addEventListener("click", submit);
+		path.addEventListener("keydown", (event) => {
+			if (event.key === "Enter") submit();
+		});
+		const report = button(t.assistantSearchReport, { class: "assistant-link" });
+		report.addEventListener("click", () => {
+			void bridge
+				.assistantSearchReport()
+				.then((text) => navigator.clipboard.writeText(text))
+				.then(() => {
+					report.textContent = t.assistantCopied;
+					setTimeout(() => {
+						report.textContent = t.assistantSearchReport;
+					}, 1200);
+				});
 		});
 		const useApi = button(t.assistantUseApi);
 		useApi.addEventListener("click", () => void setView("settings"));
@@ -1494,6 +1556,15 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				class: "assistant-empty-title",
 				text: copilot ? t.copilotMissing : t.assistantMissing,
 			}),
+			...(offered.length === 0
+				? []
+				: [
+						el("p", {
+							class: "assistant-empty-hint",
+							text: copilot ? t.copilotOffered : t.assistantOffered,
+						}),
+						el("div", { class: "assistant-offered-list", children: offered }),
+					]),
 			el("p", {
 				class: "assistant-empty-hint",
 				text: copilot ? t.copilotMissingHint : t.assistantMissingHint,
@@ -1503,7 +1574,11 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				class: "assistant-empty-hint",
 				text: copilot ? t.copilotMissingLogin : t.assistantMissingLogin,
 			}),
-			el("div", { class: "assistant-missing-actions", children: [guide, locate, retry] }),
+			el("div", { class: "assistant-missing-actions", children: [guide, retry] }),
+			el("p", { class: "assistant-empty-hint", text: t.assistantSearchHint }),
+			el("div", { class: "assistant-missing-actions", children: [search, locate] }),
+			el("div", { class: "assistant-path-row", children: [path, usePath] }),
+			el("div", { class: "assistant-missing-actions", children: [report] }),
 			el("p", { class: "assistant-empty-hint", text: t.assistantOrApi }),
 			el("div", { class: "assistant-missing-actions", children: [useApi] }),
 		);

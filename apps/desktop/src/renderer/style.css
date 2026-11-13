@@ -998,6 +998,53 @@ button {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 6px;
+	margin: 0 0 12px;
+}
+
+.assistant-path-row {
+	display: flex;
+	gap: 6px;
+	margin: 0 0 8px;
+}
+
+.assistant-path {
+	flex: 1;
+	min-width: 0;
+	padding: 4px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 12px;
+}
+
+.assistant-path:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -1px;
+}
+
+.assistant-offered-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin: 0 0 12px;
+}
+
+.assistant-offered {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.assistant-offered-path {
+	flex: 1;
+	min-width: 0;
+	padding: 6px 8px;
+	border-radius: 6px;
+	background: var(--app-raised);
+	font-size: 12px;
+	overflow-wrap: anywhere;
 }
 
 .assistant-message {

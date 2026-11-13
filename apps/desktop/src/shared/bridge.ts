@@ -622,6 +622,11 @@ export interface AssistantStatus {
 	readonly detail: string;
 	/** What keeps it from being ready: the CLI is not installed, or the service is not set up. */
 	readonly missing: "cli" | "setup" | null;
+	/**
+	 * Files that may be the missing CLI, found by going through this
+	 * computer's folders; none was started. The user picks one to use it.
+	 */
+	readonly offered?: readonly string[];
 }
 
 /** One question to the assistant; the reply comes through `onAssistantEvent`. */
@@ -965,6 +970,14 @@ export interface KalemBridge {
 	}): Promise<readonly ModelOption[]>;
 	/** Lets the user pick the program of the CLI in use. */
 	assistantLocate(): Promise<AssistantStatus>;
+	/** Uses the CLI at a path the user typed (its file, or a folder it is in), once they say so. */
+	assistantUsePath(path: string): Promise<AssistantStatus>;
+	/** Looks for the CLI in use through this computer's folders; what is found comes as `offered`. */
+	assistantSearch(): Promise<AssistantStatus>;
+	/** Uses a file the search offered. */
+	assistantUseFound(path: string): Promise<AssistantStatus>;
+	/** Where the CLI in use was looked for and what each file there answered, to send on. */
+	assistantSearchReport(): Promise<string>;
 	/** The kept chats, newest first. */
 	assistantChats(): Promise<readonly ChatSummary[]>;
 	assistantChat(id: string): Promise<StoredChat | null>;
@@ -1120,6 +1133,10 @@ export const CHANNEL = {
 	assistantModels: "kalem:assistant-models",
 	assistantToolCatalog: "kalem:assistant-tool-catalog",
 	assistantLocate: "kalem:assistant-locate",
+	assistantUsePath: "kalem:assistant-use-path",
+	assistantSearch: "kalem:assistant-search",
+	assistantUseFound: "kalem:assistant-use-found",
+	assistantSearchReport: "kalem:assistant-search-report",
 	assistantChats: "kalem:assistant-chats",
 	assistantChat: "kalem:assistant-chat",
 	assistantSaveChat: "kalem:assistant-save-chat",
