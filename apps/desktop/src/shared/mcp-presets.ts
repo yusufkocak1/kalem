@@ -52,31 +52,17 @@ const http = (
 	purpose,
 });
 
-const DBHUB = ["-y", "@bytebase/dbhub@latest", "--transport", "stdio", "--config"];
-
 export const MCP_PRESETS: readonly McpPreset[] = [
 	{
-		id: "db-params",
-		label: "DBHub · parameters",
-		description: "mcpPresetDbParams",
+		id: "dbhub",
+		label: "DBHub",
+		description: "mcpPresetDbhub",
 		server: stdio(
-			"db-params",
+			"db",
 			"npx",
-			[...DBHUB, "<path>/dbhub.toml"],
-			"The application's parameters. When the user asks what a parameter's value is, call get_parameter with its code and explain the value in plain words; do not guess.",
-			{ tools: ["get_parameter"] },
-		),
-	},
-	{
-		id: "db-i18n",
-		label: "DBHub · i18n",
-		description: "mcpPresetDbI18n",
-		server: stdio(
-			"i18n-db",
-			"npx",
-			[...DBHUB, "<path>/dbhub-i18n.toml"],
-			"The project's i18n database. When you add a new i18n key in code, add it here too with add_i18n_key (Turkish and English texts) without being asked, and say which keys you added.",
-			{ tools: ["add_i18n_key"] },
+			["-y", "@bytebase/dbhub@latest", "--transport", "stdio", "--config", "<path>/dbhub.toml"],
+			"The application's database, through fixed queries only. When the user asks what a parameter's value is, call get_parameter with its code and explain the value in plain words; do not guess. When you add a new i18n key in code, add it here too with add_i18n_key (Turkish and English texts) without being asked, and say which keys you added.",
+			{ tools: ["get_parameter", "add_i18n_key"] },
 		),
 	},
 	{
@@ -155,6 +141,28 @@ export const MCP_PRESETS: readonly McpPreset[] = [
 			["-y", "@sentry/mcp-server@latest"],
 			"The application's errors in production: when the user mentions an error or a crash, look up its issue and stack trace here before guessing at the cause.",
 			{ env: { SENTRY_ACCESS_TOKEN: "<token>", SENTRY_HOST: "sentry.io" } },
+		),
+	},
+	{
+		id: "fortify",
+		label: "Fortify (fcli)",
+		description: "mcpPresetFortify",
+		server: stdio(
+			"fortify",
+			"fcli",
+			["util", "mcp-server", "start", "--module=ssc"],
+			"The application's security findings in Fortify SSC: when code touches a part with open findings, or the user asks about vulnerabilities, look them up here and fix or explain them.",
+		),
+	},
+	{
+		id: "graylog",
+		label: "Graylog",
+		description: "mcpPresetGraylog",
+		server: http(
+			"graylog",
+			"http://<graylog-host>:9000/api/mcp",
+			"The application's logs in Graylog: when the user mentions an error, a slow request or an incident, search the logs here (a narrow time range first) before guessing at the cause.",
+			{ headers: { Authorization: "Basic <base64 of API_TOKEN:token>" } },
 		),
 	},
 	{

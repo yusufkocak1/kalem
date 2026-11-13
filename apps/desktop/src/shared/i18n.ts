@@ -958,10 +958,8 @@ const en = {
 	mcpPresets: "Ready-made servers",
 	mcpPresetsHint:
 		"Added filled in as they are commonly run, with what each is for. Fill in the words in angle brackets (<GITHUB_TOKEN>, <folder>). npx needs Node.js, uvx needs uv.",
-	mcpPresetDbParams:
-		"Answers “what is this parameter's value?” from your database with one fixed query (DBHub). Define get_parameter in dbhub.toml; read-only database user.",
-	mcpPresetDbI18n:
-		"Adds the i18n keys written in code to your database (DBHub). Define add_i18n_key (INSERT … ON CONFLICT DO NOTHING) in dbhub.toml.",
+	mcpPresetDbhub:
+		"Your database through fixed queries only (DBHub): answers “what is this parameter's value?” and adds the i18n keys written in code. Define get_parameter and add_i18n_key in dbhub.toml; a database user with only the rights they need.",
 	mcpPresetGithub:
 		"Issues, pull requests and code of your repositories, read-only. Needs a GitHub token in place of <GITHUB_TOKEN>.",
 	mcpPresetGit: "The repository's log, diffs and commits, read-only. Needs uv (uvx).",
@@ -972,6 +970,10 @@ const en = {
 		"A browser the assistant drives: opens your app's pages to check a change or reproduce a bug.",
 	mcpPresetSentry:
 		"Production errors and stack traces from Sentry. Needs an access token; SENTRY_HOST for your own server.",
+	mcpPresetFortify:
+		"Security findings in Fortify SSC (OpenText's fcli). Log in once with fcli ssc session login; newer fcli versions start it with: ai assist mcp start stdio.",
+	mcpPresetGraylog:
+		"Searches your logs (Graylog 7.0 or later, built in). An API token of a read-only user, base64-encoded as API_TOKEN:token.",
 	mcpPresetFetch: "Reads a web page as text. Needs uv (uvx).",
 	mcpPresetMemory: "A memory kept between chats: the project's decisions, names and conventions.",
 	mcpPresetFigma:
@@ -2498,10 +2500,8 @@ const tr: Strings = {
 	mcpPresets: "Hazır sunucular",
 	mcpPresetsHint:
 		"Yaygın kullanıldıkları gibi doldurulmuş ve ne için oldukları yazılmış olarak eklenir. Köşeli parantezdeki yerleri (<GITHUB_TOKEN>, <folder>) doldurun. npx için Node.js, uvx için uv gerekir.",
-	mcpPresetDbParams:
-		"“Bu parametrenin değeri ne?” sorusunu veritabanınızdan tek bir sabit sorguyla cevaplar (DBHub). get_parameter aracını dbhub.toml'da tanımlayın; salt okunur veritabanı kullanıcısı.",
-	mcpPresetDbI18n:
-		"Kodda yazılan i18n anahtarlarını veritabanınıza ekler (DBHub). add_i18n_key aracını (INSERT … ON CONFLICT DO NOTHING) dbhub.toml'da tanımlayın.",
+	mcpPresetDbhub:
+		"Veritabanınız, yalnızca sabit sorgularla (DBHub): “bu parametrenin değeri ne?” sorusunu cevaplar ve kodda yazılan i18n anahtarlarını ekler. get_parameter ve add_i18n_key araçlarını dbhub.toml'da tanımlayın; yalnızca gereken yetkileri olan bir veritabanı kullanıcısı.",
 	mcpPresetGithub:
 		"Depolarınızın issue, pull request ve kodları, salt okunur. <GITHUB_TOKEN> yerine bir GitHub token'ı gerekir.",
 	mcpPresetGit: "Deponun geçmişi, farkları ve commit'leri, salt okunur. uv (uvx) gerekir.",
@@ -2513,6 +2513,10 @@ const tr: Strings = {
 		"Asistanın kullandığı bir tarayıcı: bir değişikliği görmek ya da hatayı tekrar etmek için uygulamanızın sayfalarını açar.",
 	mcpPresetSentry:
 		"Sentry'deki canlı ortam hataları ve stack trace'ler. Erişim token'ı gerekir; kendi sunucunuz için SENTRY_HOST.",
+	mcpPresetFortify:
+		"Fortify SSC'deki güvenlik bulguları (OpenText fcli). Bir kez fcli ssc session login ile giriş yapın; yeni fcli sürümlerinde komut: ai assist mcp start stdio.",
+	mcpPresetGraylog:
+		"Loglarınızda arama yapar (Graylog 7.0 ve sonrası, yerleşik). Salt okunur bir kullanıcının API token'ı, API_TOKEN:token olarak base64 kodlanmış.",
 	mcpPresetFetch: "Bir web sayfasını metin olarak okur. uv (uvx) gerekir.",
 	mcpPresetMemory: "Sohbetler arasında kalan bir hafıza: projenin kararları, adları ve kuralları.",
 	mcpPresetFigma:
