@@ -824,6 +824,21 @@ verir.
 >     (adları ve ek kelimeleriyle) görünür; ayrıntı ve yanıt dili de
 >     seçilir. Bir MCP sunucusu bu bilgisayarda program çalıştırabildiği
 >     için asistan bu ayarı göremez ve değiştiremez (`assistantCustomModes`).
+>   - **Kalem'in kendi modlarında da MCP sunucuları** (Asistan Modları →
+>     ör. **Kod** → **MCP sunucuları**): kendi modlarınızdakiyle aynı kart,
+>     ek olarak **Ne için (asistana söylenir)** alanı. Bu metin modele
+>     sunucunun adı ve araçlarıyla birlikte söylenir ve "iş bu amaca
+>     uyduğunda sorulmadan kullan" talimatı eklenir; böylece örneğin Kod
+>     modunda yazılan yeni bir i18n anahtarı veritabanına da eklenir.
+>     **Hazır sunucular** listesi tek tıkla dolu bir kart ekler: DBHub
+>     (parametre sorgusu ve i18n ekleme, yalnızca sabit sorgular), GitHub,
+>     Git, Filesystem, Context7, Playwright, Sentry, Fortify (fcli),
+>     Graylog, Fetch, Memory ve Figma; köşeli parantezli yerler
+>     (`<GITHUB_TOKEN>`…) kullanıcıya kalır. Asistan mod ayarlarını
+>     okuyabilir ama sunucuların yalnızca adını, araçlarını ve amacını
+>     görür; komut, argüman, ortam değişkeni, adres ve başlıklar ona
+>     gösterilmez, sunucuları değiştiremez (`assistantModes`). Ayrıntılı
+>     kullanım: [`docs/05-mcp-sunuculari.md`](../../docs/05-mcp-sunuculari.md).
 > - **Analiz şablonları:** **Dosya → Şablondan Yeni…** ve **Dosya → Ayarlar →
 >   Şablonlar**. Ekip şablonları açık klasörün `.kalem/templates/`
 >   klasöründe (Git ile paylaşılır; aynı adlı kişisel şablonun önüne geçer),

@@ -593,3 +593,27 @@ export function modeInstructions(mode: unknown, settings: ModeSettings = {}): st
 	if (lines.length === 0) return INTRO[current];
 	return [INTRO[current], ...lines].filter((part) => part !== "").join("\n");
 }
+
+/**
+ * The modes as the assistant may read them: each MCP server by its name,
+ * tools and purpose only. Its command, arguments, environment, address and
+ * headers can hold tokens and paths, and are never shown to the model.
+ */
+export function modesForAssistant(settings: ModeSettings): unknown {
+	return Object.fromEntries(
+		Object.entries(settings).map(([name, stored]) => [
+			name,
+			stored?.mcp === undefined
+				? stored
+				: {
+						...stored,
+						mcp: stored.mcp.map((server) => ({
+							name: server.name,
+							enabled: server.enabled,
+							tools: server.tools,
+							purpose: server.purpose,
+						})),
+					},
+		]),
+	);
+}
