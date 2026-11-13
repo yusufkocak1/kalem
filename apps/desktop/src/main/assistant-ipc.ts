@@ -67,6 +67,7 @@ import { collectSources, MAX_SOURCES, SOURCE_BUDGET } from "./assistant-sources.
 import type { AssistantStore } from "./assistant-store.js";
 import type { CliProgram } from "./cli.js";
 import { claudeOutput, LocalCli, runCli, SearchLog, textOutput } from "./cli.js";
+import { CliCatalog } from "./cli-catalog.js";
 import { cliCommands } from "./cli-commands.js";
 import type { ConfluenceClient } from "./confluence-client.js";
 import type { JiraClient } from "./jira-client.js";
@@ -274,6 +275,8 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 	/** The workspace folders' file lists, shared by the chats. */
 	const indexes = new WorkspaceIndexes();
 	/** The models Claude Code's aliases answered with, and the GitHub account's Copilot models. */
+	/** What the CLIs say the account has: its models, Claude Code's commands. */
+	const cliCatalog = new CliCatalog();
 	const catalog = new ModelCatalog(
 		join(app.getPath("userData"), "assistant-models.json"),
 		(url, init) => net.fetch(url, init),
@@ -397,9 +400,13 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		const provider = request.provider;
 		const program = programOf(provider);
 		if (program === "claude") {
-			// Claude Code lists no models: its aliases, named by what each answered with last;
-			// Anthropic's list when a key for it is kept; and what its help names.
 			await locate(program);
+			// The models the account may use, as Claude Code itself says.
+			const launch = clis[program].launch;
+			const account = launch === null ? null : await cliCatalog.claude(launch);
+			if (account !== null && account.models.length > 0) return [...account.models];
+			// An older Claude Code says none: its aliases, named by what each answered with last;
+			// Anthropic's list when a key for it is kept; and what its help names.
 			const anthropicKey = await ctx.assistant.key("anthropic").catch(() => null);
 			const anthropic =
 				anthropicKey === null
@@ -419,11 +426,13 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			);
 		}
 		if (program === "copilot") {
-			// The account's models, as VS Code lists them; the CLI's own choices when it has a fixed list.
 			await locate(program);
+			// The account's models, as the CLI itself says; else as VS Code lists them.
+			const launch = clis[program].launch;
+			const own = launch === null ? [] : await cliCatalog.copilot(launch);
 			return copilotModelOptions(
 				modelsFromHelp(await clis[program].help()),
-				await catalog.copilotModels(),
+				own.length > 0 ? own : await catalog.copilotModels(),
 			);
 		}
 		const info = PROVIDER_INFO[provider];
@@ -1210,7 +1219,28 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		const checked = (
 			await Promise.all(folders.map(async (folder) => ((await isFolder(folder)) ? folder : null)))
 		).filter((folder): folder is string => folder !== null);
-		return cliCommands(checked);
+		const found = await cliCommands(checked);
+		// Claude Code's own list has the plugins it loaded, wherever they are: what the files did not show joins.
+		await locate("claude");
+		const launch = clis.claude.launch;
+		// Its answer takes a few seconds the first time: the menu does not wait for it longer than this.
+		const listed =
+			launch === null
+				? []
+				: await Promise.race([
+						cliCatalog.claude(launch).then((account) => account.commands),
+						new Promise<never[]>((resolve) => setTimeout(() => resolve([]), 4000)),
+					]);
+		const known = new Set(found.map((command) => command.name));
+		return [
+			...found,
+			...listed
+				.filter((command) => !known.has(command.name))
+				.map((command) => ({
+					...command,
+					source: command.name.includes(":") ? (command.name.split(":")[0] ?? "") : "user",
+				})),
+		];
 	});
 
 	ipcMain.handle(

@@ -100,3 +100,20 @@ describe("Copilot's choices", () => {
 		expect(copilotOauthToken({})).toBeNull();
 	});
 });
+
+describe("the CLIs' own answers", () => {
+	it("reads JSON-RPC messages split anywhere, in any letters", async () => {
+		const { RpcReader, rpcFrame } = await import("./models.js");
+		const bytes = new TextEncoder().encode(
+			rpcFrame({ id: 1, result: "çğü" }) + rpcFrame({ id: 2, result: [] }),
+		);
+		const reader = new RpcReader();
+		const got: unknown[] = [];
+		for (let at = 0; at < bytes.length; at += 7)
+			got.push(...reader.push(bytes.subarray(at, at + 7)));
+		expect(got).toEqual([
+			{ id: 1, result: "çğü" },
+			{ id: 2, result: [] },
+		]);
+	});
+});

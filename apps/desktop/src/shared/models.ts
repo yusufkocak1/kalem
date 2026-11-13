@@ -133,3 +133,116 @@ export function copilotOauthToken(raw: unknown): string | null {
 	}
 	return null;
 }
+
+// --- What the CLIs say the account has --------------------------------------------------
+
+/**
+ * Claude Code's models, as it answers an `initialize` control request (the
+ * Agent SDK's `supportedModels`): those the account may use, each with its
+ * name. "default" is left out: the picker has its own "the CLI chooses".
+ */
+export function claudeInitializeModels(response: unknown): ModelOption[] {
+	const list = asJson(response).models;
+	if (!Array.isArray(list)) return [];
+	const seen = new Set<string>();
+	return list.flatMap((item) => {
+		const model = asJson(item);
+		const id = asString(model.value);
+		if (id === "" || id === "default" || seen.has(id) || !/^[\w.:[\]/@-]{1,120}$/.test(id))
+			return [];
+		seen.add(id);
+		const name = asString(model.displayName) || claudeModelName(id);
+		const resolved = asString(model.resolvedModel);
+		// An alias says which model it is now: `opus · Opus 5.5`.
+		const label = id.includes("-") ? name : `${id} · ${name}`;
+		return [{ id, label: resolved === "" && label === id ? id : label }];
+	});
+}
+
+/** A slash command Claude Code lists in its `initialize` answer. */
+export interface InitializeCommand {
+	readonly name: string;
+	readonly description: string;
+	readonly argument?: string;
+}
+
+/**
+ * The commands of Claude Code's `initialize` answer that a question can
+ * run: the user's, the folder's and the plugins' (`plugin:command`), not
+ * its own built-in ones (`/clear`, `/config`), which work in its terminal.
+ */
+export function claudeInitializeCommands(response: unknown): InitializeCommand[] {
+	const list = asJson(response).commands;
+	if (!Array.isArray(list)) return [];
+	return list.flatMap((item) => {
+		const command = asJson(item);
+		const name = asString(command.name);
+		if (name === "" || command.builtin === true || !/^[\w.:-]{1,120}$/.test(name)) return [];
+		const argument = asString(command.argumentHint);
+		return [
+			{
+				name,
+				description: asString(command.description).slice(0, 300),
+				...(argument === "" ? {} : { argument: argument.slice(0, 100) }),
+			},
+		];
+	});
+}
+
+/**
+ * The Copilot CLI's models, as its `models.list` answers (the Copilot
+ * SDK's `listModels`): the account's, those its policy turned off left out.
+ */
+export function copilotRpcModels(result: unknown): ModelOption[] {
+	const list = asJson(result).models;
+	if (!Array.isArray(list)) return [];
+	const seen = new Set<string>();
+	return list.flatMap((item) => {
+		const model = asJson(item);
+		const id = asString(model.id);
+		if (id === "" || seen.has(id)) return [];
+		if (asString(asJson(model.policy).state) === "disabled") return [];
+		seen.add(id);
+		return [{ id, label: asString(model.name) || id }];
+	});
+}
+
+/** A JSON-RPC message as the Copilot CLI reads it on standard input: a `Content-Length` header, then the JSON. */
+export function rpcFrame(message: unknown): string {
+	const body = JSON.stringify(message);
+	return `Content-Length: ${new TextEncoder().encode(body).length}\r\n\r\n${body}`;
+}
+
+/** Reads the CLI's JSON-RPC messages as they come, a chunk at a time. */
+export class RpcReader {
+	#buffer: Uint8Array = new Uint8Array(0);
+
+	push(chunk: Uint8Array): unknown[] {
+		const joined = new Uint8Array(this.#buffer.length + chunk.length);
+		joined.set(this.#buffer);
+		joined.set(chunk, this.#buffer.length);
+		this.#buffer = joined;
+		const messages: unknown[] = [];
+		const decoder = new TextDecoder();
+		for (;;) {
+			const text = decoder.decode(this.#buffer.subarray(0, Math.min(this.#buffer.length, 1024)));
+			const end = text.indexOf("\r\n\r\n");
+			if (end === -1) break;
+			const length = /Content-Length:\s*(\d+)/i.exec(text.slice(0, end));
+			const start = new TextEncoder().encode(text.slice(0, end + 4)).length;
+			if (length === null) {
+				this.#buffer = this.#buffer.subarray(start);
+				continue;
+			}
+			const size = Number(length[1]);
+			if (this.#buffer.length < start + size) break;
+			try {
+				messages.push(JSON.parse(decoder.decode(this.#buffer.subarray(start, start + size))));
+			} catch {
+				// Not JSON: skipped.
+			}
+			this.#buffer = this.#buffer.subarray(start + size);
+		}
+		return messages;
+	}
+}
