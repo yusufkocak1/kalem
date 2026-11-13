@@ -34,6 +34,8 @@ export interface Finding {
 	readonly question: string;
 	/** Found by a rule, not by the model. */
 	readonly rule?: boolean;
+	/** A section the template requires that the document does not have: its name. */
+	readonly missingSection?: string;
 }
 
 const text = (value: unknown, max: number): string =>
@@ -62,6 +64,9 @@ export function parseFinding(raw: unknown, index: number): Finding | null {
 		suggestion: typeof item.suggestion === "string" ? item.suggestion.slice(0, 8000) : "",
 		question: text(item.question, 2000),
 		...(item.rule === true ? { rule: true } : {}),
+		...(typeof item.missingSection === "string" && item.missingSection.trim() !== ""
+			? { missingSection: text(item.missingSection, 300) }
+			: {}),
 	};
 }
 
@@ -156,6 +161,8 @@ export type FindingEdit =
 			readonly at: number;
 	  }
 	| { readonly kind: "noted"; readonly note: string }
+	/** A section the template requires, added at the end: its heading line. */
+	| { readonly kind: "added"; readonly heading: string }
 	| {
 			readonly kind: "asked";
 			readonly line: string;
@@ -197,6 +204,22 @@ export function revertFindingEdit(markdown: string, edit: FindingEdit): string |
 				? rest.replace(/^\n+/, "")
 				: text.slice(0, from) + (rest === "" ? "\n" : rest);
 		}
+		case "added": {
+			const lines = text.split("\n");
+			const at = lines.indexOf(edit.heading);
+			if (at === -1) return null;
+			let end = at + 1;
+			while (end < lines.length && !/^#{1,6}\s/.test(lines[end] as string)) {
+				// Something was written in it since: it is the user's now.
+				if ((lines[end] as string).trim() !== "") return null;
+				end++;
+			}
+			let from = at;
+			while (from > 0 && (lines[from - 1] as string).trim() === "") from--;
+			lines.splice(from, end - from, ...(from === 0 || end === lines.length ? [] : [""]));
+			const next = lines.join("\n");
+			return next.endsWith("\n") || next === "" ? next : `${next}\n`;
+		}
 		case "asked": {
 			const lines = text.split("\n");
 			const at = lines.indexOf(edit.line);
@@ -211,6 +234,35 @@ export function revertFindingEdit(markdown: string, edit: FindingEdit): string |
 			return next;
 		}
 	}
+}
+
+/** The heading line a missing section is added with. */
+export const sectionHeading = (name: string): string => `## ${name.trim()}`;
+
+const fold = (text: string): string => text.trim().toLocaleLowerCase("tr");
+
+/** Whether the document has a heading for the section, as the rule checks look for it. */
+export function hasSection(markdown: string, name: string): boolean {
+	const wanted = fold(name);
+	return markdown
+		.replace(/\r\n?/g, "\n")
+		.split("\n")
+		.some((line) => {
+			const title = /^ {0,3}#{1,6}\s+(.*?)\s*#*\s*$/.exec(line)?.[1];
+			return title !== undefined && fold(title).includes(wanted);
+		});
+}
+
+/**
+ * The document with the sections the template requires added at its end,
+ * in the order given; one it has by now (the user added it) is not added again.
+ */
+export function withSections(markdown: string, names: readonly string[]): string {
+	const text = markdown.replace(/\r\n?/g, "\n").replace(/\n+$/, "");
+	const missing = names.filter((name) => !hasSection(text, name));
+	if (missing.length === 0) return text === "" ? "" : `${text}\n`;
+	const added = missing.map((name) => `${sectionHeading(name)}\n`).join("\n");
+	return text === "" ? added : `${text}\n\n${added}`;
 }
 
 /** Whether the document has an open questions' section already: `addToQuestions` then makes none. */

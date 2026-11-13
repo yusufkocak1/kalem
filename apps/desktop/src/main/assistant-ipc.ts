@@ -5,6 +5,8 @@
  * keeps no conversation, so the messages of each chat are kept here and
  * sent again with every question.
  */
+
+import type { ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -44,6 +46,7 @@ import {
 	providerLabel,
 	SUGGESTED_MODELS,
 } from "../shared/providers.js";
+import { reviewPlan, summaryQuestion } from "../shared/review-plan.js";
 import type { ChatStore } from "./assistant-chats.js";
 import { ConfluenceLookups } from "./assistant-confluence.js";
 import { JiraLookups } from "./assistant-jira.js";
@@ -53,6 +56,7 @@ import { PermissionGate } from "./assistant-permissions.js";
 import type { DocumentSnapshot, ToolContext, ToolResult } from "./assistant-tools.js";
 import { allTools, approver, RendererCalls, runTool, toolsFor } from "./assistant-tools.js";
 import { ModelCatalog } from "./model-catalog.js";
+import { ReviewRun, ReviewRuns } from "./review-run.js";
 import "./assistant-app-tools.js";
 import "./assistant-analysis-tools.js";
 import "./assistant-external-tools.js";
@@ -251,6 +255,8 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 	};
 	/** Running questions by window and chat; each can be stopped. */
 	const running = new Map<string, () => void>();
+	/** The latest reviews run side by side: a check that failed can be run again. */
+	const reviews = new ReviewRuns();
 	/** The folder each CLI conversation ran in. */
 	const folders = new Map<string, string>();
 	/** Each API conversation's messages. */
@@ -563,6 +569,11 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			typeof request.sessionId === "string" && /^[\w-]{1,100}$/.test(request.sessionId)
 				? request.sessionId
 				: null;
+		// A review a CLI may run side by side: the question as each reviewer is asked it.
+		const reviewPrompt =
+			typeof request.reviewPrompt === "string" && request.reviewPrompt.trim() !== ""
+				? request.reviewPrompt
+				: null;
 		const images = sentImages(request.images);
 		const sources = sentSources(request.sources);
 		const sender = event.sender;
@@ -607,6 +618,8 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			customModes,
 			allTools().map((tool) => tool.definition.name),
 		);
+		// What a tool sends the chat; after a review run side by side, findings join its one list.
+		let emit = forward;
 		const tools: ToolContext = {
 			chatId,
 			sender,
@@ -627,7 +640,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			document: sentDocument(request.document),
 			// Claude Code's own stream says which tools it called: the steps are not said twice.
 			step: program === "claude" ? () => {} : step,
-			emit: forward,
+			emit: (emitted) => emit(emitted),
 			approve: (asked) => approve(asked),
 			renderer: (name, input) => rendererCalls.call(sender, chatId, name, input),
 			readExternal: false,
@@ -656,6 +669,8 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 						.catch(() => null)
 				: null;
 		let way: LookupWay = program === null ? "tools" : mcpRun === null ? "block" : "mcp";
+		// The modes the answer is given in: a review run side by side leaves it only the summary.
+		let answerModes = modeSettings;
 		const instructionsFor = (lookupWay: LookupWay): string =>
 			assistantInstructions(t, {
 				way: lookupWay,
@@ -663,7 +678,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				jira: jiraLookups?.site ?? null,
 				tools: definitions,
 				mode: request.mode,
-				modes: modeSettings,
+				modes: answerModes,
 				custom: customModes,
 				document: tools.document,
 			});
@@ -686,7 +701,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		};
 		if (program !== null) {
 			const sent = sessionId === null ? undefined : sentFiles.get(sessionId);
-			const asked = withSources(files.text, sent, prompt);
+			let asked = withSources(files.text, sent, prompt);
 			const tab = typeof request.tabId === "string" ? win.tabs.get(request.tabId) : undefined;
 			// A CLI keeps a conversation with the folder it ran in, and resumes it
 			// only from there; a new one runs next to the active document.
@@ -746,6 +761,121 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 							folders: files.folders,
 							...(way === "mcp" && mcpRun !== null ? { mcpConfig: mcpRun.copilot } : {}),
 						});
+			let stopped = false;
+			// A review's checks, each by a reviewer of its own, all at once; the answer then sums up.
+			const plan =
+				request.mode === "review" &&
+				reviewPrompt !== null &&
+				tools.document !== null &&
+				mcpRun !== null &&
+				way === "mcp"
+					? reviewPlan(modeSettings, { hasWorkspace: workspace !== null })
+					: null;
+			if (plan !== null) {
+				const children = new Set<ChildProcess>();
+				running.set(runKey, () => {
+					stopped = true;
+					gate.cancel(sender, chatId);
+					for (const child of children) child.kill();
+				});
+				const review = new ReviewRun({
+					plan,
+					t,
+					tools,
+					sender,
+					open: (definitions, run) => ctx.tools.open(() => definitions, run),
+					forward,
+					instructions: (modes, reviewerTools) =>
+						assistantInstructions(t, {
+							way: "mcp",
+							confluence: lookups?.site ?? null,
+							jira: jiraLookups?.site ?? null,
+							tools: reviewerTools,
+							mode: "review",
+							modes,
+							custom: customModes,
+							document: tools.document,
+						}),
+					question: withSources(files.text, undefined, reviewPrompt ?? asked),
+					ask: async (system, question, run, reviewerTools, send, isStopped) => {
+						const persist =
+							program === "claude" &&
+							(await clis.claude.help()).includes("--no-session-persistence")
+								? ["--no-session-persistence"]
+								: [];
+						const jsonInput = program === "claude" && images.length > 0;
+						await runCli(
+							launch,
+							folder,
+							program === "claude"
+								? [
+										...claudeArgs({
+											sessionId: null,
+											systemPrompt: system,
+											model: connection.model,
+											jsonInput,
+											folders: files.folders,
+											mcp: { config: run.claude, tools: reviewerTools.map(mcpToolName) },
+											denied,
+										}),
+										...persist,
+									]
+								: copilotArgs({
+										sessionId: randomUUID(),
+										model: connection.model,
+										folders: files.folders,
+										mcpConfig: run.copilot,
+									}),
+							program === "claude"
+								? jsonInput
+									? claudeInputLine(question, images)
+									: question
+								: withInstructions(system, question),
+							program === "claude" ? claudeOutput() : textOutput(),
+							(cliEvent) => {
+								if (cliEvent.kind === "model")
+									void catalog.learn(connection.model, cliEvent.model).catch(() => {});
+								send(cliEvent);
+							},
+							sender,
+							(child) => {
+								children.add(child);
+								child.once("close", () => children.delete(child));
+								if (isStopped()) child.kill();
+							},
+							env,
+						);
+					},
+				});
+				reviews.add(review);
+				const reviewed = await review.run(() => stopped || sender.isDestroyed());
+				if (stopped) {
+					await mcpRun?.close();
+					running.delete(runKey);
+					send({ kind: "done" });
+					return;
+				}
+				// Reviewers that could not run (an older CLI, say) leave the review to the answer, as before.
+				if (reviewed !== null) {
+					asked = summaryQuestion(asked, {
+						findings: review.merger.all,
+						checks: reviewed.checks,
+						failed: reviewed.failed,
+						hasSummary: plan.hasSummary,
+					});
+					// A finding the answer reports all the same is not listed twice.
+					emit = (emitted) => {
+						if (emitted.kind !== "findings") return forward(emitted);
+						// The rules ran already: what they found is in the list.
+						const added = review.merger.add(
+							emitted.findings.filter((finding) => finding.rule !== true),
+						);
+						if (added.length > 0) forward({ kind: "findings", findings: added, review: review.id });
+					};
+					answerModes = plan.summary;
+					system = instructionsFor(way);
+				}
+			}
 			let args: string[];
 			let question = asked;
 			if (program === "claude") {
@@ -763,7 +893,6 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			// Rounds of look-ups and tool calls written in blocks: the reply's requests
 			// are run and their results sent back in the same conversation, until it answers.
 			let conversation = program === "copilot" ? copilotSession : sessionId;
-			let stopped = false;
 			running.set(runKey, () => {
 				stopped = true;
 				gate.cancel(sender, chatId);
@@ -990,6 +1119,13 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 						{ role: "assistant", content: reply },
 					];
 		histories.set(id, answered.slice(-MAX_HISTORY));
+	});
+
+	// A check of a review run side by side that failed, run again on its own.
+	ipcMain.handle(CHANNEL.assistantRetryCheck, async (event, id: unknown, index: unknown) => {
+		const review = reviews.get(id, event.sender);
+		if (review === null || typeof index !== "number" || !Number.isInteger(index)) return;
+		await review.retry(index, () => event.sender.isDestroyed());
 	});
 
 	ipcMain.handle(CHANNEL.assistantStop, (event, chatId: unknown) => {

@@ -36,6 +36,12 @@ export async function fakeClaude(
 	 * with the call, and the calls show in the stream as tool uses.
 	 */
 	tools: readonly { readonly name: string; readonly input: Record<string, unknown> }[] = [],
+	options: {
+		/** A run whose arguments hold this fails the first time, as a rate limit would. */
+		readonly failOnce?: string;
+		/** How long each run takes before it answers, in ms. */
+		readonly delay?: number;
+	} = {},
 ): Promise<{ path: string; calls: () => Promise<Call[]> }> {
 	const log = join(folder, "calls.jsonl");
 	const script = join(folder, "fake-claude.cjs");
@@ -96,6 +102,15 @@ async function callTools() {
 	return results;
 }
 process.stdin.on("end", async () => {
+	const options = ${JSON.stringify(options)};
+	if (options.delay) await new Promise((resolve) => setTimeout(resolve, options.delay));
+	const failMark = ${JSON.stringify(join(folder, "failed-once"))};
+	if (options.failOnce && args.join(" ").includes(options.failOnce) && !fs.existsSync(failMark)) {
+		fs.writeFileSync(failMark, "");
+		fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args, prompt, cwd: process.cwd(), failed: true }) + "\\n");
+		process.stdout.write(JSON.stringify({ type: "result", subtype: "error_during_execution", is_error: true, result: "rate limited", session_id: "sess-1" }) + "\\n");
+		return;
+	}
 	const used = await callTools();
 	const mcpAt = args.indexOf("--mcp-config");
 	const mcp = mcpAt === -1 ? null : JSON.parse(fs.readFileSync(args[mcpAt + 1], "utf8"));
@@ -155,4 +170,6 @@ export interface Call {
 	}[];
 	/** The `--mcp-config` file's contents, when one was given. */
 	readonly mcp?: { readonly mcpServers: Record<string, Record<string, unknown>> } | null;
+	/** It failed on purpose (`failOnce`). */
+	readonly failed?: boolean;
 }

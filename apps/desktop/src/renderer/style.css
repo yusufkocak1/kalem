@@ -8691,6 +8691,171 @@ textarea.jira-worklog-input {
 	font-weight: 600;
 }
 
+.assistant-checks {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	min-width: 0;
+	max-width: 100%;
+	gap: 6px;
+	margin: 0 0 8px;
+	padding: 8px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	font-size: 13px;
+}
+
+.assistant-checks-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 6px;
+}
+
+.assistant-checks-head .assistant-plan-title {
+	margin: 0;
+}
+
+.assistant-checks-stages {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	color: var(--app-muted);
+	font-size: 11px;
+}
+
+.assistant-checks-stage + .assistant-checks-stage::before {
+	content: "›";
+	margin-inline-end: 4px;
+	color: var(--app-muted);
+	font-weight: 400;
+}
+
+.assistant-checks-stage.stage-done::after {
+	content: " ✓";
+	color: var(--app-ok);
+}
+
+.assistant-checks-stage.stage-active {
+	color: var(--app-text);
+	font-weight: 600;
+}
+
+.assistant-checks-bar {
+	height: 3px;
+	overflow: hidden;
+	border-radius: 2px;
+	background: var(--app-hover);
+}
+
+.assistant-checks-bar > span {
+	display: block;
+	height: 100%;
+	background: var(--app-accent);
+	transition: width 0.3s var(--app-ease);
+}
+
+.assistant-checks-list {
+	display: grid;
+	gap: 6px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.assistant-check {
+	display: grid;
+	grid-template-columns: 14px minmax(0, 1fr) auto;
+	column-gap: 6px;
+	align-items: baseline;
+}
+
+.assistant-check-icon {
+	align-self: center;
+	width: 10px;
+	height: 10px;
+}
+
+.check-running .assistant-check-icon {
+	border: 2px solid var(--app-border);
+	border-top-color: var(--app-accent);
+	border-radius: 50%;
+	animation: confluence-spin 0.8s linear infinite;
+}
+
+.check-done .assistant-check-icon::before {
+	content: "✓";
+	color: var(--app-ok);
+	font-size: 12px;
+	line-height: 10px;
+}
+
+.check-failed .assistant-check-icon::before {
+	content: "!";
+	color: var(--app-error);
+	font-size: 12px;
+	font-weight: 700;
+	line-height: 10px;
+}
+
+.check-running .assistant-check-title {
+	font-weight: 600;
+}
+
+.assistant-check-meta {
+	color: var(--app-muted);
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.assistant-check-below {
+	display: flex;
+	flex-wrap: wrap;
+	grid-column: 2 / -1;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+
+.assistant-check-last {
+	overflow: hidden;
+	color: var(--app-muted);
+	font-size: 12px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.assistant-check-error {
+	color: var(--app-error);
+	font-size: 12px;
+}
+
+.assistant-checks-done {
+	gap: 0;
+	padding: 6px 10px;
+}
+
+.assistant-checks-done > summary {
+	color: var(--app-muted);
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.assistant-checks-done[open] > summary {
+	margin-bottom: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.check-running .assistant-check-icon {
+		animation: none;
+	}
+
+	.assistant-checks-bar > span {
+		transition: none;
+	}
+}
+
 .assistant-change {
 	display: flex;
 	align-items: center;
@@ -8733,6 +8898,9 @@ textarea.jira-worklog-input {
 
 .assistant-review {
 	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	min-width: 0;
+	max-width: 100%;
 	gap: 8px;
 	margin: 8px 0;
 	padding: 10px 12px;
@@ -8742,53 +8910,179 @@ textarea.jira-worklog-input {
 }
 
 .assistant-review-head {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: baseline;
-	gap: 8px;
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 6px;
 }
 
-.assistant-review-counts,
-.assistant-finding-section,
-.assistant-finding-rule,
-.assistant-finding-state {
-	color: var(--app-muted);
-	font-size: 12px;
-}
-
+.assistant-review-chips,
 .assistant-review-tools,
 .assistant-finding-actions {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 10px;
+	gap: 6px;
+}
+
+.assistant-review-chip {
+	padding: 2px 9px;
+	border: 1px solid var(--app-border);
+	border-radius: 999px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.assistant-review-chip:hover:not(:disabled) {
+	border-color: var(--app-accent);
+}
+
+.assistant-review-chip:disabled {
+	opacity: 0.45;
+	cursor: default;
+}
+
+.assistant-review-chip[aria-pressed="true"] {
+	border-color: var(--app-accent);
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+}
+
+.assistant-review-chip.chip-severity-high:not([aria-pressed="true"]) {
+	border-color: color-mix(in srgb, var(--app-error) 45%, var(--app-border));
+}
+
+.assistant-review-chip.chip-severity-medium:not([aria-pressed="true"]) {
+	border-color: color-mix(in srgb, var(--app-warning) 45%, var(--app-border));
+}
+
+.assistant-review-hidden {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.assistant-review-empty {
+	margin: 0;
+	color: var(--app-muted);
+}
+
+.assistant-finding-section,
+.assistant-finding-rule,
+.assistant-finding-state,
+.assistant-finding-id {
+	color: var(--app-muted);
+	font-size: 11px;
 }
 
 .assistant-findings {
 	display: grid;
-	gap: 8px;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 4px;
 	margin: 0;
 	padding: 0;
 	list-style: none;
 }
 
 .assistant-finding {
-	display: grid;
-	gap: 4px;
-	padding: 8px;
+	min-width: 0;
 	border-inline-start: 3px solid var(--app-border);
 	border-radius: 4px;
 	background: var(--app-surface);
 }
 
 .assistant-finding.severity-high {
-	border-inline-start-color: #c92a2a;
+	border-inline-start-color: var(--app-error);
 }
 
 .assistant-finding.severity-medium {
 	border-inline-start-color: var(--app-warning);
 }
 
-.assistant-finding:not(.finding-open) > :not(.assistant-finding-actions) {
+.assistant-finding-row {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+	width: 100%;
+	padding: 6px 8px;
+	border: 0;
+	border-radius: 4px;
+	background: none;
+	color: var(--app-text);
+	font: inherit;
+	text-align: start;
+	cursor: pointer;
+}
+
+.assistant-finding-row:hover {
+	background: var(--app-hover);
+}
+
+.assistant-finding-row:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -2px;
+}
+
+.assistant-finding-severity {
+	flex: none;
+	font-size: 11px;
+	font-weight: 600;
+}
+
+.assistant-finding.severity-high .assistant-finding-severity {
+	color: var(--app-error);
+}
+
+.assistant-finding-title {
+	display: -webkit-box;
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	line-clamp: 2;
+	overflow-wrap: anywhere;
+}
+
+.finding-expanded > .assistant-finding-row .assistant-finding-title {
+	display: block;
+}
+
+.finding-expanded .assistant-finding-title {
+	font-weight: 600;
+}
+
+.assistant-finding-kind,
+.assistant-finding-row .assistant-finding-rule,
+.assistant-finding-row .assistant-finding-state {
+	flex: none;
+}
+
+.assistant-finding-kind {
+	padding: 0 6px;
+	border-radius: 999px;
+	background: var(--app-hover);
+	color: var(--app-muted);
+	font-size: 11px;
+}
+
+.assistant-finding-chevron::before {
+	content: "›";
+	display: inline-block;
+	color: var(--app-muted);
+	transition: transform 0.15s var(--app-ease);
+}
+
+.finding-expanded > .assistant-finding-row .assistant-finding-chevron::before {
+	transform: rotate(90deg);
+}
+
+.assistant-finding:not(.finding-open) .assistant-finding-title,
+.assistant-finding:not(.finding-open) .assistant-finding-body > :not(.assistant-finding-actions) {
 	opacity: 0.6;
 }
 
@@ -8796,15 +9090,11 @@ textarea.jira-worklog-input {
 	font-style: italic;
 }
 
-.assistant-finding-head {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 6px;
-	align-items: baseline;
-}
-
-.assistant-finding-severity {
-	font-weight: 600;
+.assistant-finding-body {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 4px;
+	padding: 0 8px 8px;
 }
 
 .assistant-finding p,
@@ -8816,6 +9106,50 @@ textarea.jira-worklog-input {
 	padding-inline-start: 8px;
 	border-inline-start: 2px solid var(--app-border);
 	color: var(--app-muted);
+}
+
+.assistant-sections {
+	display: grid;
+	gap: 2px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.assistant-section {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 6px;
+	min-width: 0;
+	padding: 2px 0;
+}
+
+.assistant-section-name {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.assistant-section:not(.finding-open) .assistant-section-name {
+	color: var(--app-muted);
+	text-decoration: line-through;
+}
+
+.assistant-review-done > summary {
+	color: var(--app-muted);
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.assistant-review-done > .assistant-findings {
+	margin-top: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.assistant-finding-chevron::before {
+		transition: none;
+	}
 }
 
 /* --- Templates ----------------------------------------------------------------------- */

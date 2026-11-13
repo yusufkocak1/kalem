@@ -789,6 +789,26 @@ verir.
 >     otomatik seçtiren **ek kelimeler**, **ek talimat**; **Asistana
 >     söylenen** önizlemesi değiştikçe güncellenir; **Varsayılana döndür**.
 >     Ayarlar yalnızca varsayılandan farkı saklar (`assistantModes`).
+>   - **Yan yana inceleme** (Claude Code ve Copilot CLI; İnceleme modunda
+>     **Kontrolleri yan yana çalıştır**, varsayılan açık): inceleme
+>     istendiğinde Kalem kural denetimini kendisi çalıştırır, sonra her
+>     kontrol adımını (kapsam, çelişkiler, uç durumlar, test edilebilirlik,
+>     güvenlik, varsa kodla karşılaştırma ve kendi adımlarınız) ayrı bir
+>     **inceleyiciye** verir; hepsi aynı anda çalışır (en çok 6, fazlası
+>     paylaştırılır). Her inceleyici belgenin tamamını alır, yalnızca okuyan
+>     araçları kullanır ve sohbeti sürdürmez. Bulgular geldikçe tek listede
+>     toplanır (yeniden numaralanır, aynı cümle iki kez bildirilmez).
+>     **Kontroller kartı** çalışırken aşamaları (Kurallar › Kontroller n/m ›
+>     Özet), bir ilerleme çubuğu ve her kontrol için ne yaptığını, kaç bulgu
+>     bulduğunu ve ne kadar sürdüğünü (canlı) gösterir. Bitemeyen bir
+>     kontrol nedeniyle birlikte kırmızı görünür ve **Yeniden Dene** ile tek
+>     başına tekrar çalıştırılır (yanıt bittikten sonra da); bulguları aynı
+>     listeye eklenir. Her şey bitince kart tek satıra iner ("5 kontrol · 11
+>     bulgu · 0:42"); açılınca kontrol başına süre ve token görünür, başarısız
+>     bir kontrol varken açık kalır. Sohbetin kendisi sonda yalnızca özetler. Süre adımların toplamı yerine en uzun kontrol kadar
+>     olur, token harcaması artar. Önceki incelemeyle ilgili bir soru (yeni
+>     inceleme istemeyen) tek yanıt olarak kalır; hiçbir inceleyici
+>     çalışamazsa inceleme eskisi gibi tek yanıtta yapılır.
 >   - **Kendi modlarınız** (Asistan Modları → **Yeni mod**): ad, simge ve
 >     tek satırlık açıklama; asistana söylenen **talimat** (prompt); kendi
 >     **adımlarınız**; Kalem'in **araçlarından** hepsi ya da yalnızca
@@ -820,9 +840,17 @@ verir.
 >   FR/BR/NFR kimlikleri, kabul kriteri olmayan gereksinimler, kırık
 >   başlık bağlantıları), sonra modelin bulguları (çelişki, eksik senaryo,
 >   test edilemezlik, güvenlik, kodla uyumsuzluk). Bulgular yanıtta
->   **geliştirmeye hazırlık puanıyla** listelenir; her biri **Göster**,
->   **Düzelt**, **Açık Sorulara Ekle**, **Not Ekle** ya da **Yoksay** ile
->   ele alınır. Bulgular belgede yalnızca **oturum boyunca** işaretlenir;
+>   **geliştirmeye hazırlık puanıyla** listelenir. Her bulgu tek satırdır
+>   (önem, numara, sorunun ilk cümlesi, türü); tıklayınca açılır, belgedeki
+>   yerini gösterir ve **Göster**, **Düzelt**, **Açık Sorulara Ekle**,
+>   **Not Ekle** ya da **Yoksay** ile ele alınır. Model bulguları aynı önemdeki
+>   kural bulgularından önce gelir. Önem ve tür sayıları **süzgeçtir**
+>   (tıklayınca liste daralır, **Tümünü göster** ile açılır). Şablonun
+>   eksik bölümleri tek kalemde toplanır ("Şablonun 7 bölümü eksik"):
+>   bölümler tek tek ya da **Tüm Bölümleri Ekle** ile belgenin sonuna
+>   eklenir (belgede artık olan bölüm yeniden eklenmez), her biri ayrıca geri
+>   alınabilir. Ele alınan bulgular açık kaldıkça yerinde durur (Geri Al
+>   elinizin altında), kapatılınca sondaki **Ele alınanlar** bölümüne iner. Bulgular belgede yalnızca **oturum boyunca** işaretlenir;
 >   Markdown'a ancak kullanıcı bir düğmeye basınca bir şey yazılır.
 >   **Not Ekle**, alıntılanan paragrafın hemen altına bir alıntı bloğu
 >   (`> 📝 **İnceleme F-01:** …`, Confluence'ta da görünür) koyar ve onu

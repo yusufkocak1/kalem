@@ -52,6 +52,13 @@ describe("lintAnalysis", () => {
 		expect(problems).toContain('The template\'s section "İş Kuralları" is missing.');
 		expect(problems).toContain('The section "Terimler Sözlüğü" is empty.');
 		expect(problems).not.toContain('The section "Amaç ve Kapsam" is empty.');
+		// A missing section names itself, so the list can add it; an empty one does not.
+		expect(findings.find((finding) => finding.problem.includes("İş Kuralları"))).toMatchObject({
+			missingSection: "İş Kuralları",
+		});
+		expect(
+			findings.find((finding) => finding.problem.includes("Terimler Sözlüğü"))?.missingSection,
+		).toBeUndefined();
 	});
 
 	it("quotes vague words and open points exactly, outside code and comments", () => {

@@ -376,8 +376,20 @@ export type ClaudeEvent =
 	| { readonly kind: "step"; readonly tool: string; readonly detail: string }
 	/** The model's plan for the answer, its steps as they get done. */
 	| { readonly kind: "plan"; readonly steps: readonly PlanStep[] }
-	/** Problems a review found in the document. */
-	| { readonly kind: "findings"; readonly findings: readonly Finding[] }
+	/** Problems a review found in the document; with `review`, for the reply that ran it. */
+	| {
+			readonly kind: "findings";
+			readonly findings: readonly Finding[];
+			readonly review?: string;
+	  }
+	/** How the checks of a review run side by side are going, for the reply that ran it. */
+	| {
+			readonly kind: "checks";
+			readonly review: string;
+			readonly checks: readonly CheckProgress[];
+			/** Whether Kalem ran the rule checks before them. */
+			readonly rules: boolean;
+	  }
 	/** A setting the assistant changed, with what puts it back. */
 	| {
 			readonly kind: "changed";
@@ -393,6 +405,24 @@ export type ClaudeEvent =
 	  }
 	| { readonly kind: "done" }
 	| { readonly kind: "error"; readonly message: string };
+
+/** One check of a review run side by side, as it goes. */
+export interface CheckProgress {
+	/** The checks it makes, by name. */
+	readonly title: string;
+	readonly status: "running" | "done" | "failed";
+	/** When it started and ended, in ms since the epoch. */
+	readonly started: number;
+	readonly ended?: number;
+	/** The findings it added to the list. */
+	readonly findings: number;
+	/** What it did last: a tool, and what on. */
+	readonly last?: { readonly tool: string; readonly detail: string };
+	/** Why it could not finish. */
+	readonly error?: string;
+	/** What it cost, in tokens, when the CLI says. */
+	readonly usage?: { readonly input: number; readonly output: number; readonly cached: number };
+}
 
 export interface PlanStep {
 	readonly title: string;
