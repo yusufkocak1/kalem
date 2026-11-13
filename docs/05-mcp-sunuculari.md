@@ -309,12 +309,17 @@ Sunucunun belgesindeki Claude Code / Claude Desktop yapılandırması genelde
 - **Token'lar ayar dosyasında düz metin durur** (uygulama verisindeki
   `settings.json`). Salt okunur, kısa ömürlü token'lar kullanın;
   `dbhub.toml` gibi şifre içeren dosyaları repoya koymayın.
-- **Asistan bu ayarları değiştiremez.** Bir MCP sunucusu bilgisayarınızda
-  program çalıştırabildiği için mod ayarlarındaki sunucuları yalnızca siz
-  Ayarlar penceresinden ekleyip değiştirebilirsiniz. Asistan mod ayarlarını
-  okuduğunda sunucuların yalnızca **adını, araçlarını ve "ne için"
-  metnini** görür; komut, argüman, ortam değişkeni, adres ve başlıklar
-  (dolayısıyla token'lar) ona gösterilmez.
+- **Asistan sunucuları yalnızca sizin onayınızla değiştirir.** Ona
+  *"DBHub'ı Kod moduna bağla, config dosyası C:\\kalem\\dbhub.toml"*
+  diyebilirsiniz; asistan `mode_mcp_change` aracıyla ekler, değiştirir ya
+  da kaldırır. Bir MCP sunucusu bilgisayarınızda program çalıştırabildiği
+  için onay kartı **her seferinde** çıkar ve komutun ya da adresin
+  tamamını gösterir (token'lar yalnızca başıyla, örn. `Bear…`). Bu onay
+  "her zaman izin ver" ile hatırlanmaz; araç Ayarlar'da "sormadan
+  çalıştır" yapılmış olsa da sorulur. Asistan mod ayarlarını okuduğunda
+  sunucuların yalnızca **adını, araçlarını ve "ne için" metnini** görür;
+  komut, argüman, ortam değişkeni, adres ve başlıklar (dolayısıyla
+  token'lar) ona gösterilmez.
 - Topluluk sunucularını (resmî olmayan npm / PyPI paketleri) kullanmadan
   önce kaynağına bakın; bilgisayarınızda sizin yetkilerinizle çalışırlar.
 

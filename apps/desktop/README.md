@@ -823,7 +823,8 @@ verir.
 >     sunucusu kullanmaz. Kendi modlarınız seçicide ve otomatik seçimde
 >     (adları ve ek kelimeleriyle) görünür; ayrıntı ve yanıt dili de
 >     seçilir. Bir MCP sunucusu bu bilgisayarda program çalıştırabildiği
->     için asistan bu ayarı göremez ve değiştiremez (`assistantCustomModes`).
+>     için asistan bu ayarı göremez; sunucularını yalnızca
+>     `mode_mcp_change` ile ve her seferinde sorarak değiştirir (aşağıda).
 >   - **Kalem'in kendi modlarında da MCP sunucuları** (Asistan Modları →
 >     ör. **Kod** → **MCP sunucuları**): kendi modlarınızdakiyle aynı kart,
 >     ek olarak **Ne için (asistana söylenir)** alanı. Bu metin modele
@@ -837,8 +838,18 @@ verir.
 >     (`<GITHUB_TOKEN>`…) kullanıcıya kalır. Asistan mod ayarlarını
 >     okuyabilir ama sunucuların yalnızca adını, araçlarını ve amacını
 >     görür; komut, argüman, ortam değişkeni, adres ve başlıklar ona
->     gösterilmez, sunucuları değiştiremez (`assistantModes`). Ayrıntılı
->     kullanım: [`docs/05-mcp-sunuculari.md`](../../docs/05-mcp-sunuculari.md).
+>     gösterilmez (`assistantModes`).
+>   - **Asistana söyleyerek bağlamak:** "DBHub'ı Kod moduna bağla, config
+>     dosyası şurada" gibi bir istekte asistan `mode_mcp_list` ile modları,
+>     bağlı sunucuları ve hazır sunucuları görür; `mode_mcp_change` ile bir
+>     moda (Kalem'in ya da sizin) hazır ya da kendi verdiğiniz bir sunucuyu
+>     ekler, alanlarını (araçlar, amaç, yol, token, açık/kapalı) değiştirir ya
+>     da kaldırır. Program çalıştırabildiği için onay kartı her seferinde
+>     çıkar: komutun ya da adresin tamamı, araçlar ve amaç görünür, token'lar
+>     yalnızca başıyla (`Bear…`). Bu onay "her zaman izin ver" ile
+>     hatırlanmaz; araç Ayarlar'da "sormadan çalıştır" yapılsa da sorulur.
+>     Değişiklik o moddaki bir sonraki sorudan itibaren geçerlidir.
+>     Ayrıntılı kullanım: [`docs/05-mcp-sunuculari.md`](../../docs/05-mcp-sunuculari.md).
 > - **Analiz şablonları:** **Dosya → Şablondan Yeni…** ve **Dosya → Ayarlar →
 >   Şablonlar**. Ekip şablonları açık klasörün `.kalem/templates/`
 >   klasöründe (Git ile paylaşılır; aynı adlı kişisel şablonun önüne geçer),

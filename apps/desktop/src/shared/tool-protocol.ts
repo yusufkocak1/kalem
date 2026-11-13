@@ -85,6 +85,12 @@ export interface ApprovalRequest {
 	readonly error?: string;
 	/** The user set the tool to be asked about every time: nothing allowed before counts. */
 	readonly everyTime?: boolean;
+	/**
+	 * Never allowed without asking, nor for later: a change that can run a
+	 * program on this computer (an MCP server). Not even a tool set to run
+	 * without asking skips it.
+	 */
+	readonly mustAsk?: boolean;
 }
 
 export interface ApprovalAnswer {

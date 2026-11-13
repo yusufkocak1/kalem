@@ -59,11 +59,11 @@ export class PermissionGate {
 	ask(sender: WebContents, request: Omit<ApprovalRequest, "id">): Promise<ApprovalAnswer> {
 		const policy = this.#store.toolPolicy?.(request.tool);
 		if (policy === "off") return Promise.resolve(DENIED);
-		// Set to run without asking: everything is allowed, a form to fill in excepted.
-		if (policy === "auto" && request.fields === undefined) {
+		// Set to run without asking: everything is allowed, a form to fill in and what must be asked excepted.
+		if (policy === "auto" && request.fields === undefined && request.mustAsk !== true) {
 			return Promise.resolve({ approved: true, scope: "once" });
 		}
-		const everyTime = policy === "ask" || request.everyTime === true;
+		const everyTime = policy === "ask" || request.everyTime === true || request.mustAsk === true;
 		if (
 			!everyTime &&
 			request.items === undefined &&
@@ -83,7 +83,9 @@ export class PermissionGate {
 				sender,
 				resolve: (answer) => {
 					sender.removeListener("destroyed", gone);
-					if (answer.approved) this.#remember(request.permission, answer.scope);
+					if (answer.approved && request.mustAsk !== true) {
+						this.#remember(request.permission, answer.scope);
+					}
 					resolve(answer);
 				},
 			});
