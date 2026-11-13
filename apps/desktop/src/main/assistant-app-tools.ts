@@ -59,7 +59,7 @@ const placeLabel = (ctx: ToolContext, place: PanePlace): string =>
 	})[place];
 
 /** A setting as the model reads it: its name, where it is, its value and what it takes. */
-function settingLine(ctx: ToolContext, def: SettingDef): string {
+export function settingLine(ctx: ToolContext, def: SettingDef): string {
 	const value = ctx.settings()[def.key];
 	const label = def.label === null ? def.key : ctx.t[def.label];
 	const shown = (raw: unknown): string => JSON.stringify(raw) ?? "null";
@@ -114,7 +114,7 @@ function intended(
 }
 
 /** Applies settings the user allowed; language goes through its own flow (a restart). */
-function applySettings(ctx: ToolContext, patch: Partial<Settings>, label: string): void {
+export function applySettings(ctx: ToolContext, patch: Partial<Settings>, label: string): void {
 	const before: Record<string, unknown> = {};
 	for (const key of Object.keys(patch) as (keyof Settings)[]) before[key] = ctx.settings()[key];
 	const { language, ...rest } = patch;

@@ -118,6 +118,8 @@ export interface AssistantHost {
 	runCommand(command: Command): void;
 	/** Changes settings, as the menus do (an assistant's change undone). */
 	changeSettings(patch: Partial<Settings>): void;
+	/** The assistant connected or disconnected Jira or Confluence: the panes follow. */
+	accountsChanged(): void;
 	/** Marks the quotes in the document for this run; how many were found. */
 	markQuotes(quotes: readonly string[]): number;
 	/** Brings a quote of the document into view and selects it; `false` when it is not there. */
@@ -1034,6 +1036,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	interface ChatCommand extends SlashEntry {
 		/** What the argument is, for a command that takes one. */
 		readonly argument?: string;
+		/** One of Claude Code's (a plugin's, the user's), which Claude Code runs. */
+		readonly cli?: boolean;
 		run(arg: string): void;
 	}
 
@@ -1203,17 +1207,67 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		app("format-code", "format-all-code", t.formatAllCode),
 	];
 
+	// --- Claude Code's own commands: the plugins', the user's, the folders' ------------
+
+	/** Claude Code's slash commands found on this computer; asked for again after a while. */
+	let cliList: ChatCommand[] = [];
+	let cliAsked = 0;
+	let cliKey = "";
+	const usesClaudeCode = (): boolean => (status?.provider ?? active.provider) === "claude-code";
+	const cliFolders = (): string[] => [
+		...new Set([...host.workspaceFolders(), ...(active.folder === null ? [] : [active.folder])]),
+	];
+
+	/** Asks for them when the menu opens: the plugins may have changed since. */
+	function refreshCliCommands(): void {
+		if (!usesClaudeCode()) return;
+		const folders = cliFolders();
+		const key = folders.join("\n");
+		if (key === cliKey && Date.now() - cliAsked < 30_000) return;
+		cliAsked = Date.now();
+		cliKey = key;
+		void bridge
+			.assistantCliCommands(folders)
+			.then((found) => {
+				cliList = found.map((command) => ({
+					name: command.name,
+					label:
+						`${command.description}${command.source === "user" ? "" : ` · ${command.source === "project" ? t.slashCliProject : command.source}`}`.trim(),
+					...(command.argument === undefined ? {} : { argument: command.argument }),
+					cli: true,
+					run: (arg: string) => ask(arg === "" ? `/${command.name}` : `/${command.name} ${arg}`),
+				}));
+				// The menu open now shows them.
+				if (!menu.hidden || slashQuery(input.value) !== null) updateMenu(false);
+			})
+			.catch(() => {});
+	}
+
+	/** Kalem's commands, then Claude Code's: one of Kalem's names keeps its own meaning. */
+	const allCommands = (): ChatCommand[] => {
+		if (!usesClaudeCode()) return [...commands];
+		const own = new Set(commands.map((command) => command.name));
+		return [...commands, ...cliList.filter((command) => !own.has(command.name))];
+	};
+
 	let menuItems: ChatCommand[] = [];
 	let menuIndex = 0;
 
-	function updateMenu(): void {
+	function updateMenu(fresh = true): void {
 		const query = slashQuery(input.value);
 		if (query === null || query.complete) {
 			hideMenu();
 			return;
 		}
-		menuItems = matchSlash(commands, query.name, host.lang);
-		menuIndex = 0;
+		if (fresh) refreshCliCommands();
+		const keep = menuItems[menuIndex]?.name;
+		menuItems = matchSlash(allCommands(), query.name, host.lang);
+		menuIndex = fresh
+			? 0
+			: Math.max(
+					0,
+					menuItems.findIndex((command) => command.name === keep),
+				);
 		if (menuItems.length === 0) {
 			hideMenu();
 			return;
@@ -1239,6 +1293,9 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 							text: `/${command.name}${command.argument === undefined ? "" : ` <${command.argument}>`}`,
 						}),
 						el("span", { class: "assistant-command-label", text: command.label }),
+						...(command.cli === true
+							? [el("span", { class: "assistant-command-badge", text: "Claude Code" })]
+							: []),
 					],
 				});
 				// Before the input loses focus, so the click is not lost with the menu.
@@ -1276,8 +1333,10 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	function runTyped(): boolean {
 		const query = slashQuery(input.value);
 		if (query === null) return false;
-		const command = findSlash(commands, query.name, host.lang);
+		const command = findSlash(allCommands(), query.name, host.lang);
 		if (command === undefined) {
+			// Claude Code may know it (a plugin's command not found on disk): it is sent as it is.
+			if (usesClaudeCode()) return false;
 			showNotice(format(t.slashUnknown, query.name));
 			return true;
 		}
@@ -2976,6 +3035,11 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			typeof call.input === "object" && call.input !== null ? call.input : {}
 		) as Record<string, unknown>;
 		try {
+			if (call.name === "accounts_changed") {
+				host.accountsChanged();
+				answer(true, "");
+				return;
+			}
 			if (call.name === "app_command" && typeof input.command === "string") {
 				host.runCommand(input.command as Command);
 				answer(true, "");

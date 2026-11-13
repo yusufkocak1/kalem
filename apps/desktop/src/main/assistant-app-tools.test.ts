@@ -55,6 +55,7 @@ function context(
 		jira: null,
 		confluenceClient: null,
 		jiraClient: null,
+		connections: null,
 		workspace: null,
 		templates: null,
 		document: null,

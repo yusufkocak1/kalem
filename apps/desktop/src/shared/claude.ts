@@ -203,6 +203,21 @@ export function diagramForPrompt(diagram: Diagram, extra: Record<string, unknown
 	});
 }
 
+/** Whether a question is one of Claude Code's slash commands (`/plugin:command args`). */
+export const isSlashCommand = (question: string): boolean =>
+	/^\/[\w.:-]+(\s|$)/.test(question.trimStart());
+
+/**
+ * Context and a question, in the order Claude Code reads them: the context
+ * first, but a slash command first of all, or it would not run as one.
+ */
+export function withContext(context: string, question: string): string {
+	if (context === "") return question;
+	return isSlashCommand(question)
+		? `${question.trim()}\n\n${context}`
+		: `${context}\n\n${question}`;
+}
+
 /** The text sent to Claude for one question: the context in tags, then the question. */
 export function composePrompt(context: PromptContext): string {
 	const parts: string[] = [];
@@ -229,8 +244,7 @@ export function composePrompt(context: PromptContext): string {
 	}
 	const selection = context.selection?.trim() ?? "";
 	if (selection !== "") parts.push(`<selection>\n${clip(selection, MAX_SELECTION)}\n</selection>`);
-	parts.push(context.question.trim());
-	return parts.join("\n\n");
+	return withContext(parts.join("\n\n"), context.question.trim());
 }
 
 /** A question with its pictures, as the Anthropic Messages API and Claude Code take it. */

@@ -253,6 +253,7 @@ const assistant = createAssistantPane({
 	},
 	close: () => updateSettings({ assistant: false }),
 	changeSettings: (patch) => updateSettings(patch),
+	accountsChanged: () => void refreshAccounts(),
 	markQuotes: (quotes) => markQuotes(canvas, quotes),
 	revealQuote: (quote) => revealQuote(canvas, quote),
 	errorText: ipcErrorMessage,

@@ -677,6 +677,15 @@ export interface AssistantRequest {
 }
 
 /** A tool's part that the window runs: the document's change, a command. */
+/** A slash command of Claude Code's (a plugin's, the user's), as the command menu lists it. */
+export interface CliCommandInfo {
+	readonly name: string;
+	readonly description: string;
+	readonly argument?: string;
+	/** `user`, `project`, or the plugin's name. */
+	readonly source: string;
+}
+
 export interface AssistantToolCall {
 	readonly id: string;
 	readonly chatId: string;
@@ -1032,6 +1041,8 @@ export interface KalemBridge {
 	assistantForgetPermissions(): Promise<void>;
 	/** Summarizes an API chat so far; a CLI compacts its own (`"cli"`). */
 	assistantCompact(sessionId: string): Promise<"done" | "cli" | "none">;
+	/** Claude Code's own slash commands on this computer: the user's, the folders', the plugins'. */
+	assistantCliCommands(folders: readonly string[]): Promise<readonly CliCommandInfo[]>;
 	onAssistantApproval(handler: (request: ApprovalRequest) => void): () => void;
 	/** The user's own notes on a document (see `local-notes.ts`), by its key. */
 	localNotes(key: string): Promise<readonly LocalNote[]>;
@@ -1205,4 +1216,5 @@ export const CHANNEL = {
 	assistantToolResult: "kalem:assistant-tool-result",
 	assistantForgetPermissions: "kalem:assistant-forget-permissions",
 	assistantCompact: "kalem:assistant-compact",
+	assistantCliCommands: "kalem:assistant-cli-commands",
 } as const;

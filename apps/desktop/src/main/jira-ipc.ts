@@ -61,6 +61,31 @@ const text = (value: unknown, name: string): string => {
 	return value;
 };
 
+/** A login as the window or a form sent it: its site, user name and token, trimmed. */
+export function loginOf(raw: unknown): ConfluenceCredentials {
+	const login = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+	const credentials = {
+		site: text(login.site, "site").trim(),
+		username: text(login.username ?? "", "user name").trim(),
+		token: text(login.token, "token").trim(),
+	};
+	if (credentials.site === "" || credentials.token === "") throw new Error("Missing login");
+	return credentials;
+}
+
+/** Checks the login with Jira and keeps it: the Jira panel and the assistant use it from then on. */
+export async function connectJira(
+	ctx: Pick<JiraIpcContext, "jira">,
+	raw: unknown,
+): Promise<JiraAccount> {
+	const credentials = loginOf(raw);
+	const client = jiraClient(credentials);
+	await client.verify();
+	const username = client.bearer ? "" : credentials.username;
+	await ctx.jira.set({ ...credentials, username, site: client.site });
+	return account({ client, username, shared: false });
+}
+
 export function registerJiraIpc(ctx: JiraIpcContext): {
 	/** The connected Jira, asked for each time: the connection can change. */
 	jira(): Promise<JiraClient | null>;
@@ -78,20 +103,7 @@ export function registerJiraIpc(ctx: JiraIpcContext): {
 		return connection === null ? null : account(connection);
 	});
 
-	ipcMain.handle(CHANNEL.jiraConnect, async (_event, raw: unknown) => {
-		const login = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
-		const credentials = {
-			site: text(login.site, "site").trim(),
-			username: text(login.username, "user name").trim(),
-			token: text(login.token, "token").trim(),
-		};
-		if (credentials.site === "" || credentials.token === "") throw new Error("Missing login");
-		const client = jiraClient(credentials);
-		await client.verify();
-		const username = client.bearer ? "" : credentials.username;
-		await ctx.jira.set({ ...credentials, username, site: client.site });
-		return account({ client, username, shared: false });
-	});
+	ipcMain.handle(CHANNEL.jiraConnect, (_event, raw: unknown) => connectJira(ctx, raw));
 
 	ipcMain.handle(CHANNEL.jiraDisconnect, () => ctx.jira.clear());
 

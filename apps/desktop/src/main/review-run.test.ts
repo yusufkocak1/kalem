@@ -28,6 +28,7 @@ function context(): ToolContext {
 		jira: null,
 		confluenceClient: null,
 		jiraClient: null,
+		connections: null,
 		workspace: null,
 		templates: null,
 		document: { tabId: "tab-1", name: "a.md", text: "# A\n\nFast enough.\n", selection: "" },

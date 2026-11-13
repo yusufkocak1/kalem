@@ -26,6 +26,7 @@ import {
 	isPromptImageType,
 	MAX_PROMPT_IMAGE_DATA,
 	MAX_PROMPT_IMAGES,
+	withContext,
 	withInstructions,
 } from "../shared/claude.js";
 import type { LookupWay } from "../shared/confluence-tool.js";
@@ -53,11 +54,12 @@ import { JiraLookups } from "./assistant-jira.js";
 import type { AssistantToolServer } from "./assistant-mcp.js";
 import { mcpToolName } from "./assistant-mcp.js";
 import { PermissionGate } from "./assistant-permissions.js";
-import type { DocumentSnapshot, ToolContext, ToolResult } from "./assistant-tools.js";
+import type { Connections, DocumentSnapshot, ToolContext, ToolResult } from "./assistant-tools.js";
 import { allTools, approver, RendererCalls, runTool, toolsFor } from "./assistant-tools.js";
 import { ModelCatalog } from "./model-catalog.js";
 import { ReviewRun, ReviewRuns } from "./review-run.js";
 import "./assistant-app-tools.js";
+import "./assistant-form-tools.js";
 import "./assistant-analysis-tools.js";
 import "./assistant-external-tools.js";
 import { blockResults, parseApprovalAnswer, toolCalls } from "../shared/tool-protocol.js";
@@ -65,6 +67,7 @@ import { collectSources, MAX_SOURCES, SOURCE_BUDGET } from "./assistant-sources.
 import type { AssistantStore } from "./assistant-store.js";
 import type { CliProgram } from "./cli.js";
 import { claudeOutput, LocalCli, runCli, SearchLog, textOutput } from "./cli.js";
+import { cliCommands } from "./cli-commands.js";
 import type { ConfluenceClient } from "./confluence-client.js";
 import type { JiraClient } from "./jira-client.js";
 import { askApi, listModels } from "./llm.js";
@@ -91,6 +94,8 @@ export interface AssistantIpcContext {
 	confluence(): Promise<ConfluenceClient | null>;
 	/** The connected Jira, for the assistant's look-ups; `null` when there is none. */
 	jira(): Promise<JiraClient | null>;
+	/** Signing in to Jira and Confluence from the assistant's forms. */
+	readonly connections: Connections;
 	/** Kalem's tools for a CLI, as an MCP server. */
 	readonly tools: AssistantToolServer;
 	/** Changes settings as the menus do: every window follows. */
@@ -216,9 +221,12 @@ async function workspaceBlock(workspace: Workspace | null, cli: boolean): Promis
 function withSources(sources: string, sent: string | undefined, prompt: string): string {
 	if (sources === "") return prompt;
 	if (sent === sources) {
-		return `<files-unchanged>The sources are as I sent them above.</files-unchanged>\n\n${prompt}`;
+		return withContext(
+			"<files-unchanged>The sources are as I sent them above.</files-unchanged>",
+			prompt,
+		);
 	}
-	return `${sources}\n\n${prompt}`;
+	return withContext(sources, prompt);
 }
 
 /** What the rest of the app can ask the assistant directly, outside a chat. */
@@ -635,6 +643,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			jira: jiraLookups,
 			confluenceClient,
 			jiraClient,
+			connections: ctx.connections,
 			workspace,
 			templates: ctx.templates,
 			document: sentDocument(request.document),
@@ -1194,6 +1203,16 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 	 * Compacts an API chat: the messages so far become a summary the next
 	 * questions carry instead. A CLI keeps and compacts its own conversation.
 	 */
+	ipcMain.handle(CHANNEL.assistantCliCommands, async (_event, raw: unknown) => {
+		const folders = (Array.isArray(raw) ? raw : [])
+			.filter((folder): folder is string => typeof folder === "string" && folder !== "")
+			.slice(0, 20);
+		const checked = (
+			await Promise.all(folders.map(async (folder) => ((await isFolder(folder)) ? folder : null)))
+		).filter((folder): folder is string => folder !== null);
+		return cliCommands(checked);
+	});
+
 	ipcMain.handle(
 		CHANNEL.assistantCompact,
 		async (event, sessionId: unknown): Promise<"done" | "cli" | "none"> => {
