@@ -543,10 +543,21 @@ export function issueText(issue: JiraIssue): string {
 		issue.url,
 		"",
 		...facts.filter(([, value]) => value !== "").map(([name, value]) => `${name}: ${value}`),
-		"",
-		"Description:",
-		issue.description === "" ? "(none)" : issue.description,
 	];
+	const others = (issue.allFields ?? []).filter((entry) => !entry.empty && entry.value !== "");
+	if (issue.sprint !== null && issue.sprint !== undefined)
+		lines.push(`Sprint: ${issue.sprint.name}`);
+	if (issue.team !== null && issue.team !== undefined) lines.push(`Team: ${issue.team.name}`);
+	if (others.length > 0) {
+		lines.push(
+			"",
+			"Other fields:",
+			...others.map(
+				(entry) => `- ${entry.name}: ${entry.value.replace(/\s+/g, " ").slice(0, 300)}`,
+			),
+		);
+	}
+	lines.push("", "Description:", issue.description === "" ? "(none)" : issue.description);
 	if (issue.subtasks.length > 0) {
 		lines.push("", "Sub-tasks:", ...issue.subtasks.map((ref) => `- ${refText(ref)}`));
 	}
