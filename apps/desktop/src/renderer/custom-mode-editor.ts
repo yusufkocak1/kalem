@@ -2,7 +2,7 @@ import type { CustomIcon, CustomMode } from "../shared/custom-modes.js";
 import { CUSTOM_ICONS, customInstructions } from "../shared/custom-modes.js";
 import type { Strings } from "../shared/i18n.js";
 import type { McpServer } from "../shared/mcp-servers.js";
-import { mcpInstructions, serversNamed } from "../shared/mcp-servers.js";
+import { mcpInstructions, PROJECT, serversNamed } from "../shared/mcp-servers.js";
 import type { StoredStep } from "../shared/mode-config.js";
 import { DETAILS, REPLY_LANGUAGES } from "../shared/mode-config.js";
 import { el } from "./dom.js";
@@ -45,7 +45,12 @@ export function createCustomModeEditor(options: CustomModeEditorOptions): HTMLEl
 
 	// What the model is told: the mode's instructions and the servers it uses.
 	const told = (): string =>
-		[customInstructions(mode), mcpInstructions(serversNamed(mode.mcp, options.mcpServers()))]
+		[
+			customInstructions(mode),
+			mcpInstructions(serversNamed(mode.mcp, options.mcpServers()))
+				.split(PROJECT)
+				.join(`‹${t.mcpProjectWord}›`),
+		]
 			.filter((part) => part !== "")
 			.join("\n\n");
 

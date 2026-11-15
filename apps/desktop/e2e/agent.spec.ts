@@ -739,6 +739,9 @@ test("one of Kalem's modes uses the assistant's MCP servers too, and the model i
 	await expect(settings.locator(".mode-preview-text")).toContainText(
 		"- context7: Up-to-date documentation",
 	);
+	await expect(settings.locator(".mode-preview-text")).toContainText(
+		"the user's code at ‹the code folder of each question›",
+	);
 	await settings.locator(".mode-preview").scrollIntoViewIfNeeded();
 	await shot(page, "09-code-mode-preview");
 	await settings.getByRole("button", { name: "Done" }).click();

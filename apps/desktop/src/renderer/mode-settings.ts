@@ -2,7 +2,7 @@ import type { Settings } from "../shared/bridge.js";
 import { newCustomMode } from "../shared/custom-modes.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
-import { mcpInstructions, serversNamed } from "../shared/mcp-servers.js";
+import { mcpInstructions, PROJECT, serversNamed } from "../shared/mcp-servers.js";
 import type { Mode, ResolvedMode, ResolvedStep } from "../shared/mode-config.js";
 import {
 	DETAILS,
@@ -217,7 +217,9 @@ export function createModeEditor(options: ModeEditorOptions): {
 	function drawPreview(): void {
 		const text = [
 			modeInstructions(selected, { [selected]: storeMode(mode) }),
-			mcpInstructions(serversNamed(mode.mcp, options.settings().assistantMcpServers)),
+			mcpInstructions(serversNamed(mode.mcp, options.settings().assistantMcpServers))
+				.split(PROJECT)
+				.join(`‹${t.mcpProjectWord}›`),
 		]
 			.filter((part) => part !== "")
 			.join("\n");
