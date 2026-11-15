@@ -29,7 +29,6 @@ import {
 	PADDING,
 	routeEdges,
 	SHAPES,
-	SMALL_FONT_SIZE,
 	serializeDiagram,
 	snap,
 } from "../shared/diagram.js";
@@ -1001,17 +1000,6 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 		textEdit.select();
 	}
 
-	/**
-	 * A shape whose new text would be drawn too small to read grows to it,
-	 * in the same step (one undo). A long question in a decision shrank to
-	 * about 8px (keşif testi K-15); growing it was a separate button.
-	 */
-	function withReadableText(next: Diagram, id: string): Diagram {
-		const node = next.nodes.find((candidate) => candidate.id === id);
-		if (node === undefined || nodeText(node).fontSize >= SMALL_FONT_SIZE) return next;
-		return fitNodesToText(next, new Set([id]));
-	}
-
 	function finishText(keep: boolean): void {
 		if (editing === null) return;
 		const { kind, id } = editing;
@@ -1021,11 +1009,7 @@ export function createDiagramEditor(t: Strings): DiagramEditor {
 		const item = kind === "node" ? nodeById(id) : edgeById(id);
 		if (keep && item !== undefined && item.text !== text) {
 			const ids = new Set([id]);
-			change(
-				kind === "node"
-					? withReadableText(updateNodes(ids, { text }), id)
-					: updateEdges(ids, () => ({ text })),
-			);
+			change(kind === "node" ? updateNodes(ids, { text }) : updateEdges(ids, () => ({ text })));
 		}
 		canvas.focus();
 	}

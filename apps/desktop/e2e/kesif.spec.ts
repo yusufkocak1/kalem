@@ -1,5 +1,5 @@
 /**
- * What an exploratory test of the app found (keşif testi, K-09 … K-15),
+ * What an exploratory test of the app found (keşif testi, K-09 … K-14),
  * each kept from coming back. The library's findings are tested in the
  * repository's own browser tests (`e2e/` at its root).
  */
@@ -85,38 +85,6 @@ test("K-14: formatting a broken JSON file says the file is not valid JSON", asyn
 	await page.locator(".text-view-format").click();
 	await expect(page.locator(".notice")).toContainText("This file is not valid JSON");
 	await expect(page.locator(".text-view-area")).toHaveValue('{"ad": "kalem", "eksik": }');
-	expect(errors).toEqual([]);
-	await app.close();
-});
-
-test("K-15: a long question in a decision makes the shape grow instead of tiny text", async () => {
-	const folder = await tempDir("kesif-diagram");
-	const doc = join(folder, "akis.md");
-	await writeFile(doc, "# Akış\n\nGiriş\n");
-	const { app, page, errors } = await launch({ args: [doc] });
-	await page.locator("#editor p", { hasText: "Giriş" }).click();
-	await clickMenu(app, "Insert", "Diagram…");
-	const editor = page.locator(".diagram-editor");
-	const canvas = editor.locator(".diagram-canvas");
-	await editor
-		.locator('[data-shape="decision"]')
-		.dragTo(canvas, { targetPosition: { x: 300, y: 120 } });
-	const shape = canvas.locator(".kd-node").first();
-	const before = await shape.boundingBox();
-	await shape.dblclick();
-	const text = editor.locator(".diagram-text-edit");
-	await text.fill("Belge eksiksiz ve imzalı mı? Uzun bir karar metni deneyelim");
-	await text.press("Enter");
-	const size = Number(await shape.locator("text").first().getAttribute("font-size"));
-	expect(size).toBeGreaterThanOrEqual(10);
-	const after = await shape.boundingBox();
-	expect((after?.height ?? 0) * (after?.width ?? 0)).toBeGreaterThan(
-		(before?.height ?? 0) * (before?.width ?? 0),
-	);
-	// One undo takes the text and the growing back together.
-	await page.keyboard.press("Control+z");
-	await expect(shape.locator("text")).toHaveText("Decision");
-	expect(await shape.boundingBox()).toEqual(before);
 	expect(errors).toEqual([]);
 	await app.close();
 });
