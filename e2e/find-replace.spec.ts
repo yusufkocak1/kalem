@@ -337,3 +337,22 @@ test("çok eşleşmeli aramada boyama belgeyi eşleşme başına taramıyor", as
 	);
 	expect(taramalar).toBeLessThan(50);
 });
+
+/**
+ * Keşif testi K-11: Tab bul kutusundan ↑ düğmesine gidiyordu; değiştirme
+ * metni kayboluyor, "Tümünü değiştir" eşleşmeleri boşlukla değiştiriyordu.
+ */
+test("Tab bul ve değiştir kutuları arasında gidiyor", async ({ page }) => {
+	await yaz(page, "istanbul ve İSTANBUL\n");
+	await page.keyboard.press("Control+h");
+	await bulKutusu(page).fill("istanbul");
+	await bulKutusu(page).press("Tab");
+	await expect(degistirKutusu(page)).toBeFocused();
+	await page.keyboard.type("Ankara");
+	await panel(page).getByRole("button", { name: "Tümünü değiştir" }).click();
+	await expect
+		.poll(() => page.evaluate(() => window.kalem.editor.getValue()))
+		.toBe("Ankara ve Ankara\n");
+	await degistirKutusu(page).press("Shift+Tab");
+	await expect(bulKutusu(page)).toBeFocused();
+});

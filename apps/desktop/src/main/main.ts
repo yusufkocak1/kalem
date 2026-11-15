@@ -18,7 +18,7 @@ import type { Lang, Strings } from "../shared/i18n.js";
 import { format, pickLanguage, stringsFor } from "../shared/i18n.js";
 import { quickNoteName } from "../shared/notes.js";
 import { isPaneShown, revealPane } from "../shared/panes.js";
-import { isPackagePath, isProgramPath } from "../shared/paths.js";
+import { isEditablePath, isPackagePath, isProgramPath } from "../shared/paths.js";
 import { ChatStore } from "./assistant-chats.js";
 import { AssistantStore } from "./assistant-store.js";
 import { confluenceClient } from "./confluence-ipc.js";
@@ -67,7 +67,11 @@ const PAGE_NUMBER_FOOTER =
 	'<div style="width:100%;font:9px sans-serif;color:#555;text-align:center">' +
 	'<span class="pageNumber"></span> / <span class="totalPages"></span></div>';
 
-/** Files named on the command line: documents open in Kalem, other files where they belong. */
+/**
+ * Files named on the command line: documents open in Kalem, other files
+ * where they belong. A document that is not there is kept, so that opening
+ * it says so; it used to be dropped without a word.
+ */
 function documentArguments(argv: readonly string[], cwd: string): string[] {
 	return argv
 		.slice(1)
@@ -77,7 +81,7 @@ function documentArguments(argv: readonly string[], cwd: string): string[] {
 			try {
 				return statSync(path).isFile();
 			} catch {
-				return false;
+				return isEditablePath(path) && !existsSync(path);
 			}
 		});
 }

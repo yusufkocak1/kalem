@@ -627,6 +627,39 @@ test.describe("blok tutamacı", () => {
 		await expect(page.locator(TUTAMAC)).toBeVisible();
 	});
 
+	/**
+	 * Keşif testi K-13: tutamaç `fixed` konumlu ve yalnızca üzerine gelinince
+	 * yerleşiyordu. Belge ya da düzen değişince eski yerinde asılı kalıyordu.
+	 */
+	test("bloğu silinince gizleniyor, düzen kayınca bloğunu izliyor", async ({ page }) => {
+		const bloklar = await besParagraf(page);
+		const kutu = await bloklar.nth(1).boundingBox();
+		await page.mouse.move(kutu!.x + kutu!.width / 2, kutu!.y + kutu!.height / 2);
+		await expect(page.locator(TUTAMAC)).toBeVisible();
+		const once = await page.locator(TUTAMAC).boundingBox();
+
+		// The page is laid out again under the pointer (focus mode, full width):
+		// the handle stays at the start of its block.
+		await page.evaluate(() => {
+			(document.querySelector("#editor") as HTMLElement).style.paddingInlineStart = "80px";
+		});
+		await expect
+			.poll(async () => {
+				const blok = await bloklar.nth(1).boundingBox();
+				const tutamac = await page.locator(TUTAMAC).boundingBox();
+				return blok === null || tutamac === null ? null : blok.x - (tutamac.x + tutamac.width);
+			})
+			.toBeGreaterThanOrEqual(0);
+		const sonra = await page.locator(TUTAMAC).boundingBox();
+		const kayma = (await bloklar.nth(1).boundingBox())!.x - kutu!.x;
+		expect(kayma).toBeGreaterThan(20);
+		expect(Math.abs(sonra!.x - once!.x - kayma)).toBeLessThanOrEqual(1);
+
+		// The block is gone: so is the handle.
+		await page.evaluate(() => window.kalem.editor.setValue("tek\n"));
+		await expect(page.locator(TUTAMAC)).toBeHidden();
+	});
+
 	/** Tutamaç bloğun **solunda** durmalı; metnin üstünü kapatamaz. */
 	test("bloğun soluna hizalanıyor", async ({ page }) => {
 		const bloklar = await besParagraf(page);

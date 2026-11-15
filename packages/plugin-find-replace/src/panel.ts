@@ -158,6 +158,24 @@ export function createPanel(anchor: HTMLElement, options: PanelOptions): Panel {
 			options.onClose();
 			return;
 		}
+		// Tab goes between the two boxes, as in Word and VS Code. In the
+		// order of the page it went to the ↑ button: what was typed next
+		// for the replacement was lost, and "Replace all" replaced the
+		// matches with nothing.
+		if (event.key === "Tab" && !event.altKey && !event.ctrlKey && !event.metaKey) {
+			const hedef =
+				event.target === bulGirdi && !event.shiftKey
+					? degistirGirdi
+					: event.target === degistirGirdi && event.shiftKey
+						? bulGirdi
+						: null;
+			if (hedef !== null && !degistirSatiri.hidden && !hedef.disabled) {
+				event.preventDefault();
+				hedef.focus();
+				hedef.select();
+			}
+			return;
+		}
 		if (event.key !== "Enter") return;
 		event.preventDefault();
 		// Değiştirme kutusunda Enter = değiştir; arama kutusunda = sonraki.

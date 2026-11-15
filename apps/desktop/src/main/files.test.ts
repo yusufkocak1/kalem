@@ -17,6 +17,22 @@ afterEach(async () => {
 });
 
 describe("readDocument / writeDocument", () => {
+	/** Keşif testi K-10: it opened as Windows-1254 text, and saving would have overwritten it. */
+	it("does not read a picture named .md as text", async () => {
+		const path = join(folder, "resim.md");
+		await writeFile(path, PNG_1X1);
+		await expect(readDocument(path, "windows-1254")).rejects.toMatchObject({ code: "not-text" });
+	});
+
+	it("still reads a UTF-16 document, whose zero bytes are text", async () => {
+		const path = join(folder, "utf16.md");
+		await writeFile(
+			path,
+			Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("# a\n", "utf16le")]),
+		);
+		expect((await readDocument(path, "windows-1254")).text).toBe("# a\n");
+	});
+
 	it("round-trips a CRLF file with a BOM byte for byte", async () => {
 		const path = join(folder, "rapor.md");
 		const original = Buffer.concat([

@@ -3523,6 +3523,29 @@ button {
 	flex-direction: column;
 	min-width: 0;
 	min-height: 0;
+	container-type: inline-size;
+}
+
+/*
+ * A narrow desk (a small window with the assistant open) gives its room to
+ * the text: the grey margin around the page and the page's own margins
+ * shrink. With them as they were, a 600px window left the text a column of
+ * about 150px, a word or two a line.
+ */
+@container (max-width: 480px) {
+	/* The column in the selectors: these rules come before `.desk` and `.page`'s own. */
+	.desk-column .desk {
+		padding: 12px 8px 48px;
+	}
+
+	.desk-column .page {
+		padding: 2em 1em 4em;
+	}
+
+	/* The block handle's gutter, too: the handle may sit over the page's margin. */
+	.desk-column .page #editor.kalem-ui {
+		padding-inline-start: 1.75rem;
+	}
 }
 
 .desk {

@@ -26,7 +26,7 @@
  */
 import type { NodeId } from "@kalem-editor/core";
 import type { Editor } from "@kalem-editor/editor";
-import { moveBlocks, newParagraph, nudgeBlock } from "@kalem-editor/editor";
+import { blockElementOf, moveBlocks, newParagraph, nudgeBlock } from "@kalem-editor/editor";
 import { button, el, themed } from "./dom.js";
 import type { UiLabels } from "./labels.js";
 
@@ -192,6 +192,39 @@ export function createBlockHandle(editor: Editor, options: BlockHandleOptions): 
 		if (gidilen instanceof Node && (kok.contains(gidilen) || element.contains(gidilen))) return;
 		tutamaciGizle();
 	};
+
+	/**
+	 * Sayfa tutamacın altında kaydı: bir düzenleme, kaydırma, pencere ya da
+	 * düzen değişikliği (odak modu, tam genişlik). Tutamaç bloğunu izliyor;
+	 * blok artık yoksa gizleniyor. `fixed` konumlu olduğu için eskiden
+	 * yerinde kalıyordu — her şey geri alınınca boş bir yerde, odak modunda
+	 * bir tablonun içinde asılı duruyordu (keşif testi K-13).
+	 */
+	let yerKaresi = 0;
+	function yerindeTut(): void {
+		if (kok.hidden || surukleme !== null) return;
+		const view = doc.defaultView;
+		if (view === null) return;
+		view.cancelAnimationFrame(yerKaresi);
+		yerKaresi = view.requestAnimationFrame(() => {
+			if (kok.hidden || surukleme !== null) return;
+			const blok = hoverId === null ? null : blockElementOf(element, hoverId);
+			if (blok === null || !blok.isConnected || blok.getClientRects().length === 0) {
+				if (!sabit && !kok.contains(doc.activeElement)) {
+					kok.hidden = true;
+					hoverId = null;
+				}
+				return;
+			}
+			tutamaciGoster(blok);
+		});
+	}
+	const degisimiBirak = editor.on("change", yerindeTut);
+	doc.addEventListener("scroll", yerindeTut, true);
+	doc.defaultView?.addEventListener("resize", yerindeTut);
+	const boyutGozcusu =
+		typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => yerindeTut());
+	boyutGozcusu?.observe(element);
 
 	// -----------------------------------------------------------------------
 	// Sürükleme
@@ -372,6 +405,11 @@ export function createBlockHandle(editor: Editor, options: BlockHandleOptions): 
 			element.removeEventListener("pointerout", ayrildi);
 			kok.removeEventListener("focusout", odakCikti);
 			doc.defaultView?.cancelAnimationFrame(kaydirmaKaresi);
+			doc.defaultView?.cancelAnimationFrame(yerKaresi);
+			degisimiBirak();
+			doc.removeEventListener("scroll", yerindeTut, true);
+			doc.defaultView?.removeEventListener("resize", yerindeTut);
+			boyutGozcusu?.disconnect();
 			kok.remove();
 			gosterge.remove();
 		},
