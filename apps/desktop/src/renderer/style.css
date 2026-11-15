@@ -10574,6 +10574,15 @@ h3.mode-panel-name {
 	overflow-wrap: anywhere;
 }
 
+.mcp-choice-list {
+	display: grid;
+	gap: 8px;
+}
+
+.mcp-used-in {
+	margin: 0;
+}
+
 .mcp-presets {
 	display: grid;
 	gap: 8px;

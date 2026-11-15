@@ -68,8 +68,8 @@ function chat(
 const allow = (): ApprovalAnswer => ({ approved: true, scope: "always" });
 const refuse = (): ApprovalAnswer => ({ approved: false, scope: "once" });
 
-describe("the assistant connecting modes to MCP servers", () => {
-	it("adds a ready-made server to a mode once the user sees the whole of it and allows it", async () => {
+describe("the assistant setting up its MCP servers and the modes that use them", () => {
+	it("adds a ready-made server, used in a mode, once the user sees the whole of it and allows it", async () => {
 		const { ctx, asked, settings, always } = chat(allow);
 		const done = await runTool(
 			"mode_mcp_change",
@@ -84,9 +84,13 @@ describe("the assistant connecting modes to MCP servers", () => {
 			},
 			ctx,
 		);
-		expect(done.text).toContain("Done: Connect the MCP server db to the Code mode");
+		expect(done.text).toContain(
+			"Done: Add the MCP server db to the assistant and use it in the Code mode",
+		);
 		const [request] = asked;
-		expect(request?.title).toBe("Connect the MCP server db to the Code mode");
+		expect(request?.title).toBe(
+			"Add the MCP server db to the assistant and use it in the Code mode",
+		);
 		expect(request?.lines).toContain(
 			"Command: npx -y @bytebase/dbhub@latest --config /home/me/dbhub.toml",
 		);
@@ -95,19 +99,46 @@ describe("the assistant connecting modes to MCP servers", () => {
 		// Only once: it is never allowed for later.
 		expect(request?.scopes).toEqual(["once"]);
 		expect(always()).toEqual([]);
-		const [server] = resolveMode("code", settings().assistantModes).mcp;
+		const [server] = settings().assistantMcpServers;
 		expect(server).toMatchObject({
 			name: "db",
 			preset: "dbhub",
 			tools: ["get_parameter", "add_i18n_key"],
 		});
 		expect(server?.purpose).toContain("get_parameter");
+		expect(resolveMode("code", settings().assistantModes).mcp).toEqual(["db"]);
+		expect(resolveMode("ask", settings().assistantModes).mcp).toEqual([]);
+	});
+
+	it("adds a server to the assistant alone, and then uses it in a mode or stops", async () => {
+		const { ctx, settings, asked } = chat(allow);
+		const added = await runTool("mode_mcp_change", { action: "add", preset: "context7" }, ctx);
+		expect(added.text).toContain("No mode uses it yet");
+		expect(settings().assistantModes).toEqual({});
+		await runTool("mode_mcp_change", { action: "use", mode: "ask", name: "context7" }, ctx);
+		await runTool("mode_mcp_change", { action: "use", mode: "code", name: "context7" }, ctx);
+		expect(resolveMode("ask", settings().assistantModes).mcp).toEqual(["context7"]);
+		const twice = await runTool(
+			"mode_mcp_change",
+			{ action: "use", mode: "code", name: "context7" },
+			ctx,
+		);
+		expect(twice.text).toContain("already uses context7");
+		await runTool("mode_mcp_change", { action: "unuse", mode: "ask", name: "context7" }, ctx);
+		expect(resolveMode("ask", settings().assistantModes).mcp).toEqual([]);
+		expect(resolveMode("code", settings().assistantModes).mcp).toEqual(["context7"]);
+		expect(asked.map((request) => request.title)).toEqual([
+			"Add the MCP server context7 to the assistant",
+			"Use the MCP server context7 in the Ask mode",
+			"Use the MCP server context7 in the Code mode",
+			"Stop using the MCP server context7 in the Ask mode",
+		]);
 	});
 
 	it("asks every time, even when the tool is set to run without asking or the kind was allowed always", async () => {
 		const { ctx, asked } = chat(allow, { policy: "auto", always: ["settings:mcp"] });
 		await runTool("mode_mcp_change", { action: "add", mode: "ask", preset: "context7" }, ctx);
-		await runTool("mode_mcp_change", { action: "add", mode: "code", preset: "context7" }, ctx);
+		await runTool("mode_mcp_change", { action: "use", mode: "code", name: "context7" }, ctx);
 		expect(asked).toHaveLength(2);
 		expect(asked.every((request) => request.mustAsk === true)).toBe(true);
 	});
@@ -121,6 +152,7 @@ describe("the assistant connecting modes to MCP servers", () => {
 		);
 		expect(answer.text).toContain("did not allow");
 		expect(settings().assistantModes).toEqual({});
+		expect(settings().assistantMcpServers).toEqual([]);
 	});
 
 	it("shows tokens on the card only by their start, and never lists how a server runs", async () => {
@@ -138,37 +170,46 @@ describe("the assistant connecting modes to MCP servers", () => {
 		expect(asked[0]?.lines).toContain("Authorization: Bear…");
 		expect(asked[0]?.lines.join(" ")).not.toContain("verysecret");
 		const list = await runTool("mode_mcp_list", {}, ctx);
-		expect(list.text).toContain("- code (Code):\n  - github");
+		expect(list.text).toContain("  - github");
+		expect(list.text).toContain("used in: code");
+		expect(list.text).toContain("- code (Code): github");
+		expect(list.text).toContain("- ask (Ask): none");
 		expect(list.text).toContain("- dbhub (DBHub)");
 		expect(list.text).not.toContain("verysecret");
 		expect(list.text).not.toContain("api.githubcopilot.com");
 	});
 
-	it("changes a server's fields, keeping the rest, and removes it", async () => {
+	it("changes a server's fields, keeping the rest, renames it in its modes, and removes it from them", async () => {
 		const { ctx, settings } = chat(allow);
 		await runTool("mode_mcp_change", { action: "add", mode: "code", preset: "sentry" }, ctx);
 		const updated = await runTool(
 			"mode_mcp_change",
 			{
 				action: "update",
-				mode: "code",
 				name: "sentry",
-				server: { env: { SENTRY_ACCESS_TOKEN: "sntrys_abc123456" }, enabled: false },
+				server: {
+					name: "errors",
+					env: { SENTRY_ACCESS_TOKEN: "sntrys_abc123456" },
+					enabled: false,
+				},
 			},
 			ctx,
 		);
 		expect(updated.text).toContain("Done");
-		const [sentry] = resolveMode("code", settings().assistantModes).mcp;
+		const [sentry] = settings().assistantMcpServers;
+		expect(sentry?.name).toBe("errors");
 		expect(sentry?.env).toEqual({
 			SENTRY_ACCESS_TOKEN: "sntrys_abc123456",
 			SENTRY_HOST: "sentry.io",
 		});
 		expect(sentry?.enabled).toBe(false);
-		await runTool("mode_mcp_change", { action: "remove", mode: "code", name: "sentry" }, ctx);
+		expect(resolveMode("code", settings().assistantModes).mcp).toEqual(["errors"]);
+		await runTool("mode_mcp_change", { action: "remove", name: "errors" }, ctx);
+		expect(settings().assistantMcpServers).toEqual([]);
 		expect(settings().assistantModes).toEqual({});
 	});
 
-	it("works on the user's own modes, by name, and refuses what cannot be used", async () => {
+	it("works with the user's own modes, by name, and refuses what cannot be used", async () => {
 		const [mine] = parseCustomModes([{ id: "custom-1", name: "Test Analisti" }]);
 		if (mine === undefined) throw new Error("no mode");
 		const { ctx, settings, asked } = chat(allow, { settings: { assistantCustomModes: [mine] } });
@@ -181,7 +222,7 @@ describe("the assistant connecting modes to MCP servers", () => {
 			},
 			ctx,
 		);
-		expect(settings().assistantCustomModes[0]?.mcp.map((server) => server.name)).toEqual(["files"]);
+		expect(settings().assistantCustomModes[0]?.mcp).toEqual(["files"]);
 		const bad = await runTool(
 			"mode_mcp_change",
 			{ action: "add", mode: "code", server: { name: "kalem", command: "x" } },
@@ -200,6 +241,8 @@ describe("the assistant connecting modes to MCP servers", () => {
 			ctx,
 		);
 		expect(nowhere.text).toContain("There is no mode");
+		const noMode = await runTool("mode_mcp_change", { action: "use", name: "files" }, ctx);
+		expect(noMode.text).toContain("Name the mode");
 		// Only the one change that could be made was asked about.
 		expect(asked).toHaveLength(1);
 	});

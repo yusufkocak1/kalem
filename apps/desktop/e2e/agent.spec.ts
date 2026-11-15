@@ -562,7 +562,7 @@ test("modes: shaped in Settings (a step off, one of the user's own), and picked 
 	await app.close();
 });
 
-test("a mode of the user's own: its instructions, its tools and its MCP server go to Claude Code", async () => {
+test("a mode of the user's own: its instructions, its tools and the MCP server it uses go to Claude Code", async () => {
 	const folder = await tempDir("agent-custom-mode");
 	const doc = join(folder, "gereksinim.md");
 	await writeFile(doc, "# Giriş\n\nKullanıcı şifresiyle girer.\n");
@@ -577,6 +577,24 @@ test("a mode of the user's own: its instructions, its tools and its MCP server g
 	await pane.locator(".assistant-mode").click();
 	await pane.getByRole("menuitem", { name: "Customize modes…" }).click();
 	const settings = page.locator(".settings-dialog");
+
+	// An MCP server of the assistant's: a program on this computer.
+	await settings.locator('[data-category="assistant"]').click();
+	const servers = settings.locator('[data-block="mcp"]');
+	await servers.getByRole("button", { name: "Add an MCP server" }).click();
+	const server = servers.locator(".mcp-card");
+	await server.getByRole("textbox", { name: "Server name" }).fill("dosyalar");
+	await server.getByRole("textbox", { name: "Server name" }).press("Tab");
+	await servers
+		.locator(".mcp-card")
+		.getByRole("textbox", { name: "Arguments (one a line)" })
+		.fill("-y\nmcp-files\n/tmp");
+	await servers
+		.locator(".mcp-card")
+		.getByRole("textbox", { name: "Environment (KEY=value, one a line)" })
+		.fill("TOKEN=abc");
+	await expect(servers.locator(".mcp-used-in")).toContainText("No mode uses it yet");
+	await settings.locator('[data-category="modes"]').click();
 
 	// A new mode: its name, instructions and a step.
 	await settings.locator(".mode-tab-new").click();
@@ -595,33 +613,20 @@ test("a mode of the user's own: its instructions, its tools and its MCP server g
 	await editor.getByRole("radio", { name: "Only those chosen" }).click();
 	await editor.locator('input[data-tool="document_read"]').check();
 	await editor.locator('input[data-tool="document_outline"]').check();
-	// An MCP server: a program on this computer.
-	await editor.getByRole("button", { name: "Add an MCP server" }).click();
-	const server = editor.locator(".mcp-card");
-	await server.getByRole("textbox", { name: "Server name" }).fill("dosyalar");
-	await server.getByRole("textbox", { name: "Server name" }).press("Tab");
-	await editor
-		.locator(".mcp-card")
-		.getByRole("textbox", { name: "Arguments (one a line)" })
-		.fill("-y\nmcp-files\n/tmp");
-	await editor
-		.locator(".mcp-card")
-		.getByRole("textbox", { name: "Environment (KEY=value, one a line)" })
-		.fill("TOKEN=abc");
+	// The assistant's server, used in this mode.
+	await editor.getByRole("switch", { name: "dosyalar" }).check();
 	await expect(settings.locator(".mode-tab-custom")).toContainText("Test Analisti");
 	await settings.getByRole("button", { name: "Done" }).click();
 	await expect
 		.poll(async () => {
 			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
 			const [mode] = stored.settings.assistantCustomModes ?? [];
-			return mode === undefined
-				? null
-				: { name: mode.name, tools: mode.tools, mcp: mode.mcp[0]?.name };
+			return mode === undefined ? null : { name: mode.name, tools: mode.tools, mcp: mode.mcp };
 		})
 		.toEqual({
 			name: "Test Analisti",
 			tools: ["document_outline", "document_read"],
-			mcp: "dosyalar",
+			mcp: ["dosyalar"],
 		});
 
 	// It is in the picker, with its line.
@@ -653,7 +658,7 @@ test("a mode of the user's own: its instructions, its tools and its MCP server g
 	await app.close();
 });
 
-test("one of Kalem's modes takes an MCP server too, and the model is told what it is for", async () => {
+test("one of Kalem's modes uses the assistant's MCP servers too, and the model is told what they are for", async () => {
 	const folder = await tempDir("agent-mode-mcp");
 	const doc = join(folder, "notlar.md");
 	await writeFile(doc, "# Notlar\n");
@@ -669,21 +674,22 @@ test("one of Kalem's modes takes an MCP server too, and the model is told what i
 	await pane.getByRole("menuitem", { name: "Customize modes…" }).click();
 	const settings = page.locator(".settings-dialog");
 
-	// The Code mode: a database server, one tool of it, and what it is for.
-	await settings.locator('.mode-tab[data-mode="code"]').click();
-	await settings.getByRole("button", { name: "Add an MCP server" }).click();
-	const server = settings.locator(".mcp-card");
+	// The assistant's servers: a database server, one tool of it, and what it is for.
+	await settings.locator('[data-category="assistant"]').click();
+	const servers = settings.locator('[data-block="mcp"]');
+	await servers.getByRole("button", { name: "Add an MCP server" }).click();
+	const server = servers.locator(".mcp-card");
 	await server.getByRole("textbox", { name: "Server name" }).fill("i18n-db");
 	await server.getByRole("textbox", { name: "Server name" }).press("Tab");
-	await settings
+	await servers
 		.locator(".mcp-card")
 		.getByRole("textbox", { name: "Arguments (one a line)" })
 		.fill("-y\n@bytebase/dbhub\n--config\n/home/me/dbhub.toml");
-	await settings
+	await servers
 		.locator(".mcp-card")
 		.getByRole("textbox", { name: "Tools it may use" })
 		.fill("add_i18n_key");
-	await settings
+	await servers
 		.locator(".mcp-card")
 		.getByRole("textbox", { name: "What it is for (the assistant is told)" })
 		.fill("When you add an i18n key in code, add it to the database with add_i18n_key.");
@@ -712,6 +718,11 @@ test("one of Kalem's modes takes an MCP server too, and the model is told what i
 	const kept = settings.locator('.mcp-card[data-server="context7"] .mcp-card-guide');
 	await kept.locator("summary").click();
 	await expect(kept).toContainText("Up-to-date documentation");
+	// The Code mode uses both; the Ask mode none.
+	await settings.locator('[data-category="modes"]').click();
+	await settings.locator('.mode-tab[data-mode="code"]').click();
+	await settings.getByRole("switch", { name: "i18n-db" }).check();
+	await settings.getByRole("switch", { name: "context7" }).check();
 	await settings.locator(".mode-preview summary").click();
 	await expect(settings.locator(".mode-preview-text")).toContainText(
 		"- i18n-db (tools: add_i18n_key): When you add an i18n key in code",
@@ -723,9 +734,20 @@ test("one of Kalem's modes takes an MCP server too, and the model is told what i
 	await expect
 		.poll(async () => {
 			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
-			return stored.settings.assistantModes?.code?.mcp?.[0]?.tools;
+			return [
+				stored.settings.assistantMcpServers?.[0]?.tools,
+				stored.settings.assistantModes?.code?.mcp,
+			];
 		})
-		.toEqual(["add_i18n_key"]);
+		.toEqual([["add_i18n_key"], ["i18n-db", "context7"]]);
+	// The servers' cards say which modes use them.
+	await pane.locator(".assistant-mode").click();
+	await pane.getByRole("menuitem", { name: "Customize modes…" }).click();
+	await settings.locator('[data-category="assistant"]').click();
+	await expect(settings.locator('.mcp-card[data-server="i18n-db"] .mcp-used-in')).toHaveText(
+		"Used in: Code",
+	);
+	await settings.getByRole("button", { name: "Done" }).click();
 
 	await pane.locator(".assistant-mode").click();
 	await pane.locator('.assistant-mode-item[data-mode="code"]').click();
@@ -1030,7 +1052,7 @@ test("the assistant's panel moves left or under the document, and '@' adds a sec
 	await app.close();
 });
 
-test("a mode's MCP server lists its tools, and each is turned on or off", async () => {
+test("an MCP server of the assistant's lists its tools, and each is turned on or off", async () => {
 	const folder = await tempDir("agent-mcp-tools");
 	const doc = join(folder, "notlar.md");
 	await writeFile(doc, "# Notlar\n");
@@ -1060,7 +1082,7 @@ test("a mode's MCP server lists its tools, and each is turned on or off", async 
 	await pane.locator(".assistant-mode").click();
 	await pane.getByRole("menuitem", { name: "Customize modes…" }).click();
 	const settings = page.locator(".settings-dialog");
-	await settings.locator('.mode-tab[data-mode="code"]').click();
+	await settings.locator('[data-category="assistant"]').click();
 	await settings.getByRole("button", { name: "Add an MCP server" }).click();
 	const card = settings.locator(".mcp-card");
 	// Node itself runs the script: the app's executable would be Electron's.
@@ -1088,7 +1110,7 @@ test("a mode's MCP server lists its tools, and each is turned on or off", async 
 	await expect
 		.poll(async () => {
 			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
-			return stored.settings.assistantModes?.code?.mcp?.[0]?.tools;
+			return stored.settings.assistantMcpServers?.[0]?.tools;
 		})
 		.toEqual(["add_i18n_key"]);
 	expect(errors).toEqual([]);

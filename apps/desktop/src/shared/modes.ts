@@ -10,8 +10,9 @@ import type { CustomMode } from "./custom-modes.js";
 import { customExcluded, customInstructions, isCustomModeId } from "./custom-modes.js";
 import type { Strings } from "./i18n.js";
 import type { McpServer } from "./mcp-servers.js";
-import type { Mode, ModeSettings } from "./mode-config.js";
-import { isMode, modeExcluded, modeInstructions, resolveMode } from "./mode-config.js";
+import { serversNamed } from "./mcp-servers.js";
+import type { Mode, ModeSettings, StoredMode } from "./mode-config.js";
+import { isMode, MODES, modeExcluded, modeInstructions, resolveMode } from "./mode-config.js";
 
 export type { Mode } from "./mode-config.js";
 export { isMode, MODES, modeExcluded, modeInstructions } from "./mode-config.js";
@@ -64,13 +65,74 @@ export function modeToolsExcluded(
 	return own === null ? modeExcluded(mode, modes) : customExcluded(own, allTools);
 }
 
-/** The MCP servers a mode connects the CLI to: one of Kalem's, as the user shaped it, or one of the user's. */
+/** The names of the assistant's MCP servers a mode uses: one of Kalem's, as the user shaped it, or one of the user's. */
+export function modeServerNames(
+	mode: unknown,
+	modes: ModeSettings = {},
+	custom: readonly CustomMode[] = [],
+): readonly string[] {
+	const own = customModeOf(mode, custom);
+	if (own !== null) return own.mcp;
+	return resolveMode(isMode(mode) ? mode : "ask", modes).mcp;
+}
+
+/** The assistant's MCP servers a mode connects the CLI to. */
 export function modeServers(
 	mode: unknown,
 	modes: ModeSettings = {},
 	custom: readonly CustomMode[] = [],
+	all: readonly McpServer[] = [],
 ): readonly McpServer[] {
-	const own = customModeOf(mode, custom);
-	if (own !== null) return own.mcp;
-	return resolveMode(isMode(mode) ? mode : "ask", modes).mcp;
+	return serversNamed(modeServerNames(mode, modes, custom), all);
+}
+
+/** Every mode, Kalem's and the user's, by its name, with the servers it uses. */
+export function modesUsingServers(
+	t: Strings,
+	modes: ModeSettings,
+	custom: readonly CustomMode[],
+): { readonly id: string; readonly name: string; readonly mcp: readonly string[] }[] {
+	return [
+		...MODES.map((mode) => ({
+			id: mode as string,
+			name: t[MODE_LABELS[mode]],
+			mcp: resolveMode(mode, modes).mcp,
+		})),
+		...custom.map((mode) => ({ id: mode.id, name: mode.name, mcp: mode.mcp })),
+	];
+}
+
+/**
+ * The modes once a server of the assistant's is renamed (`to`) or removed
+ * (`null`): each mode that used it uses it by its new name, or no longer.
+ */
+export function renameServerRefs(
+	modes: ModeSettings,
+	custom: readonly CustomMode[],
+	from: string,
+	to: string | null,
+): { assistantModes: ModeSettings; assistantCustomModes: readonly CustomMode[] } {
+	const swap = (names: readonly string[]): string[] =>
+		names.flatMap((name) =>
+			name !== from ? [name] : to === null || names.includes(to) ? [] : [to],
+		);
+	const assistantModes: Partial<Record<Mode, StoredMode>> = {};
+	for (const mode of MODES) {
+		const stored = modes[mode];
+		if (stored === undefined) continue;
+		if (stored.mcp === undefined || !stored.mcp.includes(from)) {
+			assistantModes[mode] = stored;
+			continue;
+		}
+		const { mcp: _old, ...rest } = stored;
+		const mcp = swap(stored.mcp);
+		const next = mcp.length === 0 ? rest : { ...rest, mcp };
+		if (Object.keys(next).length > 0) assistantModes[mode] = next;
+	}
+	return {
+		assistantModes,
+		assistantCustomModes: custom.map((mode) =>
+			mode.mcp.includes(from) ? { ...mode, mcp: swap(mode.mcp) } : mode,
+		),
+	};
 }

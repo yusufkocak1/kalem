@@ -138,8 +138,10 @@ export interface Settings {
 	readonly defaultTemplate: string;
 	/** The assistant's modes as the user shaped them: steps, options; what is missing is the default. */
 	readonly assistantModes: ModeSettings;
-	/** Modes the user made: their instructions, steps, tools and MCP servers. */
+	/** Modes the user made: their instructions, steps, tools and the MCP servers they use. */
 	readonly assistantCustomModes: readonly CustomMode[];
+	/** The assistant's MCP servers; each mode chooses which of them it uses. */
+	readonly assistantMcpServers: readonly McpServer[];
 	/** Where the assistant's panel is: at the right (as before), at the left, or under the document. */
 	readonly assistantPlace: AssistantPlace;
 	/** The assistant panel's height under the document, in pixels. */
@@ -197,6 +199,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	defaultTemplate: "",
 	assistantModes: {},
 	assistantCustomModes: [],
+	assistantMcpServers: [],
 	assistantPlace: "right",
 	assistantHeight: 320,
 };

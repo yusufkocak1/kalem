@@ -23,8 +23,6 @@ import {
 	searchDocument,
 } from "../shared/document-outline.js";
 import { format } from "../shared/i18n.js";
-import type { ModeSettings } from "../shared/mode-config.js";
-import { modesForAssistant } from "../shared/mode-config.js";
 import type { PanePlace, ToolPane } from "../shared/panes.js";
 import { movePane, PANE_PLACES, placesFor, revealPane, TOOL_PANES } from "../shared/panes.js";
 import type { SettingDef } from "../shared/settings-schema.js";
@@ -62,9 +60,8 @@ const placeLabel = (ctx: ToolContext, place: PanePlace): string =>
 
 /** A setting as the model reads it: its name, where it is, its value and what it takes. */
 export function settingLine(ctx: ToolContext, def: SettingDef): string {
-	const stored = ctx.settings()[def.key];
-	// A mode's MCP servers can hold tokens: the model sees what they are for, not how they run.
-	const value = def.key === "assistantModes" ? modesForAssistant(stored as ModeSettings) : stored;
+	// A mode names the MCP servers it uses; how they run (their tokens) is in a hidden setting.
+	const value = ctx.settings()[def.key];
 	const label = def.label === null ? def.key : ctx.t[def.label];
 	const shown = (raw: unknown): string => JSON.stringify(raw) ?? "null";
 	const takes =

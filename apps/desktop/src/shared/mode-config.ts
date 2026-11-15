@@ -7,8 +7,7 @@
  * off. Untouched, a mode says what it always said. Pure.
  */
 import type { Strings } from "./i18n.js";
-import type { McpServer } from "./mcp-servers.js";
-import { mcpInstructions, parseMcpServers } from "./mcp-servers.js";
+import { parseServerRefs } from "./mcp-servers.js";
 
 export const MODES = ["ask", "write", "review", "prompt", "code", "app"] as const;
 export type Mode = (typeof MODES)[number];
@@ -311,8 +310,8 @@ export interface StoredMode {
 	readonly maxFindings?: number;
 	/** Review: a CLI runs the checks side by side, one reviewer each; on unless turned off. */
 	readonly parallel?: boolean;
-	/** MCP servers Claude Code and the Copilot CLI connect to in this mode. */
-	readonly mcp?: readonly McpServer[];
+	/** The assistant's MCP servers Claude Code and the Copilot CLI connect to in this mode, by name. */
+	readonly mcp?: readonly string[];
 }
 
 export type ModeSettings = Readonly<Partial<Record<Mode, StoredMode>>>;
@@ -342,7 +341,7 @@ export interface ResolvedMode {
 	readonly minSeverity: SeverityFloor;
 	readonly maxFindings: number;
 	readonly parallel: boolean;
-	readonly mcp: readonly McpServer[];
+	readonly mcp: readonly string[];
 }
 
 const MAX_STEPS = 40;
@@ -399,7 +398,7 @@ export function parseModeSettings(raw: unknown): ModeSettings {
 			typeof stored.maxFindings === "number" && Number.isFinite(stored.maxFindings)
 				? Math.max(0, Math.min(200, Math.round(stored.maxFindings)))
 				: undefined;
-		const mcp = parseMcpServers(stored.mcp);
+		const mcp = parseServerRefs(stored.mcp);
 		result[name] = {
 			...(typeof stored.enabled === "boolean" ? { enabled: stored.enabled } : {}),
 			...(steps === undefined ? {} : { steps }),
@@ -588,32 +587,6 @@ export function modeInstructions(mode: unknown, settings: ModeSettings = {}): st
 	const language = LANGUAGE_LINES[resolved.language];
 	if (language !== "") lines.push(language);
 	if (resolved.extra !== "") lines.push(resolved.extra);
-	const servers = mcpInstructions(resolved.mcp);
-	if (servers !== "") lines.push(servers);
 	if (lines.length === 0) return INTRO[current];
 	return [INTRO[current], ...lines].filter((part) => part !== "").join("\n");
-}
-
-/**
- * The modes as the assistant may read them: each MCP server by its name,
- * tools and purpose only. Its command, arguments, environment, address and
- * headers can hold tokens and paths, and are never shown to the model.
- */
-export function modesForAssistant(settings: ModeSettings): unknown {
-	return Object.fromEntries(
-		Object.entries(settings).map(([name, stored]) => [
-			name,
-			stored?.mcp === undefined
-				? stored
-				: {
-						...stored,
-						mcp: stored.mcp.map((server) => ({
-							name: server.name,
-							enabled: server.enabled,
-							tools: server.tools,
-							purpose: server.purpose,
-						})),
-					},
-		]),
-	);
 }

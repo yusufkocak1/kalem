@@ -23,6 +23,7 @@ import { groupName } from "./favorites.js";
 import type { Strings } from "./i18n.js";
 import { format } from "./i18n.js";
 import { parseIssueLayout } from "./jira-layout.js";
+import { liftModeServers, parseMcpServers } from "./mcp-servers.js";
 import { parseModeSettings } from "./mode-config.js";
 /** The Settings window's categories, in its order. */
 import { PALETTE_IDS, parsePaletteCustom } from "./palette.js";
@@ -501,6 +502,16 @@ export const SETTINGS_SCHEMA: Schema = {
 		// It can run programs on this computer (an MCP server's command): never the assistant's to change.
 		assistant: "hidden",
 	},
+	assistantMcpServers: {
+		key: "assistantMcpServers",
+		category: "assistant",
+		label: null,
+		type: "custom",
+		parse: parseMcpServers,
+		keywords: ["mcp", "sunucu", "server", "araç", "tool", "dbhub", "github", "context7"],
+		// It runs programs on this computer: changed only by the user, or with the mode_mcp tools.
+		assistant: "hidden",
+	},
 	defaultTemplate: {
 		key: "defaultTemplate",
 		category: "templates",
@@ -744,10 +755,12 @@ export function parseSetting<K extends keyof Settings>(key: K, raw: unknown): Se
 
 /** Every setting of a stored record made valid, field by field. */
 export function parseSettings(raw: unknown): Settings {
-	const record =
+	// Modes kept servers of their own before the assistant had them: they move to the assistant.
+	const record = liftModeServers(
 		typeof raw === "object" && raw !== null && !Array.isArray(raw)
 			? (raw as Record<string, unknown>)
-			: {};
+			: {},
+	);
 	const settings: Record<string, unknown> = {};
 	for (const def of SETTING_DEFS) settings[def.key] = parseSetting(def.key, record[def.key]);
 	return settings as unknown as Settings;

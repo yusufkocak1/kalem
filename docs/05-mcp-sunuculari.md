@@ -1,13 +1,15 @@
-# Asistan modlarında MCP sunucuları — kullanım kılavuzu
+# Asistanın MCP sunucuları — kullanım kılavuzu
 
-Bu kılavuz, Kalem Masaüstü'nde asistanın bir modunu (Kod, Sor, Analiz Yaz…
-ya da kendi oluşturduğunuz bir mod) dış sistemlere **MCP sunucularıyla**
-bağlamayı anlatır: veritabanınız, GitHub, Fortify, Graylog, Sentry ve
-diğerleri.
+Bu kılavuz, Kalem Masaüstü'nde asistanı dış sistemlere **MCP
+sunucularıyla** bağlamayı anlatır: veritabanınız, GitHub, Fortify,
+Graylog, Sentry ve diğerleri.
 
-Kısaca: bir moda bir MCP sunucusu eklersiniz, sunucunun **ne için**
-olduğunu bir iki cümleyle yazarsınız; asistan o moddayken bu sunucunun
-araçlarını gerektiğinde **kendiliğinden** kullanır. Örneğin Kod modunda
+Kısaca: MCP sunucularını **asistana bir kez** eklersiniz ve her birinin
+**ne için** olduğunu bir iki cümleyle yazarsınız. Sonra her modda (Kod,
+Sor, Analiz Yaz… ya da kendi oluşturduğunuz bir mod) bu sunuculardan
+hangilerinin **kullanılacağını** bir anahtarla seçersiniz. Asistan o
+moddayken seçili sunucuların araçlarını gerektiğinde **kendiliğinden**
+kullanır. Örneğin Kod modunda
 kod yazarken yeni bir i18n anahtarı oluşturursa, siz istemeden anahtarı
 veritabanına da ekler.
 
@@ -24,32 +26,47 @@ veritabanına da ekler.
 
 ---
 
-## 2. Bir moda MCP sunucusu eklemek
+## 2. Asistana MCP sunucusu eklemek ve modlarda seçmek
 
-1. **Dosya → Ayarlar → Asistan Modları** sayfasını açın. Asistan panelindeki
-   mod seçicinin en altındaki **Modları özelleştir…** de aynı yere gider.
-2. Sunucuyu ekleyeceğiniz modun sekmesine tıklayın, örneğin **Kod**.
-3. Sayfayı **MCP sunucuları** bölümüne kadar aşağı kaydırın.
-4. İki yolunuz var:
+### 2.1 Sunucuyu asistana ekleyin
+
+1. **Dosya → Ayarlar → Asistan** sayfasını açın ve **MCP sunucuları**
+   bölümüne kadar aşağı kaydırın.
+2. İki yolunuz var:
    - **Hazır sunucular**'ı açıp bir karta tıklayın. Sunucu, yaygın
      kullanıldığı ayarlarla ve "ne için" metniyle dolu olarak eklenir.
      Size kalan, köşeli parantezli yerleri (`<GITHUB_TOKEN>`, `<path>`,
      `<folder>`, `<graylog-host>` …) kendi değerlerinizle değiştirmek.
    - Ya da **MCP sunucusu ekle** ile boş bir kart açıp her şeyi kendiniz
      doldurun.
-5. Kartın solundaki anahtarla sunucuyu istediğiniz zaman kapatıp
-   açabilirsiniz; kapalı sunucu modele hiç verilmez.
-6. Ayarlar her değişiklikte hemen kaydedilir. **Tamam** pencereyi kapatır.
+3. Kartın solundaki anahtarla sunucuyu **tüm asistan için** kapatıp
+   açabilirsiniz; kapalı sunucu hiçbir modda modele verilmez.
+4. Her kartta sunucuyu **hangi modların kullandığı** yazar ("Kullanıldığı
+   modlar: Kod, Sor"). Yeni eklenen bir sunucuyu henüz hiçbir mod
+   kullanmaz.
+5. Ayarlar her değişiklikte hemen kaydedilir. Bir sunucunun adını
+   değiştirirseniz onu kullanan modlar yeni adla kullanmaya devam eder;
+   sunucuyu kaldırırsanız tüm modlardan da kalkar.
+
+### 2.2 Modda kullanılacak sunucuları seçin
+
+1. **Dosya → Ayarlar → Asistan Modları** sayfasını açın. Asistan panelindeki
+   mod seçicinin en altındaki **Modları özelleştir…** de aynı yere gider.
+2. Modun sekmesine tıklayın, örneğin **Kod** (ya da kendi modunuzu).
+3. **Bu modun kullandığı MCP sunucuları** bölümünde, asistanın her sunucusu
+   için bir anahtar vardır: bu modda kullanılacakları açın.
+4. Aynı sunucuyu istediğiniz kadar modda açabilirsiniz; ayarları (komut,
+   token, araçlar, "ne için") tek yerde kalır.
 
 Sayfanın en altındaki **Asistana söylenen** bölümünü açarak modelin bu modda
-ne talimat aldığını görebilirsiniz. Eklediğiniz sunucular orada, her biri
+ne talimat aldığını görebilirsiniz. Bu modda açık sunucular orada, her biri
 "ne için" metniyle listelenir.
 
 ### Kartın alanları
 
 | Alan | Ne yazılır |
 |---|---|
-| **Ad** | Sunucunun adı; araçlar modelde `mcp__<ad>__<araç>` diye görünür. Harf, rakam, `_` ve `-`. Aynı modda iki sunucu aynı adı alamaz, `kalem` adı ayrılmıştır. |
+| **Ad** | Sunucunun adı; araçlar modelde `mcp__<ad>__<araç>` diye görünür. Harf, rakam, `_` ve `-`. İki sunucu aynı adı alamaz, `kalem` adı ayrılmıştır. |
 | **Bağlantı** | **Program (stdio):** bu bilgisayarda çalışan bir komut. **Adres (HTTP):** ağda çalışan bir sunucu. |
 | **Komut** (stdio) | Çalıştırılacak program: `npx`, `uvx`, `fcli`, `docker`… |
 | **Argümanlar** (stdio) | Her satıra **bir** argüman. Boşluk içeren bir değer de tek satırda kalır. |
@@ -95,20 +112,20 @@ bekleme ve ne yaptığını söyle."*
 
 ## 4. Sunucu hangi modda çalışır?
 
-Bir sunucu **yalnızca eklendiği modda** kullanılır. Asistan **Otomatik**
-moddayken her soru için bir mod seçer; sunucu, o soru için seçilen modda
-varsa kullanılır.
+Bir sunucu **yalnızca seçildiği modlarda** kullanılır. Asistan
+**Otomatik** moddayken her soru için bir mod seçer; sunucu, o soru için
+seçilen modda açıksa kullanılır.
 
 Bu yüzden:
 
 - "Bu parametrenin değeri ne?" gibi bir soru Otomatik modda genellikle
   **Sor** moduna düşer. Parametre sorularını da istiyorsanız DBHub'ı
-  **hem Sor hem Kod** moduna ekleyin, ya da soruyu sormadan önce modu elle
+  **hem Sor hem Kod** modunda açın, ya da soruyu sormadan önce modu elle
   seçin.
 - Kod yazdırırken **Kod** modunu seçin (ya da Otomatik'in seçmesine
   bırakın); i18n eklemesi orada çalışır.
-- Kendi modunuzu (**Yeni mod**) yalnızca bu iş için oluşturup sunucuyu ona
-  da ekleyebilirsiniz; kendi modlarınızda Kalem araçlarını da
+- Kendi modunuzu (**Yeni mod**) yalnızca bu iş için oluşturup sunucuyu
+  onda da açabilirsiniz; kendi modlarınızda Kalem araçlarını da
   kısıtlayabilirsiniz.
 
 ---
@@ -198,8 +215,7 @@ Notlar:
 
 ### 5.3 Kalem'de ekleyin
 
-1. **Ayarlar → Asistan Modları → Kod → MCP sunucuları → Hazır sunucular →
-   DBHub**.
+1. **Ayarlar → Asistan → MCP sunucuları → Hazır sunucular → DBHub**.
 2. Kart `db` adıyla gelir. **Argümanlar**'daki son satırı (`<path>/dbhub.toml`)
    dosyanızın tam yoluyla değiştirin.
 3. **Kullanabileceği araçlar**: `get_parameter, add_i18n_key` — böyle kalsın.
@@ -207,8 +223,9 @@ Notlar:
    onu kullanamaz.
 4. **Ne için** metnini kendi kurallarınıza göre düzenleyin (anahtar
    adlandırması, değerlerin anlamı…).
-5. Parametre sorularını Sor modunda da istiyorsanız aynı kartı **Sor**
-   moduna da ekleyin.
+5. **Ayarlar → Asistan Modları → Kod** sekmesinde, **Bu modun kullandığı
+   MCP sunucuları** bölümünde `db` anahtarını açın. Parametre sorularını
+   Sor modunda da istiyorsanız aynı anahtarı **Sor** sekmesinde de açın.
 
 ### 5.4 Kullanım
 
@@ -310,14 +327,16 @@ Sunucunun belgesindeki Claude Code / Claude Desktop yapılandırması genelde
   `settings.json`). Salt okunur, kısa ömürlü token'lar kullanın;
   `dbhub.toml` gibi şifre içeren dosyaları repoya koymayın.
 - **Asistan sunucuları yalnızca sizin onayınızla değiştirir.** Ona
-  *"DBHub'ı Kod moduna bağla, config dosyası C:\\kalem\\dbhub.toml"*
-  diyebilirsiniz; asistan `mode_mcp_change` aracıyla ekler, değiştirir ya
-  da kaldırır. Bir MCP sunucusu bilgisayarınızda program çalıştırabildiği
+  *"DBHub'ı ekle ve Kod modunda kullan, config dosyası C:\\kalem\\dbhub.toml"*
+  diyebilirsiniz; asistan `mode_mcp_change` aracıyla sunucuyu asistana
+  ekler, değiştirir ya da kaldırır, ve bir modda kullanmaya başlar ya da
+  bırakır. Bir MCP sunucusu bilgisayarınızda program çalıştırabildiği
   için onay kartı **her seferinde** çıkar ve komutun ya da adresin
   tamamını gösterir (token'lar yalnızca başıyla, örn. `Bear…`). Bu onay
   "her zaman izin ver" ile hatırlanmaz; araç Ayarlar'da "sormadan
-  çalıştır" yapılmış olsa da sorulur. Asistan mod ayarlarını okuduğunda
-  sunucuların yalnızca **adını, araçlarını ve "ne için" metnini** görür;
+  çalıştır" yapılmış olsa da sorulur. Asistan modların hangi sunucuları
+  kullandığını okuyabilir; sunucuların yalnızca **adını, araçlarını ve
+  "ne için" metnini** görür (`mode_mcp_list`);
   komut, argüman, ortam değişkeni, adres ve başlıklar (dolayısıyla
   token'lar) ona gösterilmez.
 - Topluluk sunucularını (resmî olmayan npm / PyPI paketleri) kullanmadan
@@ -329,7 +348,7 @@ Sunucunun belgesindeki Claude Code / Claude Desktop yapılandırması genelde
 
 | Belirti | Olası neden ve çözüm |
 |---|---|
-| Asistan sunucuyu hiç kullanmıyor | Sunucu o soru için seçilen modda değil (4. bölüm). Kartın anahtarı kapalı. "Ne için" metni ne zaman kullanılacağını söylemiyor; araç adını metinde geçirin. **Asistana söylenen** önizlemesinde sunucunun göründüğünü kontrol edin. |
+| Asistan sunucuyu hiç kullanmıyor | Sunucu o soru için seçilen modda açık değil (4. bölüm). Sunucu kartının anahtarı (tüm asistan için) kapalı. "Ne için" metni ne zaman kullanılacağını söylemiyor; araç adını metinde geçirin. **Asistana söylenen** önizlemesinde sunucunun göründüğünü kontrol edin. |
 | Sunucu var ama araç çağrılamıyor | "Kullanabileceği araçlar"daki ad sunucunun gerçek araç adıyla aynı değil (büyük/küçük harf dahil). Emin değilseniz alanı geçici olarak boşaltın, asistana *"db sunucusunun araçlarını listele"* deyin, sonra doğru adları yazın. |
 | Program başlamıyor (stdio) | Komut PATH'te yok: terminalde `npx --version`, `uvx --version`, `fcli --version` çalışıyor mu bakın. Gerekirse komuta tam yol yazın. **Windows'ta** `npx` ile çalışan sunucular için Komut'a `cmd`, Argümanlar'ın başına `/c` ve `npx` yazın (Claude Code'un Windows'ta beklediği biçim). |
 | `<path>` / `<token>` hatası | Köşeli parantezli yer tutucular değiştirilmemiş. |

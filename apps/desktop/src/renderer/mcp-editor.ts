@@ -10,17 +10,21 @@ import { icon } from "./icons.js";
 
 export interface McpSectionOptions {
 	readonly t: Strings;
-	/** The mode's servers as they are now. */
+	/** The assistant's servers as they are now. */
 	servers(): readonly McpServer[];
 	/** Keeps the servers; `redraw` when the section's shape changes. */
 	change(servers: readonly McpServer[], redraw: boolean): void;
+	/** A server was renamed (`to`) or removed (`null`): the modes that use it follow. */
+	renamed(from: string, to: string | null): void;
+	/** The names of the modes that use a server. */
+	usedIn(name: string): readonly string[];
 	/** Starts a server and asks it which tools it has. */
 	listTools(server: McpServer): Promise<McpToolList>;
 }
 
 /**
  * The tools each server gave, by how it is reached: kept while Settings is
- * open, so a redraw or another mode with the same server shows them again.
+ * open, so a redraw shows them again.
  */
 const listed = new Map<string, McpToolList>();
 const reachKey = (server: McpServer): string =>
@@ -118,10 +122,10 @@ function pills<T extends string>(
 }
 
 /**
- * A mode's MCP servers in Settings, for Kalem's modes and the user's alike:
- * each a program or an address, the tools it may use, and what it is for
- * (the model is told, and reaches for it on its own). Every change is kept
- * at once.
+ * The assistant's MCP servers in Settings, set up once for every mode: each
+ * a program or an address, the tools it may use, what it is for (the model
+ * is told, and reaches for it on its own), and the modes that use it.
+ * Every change is kept at once.
  */
 export function createMcpSection(options: McpSectionOptions): HTMLElement {
 	const { t } = options;
@@ -186,19 +190,24 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 				name.value = server.name;
 				return;
 			}
+			const from = options.servers()[index]?.name;
 			set({ name: value }, true);
+			if (from !== undefined && from !== value) options.renamed(from, value);
 		});
 		const remove = el("button", {
 			class: "mode-icon-button",
 			attrs: { type: "button", "aria-label": t.mcpRemove, title: t.mcpRemove },
 			children: [mark("close", "mode-icon")],
 		});
-		remove.addEventListener("click", () =>
+		remove.addEventListener("click", () => {
+			const gone = options.servers()[index]?.name;
 			options.change(
 				options.servers().filter((_, i) => i !== index),
 				true,
-			),
-		);
+			);
+			if (gone !== undefined) options.renamed(gone, null);
+		});
+		const used = options.usedIn(server.name);
 		return el("div", {
 			class: "mcp-card",
 			attrs: { "data-server": server.name, ...(server.enabled ? {} : { "data-off": "" }) },
@@ -217,6 +226,10 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 						),
 						remove,
 					],
+				}),
+				el("p", {
+					class: "mode-section-hint mcp-used-in",
+					text: used.length === 0 ? t.mcpUsedNowhere : format(t.mcpUsedIn, used.join(", ")),
 				}),
 				...fields,
 				toolsField(index, set),
@@ -534,4 +547,77 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 			],
 		});
 	}
+}
+
+export interface McpChoiceOptions {
+	readonly t: Strings;
+	/** The assistant's servers. */
+	servers(): readonly McpServer[];
+	/** The names of the servers the mode uses. */
+	chosen(): readonly string[];
+	/** Keeps the names the mode uses. */
+	change(names: readonly string[]): void;
+}
+
+/**
+ * Which of the assistant's MCP servers a mode uses, in Settings: a switch
+ * for each. The servers themselves are set up once, under the assistant.
+ */
+export function createMcpChoice(options: McpChoiceOptions): HTMLElement {
+	const { t } = options;
+	const list = el("div", { class: "mcp-choice-list" });
+	function draw(): void {
+		const servers = options.servers();
+		const chosen = options.chosen();
+		if (servers.length === 0) {
+			list.replaceChildren(el("p", { class: "confluence-hint", text: t.mcpChoiceNone }));
+			return;
+		}
+		list.replaceChildren(
+			...servers.map((server) => {
+				const on = chosen.includes(server.name);
+				const note = [server.enabled ? "" : t.mcpChoiceOff, server.purpose].filter(
+					(part) => part !== "",
+				);
+				return el("div", {
+					class: "mcp-tool mcp-choice",
+					attrs: {
+						"data-server": server.name,
+						...(on && server.enabled ? {} : { "data-off": "" }),
+					},
+					children: [
+						switchOf(on, server.name, (wanted) => {
+							// The order is the assistant's, and names no longer there are let go.
+							const names = new Set(options.chosen());
+							if (wanted) names.add(server.name);
+							else names.delete(server.name);
+							options.change(
+								options
+									.servers()
+									.map((each) => each.name)
+									.filter((name) => names.has(name)),
+							);
+							draw();
+						}),
+						el("span", {
+							class: "mcp-tool-text",
+							children: [
+								el("code", { class: "mcp-tool-name", text: server.name }),
+								el("span", { class: "mcp-tool-description", text: note.join(" — ") }),
+							],
+						}),
+					],
+				});
+			}),
+		);
+	}
+	draw();
+	return el("div", {
+		class: "mode-section mode-mcp",
+		children: [
+			el("h4", { text: t.mcpChoiceTitle }),
+			el("p", { class: "mode-section-hint", text: t.mcpChoiceHint }),
+			list,
+		],
+	});
 }

@@ -812,43 +812,55 @@ verir.
 >   - **Kendi modlarınız** (Asistan Modları → **Yeni mod**): ad, simge ve
 >     tek satırlık açıklama; asistana söylenen **talimat** (prompt); kendi
 >     **adımlarınız**; Kalem'in **araçlarından** hepsi ya da yalnızca
->     seçilenler (aranabilir liste); ve **MCP sunucuları**: bu bilgisayarda
->     çalışan bir program (stdio: komut, her satıra bir argüman,
->     `ANAHTAR=değer` ortam değişkenleri) ya da bir adres (HTTP: adres ve
->     başlıklar), her biri açılıp kapatılabilir ve kullanabileceği araçlar
->     seçilebilir. Mod seçiliyken bu sunucular Claude Code'un
->     `--mcp-config` ve Copilot CLI'ın `--additional-mcp-config`
->     yapılandırmasına Kalem'in kendi sunucusunun yanına eklenir; Claude
->     Code onları sormadan çağırabilir (`mcp__<ad>`). API hizmetleri MCP
->     sunucusu kullanmaz. Kendi modlarınız seçicide ve otomatik seçimde
->     (adları ve ek kelimeleriyle) görünür; ayrıntı ve yanıt dili de
->     seçilir. Bir MCP sunucusu bu bilgisayarda program çalıştırabildiği
->     için asistan bu ayarı göremez; sunucularını yalnızca
->     `mode_mcp_change` ile ve her seferinde sorarak değiştirir (aşağıda).
->   - **Kalem'in kendi modlarında da MCP sunucuları** (Asistan Modları →
->     ör. **Kod** → **MCP sunucuları**): kendi modlarınızdakiyle aynı kart,
->     ek olarak **Ne için (asistana söylenir)** alanı. Bu metin modele
->     sunucunun adı ve araçlarıyla birlikte söylenir ve "iş bu amaca
->     uyduğunda sorulmadan kullan" talimatı eklenir; böylece örneğin Kod
->     modunda yazılan yeni bir i18n anahtarı veritabanına da eklenir.
->     **Hazır sunucular** listesi tek tıkla dolu bir kart ekler: DBHub
->     (parametre sorgusu ve i18n ekleme, yalnızca sabit sorgular), GitHub,
->     Git, Filesystem, Context7, Playwright, Sentry, Fortify (fcli),
->     Graylog, Fetch, Memory ve Figma; köşeli parantezli yerler
->     (`<GITHUB_TOKEN>`…) kullanıcıya kalır. Asistan mod ayarlarını
->     okuyabilir ama sunucuların yalnızca adını, araçlarını ve amacını
->     görür; komut, argüman, ortam değişkeni, adres ve başlıklar ona
->     gösterilmez (`assistantModes`).
->   - **Asistana söyleyerek bağlamak:** "DBHub'ı Kod moduna bağla, config
->     dosyası şurada" gibi bir istekte asistan `mode_mcp_list` ile modları,
->     bağlı sunucuları ve hazır sunucuları görür; `mode_mcp_change` ile bir
->     moda (Kalem'in ya da sizin) hazır ya da kendi verdiğiniz bir sunucuyu
->     ekler, alanlarını (araçlar, amaç, yol, token, açık/kapalı) değiştirir ya
->     da kaldırır. Program çalıştırabildiği için onay kartı her seferinde
->     çıkar: komutun ya da adresin tamamı, araçlar ve amaç görünür, token'lar
->     yalnızca başıyla (`Bear…`). Bu onay "her zaman izin ver" ile
->     hatırlanmaz; araç Ayarlar'da "sormadan çalıştır" yapılsa da sorulur.
->     Değişiklik o moddaki bir sonraki sorudan itibaren geçerlidir.
+>     seçilenler (aranabilir liste); ve asistanın MCP sunucularından bu
+>     modda **kullanılacaklar** (aşağıda). Kendi modlarınız seçicide ve
+>     otomatik seçimde (adları ve ek kelimeleriyle) görünür; ayrıntı ve
+>     yanıt dili de seçilir.
+>   - **Asistanın MCP sunucuları** (Ayarlar → **Asistan** → **MCP
+>     sunucuları**): sunucular modlara tek tek değil, **asistana bir kez**
+>     eklenir: bu bilgisayarda çalışan bir program (stdio: komut, her
+>     satıra bir argüman, `ANAHTAR=değer` ortam değişkenleri) ya da bir
+>     adres (HTTP: adres ve başlıklar); kullanabileceği araçlar (elle ya da
+>     **Araçlarını listele** ile sunucudan alınıp tek tek açılıp
+>     kapatılarak) ve **Ne için (asistana söylenir)** metni. Kartın anahtarı
+>     sunucuyu tüm asistan için kapatır; kartta sunucuyu hangi modların
+>     kullandığı yazar. Sunucu yeniden adlandırılırsa modlar yeni adla
+>     kullanmaya devam eder; kaldırılırsa tüm modlardan kalkar. **Hazır
+>     sunucular** listesi tek tıkla dolu bir kart ekler: DBHub (parametre
+>     sorgusu ve i18n ekleme, yalnızca sabit sorgular), GitHub, Git,
+>     Filesystem, Context7, Playwright, Sentry, Fortify (fcli), Graylog,
+>     Fetch, Memory ve Figma; köşeli parantezli yerler (`<GITHUB_TOKEN>`…)
+>     kullanıcıya kalır. Bir MCP sunucusu bu bilgisayarda program
+>     çalıştırabildiği için asistan bu ayarı (`assistantMcpServers`)
+>     göremez.
+>   - **Modlarda sunucu seçimi** (Asistan Modları → bir mod, Kalem'in ya da
+>     sizin → **Bu modun kullandığı MCP sunucuları**): asistanın her
+>     sunucusu için bir anahtar; mod yalnızca açtıklarını kullanır. Mod
+>     seçiliyken bu sunucular Claude Code'un `--mcp-config` ve Copilot
+>     CLI'ın `--additional-mcp-config` yapılandırmasına Kalem'in kendi
+>     sunucusunun yanına eklenir; Claude Code onları sormadan çağırabilir
+>     (`mcp__<ad>`). "Ne için" metinleri modele sunucunun adı ve
+>     araçlarıyla birlikte söylenir ve "iş bu amaca uyduğunda sorulmadan
+>     kullan" talimatı eklenir; böylece örneğin Kod modunda yazılan yeni
+>     bir i18n anahtarı veritabanına da eklenir. API hizmetleri MCP
+>     sunucusu kullanmaz. Modlar sunucuları yalnızca adlarıyla tutar
+>     (`assistantModes`, `assistantCustomModes`); önceki sürümlerde modların
+>     içinde duran sunucular ilk açılışta asistana taşınır (aynı sunucu
+>     bir kez, aynı adlı farklı sunucular `ad-2` olarak) ve her mod, açık
+>     olanları kullanmaya devam eder.
+>   - **Asistana söyleyerek bağlamak:** "DBHub'ı ekle ve Kod modunda
+>     kullan, config dosyası şurada" gibi bir istekte asistan
+>     `mode_mcp_list` ile sunucuları, hangi modların kullandığını ve hazır
+>     sunucuları görür; `mode_mcp_change` ile asistana hazır ya da kendi
+>     verdiğiniz bir sunucuyu ekler (isterseniz bir modda kullanılır
+>     hâlde), alanlarını (araçlar, amaç, yol, token, açık/kapalı)
+>     değiştirir ya da kaldırır, ve bir sunucuyu bir modda kullanmaya
+>     başlar ya da bırakır (`use` / `unuse`). Program çalıştırabildiği için
+>     onay kartı her seferinde çıkar: komutun ya da adresin tamamı, araçlar
+>     ve amaç görünür, token'lar yalnızca başıyla (`Bear…`). Bu onay "her
+>     zaman izin ver" ile hatırlanmaz; araç Ayarlar'da "sormadan çalıştır"
+>     yapılsa da sorulur. Değişiklik bir sonraki sorudan itibaren
+>     geçerlidir.
 >     Ayrıntılı kullanım: [`docs/05-mcp-sunuculari.md`](../../docs/05-mcp-sunuculari.md).
 > - **Doküman şablonları:** **Dosya → Doküman Şablonundan Yeni…** ve
 >   **Dosya → Ayarlar → Doküman Şablonları**. Şablonlar yalnız analiz için

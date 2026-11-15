@@ -1,13 +1,14 @@
 import type { CustomIcon, CustomMode } from "../shared/custom-modes.js";
 import { CUSTOM_ICONS, customInstructions } from "../shared/custom-modes.js";
 import type { Strings } from "../shared/i18n.js";
-import type { McpServer, McpToolList } from "../shared/mcp-servers.js";
+import type { McpServer } from "../shared/mcp-servers.js";
+import { mcpInstructions, serversNamed } from "../shared/mcp-servers.js";
 import type { StoredStep } from "../shared/mode-config.js";
 import { DETAILS, REPLY_LANGUAGES } from "../shared/mode-config.js";
 import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
-import { createMcpSection } from "./mcp-editor.js";
+import { createMcpChoice } from "./mcp-editor.js";
 
 export interface ToolInfo {
 	readonly name: string;
@@ -19,8 +20,8 @@ export interface CustomModeEditorOptions {
 	readonly mode: CustomMode;
 	/** Kalem's tools, for choosing the mode's. */
 	readonly catalog: Promise<readonly ToolInfo[]>;
-	/** Starts an MCP server and asks it which tools it has. */
-	mcpListTools(server: McpServer): Promise<McpToolList>;
+	/** The assistant's MCP servers, for choosing the mode's. */
+	mcpServers(): readonly McpServer[];
 	/** Keeps the mode; `null` removes it. */
 	save(mode: CustomMode | null): void;
 }
@@ -34,7 +35,7 @@ function mark(name: IconName, className: string): Element {
 /**
  * A mode of the user's in Settings: its name, icon and line, the
  * instructions the model is given, its steps, the Kalem tools it may use,
- * and its MCP servers. Every change is kept at once.
+ * and which of the assistant's MCP servers it uses. Every change is kept at once.
  */
 export function createCustomModeEditor(options: CustomModeEditorOptions): HTMLElement {
 	const { t } = options;
@@ -42,10 +43,16 @@ export function createCustomModeEditor(options: CustomModeEditorOptions): HTMLEl
 	const root = el("div", { class: "custom-mode" });
 	const preview = el("pre", { class: "mode-preview-text" });
 
+	// What the model is told: the mode's instructions and the servers it uses.
+	const told = (): string =>
+		[customInstructions(mode), mcpInstructions(serversNamed(mode.mcp, options.mcpServers()))]
+			.filter((part) => part !== "")
+			.join("\n\n");
+
 	const keep = (next: Partial<CustomMode>, redraw = false): void => {
 		mode = { ...mode, ...next };
 		options.save(mode);
-		preview.textContent = customInstructions(mode);
+		preview.textContent = told();
 		if (redraw) draw();
 	};
 
@@ -345,7 +352,7 @@ export function createCustomModeEditor(options: CustomModeEditorOptions): HTMLEl
 		language.addEventListener("change", () =>
 			keep({ language: language.value as CustomMode["language"] }),
 		);
-		preview.textContent = customInstructions(mode);
+		preview.textContent = told();
 		root.replaceChildren(
 			el("div", {
 				class: "mode-panel-head",
@@ -413,11 +420,11 @@ export function createCustomModeEditor(options: CustomModeEditorOptions): HTMLEl
 			),
 			stepsSection(),
 			toolsSection(),
-			createMcpSection({
+			createMcpChoice({
 				t,
-				servers: () => mode.mcp,
-				change: (mcp, redraw) => keep({ mcp }, redraw),
-				listTools: options.mcpListTools,
+				servers: options.mcpServers,
+				chosen: () => mode.mcp,
+				change: (mcp) => keep({ mcp }),
 			}),
 			section(
 				t.modeOptions,

@@ -641,7 +641,12 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		// The mode: one of Kalem's, as the user shaped it, or one the user made (its tools and MCP servers).
 		const modeSettings = ctx.store.settings.assistantModes;
 		const customModes = ctx.store.settings.assistantCustomModes;
-		const servers = modeServers(request.mode, modeSettings, customModes);
+		const servers = modeServers(
+			request.mode,
+			modeSettings,
+			customModes,
+			ctx.store.settings.assistantMcpServers,
+		);
 		// The document template picked for this question, whatever the mode: the model works by it.
 		const pickedTemplate =
 			typeof request.template === "string" && request.template !== ""
@@ -696,7 +701,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 
 		// Claude Code gets the tools from Kalem's MCP server; Copilot too when it takes one,
 		// else it writes them in blocks; an API calls them as its own tools.
-		// The mode may bring MCP servers of the user's, even with none of Kalem's tools.
+		// The mode may use MCP servers of the user's, even with none of Kalem's tools.
 		const ownServers = servers.some((server) => server.enabled);
 		const needsMcp = definitions.length > 0 || ownServers;
 		const copilotMcp = program === "copilot" && needsMcp && (await copilotUsesMcp());
@@ -726,6 +731,8 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				custom: customModes,
 				document: tools.document,
 				template: templateGiven,
+				// The servers are told of only when the CLI is connected to them.
+				servers: mcpRun === null ? [] : servers,
 			});
 		let system = instructionsFor(way);
 		// The sites cannot be fetched without the user's sign-in: Kalem's tools reach them, WebFetch does not.

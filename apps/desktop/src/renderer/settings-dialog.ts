@@ -1,6 +1,7 @@
 import type { AssistantStatus, KalemBridge, Settings } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
+import { modesUsingServers, renameServerRefs } from "../shared/modes.js";
 import type {
 	PaletteChoice,
 	PaletteColors,
@@ -28,6 +29,7 @@ import {
 import type { TemplateInfo } from "../shared/templates.js";
 import { createAssistantSettings } from "./assistant-settings.js";
 import { el } from "./dom.js";
+import { createMcpSection } from "./mcp-editor.js";
 import { createModeEditor } from "./mode-settings.js";
 import { sourceLabel } from "./template-picker.js";
 import { createToolSettings } from "./tool-settings.js";
@@ -557,6 +559,53 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 	);
 	refreshers.push(() => toolSettings.refresh());
 
+	// --- Assistant: its MCP servers, which each mode chooses from ----------------
+
+	const mcpBlock = el("div", { class: "settings-block", attrs: { "data-block": "mcp" } });
+	function drawMcp(): void {
+		mcpBlock.replaceChildren(
+			createMcpSection({
+				t,
+				servers: () => options.settings().assistantMcpServers,
+				change(servers, redraw) {
+					options.update({ assistantMcpServers: servers });
+					if (redraw) drawMcp();
+				},
+				renamed(from, to) {
+					const settings = options.settings();
+					options.update(
+						renameServerRefs(settings.assistantModes, settings.assistantCustomModes, from, to),
+					);
+					modeEditor.refresh();
+				},
+				usedIn: (name) => {
+					const settings = options.settings();
+					return modesUsingServers(t, settings.assistantModes, settings.assistantCustomModes)
+						.filter((mode) => mode.mcp.includes(name))
+						.map((mode) => mode.name);
+				},
+				listTools: (server) => bridge.mcpListTools(server),
+			}),
+		);
+	}
+	drawMcp();
+	item(
+		"assistant",
+		[t.mcpTitle, t.mcpHint, ...settingDef("assistantMcpServers").keywords].join(" "),
+		mcpBlock,
+	);
+	refreshers.push(() => {
+		// Text being typed is not redrawn under the cursor.
+		if (
+			mcpBlock.contains(document.activeElement) &&
+			document.activeElement?.matches("input, textarea")
+		) {
+			return;
+		}
+		if (mcpBlock.contains(document.activeElement)) return;
+		drawMcp();
+	});
+
 	// --- The assistant's modes --------------------------------------------------
 
 	const modeEditor = createModeEditor({
@@ -564,7 +613,6 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		settings: options.settings,
 		update: options.update,
 		toolCatalog: () => bridge.assistantToolCatalog(),
-		mcpListTools: (server) => bridge.mcpListTools(server),
 	});
 	item(
 		"modes",

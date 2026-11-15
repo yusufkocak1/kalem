@@ -1,12 +1,13 @@
 /**
- * The tools that let the assistant connect a mode to MCP servers when the
- * user asks ("connect DBHub to the Code mode"): list what each mode has and
- * the ready-made servers, and add, change or remove one. A server runs a
- * program on this computer, so every change is shown in full and asked
- * about every time, whatever the user allowed before or set in Settings.
- * The model never reads how a server runs (its tokens); it may write what
- * the user gives it.
+ * The tools that let the assistant set up its MCP servers when the user
+ * asks ("add DBHub and use it in the Code mode"): list the servers, which
+ * modes use each, and the ready-made ones; add, change or remove a server;
+ * and turn one on or off in a mode. A server runs a program on this
+ * computer, so every change is shown in full and asked about every time,
+ * whatever the user allowed before or set in Settings. The model never
+ * reads how a server runs (its tokens); it may write what the user gives it.
  */
+import type { Settings } from "../shared/bridge.js";
 import { format } from "../shared/i18n.js";
 import type { McpPreset } from "../shared/mcp-presets.js";
 import { MCP_PRESETS, presetServer } from "../shared/mcp-presets.js";
@@ -14,7 +15,7 @@ import type { McpServer } from "../shared/mcp-servers.js";
 import { MAX_SERVERS, parseMcpServer, serverName } from "../shared/mcp-servers.js";
 import type { Mode } from "../shared/mode-config.js";
 import { MODES, resolveMode, storeMode } from "../shared/mode-config.js";
-import { customModeOf, MODE_LABELS } from "../shared/modes.js";
+import { customModeOf, MODE_LABELS, modesUsingServers, renameServerRefs } from "../shared/modes.js";
 import type { KalemTool, ToolContext } from "./assistant-tools.js";
 import { registerTools } from "./assistant-tools.js";
 
@@ -29,9 +30,10 @@ const text = (input: Record<string, unknown>, key: string): string =>
 /** A mode the model named: Kalem's by id or name, or the user's by id or name. */
 interface ModeRef {
 	readonly label: string;
-	readonly servers: readonly McpServer[];
-	/** Keeps the mode's servers. */
-	save(ctx: ToolContext, servers: readonly McpServer[]): void;
+	/** The names of the servers it uses. */
+	readonly names: readonly string[];
+	/** The settings that keep the names it uses. */
+	patch(ctx: ToolContext, names: readonly string[]): Partial<Settings>;
 }
 
 function modeOf(ctx: ToolContext, raw: string): ModeRef | null {
@@ -52,32 +54,27 @@ function modeOf(ctx: ToolContext, raw: string): ModeRef | null {
 	if (own === null) return null;
 	return {
 		label: own.name,
-		servers: own.mcp,
-		save: (context, servers) =>
-			context.changeSettings({
-				assistantCustomModes: context
-					.settings()
-					.assistantCustomModes.map((mode) =>
-						mode.id === own.id ? { ...mode, mcp: [...servers] } : mode,
-					),
-			}),
+		names: own.mcp,
+		patch: (context, names) => ({
+			assistantCustomModes: context
+				.settings()
+				.assistantCustomModes.map((mode) =>
+					mode.id === own.id ? { ...mode, mcp: [...names] } : mode,
+				),
+		}),
 	};
 }
 
 function builtinRef(ctx: ToolContext, mode: Mode): ModeRef {
-	const resolved = resolveMode(mode, ctx.settings().assistantModes);
 	return {
 		label: ctx.t[MODE_LABELS[mode]],
-		servers: resolved.mcp,
-		save: (context, servers) => {
+		names: resolveMode(mode, ctx.settings().assistantModes).mcp,
+		patch: (context, names) => {
 			const all = { ...context.settings().assistantModes };
-			const stored = storeMode({
-				...resolveMode(mode, all),
-				mcp: servers,
-			});
+			const stored = storeMode({ ...resolveMode(mode, all), mcp: [...names] });
 			if (Object.keys(stored).length === 0) delete all[mode];
 			else all[mode] = stored;
-			context.changeSettings({ assistantModes: all });
+			return { assistantModes: all };
 		},
 	};
 }
@@ -175,7 +172,7 @@ const SERVER_FIELDS = {
 		},
 		purpose: {
 			type: "string",
-			description: "What it is for and when to use it; the model is told in that mode.",
+			description: "What it is for and when to use it; the model is told in the modes that use it.",
 		},
 		enabled: { type: "boolean" },
 	},
@@ -186,31 +183,33 @@ const MODE_TOOLS: readonly KalemTool[] = [
 		definition: {
 			name: "mode_mcp_list",
 			description:
-				"Lists the assistant's modes with the MCP servers connected to each (name, tools, what it is for; never how it runs), and the ready-made servers mode_mcp_change can add.",
+				"Lists the assistant's MCP servers (name, tools, what it is for, the modes that use it; never how it runs), the servers each mode uses, and the ready-made servers mode_mcp_change can add.",
 			parameters: { type: "object", properties: {}, required: [] },
 		},
 		risk: "read",
 		available: () => true,
 		async run(_input, ctx) {
 			const settings = ctx.settings();
-			const modes = [
-				...MODES.map((mode) => ({
-					id: mode,
-					label: ctx.t[MODE_LABELS[mode]],
-					servers: resolveMode(mode, settings.assistantModes).mcp,
-				})),
-				...settings.assistantCustomModes.map((mode) => ({
-					id: mode.id,
-					label: mode.name,
-					servers: mode.mcp,
-				})),
-			];
+			const modes = modesUsingServers(
+				ctx.t,
+				settings.assistantModes,
+				settings.assistantCustomModes,
+			);
+			const servers = settings.assistantMcpServers;
 			return [
-				"Modes and their MCP servers:",
-				...modes.map(
-					(mode) =>
-						`- ${mode.id} (${mode.label})${mode.servers.length === 0 ? ": none" : `:\n${mode.servers.map(serverLine).join("\n")}`}`,
-				),
+				"The assistant's MCP servers (set up once; each mode chooses which it uses):",
+				...(servers.length === 0
+					? ["  none"]
+					: servers.map((server) => {
+							const using = modes.filter((mode) => mode.mcp.includes(server.name));
+							return `${serverLine(server)}\n    used in: ${using.length === 0 ? "no mode" : using.map((mode) => mode.id).join(", ")}`;
+						})),
+				"",
+				"Modes and the servers they use:",
+				...modes.map((mode) => {
+					const names = mode.mcp.filter((name) => servers.some((server) => server.name === name));
+					return `- ${mode.id} (${mode.name}): ${names.length === 0 ? "none" : names.join(", ")}`;
+				}),
 				"",
 				"Ready-made servers (preset ids for mode_mcp_change):",
 				...MCP_PRESETS.map((preset) => presetLine(ctx, preset)),
@@ -223,34 +222,40 @@ const MODE_TOOLS: readonly KalemTool[] = [
 		definition: {
 			name: "mode_mcp_change",
 			description:
-				"Connects a mode to an MCP server, changes one, or removes it; the user sees the whole change and is asked every time. add: from a ready-made server (preset) with what the user gave (a path, a token, other tools), or one of the user's own (server with name and command or url). update: the named server's fields. remove: the named server. Call mode_mcp_list first. Ask the user for what a ready-made server needs filled in (words in angle brackets) instead of leaving it.",
+				"Changes the assistant's MCP servers, or which a mode uses; the user sees the whole change and is asked every time. add: a server for the assistant, from a ready-made server (preset) with what the user gave (a path, a token, other tools), or one of the user's own (server with name and command or url); with mode, it is used in that mode too. update: the named server's fields. remove: the named server, from every mode. use / unuse: the named server in a mode (mode required). Call mode_mcp_list first. Ask the user for what a ready-made server needs filled in (words in angle brackets) instead of leaving it.",
 			parameters: {
 				type: "object",
 				properties: {
-					action: { type: "string", enum: ["add", "update", "remove"] },
+					action: { type: "string", enum: ["add", "update", "remove", "use", "unuse"] },
 					mode: {
 						type: "string",
-						description: "The mode's id (ask, write, review, prompt, code, app, custom-…) or name.",
+						description:
+							"The mode's id (ask, write, review, prompt, code, app, custom-…) or name: for use / unuse, and for add to use it there.",
 					},
-					name: { type: "string", description: "update / remove: the server's name in that mode." },
+					name: {
+						type: "string",
+						description: "update / remove / use / unuse: the server's name.",
+					},
 					preset: { type: "string", description: "add: a ready-made server's id." },
 					server: SERVER_FIELDS,
 					reason: { type: "string", description: "Why, in a few words, in the user's language." },
 				},
-				required: ["action", "mode"],
+				required: ["action"],
 			},
 		},
 		risk: "ui",
 		available: () => true,
 		async run(input, ctx) {
 			const action = text(input, "action");
-			const mode = modeOf(ctx, text(input, "mode"));
-			if (mode === null) {
-				return `There is no mode named "${text(input, "mode")}"; see mode_mcp_list.`;
+			const modeName = text(input, "mode");
+			const mode = modeName === "" ? null : modeOf(ctx, modeName);
+			if (modeName !== "" && mode === null) {
+				return `There is no mode named "${modeName}"; see mode_mcp_list.`;
 			}
 			const given = record(input.server);
-			const servers = [...mode.servers];
-			let next: McpServer[];
+			const settings = ctx.settings();
+			const servers = [...settings.assistantMcpServers];
+			let patch: Partial<Settings>;
 			let title: string;
 			let lines: string[];
 			if (action === "add") {
@@ -262,7 +267,9 @@ const MODE_TOOLS: readonly KalemTool[] = [
 				if (preset === undefined && typeof given.name !== "string") {
 					return "Give a ready-made server (preset) or a server with its name.";
 				}
-				if (servers.length >= MAX_SERVERS) return `A mode takes at most ${MAX_SERVERS} servers.`;
+				if (servers.length >= MAX_SERVERS) {
+					return `The assistant takes at most ${MAX_SERVERS} servers.`;
+				}
 				const base: McpServer =
 					preset === undefined
 						? {
@@ -285,37 +292,71 @@ const MODE_TOOLS: readonly KalemTool[] = [
 					return "That server cannot be used: give it a name (not kalem), and a command (stdio) or an address starting with http(s) (http).";
 				}
 				if (servers.some((each) => each.name === server.name)) {
-					return `${mode.label} already has a server named ${server.name}: update it, or give another name.`;
+					return `The assistant already has a server named ${server.name}: update it, use it in a mode, or give another name.`;
 				}
-				next = [...servers, server];
-				title = format(ctx.t.approvalMcpAdd, server.name, mode.label);
+				patch = {
+					assistantMcpServers: [...servers, server],
+					...(mode === null ? {} : mode.patch(ctx, [...mode.names, server.name])),
+				};
+				title =
+					mode === null
+						? format(ctx.t.approvalMcpAdd, server.name)
+						: format(ctx.t.approvalMcpAddTo, server.name, mode.label);
 				lines = runLines(ctx, server);
-			} else if (action === "update" || action === "remove") {
+			} else if (["update", "remove", "use", "unuse"].includes(action)) {
 				const name = text(input, "name");
 				const at = servers.findIndex((each) => each.name === name);
 				const current = servers[at];
 				if (current === undefined) {
-					return `${mode.label} has no server named "${name}"; see mode_mcp_list.`;
+					return `The assistant has no server named "${name}"; see mode_mcp_list.`;
 				}
 				if (action === "remove") {
-					next = servers.filter((_, i) => i !== at);
-					title = format(ctx.t.approvalMcpRemove, name, mode.label);
+					patch = {
+						assistantMcpServers: servers.filter((_, i) => i !== at),
+						...renameServerRefs(settings.assistantModes, settings.assistantCustomModes, name, null),
+					};
+					title = format(ctx.t.approvalMcpRemove, name);
 					lines = runLines(ctx, current);
-				} else {
+				} else if (action === "update") {
 					const wantedName = typeof given.name === "string" ? serverName(given.name) : current.name;
 					const server = parseMcpServer({ ...withChanges(current, given), name: wantedName });
 					if (server === null) {
 						return "That change leaves a server that cannot be used: it needs a command (stdio) or an address starting with http(s) (http), and a name that is not kalem.";
 					}
 					if (servers.some((each, i) => i !== at && each.name === server.name)) {
-						return `${mode.label} already has a server named ${server.name}.`;
+						return `The assistant already has a server named ${server.name}.`;
 					}
-					next = servers.map((each, i) => (i === at ? server : each));
-					title = format(ctx.t.approvalMcpUpdate, name, mode.label);
+					patch = {
+						assistantMcpServers: servers.map((each, i) => (i === at ? server : each)),
+						...(server.name === name
+							? {}
+							: renameServerRefs(
+									settings.assistantModes,
+									settings.assistantCustomModes,
+									name,
+									server.name,
+								)),
+					};
+					title = format(ctx.t.approvalMcpUpdate, name);
 					lines = runLines(ctx, server);
+				} else {
+					if (mode === null) return `Name the mode to ${action} ${name} in; see mode_mcp_list.`;
+					const using = mode.names.includes(name);
+					if (action === "use" && using) return `${mode.label} already uses ${name}.`;
+					if (action === "unuse" && !using) return `${mode.label} does not use ${name}.`;
+					patch = mode.patch(
+						ctx,
+						action === "use" ? [...mode.names, name] : mode.names.filter((each) => each !== name),
+					);
+					title = format(
+						action === "use" ? ctx.t.approvalMcpUse : ctx.t.approvalMcpUnuse,
+						name,
+						mode.label,
+					);
+					lines = runLines(ctx, current);
 				}
 			} else {
-				return 'action is one of "add", "update", "remove".';
+				return 'action is one of "add", "update", "remove", "use", "unuse".';
 			}
 			const reason = text(input, "reason");
 			const answer = await ctx.approve({
@@ -331,11 +372,14 @@ const MODE_TOOLS: readonly KalemTool[] = [
 			if (!answer.approved) {
 				return "The user did not allow it: nothing changed. Do not try again unless they ask.";
 			}
-			mode.save(ctx, next);
+			ctx.changeSettings(patch);
 			ctx.step({ tool: "mode_mcp_change", detail: title });
 			const left = lines.filter((line) => /<[^>]+>/.test(line));
 			return [
-				`Done: ${title}. It is used from the next question in that mode, with Claude Code or the Copilot CLI.`,
+				`Done: ${title}. It is used from the next question in the modes that use it, with Claude Code or the Copilot CLI.`,
+				action === "add" && mode === null
+					? "No mode uses it yet: ask the user which modes should (mode_mcp_change use)."
+					: "",
 				left.length === 0
 					? ""
 					: `Still to fill in (tell the user, or ask them for it): ${left.join(" · ")}`,
