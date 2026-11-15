@@ -12,7 +12,7 @@
  * app's run; the token is in files only the user can read, never on a
  * command line.
  */
-import { randomBytes } from "node:crypto";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { chmod, mkdir, rm, writeFile } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createServer } from "node:http";
@@ -238,7 +238,7 @@ export class AssistantToolServer {
 		if (
 			request.method !== "POST" ||
 			(request.url !== "/call" && request.url !== "/list") ||
-			request.headers.authorization !== `Bearer ${this.#token}`
+			!sameSecret(request.headers.authorization ?? "", `Bearer ${this.#token}`)
 		) {
 			reply(403, { text: "Forbidden", isError: true });
 			return;
@@ -265,6 +265,12 @@ export class AssistantToolServer {
 			reply(200, { text: error instanceof Error ? error.message : String(error), isError: true });
 		}
 	}
+}
+
+function sameSecret(given: string, expected: string): boolean {
+	const a = Buffer.from(given);
+	const b = Buffer.from(expected);
+	return a.length === b.length && timingSafeEqual(a, b);
 }
 
 /** Writes a file only the user can read: it holds the token. */

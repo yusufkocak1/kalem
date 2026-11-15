@@ -24,10 +24,10 @@ import { format, lossLabel } from "../shared/i18n.js";
 import { fileNameKey, IMAGE_EXTENSIONS, parseDataUrl } from "../shared/images.js";
 import {
 	freeName,
-	isRunnable,
 	localFileName,
 	MAX_UPLOAD_MB,
 	mediaTypeOf,
+	opensDirectly,
 } from "./confluence-attachments.js";
 import type { ConfluenceCredentials, Fetch } from "./confluence-client.js";
 import { ConfluenceClient, ConfluenceError } from "./confluence-client.js";
@@ -37,6 +37,7 @@ import type { DraftStore } from "./drafts.js";
 import type { JiraClient } from "./jira-client.js";
 import type { AppWindow, DocumentTab, WindowManager } from "./windows.js";
 import { errorMessage } from "./windows.js";
+import { markFromInternet } from "./zone.js";
 
 export interface ConfluenceIpcContext {
 	readonly windows: WindowManager;
@@ -524,11 +525,12 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 	ipcMain.handle(CHANNEL.confluenceOpenAttachment, async (event, tabId: unknown, raw: unknown) => {
 		const { client, page } = await remoteOf(senderOf(event), tabId);
 		const name = text(raw, "attachment name");
-		if (isRunnable(name)) throw new Error(ctx.strings().confluenceAttachmentRisky);
+		if (!opensDirectly(name)) throw new Error(ctx.strings().confluenceAttachmentRisky);
 		const folder = join(app.getPath("temp"), "kalem-confluence", page.id);
 		await mkdir(folder, { recursive: true });
 		const path = join(folder, localFileName(name));
 		await writeFile(path, await download(client, page, name));
+		await markFromInternet(path, client.site);
 		const failure = await shell.openPath(path);
 		if (failure !== "") throw new Error(failure);
 	});
@@ -545,6 +547,7 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 			});
 			if (result.canceled || result.filePath === "") return null;
 			await writeFile(result.filePath, await download(client, page, name));
+			await markFromInternet(result.filePath, client.site);
 			return result.filePath;
 		},
 	);

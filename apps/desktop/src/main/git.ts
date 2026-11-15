@@ -23,6 +23,7 @@ const TIMEOUT = 2 * 60_000;
 const CLONE_TIMEOUT = 30 * 60_000;
 
 export type GitProblem =
+	| "untrusted"
 	| "missing"
 	| "failed"
 	| "invalid-url"
@@ -80,7 +81,8 @@ export function runGit(
 		execFile(
 			"git",
 			// Looking never writes: a status would otherwise refresh the index, which the folder watcher sees.
-			["--no-optional-locks", ...args],
+			// A repository's fsmonitor setting names a program git would run on every look.
+			["--no-optional-locks", "-c", "core.fsmonitor=false", ...args],
 			{
 				cwd,
 				timeout,

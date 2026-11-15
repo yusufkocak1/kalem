@@ -117,6 +117,8 @@ export interface Settings {
 	readonly tray: boolean;
 	/** Fetch the open folders' repositories in the background now and then. */
 	readonly gitAutoFetch: boolean;
+	/** Repositories whose own git settings the user trusts: git runs only in these. */
+	readonly gitTrustedFolders: readonly string[];
 	/** The Claude assistant's panel, at the right of the document. */
 	readonly assistant: boolean;
 	/** Share the active document with Claude along with each question. */
@@ -188,6 +190,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	checkUpdates: true,
 	tray: false,
 	gitAutoFetch: true,
+	gitTrustedFolders: [],
 	assistant: false,
 	assistantDocument: true,
 	claudePath: "",
@@ -511,8 +514,10 @@ export interface WorkspaceRoot {
 	readonly path: string;
 	readonly entries: readonly WorkspaceEntry[];
 	readonly truncated: boolean;
-	/** The git repository the folder is in; `null` when it is in none. */
+	/** The git repository the folder is in; `null` when it is in none or it is not trusted. */
 	readonly git: GitStatus | null;
+	/** The repository the folder is in when the user has not trusted it yet: git does not run there. */
+	readonly untrustedRepo: string | null;
 }
 
 /** Where a git repository stands. */
@@ -992,6 +997,8 @@ export interface KalemBridge {
 	gitSuggestMessage(folder: string, paths?: readonly string[]): Promise<string>;
 	/** Asks where to clone `url`, clones it and opens the new folder; its path, `null` when cancelled. */
 	gitClone(url: string): Promise<string | null>;
+	/** Asks the user to trust the repository a shown folder is in; resolves whether git may run there. */
+	gitTrust(folder: string): Promise<boolean>;
 
 	/** Earlier saved states of the tab's document, newest first. */
 	listVersions(tabId: string): Promise<readonly Version[]>;
@@ -1129,6 +1136,7 @@ export const CHANNEL = {
 	confluenceOpenAttachment: "kalem:confluence-open-attachment",
 	confluenceDownloadAttachment: "kalem:confluence-download-attachment",
 	confluenceDeleteAttachment: "kalem:confluence-delete-attachment",
+	gitTrust: "kalem:git-trust",
 	jiraAccount: "kalem:jira-account",
 	jiraConnect: "kalem:jira-connect",
 	jiraDisconnect: "kalem:jira-disconnect",

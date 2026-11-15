@@ -119,7 +119,17 @@ function output(
 async function gitFiles(root: string): Promise<IndexedFile[] | null> {
 	const listed = await output(
 		"git",
-		["-c", "core.quotepath=off", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+		[
+			"-c",
+			"core.fsmonitor=false",
+			"-c",
+			"core.quotepath=off",
+			"ls-files",
+			"-z",
+			"--cached",
+			"--others",
+			"--exclude-standard",
+		],
 		root,
 	);
 	if (listed === null || listed.code !== 0) return null;

@@ -696,6 +696,32 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 	function renderGitBar(only: WorkspaceRoot | undefined): void {
 		const git = only?.git ?? null;
 		options.gitChanged?.(only === undefined ? null : git);
+		if (only !== undefined && git === null && only.untrustedRepo !== null) {
+			const root = only.path;
+			const trust = el("button", {
+				class: "files-git-trust",
+				attrs: { type: "button", title: only.untrustedRepo },
+				text: t.gitTrustButton,
+			});
+			trust.addEventListener("click", () => {
+				void bridge.gitTrust(root).then((ok) => {
+					if (ok) void refresh();
+				});
+			});
+			gitBar.hidden = false;
+			gitBar.classList.remove("conflicted");
+			gitBar.removeAttribute("aria-busy");
+			gitBar.replaceChildren(
+				icon("branch"),
+				el("span", {
+					class: "files-git-state",
+					text: t.gitUntrustedBar,
+					attrs: { title: only.untrustedRepo },
+				}),
+				trust,
+			);
+			return;
+		}
 		if (only === undefined || git === null) {
 			gitBar.hidden = true;
 			gitBar.replaceChildren();

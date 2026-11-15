@@ -1,4 +1,4 @@
-import { extension, stripExtension } from "../shared/paths.js";
+import { extension, isProgramPath, stripExtension } from "../shared/paths.js";
 
 /** Larger files are not read into memory for an upload; Confluence's own default limit is 100 MB. */
 export const MAX_UPLOAD_MB = 250;
@@ -34,49 +34,31 @@ export function mediaTypeOf(name: string): string {
 }
 
 /**
- * Files the operating system would run rather than show. "Open" hands a
- * downloaded attachment to the default app, so these are only downloaded.
+ * What "Open" hands to the default app: documents, pictures and media only.
+ * Anything else (programs, scripts, macro-enabled files, disk images) is
+ * only downloaded, to be opened by the user if they trust it.
  */
-const RUNNABLE = new Set([
-	"exe",
-	"msi",
-	"msix",
-	"appx",
-	"bat",
-	"cmd",
-	"com",
-	"scr",
-	"pif",
-	"cpl",
-	"msc",
-	"lnk",
-	"url",
-	"reg",
-	"ps1",
-	"psm1",
-	"vbs",
-	"vbe",
-	"js",
-	"jse",
-	"wsf",
-	"wsh",
-	"hta",
-	"jar",
-	"app",
-	"command",
-	"sh",
-	"py",
-	"pkg",
-	"dmg",
-	"iso",
-	"appref-ms",
-	"application",
-	"settingcontent-ms",
-]);
+const OPENABLE = new Set(
+	[
+		"pdf txt csv md markdown log json xml yaml yml rtf",
+		"doc docx xls xlsx ppt pptx odt ods odp vsdx drawio msg eml",
+		"png jpg jpeg gif bmp webp tif tiff heic",
+		"mp3 wav m4a ogg mp4 mov avi mkv webm",
+		"zip 7z",
+	]
+		.join(" ")
+		.split(" "),
+);
+
+export function opensDirectly(name: string): boolean {
+	return OPENABLE.has(extension(name)) && !isProgramPath(name);
+}
 
 export function isRunnable(name: string): boolean {
-	return RUNNABLE.has(extension(name));
+	return isProgramPath(name);
 }
+
+const RESERVED_NAME = /^(con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³])(\.|$)/i;
 
 /** The attachment's name as a file name on this computer. */
 export function localFileName(name: string): string {
@@ -84,8 +66,10 @@ export function localFileName(name: string): string {
 		// biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are invalid in file names
 		.replace(/[\\/:*?"<>|\u0000-\u001f]/g, "_")
 		.replace(/^[.\s]+/, "")
+		.replace(/[.\s]+$/, "")
 		.trim();
-	return clean === "" ? "attachment" : clean;
+	if (clean === "") return "attachment";
+	return RESERVED_NAME.test(clean) ? `_${clean}` : clean;
 }
 
 /** `name` or, when the page already has it, `name-2`, `name-3`… with the extension kept. */

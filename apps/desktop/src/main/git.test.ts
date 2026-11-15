@@ -365,3 +365,28 @@ describe.skipIf(!hasGit)("git for changed files", () => {
 		expect(context).not.toContain("yeni.md");
 	});
 });
+
+describe.runIf(hasGit)("a repository's own settings", () => {
+	it("do not run the program its fsmonitor setting names when Kalem looks", async () => {
+		const folder = await mkdtemp(join(tmpdir(), "kalem-fsmonitor-"));
+		const marker = join(folder, "..", `${folder.split(/[\\/]/).pop()}-ran`);
+		execFileSync("git", ["init", "-q"], { cwd: folder });
+		await writeFile(join(folder, "a.md"), "a");
+		execFileSync("git", ["add", "a.md"], { cwd: folder });
+		execFileSync("git", ["-c", "user.email=a@b", "-c", "user.name=a", "commit", "-qm", "i"], {
+			cwd: folder,
+		});
+		execFileSync(
+			"git",
+			[
+				"config",
+				"core.fsmonitor",
+				`node -e "require('fs').writeFileSync(process.argv[1],'')" ${JSON.stringify(marker)}; false`,
+			],
+			{ cwd: folder },
+		);
+		expect(await gitStatus(folder)).not.toBeNull();
+		await expect(readFile(marker)).rejects.toThrow();
+		await rm(folder, { recursive: true, force: true });
+	});
+});
