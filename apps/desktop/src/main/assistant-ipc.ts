@@ -10,7 +10,7 @@ import type { ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
 import { app, dialog, ipcMain, net } from "electron";
 import { assistantInstructions } from "../shared/assistant-prompt.js";
@@ -80,6 +80,7 @@ import type { CliProgram } from "./cli.js";
 import { claudeOutput, LocalCli, runCli, SearchLog, textOutput } from "./cli.js";
 import { CliCatalog } from "./cli-catalog.js";
 import { cliCommands } from "./cli-commands.js";
+import { sameKey } from "./cli-find.js";
 import type { ConfluenceClient } from "./confluence-client.js";
 import type { JiraClient } from "./jira-client.js";
 import { askApi, listModels } from "./llm.js";
@@ -649,7 +650,15 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		const servers = withProject(
 			modeServers(request.mode, modeSettings, customModes, ctx.store.settings.assistantMcpServers),
 			projectFolder(
-				collected.roots[0],
+				// The Files pane's folders go with every question: one added besides them was picked for it.
+				collected.roots.find(
+					(root) =>
+						!ctx.store.state.workspaces.some(
+							(open) =>
+								sameKey(resolve(open), process.platform) ===
+								sameKey(resolve(root), process.platform),
+						),
+				),
 				ctx.store.state.workspaces[0],
 				activeTab !== undefined && activeTab.path !== null && activeTab.remote === null
 					? dirname(activeTab.path)

@@ -4,7 +4,13 @@ import type { McpPreset } from "../shared/mcp-presets.js";
 import { MCP_PRESETS, presetServer } from "../shared/mcp-presets.js";
 import { runtimeOf } from "../shared/mcp-runtimes.js";
 import type { McpServer, McpToolList } from "../shared/mcp-servers.js";
-import { newMcpServer, RESERVED_SERVER, serverName, toggleTool } from "../shared/mcp-servers.js";
+import {
+	newMcpServer,
+	PROJECT,
+	RESERVED_SERVER,
+	serverName,
+	toggleTool,
+} from "../shared/mcp-servers.js";
 import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
@@ -677,9 +683,11 @@ export function createMcpChoice(options: McpChoiceOptions): HTMLElement {
 		list.replaceChildren(
 			...servers.map((server) => {
 				const on = chosen.includes(server.name);
-				const note = [server.enabled ? "" : t.mcpChoiceOff, server.purpose].filter(
-					(part) => part !== "",
-				);
+				// `${project}` is shown as what it stands for.
+				const note = [
+					server.enabled ? "" : t.mcpChoiceOff,
+					server.purpose.split(PROJECT).join(t.mcpProjectWord),
+				].filter((part) => part !== "");
 				return el("div", {
 					class: "mcp-tool mcp-choice",
 					attrs: {

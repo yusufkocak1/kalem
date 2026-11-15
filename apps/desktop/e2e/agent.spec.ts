@@ -6,6 +6,7 @@ import { expect, test } from "@playwright/test";
 import type { Call } from "./fake-claude.js";
 import { fakeClaude } from "./fake-claude.js";
 import { clickMenu, launch, stubMessageBox, tempDir } from "./launch.js";
+import { shot } from "./shots.js";
 
 /**
  * A stand-in for the GitHub Copilot CLI that answers by what the question
@@ -738,6 +739,8 @@ test("one of Kalem's modes uses the assistant's MCP servers too, and the model i
 	await expect(settings.locator(".mode-preview-text")).toContainText(
 		"- context7: Up-to-date documentation",
 	);
+	await settings.locator(".mode-preview").scrollIntoViewIfNeeded();
+	await shot(page, "09-code-mode-preview");
 	await settings.getByRole("button", { name: "Done" }).click();
 	await expect
 		.poll(async () => {
@@ -817,6 +820,8 @@ test("a server whose command is not on this computer says what it is and how to 
 	await expect(missing).toContainText("uvx comes with uv");
 	await expect(missing).toContainText("pip install uv");
 	await expect(missing.locator(".mcp-sample-text").first()).toContainText("install.ps1");
+	await missing.scrollIntoViewIfNeeded();
+	await shot(page, "08-command-missing-uv");
 	// Once it is there, looking again finds it.
 	await writeFile(join(bin, "uvx"), "#!/bin/sh\n");
 	await chmod(join(bin, "uvx"), 0o755);

@@ -127,7 +127,7 @@ function runLines(ctx: ToolContext, server: McpServer): string[] {
 				];
 	return [
 		...lines,
-		`${ctx.t.mcpTools}: ${server.tools.length === 0 ? ctx.t.mcpToolsAll : server.tools.join(", ")}`,
+		`${ctx.t.mcpTools}: ${server.tools.length === 0 ? ctx.t.mcpToolsEvery : server.tools.join(", ")}`,
 		...(server.purpose === "" ? [] : [`${ctx.t.mcpPurpose}: ${server.purpose}`]),
 		...(server.enabled ? [] : [ctx.t.mcpServerOff]),
 	];
