@@ -45,6 +45,12 @@ export const ID_ATTR = "data-kalem-id";
 /** Kod bloğunun metin gövdesi — satır içi değil, düz metin. */
 export const CODE_ATTR = "data-kalem-code";
 export const COLOR_ATTR = "data-kalem-color";
+/**
+ * Kalın ve italiğin `_` ile yazıldığı (`_a_`, `__a__`). Yazarken blok
+ * DOM'dan geri okunuyor; işaret DOM'da durmasaydı düzenlenen satırdaki
+ * her `_a_` `*a*` olarak kaydedilir, Git farkı gürültüyle dolardı.
+ */
+export const MARKER_ATTR = "data-kalem-marker";
 
 export interface RenderContext {
 	readonly document: Document;
@@ -244,7 +250,9 @@ function renderListItems(
 			 * kutu erişilebilirlik ağacından çıkarılıyor — duyurulacak bir
 			 * görev zaten yok.
 			 */
-			const ad = itemText(item).trim().replace(/\s+/g, " ");
+			// Yalnızca maddenin kendi paragrafı: alt maddelerin metni üst
+			// maddenin kutusunun adına girmemeli.
+			const ad = itemText(item.children[0]).trim().replace(/\s+/g, " ");
 			if (ad === "") box.setAttribute("aria-hidden", "true");
 			else box.setAttribute("aria-label", ad);
 			li.append(box, ctx.document.createTextNode(" "));
@@ -325,11 +333,12 @@ function appendInline(target: HTMLElement, node: Inline, ctx: RenderContext): vo
 			target.append(d.createTextNode(node.value));
 			return;
 		case "strong":
-			target.append(wrap("strong", node.children, ctx));
+		case "emphasis": {
+			const element = wrap(node.type === "strong" ? "strong" : "em", node.children, ctx);
+			if (node.syntax?.marker === "_") element.setAttribute(MARKER_ATTR, "_");
+			target.append(element);
 			return;
-		case "emphasis":
-			target.append(wrap("em", node.children, ctx));
-			return;
+		}
 		case "delete":
 			target.append(wrap("del", node.children, ctx));
 			return;

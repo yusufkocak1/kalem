@@ -679,6 +679,53 @@ test.describe("klavye", () => {
 		await expect(page.locator("#cikti")).toHaveText("- bir\n- ic\n");
 	});
 
+	/** Keşif testi K-01: iç maddede Enter yutuluyor, yazı aynı maddeye ekleniyordu. */
+	test("iç maddede Enter yeni iç madde açıyor, boş iç maddede Enter dışarı alıyor", async ({
+		page,
+	}) => {
+		await page.evaluate(() => window.kalem.editor.setValue("- üst\n  - alt\n"));
+		await page.locator("#editor li li").first().click();
+		await page.keyboard.press("End");
+		await page.keyboard.press("Enter");
+		await page.keyboard.type("yeni");
+		await expect(page.locator("#cikti")).toHaveText("- üst\n  - alt\n  - yeni\n");
+		await page.keyboard.press("Enter");
+		await page.keyboard.press("Enter");
+		await page.keyboard.type("dış");
+		await expect(page.locator("#cikti")).toHaveText("- üst\n  - alt\n  - yeni\n- dış\n");
+	});
+
+	test("Tab'la açılan iç maddede de Enter çalışıyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("- a\n- b\n"));
+		await page.locator("#editor li").nth(1).click();
+		await page.keyboard.press("End");
+		await page.keyboard.press("Tab");
+		await page.keyboard.press("Enter");
+		await page.keyboard.type("c");
+		await expect(page.locator("#cikti")).toHaveText("- a\n  - b\n  - c\n");
+	});
+
+	test("iç maddenin başında Backspace girintiyi azaltıyor", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("- a\n  - b\n"));
+		await page.locator("#editor li li").first().click();
+		await page.keyboard.press("Home");
+		await page.keyboard.press("Backspace");
+		await expect(page.locator("#cikti")).toHaveText("- a\n- b\n");
+	});
+
+	/** Keşif testi K-05: alt listesi olan görevde kutu ve metin ayrı satırlara düşüyordu. */
+	test("alt listesi olan görev maddesinde kutu metinle aynı satırda", async ({ page }) => {
+		await page.evaluate(() => window.kalem.editor.setValue("- [ ] Bekleyen\n  - [ ] Alt\n"));
+		const madde = page.locator("#editor li.kalem-task").first();
+		const kutu = await madde.locator("> input").boundingBox();
+		const metin = await madde.locator("> p").boundingBox();
+		if (kutu === null || metin === null) throw new Error("ölçülemedi");
+		const kutuOrta = kutu.y + kutu.height / 2;
+		expect(kutuOrta).toBeGreaterThan(metin.y);
+		expect(kutuOrta).toBeLessThan(metin.y + metin.height);
+		await expect(madde.locator("> input")).toHaveAttribute("aria-label", "Bekleyen");
+	});
+
 	test("Ctrl+Alt+2 paragrafı başlığa çeviriyor", async ({ page }) => {
 		await bosla(page, "başlık");
 		await page.keyboard.press("ControlOrMeta+Alt+2");
@@ -931,6 +978,22 @@ test.describe("giriş kuralları", () => {
 		await bosBelge(page);
 		await page.keyboard.type("bir `kod`");
 		await expect(page.locator("#editor > p code")).toHaveText("kod");
+	});
+
+	/** Keşif testi K-02: kapanıştan sonra yazılan metin de kalın/kod kalıyordu. */
+	test("kapanış işaretinden sonra yazılan metin biçimin dışında kalıyor", async ({ page }) => {
+		await bosBelge(page);
+		await page.keyboard.type("Önce **kalın** sonra düz");
+		await expect(page.locator("#editor > p strong")).toHaveText("kalın");
+		await expect(page.locator("#cikti")).toHaveText("Önce **kalın** sonra düz\n");
+	});
+
+	test("kod, italik ve üstü çizili de kapanıştan sonra bitiyor", async ({ page }) => {
+		await bosBelge(page);
+		await page.keyboard.type("a `kod` b _iki_ c ~~üç~~ d");
+		await expect(page.locator("#editor > p code")).toHaveText("kod");
+		await expect(page.locator("#editor > p em")).toHaveText("iki");
+		await expect(page.locator("#cikti")).toHaveText("a `kod` b _iki_ c ~~üç~~ d\n");
 	});
 
 	test("dönüşümden sonra yazmaya devam edilebiliyor", async ({ page }) => {

@@ -85,6 +85,46 @@ describe("Enter — bölme", () => {
 		expect(md(splitAtCaret(doc, imlec(0, [1, 0], 0)))).toBe("- bir\n\n\n");
 	});
 
+	/** Keşif testi K-01: iç maddede Enter yutuluyordu, yazı aynı maddeye ekleniyordu. */
+	it("iç listedeki maddeyi yeni iç maddeye bölüyor", () => {
+		const doc = belge("- üst\n  - alt bir\n- son\n");
+		const sonuc = splitAtCaret(doc, imlec(0, [0, 1, 0, 0], 7));
+		expect(md(sonuc)).toBe("- üst\n  - alt bir\n  -\n- son\n");
+		expect(sonuc?.caret).toEqual(imlec(0, [0, 1, 1, 0], 0));
+	});
+
+	it("numaralı iç listede de bölüyor", () => {
+		const doc = belge("1. bir\n   1. içabc\n");
+		expect(md(splitAtCaret(doc, imlec(0, [0, 1, 0, 0], 2)))).toBe("1. bir\n   1. iç\n   2. abc\n");
+	});
+
+	it("üç seviye derindeki maddeyi de bölüyor", () => {
+		const doc = belge("- a\n  - b\n    - cd\n");
+		const sonuc = splitAtCaret(doc, imlec(0, [0, 1, 0, 1, 0, 0], 1));
+		expect(md(sonuc)).toBe("- a\n  - b\n    - c\n    - d\n");
+		expect(sonuc?.caret).toEqual(imlec(0, [0, 1, 0, 1, 1, 0], 0));
+	});
+
+	/** Eskiden yalnızca paragraf bölünüyor, alt maddeler siliniyordu. */
+	it("üst maddenin sonunda Enter alt maddeleri silmiyor, yeni maddenin altına alıyor", () => {
+		const doc = belge("- üst\n  - alt\n");
+		expect(md(splitAtCaret(doc, imlec(0, [0, 0], 3)))).toBe("- üst\n-\n  - alt\n");
+	});
+
+	it("iç listedeki boş maddeye de yazılacak bir paragraf konuyor", () => {
+		// "- üst\n  - " olmuyor: oradaki "-" setext başlık çizgisi sayılıyor.
+		const doc = normalizeDocument(belge("- üst\n  - a\n  - \n"));
+		const ic = doc.children[0]?.type === "list" ? doc.children[0].children[0]?.children[1] : null;
+		expect(ic?.type === "list" ? ic.children[1]?.children[0]?.type : null).toBe("paragraph");
+	});
+
+	it("boş iç maddede Enter maddeyi bir seviye dışarı alıyor", () => {
+		const doc = normalizeDocument(belge("- üst\n  - alt\n  - \n"));
+		const sonuc = splitAtCaret(doc, imlec(0, [0, 1, 1, 0], 0));
+		expect(md(sonuc)).toBe("- üst\n  - alt\n-\n");
+		expect(sonuc?.caret).toEqual(imlec(0, [1, 0], 0));
+	});
+
 	it("alıntı içinde Enter alıntıdan çıkarmıyor", () => {
 		expect(md(splitAtCaret(belge("> abcd\n"), imlec(0, [0], 2)))).toBe("> ab\n>\n> cd\n");
 	});
@@ -167,6 +207,37 @@ describe("Tab — liste girintisi", () => {
 	it("Shift+Tab maddeyi dışarı alıyor", () => {
 		const doc = belge("- bir\n  - ic\n");
 		expect(md(outdentItem(doc, imlec(0, [0, 1, 0, 0], 0)))).toBe("- bir\n- ic\n");
+	});
+
+	it("iç listedeki maddeyi bir seviye daha içeri alıyor", () => {
+		const doc = belge("- a\n  - b\n  - c\n");
+		const sonuc = indentItem(doc, imlec(0, [0, 1, 1, 0], 0));
+		expect(md(sonuc)).toBe("- a\n  - b\n    - c\n");
+		expect(sonuc?.caret).toEqual(imlec(0, [0, 1, 0, 1, 0, 0], 0));
+	});
+
+	it("iki seviye içerideki maddeyi dışarı alıyor", () => {
+		const doc = belge("- a\n  - b\n    - c\n");
+		expect(md(outdentItem(doc, imlec(0, [0, 1, 0, 1, 0, 0], 0)))).toBe("- a\n  - b\n  - c\n");
+	});
+
+	/** Sonraki kardeşler yerinde kalsaydı dışarı alınan maddenin üstüne çıkardı. */
+	it("Shift+Tab okunan sırayı bozmuyor: sonraki kardeşler maddenin altına geçiyor", () => {
+		const doc = belge("- a\n  - x\n  - y\n  - z\n");
+		expect(md(outdentItem(doc, imlec(0, [0, 1, 1, 0], 0)))).toBe("- a\n  - x\n- y\n  - z\n");
+	});
+
+	it("üst düzey maddede Shift+Tab bir şey yapmıyor", () => {
+		expect(outdentItem(belge("- a\n"), imlec(0, [0, 0], 0))).toBeNull();
+	});
+});
+
+describe("Backspace — iç madde", () => {
+	it("iç maddenin başında Backspace girintiyi azaltıyor", () => {
+		const doc = belge("- a\n  - b\n");
+		const sonuc = mergeWithPrevious(doc, imlec(0, [0, 1, 0, 0], 0));
+		expect(md(sonuc)).toBe("- a\n- b\n");
+		expect(sonuc?.caret).toEqual(imlec(0, [1, 0], 0));
 	});
 });
 

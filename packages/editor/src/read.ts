@@ -20,7 +20,7 @@
  * bir yerden `<span style=…>` yapıştırırsa metni kalır, çöp gitmez.
  */
 import type { Inline } from "@kalem-editor/core";
-import { COLOR_ATTR } from "./render.js";
+import { COLOR_ATTR, MARKER_ATTR } from "./render.js";
 
 const ELEMENT = 1;
 const TEXT = 3;
@@ -123,7 +123,12 @@ function readNode(node: Node, out: Inline[]): void {
 	if (mark !== undefined) {
 		const children = normalize(collect(element));
 		if (children.length === 0) return;
-		out.push({ type: mark, children } as Inline);
+		const underscore = mark !== "delete" && element.getAttribute(MARKER_ATTR) === "_";
+		out.push({
+			type: mark,
+			children,
+			...(underscore ? { syntax: { marker: "_" } } : {}),
+		} as Inline);
 		return;
 	}
 

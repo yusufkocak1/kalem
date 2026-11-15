@@ -219,15 +219,20 @@ function listeYap(
  * Kalıpların hepsi imlecin **hemen solunda** bitmek zorunda (`$`), yani
  * kural yalnızca kapanış işareti yazıldığı anda çalışıyor.
  */
-const SATIR_ICI: readonly { readonly desen: RegExp; readonly mark: Inline["type"] }[] = [
+const SATIR_ICI: readonly {
+	readonly desen: RegExp;
+	readonly mark: Inline["type"];
+	/** Kullanıcının yazdığı işaret; serileştirici aynısını geri yazsın diye. */
+	readonly syntax?: object;
+}[] = [
 	// Her kalıpta 1. grup **önceki karakter** (ya da satır başı), 2. grup
 	// gövde. İlk grup sayesinde işaretin uzunluğu tek bir çıkarmayla
 	// hesaplanabiliyor ve `***a***` gibi girdilerde yanlış yerden kesilmiyor.
-	{ desen: /(^|[^*])\*\*([^\s*][^*]*)\*\*$/, mark: "strong" },
-	{ desen: /(^|[^_])__([^\s_][^_]*)__$/, mark: "strong" },
-	{ desen: /(^|[^~])~~([^\s~][^~]*)~~$/, mark: "delete" },
-	{ desen: /(^|[^*])\*([^\s*][^*]*)\*$/, mark: "emphasis" },
-	{ desen: /(^|[^_])_([^\s_][^_]*)_$/, mark: "emphasis" },
+	{ desen: /(^|[^*])\*\*([^\s*][^*]*)\*\*$/, mark: "strong", syntax: { marker: "*" } },
+	{ desen: /(^|[^_])__([^\s_][^_]*)__$/, mark: "strong", syntax: { marker: "_" } },
+	{ desen: /(^|[^~])~~([^\s~][^~]*)~~$/, mark: "delete", syntax: { length: 2 } },
+	{ desen: /(^|[^*])\*([^\s*][^*]*)\*$/, mark: "emphasis", syntax: { marker: "*" } },
+	{ desen: /(^|[^_])_([^\s_][^_]*)_$/, mark: "emphasis", syntax: { marker: "_" } },
 	{ desen: /(^|[^`])`([^`]+)`$/, mark: "inlineCode" },
 ];
 
@@ -246,7 +251,7 @@ export function applyInlineRule(doc: Root, caret: Caret): EditResult | null {
 	const metin = plainInline(children);
 	const solda = metin.slice(0, caret.offset);
 
-	for (const { desen, mark } of SATIR_ICI) {
+	for (const { desen, mark, syntax } of SATIR_ICI) {
 		const eslesme = desen.exec(solda);
 		if (eslesme === null) continue;
 
@@ -269,7 +274,7 @@ export function applyInlineRule(doc: Root, caret: Caret): EditResult | null {
 		const yeni: Inline =
 			mark === "inlineCode"
 				? { type: "inlineCode", value: plainInline(govde) }
-				: ({ type: mark, children: govde } as Inline);
+				: ({ type: mark, children: govde, ...(syntax === undefined ? {} : { syntax }) } as Inline);
 
 		const sonuc = spliceInline(children, bas, son, [yeni]);
 		return {

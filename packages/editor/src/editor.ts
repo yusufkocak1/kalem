@@ -30,7 +30,14 @@ import type {
 	TableCell,
 	TableRow,
 } from "@kalem-editor/core";
-import { createSerializeCache, parse, removeAt, replaceAt, serialize } from "@kalem-editor/core";
+import {
+	createSerializeCache,
+	nodeAtPath,
+	parse,
+	removeAt,
+	replaceAt,
+	serialize,
+} from "@kalem-editor/core";
 import type { BlockType, MarkType } from "@kalem-editor/core/commands";
 import { emptyParagraph, setBlockType } from "@kalem-editor/core/commands";
 import type { Caret, EditResult } from "./block-edit.js";
@@ -179,6 +186,16 @@ export interface EditorOptions {
 	transformPaste?: (fragment: Root, input: PasteInput, plain: boolean) => Root;
 }
 
+/** Where an input rule closed a mark: block, path to the text holder, offset. */
+interface MarkExit {
+	readonly blockId: string;
+	readonly path: string;
+	readonly offset: number;
+}
+
+/** Inline nodes an input rule closes; typing right after one leaves it. */
+const MARK_TYPES: ReadonlySet<string> = new Set(["strong", "emphasis", "delete", "inlineCode"]);
+
 export class Editor {
 	readonly #element: HTMLElement;
 	readonly #options: EditorOptions;
@@ -242,6 +259,13 @@ export class Editor {
 		readonly path: string;
 		offset: number;
 	} | null = null;
+	/**
+	 * Where an inline input rule just closed a mark (`**kalın**`, `` `kod` ``).
+	 * The caret sits at the end of the new `<strong>`/`<code>`, and a browser
+	 * types the next character **inside** it: `**kalın** sonra` came out as
+	 * `**kalın sonra**`. What is typed there next goes after the mark instead.
+	 */
+	#markExit: MarkExit | null = null;
 
 	constructor(element: HTMLElement, options: EditorOptions = {}) {
 		this.#element = element;
@@ -1001,7 +1025,63 @@ export class Editor {
 		if (this.#options.inputRules === false || this.#composing) return;
 		const caret = this.#caret();
 		if (caret === null) return;
-		this.#applyEdit(this.#plugins.runInputRules(this.#doc, caret));
+		const sonuc = this.#plugins.runInputRules(this.#doc, caret);
+		this.#applyEdit(sonuc);
+		this.#markExit = sonuc === null ? null : this.#markEndingAt(sonuc);
+	}
+
+	/** The caret of `result`, when it stands right after a formatted run. */
+	#markEndingAt(result: EditResult): MarkExit | null {
+		const caret = result.caret;
+		if (caret === null || caret.offset === 0) return null;
+		const node = nodeAtPath(result.doc, [caret.blockIndex, ...caret.path]) as
+			| { children?: readonly Inline[] }
+			| undefined;
+		const children = node?.children;
+		if (children === undefined) return null;
+		const son = sliceInline(children, caret.offset - 1, caret.offset).at(-1);
+		if (son === undefined || !MARK_TYPES.has(son.type)) return null;
+		const blockId = result.doc.children[caret.blockIndex]?.id;
+		if (blockId === undefined) return null;
+		return { blockId, path: caret.path.join(","), offset: caret.offset };
+	}
+
+	/** Types `text` after the mark an input rule just closed, not inside it. */
+	#typeAfterMark(event: InputEvent): boolean {
+		const exit = this.#markExit;
+		if (exit === null) return false;
+		this.#markExit = null;
+		if (this.#readOnly || event.inputType !== "insertText" || event.isComposing || this.#composing)
+			return false;
+		const text = event.data;
+		const target = this.#rangeTarget();
+		if (
+			text === null ||
+			text === "" ||
+			target === null ||
+			target.from !== target.to ||
+			target.from !== exit.offset ||
+			this.#doc.children[target.blockIndex]?.id !== exit.blockId ||
+			target.path.join(",") !== exit.path
+		) {
+			return false;
+		}
+		event.preventDefault();
+		const from = target.from;
+		const to = from + text.length;
+		this.#editRangeAt(
+			target.blockIndex,
+			target.path,
+			from,
+			from,
+			(children) => spliceInline(children, from, from, [{ type: "text", value: text }]),
+			{ select: to, coalesceKey: `mark-exit:${exit.blockId}` },
+		);
+		// A space alone at the end of a paragraph is not shown, and Chromium
+		// drops it and types the next letter into the mark again. Until a
+		// letter follows, the next keys go through here too.
+		if (text.trim() === "") this.#markExit = { ...exit, offset: to };
+		return true;
 	}
 
 	/**
@@ -1015,6 +1095,7 @@ export class Editor {
 	 * başına yetmez.
 	 */
 	#onBeforeInput = (event: InputEvent): void => {
+		if (this.#typeAfterMark(event)) return;
 		if (this.#typeStoredColor(event)) return;
 		if (event.inputType !== "historyUndo" && event.inputType !== "historyRedo") return;
 		event.preventDefault();

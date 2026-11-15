@@ -249,14 +249,21 @@ function listItem(
 	// Gevşeklik ya listenin ya da maddenin kendisinden gelir.
 	const loose = listSpread || item.spread;
 	const content: RenderNode[] = [];
+	// Maddenin kendi metni: ilk paragrafı. Görev kutusunun adı yalnızca
+	// bundan üretiliyor; alt maddelerin metni üst maddenin adına girmemeli.
+	let own: RenderNode[] = [];
 
-	for (const child of item.children) {
+	for (const [i, child] of item.children.entries()) {
 		if (!loose && child.type === "paragraph") {
-			content.push(...inlines(child.children, ctx));
+			const nodes = inlines(child.children, ctx);
+			if (i === 0) own = nodes;
+			content.push(...nodes);
 			continue;
 		}
 		const rendered = block(child, ctx);
-		if (rendered !== null) content.push(rendered);
+		if (rendered === null) continue;
+		if (i === 0 && child.type === "paragraph") own = [rendered];
+		content.push(rendered);
 	}
 
 	if (item.checked === null) return el("li", [], content);
@@ -282,7 +289,7 @@ function listItem(
 	 * Metinsiz madde (`- [ ]`) için ad üretilemez; orada kutu erişilebilirlik
 	 * ağacından çıkarılıyor — duyurulacak bir görev zaten yok.
 	 */
-	const label = planText(content).trim().replace(/\s+/g, " ");
+	const label = planText(own).trim().replace(/\s+/g, " ");
 	if (label === "") attrs.push(["aria-hidden", "true"]);
 	else attrs.push(["aria-label", label]);
 

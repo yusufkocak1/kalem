@@ -109,6 +109,43 @@ test.describe("konumlandırma", () => {
 		await expect(page.locator(BALON)).toHaveAttribute("data-placement", "top");
 	});
 
+	/**
+	 * Keşif testi K-04: kutu `fixed` olmadan ölçülüyor, pencere genişliğinde
+	 * sanılıp sol kenara kırpılıyordu. Dikey konumu ölçen test bunu görmedi.
+	 */
+	test("seçimin ortasına hizalanıyor, ilk açılışta da", async ({ page }) => {
+		await page.evaluate(() =>
+			window.kalem.editor.setValue("solda birkaç sözcük ve en sağda duran hedefsözcük\n"),
+		);
+		// Sağdaki sözcüğün üstüne çift tıklanıyor: gerçek kullanıcının yaptığı.
+		const hedef = await page.evaluate(() => {
+			const metin = document.querySelector("#editor > p")?.firstChild;
+			if (metin === null || metin === undefined) return null;
+			const range = document.createRange();
+			const bas = (metin.textContent ?? "").indexOf("hedef");
+			range.setStart(metin, bas);
+			range.setEnd(metin, bas + 5);
+			const r = range.getBoundingClientRect();
+			return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+		});
+		if (hedef === null) throw new Error("ölçülemedi");
+		await page.mouse.dblclick(hedef.x, hedef.y);
+		await expect(page.locator(BALON)).toBeVisible();
+		const balon = await page.locator(BALON).boundingBox();
+		const secim = await page.evaluate(() => {
+			const r = window.getSelection()?.getRangeAt(0).getClientRects().item(0);
+			return r === null || r === undefined ? null : r.left + r.width / 2;
+		});
+		const genislik = await page.evaluate(() => window.innerWidth);
+		if (balon === null || secim === null) throw new Error("ölçülemedi");
+		const beklenen = Math.min(
+			Math.max(secim - balon.width / 2, 8),
+			Math.max(8, genislik - balon.width - 8),
+		);
+		expect(Math.abs(balon.x - beklenen)).toBeLessThanOrEqual(2);
+		expect(balon.x).toBeGreaterThan(8);
+	});
+
 	test("görünür alanın dışına taşmıyor", async ({ page }) => {
 		await secimYap(page);
 		await expect(page.locator(BALON)).toBeVisible();
