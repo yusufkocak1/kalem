@@ -18,13 +18,14 @@ import type { Lang, Strings } from "../shared/i18n.js";
 import { format, pickLanguage, stringsFor } from "../shared/i18n.js";
 import { quickNoteName } from "../shared/notes.js";
 import { isPaneShown, revealPane } from "../shared/panes.js";
-import { isEditablePath, isPackagePath, isProgramPath } from "../shared/paths.js";
+import { isEditablePath, isPackagePath, isProgramPath, uncShare } from "../shared/paths.js";
 import { ChatStore } from "./assistant-chats.js";
 import { AssistantStore } from "./assistant-store.js";
 import { confluenceClient } from "./confluence-ipc.js";
 import { ConfluenceStore } from "./confluence-store.js";
 import { DraftStore } from "./drafts.js";
 import { backgroundFetch } from "./git.js";
+import { findRepoRoot, isTrustedRepo } from "./git-trust.js";
 import { VersionStore } from "./history.js";
 import { registerIpc } from "./ipc.js";
 import { jiraConnection } from "./jira-ipc.js";
@@ -91,9 +92,12 @@ function start(): void {
 	const drafts = new DraftStore(join(app.getPath("userData"), "drafts"));
 	const sessions = new SessionStore(join(app.getPath("userData"), "session.json"));
 	const packages = new PackageStore(join(app.getPath("userData"), "packages"));
+	// Linux without a keyring falls back to a key written in Chromium itself: no protection at all.
+	const strongEncryption = (): boolean =>
+		safeStorage.isEncryptionAvailable() &&
+		!(process.platform === "linux" && safeStorage.getSelectedStorageBackend() === "basic_text");
 	const secrets = {
-		encrypt: (text: string) =>
-			safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(text) : null,
+		encrypt: (text: string) => (strongEncryption() ? safeStorage.encryptString(text) : null),
 		decrypt: (data: Buffer) => safeStorage.decryptString(data),
 	};
 	const confluence = new ConfluenceStore(join(app.getPath("userData"), "confluence.json"), secrets);
@@ -202,6 +206,16 @@ function start(): void {
 		if (failure !== "") fail(failure);
 	}
 
+	/** The page only writes to the clipboard: camera, microphone, location and the rest are refused unasked. */
+	function applyPermissions(): void {
+		const defaultSession = session.defaultSession;
+		const permitted = new Set(["clipboard-sanitized-write"]);
+		defaultSession.setPermissionRequestHandler((_contents, permission, answer) =>
+			answer(permitted.has(permission)),
+		);
+		defaultSession.setPermissionCheckHandler((_contents, permission) => permitted.has(permission));
+	}
+
 	function applySpellCheck(): void {
 		const defaultSession = session.defaultSession;
 		defaultSession.setSpellCheckerEnabled(store.settings.spellCheck);
@@ -300,7 +314,13 @@ function start(): void {
 	 */
 	const fetchInBackground = async (): Promise<void> => {
 		if (!store.settings.gitAutoFetch) return;
-		const fetched = await Promise.all(store.state.workspaces.map((root) => backgroundFetch(root)));
+		const fetched = await Promise.all(
+			store.state.workspaces.map(async (root) => {
+				const repo = await findRepoRoot(root);
+				if (repo === null || !isTrustedRepo(repo, store.settings.gitTrustedFolders)) return false;
+				return backgroundFetch(root);
+			}),
+		);
 		if (fetched.some(Boolean)) workspaceChanged();
 	};
 	setTimeout(() => {
@@ -537,19 +557,35 @@ function start(): void {
 
 		nativeTheme.themeSource = store.settings.theme;
 		watcher.watch(store.state.workspaces);
-		handleDocumentScheme(
-			async (pageId, name) => {
+		handleDocumentScheme({
+			loadAttachment: async (pageId, name) => {
 				const credentials = await confluence.get();
 				return credentials === null ? null : confluenceClient(credentials).attachment(pageId, name);
 			},
-			async (id, name) => {
+			loadJiraAttachment: async (id, name) => {
 				const connection = await jiraConnection({ jira, confluence });
 				if (connection === null) return null;
 				const response = await connection.client.attachment(id, name);
 				return response.ok ? response : null;
 			},
-		);
+			openShares: () => {
+				const shares = new Set<string>();
+				const add = (path: string | null): void => {
+					const share = path === null ? null : uncShare(path);
+					if (share !== null) shares.add(share);
+				};
+				for (const win of windows.all()) {
+					for (const tab of win.tabs.values()) {
+						add(tab.path);
+						add(tab.base ?? null);
+					}
+				}
+				for (const folder of store.state.workspaces) add(folder);
+				return shares;
+			},
+		});
 		applySpellCheck();
+		applyPermissions();
 		installUserTasks();
 		registerIpc({
 			windows,

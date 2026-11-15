@@ -10,7 +10,8 @@ export function stripExtension(name: string): string {
 
 /** Lowercase extension without the dot. */
 export function extension(path: string): string {
-	const name = fileName(path);
+	// Windows drops trailing dots and spaces: "setup.exe." runs as "setup.exe".
+	const name = fileName(path).replace(/[. ]+$/, "");
 	const dot = name.lastIndexOf(".");
 	// kalem-locale-ok: file extensions are ASCII
 	return dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
@@ -62,10 +63,17 @@ export function isBinaryPath(path: string): boolean {
 }
 
 /** Files that run a program when the system opens them: these are only shown in their folder. */
+/** Files the operating system runs (or mounts, or loads code from) rather than shows. */
 const PROGRAM_EXTENSIONS: ReadonlySet<string> = new Set(
-	"exe com bat cmd msi msp ps1 psm1 vbs vbe js jse wsf wsh hta scr pif cpl lnk url reg jar app sh command".split(
-		" ",
-	),
+	[
+		"exe com bat cmd msi msix msixbundle appx appxbundle msp mst scr pif cpl msc lnk url reg inf scf",
+		"ps1 psm1 psd1 ps1xml psc1 vbs vbe js jse wsf wsh wsc hta jar chm hlp gadget",
+		"xll xla xlam ppa ppam application appref-ms settingcontent-ms library-ms searchconnector-ms",
+		"diagcab diagcfg diagpkg iso img vhd vhdx",
+		"app command sh bash zsh csh ksh py pyw pl rb php desktop appimage run bin pkg dmg mpkg",
+	]
+		.join(" ")
+		.split(" "),
 );
 
 export function isProgramPath(path: string): boolean {
@@ -90,6 +98,21 @@ export function documentBaseUrl(scheme: string, documentPath: string): string {
 	return `${scheme}://local/${encoded.replace(/^\//, "")}`;
 }
 
+/**
+ * The network share a Windows path is on, as `\\server\share` in lower case;
+ * `null` for a drive path. Device paths (`\\?\`, `\\.\`) are shares of nothing.
+ */
+export function uncShare(path: string): string | null {
+	const match = /^[\\/]{2}([^\\/?.][^\\/]*)[\\/]+([^\\/]+)/.exec(path);
+	if (match === null) return null;
+	// kalem-locale-ok: host and share names compare as Windows does, without the Turkish rule
+	return `\\\\${(match[1] as string).toLowerCase()}\\${(match[2] as string).toLowerCase()}`;
+}
+
+export function isDevicePath(path: string): boolean {
+	return /^[\\/]{2}[?.][\\/]/.test(path);
+}
+
 /** Inverse of `documentBaseUrl`: an (encoded) URL pathname back to a file-system path. */
 export function urlPathToFilePath(pathname: string, windows: boolean): string | null {
 	let path: string;
@@ -101,5 +124,9 @@ export function urlPathToFilePath(pathname: string, windows: boolean): string | 
 	if (path.includes("\0")) return null;
 	if (!windows) return path;
 	if (/^\/[A-Za-z]:/.test(path)) path = path.slice(1);
-	return path.replace(/\//g, "\\");
+	path = path.replace(/\//g, "\\");
+	if (isDevicePath(path)) return null;
+	// A drive path, or a share (checked by the caller); never a stream (`a.png:x`) or a drive-relative path.
+	if (/^[A-Za-z]:\\/.test(path)) return path.slice(2).includes(":") ? null : path;
+	return uncShare(path) !== null && !path.includes(":") ? path : null;
 }

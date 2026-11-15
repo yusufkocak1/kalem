@@ -106,11 +106,16 @@ export async function unpack(bytes: Uint8Array, folder: string): Promise<string>
 
 	const root = resolve(folder);
 	await mkdir(root, { recursive: true });
+	// The sizes a zip declares can lie: what inflates is counted too.
+	let inflated = 0;
 	for (const [path, entry] of paths) {
 		if (!path.startsWith(layout.prefix)) continue;
 		const target = resolve(root, path.slice(layout.prefix.length));
 		if (!target.startsWith(root + sep)) throw new PackageError("unsafe-entry", entry.name);
 		const content = await entry.async("uint8array");
+		inflated += content.byteLength;
+		if (inflated > MAX_PACKAGE_SIZE)
+			throw new PackageError("too-large", "The package is too large.");
 		await mkdir(dirname(target), { recursive: true });
 		await writeFile(target, content);
 	}

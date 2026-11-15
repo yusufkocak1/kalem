@@ -140,6 +140,18 @@ export function parsePinnedFiles(value: unknown): string[] {
 	return [...new Set(paths)].slice(0, 30);
 }
 
+export function parseTrustedFolders(value: unknown): string[] {
+	if (!Array.isArray(value)) return [];
+	const paths = value.filter(
+		(item): item is string =>
+			typeof item === "string" &&
+			item.length < 4096 &&
+			/^(\/|[A-Za-z]:[\\/])/.test(item) &&
+			!item.startsWith("//"),
+	);
+	return [...new Set(paths)].slice(0, 500);
+}
+
 export function parseJiraFavorites(value: unknown): JiraFavorite[] {
 	if (!Array.isArray(value)) return [];
 	const seen = new Set<string>();
@@ -683,6 +695,16 @@ export const SETTINGS_SCHEMA: Schema = {
 		type: "boolean",
 		keywords: ["tepsi", "tray", "bildirim alanı", "notification", "hızlı not", "quick note"],
 		assistant: "write",
+	},
+	gitTrustedFolders: {
+		key: "gitTrustedFolders",
+		category: "system",
+		label: null,
+		type: "custom",
+		parse: parseTrustedFolders,
+		keywords: [],
+		// Trusting a repository lets its git settings run programs: only the user decides.
+		assistant: "hidden",
 	},
 	gitAutoFetch: {
 		key: "gitAutoFetch",

@@ -88,6 +88,13 @@ const en = {
 	gitRemote: "from {0}",
 	gitCurrent: "current",
 	gitDetached: "no branch",
+	gitTrustQuestion: "Trust this repository's Git settings?",
+	gitTrustDetail:
+		"{0}\n\nA repository's own Git settings can run programs on this computer when Kalem shows its changes. Trust it only if you know where it came from.",
+	gitTrustYes: "Trust",
+	gitUntrusted: "Git does not run in {0} until you trust it.",
+	gitUntrustedBar: "Git is off: not trusted yet",
+	gitTrustButton: "Trust…",
 	gitAhead: "{0} to push",
 	gitBehind: "{0} to pull",
 	gitChanged: "{0} changed",
@@ -566,7 +573,7 @@ const en = {
 	confluenceAttachmentTooLarge: "The file is larger than {0} MB.",
 	confluenceAttachmentMissing: "The attachment is no longer on the page.",
 	confluenceAttachmentRisky:
-		"For safety, programs and scripts are not opened directly. Download the file and open it yourself if you trust it.",
+		"For safety, only documents, pictures and media open directly. Download this file and open it yourself if you trust it.",
 	confluenceDeleteConfirm: "Delete “{0}” from the page?",
 	confluenceDeleteDetail: "It goes to the space's trash, from where a space admin can restore it.",
 	confluenceDeleteUsed: "The page links to it: those links stop working once it is deleted.",
@@ -1740,6 +1747,13 @@ const tr: Strings = {
 	gitRemote: "{0} üzerinde",
 	gitCurrent: "şu anki",
 	gitDetached: "dal yok",
+	gitTrustQuestion: "Bu deponun Git ayarlarına güveniyor musunuz?",
+	gitTrustDetail:
+		"{0}\n\nBir deponun kendi Git ayarları, Kalem değişiklikleri gösterirken bu bilgisayarda program çalıştırabilir. Yalnızca nereden geldiğini bildiğiniz depolara güvenin.",
+	gitTrustYes: "Güven",
+	gitUntrusted: "{0} deposuna güvenene kadar Git çalışmaz.",
+	gitUntrustedBar: "Git kapalı: depoya henüz güvenilmedi",
+	gitTrustButton: "Güven…",
 	gitAhead: "{0} gönderilecek",
 	gitBehind: "{0} çekilecek",
 	gitChanged: "{0} değişiklik",
@@ -2221,7 +2235,7 @@ const tr: Strings = {
 	confluenceAttachmentTooLarge: "Dosya {0} MB'tan büyük.",
 	confluenceAttachmentMissing: "Ek artık sayfada değil.",
 	confluenceAttachmentRisky:
-		"Güvenlik için programlar ve betikler doğrudan açılmaz. Dosyaya güveniyorsanız indirip kendiniz açın.",
+		"Güvenlik için yalnızca belgeler, resimler ve medya doğrudan açılır. Bu dosyaya güveniyorsanız indirip kendiniz açın.",
 	confluenceDeleteConfirm: "“{0}” sayfadan silinsin mi?",
 	confluenceDeleteDetail:
 		"Ek, alanın çöp kutusuna gider; alan yöneticisi oradan geri yükleyebilir.",

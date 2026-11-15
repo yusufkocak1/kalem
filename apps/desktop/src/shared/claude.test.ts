@@ -7,6 +7,8 @@ import {
 	composePrompt as composeForCommand,
 	composePrompt,
 	copilotArgs,
+	copilotConfigServers,
+	copilotIsolation,
 	DIAGRAM_FENCE,
 	diagramForPrompt,
 	diagramFromReply,
@@ -503,5 +505,35 @@ describe("slash commands for Claude Code", () => {
 		).toBe('/docs-kit:outline\n\n<document name="a.md">\n# A\n</document>');
 		expect(withContext("<files/>", "/tone")).toBe("/tone\n\n<files/>");
 		expect(withContext("<files/>", "Hello")).toBe("<files/>\n\nHello");
+	});
+});
+
+describe("copilotIsolation", () => {
+	const help = "  --disable-builtin-mcps   ...\n  --disable-mcp-server <name>   ...";
+
+	it("turns off the built-in servers and the user's own, keeping Kalem's", () => {
+		expect(copilotIsolation(help, ["github", "kalem", "jira-tools"], ["kalem"])).toEqual([
+			"--disable-builtin-mcps",
+			"--disable-mcp-server",
+			"github",
+			"--disable-mcp-server",
+			"jira-tools",
+		]);
+	});
+
+	it("adds nothing a Copilot without the flags would refuse", () => {
+		expect(copilotIsolation("--allow-all-tools", ["github"], [])).toEqual([]);
+		expect(copilotIsolation(help, ["bad name; rm"], [])).toEqual(["--disable-builtin-mcps"]);
+	});
+
+	it("reads the server names from Copilot's configuration", () => {
+		expect(copilotConfigServers('{"mcpServers":{"github":{},"x":{}}}')).toEqual(["github", "x"]);
+		expect(copilotConfigServers("not json")).toEqual([]);
+	});
+
+	it("puts the flags on Copilot's command line", () => {
+		expect(
+			copilotArgs({ sessionId: "s", model: "", isolation: ["--disable-builtin-mcps"] }),
+		).toContain("--disable-builtin-mcps");
 	});
 });

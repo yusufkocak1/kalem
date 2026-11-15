@@ -336,6 +336,8 @@ export function copilotArgs(options: {
 	readonly folders?: readonly string[];
 	/** An MCP configuration file with Kalem's tools, for a Copilot that takes one. */
 	readonly mcpConfig?: string;
+	/** Turns off the MCP servers Kalem did not choose (`copilotIsolation`). */
+	readonly isolation?: readonly string[];
 }): string[] {
 	return [
 		"-s",
@@ -344,6 +346,7 @@ export function copilotArgs(options: {
 		// Required without a terminal to ask in; the denied tools stay denied.
 		"--allow-all-tools",
 		...COPILOT_DENIED_TOOLS.flatMap((tool) => ["--deny-tool", tool]),
+		...(options.isolation ?? []),
 		...(options.folders ?? []).flatMap((folder) => ["--add-dir", folder]),
 		...(options.mcpConfig === undefined
 			? []
@@ -354,6 +357,40 @@ export function copilotArgs(options: {
 		options.sessionId,
 		...(options.model === "" ? [] : ["--model", options.model]),
 	];
+}
+
+/**
+ * `--allow-all-tools` lets every tool run unasked: the ones of MCP servers
+ * Kalem did not choose (the user's own Copilot configuration, the built-in
+ * GitHub server) are turned off, where this Copilot can. `keep` names the
+ * servers Kalem passes itself.
+ */
+export function copilotIsolation(
+	help: string,
+	userServers: readonly string[],
+	keep: readonly string[],
+): string[] {
+	const args: string[] = [];
+	if (help.includes("--disable-builtin-mcps")) args.push("--disable-builtin-mcps");
+	if (help.includes("--disable-mcp-server")) {
+		for (const name of userServers) {
+			if (!keep.includes(name) && /^[\w.-]{1,100}$/.test(name)) {
+				args.push("--disable-mcp-server", name);
+			}
+		}
+	}
+	return args;
+}
+
+/** The servers in a Copilot CLI MCP configuration (`mcp-config.json`). */
+export function copilotConfigServers(text: string): string[] {
+	try {
+		const parsed = JSON.parse(text) as { mcpServers?: unknown };
+		const servers = parsed.mcpServers;
+		return typeof servers === "object" && servers !== null ? Object.keys(servers) : [];
+	} catch {
+		return [];
+	}
 }
 
 /** Whether a Copilot CLI's help says it takes more MCP servers on its command line. */

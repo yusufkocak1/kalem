@@ -52,6 +52,10 @@ export class AssistantStore {
 			// No settings yet.
 		}
 		this.#state = state;
+		// Keys stored when encryption was weaker than now allowed are kept in memory only.
+		if (Object.keys(state.keys).length > 0 && this.#box.encrypt("") === null) {
+			await this.#save(state).catch(() => {});
+		}
 		return state;
 	}
 

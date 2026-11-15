@@ -1,7 +1,7 @@
 import { pathToFileURL } from "node:url";
 import { net, protocol } from "electron";
 import { DIAGRAM_DATA_SUFFIX, DIAGRAM_SUFFIX } from "../shared/diagram.js";
-import { extension, urlPathToFilePath } from "../shared/paths.js";
+import { extension, uncShare, urlPathToFilePath } from "../shared/paths.js";
 
 /**
  * Serves images next to the open document. The renderer points `<base href>`
@@ -51,6 +51,9 @@ export const CONFLUENCE_HOST = "confluence";
 
 export const JIRA_HOST = "jira";
 
+/** Files next to the document: `kalem-doc://local/<path>`. */
+export const LOCAL_HOST = "local";
+
 export type AttachmentLoader = (pageId: string, name: string) => Promise<Response | null>;
 
 async function serveAttachment(url: URL, load: AttachmentLoader): Promise<Response> {
@@ -89,29 +92,45 @@ function uncached(url: URL, response: Response): Response {
 }
 
 /** Must run after the app is ready. */
-export function handleDocumentScheme(
-	loadAttachment: AttachmentLoader,
-	loadJiraAttachment: AttachmentLoader,
-): void {
+export interface DocumentSchemeOptions {
+	readonly loadAttachment: AttachmentLoader;
+	readonly loadJiraAttachment: AttachmentLoader;
+	/** The network shares open documents are on (`\\server\share`, lower case): only these are read. */
+	openShares(): ReadonlySet<string>;
+}
+
+export function handleDocumentScheme(options: DocumentSchemeOptions): void {
 	protocol.handle(DOCUMENT_SCHEME, async (request) => {
 		const url = new URL(request.url);
-		return uncached(url, await serve(request, url, loadAttachment, loadJiraAttachment));
+		return uncached(url, await serve(request, url, options));
 	});
+}
+
+/** The file a `kalem-doc://local/…` address names, when it may be read; `null` otherwise. */
+export function servedPath(
+	url: URL,
+	windows: boolean,
+	openShares: ReadonlySet<string>,
+): string | null {
+	if (url.hostname !== LOCAL_HOST) return null;
+	const path = urlPathToFilePath(url.pathname, windows);
+	if (path === null || !served(path)) return null;
+	// A share no open document is on would be asked for with the user's Windows login.
+	const share = windows ? uncShare(path) : null;
+	if (share !== null && !openShares.has(share)) return null;
+	return path;
 }
 
 async function serve(
 	request: Request,
 	url: URL,
-	loadAttachment: AttachmentLoader,
-	loadJiraAttachment: AttachmentLoader,
+	options: DocumentSchemeOptions,
 ): Promise<Response> {
 	if (request.method !== "GET") return new Response(null, { status: 405 });
-	if (url.hostname === CONFLUENCE_HOST) return serveAttachment(url, loadAttachment);
-	if (url.hostname === JIRA_HOST) return serveAttachment(url, loadJiraAttachment);
-	const path = urlPathToFilePath(url.pathname, process.platform === "win32");
-	if (path === null || !served(path)) {
-		return new Response(null, { status: 403 });
-	}
+	if (url.hostname === CONFLUENCE_HOST) return serveAttachment(url, options.loadAttachment);
+	if (url.hostname === JIRA_HOST) return serveAttachment(url, options.loadJiraAttachment);
+	const path = servedPath(url, process.platform === "win32", options.openShares());
+	if (path === null) return new Response(null, { status: 403 });
 	try {
 		return await net.fetch(pathToFileURL(path).href);
 	} catch {

@@ -31,6 +31,7 @@ import { withField } from "../shared/jira-layout.js";
 import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
+import type { ImageViewer } from "./image-viewer.js";
 import { createImageViewer } from "./image-viewer.js";
 import { commentView, personMark } from "./jira-comment-view.js";
 import { createComposer } from "./jira-composer.js";
@@ -183,7 +184,13 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 	const durationLong = (seconds: number): string =>
 		formatDurationLong(seconds, t.jiraDayUnit, t.jiraHourUnit, t.jiraMinuteUnit);
 	let commentFilter: CommentFilter = NO_COMMENT_FILTER;
-	const viewer = createImageViewer({ t, readOnly: () => true, editAlt: () => {} });
+	let imageViewer: ImageViewer | null = null;
+	const viewer: ImageViewer = {
+		open: (image, images) => {
+			imageViewer ??= createImageViewer({ t, readOnly: () => true, editAlt: () => {} });
+			imageViewer.open(image, images);
+		},
+	};
 
 	const current = (): View | undefined => history.at(-1);
 

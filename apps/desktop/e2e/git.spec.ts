@@ -29,10 +29,29 @@ test("knows a folder with .git, commits, pushes, branches and clones", async () 
 	git(work, "add", "--all");
 	git(work, "commit", "-m", "First");
 	git(work, "push", "-u", "origin", "main");
+	// A repository's own settings can name a program git runs as it looks: Kalem never lets it.
+	const marker = join(base, "fsmonitor-ran");
+	git(
+		work,
+		"config",
+		"core.fsmonitor",
+		`node -e "require('fs').writeFileSync(process.argv[1], '')" ${JSON.stringify(marker)}; false`,
+	);
 
 	const { app, page, errors } = await launch({ args: [doc], env: IDENTITY });
 	await showPane(page, "files");
 	const bar = page.locator(".files-git");
+	// Not trusted yet: git does not run there at all, until the user says so.
+	await expect(bar.locator(".files-git-state")).toHaveText("Git is off: not trusted yet");
+	await expect(page.locator(".statusbar .status-git")).toBeHidden();
+	await app.evaluate(({ dialog }) => {
+		const original = dialog.showMessageBox;
+		dialog.showMessageBox = (async () => {
+			dialog.showMessageBox = original;
+			return { response: 0, checkboxChecked: false };
+		}) as never;
+	});
+	await bar.getByRole("button", { name: "Trust…" }).click();
 	// The folder is a repository: its branch is shown without being asked.
 	await expect(bar.locator(".files-git-name")).toHaveText("main");
 	await expect(bar.locator(".files-git-state")).toHaveText("origin/main · Up to date");
@@ -102,6 +121,7 @@ test("knows a folder with .git, commits, pushes, branches and clones", async () 
 	await expect(page.locator(".files-title")).toHaveText("remote");
 	await expect(bar.locator(".files-git-name")).toHaveText("main");
 	expect(git(join(target, "remote"), "log", "-1", "--format=%s")).toBe("Theirs");
+	await expect(readFile(marker)).rejects.toThrow();
 
 	expect(errors).toEqual([]);
 	await app.close();
@@ -119,6 +139,7 @@ test("marks changed files, compares them, commits only some and discards others"
 
 	const { app, page, errors } = await launch({
 		env: { ...IDENTITY, KALEM_CLAUDE: join(base, "nothing-here") },
+		settings: { gitTrustedFolders: [base] },
 	});
 	await app.evaluate(({ dialog }, folder) => {
 		dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [folder] })) as never;
@@ -188,6 +209,7 @@ test("lets the assistant write the commit message from the chosen files' changes
 	const claude = await fakeClaude(base, "```\ndocs: say iki instead of bir\n```");
 	const { app, page, errors } = await launch({
 		env: { ...IDENTITY, KALEM_CLAUDE: claude.path },
+		settings: { gitTrustedFolders: [base] },
 	});
 	await app.evaluate(({ dialog }, folder) => {
 		dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [folder] })) as never;

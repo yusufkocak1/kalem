@@ -17,6 +17,16 @@ compression: maximum
 
 afterPack: scripts/after-pack.cjs
 
+# Electron's own switches, set in the packaged executable.
+electronFuses:
+  # Kalem runs its own executable as Node for the assistant's MCP bridge.
+  runAsNode: true
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  onlyLoadAppFromAsar: true
+  loadBrowserProcessSpecificV8Snapshot: false
+
 # Chromium ships ~50 MB of UI locales; the app only speaks these two.
 electronLanguages:
   - en-US

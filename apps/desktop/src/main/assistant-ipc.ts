@@ -8,7 +8,7 @@
 
 import type { ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
@@ -22,6 +22,8 @@ import {
 	claudeArgs,
 	claudeInputLine,
 	copilotArgs,
+	copilotConfigServers,
+	copilotIsolation,
 	copilotTakesMcp,
 	isPromptImageType,
 	MAX_PROMPT_IMAGE_DATA,
@@ -60,7 +62,7 @@ import type { ChatStore } from "./assistant-chats.js";
 import { ConfluenceLookups } from "./assistant-confluence.js";
 import { JiraLookups } from "./assistant-jira.js";
 import type { AssistantToolServer } from "./assistant-mcp.js";
-import { mcpToolName } from "./assistant-mcp.js";
+import { MCP_SERVER, mcpToolName } from "./assistant-mcp.js";
 import { PermissionGate } from "./assistant-permissions.js";
 import type { Connections, DocumentSnapshot, ToolContext, ToolResult } from "./assistant-tools.js";
 import { allTools, approver, RendererCalls, runTool, toolsFor } from "./assistant-tools.js";
@@ -307,6 +309,14 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 	const rendererCalls = new RendererCalls();
 	/** The Copilot CLIs that could not start Kalem's MCP server, by path. */
 	const noMcp = new Set<string>();
+	/** The flags that keep Copilot to the MCP servers Kalem chose. */
+	const copilotIsolationArgs = async (keep: readonly string[]): Promise<string[]> => {
+		const home = process.env.XDG_CONFIG_HOME ?? homedir();
+		const config = await readFile(join(home, ".copilot", "mcp-config.json"), "utf8").catch(
+			() => "",
+		);
+		return copilotIsolation(await clis.copilot.help(), copilotConfigServers(config), keep);
+	};
 	const copilotUsesMcp = async (): Promise<boolean> => {
 		const choice = ctx.store.settings.copilotTools;
 		if (choice === "block") return false;
@@ -814,6 +824,13 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			// An answer may wait for the user to allow a change: Claude Code waits for the tool as long.
 			const env = program === "claude" ? { MCP_TOOL_TIMEOUT: String(APPROVAL_WAIT) } : {};
 			let copilotSession = sessionId ?? randomUUID();
+			const isolation =
+				program === "copilot"
+					? await copilotIsolationArgs([
+							MCP_SERVER,
+							...(ownServers ? Object.keys(copilotServers(servers)) : []),
+						])
+					: [];
 			const argsFor = (conversation: string | null, jsonInput = false): string[] =>
 				program === "claude"
 					? claudeArgs({
@@ -830,6 +847,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 							sessionId: conversation ?? copilotSession,
 							model: connection.model,
 							folders: files.folders,
+							isolation,
 							...(way === "mcp" && mcpRun !== null ? { mcpConfig: mcpRun.copilot } : {}),
 						});
 			let stopped = false;
@@ -1257,7 +1275,12 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				const args =
 					program === "claude"
 						? claudeArgs({ sessionId: null, systemPrompt: system, model: connection.model })
-						: copilotArgs({ sessionId: randomUUID(), model: connection.model, folders: [] });
+						: copilotArgs({
+								sessionId: randomUUID(),
+								model: connection.model,
+								folders: [],
+								isolation: await copilotIsolationArgs([]),
+							});
 				const question = program === "claude" ? prompt : withInstructions(system, prompt);
 				const output = program === "claude" ? claudeOutput() : textOutput();
 				await runCli(

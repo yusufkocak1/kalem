@@ -34,6 +34,8 @@ export class ConfluenceStore {
 					username: typeof raw.username === "string" ? raw.username : "",
 					token: this.#box.decrypt(Buffer.from(raw.token, "base64")),
 				};
+				// Stored when encryption was weaker than now allowed: kept in memory only.
+				if (this.#box.encrypt("") === null) await rm(this.#file, { force: true });
 			}
 		} catch {
 			this.#memory = null;
