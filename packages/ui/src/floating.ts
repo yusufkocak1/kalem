@@ -99,6 +99,11 @@ export function position(
 	options: FloatingOptions = {},
 ): FloatingResult {
 	const view = box.ownerDocument.defaultView;
+	// Ölçmeden **önce** `fixed`: konumlanmamış blok kutu kapsayıcısının
+	// (çoğu zaman pencerenin) tüm genişliğini kaplıyor. O genişlikle ortalama
+	// kutuyu her seferinde sol kenara kırpıyordu — balon seçimin değil
+	// pencerenin solunda açılıyordu (keşif testi K-04).
+	box.style.position = "fixed";
 	const olcu = box.getBoundingClientRect();
 	const sonuc = computePosition(
 		anchor,

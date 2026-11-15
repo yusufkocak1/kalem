@@ -305,3 +305,54 @@ test("kapatınca görünüm yerinde kalıyor ve eşleşme seçili", async ({ pag
 	await page.keyboard.type("X");
 	expect(await page.evaluate(() => window.kalem.editor.getValue())).toContain("Aranan X burada.");
 });
+
+/**
+ * Keşif testi K-07: boyama her eşleşme için bütün belgeyi `querySelector`
+ * ile tarıyordu. 8000 bloklu bir belgede "Paragraf" yazmak tuş başına
+ * ~0,8 sn sürüyordu. Süre ölçmek CI'da kırılgan; ölçülen, kökün kaç kez
+ * tarandığı: eşleşme sayısıyla büyümemeli.
+ */
+test("çok eşleşmeli aramada boyama belgeyi eşleşme başına taramıyor", async ({ page }) => {
+	await page.evaluate(() => {
+		const parcalar: string[] = [];
+		for (let i = 0; i < 1500; i++) parcalar.push(`Paragraf ${i}: sipariş iptal edilebilir.`);
+		window.kalem.editor.setValue(`${parcalar.join("\n\n")}\n`);
+		window.kalem.editor.focus();
+	});
+	await page.keyboard.press("Control+f");
+	await page.evaluate(() => {
+		const kok = document.querySelector("#editor");
+		const asil = Element.prototype.querySelector;
+		const sayac = { n: 0 };
+		(window as unknown as { kokTaramasi: { n: number } }).kokTaramasi = sayac;
+		Element.prototype.querySelector = function (this: Element, secici: string) {
+			if (this === kok) sayac.n++;
+			return asil.call(this, secici);
+		} as typeof Element.prototype.querySelector;
+	});
+	await bulKutusu(page).fill("Paragraf");
+	await expect(sayac(page)).toHaveText("1 / 1500");
+	const taramalar = await page.evaluate(
+		() => (window as unknown as { kokTaramasi: { n: number } }).kokTaramasi.n,
+	);
+	expect(taramalar).toBeLessThan(50);
+});
+
+/**
+ * Keşif testi K-11: Tab bul kutusundan ↑ düğmesine gidiyordu; değiştirme
+ * metni kayboluyor, "Tümünü değiştir" eşleşmeleri boşlukla değiştiriyordu.
+ */
+test("Tab bul ve değiştir kutuları arasında gidiyor", async ({ page }) => {
+	await yaz(page, "istanbul ve İSTANBUL\n");
+	await page.keyboard.press("Control+h");
+	await bulKutusu(page).fill("istanbul");
+	await bulKutusu(page).press("Tab");
+	await expect(degistirKutusu(page)).toBeFocused();
+	await page.keyboard.type("Ankara");
+	await panel(page).getByRole("button", { name: "Tümünü değiştir" }).click();
+	await expect
+		.poll(() => page.evaluate(() => window.kalem.editor.getValue()))
+		.toBe("Ankara ve Ankara\n");
+	await degistirKutusu(page).press("Shift+Tab");
+	await expect(bulKutusu(page)).toBeFocused();
+});

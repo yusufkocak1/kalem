@@ -145,3 +145,21 @@ describe("footnotes", () => {
 		expect(notes).toMatch(/<w:b\/>.*not/s);
 	});
 });
+
+/**
+ * Keşif testi K-12: Kalem → Word → Kalem lost quotes and code blocks; they
+ * came back as plain paragraphs, the code a paragraph a line.
+ */
+describe("a document exported to Word and imported again", () => {
+	it("keeps its quotes and code blocks", async () => {
+		const { readWord } = await import("./word.js");
+		const docx = await markdownToDocx(
+			'# Başlık\n\n> Önemli: taslak.\n\n```json\n{"a": 1}\n[2]\n```\n\nSon.\n',
+			options(),
+		);
+		const { html } = await readWord(docx);
+		expect(html).toContain("<blockquote><p>Önemli: taslak.</p></blockquote>");
+		expect(html).toContain('<pre>{"a": 1}\n[2]</pre>');
+		expect(html).toContain("<p>Son.</p>");
+	});
+});

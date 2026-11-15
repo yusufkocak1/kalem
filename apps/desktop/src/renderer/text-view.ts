@@ -160,7 +160,7 @@ export function createTextView(options: TextViewOptions): TextView {
 			if (result.reason === "unsupported") options.notify(t.textFormatUnsupported, "warning");
 			else
 				options.notify(
-					format(t.formatInvalid, result.language.toLocaleUpperCase("en"), result.message),
+					format(t.formatInvalidFile, result.language.toLocaleUpperCase("en"), result.message),
 					"error",
 				);
 			return;

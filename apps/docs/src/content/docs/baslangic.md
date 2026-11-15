@@ -17,8 +17,8 @@ indirmezsiniz.
 |---|---|---|
 | Markdown'ı **göstermek** (salt okunur) | `@kalem-editor/viewer` | 2,9 kB |
 | Markdown'ı **ayrıştırmak** (sunucuda, betikte) | `@kalem-editor/core` | 13,4 kB |
-| **Düzenlemek**, kendi arayüzünüzle | `@kalem-editor/editor` | 32,4 kB |
-| **Word benzeri** tam deneyim | `@kalem-editor/editor` + `@kalem-editor/ui` | 41,1 kB |
+| **Düzenlemek**, kendi arayüzünüzle | `@kalem-editor/editor` | 33,1 kB |
+| **Word benzeri** tam deneyim | `@kalem-editor/editor` + `@kalem-editor/ui` | 42,0 kB |
 
 Çerçeve sarmalayıcıları bunların üstüne birkaç yüz bayt ekliyor:
 `@kalem-editor/react` 907 B, `@kalem-editor/vue` 686 B, `@kalem-editor/wc` 1,99 kB.

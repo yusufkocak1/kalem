@@ -58,6 +58,9 @@ export interface DocxOptions {
 const TWIPS_PER_MM = 56.7;
 const MONOSPACE = "Consolas";
 const CODE_FILL = "F3F3F3";
+/** Paragraph styles Word knows by these names; Kalem's import maps them back. */
+const QUOTE_STYLE = "Quote";
+const CODE_STYLE = "SourceCode";
 const QUOTE_BORDER = "C8C8C8";
 /** Word indents each list level by this much (twips). */
 const LEVEL_INDENT = 360;
@@ -245,6 +248,9 @@ class Converter {
 		const quoteIndent = ctx.quote * 360;
 		const left = ctx.indent + quoteIndent;
 		return {
+			// A quote's paragraphs carry Word's own Quote style: imported again,
+			// they are a quote (word.ts maps it), not plain paragraphs.
+			...(ctx.quote > 0 ? { style: QUOTE_STYLE } : {}),
 			...(left > 0 ? { indent: { left } } : {}),
 			...(ctx.quote > 0
 				? {
@@ -303,6 +309,8 @@ class Converter {
 					(line, i) =>
 						new Paragraph({
 							...this.#paragraphOptions(ctx),
+							// Imported again, the lines are one code block (word.ts).
+							style: CODE_STYLE,
 							shading: { type: ShadingType.CLEAR, color: "auto", fill: CODE_FILL },
 							spacing: { before: 0, after: i === lines.length - 1 ? 160 : 0 },
 							children: [new TextRun({ text: line, font: MONOSPACE, size: 19 })],
@@ -460,6 +468,12 @@ export async function markdownToDocx(markdown: string, options: DocxOptions): Pr
 		title: options.title,
 		creator: "Kalem",
 		footnotes,
+		styles: {
+			paragraphStyles: [
+				{ id: QUOTE_STYLE, name: "Quote", basedOn: "Normal", next: "Normal", quickFormat: true },
+				{ id: CODE_STYLE, name: "Source Code", basedOn: "Normal", next: "Normal" },
+			],
+		},
 		numbering: {
 			config: [
 				{ reference: "bullet", levels: numberingLevels(LevelFormat.BULLET, 1) },

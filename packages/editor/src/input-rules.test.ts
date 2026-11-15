@@ -109,6 +109,12 @@ describe("satır içi kuralları", () => {
 		expect(md(applyInlineRule(metinBelgesi("`abc`"), imlec(5)))).toBe("`abc`\n");
 	});
 
+	/** Kullanıcı `_` yazdıysa `_` kalıyor; `*`e çevrilmiyor. */
+	it("alt çizgiyle yazılan italik ve kalın alt çizgiyle kalıyor", () => {
+		expect(md(applyInlineRule(metinBelgesi("_abc_"), imlec(5)))).toBe("_abc_\n");
+		expect(md(applyInlineRule(metinBelgesi("__abc__"), imlec(7)))).toBe("__abc__\n");
+	});
+
 	it("metnin ortasında da çalışıyor", () => {
 		expect(md(applyInlineRule(metinBelgesi("bir **iki**"), imlec(11)))).toBe("bir **iki**\n");
 	});

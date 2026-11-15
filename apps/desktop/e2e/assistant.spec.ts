@@ -59,7 +59,9 @@ test("asks the local Claude about the document and inserts its reply with the di
 	await page.locator('[data-command="save"]').click();
 	await expect(page.locator(".save-status")).toHaveText("Saved");
 	const saved = await readFile(doc, "utf8");
-	expect(saved).toContain("İşte akış:");
+	// A reply of several blocks goes in as blocks of its own, not glued to the
+	// caret's sentence ("Girişİşte akış:", keşif testi K-06).
+	expect(saved).toContain("# Notlar\n\nGiriş\n\nİşte akış:\n\n");
 	expect(saved).toContain("![Onay akışı](notlar.assets/Onay-ak%C4%B1%C5%9F%C4%B1.diagram.png)");
 	expect(saved).toContain("Bitti.");
 	expect(saved).not.toContain("kalem-diagram");
@@ -609,6 +611,9 @@ if (args.includes("--version")) {
 	console.log("9.9.9-copilot");
 	process.exit(0);
 }
+// Kalem asks a Copilot CLI for the account's models as a server (\`--headless\`);
+// this one, like an older CLI, has no such mode and quits.
+if (args.includes("--headless")) process.exit(1);
 if (args.includes("--help")) {
 	console.log('Usage: copilot [options]\\n\\nOptions:\\n  --model <model>  Set the AI model to use (choices: "claude-sonnet-4.5", "gpt-5", "gpt-5-mini")\\n  -s, --silent  Output only the agent response');
 	process.exit(0);
@@ -788,6 +793,40 @@ test("resizes the assistant by dragging its edge, and keeps the width", async ()
 	await second.app.close();
 });
 
+/**
+ * The account's models come from Claude Code itself, which takes seconds to
+ * start. The picker waited for them with an empty list, for half a minute
+ * when the CLI did not answer (keşif testi K-08); now it shows the aliases
+ * and the help's models at once and the account's list once it comes.
+ */
+test("the model picker lists the aliases at once and the account's models once Claude Code says them", async () => {
+	const folder = await tempDir("assistant-account-models");
+	const claude = await fakeClaude(folder, REPLY, [], {
+		accountModels: [
+			{ value: "opus", displayName: "Opus 5.5" },
+			{ value: "claude-fable-5-2", displayName: "Fable 5.2" },
+		],
+		accountDelay: 3000,
+	});
+	const { app, page, errors } = await launch({
+		settings: { assistant: true },
+		env: { KALEM_CLAUDE: claude.path },
+	});
+	const options = page.locator(".assistant .assistant-model option");
+	await expect(options).toHaveText(
+		["Default model", "opus", "sonnet", "haiku", "Sonnet 4.5", "Other model…"],
+		{ timeout: 2500 },
+	);
+	await expect(options).toHaveText([
+		"Default model",
+		"opus · Opus 5.5",
+		"Fable 5.2",
+		"Other model…",
+	]);
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
 test("picks the model from the panel and keeps the chat going; earlier chats are listed when a new one starts", async () => {
 	const services = await fakeServices();
 	const folder = await tempDir("assistant-models");
@@ -947,6 +986,11 @@ test("runs commands typed after a slash: the assistant's, ready questions and th
 		"/yokboyle diye bir komut yok",
 	);
 	expect(await claude.calls()).toHaveLength(1);
+	// Claude Code may know it (a plugin's command Kalem did not find): Enter again sends it.
+	await expect(input).toHaveValue("/yokboyle");
+	await input.press("Enter");
+	await expect.poll(async () => (await claude.calls()).length).toBe(2);
+	expect((await claude.calls())[1]?.prompt).toContain("/yokboyle");
 	expect(errors).toEqual([]);
 	await app.close();
 });

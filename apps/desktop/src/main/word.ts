@@ -23,6 +23,8 @@ const STYLE_MAP = [
 	"p[style-name='Subtitle'] => p:fresh",
 	"p[style-name='Quote'] => blockquote > p:fresh",
 	"p[style-name='Intense Quote'] => blockquote > p:fresh",
+	// Kalem's own export writes code blocks in this style, a line a paragraph.
+	"p[style-name='Source Code'] => pre:separator('\\n')",
 	"r[style-name='Strong'] => strong",
 	"r[style-name='Emphasis'] => em",
 	"r[style-name='Intense Emphasis'] => strong > em",

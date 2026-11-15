@@ -60,6 +60,18 @@ describe("temel dönüşüm", () => {
 		]);
 	});
 
+	/** Düzenlenen satırdaki `_a_` `*a*` olarak kaydediliyordu. */
+	it("alt çizgiyle yazılmış kalın ve italik işaretini koruyor", () => {
+		const p = el("P", [
+			el("EM", [metin("a")], { "data-kalem-marker": "_" }),
+			el("STRONG", [metin("b")], { "data-kalem-marker": "_" }),
+		]);
+		expect(readInline(p)).toEqual([
+			{ type: "emphasis", children: [{ type: "text", value: "a" }], syntax: { marker: "_" } },
+			{ type: "strong", children: [{ type: "text", value: "b" }], syntax: { marker: "_" } },
+		]);
+	});
+
 	it("tarayıcının eski etiketleri de tanınıyor", () => {
 		// `document.execCommand` ve bazı yapıştırma kaynakları hâlâ bunları üretir.
 		const p = el("P", [el("B", [metin("a")]), el("I", [metin("b")]), el("S", [metin("c")])]);

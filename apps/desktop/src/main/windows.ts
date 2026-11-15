@@ -31,7 +31,7 @@ import {
 	TEXT_EXTENSIONS,
 } from "../shared/paths.js";
 import type { DraftStore } from "./drafts.js";
-import { modifiedTime, readDocument } from "./files.js";
+import { FileError, modifiedTime, readDocument } from "./files.js";
 import type { PackageStore } from "./package.js";
 import { pathKey } from "./path-key.js";
 import type { SessionStore, SessionTabEntry, SessionWindow } from "./session-store.js";
@@ -108,6 +108,13 @@ export { pathKey } from "./path-key.js";
 
 export function errorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
+}
+
+/** Why a document could not be opened, in the user's words where it is a usual reason. */
+function openErrorDetail(error: unknown, t: Strings): string {
+	if (error instanceof FileError && error.code === "not-text") return t.openNotText;
+	if ((error as { code?: unknown } | null)?.code === "ENOENT") return t.openNotFound;
+	return errorMessage(error);
 }
 
 const DARK_BACKGROUND = "#17161b";
@@ -857,11 +864,8 @@ export class WindowManager {
 			this.#addRecentFile(full);
 		} catch (error) {
 			this.#removeRecentFile(full);
-			this.#showError(
-				preferred,
-				this.#options.strings().openFailed,
-				`${full}\n\n${errorMessage(error)}`,
-			);
+			const t = this.#options.strings();
+			this.#showError(preferred, t.openFailed, `${full}\n\n${openErrorDetail(error, t)}`);
 		}
 	}
 

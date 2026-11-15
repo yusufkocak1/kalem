@@ -109,6 +109,43 @@ test.describe("konumlandırma", () => {
 		await expect(page.locator(BALON)).toHaveAttribute("data-placement", "top");
 	});
 
+	/**
+	 * Keşif testi K-04: kutu `fixed` olmadan ölçülüyor, pencere genişliğinde
+	 * sanılıp sol kenara kırpılıyordu. Dikey konumu ölçen test bunu görmedi.
+	 */
+	test("seçimin ortasına hizalanıyor, ilk açılışta da", async ({ page }) => {
+		await page.evaluate(() =>
+			window.kalem.editor.setValue("solda birkaç sözcük ve en sağda duran hedefsözcük\n"),
+		);
+		// Sağdaki sözcüğün üstüne çift tıklanıyor: gerçek kullanıcının yaptığı.
+		const hedef = await page.evaluate(() => {
+			const metin = document.querySelector("#editor > p")?.firstChild;
+			if (metin === null || metin === undefined) return null;
+			const range = document.createRange();
+			const bas = (metin.textContent ?? "").indexOf("hedef");
+			range.setStart(metin, bas);
+			range.setEnd(metin, bas + 5);
+			const r = range.getBoundingClientRect();
+			return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+		});
+		if (hedef === null) throw new Error("ölçülemedi");
+		await page.mouse.dblclick(hedef.x, hedef.y);
+		await expect(page.locator(BALON)).toBeVisible();
+		const balon = await page.locator(BALON).boundingBox();
+		const secim = await page.evaluate(() => {
+			const r = window.getSelection()?.getRangeAt(0).getClientRects().item(0);
+			return r === null || r === undefined ? null : r.left + r.width / 2;
+		});
+		const genislik = await page.evaluate(() => window.innerWidth);
+		if (balon === null || secim === null) throw new Error("ölçülemedi");
+		const beklenen = Math.min(
+			Math.max(secim - balon.width / 2, 8),
+			Math.max(8, genislik - balon.width - 8),
+		);
+		expect(Math.abs(balon.x - beklenen)).toBeLessThanOrEqual(2);
+		expect(balon.x).toBeGreaterThan(8);
+	});
+
 	test("görünür alanın dışına taşmıyor", async ({ page }) => {
 		await secimYap(page);
 		await expect(page.locator(BALON)).toBeVisible();
@@ -588,6 +625,39 @@ test.describe("blok tutamacı", () => {
 		const kutu = await bloklar.nth(1).boundingBox();
 		await page.mouse.move(kutu!.x + 10, kutu!.y + kutu!.height / 2);
 		await expect(page.locator(TUTAMAC)).toBeVisible();
+	});
+
+	/**
+	 * Keşif testi K-13: tutamaç `fixed` konumlu ve yalnızca üzerine gelinince
+	 * yerleşiyordu. Belge ya da düzen değişince eski yerinde asılı kalıyordu.
+	 */
+	test("bloğu silinince gizleniyor, düzen kayınca bloğunu izliyor", async ({ page }) => {
+		const bloklar = await besParagraf(page);
+		const kutu = await bloklar.nth(1).boundingBox();
+		await page.mouse.move(kutu!.x + kutu!.width / 2, kutu!.y + kutu!.height / 2);
+		await expect(page.locator(TUTAMAC)).toBeVisible();
+		const once = await page.locator(TUTAMAC).boundingBox();
+
+		// The page is laid out again under the pointer (focus mode, full width):
+		// the handle stays at the start of its block.
+		await page.evaluate(() => {
+			(document.querySelector("#editor") as HTMLElement).style.paddingInlineStart = "80px";
+		});
+		await expect
+			.poll(async () => {
+				const blok = await bloklar.nth(1).boundingBox();
+				const tutamac = await page.locator(TUTAMAC).boundingBox();
+				return blok === null || tutamac === null ? null : blok.x - (tutamac.x + tutamac.width);
+			})
+			.toBeGreaterThanOrEqual(0);
+		const sonra = await page.locator(TUTAMAC).boundingBox();
+		const kayma = (await bloklar.nth(1).boundingBox())!.x - kutu!.x;
+		expect(kayma).toBeGreaterThan(20);
+		expect(Math.abs(sonra!.x - once!.x - kayma)).toBeLessThanOrEqual(1);
+
+		// The block is gone: so is the handle.
+		await page.evaluate(() => window.kalem.editor.setValue("tek\n"));
+		await expect(page.locator(TUTAMAC)).toBeHidden();
 	});
 
 	/** Tutamaç bloğun **solunda** durmalı; metnin üstünü kapatamaz. */

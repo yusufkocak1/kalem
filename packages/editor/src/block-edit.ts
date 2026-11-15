@@ -16,7 +16,7 @@
  * sabitlenebiliyor; tarayıcı testleri yalnızca tuşun buraya doğru
  * bağlandığını doğruluyor.
  */
-import type { Block, Inline, ListItem, NodeId, Paragraph, Root } from "@kalem-editor/core";
+import type { Block, Inline, List, ListItem, NodeId, Paragraph, Root } from "@kalem-editor/core";
 import { isFrontmatter, nodeAtPath, replaceAt } from "@kalem-editor/core";
 import { emptyParagraph } from "@kalem-editor/core/commands";
 import { newId } from "./ids.js";
@@ -138,6 +138,52 @@ function withBlocks(doc: Root, children: Root["children"]): Root {
 	return { ...doc, children };
 }
 
+/**
+ * İmlecin içinde bulunduğu liste maddesi — hangi derinlikte olursa olsun.
+ *
+ * Liste bloğundaki yol madde ve çocuk indekslerinin sırayla dizilişi:
+ * `[madde, çocuk, madde, çocuk, …, madde, paragraf]`. Üst düzey maddede
+ * yol iki elemanlı, bir seviye içeride dört elemanlı. Enter, Tab ve
+ * Backspace yalnızca iki ve dört elemanlı yolları tanıdığı için daha
+ * derindeki maddelerde (ve iç maddede Enter'da) tuş sessizce yutuluyordu.
+ */
+interface MaddeYeri {
+	/** Maddenin listesinin liste bloğu içindeki yolu; üst düzey listede `[]`. */
+	readonly listePath: readonly number[];
+	readonly liste: List;
+	readonly itemIndex: number;
+	readonly madde: ListItem;
+	/** İmlecin bulunduğu paragrafın madde içindeki indeksi. */
+	readonly cocukIndex: number;
+}
+
+function maddeYeri(doc: Root, caret: Caret): MaddeYeri | null {
+	const blok = doc.children[caret.blockIndex];
+	const yol = caret.path;
+	if (blok?.type !== "list" || yol.length < 2 || yol.length % 2 !== 0) return null;
+	let liste: List = blok;
+	for (let k = 0; k < yol.length - 2; k += 2) {
+		const ic = liste.children[yol[k] as number]?.children[yol[k + 1] as number];
+		if (ic?.type !== "list") return null;
+		liste = ic;
+	}
+	const itemIndex = yol[yol.length - 2] as number;
+	const cocukIndex = yol[yol.length - 1] as number;
+	const madde = liste.children[itemIndex];
+	if (madde?.children[cocukIndex]?.type !== "paragraph") return null;
+	return { listePath: yol.slice(0, -2), liste, itemIndex, madde, cocukIndex };
+}
+
+/** Liste bloğundaki `listePath` yolundaki listeyi değiştirir. */
+function listeyiDegistir(
+	doc: Root,
+	blockIndex: number,
+	listePath: readonly number[],
+	liste: List,
+): Root {
+	return replaceAt(doc, [blockIndex, ...listePath], liste);
+}
+
 // ---------------------------------------------------------------------------
 // Enter — bloğu böl
 // ---------------------------------------------------------------------------
@@ -152,8 +198,9 @@ function withBlocks(doc: Root, children: Root["children"]): Root {
  *   ikinci bir başlık değil, o başlığın altına metin yazmak istiyor.
  * - **Alıntı içi** → alıntının içinde yeni paragraf. Enter alıntıdan
  *   çıkarmıyor; çıkarsaydı çok paragraflı alıntı yazmak imkânsız olurdu.
- * - **Liste maddesi** → yeni madde. Madde **boşsa** listeden çıkılıyor;
- *   bu, her editörde listeyi bitirmenin yolu.
+ * - **Liste maddesi** → yeni madde, hangi derinlikte olursa olsun. Madde
+ *   **boşsa** üst düzeyde listeden çıkılıyor, iç listede bir seviye
+ *   dışarı alınıyor; bu, her editörde listeyi bitirmenin yolu.
  */
 export function splitAtCaret(doc: Root, caret: Caret): EditResult | null {
 	const icerik = contentAt(doc, caret);
@@ -166,10 +213,16 @@ export function splitAtCaret(doc: Root, caret: Caret): EditResult | null {
 	if (blok === undefined) return null;
 
 	// --- Liste maddesi ---
-	if (blok.type === "list" && caret.path.length === 2) {
-		const itemIndex = caret.path[0] as number;
-		if (uzunluk === 0) return exitList(doc, caret, itemIndex);
-		return splitListItem(doc, caret, itemIndex, once, sonra);
+	const yer = maddeYeri(doc, caret);
+	if (yer !== null) {
+		// Altında iç listesi olan boş madde çıkarılmıyor: çıkarmak iç listeyi
+		// de silerdi. Bölünüyor; iç liste yeni maddenin altına geçiyor.
+		if (uzunluk === 0 && yer.madde.children.length === 1) {
+			return yer.listePath.length === 0
+				? exitList(doc, caret, yer.itemIndex)
+				: liftItem(doc, caret);
+		}
+		return splitListItem(doc, caret, yer, once, sonra);
 	}
 
 	// --- Tablo hücresi ---
@@ -201,33 +254,96 @@ export function splitAtCaret(doc: Root, caret: Caret): EditResult | null {
 	};
 }
 
+/**
+ * Maddeyi imleçte ikiye böler.
+ *
+ * İmleçten sonraki her şey yeni maddeye geçiyor: paragrafın kalanı ve
+ * maddenin altındaki iç liste. Eskiden yalnızca paragraf bölünüyor, iç
+ * liste sessizce siliniyordu — üst maddenin sonunda Enter'a basmak alt
+ * maddeleri yok ediyordu.
+ */
 function splitListItem(
 	doc: Root,
 	caret: Caret,
-	itemIndex: number,
+	yer: MaddeYeri,
 	once: readonly Inline[],
 	sonra: readonly Inline[],
 ): EditResult | null {
-	const blok = doc.children[caret.blockIndex];
-	if (blok?.type !== "list") return null;
-	const madde = blok.children[itemIndex];
-	if (madde === undefined) return null;
-
-	const ilk: ListItem = { ...madde, children: [paragraf(once)] };
+	const { madde, cocukIndex, itemIndex, liste, listePath } = yer;
+	const ilk: ListItem = {
+		...madde,
+		children: [...madde.children.slice(0, cocukIndex), paragraf(once)],
+	};
 	const ikinci: ListItem = {
 		type: "listItem",
 		// Görev listesinde yeni madde de görev olmalı ama işaretsiz: yeni bir
 		// iş eklendi, yapılmış sayılamaz.
 		checked: madde.checked === null ? null : false,
 		spread: madde.spread,
-		children: [paragraf(sonra)],
+		children: [paragraf(sonra), ...madde.children.slice(cocukIndex + 1)],
 	};
-	const maddeler = [...blok.children];
+	const maddeler = [...liste.children];
 	maddeler.splice(itemIndex, 1, ilk, ikinci);
 
 	return {
-		doc: replaceAt(doc, [caret.blockIndex], { ...blok, children: maddeler }),
-		caret: { blockIndex: caret.blockIndex, path: [itemIndex + 1, 0], offset: 0 },
+		doc: listeyiDegistir(doc, caret.blockIndex, listePath, { ...liste, children: maddeler }),
+		caret: { blockIndex: caret.blockIndex, path: [...listePath, itemIndex + 1, 0], offset: 0 },
+	};
+}
+
+/**
+ * İç listedeki maddeyi bir seviye dışarı alır (Shift+Tab, boş iç maddede
+ * Enter, iç maddenin başında Backspace).
+ *
+ * Madde, üst maddesinin hemen arkasına geçiyor. Kendisinden **sonraki**
+ * kardeşleri onun altına taşınıyor: yerlerinde bırakılsalar üst maddenin
+ * altında kalır ve ekranda dışarı alınan maddenin **üstüne** çıkarlardı —
+ * okunan sıra değişirdi.
+ */
+function liftItem(doc: Root, caret: Caret): EditResult | null {
+	const yer = maddeYeri(doc, caret);
+	if (yer === null || yer.listePath.length < 2) return null;
+	const disListePath = yer.listePath.slice(0, -2);
+	const disIndex = yer.listePath[yer.listePath.length - 2] as number;
+	const icListeIndex = yer.listePath[yer.listePath.length - 1] as number;
+	const disListe = nodeAt(doc, caret.blockIndex, disListePath) as List | undefined;
+	const dis = disListe?.children[disIndex];
+	if (disListe?.type !== "list" || dis === undefined) return null;
+
+	const onceki = yer.liste.children.slice(0, yer.itemIndex);
+	const sonraki = yer.liste.children.slice(yer.itemIndex + 1);
+	const yeniDis: ListItem = {
+		...dis,
+		children:
+			onceki.length > 0
+				? dis.children.map((c, i) => (i === icListeIndex ? { ...yer.liste, children: onceki } : c))
+				: dis.children.filter((_, i) => i !== icListeIndex),
+	};
+
+	let madde = yer.madde;
+	if (sonraki.length > 0) {
+		const son = madde.children[madde.children.length - 1];
+		madde = {
+			...madde,
+			children:
+				son?.type === "list"
+					? [...madde.children.slice(0, -1), { ...son, children: [...son.children, ...sonraki] }]
+					: [
+							...madde.children,
+							{ ...yer.liste, start: yer.liste.ordered ? 1 : null, children: sonraki },
+						],
+		};
+	}
+
+	const maddeler = [...disListe.children];
+	maddeler.splice(disIndex, 1, yeniDis, madde);
+	return {
+		doc: listeyiDegistir(doc, caret.blockIndex, disListePath, { ...disListe, children: maddeler }),
+		caret: {
+			blockIndex: caret.blockIndex,
+			path: [...disListePath, disIndex + 1, yer.cocukIndex],
+			offset: caret.offset,
+		},
 	};
 }
 
@@ -299,6 +415,8 @@ export function mergeWithPrevious(doc: Root, caret: Caret): EditResult | null {
 		const itemIndex = caret.path[0] as number;
 		return itemIndex === 0 ? liftFirstItem(doc, caret) : mergeListItems(doc, caret, itemIndex);
 	}
+	// İç maddenin başında Backspace girintiyi azaltıyor (Word, Google Docs).
+	if (caret.path.length >= 4) return liftItem(doc, caret);
 	if (caret.path.length !== 0) return null;
 
 	const index = caret.blockIndex;
@@ -404,18 +522,18 @@ function liftFirstItem(doc: Root, caret: Caret): EditResult | null {
  * Liste maddesini bir seviye içeri alır.
  *
  * İlk madde girintilenemez: girintili bir maddenin üstünde bir ana madde
- * olmak zorunda, yoksa Markdown'da karşılığı yok.
+ * olmak zorunda, yoksa Markdown'da karşılığı yok. İç listelerde de
+ * çalışıyor; madde her basışta bir seviye daha içeri giriyor.
  */
 export function indentItem(doc: Root, caret: Caret): EditResult | null {
-	if (caret.path.length !== 2) return null;
-	const itemIndex = caret.path[0] as number;
+	const yer = maddeYeri(doc, caret);
+	if (yer === null) return null;
+	const { itemIndex, liste, listePath } = yer;
 	if (itemIndex === 0) return null;
 
-	const blok = doc.children[caret.blockIndex];
-	if (blok?.type !== "list") return null;
-	const onceki = blok.children[itemIndex - 1];
-	const simdiki = blok.children[itemIndex];
-	if (onceki === undefined || simdiki === undefined) return null;
+	const onceki = liste.children[itemIndex - 1];
+	const simdiki = yer.madde;
+	if (onceki === undefined) return null;
 
 	// Önceki maddenin sonunda zaten iç liste varsa ona ekleniyor; yoksa yeni
 	// bir iç liste açılıyor. İki ayrı iç liste üretmek, aynı görünen ama
@@ -426,7 +544,7 @@ export function indentItem(doc: Root, caret: Caret): EditResult | null {
 			? { ...son, children: [...son.children, simdiki] }
 			: {
 					type: "list" as const,
-					ordered: blok.ordered,
+					ordered: liste.ordered,
 					start: null,
 					spread: false,
 					children: [simdiki],
@@ -439,55 +557,26 @@ export function indentItem(doc: Root, caret: Caret): EditResult | null {
 				? [...onceki.children.slice(0, -1), icListe]
 				: [...onceki.children, icListe],
 	};
-	const maddeler = [...blok.children];
+	const maddeler = [...liste.children];
 	maddeler.splice(itemIndex - 1, 2, yeniOnceki);
 
 	const icIndex = icListe.children.length - 1;
 	return {
-		doc: replaceAt(doc, [caret.blockIndex], { ...blok, children: maddeler }),
+		doc: listeyiDegistir(doc, caret.blockIndex, listePath, { ...liste, children: maddeler }),
 		caret: {
 			blockIndex: caret.blockIndex,
-			path: [itemIndex - 1, yeniOnceki.children.length - 1, icIndex, 0],
+			path: [...listePath, itemIndex - 1, yeniOnceki.children.length - 1, icIndex, yer.cocukIndex],
 			offset: caret.offset,
 		},
 	};
 }
 
 /**
- * İç listedeki maddeyi bir seviye dışarı alır.
- *
- * Yalnızca tek seviye içerideki maddeler destekleniyor; daha derin
- * girintiler için aynı işlem tekrarlanıyor. Rastgele derinlikte yeniden
- * yapılandırma, `lift`'in çekirdekteki sınırlarıyla (F1-11) uyumlu
- * tutuldu.
+ * İç listedeki maddeyi bir seviye dışarı alır (Shift+Tab), hangi
+ * derinlikte olursa olsun. Üst düzey maddede bir şey yapmıyor.
  */
 export function outdentItem(doc: Root, caret: Caret): EditResult | null {
-	if (caret.path.length !== 4) return null;
-	const [disIndex, cocukIndex, icIndex] = caret.path as [number, number, number, number];
-
-	const blok = doc.children[caret.blockIndex];
-	if (blok?.type !== "list") return null;
-	const dis = blok.children[disIndex];
-	const icListe = dis?.children[cocukIndex];
-	if (dis === undefined || icListe?.type !== "list") return null;
-	const madde = icListe.children[icIndex];
-	if (madde === undefined) return null;
-
-	const kalan = icListe.children.filter((_, i) => i !== icIndex);
-	const yeniDis: ListItem = {
-		...dis,
-		children:
-			kalan.length > 0
-				? dis.children.map((c, i) => (i === cocukIndex ? { ...icListe, children: kalan } : c))
-				: dis.children.filter((_, i) => i !== cocukIndex),
-	};
-
-	const maddeler = [...blok.children];
-	maddeler.splice(disIndex, 1, yeniDis, madde);
-	return {
-		doc: replaceAt(doc, [caret.blockIndex], { ...blok, children: maddeler }),
-		caret: { blockIndex: caret.blockIndex, path: [disIndex + 1, 0], offset: caret.offset },
-	};
+	return liftItem(doc, caret);
 }
 
 // ---------------------------------------------------------------------------
@@ -573,17 +662,37 @@ export function normalizeDocument(doc: Root): Root {
 	let degisti = false;
 	const children = doc.children.map((blok) => {
 		if (blok.type !== "list") return blok;
-		let listeDegisti = false;
-		const maddeler = blok.children.map((madde) => {
-			if (madde.children.length > 0) return madde;
-			listeDegisti = true;
-			return { ...madde, children: [emptyParagraph()] };
-		});
-		if (!listeDegisti) return blok;
-		degisti = true;
-		return { ...blok, children: maddeler };
+		const yeni = bosMaddeleriDoldur(blok);
+		if (yeni !== blok) degisti = true;
+		return yeni;
 	});
 	return degisti ? withBlocks(doc, children as Root["children"]) : doc;
+}
+
+/**
+ * Listedeki — iç listeler dâhil — çocuksuz maddelere boş paragraf koyar.
+ * Değişiklik yoksa aynı nesneyi döndürür; değişmeyen bloğun DOM'u yeniden
+ * kurulmasın diye.
+ */
+function bosMaddeleriDoldur(liste: List): List {
+	let degisti = false;
+	const maddeler = liste.children.map((madde): ListItem => {
+		if (madde.children.length === 0) {
+			degisti = true;
+			return { ...madde, children: [emptyParagraph()] };
+		}
+		let icDegisti = false;
+		const cocuklar = madde.children.map((cocuk) => {
+			if (cocuk.type !== "list") return cocuk;
+			const yeni = bosMaddeleriDoldur(cocuk);
+			if (yeni !== cocuk) icDegisti = true;
+			return yeni;
+		});
+		if (!icDegisti) return madde;
+		degisti = true;
+		return { ...madde, children: cocuklar };
+	});
+	return degisti ? { ...liste, children: maddeler } : liste;
 }
 
 /** Kimlik atanmış boş paragraf — dışarıdan da gerekiyor. */

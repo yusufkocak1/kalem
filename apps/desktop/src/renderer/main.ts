@@ -995,8 +995,12 @@ function fitSidePanes(): void {
 	const left = docks.elements.left;
 	const right = docks.elements.right;
 	const stripes = 2 * 34;
+	// Its real width: counted as a narrow side pane, the page was left far less
+	// than PAGE_MIN beside it in a small window.
 	const assistantWidth =
-		!assistant.element.hidden && settings.assistantPlace !== "bottom" ? SIDE_PANE_MIN : 0;
+		!assistant.element.hidden && settings.assistantPlace !== "bottom"
+			? Math.max(SIDE_PANE_MIN, assistant.element.getBoundingClientRect().width)
+			: 0;
 	const room = window.innerWidth - stripes - assistantWidth - PAGE_MIN;
 	const squeeze: string[] = [];
 	const panes = [shown(left) ? "left" : null, shown(right) ? "right" : null].filter(

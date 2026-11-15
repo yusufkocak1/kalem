@@ -23,11 +23,12 @@ import {
 	safeExtension,
 	uniqueFileName,
 } from "../shared/images.js";
+import { looksBinary } from "./text-files.js";
 
 export const MAX_DOCUMENT_SIZE = 32 * 1024 * 1024;
 export const MAX_IMAGE_SIZE = 64 * 1024 * 1024;
 
-type FileErrorCode = "too-large" | "image-type" | "not-a-file";
+type FileErrorCode = "too-large" | "image-type" | "not-a-file" | "not-text";
 
 export class FileError extends Error {
 	readonly code: FileErrorCode;
@@ -47,7 +48,11 @@ export async function readDocument(
 	if (info.size > MAX_DOCUMENT_SIZE) {
 		throw new FileError("too-large", `${basename(path)}: ${Math.round(info.size / 1048576)} MB`);
 	}
-	const { text, format } = decodeBytes(await readFile(path), legacyEncoding);
+	const bytes = await readFile(path);
+	// A picture or a program named `.md` was read as Windows-1254 text, and
+	// saving it would have written that over the file.
+	if (looksBinary(bytes)) throw new FileError("not-text", basename(path));
+	const { text, format } = decodeBytes(bytes, legacyEncoding);
 	return { path, name: basename(path), text, format, modified: info.mtimeMs };
 }
 

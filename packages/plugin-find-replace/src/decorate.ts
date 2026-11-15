@@ -35,7 +35,7 @@
  * ayrı bir `<style>` yazmak demekti — aynı sayfada iki arama panelini
  * birden açık tutmanın bedeli olarak fazla.
  */
-import { blockElementOf, holderIn, pointAt } from "@kalem-editor/editor";
+import { blockElementOf, holderIn, ID_ATTR, pointAt } from "@kalem-editor/editor";
 import type { Match } from "./search.js";
 
 /** Bütün eşleşmeler. */
@@ -74,11 +74,38 @@ export interface Decorator {
 export function createDecorator(root: HTMLElement, getBlockId: (index: number) => string | null) {
 	const doc = root.ownerDocument;
 
+	/**
+	 * Üst düzey blok elemanları, kimlikleriyle — tek bir boyama boyunca.
+	 *
+	 * Eşleşme başına `querySelector` bütün belgeyi tarıyordu: büyük bir
+	 * belgede "Paragraf" gibi binlerce kez geçen bir sözcük her tuşta
+	 * eşleşme sayısı × blok sayısı kadar öznitelik karşılaştırması demekti
+	 * (8000 blokta tuş başına ~0,8 sn, keşif testi K-07). Kökün çocukları
+	 * bir kez gezilip haritaya konuyor.
+	 */
+	let bloklar: Map<string, HTMLElement> | null = null;
+
+	function blokElemani(id: string): HTMLElement | null {
+		if (bloklar === null) return blockElementOf(root, id);
+		const el = bloklar.get(id);
+		// Haritada yoksa (iç içe bir kök, beklenmedik bir yapı) eski yol.
+		return el ?? blockElementOf(root, id);
+	}
+
+	function haritaKur(): Map<string, HTMLElement> {
+		const harita = new Map<string, HTMLElement>();
+		for (const el of Array.from(root.children)) {
+			const id = el.getAttribute(ID_ATTR);
+			if (id !== null && el instanceof HTMLElement) harita.set(id, el);
+		}
+		return harita;
+	}
+
 	/** Eşleşmenin DOM aralığı; eleman bulunamazsa `null`. */
 	function aralik(match: Match): Range | null {
 		const id = getBlockId(match.blockIndex);
 		if (id === null) return null;
-		const blok = blockElementOf(root, id);
+		const blok = blokElemani(id);
 		if (blok === null) return null;
 
 		const holder = holderIn(blok, match.path);
@@ -107,11 +134,16 @@ export function createDecorator(root: HTMLElement, getBlockId: (index: number) =
 
 			const hepsi: Range[] = [];
 			let gecerli: Range | null = null;
-			for (const [i, match] of matches.entries()) {
-				const range = aralik(match);
-				if (range === null) continue;
-				if (i === current) gecerli = range;
-				else hepsi.push(range);
+			bloklar = haritaKur();
+			try {
+				for (const [i, match] of matches.entries()) {
+					const range = aralik(match);
+					if (range === null) continue;
+					if (i === current) gecerli = range;
+					else hepsi.push(range);
+				}
+			} finally {
+				bloklar = null;
 			}
 
 			kayit.set(TUM, new Kurucu(...hepsi));

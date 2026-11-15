@@ -415,11 +415,12 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		if (!isProvider(request.provider)) return [];
 		const provider = request.provider;
 		const program = programOf(provider);
+		const quick = request.quick === true;
 		if (program === "claude") {
 			await locate(program);
 			// The models the account may use, as Claude Code itself says.
 			const launch = clis[program].launch;
-			const account = launch === null ? null : await cliCatalog.claude(launch);
+			const account = launch === null || quick ? null : await cliCatalog.claude(launch);
 			if (account !== null && account.models.length > 0) return [...account.models];
 			// An older Claude Code says none: its aliases, named by what each answered with last;
 			// Anthropic's list when a key for it is kept; and what its help names.
@@ -445,7 +446,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			await locate(program);
 			// The account's models, as the CLI itself says; else as VS Code lists them.
 			const launch = clis[program].launch;
-			const own = launch === null ? [] : await cliCatalog.copilot(launch);
+			const own = launch === null || quick ? [] : await cliCatalog.copilot(launch);
 			return copilotModelOptions(
 				modelsFromHelp(await clis[program].help()),
 				own.length > 0 ? own : await catalog.copilotModels(),

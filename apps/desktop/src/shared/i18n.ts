@@ -285,6 +285,9 @@ const en = {
 	images: "Images",
 	allFiles: "All files",
 	openFailed: "The file could not be opened",
+	openNotText:
+		"It is not a text file (a picture or a program, for instance), so it was not opened as a document.",
+	openNotFound: "There is no such file.",
 	saveFailed: "The file could not be saved",
 	wordImportFailed: "The Word document could not be imported",
 	legacyWord:
@@ -709,6 +712,7 @@ const en = {
 	formatNotCode: "Place the caret in a code block first.",
 	formatUnsupported: "Only JSON, XML, HTML and YAML code blocks can be formatted.",
 	formatInvalid: "This code block is not valid {0}, so it was left unchanged: {1}",
+	formatInvalidFile: "This file is not valid {0}, so it was left unchanged: {1}",
 	formatAllDone: "{0} code block(s) formatted.",
 	formatAllSkipped:
 		"{0} code block(s) formatted; {1} left unchanged because the content is not valid.",
@@ -1567,6 +1571,8 @@ const en = {
 	slashDiagramArgument: "what to draw",
 	slashDiagramPrompt: "Draw a flow diagram of this as a Kalem diagram: {0}",
 	slashUnknown: "There is no /{0} command. Type / to see the commands.",
+	slashUnknownClaude:
+		"Kalem does not know a /{0} command. Type / to see the commands, or press Enter again to send it to Claude Code as it is.",
 	claudeModelPlaceholder: "Claude Code's default model (or opus, sonnet, haiku, a model name)",
 	assistantDefaultModel: "Default model",
 	assistantMoreModels: "Other model…",
@@ -1932,6 +1938,9 @@ const tr: Strings = {
 	images: "Görseller",
 	allFiles: "Tüm dosyalar",
 	openFailed: "Dosya açılamadı",
+	openNotText:
+		"Bu bir metin dosyası değil (örneğin bir resim ya da program); belge olarak açılmadı.",
+	openNotFound: "Böyle bir dosya yok.",
 	saveFailed: "Dosya kaydedilemedi",
 	wordImportFailed: "Word belgesi içe aktarılamadı",
 	legacyWord:
@@ -2361,6 +2370,7 @@ const tr: Strings = {
 	formatNotCode: "Önce imleci bir kod bloğuna getirin.",
 	formatUnsupported: "Yalnızca JSON, XML, HTML ve YAML kod blokları biçimlendirilebiliyor.",
 	formatInvalid: "Bu kod bloğu geçerli {0} değil, olduğu gibi bırakıldı: {1}",
+	formatInvalidFile: "Bu dosya geçerli {0} değil, olduğu gibi bırakıldı: {1}",
 	formatAllDone: "{0} kod bloğu biçimlendirildi.",
 	formatAllSkipped:
 		"{0} kod bloğu biçimlendirildi; {1} blok, içeriği geçerli olmadığı için olduğu gibi bırakıldı.",
@@ -3220,6 +3230,8 @@ const tr: Strings = {
 	slashDiagramArgument: "ne çizilecek",
 	slashDiagramPrompt: "Şunun akış diyagramını Kalem diyagramı olarak çiz: {0}",
 	slashUnknown: "/{0} diye bir komut yok. Komutları görmek için / yazın.",
+	slashUnknownClaude:
+		"/{0} diye bir komut yok. Komutları görmek için / yazın; Claude Code'un kendi komutuysa göndermek için yeniden Enter'a basın.",
 	claudeModelPlaceholder:
 		"Claude Code'un varsayılan modeli (ya da opus, sonnet, haiku, bir model adı)",
 	assistantDefaultModel: "Varsayılan model",

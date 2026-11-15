@@ -210,6 +210,17 @@
 	text-indent: 0;
 }
 
+/*
+ * Kutudan sonraki paragraf kutuyla aynı satırda.
+ *
+ * Altında iç listesi olan maddede (editörde) ve gevşek listede madde
+ * metni `<p>` içinde geliyor; blok olduğu için kutu tek başına bir
+ * satırda kalıyor, metin bir alt satıra düşüyordu (keşif testi K-05).
+ */
+.kalem-doc .kalem-task > input[type="checkbox"] + p {
+	display: inline;
+}
+
 .kalem-doc .kalem-task input[type="checkbox"] {
 	width: 0.95em;
 	height: 0.95em;

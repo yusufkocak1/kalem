@@ -33,11 +33,11 @@ ve görev listesi. **Boş dizi vermek onları kapatıyor** — çekirdek
 | Paket | Ne yapıyor | Boyut (gzip) |
 |---|---|---|
 | `@kalem-editor/plugin-code-highlight` | Kod bloğu vurgulama, 8 dil | 3,7 kB |
-| `@kalem-editor/plugin-find-replace` | Ctrl+F / Ctrl+H | 5,5 kB |
+| `@kalem-editor/plugin-find-replace` | Ctrl+F / Ctrl+H | 5,7 kB |
 | `@kalem-editor/plugin-image-upload` | Sürükle-bırak / yapıştır görsel yükleme | 2,9 kB |
 | `@kalem-editor/plugin-outline` | İçindekiler paneli | 1,9 kB |
 | `@kalem-editor/plugin-word-count` | Kelime sayacı ve okuma süresi | 1,4 kB |
-| `@kalem-editor/plugin-source-mode` | Ham Markdown kaynağı (Ctrl+Shift+M) | 1,1 kB |
+| `@kalem-editor/plugin-source-mode` | Ham Markdown kaynağı (Ctrl+Shift+M) | 2,3 kB |
 | `@kalem-editor/plugin-autosave` | Gecikmeli kaydetme + durum göstergesi | 657 B |
 
 Her birinin kendi CSS dosyası var: `@kalem-editor/themes/plugin-code.css`,

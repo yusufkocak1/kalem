@@ -88,6 +88,18 @@ describe("listeler", () => {
 		expect(html("- dış\n  - iç")).toBe("<ul><li>dış<ul><li>iç</li></ul></li></ul>");
 	});
 
+	/** Alt maddelerin metni üst maddenin kutusunun adına giriyordu ("Bekleyen Alt"). */
+	it("görev kutusunun adı yalnızca maddenin kendi metni", () => {
+		expect(html("- [ ] Bekleyen\n  - [ ] Alt")).toContain('aria-label="Bekleyen"> Bekleyen<ul>');
+	});
+
+	/** Paragraflar boşluksuz birleşiyordu ("gevşekikinci paragraf"). */
+	it("gevşek görev maddesinde ad ilk paragraftan", () => {
+		expect(html("- [ ] gevşek\n\n  ikinci paragraf")).toContain(
+			'aria-label="gevşek"> <p>gevşek</p>',
+		);
+	});
+
 	it("görev listesi devre dışı kutu üretir", () => {
 		expect(html("- [ ] yapılacak\n- [x] bitti")).toBe(
 			"<ul>" +
