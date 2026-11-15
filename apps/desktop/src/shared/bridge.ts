@@ -29,6 +29,7 @@ import { defaultServers } from "./mcp-presets.js";
 import type { McpServer, McpToolList } from "./mcp-servers.js";
 import type { ModeSettings } from "./mode-config.js";
 import type { ModelOption } from "./models.js";
+import type { NetworkEntry, NetworkEvent, NetworkLogState } from "./network.js";
 import type { PaletteChoice, PaletteTheme } from "./palette.js";
 import { PALETTES } from "./palette.js";
 import type { PanePlaces, ToolPane } from "./panes.js";
@@ -487,6 +488,8 @@ export interface Startup {
 	readonly language: Lang;
 	readonly platform: string;
 	readonly version: string;
+	/** The hidden debug mode is on: the network log can be opened. */
+	readonly debugMode: boolean;
 	/** One entry per tab; the last one is the active tab unless `active` says another. */
 	readonly documents: readonly TabDocument[];
 	readonly active?: string;
@@ -787,6 +790,7 @@ export const COMMANDS = [
 	"assistant",
 	"new-from-template",
 	"command-palette",
+	"network-log",
 ] as const;
 
 /** A command of the application menu, as the command palette lists it. */
@@ -1099,6 +1103,21 @@ export interface KalemBridge {
 	templateImport(): Promise<TemplateInfo | "word" | null>;
 	onAssistantToolCall(handler: (call: AssistantToolCall) => void): () => void;
 	onAssistantEvent(handler: (chatId: string, event: ClaudeEvent) => void): () => void;
+
+	/** Turns the hidden debug mode on or off; off forgets the network log. */
+	setDebugMode(on: boolean): Promise<void>;
+	/** Debug mode was turned on or off, in this window or another. */
+	onDebugMode(handler: (on: boolean) => void): () => void;
+	/** The network log's rows; empty while debug mode is off. */
+	networkLog(): Promise<NetworkLogState>;
+	/** One row with its headers and bodies; `null` when it is no longer kept. */
+	networkEntry(id: number): Promise<NetworkEntry | null>;
+	/** Pauses or resumes recording. */
+	networkRecord(on: boolean): Promise<void>;
+	networkClear(): Promise<void>;
+	/** Saves the log as a HAR file; `false` when the user cancelled. */
+	networkExport(): Promise<boolean>;
+	onNetworkEvent(handler: (event: NetworkEvent) => void): () => void;
 }
 
 export const CHANNEL = {
@@ -1252,4 +1271,12 @@ export const CHANNEL = {
 	assistantCliCommands: "kalem:assistant-cli-commands",
 	mcpListTools: "kalem:mcp-list-tools",
 	mcpFindCommand: "kalem:mcp-find-command",
+	setDebugMode: "kalem:set-debug-mode",
+	debugMode: "kalem:debug-mode",
+	networkLog: "kalem:network-log",
+	networkEntry: "kalem:network-entry",
+	networkRecord: "kalem:network-record",
+	networkClear: "kalem:network-clear",
+	networkExport: "kalem:network-export",
+	networkEvent: "kalem:network-event",
 } as const;

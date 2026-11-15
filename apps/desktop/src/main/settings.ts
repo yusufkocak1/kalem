@@ -23,6 +23,12 @@ export interface StoredState {
 	readonly workspaces: readonly string[];
 	/** When releases were last looked up, in ms. */
 	readonly lastUpdateCheck: number | null;
+	/**
+	 * The hidden debug mode (seven clicks on the version in Settings): the
+	 * network log records the app's requests. Not a setting: nothing lists
+	 * it and the assistant's tools cannot change it.
+	 */
+	readonly debugMode: boolean;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -68,6 +74,7 @@ export function parseStoredState(raw: unknown): StoredState {
 		welcomed: asBoolean(root.welcomed, false),
 		workspaces: parseWorkspaces(root),
 		lastUpdateCheck: asNumber(root.lastUpdateCheck),
+		debugMode: asBoolean(root.debugMode, false),
 	};
 }
 

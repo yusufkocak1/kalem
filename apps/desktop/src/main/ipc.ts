@@ -69,6 +69,8 @@ import type { VersionStore } from "./history.js";
 import { connectJira, jiraConnection, registerJiraIpc } from "./jira-ipc.js";
 import { LocalNotesStore } from "./local-notes-store.js";
 import { paletteCommands, runPaletteCommand } from "./menu.js";
+import { registerNetworkIpc } from "./network-ipc.js";
+import { networkLog } from "./network-log.js";
 import type { PackageStore } from "./package.js";
 import { PACKAGE_ASSETS } from "./package.js";
 import { DOCUMENT_SCHEME } from "./protocol.js";
@@ -106,6 +108,8 @@ export interface IpcContext {
 	addFolder(folder: string): void;
 	/** Closes one open folder; all of them with `null`. */
 	closeFolder(path: string | null): void;
+	/** Turns the hidden debug mode on or off, in every window. */
+	setDebugMode(on: boolean): void;
 }
 
 const TYPE_BY_EXTENSION: Readonly<Record<string, string>> = {
@@ -193,6 +197,7 @@ export function registerIpc(ctx: IpcContext): void {
 			language: ctx.language(),
 			platform: process.platform,
 			version: app.getVersion(),
+			debugMode: ctx.store.state.debugMode,
 			documents: await windows.takePending(win),
 			...(win.activeTabId === null ? {} : { active: win.activeTabId }),
 			documentScheme: DOCUMENT_SCHEME,
@@ -1019,6 +1024,7 @@ export function registerIpc(ctx: IpcContext): void {
 		language: ctx.language,
 	});
 	registerTemplateIpc({ templates, windows, strings: ctx.strings, senderOf });
+	registerNetworkIpc({ log: networkLog, senderOf, setDebugMode: ctx.setDebugMode });
 
 	// The user's own notes on documents: in the app's data folder, never in a document.
 	const localNotes = new LocalNotesStore(join(app.getPath("userData"), "local-notes.json"));

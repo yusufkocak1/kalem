@@ -17,12 +17,17 @@ import {
 	modelIds,
 	SseReader,
 } from "../shared/providers.js";
+import { networkLog } from "./network-log.js";
+
+/** Electron's fetch, its requests in the debug mode's network log. */
+const assistantFetch = networkLog.trace(
+	"assistant",
+	(input: string | URL | Request, init?: RequestInit): Promise<Response> =>
+		net.fetch(input instanceof URL ? input.toString() : input, init),
+);
 
 const electronFetch = ((input: RequestInfo | URL, init?: RequestInit) =>
-	net.fetch(
-		input instanceof URL ? input.toString() : (input as string | Request),
-		init,
-	)) as typeof fetch;
+	assistantFetch(input, init)) as typeof fetch;
 
 function anthropic(connection: Connection, key: string | null): Anthropic {
 	return new Anthropic({
@@ -289,7 +294,7 @@ async function streamChatCompletions(
 ): Promise<boolean> {
 	let response: Response;
 	try {
-		response = await net.fetch(url, { ...init, signal });
+		response = await assistantFetch(url, { ...init, signal });
 	} catch (error) {
 		if (signal.aborted) return false;
 		throw error;
@@ -334,7 +339,7 @@ export async function listModels(
 			throw anthropicError(error);
 		}
 	}
-	const response = await net.fetch(provider.modelsUrl ?? `${connection.baseUrl}/models`, {
+	const response = await assistantFetch(provider.modelsUrl ?? `${connection.baseUrl}/models`, {
 		headers: key ? { authorization: `Bearer ${key}` } : {},
 	});
 	const body = await response.text();

@@ -35,6 +35,7 @@ import type { ConfluenceStore } from "./confluence-store.js";
 import { checkDiagramBytes, checkDiagramData, diagramFileName } from "./diagram-files.js";
 import type { DraftStore } from "./drafts.js";
 import type { JiraClient } from "./jira-client.js";
+import { networkLog } from "./network-log.js";
 import type { AppWindow, DocumentTab, WindowManager } from "./windows.js";
 import { errorMessage } from "./windows.js";
 import { markFromInternet } from "./zone.js";
@@ -57,18 +58,25 @@ export interface ConfluenceIpcContext {
  * does not read as a browser's. With either, Jira takes a write for one made
  * from a web page and refuses it: "XSRF check failed", a 403.
  */
-export const atlassianFetch: Fetch = (url, init) =>
-	net.fetch(url, {
-		...init,
-		credentials: "omit",
-		headers: {
-			...(init?.headers as Record<string, string> | undefined),
-			"User-Agent": `kalem-desktop/${app.getVersion()}`,
-		},
-	});
+export function atlassianFetch(source: "confluence" | "jira"): Fetch {
+	const traced = networkLog.trace(source, (url: string, init?: RequestInit) =>
+		net.fetch(url, init),
+	);
+	return (url, init) =>
+		traced(url, {
+			...init,
+			credentials: "omit",
+			headers: {
+				...(init?.headers as Record<string, string> | undefined),
+				"User-Agent": `kalem-desktop/${app.getVersion()}`,
+			},
+		});
+}
+
+const confluenceFetch = atlassianFetch("confluence");
 
 export function confluenceClient(credentials: ConfluenceCredentials): ConfluenceClient {
-	return new ConfluenceClient(credentials, atlassianFetch);
+	return new ConfluenceClient(credentials, confluenceFetch);
 }
 
 function account(client: ConfluenceClient, username: string): ConfluenceAccount {

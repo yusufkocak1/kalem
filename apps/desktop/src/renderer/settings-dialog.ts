@@ -54,6 +54,10 @@ export interface SettingsDialogOptions {
 	errorText(error: unknown): string;
 	/** The active document's name and text, to keep as a template. */
 	activeDocument(): Promise<{ readonly name: string; readonly text: string }>;
+	/** The app's version, shown small at the bottom. */
+	readonly version: string;
+	/** The version was clicked seven times in a row: the hidden debug mode. */
+	unlockDebug(): void;
 }
 
 export interface SettingsDialog {
@@ -64,6 +68,10 @@ export interface SettingsDialog {
 }
 
 let fieldCount = 0;
+
+/** Clicks on the version that open the hidden debug mode, each within `TAP_GAP` ms of the last. */
+const TAPS_TO_DEBUG = 7;
+const TAP_GAP = 800;
 
 /**
  * The app's settings in one place, as in an IDE: categories at the left, a
@@ -92,6 +100,22 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		text: t.settingsDone,
 		attrs: { type: "button" },
 	});
+	// Nothing says it can be clicked: the debug mode is for whoever is told about it.
+	const version = el("span", {
+		class: "settings-version",
+		text: `${t.appName} ${options.version}`,
+	});
+	let taps = 0;
+	let lastTap = 0;
+	version.addEventListener("click", () => {
+		const now = Date.now();
+		taps = now - lastTap <= TAP_GAP ? taps + 1 : 1;
+		lastTap = now;
+		if (taps < TAPS_TO_DEBUG) return;
+		taps = 0;
+		dialog.close();
+		options.unlockDebug();
+	});
 	const dialog = el("dialog", {
 		class: "settings-dialog",
 		attrs: { "aria-label": t.settingsTitle },
@@ -104,7 +128,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 				class: "settings-layout",
 				children: [nav, el("div", { class: "settings-main", children: [body, empty] })],
 			}),
-			el("div", { class: "confluence-actions", children: [done] }),
+			el("div", { class: "confluence-actions settings-actions", children: [version, done] }),
 		],
 	});
 	document.body.append(dialog);

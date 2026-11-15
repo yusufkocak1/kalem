@@ -8,6 +8,7 @@ import type {
 } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
 import type { ClaudeEvent } from "../shared/claude.js";
+import type { NetworkEvent } from "../shared/network.js";
 import type { ApprovalRequest } from "../shared/tool-protocol.js";
 
 function listen<Args extends unknown[]>(
@@ -192,6 +193,14 @@ const bridge: KalemBridge = {
 	assistantPickSources: (kind) => ipcRenderer.invoke(CHANNEL.assistantPickSources, kind),
 	assistantApplyEdit: (id) => ipcRenderer.invoke(CHANNEL.assistantApplyEdit, id),
 	onAssistantEvent: (handler) => listen<[string, ClaudeEvent]>(CHANNEL.assistantEvent, handler),
+	setDebugMode: (on) => ipcRenderer.invoke(CHANNEL.setDebugMode, on),
+	onDebugMode: (handler) => listen<[boolean]>(CHANNEL.debugMode, handler),
+	networkLog: () => ipcRenderer.invoke(CHANNEL.networkLog),
+	networkEntry: (id) => ipcRenderer.invoke(CHANNEL.networkEntry, id),
+	networkRecord: (on) => ipcRenderer.invoke(CHANNEL.networkRecord, on),
+	networkClear: () => ipcRenderer.invoke(CHANNEL.networkClear),
+	networkExport: () => ipcRenderer.invoke(CHANNEL.networkExport),
+	onNetworkEvent: (handler) => listen<[NetworkEvent]>(CHANNEL.networkEvent, handler),
 	assistantApprove: (id, answer) => ipcRenderer.invoke(CHANNEL.assistantApprove, id, answer),
 	assistantToolResult: (id, answer) => ipcRenderer.invoke(CHANNEL.assistantToolResult, id, answer),
 	assistantForgetPermissions: () => ipcRenderer.invoke(CHANNEL.assistantForgetPermissions),
