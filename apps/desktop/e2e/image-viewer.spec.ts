@@ -15,7 +15,8 @@ test("shows a clicked picture large, goes through the pictures and edits a descr
 	await expect(images).toHaveCount(2);
 
 	await images.first().click();
-	const viewer = page.locator("dialog.image-viewer");
+	// The Jira window keeps a viewer of its own, closed; the document's is the open one.
+	const viewer = page.locator("dialog.image-viewer[open]");
 	await expect(viewer).toBeVisible();
 	await expect(viewer.locator(".image-viewer-caption")).toHaveText("Akış şeması");
 	await expect(viewer.locator(".image-viewer-count")).toHaveText("1 / 2");

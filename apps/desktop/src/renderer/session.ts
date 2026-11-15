@@ -1,7 +1,7 @@
 import type { Root } from "@kalem-editor/core";
 import { parse, serialize } from "@kalem-editor/core";
 import type { Caret, ClipboardPayload, EditResult, PasteInput } from "@kalem-editor/editor";
-import { Editor, insertFragment } from "@kalem-editor/editor";
+import { Editor } from "@kalem-editor/editor";
 import { autosavePlugin } from "@kalem-editor/plugin-autosave";
 import { codeHighlightPlugin } from "@kalem-editor/plugin-code-highlight";
 import type { FindReplacePlugin } from "@kalem-editor/plugin-find-replace";
@@ -60,6 +60,7 @@ import { decorateLocked } from "./confluence-locked.js";
 import { insertImageBlock, insertLink, insertTable } from "./edits.js";
 import type { Notices } from "./notices.js";
 import type { Previews } from "./previews.js";
+import { insertReplyFragment } from "./reply-insert.js";
 import { TableStyles } from "./table-styles.js";
 import type { TextView } from "./text-view.js";
 import { createTextView } from "./text-view.js";
@@ -316,9 +317,10 @@ export class Session {
 	}
 
 	/**
-	 * Puts Markdown (table style comments included) at `caret`, or at the end
-	 * when there is none or it no longer fits the document. Resolves with the
-	 * caret after it; `null` when nothing was inserted.
+	 * Puts the assistant's Markdown (table style comments included) at
+	 * `caret`, or at the end when there is none or it no longer fits the
+	 * document: a reply of several blocks as blocks of its own. Resolves with
+	 * the caret after it; `null` when nothing was inserted.
 	 */
 	insertMarkdown(markdown: string, caret: Caret | null): Caret | null {
 		// A text file takes the text as it is, at its caret.
@@ -334,7 +336,7 @@ export class Session {
 		const doc = editor.getDocument();
 		let result: EditResult | null = null;
 		try {
-			result = caret === null ? null : insertFragment(doc, caret, fragment);
+			result = caret === null ? null : insertReplyFragment(doc, caret, fragment);
 		} catch {
 			// The caret was in a part of the document that has since changed.
 		}

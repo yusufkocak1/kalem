@@ -1020,6 +1020,12 @@ export interface KalemBridge {
 		readonly provider: ProviderId;
 		readonly baseUrl: string;
 		readonly key?: string;
+		/**
+		 * Without asking a CLI what the account has (it takes seconds to
+		 * start, an older one never answers): its aliases and what its help
+		 * names, at once. The picker shows these until the whole list comes.
+		 */
+		readonly quick?: boolean;
 	}): Promise<readonly ModelOption[]>;
 	/** Lets the user pick the program of the CLI in use. */
 	assistantLocate(): Promise<AssistantStatus>;

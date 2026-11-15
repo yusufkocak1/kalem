@@ -1481,17 +1481,30 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		command.run("");
 	}
 
+	/**
+	 * A command Kalem does not know, already shown as unknown once. Claude
+	 * Code may still know it (a plugin's command not found on disk), so
+	 * Enter again on the same text sends it as it is. A typo is caught first
+	 * instead of going to the model with the document.
+	 */
+	let unknownShown: string | null = null;
+
 	/** Runs the command typed in the input; `false` when the input is not a command. */
 	function runTyped(): boolean {
 		const query = slashQuery(input.value);
 		if (query === null) return false;
 		const command = findSlash(allCommands(), query.name, host.lang);
 		if (command === undefined) {
-			// Claude Code may know it (a plugin's command not found on disk): it is sent as it is.
-			if (usesClaudeCode()) return false;
-			showNotice(format(t.slashUnknown, query.name));
+			const typed = input.value.trim();
+			if (usesClaudeCode() && unknownShown === typed) {
+				unknownShown = null;
+				return false;
+			}
+			unknownShown = typed;
+			showNotice(format(usesClaudeCode() ? t.slashUnknownClaude : t.slashUnknown, query.name));
 			return true;
 		}
+		unknownShown = null;
 		input.value = "";
 		hideMenu();
 		command.run(query.arg);
@@ -1708,14 +1721,27 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		modelSelect.value = status.model;
 		if (modelLists.has(provider) || !status.ready) return;
 		modelLists.set(provider, []);
+		let whole = false;
+		const show = (found: readonly ModelOption[], complete: boolean): void => {
+			// The quick list never replaces the whole one when that came first.
+			if (whole) return;
+			whole = complete;
+			modelLists.set(provider, found);
+			if (status?.provider === provider) renderModels();
+			// A /model menu open now shows the whole list.
+			if (!menu.hidden && slashQuery(input.value)?.complete === true) updateMenu(false);
+		};
+		// A CLI's account list takes seconds to come (up to half a minute from
+		// one that does not answer); its aliases and help are shown meanwhile.
+		if (cli) {
+			void bridge
+				.assistantModels({ provider, baseUrl: "", quick: true })
+				.then((found) => show(found, false))
+				.catch(() => {});
+		}
 		void bridge
 			.assistantModels({ provider, baseUrl: "" })
-			.then((found) => {
-				modelLists.set(provider, found);
-				if (status?.provider === provider) renderModels();
-				// A /model menu open now shows the whole list.
-				if (!menu.hidden && slashQuery(input.value)?.complete === true) updateMenu(false);
-			})
+			.then((found) => show(found, true))
 			.catch(() => {});
 	}
 

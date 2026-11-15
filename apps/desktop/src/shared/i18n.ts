@@ -1567,6 +1567,8 @@ const en = {
 	slashDiagramArgument: "what to draw",
 	slashDiagramPrompt: "Draw a flow diagram of this as a Kalem diagram: {0}",
 	slashUnknown: "There is no /{0} command. Type / to see the commands.",
+	slashUnknownClaude:
+		"Kalem does not know a /{0} command. Type / to see the commands, or press Enter again to send it to Claude Code as it is.",
 	claudeModelPlaceholder: "Claude Code's default model (or opus, sonnet, haiku, a model name)",
 	assistantDefaultModel: "Default model",
 	assistantMoreModels: "Other model…",
@@ -3220,6 +3222,8 @@ const tr: Strings = {
 	slashDiagramArgument: "ne çizilecek",
 	slashDiagramPrompt: "Şunun akış diyagramını Kalem diyagramı olarak çiz: {0}",
 	slashUnknown: "/{0} diye bir komut yok. Komutları görmek için / yazın.",
+	slashUnknownClaude:
+		"/{0} diye bir komut yok. Komutları görmek için / yazın; Claude Code'un kendi komutuysa göndermek için yeniden Enter'a basın.",
 	claudeModelPlaceholder:
 		"Claude Code'un varsayılan modeli (ya da opus, sonnet, haiku, bir model adı)",
 	assistantDefaultModel: "Varsayılan model",

@@ -41,6 +41,14 @@ export async function fakeClaude(
 		readonly failOnce?: string;
 		/** How long each run takes before it answers, in ms. */
 		readonly delay?: number;
+		/**
+		 * The account's models, given in answer to Claude Code's `initialize`
+		 * control request (how Kalem asks which models the account has).
+		 * Without it the request goes unanswered, as an older Claude Code's.
+		 */
+		readonly accountModels?: readonly { readonly value: string; readonly displayName: string }[];
+		/** How long the `initialize` answer takes, in ms. */
+		readonly accountDelay?: number;
 	} = {},
 ): Promise<{ path: string; calls: () => Promise<Call[]> }> {
 	const log = join(folder, "calls.jsonl");
@@ -59,7 +67,18 @@ if (args.includes("--help")) {
 }
 let prompt = "";
 process.stdin.setEncoding("utf8");
-process.stdin.on("data", (chunk) => (prompt += chunk));
+const accountModels = ${JSON.stringify(options.accountModels ?? null)};
+process.stdin.on("data", (chunk) => {
+	prompt += chunk;
+	// Kalem asks for the account's models with an initialize control request.
+	const request = prompt.split("\\n").find((line) => line.includes('"control_request"'));
+	if (accountModels === null || request === undefined) return;
+	const id = JSON.parse(request).request_id;
+	setTimeout(() => {
+		process.stdout.write(JSON.stringify({ type: "control_response", response: { subtype: "success", request_id: id, response: { models: accountModels, commands: [] } } }) + "\\n");
+		process.exit(0);
+	}, ${JSON.stringify(options.accountDelay ?? 0)});
+});
 const tools = ${JSON.stringify(tools)};
 /** Calls the tools through the configured MCP server; their texts. */
 async function callTools() {
