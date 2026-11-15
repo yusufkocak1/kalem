@@ -1,12 +1,13 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { runtimeOf } from "../shared/mcp-runtimes.js";
 import type { McpServer } from "../shared/mcp-servers.js";
 import { newMcpServer, parseToolList, toggleTool } from "../shared/mcp-servers.js";
-import { answerIn, listMcpTools } from "./mcp-probe.js";
+import { answerIn, findProgram, listMcpTools } from "./mcp-probe.js";
 
 /** A server that lists its tools in two pages, as MCP servers on standard input and output do. */
 const FAKE = `
@@ -132,5 +133,35 @@ describe("toggleTool", () => {
 	it("keeps a typed tool the server did not list", () => {
 		expect(toggleTool(["a", "x"], listed, "b", true)).toEqual(["a", "b", "x"]);
 		expect(toggleTool(["a", "x"], listed, "x", false)).toEqual(["a"]);
+	});
+});
+
+describe("an MCP server's command on this computer", () => {
+	it("is found on PATH, by its path, and on Windows by the extensions PATHEXT names", async () => {
+		const root = await mkdtemp(join(tmpdir(), "kalem-find-"));
+		const bin = join(root, "bin");
+		await mkdir(bin);
+		await writeFile(join(bin, "uvx"), "");
+		await writeFile(join(bin, "npx.cmd"), "");
+		await mkdir(join(bin, "node"));
+		const env = { PATH: `${join(root, "none")}:${bin}` };
+		expect(await findProgram("uvx", env, "linux")).toBe(join(bin, "uvx"));
+		expect(await findProgram(join(bin, "uvx"), {}, "linux")).toBe(join(bin, "uvx"));
+		// A folder of that name is not the program.
+		expect(await findProgram("node", env, "linux")).toBeNull();
+		expect(await findProgram("npx", env, "linux")).toBeNull();
+		expect(await findProgram("  ", env, "linux")).toBeNull();
+		// Windows: Path in any case, separated by ;, and npx.cmd for npx.
+		expect(await findProgram("npx", { Path: bin, PATHEXT: ".exe;.cmd" }, "win32")).toBe(
+			join(bin, "npx.cmd"),
+		);
+	});
+
+	it("says which program a command comes with, to tell how it is installed", () => {
+		expect(runtimeOf("npx")?.label).toBe("Node.js");
+		expect(runtimeOf("C:\\Users\\me\\.local\\bin\\UVX.EXE")?.label).toBe("uv");
+		expect(runtimeOf("/usr/bin/docker")?.id).toBe("docker");
+		expect(runtimeOf("fcli")).toBeNull();
+		expect(runtimeOf("uvx")?.install.map((step) => step.command)).toContain("pip install uv");
 	});
 });

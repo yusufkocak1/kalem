@@ -23,7 +23,8 @@ import { groupName } from "./favorites.js";
 import type { Strings } from "./i18n.js";
 import { format } from "./i18n.js";
 import { parseIssueLayout } from "./jira-layout.js";
-import { parseModeSettings } from "./mode-config.js";
+import { liftModeServers, parseMcpServers } from "./mcp-servers.js";
+import { DEFAULT_MODE_SERVERS, isMode, parseModeSettings } from "./mode-config.js";
 /** The Settings window's categories, in its order. */
 import { PALETTE_IDS, parsePaletteCustom } from "./palette.js";
 import { MAX_DOCK_SIZE, MIN_DOCK_SIZE, parsePanePlaces, TOOL_PANES } from "./panes.js";
@@ -501,6 +502,16 @@ export const SETTINGS_SCHEMA: Schema = {
 		// It can run programs on this computer (an MCP server's command): never the assistant's to change.
 		assistant: "hidden",
 	},
+	assistantMcpServers: {
+		key: "assistantMcpServers",
+		category: "assistant",
+		label: null,
+		type: "custom",
+		parse: parseMcpServers,
+		keywords: ["mcp", "sunucu", "server", "araç", "tool", "dbhub", "github", "context7"],
+		// It runs programs on this computer: changed only by the user, or with the mode_mcp tools.
+		assistant: "hidden",
+	},
 	defaultTemplate: {
 		key: "defaultTemplate",
 		category: "templates",
@@ -742,12 +753,39 @@ export function parseSetting<K extends keyof Settings>(key: K, raw: unknown): Se
 	}
 }
 
+/**
+ * Settings from before the assistant had servers of its own get the ones
+ * it starts with; Kalem's modes whose servers were chosen then use them too
+ * where they would by default.
+ */
+function withDefaultServers(stored: Record<string, unknown>): Record<string, unknown> {
+	const modes = stored.assistantModes;
+	if (typeof modes !== "object" || modes === null || Array.isArray(modes)) {
+		return { ...stored, assistantMcpServers: DEFAULT_SETTINGS.assistantMcpServers };
+	}
+	return {
+		...stored,
+		assistantMcpServers: DEFAULT_SETTINGS.assistantMcpServers,
+		assistantModes: Object.fromEntries(
+			Object.entries(modes).map(([name, mode]) => {
+				const chosen = (mode as { mcp?: unknown } | null)?.mcp;
+				if (!isMode(name) || !Array.isArray(chosen)) return [name, mode];
+				return [name, { ...(mode as object), mcp: [...DEFAULT_MODE_SERVERS[name], ...chosen] }];
+			}),
+		),
+	};
+}
+
 /** Every setting of a stored record made valid, field by field. */
 export function parseSettings(raw: unknown): Settings {
-	const record =
+	const stored =
 		typeof raw === "object" && raw !== null && !Array.isArray(raw)
 			? (raw as Record<string, unknown>)
 			: {};
+	// Modes kept servers of their own before the assistant had them: they move to the assistant.
+	const record = liftModeServers(
+		"assistantMcpServers" in stored ? stored : withDefaultServers(stored),
+	);
 	const settings: Record<string, unknown> = {};
 	for (const def of SETTING_DEFS) settings[def.key] = parseSetting(def.key, record[def.key]);
 	return settings as unknown as Settings;

@@ -25,6 +25,7 @@ import type { IssueLayout } from "./jira-layout.js";
 import { DEFAULT_ISSUE_LAYOUT } from "./jira-layout.js";
 import type { WorklogContext, WorklogEntry } from "./jira-worklog.js";
 import type { LocalNote } from "./local-notes.js";
+import { defaultServers } from "./mcp-presets.js";
 import type { McpServer, McpToolList } from "./mcp-servers.js";
 import type { ModeSettings } from "./mode-config.js";
 import type { ModelOption } from "./models.js";
@@ -138,8 +139,10 @@ export interface Settings {
 	readonly defaultTemplate: string;
 	/** The assistant's modes as the user shaped them: steps, options; what is missing is the default. */
 	readonly assistantModes: ModeSettings;
-	/** Modes the user made: their instructions, steps, tools and MCP servers. */
+	/** Modes the user made: their instructions, steps, tools and the MCP servers they use. */
 	readonly assistantCustomModes: readonly CustomMode[];
+	/** The assistant's MCP servers; each mode chooses which of them it uses. */
+	readonly assistantMcpServers: readonly McpServer[];
 	/** Where the assistant's panel is: at the right (as before), at the left, or under the document. */
 	readonly assistantPlace: AssistantPlace;
 	/** The assistant panel's height under the document, in pixels. */
@@ -197,6 +200,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	defaultTemplate: "",
 	assistantModes: {},
 	assistantCustomModes: [],
+	assistantMcpServers: defaultServers(),
 	assistantPlace: "right",
 	assistantHeight: 320,
 };
@@ -1056,6 +1060,8 @@ export interface KalemBridge {
 	assistantCliCommands(folders: readonly string[]): Promise<readonly CliCommandInfo[]>;
 	/** Starts a mode's MCP server and asks it which tools it has. */
 	mcpListTools(server: McpServer): Promise<McpToolList>;
+	/** Where an MCP server's command is on this computer; `null` when it is not found. */
+	mcpFindCommand(command: string): Promise<string | null>;
 	onAssistantApproval(handler: (request: ApprovalRequest) => void): () => void;
 	/** The user's own notes on a document (see `local-notes.ts`), by its key. */
 	localNotes(key: string): Promise<readonly LocalNote[]>;
@@ -1231,4 +1237,5 @@ export const CHANNEL = {
 	assistantCompact: "kalem:assistant-compact",
 	assistantCliCommands: "kalem:assistant-cli-commands",
 	mcpListTools: "kalem:mcp-list-tools",
+	mcpFindCommand: "kalem:mcp-find-command",
 } as const;

@@ -18,6 +18,8 @@ import { confluenceInstructions } from "./confluence-tool.js";
 import type { CustomMode } from "./custom-modes.js";
 import type { Strings } from "./i18n.js";
 import { jiraInstructions } from "./jira-tool.js";
+import type { McpServer } from "./mcp-servers.js";
+import { mcpInstructions } from "./mcp-servers.js";
 import type { ModeSettings } from "./mode-config.js";
 import { modePrompt } from "./modes.js";
 import type { ToolDefinition } from "./tool-protocol.js";
@@ -39,6 +41,8 @@ export interface PromptOptions {
 	readonly document?: { readonly name: string } | null;
 	/** The document template the user picked for this question, whatever the mode. */
 	readonly template?: { readonly name: string; readonly text: string } | null;
+	/** The assistant's MCP servers the CLI is connected to in this mode. */
+	readonly servers?: readonly McpServer[];
 }
 
 /** The longest template text that goes in the instructions; the rest is read with analysis_template. */
@@ -111,6 +115,7 @@ export function assistantInstructions(t: Strings, options: PromptOptions): strin
 	const tools = options.tools ?? [];
 	const mode = [
 		modePrompt(options.mode, options.modes, options.custom),
+		mcpInstructions(options.servers ?? []),
 		templateInstructions(options.template),
 	]
 		.filter((part) => part !== "")

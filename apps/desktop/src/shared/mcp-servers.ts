@@ -1,12 +1,14 @@
 /**
- * MCP servers a mode connects Claude Code and the Copilot CLI to: a
- * program run on this computer, or an address. Kalem's own modes and the
- * user's take them alike. Each says when it is for, so the model reaches
- * for it on its own (an i18n key written in code goes into the database,
- * say). Pure: the main process writes the CLIs' configurations.
+ * The assistant's MCP servers, which Claude Code and the Copilot CLI
+ * connect to: a program run on this computer, or an address. They are set
+ * up once, for the whole assistant; each mode (Kalem's or the user's)
+ * chooses by name which of them it uses. Each says what it is for, so the
+ * model reaches for it on its own (an i18n key written in code goes into
+ * the database, say). Pure: the main process writes the CLIs'
+ * configurations.
  */
 
-/** An MCP server a mode connects the CLI to. */
+/** An MCP server of the assistant's. */
 export interface McpServer {
 	/** Its name for the CLI: tools are called `mcp__<name>__<tool>`. */
 	readonly name: string;
@@ -27,11 +29,19 @@ export interface McpServer {
 	readonly enabled: boolean;
 }
 
-/** Kalem's own server's name: a mode's server may not take it. */
+/**
+ * Written in a server's arguments, environment, address, headers or
+ * purpose, it is the user's code folder for each question: a folder added
+ * to the question, else one open in the Files pane, else the active
+ * document's. A server that needs it is left out when there is none.
+ */
+export const PROJECT = "${project}";
+
+/** Kalem's own server's name: a server of the user's may not take it. */
 export const RESERVED_SERVER = "kalem";
 
-/** At most this many servers in a mode. */
-export const MAX_SERVERS = 20;
+/** At most this many servers in the assistant. */
+export const MAX_SERVERS = 50;
 
 const text = (value: unknown, max: number): string =>
 	typeof value === "string" ? value.trim().slice(0, max) : "";
@@ -87,7 +97,7 @@ export function parseMcpServer(raw: unknown): McpServer | null {
 	};
 }
 
-/** A mode's servers, validated: one of each name, at most `MAX_SERVERS`. */
+/** The assistant's servers, validated: one of each name, at most `MAX_SERVERS`. */
 export function parseMcpServers(raw: unknown): McpServer[] {
 	const names = new Set<string>();
 	return (Array.isArray(raw) ? raw : [])
@@ -100,7 +110,7 @@ export function parseMcpServers(raw: unknown): McpServer[] {
 		.slice(0, MAX_SERVERS);
 }
 
-/** A new server for a mode: a name not yet taken, everything else to fill in. */
+/** A new server: a name not yet taken, everything else to fill in. */
 export function newMcpServer(taken: readonly McpServer[]): McpServer {
 	const names = new Set(taken.map((server) => server.name));
 	let n = taken.length + 1;
@@ -124,7 +134,133 @@ const on = (servers: readonly McpServer[]): McpServer[] =>
 	servers.filter((server) => server.enabled);
 
 /**
- * What the model is told of a mode's servers: each by name, what it is for,
+ * The servers a mode uses, as a mode keeps them: their names. A server
+ * written out whole (as modes kept them before) counts by its name.
+ */
+export function parseServerRefs(raw: unknown): string[] {
+	if (!Array.isArray(raw)) return [];
+	const names = raw.map((item) =>
+		serverName(
+			typeof item === "string"
+				? item
+				: typeof item === "object" && item !== null
+					? text((item as { name?: unknown }).name, 60)
+					: "",
+		),
+	);
+	return [...new Set(names.filter((name) => name !== ""))].slice(0, MAX_SERVERS);
+}
+
+/** The assistant's servers a mode chose, in the assistant's order. */
+export function serversNamed(
+	names: readonly string[],
+	all: readonly McpServer[],
+): readonly McpServer[] {
+	const chosen = new Set(names);
+	return all.filter((server) => chosen.has(server.name));
+}
+
+/** Whether two servers are the same but for being on. */
+const sameServer = (a: McpServer, b: McpServer): boolean =>
+	JSON.stringify({ ...a, enabled: true }) === JSON.stringify({ ...b, enabled: true });
+
+/**
+ * Settings kept when each mode had servers of its own, moved to the
+ * assistant: each server once (the same server in two modes is one; two
+ * different ones with a name get `name-2`), and each mode left with the
+ * names of the servers it had on. Settings already moved come back as they are.
+ */
+export function liftModeServers(raw: Record<string, unknown>): Record<string, unknown> {
+	const whole = (list: unknown): boolean =>
+		Array.isArray(list) && list.some((item) => typeof item === "object" && item !== null);
+	const modes =
+		typeof raw.assistantModes === "object" &&
+		raw.assistantModes !== null &&
+		!Array.isArray(raw.assistantModes)
+			? (raw.assistantModes as Record<string, unknown>)
+			: {};
+	const custom = Array.isArray(raw.assistantCustomModes) ? raw.assistantCustomModes : [];
+	const mcpOf = (mode: unknown): unknown =>
+		typeof mode === "object" && mode !== null ? (mode as { mcp?: unknown }).mcp : undefined;
+	if (![...Object.values(modes), ...custom].some((mode) => whole(mcpOf(mode)))) return raw;
+	const servers = parseMcpServers(raw.assistantMcpServers);
+	const lift = (list: unknown): unknown => {
+		if (!whole(list)) return list;
+		return (list as unknown[]).flatMap((item): string[] => {
+			if (typeof item === "string") return [item];
+			const server = parseMcpServer(item);
+			if (server === null) return [];
+			let kept = servers.find((each) => sameServer(each, server));
+			if (kept === undefined) {
+				let name = server.name;
+				for (let n = 2; servers.some((each) => each.name === name); n++) {
+					name = `${server.name.slice(0, 36)}-${n}`;
+				}
+				kept = { ...server, name, enabled: true };
+				servers.push(kept);
+			}
+			return server.enabled ? [kept.name] : [];
+		});
+	};
+	const withLifted = (mode: unknown): unknown =>
+		whole(mcpOf(mode)) ? { ...(mode as object), mcp: lift(mcpOf(mode)) } : mode;
+	return {
+		...raw,
+		assistantMcpServers: servers,
+		...(raw.assistantModes === undefined
+			? {}
+			: {
+					assistantModes: Object.fromEntries(
+						Object.entries(modes).map(([name, mode]) => [name, withLifted(mode)]),
+					),
+				}),
+		...(raw.assistantCustomModes === undefined
+			? {}
+			: { assistantCustomModes: custom.map(withLifted) }),
+	};
+}
+
+/** The folder a question works on, for `${project}`: the first one found. */
+export function projectFolder(
+	...candidates: readonly (string | null | undefined)[]
+): string | null {
+	return (
+		candidates.find((folder): folder is string => typeof folder === "string" && folder !== "") ??
+		null
+	);
+}
+
+/** Servers with `${project}` filled in; those that need it are left out without a folder. */
+export function withProject(servers: readonly McpServer[], project: string | null): McpServer[] {
+	const fill = (value: string): string =>
+		project === null ? value : value.split(PROJECT).join(project);
+	const pairs = (record: Readonly<Record<string, string>>): Record<string, string> =>
+		Object.fromEntries(Object.entries(record).map(([key, value]) => [key, fill(value)]));
+	return servers.flatMap((server) => {
+		const needs = [
+			server.command,
+			...server.args,
+			...Object.values(server.env),
+			server.url,
+			...Object.values(server.headers),
+		].some((value) => value.includes(PROJECT));
+		if (needs && project === null) return [];
+		return [
+			{
+				...server,
+				command: fill(server.command),
+				args: server.args.map(fill),
+				env: pairs(server.env),
+				url: fill(server.url),
+				headers: pairs(server.headers),
+				purpose: fill(server.purpose),
+			},
+		];
+	});
+}
+
+/**
+ * What the model is told of the servers a mode uses: each by name, what it is for,
  * and the tools it may call. With a purpose, the model reaches for the
  * server on its own while it works, not only when asked.
  */

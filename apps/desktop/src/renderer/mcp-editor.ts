@@ -2,25 +2,38 @@ import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type { McpPreset } from "../shared/mcp-presets.js";
 import { MCP_PRESETS, presetServer } from "../shared/mcp-presets.js";
+import { runtimeOf } from "../shared/mcp-runtimes.js";
 import type { McpServer, McpToolList } from "../shared/mcp-servers.js";
-import { newMcpServer, RESERVED_SERVER, serverName, toggleTool } from "../shared/mcp-servers.js";
+import {
+	newMcpServer,
+	PROJECT,
+	RESERVED_SERVER,
+	serverName,
+	toggleTool,
+} from "../shared/mcp-servers.js";
 import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
 
 export interface McpSectionOptions {
 	readonly t: Strings;
-	/** The mode's servers as they are now. */
+	/** The assistant's servers as they are now. */
 	servers(): readonly McpServer[];
 	/** Keeps the servers; `redraw` when the section's shape changes. */
 	change(servers: readonly McpServer[], redraw: boolean): void;
+	/** A server was renamed (`to`) or removed (`null`): the modes that use it follow. */
+	renamed(from: string, to: string | null): void;
+	/** The names of the modes that use a server. */
+	usedIn(name: string): readonly string[];
 	/** Starts a server and asks it which tools it has. */
 	listTools(server: McpServer): Promise<McpToolList>;
+	/** Where a command is on this computer; `null` when it is not found. */
+	findCommand(command: string): Promise<string | null>;
 }
 
 /**
  * The tools each server gave, by how it is reached: kept while Settings is
- * open, so a redraw or another mode with the same server shows them again.
+ * open, so a redraw shows them again.
  */
 const listed = new Map<string, McpToolList>();
 const reachKey = (server: McpServer): string =>
@@ -29,6 +42,9 @@ const reachKey = (server: McpServer): string =>
 			? [server.transport, server.url, server.headers]
 			: [server.transport, server.command, server.args, server.env],
 	);
+
+/** Where each command was found, while Settings is open: a redraw does not look again. */
+const found = new Map<string, Promise<string | null>>();
 
 function mark(name: IconName, className: string): Element {
 	const svg = icon(name);
@@ -118,10 +134,10 @@ function pills<T extends string>(
 }
 
 /**
- * A mode's MCP servers in Settings, for Kalem's modes and the user's alike:
- * each a program or an address, the tools it may use, and what it is for
- * (the model is told, and reaches for it on its own). Every change is kept
- * at once.
+ * The assistant's MCP servers in Settings, set up once for every mode: each
+ * a program or an address, the tools it may use, what it is for (the model
+ * is told, and reaches for it on its own), and the modes that use it.
+ * Every change is kept at once.
  */
 export function createMcpSection(options: McpSectionOptions): HTMLElement {
 	const { t } = options;
@@ -136,6 +152,19 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 				redraw,
 			);
 		const http = server.transport === "http";
+		let check = commandCheck(server.command);
+		// The command typed is looked for once it is left.
+		const commandField = (): HTMLElement => {
+			const field = input(t.mcpCommand, server.command, (value) => set({ command: value.trim() }), {
+				placeholder: "npx",
+			});
+			field.querySelector("input")?.addEventListener("change", () => {
+				const next = commandCheck(options.servers()[index]?.command ?? "");
+				check.replaceWith(next);
+				check = next;
+			});
+			return field;
+		};
 		const fields: HTMLElement[] = http
 			? [
 					input(t.mcpUrl, server.url, (value) => set({ url: value.trim() }), {
@@ -150,9 +179,7 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 					),
 				]
 			: [
-					input(t.mcpCommand, server.command, (value) => set({ command: value.trim() }), {
-						placeholder: "npx",
-					}),
+					commandField(),
 					input(
 						t.mcpArgs,
 						server.args.join("\n"),
@@ -186,19 +213,24 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 				name.value = server.name;
 				return;
 			}
+			const from = options.servers()[index]?.name;
 			set({ name: value }, true);
+			if (from !== undefined && from !== value) options.renamed(from, value);
 		});
 		const remove = el("button", {
 			class: "mode-icon-button",
 			attrs: { type: "button", "aria-label": t.mcpRemove, title: t.mcpRemove },
 			children: [mark("close", "mode-icon")],
 		});
-		remove.addEventListener("click", () =>
+		remove.addEventListener("click", () => {
+			const gone = options.servers()[index]?.name;
 			options.change(
 				options.servers().filter((_, i) => i !== index),
 				true,
-			),
-		);
+			);
+			if (gone !== undefined) options.renamed(gone, null);
+		});
+		const used = options.usedIn(server.name);
 		return el("div", {
 			class: "mcp-card",
 			attrs: { "data-server": server.name, ...(server.enabled ? {} : { "data-off": "" }) },
@@ -218,6 +250,11 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 						remove,
 					],
 				}),
+				el("p", {
+					class: "mode-section-hint mcp-used-in",
+					text: used.length === 0 ? t.mcpUsedNowhere : format(t.mcpUsedIn, used.join(", ")),
+				}),
+				...(http ? [] : [check]),
 				...fields,
 				toolsField(index, set),
 				input(
@@ -372,6 +409,89 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 				list,
 			],
 		});
+	}
+
+	/**
+	 * A warning when a server's command is not on this computer: what the
+	 * program is, how to install it, and a button to look again.
+	 */
+	function commandCheck(command: string): HTMLElement {
+		const box = el("div", { class: "mcp-missing", attrs: { hidden: "", role: "status" } });
+		const name = command.trim();
+		if (name === "") return box;
+		let looking = found.get(name);
+		if (looking === undefined) {
+			looking = options.findCommand(name).catch(() => null);
+			found.set(name, looking);
+		}
+		void looking.then((path) => {
+			if (path !== null) return;
+			const runtime = runtimeOf(name);
+			const again = el("button", {
+				class: "assistant-link mcp-missing-again",
+				text: t.mcpMissingAgain,
+				attrs: { type: "button" },
+			});
+			again.addEventListener("click", () => {
+				found.delete(name);
+				box.replaceWith(commandCheck(command));
+			});
+			const steps = (runtime?.install ?? []).map((step) => {
+				const copy = el("button", {
+					class: "assistant-link mcp-sample-copy",
+					text: t.copy,
+					attrs: { type: "button" },
+				});
+				copy.addEventListener("click", () => {
+					void navigator.clipboard.writeText(step.command).then(() => {
+						copy.textContent = t.assistantCopied;
+						setTimeout(() => {
+							copy.textContent = t.copy;
+						}, 1500);
+					});
+				});
+				return el("div", {
+					class: "mcp-sample",
+					children: [
+						el("div", {
+							class: "mcp-sample-head",
+							children: [el("span", { class: "mode-label", text: step.system }), copy],
+						}),
+						el("pre", { class: "mcp-sample-text", text: step.command }),
+					],
+				});
+			});
+			box.replaceChildren(
+				el("p", {
+					class: "mcp-missing-title",
+					children: [mark("noteAttention", "mode-icon"), format(t.mcpMissing, name)],
+				}),
+				el("p", {
+					class: "mcp-missing-text",
+					text: runtime === null ? t.mcpMissingOther : t[runtime.about],
+				}),
+				...(runtime === null
+					? []
+					: [
+							el("span", {
+								class: "mode-label",
+								text: format(t.mcpMissingInstall, runtime.label),
+							}),
+							...steps,
+							el("p", {
+								class: "mcp-missing-text",
+								text: format(t.mcpMissingLink, runtime.link),
+							}),
+						]),
+				el("p", {
+					class: "mcp-missing-text",
+					children: [t.mcpMissingRestart, " ", again],
+				}),
+			);
+			box.setAttribute("data-runtime", runtime?.id ?? "");
+			box.hidden = false;
+		});
+		return box;
 	}
 
 	/** A server added from a ready-made one keeps its guide at hand. */
@@ -534,4 +654,79 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 			],
 		});
 	}
+}
+
+export interface McpChoiceOptions {
+	readonly t: Strings;
+	/** The assistant's servers. */
+	servers(): readonly McpServer[];
+	/** The names of the servers the mode uses. */
+	chosen(): readonly string[];
+	/** Keeps the names the mode uses. */
+	change(names: readonly string[]): void;
+}
+
+/**
+ * Which of the assistant's MCP servers a mode uses, in Settings: a switch
+ * for each. The servers themselves are set up once, under the assistant.
+ */
+export function createMcpChoice(options: McpChoiceOptions): HTMLElement {
+	const { t } = options;
+	const list = el("div", { class: "mcp-choice-list" });
+	function draw(): void {
+		const servers = options.servers();
+		const chosen = options.chosen();
+		if (servers.length === 0) {
+			list.replaceChildren(el("p", { class: "confluence-hint", text: t.mcpChoiceNone }));
+			return;
+		}
+		list.replaceChildren(
+			...servers.map((server) => {
+				const on = chosen.includes(server.name);
+				// `${project}` is shown as what it stands for.
+				const note = [
+					server.enabled ? "" : t.mcpChoiceOff,
+					server.purpose.split(PROJECT).join(t.mcpProjectWord),
+				].filter((part) => part !== "");
+				return el("div", {
+					class: "mcp-tool mcp-choice",
+					attrs: {
+						"data-server": server.name,
+						...(on && server.enabled ? {} : { "data-off": "" }),
+					},
+					children: [
+						switchOf(on, server.name, (wanted) => {
+							// The order is the assistant's, and names no longer there are let go.
+							const names = new Set(options.chosen());
+							if (wanted) names.add(server.name);
+							else names.delete(server.name);
+							options.change(
+								options
+									.servers()
+									.map((each) => each.name)
+									.filter((name) => names.has(name)),
+							);
+							draw();
+						}),
+						el("span", {
+							class: "mcp-tool-text",
+							children: [
+								el("code", { class: "mcp-tool-name", text: server.name }),
+								el("span", { class: "mcp-tool-description", text: note.join(" — ") }),
+							],
+						}),
+					],
+				});
+			}),
+		);
+	}
+	draw();
+	return el("div", {
+		class: "mode-section mode-mcp",
+		children: [
+			el("h4", { text: t.mcpChoiceTitle }),
+			el("p", { class: "mode-section-hint", text: t.mcpChoiceHint }),
+			list,
+		],
+	});
 }

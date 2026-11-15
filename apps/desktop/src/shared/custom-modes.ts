@@ -1,12 +1,10 @@
 /**
  * Modes the user makes: a name and an icon, the instructions the model is
  * given, steps of their own, the Kalem tools it may use (all, or a few),
- * and MCP servers of their own (a program run on this computer, or an
- * address) that Claude Code and the Copilot CLI connect to while the mode
- * is on. Pure: the main process writes the CLIs' configurations.
+ * and which of the assistant's MCP servers Claude Code and the Copilot CLI
+ * connect to while the mode is on. Pure.
  */
-import type { McpServer } from "./mcp-servers.js";
-import { mcpInstructions, parseMcpServers } from "./mcp-servers.js";
+import { parseServerRefs } from "./mcp-servers.js";
 import type { Detail, ReplyLanguage, StoredStep } from "./mode-config.js";
 import { DETAILS, REPLY_LANGUAGES } from "./mode-config.js";
 
@@ -46,7 +44,8 @@ export interface CustomMode {
 	readonly steps: readonly StoredStep[];
 	/** Kalem's tools it may use: all of them, or only these. */
 	readonly tools: "all" | readonly string[];
-	readonly mcp: readonly McpServer[];
+	/** The assistant's MCP servers it uses, by name. */
+	readonly mcp: readonly string[];
 	readonly keywords: readonly string[];
 	readonly detail: Detail;
 	readonly language: ReplyLanguage;
@@ -107,7 +106,7 @@ export function parseCustomModes(raw: unknown): CustomMode[] {
 					steps: steps.slice(0, 40),
 					tools:
 						mode.tools === "all" || !Array.isArray(mode.tools) ? "all" : list(mode.tools, 200, 100),
-					mcp: parseMcpServers(mode.mcp),
+					mcp: parseServerRefs(mode.mcp),
 					keywords: list(mode.keywords, 50, 60),
 					detail: DETAILS.includes(mode.detail as Detail) ? (mode.detail as Detail) : "normal",
 					language: REPLY_LANGUAGES.includes(mode.language as ReplyLanguage)
@@ -165,7 +164,6 @@ export function customInstructions(mode: CustomMode): string {
 					"Work in these steps, in order:",
 					...steps.map((step, index) => `${index + 1}. ${step.instruction}`),
 				].join("\n"),
-		mcpInstructions(mode.mcp),
 		DETAIL_LINES[mode.detail],
 		LANGUAGE_LINES[mode.language],
 	]

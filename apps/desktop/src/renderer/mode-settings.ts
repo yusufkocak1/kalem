@@ -2,7 +2,7 @@ import type { Settings } from "../shared/bridge.js";
 import { newCustomMode } from "../shared/custom-modes.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
-import type { McpServer, McpToolList } from "../shared/mcp-servers.js";
+import { mcpInstructions, serversNamed } from "../shared/mcp-servers.js";
 import type { Mode, ResolvedMode, ResolvedStep } from "../shared/mode-config.js";
 import {
 	DETAILS,
@@ -20,7 +20,7 @@ import { createCustomModeEditor } from "./custom-mode-editor.js";
 import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
-import { createMcpSection } from "./mcp-editor.js";
+import { createMcpChoice } from "./mcp-editor.js";
 
 /** Each mode's mark, in the picker and in Settings. */
 export const MODE_ICONS: Readonly<Record<Mode | "auto", IconName>> = {
@@ -39,8 +39,6 @@ export interface ModeEditorOptions {
 	update(patch: Partial<Settings>): void;
 	/** Kalem's tools, for choosing a mode's of the user's. */
 	toolCatalog(): Promise<readonly ToolInfo[]>;
-	/** Starts an MCP server and asks it which tools it has. */
-	mcpListTools(server: McpServer): Promise<McpToolList>;
 }
 
 /** An icon with a class of its own. */
@@ -196,7 +194,7 @@ export function createModeEditor(options: ModeEditorOptions): {
 				t,
 				mode: own,
 				catalog,
-				mcpListTools: options.mcpListTools,
+				mcpServers: () => options.settings().assistantMcpServers,
 				save(next) {
 					const all = options.settings().assistantCustomModes;
 					if (next === null) {
@@ -217,7 +215,12 @@ export function createModeEditor(options: ModeEditorOptions): {
 
 	const preview = el("pre", { class: "mode-preview-text" });
 	function drawPreview(): void {
-		const text = modeInstructions(selected, { [selected]: storeMode(mode) });
+		const text = [
+			modeInstructions(selected, { [selected]: storeMode(mode) }),
+			mcpInstructions(serversNamed(mode.mcp, options.settings().assistantMcpServers)),
+		]
+			.filter((part) => part !== "")
+			.join("\n");
 		preview.textContent = text === "" ? t.modeNoInstructions : text;
 	}
 
@@ -601,11 +604,11 @@ export function createModeEditor(options: ModeEditorOptions): {
 					}),
 				],
 			}),
-			createMcpSection({
+			createMcpChoice({
 				t,
-				servers: () => mode.mcp,
-				change: (mcp, redraw) => change({ mcp }, redraw),
-				listTools: options.mcpListTools,
+				servers: () => options.settings().assistantMcpServers,
+				chosen: () => mode.mcp,
+				change: (mcp) => change({ mcp }),
 			}),
 			el("details", {
 				class: "mode-preview",

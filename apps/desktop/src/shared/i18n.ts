@@ -786,9 +786,12 @@ const en = {
 	settingsAssistantWidth: "Assistant panel width (px)",
 	settingsAssistantConnection: "Service and model",
 	approvalSettings: "Change settings",
-	approvalMcpAdd: "Connect the MCP server {0} to the {1} mode",
-	approvalMcpUpdate: "Change the MCP server {0} of the {1} mode",
-	approvalMcpRemove: "Remove the MCP server {0} from the {1} mode",
+	approvalMcpAdd: "Add the MCP server {0} to the assistant",
+	approvalMcpAddTo: "Add the MCP server {0} to the assistant and use it in the {1} mode",
+	approvalMcpUpdate: "Change the MCP server {0}",
+	approvalMcpRemove: "Remove the MCP server {0} from the assistant and its modes",
+	approvalMcpUse: "Use the MCP server {0} in the {1} mode",
+	approvalMcpUnuse: "Stop using the MCP server {0} in the {1} mode",
 	mcpServerOff: "Turned off",
 	approvalPanels: "Change the panels",
 	approvalShowPane: "Show the {0} panel",
@@ -962,7 +965,15 @@ const en = {
 	customToolsFind: "Find a tool…",
 	mcpTitle: "MCP servers",
 	mcpHint:
-		"Connected while this mode is on, with Claude Code and the Copilot CLI (the API services do not use MCP servers). A program on this computer (stdio) or an address (HTTP). You can also ask the assistant (“connect DBHub to the Code mode”): it shows you the whole change first.",
+		"The assistant's MCP servers, set up once: each mode chooses which of them it uses (Settings › Assistant Modes). Connected with Claude Code and the Copilot CLI (the API services do not use MCP servers). A program on this computer (stdio) or an address (HTTP). You can also ask the assistant (“add DBHub and use it in the Code mode”): it shows you the whole change first.",
+	mcpUsedIn: "Used in: {0}",
+	mcpUsedNowhere: "No mode uses it yet: choose it in Settings › Assistant Modes.",
+	mcpChoiceTitle: "MCP servers this mode uses",
+	mcpChoiceHint:
+		"Turn on the assistant's MCP servers this mode should connect to. Servers are added and set up under Settings › Assistant › MCP servers.",
+	mcpChoiceNone:
+		"The assistant has no MCP servers yet: add them under Settings › Assistant › MCP servers.",
+	mcpChoiceOff: "turned off for the whole assistant",
 	mcpAdd: "Add an MCP server",
 	mcpName: "Server name",
 	mcpTransport: "Connection",
@@ -975,6 +986,8 @@ const en = {
 	mcpHeaders: "Headers (Name: value, one a line)",
 	mcpTools: "Tools it may use",
 	mcpToolsAll: "All of them (or names, separated by commas)",
+	mcpToolsEvery: "All of them",
+	mcpProjectWord: "the code folder of each question",
 	mcpToolsFetch: "List its tools",
 	mcpToolsFetching: "Starting the server and asking it…",
 	mcpToolsFailed: "Its tools could not be listed: {0}",
@@ -984,10 +997,30 @@ const en = {
 	mcpToolsKeepOne: "At least one tool stays on; to use none, turn the server off.",
 	mcpToolsMissing: "not offered by the server",
 	mcpToolsInvalid: "Fill in the server's command or address first.",
+	mcpMissing: "“{0}” is not installed on this computer: this server cannot start.",
+	mcpMissingInstall: "Install {0}:",
+	mcpMissingLink: "More: {0}",
+	mcpMissingRestart:
+		"Once it is installed, close Kalem and open it again so it finds the new command.",
+	mcpMissingAgain: "Check again",
+	mcpMissingOther:
+		"Install the program the server runs with, or write its full path in Command. The server's guide (or its page) says what it needs.",
+	mcpRuntimeNode:
+		"npx comes with Node.js, the JavaScript runtime. npx downloads the server's package the first time it is used and runs it; nothing else needs installing. Install the LTS version.",
+	mcpRuntimeUv:
+		"uvx comes with uv, a small tool for Python programs (Serena is one). uvx downloads the server the first time it is used and runs it in a place of its own, without touching other Python installs; it fetches a suitable Python itself, so Python need not be installed. Python's installer does not include uv; with Python already installed, pip install uv is enough.",
+	mcpRuntimeDocker:
+		"docker is Docker's command: it runs the server in a container. Install Docker Desktop and start it before asking the assistant.",
+	mcpRuntimePython:
+		"The server is a Python program. Install Python 3 (tick “Add python.exe to PATH” on Windows). uv (uvx) is often an easier way to run Python servers.",
+	mcpToolsNoProject:
+		"It works on the folder of each question (${project}): open a folder in the Files pane to list its tools.",
 	mcpRemove: "Remove the server",
 	mcpPresets: "Ready-made servers",
 	mcpPresetsHint:
 		"Added filled in as they are commonly run, with what each is for. Fill in the words in angle brackets (<GITHUB_TOKEN>, <folder>). npx needs Node.js, uvx needs uv.",
+	mcpPresetSerena:
+		"Your code as an IDE sees it (Serena): symbols, definitions, references, and edits symbol by symbol. Works on the folder of each question (${project}). Needs uv (uvx).",
 	mcpPresetDbhub:
 		"Your database through fixed queries only (DBHub): answers “what is this parameter's value?” and adds the i18n keys written in code. Define get_parameter and add_i18n_key in dbhub.toml; a database user with only the rights they need.",
 	mcpPresetGithub:
@@ -1021,6 +1054,8 @@ const en = {
 		"DBHub connects to your database (PostgreSQL, MySQL, SQL Server, MariaDB, SQLite). Here it opens only queries you wrote yourself, not free SQL: the assistant never writes SQL, it only gives values. One server answers “what is this parameter's value?” and adds the i18n keys written in code.\nIn the database, make a user for the assistant with only the rights it needs (the SQL below).\nSave the dbhub.toml below outside the repository (it holds a password), and change the connection address and the table and column names to yours.\nPress Add, then replace <path>/dbhub.toml in the last line of Arguments with the file's full path.\nLeave “Tools it may use” as get_parameter, add_i18n_key: DBHub's free SQL tool (execute_sql) stays closed.\nAdd your own rules to “What it is for”: what values mean (1 = on, durations in seconds) and how keys are named (screen.part.what).\nAdd the server to the Ask mode too: the automatic choice usually sends “what is X's value?” there.\nTry it: in Ask, “What is MAX_LOGIN_ATTEMPTS?”; in Code, “Add a wrong-password message to the login screen”. The panel shows an mcp__db__… step.",
 	mcpGuideGithub:
 		"GitHub's own MCP server: issues, pull requests and code of your repositories. The X-MCP-Readonly header keeps it read-only.\nOn GitHub: Settings → Developer settings → Personal access tokens → Fine-grained token; give it only the repositories it needs, with read access.\nPress Add, and in Headers replace <GITHUB_TOKEN> with the token.\nTry it: “What does issue #142 ask for?”",
+	mcpGuideSerena:
+		"Serena gives the assistant an IDE's view of your code: symbols, definitions, references and file outlines, and edits symbol by symbol, through a language server (Java, C#, TypeScript, Python, Go and more). It is on in the Code, Review analysis and Prepare prompt modes from the start.\nInstall uv (docs.astral.sh/uv); uvx comes with it. The first start downloads Serena, so the first question takes longer.\nThe code folder is found for each question: ${project} in its arguments is a folder you added to the question (+ › Folder…), else the first folder open in the Files pane, else the active document's folder. With none of them, Serena is not started for that question.\nTo keep it on one project wherever you work, write that folder in place of ${project} in Arguments.\nIt may open its dashboard in the browser when it starts; turn that off with web_dashboard_open_on_launch: false in ~/.serena/serena_config.yml.\nTry it: “Where is the login error handled? Add a check for an expired password.”",
 	mcpGuideGit:
 		"Reads the history of a repository on this computer: log, diffs and commits. Only the reading tools are open.\nInstall uv (docs.astral.sh/uv); uvx comes with it.\nPress Add, and replace <repository folder> in Arguments with the repository's folder.\nTry it: “In which commit did this file last change, and why?”",
 	mcpGuideFilesystem:
@@ -2403,9 +2438,12 @@ const tr: Strings = {
 	settingsAssistantWidth: "Asistan paneli genişliği (px)",
 	settingsAssistantConnection: "Hizmet ve model",
 	approvalSettings: "Ayar değişikliği",
-	approvalMcpAdd: "{0} MCP sunucusunu {1} moduna bağla",
-	approvalMcpUpdate: "{1} modundaki {0} MCP sunucusunu değiştir",
-	approvalMcpRemove: "{0} MCP sunucusunu {1} modundan kaldır",
+	approvalMcpAdd: "{0} MCP sunucusunu asistana ekle",
+	approvalMcpAddTo: "{0} MCP sunucusunu asistana ekle ve {1} modunda kullan",
+	approvalMcpUpdate: "{0} MCP sunucusunu değiştir",
+	approvalMcpRemove: "{0} MCP sunucusunu asistandan ve modlarından kaldır",
+	approvalMcpUse: "{0} MCP sunucusunu {1} modunda kullan",
+	approvalMcpUnuse: "{0} MCP sunucusunu {1} modunda kullanma",
 	mcpServerOff: "Kapalı",
 	approvalPanels: "Panel değişikliği",
 	approvalShowPane: "{0} panelini göster",
@@ -2581,7 +2619,15 @@ const tr: Strings = {
 	customToolsFind: "Araç ara…",
 	mcpTitle: "MCP sunucuları",
 	mcpHint:
-		"Bu mod açıkken Claude Code ve Copilot CLI ile bağlanır (API hizmetleri MCP sunucusu kullanmaz). Bu bilgisayarda çalışan bir program (stdio) ya da bir adres (HTTP). Asistana da söyleyebilirsiniz (“DBHub'ı Kod moduna bağla”): değişikliğin tamamını önce size gösterir.",
+		"Asistanın MCP sunucuları, bir kez kurulur: her mod hangilerini kullanacağını seçer (Ayarlar › Asistan Modları). Claude Code ve Copilot CLI ile bağlanır (API hizmetleri MCP sunucusu kullanmaz). Bu bilgisayarda çalışan bir program (stdio) ya da bir adres (HTTP). Asistana da söyleyebilirsiniz (“DBHub'ı ekle ve Kod modunda kullan”): değişikliğin tamamını önce size gösterir.",
+	mcpUsedIn: "Kullanıldığı modlar: {0}",
+	mcpUsedNowhere: "Henüz hiçbir mod kullanmıyor: Ayarlar › Asistan Modları bölümünden seçin.",
+	mcpChoiceTitle: "Bu modun kullandığı MCP sunucuları",
+	mcpChoiceHint:
+		"Bu modun bağlanacağı asistan MCP sunucularını açın. Sunucular Ayarlar › Asistan › MCP sunucuları bölümünde eklenir ve ayarlanır.",
+	mcpChoiceNone:
+		"Asistanın henüz MCP sunucusu yok: Ayarlar › Asistan › MCP sunucuları bölümünden ekleyin.",
+	mcpChoiceOff: "tüm asistan için kapalı",
 	mcpAdd: "MCP sunucusu ekle",
 	mcpName: "Sunucu adı",
 	mcpTransport: "Bağlantı",
@@ -2594,6 +2640,8 @@ const tr: Strings = {
 	mcpHeaders: "Başlıklar (Ad: değer, her satıra bir tane)",
 	mcpTools: "Kullanabileceği araçlar",
 	mcpToolsAll: "Hepsi (ya da virgülle ayrılmış adlar)",
+	mcpToolsEvery: "Hepsi",
+	mcpProjectWord: "her sorunun kod klasörü",
 	mcpToolsFetch: "Araçlarını listele",
 	mcpToolsFetching: "Sunucu başlatılıp soruluyor…",
 	mcpToolsFailed: "Araçları listelenemedi: {0}",
@@ -2603,10 +2651,29 @@ const tr: Strings = {
 	mcpToolsKeepOne: "En az bir araç açık kalır; hiçbirini kullanmamak için sunucuyu kapatın.",
 	mcpToolsMissing: "sunucu sunmuyor",
 	mcpToolsInvalid: "Önce sunucunun komutunu ya da adresini doldurun.",
+	mcpMissing: "“{0}” bu bilgisayarda kurulu değil: bu sunucu başlatılamaz.",
+	mcpMissingInstall: "{0} kurulumu:",
+	mcpMissingLink: "Ayrıntı: {0}",
+	mcpMissingRestart: "Kurduktan sonra yeni komutu bulması için Kalem'i kapatıp yeniden açın.",
+	mcpMissingAgain: "Yeniden kontrol et",
+	mcpMissingOther:
+		"Sunucunun çalıştığı programı kurun ya da Komut alanına tam yolunu yazın. Sunucunun kılavuzu (ya da sayfası) neye ihtiyaç duyduğunu yazar.",
+	mcpRuntimeNode:
+		"npx, JavaScript çalıştırma ortamı Node.js ile gelir. npx sunucunun paketini ilk kullanımda indirip çalıştırır; başka bir şey kurmanız gerekmez. LTS sürümünü kurun.",
+	mcpRuntimeUv:
+		"uvx, Python programları için küçük bir araç olan uv ile gelir (Serena da bir Python programıdır). uvx sunucuyu ilk kullanımda indirir ve diğer Python kurulumlarınıza dokunmadan kendi yerinde çalıştırır; uygun Python'u kendisi getirir, ayrıca Python kurmanız gerekmez. Python'un kurulum paketinde uv yoktur; Python zaten kuruluysa pip install uv yeterlidir.",
+	mcpRuntimeDocker:
+		"docker, Docker'ın komutudur: sunucuyu bir konteynerde çalıştırır. Docker Desktop'ı kurun ve asistana sormadan önce başlatın.",
+	mcpRuntimePython:
+		"Sunucu bir Python programı. Python 3'ü kurun (Windows'ta “Add python.exe to PATH” kutusunu işaretleyin). Python sunucularını çalıştırmanın daha kolay yolu çoğu zaman uv'dir (uvx).",
+	mcpToolsNoProject:
+		"Her sorunun klasöründe çalışır (${project}): araçlarını listelemek için Dosyalar panelinde bir klasör açın.",
 	mcpRemove: "Sunucuyu kaldır",
 	mcpPresets: "Hazır sunucular",
 	mcpPresetsHint:
 		"Yaygın kullanıldıkları gibi doldurulmuş ve ne için oldukları yazılmış olarak eklenir. Köşeli parantezdeki yerleri (<GITHUB_TOKEN>, <folder>) doldurun. npx için Node.js, uvx için uv gerekir.",
+	mcpPresetSerena:
+		"Kodunuz, bir IDE'nin gördüğü gibi (Serena): semboller, tanımlar, kullanıldığı yerler ve sembol sembol düzenleme. Her sorunun klasöründe çalışır (${project}). uv (uvx) gerekir.",
 	mcpPresetDbhub:
 		"Veritabanınız, yalnızca sabit sorgularla (DBHub): “bu parametrenin değeri ne?” sorusunu cevaplar ve kodda yazılan i18n anahtarlarını ekler. get_parameter ve add_i18n_key araçlarını dbhub.toml'da tanımlayın; yalnızca gereken yetkileri olan bir veritabanı kullanıcısı.",
 	mcpPresetGithub:
@@ -2641,6 +2708,8 @@ const tr: Strings = {
 		"DBHub veritabanınıza (PostgreSQL, MySQL, SQL Server, MariaDB, SQLite) bağlanır. Burada serbest SQL değil, yalnızca sizin yazdığınız sorgular açılır: asistan SQL yazmaz, sadece değer verir. Tek sunucu hem “bu parametrenin değeri ne?” sorusunu cevaplar hem de kodda yazılan i18n anahtarlarını ekler.\nVeritabanında asistana özel, yalnızca gereken yetkileri olan bir kullanıcı açın (aşağıdaki SQL).\nAşağıdaki dbhub.toml'u reponun dışına kaydedin (içinde şifre var); bağlantı adresini, tablo ve kolon adlarını kendinize göre değiştirin.\nEkle'ye basın; Argümanlar'ın son satırındaki <path>/dbhub.toml'u dosyanın tam yoluyla değiştirin.\n“Kullanabileceği araçlar” get_parameter, add_i18n_key olarak kalsın: DBHub'ın serbest SQL aracı (execute_sql) böylece kapalı kalır.\n“Ne için” metnine kendi kurallarınızı ekleyin: değerlerin anlamı (1 = açık, süreler saniye) ve anahtarların adlandırması (ekran.bölüm.ne).\nSunucuyu Sor moduna da ekleyin: otomatik seçim “X'in değeri ne?” sorularını genellikle oraya gönderir.\nDeneyin: Sor modunda “MAX_LOGIN_ATTEMPTS kaç?”, Kod modunda “Giriş ekranına şifre yanlış mesajı ekle”. Panelde bir mcp__db__… adımı görünür.",
 	mcpGuideGithub:
 		"GitHub'ın kendi MCP sunucusu: depolarınızın issue, pull request ve kodları. X-MCP-Readonly başlığı onu salt okunur tutar.\nGitHub'da: Settings → Developer settings → Personal access tokens → Fine-grained token; yalnızca gereken depolara, okuma izniyle.\nEkle'ye basın; Başlıklar'daki <GITHUB_TOKEN>'ı token ile değiştirin.\nDeneyin: “#142 numaralı issue ne istiyor?”",
+	mcpGuideSerena:
+		"Serena, asistana kodunuzu bir IDE gibi gösterir: semboller, tanımlar, kullanıldığı yerler ve dosya özetleri; düzenlemeyi de sembol sembol yapar. Bunu bir dil sunucusuyla yapar (Java, C#, TypeScript, Python, Go ve daha fazlası). Baştan Kod, Analizi İncele ve Prompt Hazırla modlarında açıktır.\nuv'yi kurun (docs.astral.sh/uv); uvx onunla gelir. İlk başlangıçta Serena indirilir, bu yüzden ilk soru daha uzun sürer.\nKod klasörü her soru için bulunur: argümanlardaki ${project}, soruya eklediğiniz bir klasördür (+ › Klasör…); yoksa Dosyalar panelinde açık ilk klasör; o da yoksa etkin dokümanın klasörü. Hiçbiri yoksa Serena o soruda başlatılmaz.\nNerede çalışırsanız çalışın hep aynı projede kalsın istiyorsanız Argümanlar'da ${project} yerine o klasörü yazın.\nBaşlarken tarayıcıda kendi panosunu açabilir; ~/.serena/serena_config.yml içinde web_dashboard_open_on_launch: false ile kapatın.\nDeneyin: “Giriş hatası nerede ele alınıyor? Süresi dolmuş şifre için bir kontrol ekle.”",
 	mcpGuideGit:
 		"Bu bilgisayardaki bir deponun geçmişini okur: log, farklar, commit'ler. Yalnızca okuma araçları açıktır.\nuv'yi kurun (docs.astral.sh/uv); uvx onunla gelir.\nEkle'ye basın; Argümanlar'daki <repository folder>'ı deponun klasörüyle değiştirin.\nDeneyin: “Bu dosya en son hangi commit'te değişti, neden?”",
 	mcpGuideFilesystem:

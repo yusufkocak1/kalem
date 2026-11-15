@@ -10574,6 +10574,43 @@ h3.mode-panel-name {
 	overflow-wrap: anywhere;
 }
 
+.mcp-missing {
+	display: grid;
+	gap: 6px;
+	padding: 10px 12px;
+	border: 1px solid var(--app-error);
+	border-radius: 8px;
+}
+
+.mcp-missing[hidden] {
+	display: none;
+}
+
+.mcp-missing-title {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 0;
+	font-weight: 600;
+	color: var(--app-error);
+}
+
+.mcp-missing-text {
+	margin: 0;
+	font-size: 12px;
+	color: var(--app-muted);
+	overflow-wrap: anywhere;
+}
+
+.mcp-choice-list {
+	display: grid;
+	gap: 8px;
+}
+
+.mcp-used-in {
+	margin: 0;
+}
+
 .mcp-presets {
 	display: grid;
 	gap: 8px;

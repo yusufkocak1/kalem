@@ -10,7 +10,7 @@ import type { ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { IpcMainInvokeEvent, WebContents } from "electron";
 import { app, dialog, ipcMain, net } from "electron";
 import { assistantInstructions } from "../shared/assistant-prompt.js";
@@ -39,6 +39,8 @@ import {
 	claudeServers,
 	copilotServers,
 	parseMcpServer,
+	projectFolder,
+	withProject,
 } from "../shared/mcp-servers.js";
 import type { ModelOption } from "../shared/models.js";
 import { claudeModelName, claudeModelOptions, copilotModelOptions } from "../shared/models.js";
@@ -78,10 +80,11 @@ import type { CliProgram } from "./cli.js";
 import { claudeOutput, LocalCli, runCli, SearchLog, textOutput } from "./cli.js";
 import { CliCatalog } from "./cli-catalog.js";
 import { cliCommands } from "./cli-commands.js";
+import { sameKey } from "./cli-find.js";
 import type { ConfluenceClient } from "./confluence-client.js";
 import type { JiraClient } from "./jira-client.js";
 import { askApi, listModels } from "./llm.js";
-import { listMcpTools } from "./mcp-probe.js";
+import { findProgram, listMcpTools } from "./mcp-probe.js";
 import type { SettingsStore } from "./settings.js";
 import type { TemplateStore } from "./templates.js";
 import type { AppWindow } from "./windows.js";
@@ -641,7 +644,27 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		// The mode: one of Kalem's, as the user shaped it, or one the user made (its tools and MCP servers).
 		const modeSettings = ctx.store.settings.assistantModes;
 		const customModes = ctx.store.settings.assistantCustomModes;
-		const servers = modeServers(request.mode, modeSettings, customModes);
+		// The user's code folder for `${project}` (Serena's): a folder added to the question,
+		// else one open in the Files pane, else the active document's.
+		const activeTab = typeof request.tabId === "string" ? win.tabs.get(request.tabId) : undefined;
+		const servers = withProject(
+			modeServers(request.mode, modeSettings, customModes, ctx.store.settings.assistantMcpServers),
+			projectFolder(
+				// The Files pane's folders go with every question: one added besides them was picked for it.
+				collected.roots.find(
+					(root) =>
+						!ctx.store.state.workspaces.some(
+							(open) =>
+								sameKey(resolve(open), process.platform) ===
+								sameKey(resolve(root), process.platform),
+						),
+				),
+				ctx.store.state.workspaces[0],
+				activeTab !== undefined && activeTab.path !== null && activeTab.remote === null
+					? dirname(activeTab.path)
+					: null,
+			),
+		);
 		// The document template picked for this question, whatever the mode: the model works by it.
 		const pickedTemplate =
 			typeof request.template === "string" && request.template !== ""
@@ -696,7 +719,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 
 		// Claude Code gets the tools from Kalem's MCP server; Copilot too when it takes one,
 		// else it writes them in blocks; an API calls them as its own tools.
-		// The mode may bring MCP servers of the user's, even with none of Kalem's tools.
+		// The mode may use MCP servers of the user's, even with none of Kalem's tools.
 		const ownServers = servers.some((server) => server.enabled);
 		const needsMcp = definitions.length > 0 || ownServers;
 		const copilotMcp = program === "copilot" && needsMcp && (await copilotUsesMcp());
@@ -726,6 +749,8 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				custom: customModes,
 				document: tools.document,
 				template: templateGiven,
+				// The servers are told of only when the CLI is connected to them.
+				servers: mcpRun === null ? [] : servers,
 			});
 		let system = instructionsFor(way);
 		// The sites cannot be fetched without the user's sign-in: Kalem's tools reach them, WebFetch does not.
@@ -1306,10 +1331,17 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 	});
 
 	ipcMain.handle(CHANNEL.mcpListTools, async (_event, raw: unknown) => {
-		const server = parseMcpServer(raw);
-		if (server === null) return { ok: false, error: ctx.strings().mcpToolsInvalid };
+		const parsed = parseMcpServer(raw);
+		if (parsed === null) return { ok: false, error: ctx.strings().mcpToolsInvalid };
+		// `${project}` is the first folder open in the Files pane while its tools are listed.
+		const [server] = withProject([parsed], projectFolder(ctx.store.state.workspaces[0]));
+		if (server === undefined) return { ok: false, error: ctx.strings().mcpToolsNoProject };
 		return listMcpTools(server);
 	});
+
+	ipcMain.handle(CHANNEL.mcpFindCommand, (_event, command: unknown) =>
+		typeof command === "string" ? findProgram(command.slice(0, 1000)) : null,
+	);
 
 	ipcMain.handle(
 		CHANNEL.assistantCompact,
