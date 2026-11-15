@@ -130,6 +130,42 @@ Bu yüzden:
 
 ---
 
+## 4.1 Hazır gelen sunucu: Serena ve kod klasörü
+
+Asistan **Serena** ile gelir. Serena kodunuzu bir IDE gibi okur: semboller,
+tanımlar, kullanıldığı yerler, dosya özetleri ve sembol sembol düzenleme
+(bir dil sunucusuyla: Java, C#, TypeScript, Python, Go…). Baştan **Kod**,
+**Analizi İncele** ve **Prompt Hazırla** modlarında açıktır; diğer modlarda
+kapalıdır. **Asistan Modları** sayfasında her modda açıp kapatabilirsiniz.
+`uv` gerekir (`uvx`); ilk başlangıçta Serena indirildiği için ilk soru
+daha uzun sürer.
+
+**Hangi klasörde çalışır?** Serena'nın argümanlarındaki `${project}`, her
+soru için şu sırayla bulunan klasördür:
+
+1. Soruya eklediğiniz klasör (asistan panelinde **+ › Klasör…**),
+2. yoksa **Dosyalar** panelinde açık ilk klasör (**Dosya › Klasör Aç**),
+3. o da yoksa etkin dokümanın klasörü.
+
+Hiçbiri yoksa Serena o soruda başlatılmaz. Böylece:
+
+- Kodunuz Dosyalar panelinde açıksa ek bir şey yapmanız gerekmez.
+- Kod **başka bir dizindeyse** ve o soru için gerekiyorsa, klasörü soruya
+  ekleyin (+ › Klasör…): ilk sıradadır.
+- Hep aynı projede kalsın istiyorsanız **Ayarlar › Asistan › MCP
+  sunucuları › serena › Argümanlar**'da `${project}` yerine o klasörün
+  yolunu yazın.
+- Birden fazla proje için kartı çoğaltabilirsiniz (ör. `serena-api` ve
+  `serena-web`, her biri kendi yoluyla) ve her modda hangisinin
+  kullanılacağını seçebilirsiniz.
+
+`${project}` başka sunucularda da kullanılabilir (argüman, ortam değişkeni,
+adres, başlık ya da "ne için" metninde). Serena başlarken tarayıcıda kendi
+panosunu açabilir; `~/.serena/serena_config.yml` içinde
+`web_dashboard_open_on_launch: false` ile kapatılır.
+
+---
+
 ## 5. Örnek: tek DBHub sunucusuyla parametre sorgusu ve i18n ekleme
 
 [DBHub](https://github.com/bytebase/dbhub) PostgreSQL, MySQL, SQL Server,

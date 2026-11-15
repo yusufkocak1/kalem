@@ -29,6 +29,14 @@ export interface McpServer {
 	readonly enabled: boolean;
 }
 
+/**
+ * Written in a server's arguments, environment, address, headers or
+ * purpose, it is the user's code folder for each question: a folder added
+ * to the question, else one open in the Files pane, else the active
+ * document's. A server that needs it is left out when there is none.
+ */
+export const PROJECT = "${project}";
+
 /** Kalem's own server's name: a server of the user's may not take it. */
 export const RESERVED_SERVER = "kalem";
 
@@ -210,6 +218,45 @@ export function liftModeServers(raw: Record<string, unknown>): Record<string, un
 			? {}
 			: { assistantCustomModes: custom.map(withLifted) }),
 	};
+}
+
+/** The folder a question works on, for `${project}`: the first one found. */
+export function projectFolder(
+	...candidates: readonly (string | null | undefined)[]
+): string | null {
+	return (
+		candidates.find((folder): folder is string => typeof folder === "string" && folder !== "") ??
+		null
+	);
+}
+
+/** Servers with `${project}` filled in; those that need it are left out without a folder. */
+export function withProject(servers: readonly McpServer[], project: string | null): McpServer[] {
+	const fill = (value: string): string =>
+		project === null ? value : value.split(PROJECT).join(project);
+	const pairs = (record: Readonly<Record<string, string>>): Record<string, string> =>
+		Object.fromEntries(Object.entries(record).map(([key, value]) => [key, fill(value)]));
+	return servers.flatMap((server) => {
+		const needs = [
+			server.command,
+			...server.args,
+			...Object.values(server.env),
+			server.url,
+			...Object.values(server.headers),
+		].some((value) => value.includes(PROJECT));
+		if (needs && project === null) return [];
+		return [
+			{
+				...server,
+				command: fill(server.command),
+				args: server.args.map(fill),
+				env: pairs(server.env),
+				url: fill(server.url),
+				headers: pairs(server.headers),
+				purpose: fill(server.purpose),
+			},
+		];
+	});
 }
 
 /**

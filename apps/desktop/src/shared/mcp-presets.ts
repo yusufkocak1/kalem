@@ -6,6 +6,7 @@
  */
 import type { Strings } from "./i18n.js";
 import type { McpServer } from "./mcp-servers.js";
+import { PROJECT } from "./mcp-servers.js";
 
 export interface McpPreset {
 	readonly id: string;
@@ -66,6 +67,27 @@ const http = (
 });
 
 export const MCP_PRESETS: readonly McpPreset[] = [
+	{
+		id: "serena",
+		guide: "mcpGuideSerena",
+		label: "Serena",
+		description: "mcpPresetSerena",
+		server: stdio(
+			"serena",
+			"uvx",
+			[
+				"--from",
+				"git+https://github.com/oraios/serena",
+				"serena",
+				"start-mcp-server",
+				"--context",
+				"ide-assistant",
+				"--project",
+				PROJECT,
+			],
+			`Semantic code tools for the user's code at ${PROJECT}: find symbols, their definitions and references, and an outline of a file, instead of reading whole files; edit code symbol by symbol. Use it first whenever the work touches that code. When the user says the code is in another folder, say that it can be added to the question (+ › Folder…) or opened in the Files pane.`,
+		),
+	},
 	{
 		id: "dbhub",
 		samples: [
@@ -254,4 +276,11 @@ export function presetServer(preset: McpPreset, taken: readonly McpServer[]): Mc
 	let name = preset.server.name;
 	for (let n = 2; names.has(name); n++) name = `${preset.server.name}-${n}`;
 	return { ...preset.server, name, preset: preset.id, enabled: true };
+}
+
+/** The servers the assistant has from the start: Serena, for the user's code. */
+export function defaultServers(): McpServer[] {
+	return MCP_PRESETS.filter((preset) => preset.id === "serena").map((preset) =>
+		presetServer(preset, []),
+	);
 }

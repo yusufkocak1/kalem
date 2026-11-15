@@ -344,6 +344,19 @@ export interface ResolvedMode {
 	readonly mcp: readonly string[];
 }
 
+/** The assistant's servers each of Kalem's modes uses until the user chooses: Serena where code is read. */
+export const DEFAULT_MODE_SERVERS: Readonly<Record<Mode, readonly string[]>> = {
+	ask: [],
+	write: [],
+	review: ["serena"],
+	prompt: ["serena"],
+	code: ["serena"],
+	app: [],
+};
+
+const sameNames = (a: readonly string[], b: readonly string[]): boolean =>
+	a.length === b.length && a.every((name, index) => name === b[index]);
+
 const MAX_STEPS = 40;
 const MAX_TEXT = 2000;
 
@@ -398,7 +411,8 @@ export function parseModeSettings(raw: unknown): ModeSettings {
 			typeof stored.maxFindings === "number" && Number.isFinite(stored.maxFindings)
 				? Math.max(0, Math.min(200, Math.round(stored.maxFindings)))
 				: undefined;
-		const mcp = parseServerRefs(stored.mcp);
+		// An empty list is kept: the user turned off the servers the mode has by default.
+		const mcp = Array.isArray(stored.mcp) ? parseServerRefs(stored.mcp) : undefined;
 		result[name] = {
 			...(typeof stored.enabled === "boolean" ? { enabled: stored.enabled } : {}),
 			...(steps === undefined ? {} : { steps }),
@@ -409,7 +423,7 @@ export function parseModeSettings(raw: unknown): ModeSettings {
 			...(minSeverity === undefined ? {} : { minSeverity }),
 			...(maxFindings === undefined ? {} : { maxFindings }),
 			...(typeof stored.parallel === "boolean" ? { parallel: stored.parallel } : {}),
-			...(mcp.length === 0 ? {} : { mcp }),
+			...(mcp === undefined ? {} : { mcp }),
 		};
 	}
 	return result;
@@ -473,7 +487,7 @@ export function resolveMode(mode: Mode, settings: ModeSettings = {}): ResolvedMo
 		minSeverity: stored.minSeverity ?? "low",
 		maxFindings: stored.maxFindings ?? 0,
 		parallel: stored.parallel ?? true,
-		mcp: stored.mcp ?? [],
+		mcp: stored.mcp ?? DEFAULT_MODE_SERVERS[mode],
 	};
 }
 
@@ -515,7 +529,7 @@ export function storeMode(resolved: ResolvedMode): StoredMode {
 		...(resolved.minSeverity === "low" ? {} : { minSeverity: resolved.minSeverity }),
 		...(resolved.maxFindings === 0 ? {} : { maxFindings: resolved.maxFindings }),
 		...(resolved.parallel ? {} : { parallel: false }),
-		...(resolved.mcp.length === 0 ? {} : { mcp: resolved.mcp }),
+		...(sameNames(resolved.mcp, DEFAULT_MODE_SERVERS[resolved.mode]) ? {} : { mcp: resolved.mcp }),
 	};
 }
 

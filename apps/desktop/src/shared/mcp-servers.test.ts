@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { parseCustomModes } from "./custom-modes.js";
-import { liftModeServers, mcpInstructions, newMcpServer, parseMcpServers } from "./mcp-servers.js";
+import {
+	liftModeServers,
+	mcpInstructions,
+	newMcpServer,
+	PROJECT,
+	parseMcpServers,
+	projectFolder,
+	withProject,
+} from "./mcp-servers.js";
 import { modeInstructions, parseModeSettings, resolveMode, storeMode } from "./mode-config.js";
 import { modeServers, renameServerRefs } from "./modes.js";
 import { parseSettings } from "./settings-schema.js";
@@ -61,7 +69,7 @@ describe("the assistant's MCP servers", () => {
 
 	it("move from the modes that kept their own to the assistant, once each", () => {
 		const files = { name: "files", command: "npx", args: ["a"] };
-		const lifted = liftModeServers({
+		const settings = parseSettings({
 			theme: "dark",
 			assistantModes: {
 				code: { detail: "short", mcp: [I18N, files] },
@@ -72,16 +80,20 @@ describe("the assistant's MCP servers", () => {
 				{ id: "custom-1", name: "Mine", mcp: [{ name: "files", command: "other" }] },
 			],
 		});
-		const settings = parseSettings(lifted);
 		expect(settings.theme).toBe("dark");
+		// Serena, which the assistant starts with, first.
 		expect(settings.assistantMcpServers.map((server) => [server.name, server.enabled])).toEqual([
+			["serena", true],
 			["i18n-db", true],
 			["files", true],
 			["files-2", true],
 		]);
-		expect(settings.assistantModes.code).toEqual({ detail: "short", mcp: ["i18n-db", "files"] });
+		expect(settings.assistantModes.code).toEqual({
+			detail: "short",
+			mcp: ["serena", "i18n-db", "files"],
+		});
 		// It was off in that mode: the mode does not use it.
-		expect(settings.assistantModes.ask).toEqual({});
+		expect(settings.assistantModes.ask).toEqual({ mcp: [] });
 		expect(settings.assistantCustomModes[0]?.mcp).toEqual(["files-2"]);
 		// Moved once: settings already moved are as they are.
 		const again = { ...settings } as unknown as Record<string, unknown>;
@@ -96,7 +108,44 @@ describe("the assistant's MCP servers", () => {
 		expect(renamed.assistantModes.code).toEqual({ mcp: ["database"] });
 		expect(renamed.assistantCustomModes[0]?.mcp).toEqual(["database", "web"]);
 		const removed = renameServerRefs(modes, [mine], "db", null);
-		expect(removed.assistantModes).toEqual({ ask: { detail: "short" } });
+		// The Code mode's servers by default (Serena) were not chosen: none is left.
+		expect(removed.assistantModes).toEqual({ ask: { detail: "short" }, code: { mcp: [] } });
 		expect(removed.assistantCustomModes[0]?.mcp).toEqual(["web"]);
+	});
+
+	it("start with Serena on the user's code, in the modes that read code", () => {
+		const settings = parseSettings({});
+		expect(settings.assistantMcpServers.map((server) => server.name)).toEqual(["serena"]);
+		const used = (
+			mode: "ask" | "write" | "review" | "prompt" | "code" | "app",
+		): readonly string[] =>
+			modeServers(mode, settings.assistantModes, [], settings.assistantMcpServers).map(
+				(server) => server.name,
+			);
+		expect([used("code"), used("review"), used("prompt")]).toEqual([
+			["serena"],
+			["serena"],
+			["serena"],
+		]);
+		expect([used("ask"), used("write"), used("app")]).toEqual([[], [], []]);
+		// Turned off in a mode, it stays off; removed, it is not added again.
+		const off = parseModeSettings({ code: storeMode({ ...resolveMode("code"), mcp: [] }) });
+		expect(off.code).toEqual({ mcp: [] });
+		expect(resolveMode("code", off).mcp).toEqual([]);
+		expect(parseSettings({ assistantMcpServers: [] }).assistantMcpServers).toEqual([]);
+	});
+
+	it("work on the folder of each question, and are left out without one", () => {
+		const [serena] = parseSettings({}).assistantMcpServers;
+		if (serena === undefined) throw new Error("no Serena");
+		expect(serena.args.at(-1)).toBe(PROJECT);
+		const [filled] = withProject([serena], "/home/me/app");
+		expect(filled?.args.slice(-2)).toEqual(["--project", "/home/me/app"]);
+		expect(filled?.purpose).toContain("the user's code at /home/me/app");
+		expect(withProject([serena], null)).toEqual([]);
+		const files = parseMcpServers([{ name: "files", command: "x" }]);
+		expect(withProject(files, null)).toEqual(files);
+		expect(projectFolder(undefined, "", "/work", "/doc")).toBe("/work");
+		expect(projectFolder(null, undefined)).toBeNull();
 	});
 });

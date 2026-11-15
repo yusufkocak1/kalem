@@ -36,7 +36,8 @@ function chat(
 			queueMicrotask(() => gate.answer(request.id, answer(request)));
 		},
 	}) as unknown as WebContents;
-	let settings: Settings = { ...DEFAULT_SETTINGS, ...options.settings };
+	// Without Serena, the server the assistant starts with: each test adds its own.
+	let settings: Settings = { ...DEFAULT_SETTINGS, assistantMcpServers: [], ...options.settings };
 	const ctx: ToolContext = {
 		chatId: "chat-1",
 		sender: window,
@@ -106,7 +107,8 @@ describe("the assistant setting up its MCP servers and the modes that use them",
 			tools: ["get_parameter", "add_i18n_key"],
 		});
 		expect(server?.purpose).toContain("get_parameter");
-		expect(resolveMode("code", settings().assistantModes).mcp).toEqual(["db"]);
+		// Next to Serena, which the Code mode uses from the start.
+		expect(resolveMode("code", settings().assistantModes).mcp).toEqual(["serena", "db"]);
 		expect(resolveMode("ask", settings().assistantModes).mcp).toEqual([]);
 	});
 
@@ -126,7 +128,7 @@ describe("the assistant setting up its MCP servers and the modes that use them",
 		expect(twice.text).toContain("already uses context7");
 		await runTool("mode_mcp_change", { action: "unuse", mode: "ask", name: "context7" }, ctx);
 		expect(resolveMode("ask", settings().assistantModes).mcp).toEqual([]);
-		expect(resolveMode("code", settings().assistantModes).mcp).toEqual(["context7"]);
+		expect(resolveMode("code", settings().assistantModes).mcp).toEqual(["serena", "context7"]);
 		expect(asked.map((request) => request.title)).toEqual([
 			"Add the MCP server context7 to the assistant",
 			"Use the MCP server context7 in the Ask mode",
@@ -203,7 +205,7 @@ describe("the assistant setting up its MCP servers and the modes that use them",
 			SENTRY_HOST: "sentry.io",
 		});
 		expect(sentry?.enabled).toBe(false);
-		expect(resolveMode("code", settings().assistantModes).mcp).toEqual(["errors"]);
+		expect(resolveMode("code", settings().assistantModes).mcp).toEqual(["serena", "errors"]);
 		await runTool("mode_mcp_change", { action: "remove", name: "errors" }, ctx);
 		expect(settings().assistantMcpServers).toEqual([]);
 		expect(settings().assistantModes).toEqual({});

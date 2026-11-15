@@ -39,6 +39,8 @@ import {
 	claudeServers,
 	copilotServers,
 	parseMcpServer,
+	projectFolder,
+	withProject,
 } from "../shared/mcp-servers.js";
 import type { ModelOption } from "../shared/models.js";
 import { claudeModelName, claudeModelOptions, copilotModelOptions } from "../shared/models.js";
@@ -641,11 +643,18 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		// The mode: one of Kalem's, as the user shaped it, or one the user made (its tools and MCP servers).
 		const modeSettings = ctx.store.settings.assistantModes;
 		const customModes = ctx.store.settings.assistantCustomModes;
-		const servers = modeServers(
-			request.mode,
-			modeSettings,
-			customModes,
-			ctx.store.settings.assistantMcpServers,
+		// The user's code folder for `${project}` (Serena's): a folder added to the question,
+		// else one open in the Files pane, else the active document's.
+		const activeTab = typeof request.tabId === "string" ? win.tabs.get(request.tabId) : undefined;
+		const servers = withProject(
+			modeServers(request.mode, modeSettings, customModes, ctx.store.settings.assistantMcpServers),
+			projectFolder(
+				collected.roots[0],
+				ctx.store.state.workspaces[0],
+				activeTab !== undefined && activeTab.path !== null && activeTab.remote === null
+					? dirname(activeTab.path)
+					: null,
+			),
 		);
 		// The document template picked for this question, whatever the mode: the model works by it.
 		const pickedTemplate =
@@ -1313,8 +1322,11 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 	});
 
 	ipcMain.handle(CHANNEL.mcpListTools, async (_event, raw: unknown) => {
-		const server = parseMcpServer(raw);
-		if (server === null) return { ok: false, error: ctx.strings().mcpToolsInvalid };
+		const parsed = parseMcpServer(raw);
+		if (parsed === null) return { ok: false, error: ctx.strings().mcpToolsInvalid };
+		// `${project}` is the first folder open in the Files pane while its tools are listed.
+		const [server] = withProject([parsed], projectFolder(ctx.store.state.workspaces[0]));
+		if (server === undefined) return { ok: false, error: ctx.strings().mcpToolsNoProject };
 		return listMcpTools(server);
 	});
 

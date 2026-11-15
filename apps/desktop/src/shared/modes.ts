@@ -12,7 +12,14 @@ import type { Strings } from "./i18n.js";
 import type { McpServer } from "./mcp-servers.js";
 import { serversNamed } from "./mcp-servers.js";
 import type { Mode, ModeSettings, StoredMode } from "./mode-config.js";
-import { isMode, MODES, modeExcluded, modeInstructions, resolveMode } from "./mode-config.js";
+import {
+	isMode,
+	MODES,
+	modeExcluded,
+	modeInstructions,
+	resolveMode,
+	storeMode,
+} from "./mode-config.js";
 
 export type { Mode } from "./mode-config.js";
 export { isMode, MODES, modeExcluded, modeInstructions } from "./mode-config.js";
@@ -118,16 +125,11 @@ export function renameServerRefs(
 		);
 	const assistantModes: Partial<Record<Mode, StoredMode>> = {};
 	for (const mode of MODES) {
-		const stored = modes[mode];
-		if (stored === undefined) continue;
-		if (stored.mcp === undefined || !stored.mcp.includes(from)) {
-			assistantModes[mode] = stored;
-			continue;
-		}
-		const { mcp: _old, ...rest } = stored;
-		const mcp = swap(stored.mcp);
-		const next = mcp.length === 0 ? rest : { ...rest, mcp };
-		if (Object.keys(next).length > 0) assistantModes[mode] = next;
+		const resolved = resolveMode(mode, modes);
+		const stored = resolved.mcp.includes(from)
+			? storeMode({ ...resolved, mcp: swap(resolved.mcp) })
+			: modes[mode];
+		if (stored !== undefined && Object.keys(stored).length > 0) assistantModes[mode] = stored;
 	}
 	return {
 		assistantModes,

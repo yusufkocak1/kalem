@@ -582,18 +582,22 @@ test("a mode of the user's own: its instructions, its tools and the MCP server i
 	await settings.locator('[data-category="assistant"]').click();
 	const servers = settings.locator('[data-block="mcp"]');
 	await servers.getByRole("button", { name: "Add an MCP server" }).click();
-	const server = servers.locator(".mcp-card");
+	// Next to Serena, which the assistant starts with.
+	await expect(servers.locator(".mcp-card")).toHaveCount(2);
+	const server = servers.locator(".mcp-card").last();
 	await server.getByRole("textbox", { name: "Server name" }).fill("dosyalar");
 	await server.getByRole("textbox", { name: "Server name" }).press("Tab");
 	await servers
 		.locator(".mcp-card")
+		.last()
 		.getByRole("textbox", { name: "Arguments (one a line)" })
 		.fill("-y\nmcp-files\n/tmp");
 	await servers
 		.locator(".mcp-card")
+		.last()
 		.getByRole("textbox", { name: "Environment (KEY=value, one a line)" })
 		.fill("TOKEN=abc");
-	await expect(servers.locator(".mcp-used-in")).toContainText("No mode uses it yet");
+	await expect(servers.locator(".mcp-used-in").last()).toContainText("No mode uses it yet");
 	await settings.locator('[data-category="modes"]').click();
 
 	// A new mode: its name, instructions and a step.
@@ -678,19 +682,22 @@ test("one of Kalem's modes uses the assistant's MCP servers too, and the model i
 	await settings.locator('[data-category="assistant"]').click();
 	const servers = settings.locator('[data-block="mcp"]');
 	await servers.getByRole("button", { name: "Add an MCP server" }).click();
-	const server = servers.locator(".mcp-card");
+	const server = servers.locator(".mcp-card").last();
 	await server.getByRole("textbox", { name: "Server name" }).fill("i18n-db");
 	await server.getByRole("textbox", { name: "Server name" }).press("Tab");
 	await servers
 		.locator(".mcp-card")
+		.last()
 		.getByRole("textbox", { name: "Arguments (one a line)" })
 		.fill("-y\n@bytebase/dbhub\n--config\n/home/me/dbhub.toml");
 	await servers
 		.locator(".mcp-card")
+		.last()
 		.getByRole("textbox", { name: "Tools it may use" })
 		.fill("add_i18n_key");
 	await servers
 		.locator(".mcp-card")
+		.last()
 		.getByRole("textbox", { name: "What it is for (the assistant is told)" })
 		.fill("When you add an i18n key in code, add it to the database with add_i18n_key.");
 	// One of the ready-made servers, filled in.
@@ -708,7 +715,7 @@ test("one of Kalem's modes uses the assistant's MCP servers too, and the model i
 	await settings.locator('.mcp-preset[data-preset="dbhub"] .mcp-preset-help').click();
 	await expect(settings.locator(".mcp-guide-panel")).toHaveCount(0);
 	await settings.locator('.mcp-preset[data-preset="context7"] .mcp-preset-add').click();
-	await expect(settings.locator(".mcp-card")).toHaveCount(2);
+	await expect(settings.locator(".mcp-card")).toHaveCount(3);
 	await expect(
 		settings
 			.locator('.mcp-card[data-server="context7"]')
@@ -718,7 +725,8 @@ test("one of Kalem's modes uses the assistant's MCP servers too, and the model i
 	const kept = settings.locator('.mcp-card[data-server="context7"] .mcp-card-guide');
 	await kept.locator("summary").click();
 	await expect(kept).toContainText("Up-to-date documentation");
-	// The Code mode uses both; the Ask mode none.
+	// The Code mode uses both, next to Serena, on there from the start; the Ask mode none.
+	await expect(settings.getByRole("switch", { name: "serena" })).toBeChecked();
 	await settings.locator('[data-category="modes"]').click();
 	await settings.locator('.mode-tab[data-mode="code"]').click();
 	await settings.getByRole("switch", { name: "i18n-db" }).check();
@@ -735,11 +743,11 @@ test("one of Kalem's modes uses the assistant's MCP servers too, and the model i
 		.poll(async () => {
 			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
 			return [
-				stored.settings.assistantMcpServers?.[0]?.tools,
+				stored.settings.assistantMcpServers?.[1]?.tools,
 				stored.settings.assistantModes?.code?.mcp,
 			];
 		})
-		.toEqual([["add_i18n_key"], ["i18n-db", "context7"]]);
+		.toEqual([["add_i18n_key"], ["serena", "i18n-db", "context7"]]);
 	// The servers' cards say which modes use them.
 	await pane.locator(".assistant-mode").click();
 	await pane.getByRole("menuitem", { name: "Customize modes…" }).click();
@@ -763,6 +771,19 @@ test("one of Kalem's modes uses the assistant's MCP servers too, and the model i
 	const allowed = call?.args.slice(call.args.indexOf("--allowedTools") + 1) ?? [];
 	expect(allowed).toContain("mcp__i18n-db__add_i18n_key");
 	expect(allowed).toContain("mcp__context7");
+	// Serena, on the active document's folder: no folder is open or added.
+	expect(allowed).toContain("mcp__serena");
+	expect(call?.mcp?.mcpServers.serena?.args).toEqual([
+		"--from",
+		"git+https://github.com/oraios/serena",
+		"serena",
+		"start-mcp-server",
+		"--context",
+		"ide-assistant",
+		"--project",
+		folder,
+	]);
+	expect(system).toContain(`the user's code at ${folder}`);
 	expect(call?.mcp?.mcpServers["i18n-db"]).toEqual({
 		type: "stdio",
 		command: "npx",
@@ -1084,7 +1105,7 @@ test("an MCP server of the assistant's lists its tools, and each is turned on or
 	const settings = page.locator(".settings-dialog");
 	await settings.locator('[data-category="assistant"]').click();
 	await settings.getByRole("button", { name: "Add an MCP server" }).click();
-	const card = settings.locator(".mcp-card");
+	const card = settings.locator(".mcp-card").last();
 	// Node itself runs the script: the app's executable would be Electron's.
 	await card.getByRole("textbox", { name: "Command" }).fill(process.execPath);
 	await card.getByRole("textbox", { name: "Arguments (one a line)" }).fill(script);
@@ -1110,7 +1131,7 @@ test("an MCP server of the assistant's lists its tools, and each is turned on or
 	await expect
 		.poll(async () => {
 			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
-			return stored.settings.assistantMcpServers?.[0]?.tools;
+			return stored.settings.assistantMcpServers?.[1]?.tools;
 		})
 		.toEqual(["add_i18n_key"]);
 	expect(errors).toEqual([]);

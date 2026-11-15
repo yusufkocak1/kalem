@@ -25,6 +25,7 @@ import type { IssueLayout } from "./jira-layout.js";
 import { DEFAULT_ISSUE_LAYOUT } from "./jira-layout.js";
 import type { WorklogContext, WorklogEntry } from "./jira-worklog.js";
 import type { LocalNote } from "./local-notes.js";
+import { defaultServers } from "./mcp-presets.js";
 import type { McpServer, McpToolList } from "./mcp-servers.js";
 import type { ModeSettings } from "./mode-config.js";
 import type { ModelOption } from "./models.js";
@@ -199,7 +200,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	defaultTemplate: "",
 	assistantModes: {},
 	assistantCustomModes: [],
-	assistantMcpServers: [],
+	assistantMcpServers: defaultServers(),
 	assistantPlace: "right",
 	assistantHeight: 320,
 };

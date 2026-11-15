@@ -995,10 +995,14 @@ const en = {
 	mcpToolsKeepOne: "At least one tool stays on; to use none, turn the server off.",
 	mcpToolsMissing: "not offered by the server",
 	mcpToolsInvalid: "Fill in the server's command or address first.",
+	mcpToolsNoProject:
+		"It works on the folder of each question (${project}): open a folder in the Files pane to list its tools.",
 	mcpRemove: "Remove the server",
 	mcpPresets: "Ready-made servers",
 	mcpPresetsHint:
 		"Added filled in as they are commonly run, with what each is for. Fill in the words in angle brackets (<GITHUB_TOKEN>, <folder>). npx needs Node.js, uvx needs uv.",
+	mcpPresetSerena:
+		"Your code as an IDE sees it (Serena): symbols, definitions, references, and edits symbol by symbol. Works on the folder of each question (${project}). Needs uv (uvx).",
 	mcpPresetDbhub:
 		"Your database through fixed queries only (DBHub): answers “what is this parameter's value?” and adds the i18n keys written in code. Define get_parameter and add_i18n_key in dbhub.toml; a database user with only the rights they need.",
 	mcpPresetGithub:
@@ -1032,6 +1036,8 @@ const en = {
 		"DBHub connects to your database (PostgreSQL, MySQL, SQL Server, MariaDB, SQLite). Here it opens only queries you wrote yourself, not free SQL: the assistant never writes SQL, it only gives values. One server answers “what is this parameter's value?” and adds the i18n keys written in code.\nIn the database, make a user for the assistant with only the rights it needs (the SQL below).\nSave the dbhub.toml below outside the repository (it holds a password), and change the connection address and the table and column names to yours.\nPress Add, then replace <path>/dbhub.toml in the last line of Arguments with the file's full path.\nLeave “Tools it may use” as get_parameter, add_i18n_key: DBHub's free SQL tool (execute_sql) stays closed.\nAdd your own rules to “What it is for”: what values mean (1 = on, durations in seconds) and how keys are named (screen.part.what).\nAdd the server to the Ask mode too: the automatic choice usually sends “what is X's value?” there.\nTry it: in Ask, “What is MAX_LOGIN_ATTEMPTS?”; in Code, “Add a wrong-password message to the login screen”. The panel shows an mcp__db__… step.",
 	mcpGuideGithub:
 		"GitHub's own MCP server: issues, pull requests and code of your repositories. The X-MCP-Readonly header keeps it read-only.\nOn GitHub: Settings → Developer settings → Personal access tokens → Fine-grained token; give it only the repositories it needs, with read access.\nPress Add, and in Headers replace <GITHUB_TOKEN> with the token.\nTry it: “What does issue #142 ask for?”",
+	mcpGuideSerena:
+		"Serena gives the assistant an IDE's view of your code: symbols, definitions, references and file outlines, and edits symbol by symbol, through a language server (Java, C#, TypeScript, Python, Go and more). It is on in the Code, Review analysis and Prepare prompt modes from the start.\nInstall uv (docs.astral.sh/uv); uvx comes with it. The first start downloads Serena, so the first question takes longer.\nThe code folder is found for each question: ${project} in its arguments is a folder you added to the question (+ › Folder…), else the first folder open in the Files pane, else the active document's folder. With none of them, Serena is not started for that question.\nTo keep it on one project wherever you work, write that folder in place of ${project} in Arguments.\nIt may open its dashboard in the browser when it starts; turn that off with web_dashboard_open_on_launch: false in ~/.serena/serena_config.yml.\nTry it: “Where is the login error handled? Add a check for an expired password.”",
 	mcpGuideGit:
 		"Reads the history of a repository on this computer: log, diffs and commits. Only the reading tools are open.\nInstall uv (docs.astral.sh/uv); uvx comes with it.\nPress Add, and replace <repository folder> in Arguments with the repository's folder.\nTry it: “In which commit did this file last change, and why?”",
 	mcpGuideFilesystem:
@@ -2625,10 +2631,14 @@ const tr: Strings = {
 	mcpToolsKeepOne: "En az bir araç açık kalır; hiçbirini kullanmamak için sunucuyu kapatın.",
 	mcpToolsMissing: "sunucu sunmuyor",
 	mcpToolsInvalid: "Önce sunucunun komutunu ya da adresini doldurun.",
+	mcpToolsNoProject:
+		"Her sorunun klasöründe çalışır (${project}): araçlarını listelemek için Dosyalar panelinde bir klasör açın.",
 	mcpRemove: "Sunucuyu kaldır",
 	mcpPresets: "Hazır sunucular",
 	mcpPresetsHint:
 		"Yaygın kullanıldıkları gibi doldurulmuş ve ne için oldukları yazılmış olarak eklenir. Köşeli parantezdeki yerleri (<GITHUB_TOKEN>, <folder>) doldurun. npx için Node.js, uvx için uv gerekir.",
+	mcpPresetSerena:
+		"Kodunuz, bir IDE'nin gördüğü gibi (Serena): semboller, tanımlar, kullanıldığı yerler ve sembol sembol düzenleme. Her sorunun klasöründe çalışır (${project}). uv (uvx) gerekir.",
 	mcpPresetDbhub:
 		"Veritabanınız, yalnızca sabit sorgularla (DBHub): “bu parametrenin değeri ne?” sorusunu cevaplar ve kodda yazılan i18n anahtarlarını ekler. get_parameter ve add_i18n_key araçlarını dbhub.toml'da tanımlayın; yalnızca gereken yetkileri olan bir veritabanı kullanıcısı.",
 	mcpPresetGithub:
@@ -2663,6 +2673,8 @@ const tr: Strings = {
 		"DBHub veritabanınıza (PostgreSQL, MySQL, SQL Server, MariaDB, SQLite) bağlanır. Burada serbest SQL değil, yalnızca sizin yazdığınız sorgular açılır: asistan SQL yazmaz, sadece değer verir. Tek sunucu hem “bu parametrenin değeri ne?” sorusunu cevaplar hem de kodda yazılan i18n anahtarlarını ekler.\nVeritabanında asistana özel, yalnızca gereken yetkileri olan bir kullanıcı açın (aşağıdaki SQL).\nAşağıdaki dbhub.toml'u reponun dışına kaydedin (içinde şifre var); bağlantı adresini, tablo ve kolon adlarını kendinize göre değiştirin.\nEkle'ye basın; Argümanlar'ın son satırındaki <path>/dbhub.toml'u dosyanın tam yoluyla değiştirin.\n“Kullanabileceği araçlar” get_parameter, add_i18n_key olarak kalsın: DBHub'ın serbest SQL aracı (execute_sql) böylece kapalı kalır.\n“Ne için” metnine kendi kurallarınızı ekleyin: değerlerin anlamı (1 = açık, süreler saniye) ve anahtarların adlandırması (ekran.bölüm.ne).\nSunucuyu Sor moduna da ekleyin: otomatik seçim “X'in değeri ne?” sorularını genellikle oraya gönderir.\nDeneyin: Sor modunda “MAX_LOGIN_ATTEMPTS kaç?”, Kod modunda “Giriş ekranına şifre yanlış mesajı ekle”. Panelde bir mcp__db__… adımı görünür.",
 	mcpGuideGithub:
 		"GitHub'ın kendi MCP sunucusu: depolarınızın issue, pull request ve kodları. X-MCP-Readonly başlığı onu salt okunur tutar.\nGitHub'da: Settings → Developer settings → Personal access tokens → Fine-grained token; yalnızca gereken depolara, okuma izniyle.\nEkle'ye basın; Başlıklar'daki <GITHUB_TOKEN>'ı token ile değiştirin.\nDeneyin: “#142 numaralı issue ne istiyor?”",
+	mcpGuideSerena:
+		"Serena, asistana kodunuzu bir IDE gibi gösterir: semboller, tanımlar, kullanıldığı yerler ve dosya özetleri; düzenlemeyi de sembol sembol yapar. Bunu bir dil sunucusuyla yapar (Java, C#, TypeScript, Python, Go ve daha fazlası). Baştan Kod, Analizi İncele ve Prompt Hazırla modlarında açıktır.\nuv'yi kurun (docs.astral.sh/uv); uvx onunla gelir. İlk başlangıçta Serena indirilir, bu yüzden ilk soru daha uzun sürer.\nKod klasörü her soru için bulunur: argümanlardaki ${project}, soruya eklediğiniz bir klasördür (+ › Klasör…); yoksa Dosyalar panelinde açık ilk klasör; o da yoksa etkin dokümanın klasörü. Hiçbiri yoksa Serena o soruda başlatılmaz.\nNerede çalışırsanız çalışın hep aynı projede kalsın istiyorsanız Argümanlar'da ${project} yerine o klasörü yazın.\nBaşlarken tarayıcıda kendi panosunu açabilir; ~/.serena/serena_config.yml içinde web_dashboard_open_on_launch: false ile kapatın.\nDeneyin: “Giriş hatası nerede ele alınıyor? Süresi dolmuş şifre için bir kontrol ekle.”",
 	mcpGuideGit:
 		"Bu bilgisayardaki bir deponun geçmişini okur: log, farklar, commit'ler. Yalnızca okuma araçları açıktır.\nuv'yi kurun (docs.astral.sh/uv); uvx onunla gelir.\nEkle'ye basın; Argümanlar'daki <repository folder>'ı deponun klasörüyle değiştirin.\nDeneyin: “Bu dosya en son hangi commit'te değişti, neden?”",
 	mcpGuideFilesystem:

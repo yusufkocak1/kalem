@@ -833,6 +833,14 @@ verir.
 >     kullanıcıya kalır. Bir MCP sunucusu bu bilgisayarda program
 >     çalıştırabildiği için asistan bu ayarı (`assistantMcpServers`)
 >     göremez.
+>   - **Serena, hazır gelen sunucu:** asistan Serena ile gelir (kodu IDE
+>     gibi okuyan, sembol sembol düzenleyen MCP sunucusu; `uvx` gerekir) ve
+>     baştan Kod, Analizi İncele ve Prompt Hazırla modlarında açıktır.
+>     Argümanlarındaki `${project}` her soru için kod klasörüdür: soruya
+>     eklenen klasör, yoksa Dosyalar panelinde açık ilk klasör, yoksa etkin
+>     dokümanın klasörü; hiçbiri yoksa o soruda başlatılmaz. Sabit bir
+>     yol yazılırsa hep o projede çalışır. Önceki sürümden gelen ayarlara
+>     bir kez eklenir; kaldırılırsa geri gelmez.
 >   - **Modlarda sunucu seçimi** (Asistan Modları → bir mod, Kalem'in ya da
 >     sizin → **Bu modun kullandığı MCP sunucuları**): asistanın her
 >     sunucusu için bir anahtar; mod yalnızca açtıklarını kullanır. Mod
