@@ -5,6 +5,7 @@
  * The user applies them with one click; nothing runs by itself. Pure.
  */
 import type { Command } from "./bridge.js";
+import type { Strings } from "./i18n.js";
 
 /** The code fence language of the actions in a reply. */
 export const ACTIONS_FENCE = "kalem-actions";
@@ -42,6 +43,43 @@ export type AssistantCommand = keyof typeof ASSISTANT_COMMANDS;
 
 export const isAssistantCommand = (value: unknown): value is AssistantCommand =>
 	typeof value === "string" && Object.hasOwn(ASSISTANT_COMMANDS, value);
+
+/**
+ * A command as the user knows it: its menu item, in the interface's
+ * language ("Dışa Aktar: HTML"). The descriptions above are for the model;
+ * the approval card showed those, in English, to a Turkish user.
+ */
+export function commandLabel(t: Strings, command: AssistantCommand): string {
+	const exported = (label: string): string => `${t.export}: ${label}`;
+	const labels: Readonly<Record<AssistantCommand, string>> = {
+		save: t.save,
+		"save-as": t.saveAs,
+		"save-as-package": t.saveAsPackage,
+		"export-docx": exported(t.exportDocx),
+		"export-html": exported(t.exportHtml),
+		"export-confluence": exported(t.exportConfluence),
+		"export-confluence-wiki": exported(t.exportConfluenceWiki),
+		"version-history": t.versionHistory,
+		find: t.find,
+		replace: t.replace,
+		image: t.image,
+		"attach-file": t.attachFile,
+		diagram: t.diagramInsert,
+		table: t.insertTable,
+		source: t.markdownSource,
+		"read-only": t.readOnly,
+		focus: t.focusMode,
+		"zoom-in": t.zoomIn,
+		"zoom-out": t.zoomOut,
+		"zoom-reset": t.zoomReset,
+		"quick-open": t.quickOpen,
+		"search-folder": t.searchFolder,
+		"format-all-code": t.formatAllCode,
+		undo: t.undo,
+		redo: t.redo,
+	};
+	return labels[command].replace(/…$/, "");
+}
 
 /** Where inserted text goes. */
 export type InsertPlace = "cursor" | "start" | "end";

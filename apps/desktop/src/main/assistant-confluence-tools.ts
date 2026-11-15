@@ -22,6 +22,23 @@ const clientOf = (ctx: ToolContext): ConfluenceClient => ctx.confluenceClient as
 const connected = (ctx: ToolContext): boolean => ctx.confluenceClient !== null;
 
 /** A page id the model gave, or one in a page's address. */
+/**
+ * The card's line for the page a new one goes under: by its title, as the
+ * user knows it. "41 sayfasının altında" named it by its id. The id stays
+ * when the title cannot be read.
+ */
+export async function parentLine(
+	ctx: ToolContext,
+	confluence: ConfluenceClient,
+	parent: string,
+): Promise<string> {
+	const title = await confluence.page(parent).then(
+		(content) => content.page.title,
+		() => "",
+	);
+	return format(ctx.t.approvalConfluenceParent, title === "" ? parent : `“${title}”`);
+}
+
 function pageIdOf(input: Record<string, unknown>, key = "page_id"): string | null {
 	const given = text(input, key);
 	if (/^\d+$/.test(given)) return given;
@@ -172,7 +189,17 @@ const TOOLS: readonly KalemTool[] = [
 			return `CQL \`${cql}\`: ${results.length} results.\n${results
 				.map(
 					(result) =>
-						`- ${result.title} (${result.type}${result.id === "" ? "" : `, id ${result.id}`}${result.space === "" ? "" : `, ${result.space}`}${result.modified === null ? "" : `, ${result.modified.slice(0, 10)}`}) ${result.url}${result.excerpt === "" ? "" : `\n  ${result.excerpt.slice(0, 300)}`}`,
+						`- ${result.title} (${[
+							result.type,
+							result.id === "" ? "" : `id ${result.id}`,
+							result.space,
+							result.modified?.slice(0, 10) ?? "",
+						]
+							// A result without a type read "(, id 42, …)".
+							.filter((part) => part !== "")
+							.join(
+								", ",
+							)}) ${result.url}${result.excerpt === "" ? "" : `\n  ${result.excerpt.slice(0, 300)}`}`,
 				)
 				.join("\n")}`;
 		},
@@ -298,7 +325,7 @@ const TOOLS: readonly KalemTool[] = [
 				title: format(ctx.t.approvalConfluenceCopy, source.page.title, title, space),
 				lines: [
 					source.page.webUrl,
-					...(parent === null ? [] : [format(ctx.t.approvalConfluenceParent, parent)]),
+					...(parent === null ? [] : [await parentLine(ctx, confluence, parent)]),
 				],
 			});
 			if (!answer.approved) return REFUSED;

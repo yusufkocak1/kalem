@@ -224,10 +224,69 @@ describe("Confluence tools", () => {
 			create,
 			update,
 		};
-		const { ctx } = context(null, [YES], confluence);
+		const { ctx, asked } = context(null, [YES], confluence);
 		await runTool("confluence_copy_page", { page_id: "42", title: "Plan 2" }, ctx);
+		// The parent by its title, not its id (keşif testi: "41 sayfasının altında").
+		expect(asked[0]?.lines).toContain("Under the page “Plan 2”");
 		expect(create).toHaveBeenCalledWith("DEV", "9", "Plan 2");
 		expect(update).toHaveBeenCalledWith(expect.objectContaining({ id: "43" }), "<p>Hello</p>");
+	});
+
+	it("names a new page's parent by its title, or its id when it cannot be read", async () => {
+		const confluence = {
+			page: async (id: string) => {
+				if (id !== "41") throw new Error("HTTP 404");
+				return { page: { ...page.page, id, title: "Ana Sayfa" }, storage: "" };
+			},
+			create: async () => "50",
+		};
+		const answers: ApprovalAnswer[] = [{ approved: false, scope: "once" }];
+		const known = context(null, [...answers], confluence);
+		await runTool(
+			"confluence_publish",
+			{ markdown: "# Yeni", title: "Yeni", space: "DEV", parent_id: "41" },
+			known.ctx,
+		);
+		expect(known.asked[0]?.lines).toEqual(["Under the page “Ana Sayfa”"]);
+		const unknown = context(null, [...answers], confluence);
+		await runTool(
+			"confluence_publish",
+			{ markdown: "# Yeni", title: "Yeni", space: "DEV", parent_id: "77" },
+			unknown.ctx,
+		);
+		expect(unknown.asked[0]?.lines).toEqual(["Under the page 77"]);
+	});
+
+	/** Keşif testi: a result without a type read "Sprint Planı (, id 42, …)". */
+	it("lists CQL results without empty parts", async () => {
+		const confluence = {
+			searchCql: async () => [
+				{
+					id: "42",
+					type: "",
+					title: "Sprint Planı",
+					space: "Geliştirme",
+					url: "https://wiki.example.com/pages/42",
+					excerpt: "",
+					modified: "2026-10-01T09:00:00.000Z",
+				},
+				{
+					id: "",
+					type: "page",
+					title: "Taslak",
+					space: "",
+					url: "https://wiki.example.com/x",
+					excerpt: "",
+					modified: null,
+				},
+			],
+		};
+		const { ctx } = context(null, [], confluence);
+		const result = await runTool("confluence_cql", { cql: "type = page" }, ctx);
+		expect(result.text).toContain(
+			"- Sprint Planı (id 42, Geliştirme, 2026-10-01) https://wiki.example.com/pages/42",
+		);
+		expect(result.text).toContain("- Taslak (page) https://wiki.example.com/x");
 	});
 
 	it("are offered only while connected", () => {
@@ -255,5 +314,52 @@ describe("the tools as the user set them", () => {
 		const result = await runTool("jira_get_fields", { key: "QR-48204" }, ctx);
 		expect(asked[0]).toMatchObject({ tool: "jira_get_fields", everyTime: true });
 		expect(result.text).toContain("did not allow");
+	});
+});
+
+/** Keşif testi: the card said "QR-1: Start Test → Test", the step's name where the status goes. */
+describe("jira_transition", () => {
+	function transitions(status: string | null) {
+		const moved: string[] = [];
+		const client = {
+			site: "https://jira.example.com",
+			cloud: false,
+			transitions: async () => [
+				{ id: "11", name: "Start Test", to: "Test", toCategory: "indeterminate", needs: [] },
+				{ id: "21", name: "Done", to: "Done", toCategory: "done", needs: [] },
+			],
+			row: async () => {
+				if (status === null) throw new Error("HTTP 404");
+				return { key: "QR-1", summary: "", status, statusCategory: "indeterminate", type: "Bug" };
+			},
+			async transition(_key: string, id: string) {
+				moved.push(id);
+			},
+		};
+		return { client, moved };
+	}
+
+	it("shows the status it is in, the one it goes to and the step's name", async () => {
+		const jira = transitions("In Progress");
+		const { ctx, asked } = context(jira.client, [YES]);
+		const result = await runTool("jira_transition", { key: "qr-1", status: "test" }, ctx);
+		expect(asked[0]?.lines).toEqual(["QR-1: In Progress → Test (Start Test)"]);
+		expect(jira.moved).toEqual(["11"]);
+		expect(result.text).toBe("QR-1 is now Test.");
+	});
+
+	it("leaves out a step's name that is the status's own", async () => {
+		const jira = transitions("Test");
+		const { ctx, asked } = context(jira.client, [YES]);
+		await runTool("jira_transition", { key: "QR-1", status: "Done" }, ctx);
+		expect(asked[0]?.lines).toEqual(["QR-1: Test → Done"]);
+	});
+
+	it("still asks when the issue's status cannot be read", async () => {
+		const jira = transitions(null);
+		const { ctx, asked } = context(jira.client, [{ approved: false, scope: "once" }]);
+		await runTool("jira_transition", { key: "QR-1", status: "Test" }, ctx);
+		expect(asked[0]?.lines).toEqual(["QR-1: → Test (Start Test)"]);
+		expect(jira.moved).toEqual([]);
 	});
 });

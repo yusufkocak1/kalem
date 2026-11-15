@@ -145,3 +145,23 @@ describe("jiraServerOf", () => {
 		expect(jiraServerOf({}, null)).toBeNull();
 	});
 });
+
+/**
+ * Keşif testi: the changes window showed
+ * `[@Ayşe Balcı Polat](#confluence-keep-mention-k-u1)` to the person
+ * reviewing a save; they see what the page shows.
+ */
+describe("atomsAsText", () => {
+	it("reads mentions, Jira issues and other kept atoms by their text", async () => {
+		const { atomsAsText } = await import("./confluence-storage.js");
+		expect(
+			atomsAsText(
+				"Hedef için [@Ayşe Balcı Polat](#confluence-keep-mention-k-u1) ve [ABC-7](#confluence-keep-jira-ABC-7/j1/%C5%9Eirket%20Jira) bitti",
+			),
+		).toBe("Hedef için @Ayşe Balcı Polat ve ABC-7 bitti");
+		expect(atomsAsText("[1 Kas 2026](#confluence-keep-9a8b) ve [bağ](https://ornek.com)")).toBe(
+			"1 Kas 2026 ve [bağ](https://ornek.com)",
+		);
+		expect(atomsAsText("[a \\] b](#confluence-keep-x)")).toBe("a ] b");
+	});
+});

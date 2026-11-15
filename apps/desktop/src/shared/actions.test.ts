@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { ACTIONS_PROMPT, actionsFromReply, applyActions, isAssistantCommand } from "./actions.js";
+import {
+	ACTIONS_PROMPT,
+	ASSISTANT_COMMANDS,
+	actionsFromReply,
+	applyActions,
+	commandLabel,
+	isAssistantCommand,
+} from "./actions.js";
 import { SYSTEM_PROMPT, splitReply } from "./claude.js";
+import { stringsFor } from "./i18n.js";
 
 describe("actionsFromReply", () => {
 	it("reads an array of actions", () => {
@@ -155,5 +163,23 @@ describe("actions in a reply", () => {
 	it("are explained to the model", () => {
 		expect(SYSTEM_PROMPT).toContain(ACTIONS_PROMPT);
 		expect(ACTIONS_PROMPT).toContain('"export-docx" (export the document as a Word file)');
+	});
+});
+
+/** Keşif testi: the approval card said "export-html: export the document as an HTML file" to a Turkish user. */
+describe("commandLabel", () => {
+	it("names a command as its menu does, in the interface's language", () => {
+		expect(commandLabel(stringsFor("tr"), "export-html")).toBe("Dışa Aktar: HTML");
+		expect(commandLabel(stringsFor("tr"), "save")).toBe("Kaydet");
+		expect(commandLabel(stringsFor("en"), "save-as")).toBe("Save As");
+	});
+
+	it("has a label for every command, in both languages", () => {
+		for (const lang of ["tr", "en"] as const) {
+			for (const command of Object.keys(ASSISTANT_COMMANDS)) {
+				if (!isAssistantCommand(command)) continue;
+				expect(commandLabel(stringsFor(lang), command)).not.toBe("");
+			}
+		}
 	});
 });

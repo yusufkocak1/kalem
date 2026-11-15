@@ -98,6 +98,18 @@ export function hash(text: string): string {
 /** The link target of a kept inline atom; its XML is written back in its place. */
 export const ATOM_PREFIX = "#confluence-keep-";
 
+/**
+ * Markdown with each kept atom as the text it shows: `@Ayşe Balcı`, not
+ * `[@Ayşe Balcı](#confluence-keep-mention-k-u1)`. For a person reading a
+ * comparison; what is saved keeps the links.
+ */
+export function atomsAsText(markdown: string): string {
+	return markdown.replace(
+		/!?\[((?:\\.|[^\]\\])*)\]\(#confluence-keep-[^)\s]*\)/g,
+		(_, label: string) => label.replace(/\\([\\[\]()*_`~])/g, "$1"),
+	);
+}
+
 export type AtomKind = "mention" | "page-link" | "date" | "macro";
 
 /**

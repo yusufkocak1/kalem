@@ -17,6 +17,7 @@ import {
 	CATEGORY_LABELS,
 	foldSearch,
 	matchesQuery,
+	matchesStems,
 	parseSetting,
 	permissionLabel,
 	resetPatch,
@@ -902,12 +903,19 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 	function filter(): void {
 		const query = search.value.trim();
 		const searching = query !== "";
+		const items = SETTING_CATEGORIES.flatMap((category) => [
+			...(contents.get(category)?.children ?? []),
+		]) as HTMLElement[];
+		// Words with a Turkish ending ("yakınlaştırma") only when nothing matches as typed.
+		const matches = items.some((item) => matchesQuery(item.dataset.search ?? "", query))
+			? matchesQuery
+			: matchesStems;
 		let found = 0;
 		for (const category of SETTING_CATEGORIES) {
 			let shown = 0;
 			for (const child of contents.get(category)?.children ?? []) {
 				const item = child as HTMLElement;
-				const match = !searching || matchesQuery(item.dataset.search ?? "", query);
+				const match = !searching || matches(item.dataset.search ?? "", query);
 				item.hidden = !match;
 				if (match) shown++;
 			}
