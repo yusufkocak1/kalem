@@ -59,6 +59,7 @@ import { createJiraPane } from "./jira-pane.js";
 import { createLinkCard } from "./link-card.js";
 import type { NotesTarget } from "./local-notes.js";
 import { createLocalNotes } from "./local-notes.js";
+import { createNetworkPanel } from "./network-panel.js";
 import { createNotices } from "./notices.js";
 import { Previews } from "./previews.js";
 import { documentImages } from "./prompt-images.js";
@@ -356,6 +357,35 @@ const settingsDialog = createSettingsDialog({
 		const context = await assistantContext();
 		return { name: context.name, text: context.text };
 	},
+	version: startup.version,
+	unlockDebug: () => {
+		if (!debugMode) {
+			void bridge.setDebugMode(true);
+			session.notices.show({ id: "debug", text: t.debugModeOn });
+		}
+		networkPanel.show();
+	},
+});
+
+/**
+ * The hidden debug mode: seven clicks on the version in Settings turn it
+ * on; then F12 (View › Network Log) opens the app's requests.
+ */
+let debugMode = startup.debugMode;
+const networkPanel = createNetworkPanel({
+	t,
+	bridge,
+	lang: startup.language,
+	errorText: ipcErrorMessage,
+	notify: (text) => session.notices.show({ id: "debug", kind: "error", text }),
+	turnOff: () => {
+		void bridge.setDebugMode(false);
+		session.notices.show({ id: "debug", text: t.debugModeOffDone });
+	},
+});
+bridge.onDebugMode((on) => {
+	debugMode = on;
+	if (!on) networkPanel.hide();
 });
 const templatePicker = createTemplatePicker({
 	t,
@@ -1252,6 +1282,9 @@ const commands: Record<Command, () => void> = {
 	},
 	"jira-open": () => void jiraDialog.showSearch(),
 	settings: () => void settingsDialog.show(),
+	"network-log": () => {
+		if (debugMode) networkPanel.toggle();
+	},
 	"new-from-template": () => void templatePicker.show(),
 	"move-tab": () => moveTab(session.id),
 	"case-upper": () => rewriteText((text) => changeCase(text, "upper", session.editor.getLang())),

@@ -38,6 +38,7 @@ import {
 	popupTabMenu,
 	welcomeDocument,
 } from "./menu.js";
+import { networkLog } from "./network-log.js";
 import { PackageStore } from "./package.js";
 import { pathKey } from "./path-key.js";
 import { handleDocumentScheme, registerDocumentScheme } from "./protocol.js";
@@ -239,6 +240,21 @@ function start(): void {
 		refreshMenu();
 	}
 
+	/**
+	 * The hidden debug mode: the network log records the app's requests and
+	 * the View menu offers it and the developer tools. Off, the log is gone.
+	 */
+	function setDebugMode(on: boolean): void {
+		if (store.state.debugMode !== on) store.update({ debugMode: on });
+		networkLog.setEnabled(on);
+		for (const win of windows.all()) win.window.webContents.send(CHANNEL.debugMode, on);
+		refreshMenu();
+	}
+	networkLog.setEnabled(store.state.debugMode);
+	networkLog.onChange((event) => {
+		for (const win of windows.all()) win.window.webContents.send(CHANNEL.networkEvent, event);
+	});
+
 	function changeLanguage(next: Lang | null): void {
 		store.updateSettings({ language: next });
 		windows.broadcastSettings(store.settings);
@@ -383,6 +399,8 @@ function start(): void {
 			closeFolder: () => closeFolder(null),
 			changeSettings,
 			changeLanguage,
+			debugMode: store.state.debugMode,
+			setDebugMode,
 			clearRecentFiles: () => {
 				store.update({ recentFiles: [] });
 				app.clearRecentDocuments();
@@ -607,6 +625,7 @@ function start(): void {
 			openFolder,
 			addFolder: (folder) => addFolders([folder]),
 			closeFolder: (folder) => closeFolder(folder),
+			setDebugMode,
 		});
 		refreshMenu();
 		tray.apply(store.settings.tray);

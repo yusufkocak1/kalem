@@ -9,6 +9,12 @@ import { stat } from "node:fs/promises";
 import { delimiter, isAbsolute, join } from "node:path";
 import type { McpServer, McpToolInfo, McpToolList } from "../shared/mcp-servers.js";
 import { parseToolList } from "../shared/mcp-servers.js";
+import { networkLog } from "./network-log.js";
+
+/** Node's fetch (looked up on each call), its requests in the debug mode's network log. */
+const fetch = networkLog.trace("mcp", (url: string, init?: RequestInit) =>
+	globalThis.fetch(url, init),
+);
 
 const PROTOCOL = "2025-06-18";
 /** A server that has not answered by then is not waited for. */

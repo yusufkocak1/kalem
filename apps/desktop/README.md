@@ -1323,6 +1323,35 @@ e2e/            Playwright ile gerçek uygulamayı süren testler
   `KALEM_EXPLORE_SHOTS=<klasör>` her adımın ekran görüntüsünü,
   `KALEM_EXPLORE_REPORT=<dosya>` bulguları (testi düşürmeden) yazar.
 
+## Hata ayıklama kipi (gizli)
+
+Kullanıcıya görünmeyen, tarayıcının **Network** sekmesi gibi bir ağ
+günlüğü. Açmak için: **Ayarlar**'ın sol altındaki sürüm yazısına
+(`Kalem 3.17.0`) art arda **7 kez** tıklanır (tıklamalar arası en çok
+0,8 sn). Açıkken:
+
+- **F12** (Görünüm › Ağ Günlüğü) pencerenin altındaki paneli açıp kapatır;
+  Görünüm menüsünde Geliştirici Araçları ve "Hata Ayıklama Kipini Kapat"
+  da görünür. Kapalıyken bunların hiçbiri menüde yoktur.
+- Ana sürecin Jira'ya, Confluence'a, asistanın hizmetine (Anthropic,
+  OpenAI uyumlu servisler, Copilot model listesi), MCP sunucularına ve
+  GitHub'a (güncelleme denetimi) giden istekleri kaydedilir: yöntem,
+  durum, süre, boyut, başlıklar, istek ve yanıt gövdesi (akan yanıtlar
+  dâhil). Süzgeç (`issue 404 -GET`), kaynak düğmeleri, cURL olarak
+  kopyalama ve HAR olarak kaydetme vardır.
+- **Gizli bilgiler kaydedilirken maskelenir**: `Authorization`, çerezler,
+  API anahtarı başlıkları, adresteki `token`/`key` parametreleri, JSON ve
+  form gövdelerindeki `token`, `password`, `api_key`… alanları. Günlüğe,
+  panele, panoya ve HAR dosyasına hiç girmezler.
+- Günlük bellekte tutulur (en çok 500 istek, gövdeler 256 KB'a kadar);
+  diske yazılmaz. Kip kapatılınca silinir. Kip kapalıyken istekler hiç
+  kopyalanmadan olduğu gibi geçer.
+- Görünmeyenler: Claude Code ve Copilot CLI'larının kendi istekleri (ayrı
+  süreçler), electron-updater'ın indirmeleri ve git.
+
+Kip `settings.json`'da `debugMode` olarak saklanır; bir ayar değildir,
+Ayarlar'da listelenmez ve asistanın araçları değiştiremez.
+
 ## Bilinen sınırlar
 
 - Tablo rengi ve sütun genişliği yalnızca en üst düzeydeki tablolarda

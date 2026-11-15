@@ -67,6 +67,7 @@ import { PermissionGate } from "./assistant-permissions.js";
 import type { Connections, DocumentSnapshot, ToolContext, ToolResult } from "./assistant-tools.js";
 import { allTools, approver, RendererCalls, runTool, toolsFor } from "./assistant-tools.js";
 import { ModelCatalog } from "./model-catalog.js";
+import { networkLog } from "./network-log.js";
 import { ReviewRun, ReviewRuns } from "./review-run.js";
 import "./assistant-app-tools.js";
 import "./assistant-form-tools.js";
@@ -294,7 +295,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 	const cliCatalog = new CliCatalog();
 	const catalog = new ModelCatalog(
 		join(app.getPath("userData"), "assistant-models.json"),
-		(url, init) => net.fetch(url, init),
+		networkLog.trace("assistant", (url: string, init?: RequestInit) => net.fetch(url, init)),
 	);
 	/** Changes the models proposed in this run, until they are applied. */
 	const proposals = new Map<string, KeptEdit>();

@@ -19,6 +19,9 @@ export interface MenuContext {
 	closeFolder(): void;
 	changeSettings(patch: Partial<Settings>): void;
 	changeLanguage(language: Lang | null): void;
+	/** The hidden debug mode is on: the View menu offers the network log and the developer tools. */
+	readonly debugMode: boolean;
+	setDebugMode(on: boolean): void;
 	clearRecentFiles(): void;
 	exportPdf(doc: AppWindow): void;
 	print(doc: AppWindow): void;
@@ -444,9 +447,16 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 								click: () => ctx.changeSettings({ tray: !settings.tray }),
 							} satisfies MenuItemConstructorOptions,
 						]),
-				...(app.isPackaged
+				...(app.isPackaged && !ctx.debugMode
 					? []
 					: [{ label: t.devTools, role: "toggleDevTools" } satisfies MenuItemConstructorOptions]),
+				...(ctx.debugMode
+					? ([
+							{ type: "separator" },
+							{ label: t.networkLog, accelerator: "F12", click: send(ctx, "network-log") },
+							{ label: t.debugModeOff, click: () => ctx.setDebugMode(false) },
+						] satisfies MenuItemConstructorOptions[])
+					: []),
 			],
 		},
 		{

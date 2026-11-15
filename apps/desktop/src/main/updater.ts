@@ -2,6 +2,7 @@ import type { BrowserWindow, MessageBoxOptions } from "electron";
 import { app, dialog, net, shell } from "electron";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
+import { networkLog } from "./network-log.js";
 import type { SettingsStore } from "./settings.js";
 import type { Release } from "./updates.js";
 import {
@@ -13,6 +14,11 @@ import {
 	RELEASES_URL,
 } from "./updates.js";
 import { errorMessage } from "./windows.js";
+
+/** Electron's fetch, its requests in the debug mode's network log. */
+const fetch = networkLog.trace("updates", (url: string, init?: RequestInit) =>
+	net.fetch(url, init),
+);
 
 export interface UpdaterOptions {
 	readonly store: SettingsStore;
@@ -91,18 +97,19 @@ export class Updater {
 	/** From the API, or from the releases feed when the API turns the request away. */
 	async #latest(): Promise<Release | null> {
 		const headers = { "User-Agent": "Kalem" };
-		const response = await net.fetch(RELEASES_URL, {
+		const response = await fetch(RELEASES_URL, {
 			headers: { ...headers, Accept: "application/vnd.github+json" },
 		});
 		if (response.ok) return latestRelease(await response.json());
 
-		const feed = await net.fetch(RELEASES_FEED_URL, { headers }).catch(() => null);
+		const feed = await fetch(RELEASES_FEED_URL, { headers }).catch(() => null);
 		if (feed === null || !feed.ok) throw new Error(`GitHub: ${response.status}`);
 		const release = latestReleaseInFeed(await feed.text());
 		if (release === null) return null;
-		const manifest = await net
-			.fetch(`${release.downloads}/latest.yml`, { method: "HEAD", headers })
-			.catch(() => null);
+		const manifest = await fetch(`${release.downloads}/latest.yml`, {
+			method: "HEAD",
+			headers,
+		}).catch(() => null);
 		return { ...release, installable: manifest?.ok === true };
 	}
 

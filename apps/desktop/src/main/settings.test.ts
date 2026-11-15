@@ -15,6 +15,7 @@ describe("parseStoredState", () => {
 				welcomed: false,
 				workspaces: [],
 				lastUpdateCheck: null,
+				debugMode: false,
 			});
 		}
 	});

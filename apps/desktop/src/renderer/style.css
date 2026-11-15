@@ -12774,3 +12774,361 @@ dialog {
 .jira-dialog .jira-body {
 	grid-auto-rows: max-content;
 }
+
+/* --- The hidden debug mode's network log (network-panel.ts) ------------------- */
+
+.settings-actions {
+	align-items: center;
+}
+
+.settings-version {
+	margin-inline-end: auto;
+	color: var(--app-muted);
+	font-size: 11px;
+	opacity: 0.7;
+	user-select: none;
+}
+
+.network-panel {
+	position: fixed;
+	inset: auto 0 0;
+	z-index: 70;
+	display: flex;
+	flex-direction: column;
+	min-height: 140px;
+	border-top: 1px solid var(--app-border);
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: 0 -6px 24px rgb(0 0 0 / 14%);
+	font-size: 12px;
+}
+
+.network-panel[hidden] {
+	display: none;
+}
+
+.network-resize {
+	position: absolute;
+	inset: -4px 0 auto;
+	height: 8px;
+	cursor: ns-resize;
+}
+
+.network-resize:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -3px;
+}
+
+.network-toolbar,
+.network-footer,
+.network-detail-head,
+.network-body-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+}
+
+.network-toolbar {
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--app-border);
+	background: var(--app-surface);
+}
+
+.network-title {
+	margin-inline-end: 4px;
+	font-size: 13px;
+}
+
+.network-spacer {
+	flex: 1;
+}
+
+.network-tool,
+.network-source {
+	padding: 3px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 5px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	cursor: pointer;
+}
+
+.network-tool:hover,
+.network-source:hover {
+	background: var(--app-hover);
+}
+
+.network-tool:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.network-record[aria-pressed="true"] {
+	color: var(--app-error);
+}
+
+.network-close {
+	min-width: 26px;
+	font-size: 15px;
+	line-height: 1;
+}
+
+.network-filter {
+	width: 220px;
+	padding: 3px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 5px;
+	background: var(--app-page);
+	color: var(--app-text);
+	font: inherit;
+}
+
+.network-sources {
+	display: inline-flex;
+}
+
+.network-source {
+	border-radius: 0;
+	margin-inline-start: -1px;
+}
+
+.network-source:first-child {
+	border-start-start-radius: 5px;
+	border-end-start-radius: 5px;
+}
+
+.network-source:last-child {
+	border-start-end-radius: 5px;
+	border-end-end-radius: 5px;
+}
+
+.network-source[aria-pressed="true"] {
+	position: relative;
+	background: var(--app-pressed);
+	color: var(--app-accent);
+	font-weight: 600;
+}
+
+.network-body {
+	display: flex;
+	flex: 1;
+	min-height: 0;
+}
+
+.network-list {
+	flex: 1;
+	min-width: 0;
+	overflow: auto;
+}
+
+.network-panel.has-detail .network-list {
+	flex: 0 0 42%;
+	border-inline-end: 1px solid var(--app-border);
+}
+
+.network-list:focus-visible {
+	outline: 1px solid var(--app-accent);
+	outline-offset: -1px;
+}
+
+.network-table {
+	width: 100%;
+	border-collapse: collapse;
+	table-layout: fixed;
+}
+
+.network-table th {
+	position: sticky;
+	top: 0;
+	padding: 4px 8px;
+	border-bottom: 1px solid var(--app-border);
+	background: var(--app-surface);
+	color: var(--app-muted);
+	font-weight: 600;
+	text-align: start;
+	white-space: nowrap;
+}
+
+.network-table th:nth-child(1) {
+	width: 74px;
+}
+
+.network-table th:nth-child(2) {
+	width: 62px;
+}
+
+.network-table th:nth-child(4) {
+	width: 94px;
+}
+
+.network-table th:nth-child(5),
+.network-table th:nth-child(6) {
+	width: 74px;
+	text-align: end;
+}
+
+.network-row td {
+	overflow: hidden;
+	padding: 3px 8px;
+	border-bottom: 1px solid var(--app-border);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.network-row {
+	cursor: default;
+}
+
+.network-panel.has-detail .network-table th:nth-child(n + 4),
+.network-panel.has-detail .network-row td:nth-child(n + 4) {
+	display: none;
+}
+
+.network-method,
+.network-number,
+.network-status {
+	font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.network-row:hover {
+	background: var(--app-hover);
+}
+
+.network-row[aria-selected="true"] {
+	background: var(--app-pressed);
+}
+
+.network-row.is-error .network-status,
+.network-row.is-error .network-name > :first-child {
+	color: var(--app-error);
+}
+
+.network-row.is-ok .network-status {
+	color: var(--app-ok);
+}
+
+.network-row.is-redirect .network-status,
+.network-row.is-pending .network-status {
+	color: var(--app-muted);
+}
+
+.network-number {
+	text-align: end;
+}
+
+.network-host {
+	margin-inline-start: 8px;
+	color: var(--app-muted);
+}
+
+.network-empty {
+	margin: 0;
+	padding: 18px 12px;
+	color: var(--app-muted);
+	text-align: center;
+}
+
+.network-detail {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.network-detail[hidden] {
+	display: none;
+}
+
+.network-detail-head {
+	padding: 4px 8px;
+	border-bottom: 1px solid var(--app-border);
+}
+
+.network-tabs {
+	display: inline-flex;
+	gap: 2px;
+}
+
+.network-tab {
+	padding: 4px 10px;
+	border: 0;
+	border-bottom: 2px solid transparent;
+	background: none;
+	color: var(--app-muted);
+	font: inherit;
+	cursor: pointer;
+}
+
+.network-tab[aria-selected="true"] {
+	border-bottom-color: var(--app-accent);
+	color: var(--app-text);
+	font-weight: 600;
+}
+
+.network-detail-body {
+	flex: 1;
+	min-height: 0;
+	padding: 8px 12px;
+	overflow: auto;
+}
+
+.network-section + .network-section {
+	margin-top: 12px;
+}
+
+.network-section h3 {
+	margin: 0 0 4px;
+	font-size: 12px;
+}
+
+.network-headers {
+	display: grid;
+	grid-template-columns: minmax(120px, max-content) 1fr;
+	gap: 2px 12px;
+	margin: 0;
+	font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.network-headers dt {
+	color: var(--app-muted);
+}
+
+.network-headers dd {
+	margin: 0;
+	overflow-wrap: anywhere;
+	user-select: text;
+}
+
+.network-note {
+	margin: 0;
+	color: var(--app-muted);
+}
+
+.network-body-head {
+	margin-bottom: 6px;
+}
+
+.network-pre {
+	margin: 0;
+	font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+	user-select: text;
+}
+
+.network-footer {
+	padding: 3px 10px;
+	border-top: 1px solid var(--app-border);
+	background: var(--app-surface);
+	color: var(--app-muted);
+}
+
+.network-paused {
+	color: var(--app-warning);
+}
+
+.network-paused[hidden] {
+	display: none;
+}

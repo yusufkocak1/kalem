@@ -20,8 +20,10 @@ export interface JiraIpcContext {
 	strings(): Strings;
 }
 
+const jiraFetch = atlassianFetch("jira");
+
 export function jiraClient(credentials: ConfluenceCredentials): JiraClient {
-	return new JiraClient(credentials, atlassianFetch);
+	return new JiraClient(credentials, jiraFetch);
 }
 
 /**
