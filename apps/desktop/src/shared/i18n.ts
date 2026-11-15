@@ -1183,7 +1183,7 @@ const en = {
 	reviewUndoOtherTab: "{0} was changed in another document: open that tab to undo it.",
 	changesButton: "Changes",
 	changesTitle: "Changes to “{0}”",
-	changesSummary: "{0} lines added, {1} removed, in {2} places",
+	changesSummary: "{0} line(s) added, {1} removed, in {2} place(s)",
 	changesNone: "No changes since the page was opened or last saved.",
 	changesBase: "Confluence (last saved)",
 	changesYours: "Your version",

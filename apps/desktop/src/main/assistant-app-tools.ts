@@ -10,6 +10,7 @@ import {
 	ASSISTANT_COMMANDS,
 	actionsFromReply,
 	applyActions,
+	commandLabel,
 	isAssistantCommand,
 	isDocumentAction,
 } from "../shared/actions.js";
@@ -491,7 +492,7 @@ const COMMAND_TOOLS: readonly KalemTool[] = [
 			const command = text(input, "command");
 			if (!isAssistantCommand(command)) return `No command named ${command}.`;
 			const view = VIEW_COMMANDS.has(command);
-			const line = `${command}: ${ASSISTANT_COMMANDS[command]}`;
+			const line = commandLabel(ctx.t, command);
 			const answer = await ctx.approve({
 				tool: "app_command",
 				risk: view ? "ui" : "document",

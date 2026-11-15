@@ -117,7 +117,7 @@ test("shows a page's changes as a diff, undoes one, and saves the rest from ther
 	await expect(changes).toBeVisible();
 	await expect(changes.locator(".changes-title")).toHaveText("Changes to “Sprint Planı”");
 	await expect(changes.locator(".changes-summary")).toHaveText(
-		"1 lines added, 1 removed, in 1 places",
+		"1 line(s) added, 1 removed, in 1 place(s)",
 	);
 	await expect(changes.locator(".changes-row.remove .changes-text")).toHaveText("Hedef");
 	await expect(changes.locator(".changes-row.add .changes-text")).toHaveText("Hedef eklendi");
@@ -555,6 +555,14 @@ test("mentions a person with @ and adds a Jira issue from the / menu, inside a l
 	await expect(page.locator("#editor p").first()).toHaveText(
 		"Hedef için @Ayşe Balcı Polat ve ABC-7 bitti",
 	);
+
+	// The changes read as the page does, not as the links the atoms are kept in.
+	await page.locator(".ribbon-changes").click();
+	const changes = page.locator("dialog.changes");
+	await expect(changes.locator(".changes-row.add .changes-text")).toHaveText(
+		"Hedef için @Ayşe Balcı Polat ve ABC-7 bitti",
+	);
+	await changes.getByRole("button", { name: "Close", exact: true }).last().click();
 
 	const asked = await recordMessageBoxes(app, 0);
 	await page.locator('[data-command="save"]').click();

@@ -8,6 +8,7 @@ import { markdownToStorage } from "../shared/confluence-storage.js";
 import { markdownToWiki } from "../shared/confluence-wiki.js";
 import { format } from "../shared/i18n.js";
 import { fieldMetasOf } from "../shared/jira-write.js";
+import { parentLine } from "./assistant-confluence-tools.js";
 import { FIELDS_HELP, resolveFields, typeIdOf } from "./assistant-jira-tools.js";
 import type { KalemTool, ToolContext } from "./assistant-tools.js";
 import { registerTools } from "./assistant-tools.js";
@@ -211,12 +212,19 @@ const TOOLS: readonly KalemTool[] = [
 			}
 			if (step.needs.length > 0)
 				return `That step asks for ${step.needs.join(", ")}: the user takes it in Jira.`;
+			// From the status it is in to the one it goes to; the step's own name
+			// after it. "QR-1: Start Test → Test" read as if it were in "Start Test".
+			const now = await jira.row(key).then(
+				(row) => row.status,
+				() => "",
+			);
+			const named = fold(step.name) === fold(step.to) ? "" : ` (${step.name})`;
 			const answer = await ctx.approve({
 				tool: "jira_transition",
 				risk: "external",
 				permission: "jira",
 				title: format(ctx.t.approvalJiraTransition, key),
-				lines: [`${key}: ${step.name} → ${step.to}`],
+				lines: [`${key}: ${now === "" ? "" : `${now} `}→ ${step.to}${named}`],
 			});
 			if (!answer.approved) return REFUSED;
 			await jira.transition(key, step.id);
@@ -282,7 +290,7 @@ const TOOLS: readonly KalemTool[] = [
 				risk: "external",
 				permission: "confluence",
 				title: format(ctx.t.approvalConfluenceCreate, title, space),
-				lines: parent === null ? [] : [format(ctx.t.approvalConfluenceParent, parent)],
+				lines: parent === null ? [] : [await parentLine(ctx, confluence, parent)],
 				preview: preview(markdown),
 			});
 			if (!answer.approved) return REFUSED;

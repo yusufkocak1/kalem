@@ -103,6 +103,13 @@ describe("findSettings", () => {
 		expect(matchesQuery(foldSearch("Tam Genişlik"), "genis tam")).toBe(true);
 	});
 
+	/** Keşif testi: the assistant asked for "yakınlaştırma" and was told there is no such setting. */
+	it("finds a setting by a word with a Turkish ending on it", () => {
+		expect(keys(tr, "yakınlaştırma")).toEqual(["zoom"]);
+		expect(keys(tr, "temayı koyuya")).toEqual(["theme"]);
+		expect(keys(tr, "yazım denetimini")).toEqual(["spellCheck"]);
+	});
+
 	it("leaves out hidden settings unless asked", () => {
 		expect(keys(en, "")).not.toContain("claudePath");
 		expect(findSettings(en, "", { includeHidden: true }).map((def) => def.key)).toContain(

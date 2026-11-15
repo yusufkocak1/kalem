@@ -88,3 +88,19 @@ test("K-14: formatting a broken JSON file says the file is not valid JSON", asyn
 	expect(errors).toEqual([]);
 	await app.close();
 });
+
+test("settings search finds a setting by a word with a Turkish ending", async () => {
+	const { app, page, errors } = await launch({ settings: { language: "tr" } });
+	await clickMenu(app, "Dosya", "Ayarlar…");
+	const dialog = page.locator(".settings-dialog");
+	// "yakınlaştırma" is the setting's keyword "yakınlaştır" with an ending; it found nothing.
+	await dialog.locator(".settings-search").fill("yakınlaştırma");
+	await expect(dialog.locator('[data-setting="zoom"]')).toBeVisible();
+	await expect(dialog.locator(".settings-empty")).toBeHidden();
+	// As typed it still wins: "yazım" is spell check, not the zoom's "yazı boyutu".
+	await dialog.locator(".settings-search").fill("yazım");
+	await expect(dialog.locator('input[data-setting="spellCheck"]')).toBeVisible();
+	await expect(dialog.locator('[data-setting="zoom"]')).toBeHidden();
+	expect(errors).toEqual([]);
+	await app.close();
+});

@@ -831,6 +831,21 @@ export function matchesQuery(text: string, query: string): boolean {
 	return words.every((word) => text.includes(word));
 }
 
+/**
+ * Whether every word of the query starts with one of the text's words
+ * (four letters or more), or is in it. Turkish adds its endings to the
+ * word: "yakınlaştırma" is "yakınlaştır" with one, "temayı" is "tema".
+ * Looser than {@link matchesQuery}, so it is tried only when that finds
+ * nothing ("yazım" would find "yazı boyutu" too).
+ */
+export function matchesStems(text: string, query: string): boolean {
+	const words = foldSearch(query)
+		.split(/\s+/)
+		.filter((word) => word !== "");
+	const stems = text.split(/[^\p{L}\p{N}]+/u).filter((stem) => stem.length >= 4);
+	return words.every((word) => text.includes(word) || stems.some((stem) => word.startsWith(stem)));
+}
+
 /** The settings a query finds, the ones whose name has it first; hidden ones are left out unless asked. */
 export function findSettings(
 	t: Strings,
@@ -842,7 +857,10 @@ export function findSettings(
 		(def) => options.includeHidden === true || def.assistant !== "hidden",
 	);
 	if (folded === "") return candidates;
-	const found = candidates.filter((def) => matchesQuery(searchText(t, def), folded));
+	const exact = candidates.filter((def) => matchesQuery(searchText(t, def), folded));
+	// The assistant asked for "yakınlaştırma" and was told there is no such setting.
+	const found =
+		exact.length > 0 ? exact : candidates.filter((def) => matchesStems(searchText(t, def), folded));
 	const named = (def: SettingDef): number =>
 		def.label !== null && foldSearch(t[def.label]).includes(folded) ? 0 : 1;
 	return found.sort((a, b) => named(a) - named(b));

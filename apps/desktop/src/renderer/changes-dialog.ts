@@ -6,6 +6,7 @@
  * (one editor edit: Ctrl+Z brings it back), all of them at once, or the
  * page saved to Confluence from here.
  */
+import { atomsAsText } from "../shared/confluence-storage.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type { DiffHunk, DiffRow, WordPart } from "../shared/text-diff.js";
@@ -209,13 +210,18 @@ export function createChangesDialog(options: ChangesDialogOptions): {
 		});
 	}
 
+	/**
+	 * A row as it is read: Confluence's mentions and Jira issues by their
+	 * text, not their `#confluence-keep-…` links. The comparison itself, and
+	 * undoing a part of it, work on the Markdown as it is.
+	 */
 	function parts(row: DiffRow, pairs: Map<DiffRow, DiffRow>): (Node | string)[] {
 		const other = pairs.get(row);
-		if (other === undefined || row.kind === " ") return [row.text === "" ? " " : row.text];
+		const text = atomsAsText(row.text);
+		if (other === undefined || row.kind === " ") return [text === "" ? " " : text];
+		const otherText = atomsAsText(other.text);
 		const words =
-			row.kind === "-"
-				? wordDiff(row.text, other.text).before
-				: wordDiff(other.text, row.text).after;
+			row.kind === "-" ? wordDiff(text, otherText).before : wordDiff(otherText, text).after;
 		return words.map((part: WordPart) =>
 			part.changed ? el("mark", { class: "changes-word", text: part.text }) : part.text,
 		);

@@ -1,7 +1,7 @@
 import { parse } from "@kalem-editor/core";
 import { renderToDOM } from "@kalem-editor/viewer";
-import type { AssistantAction, AssistantCommand, DocumentAction } from "../shared/actions.js";
-import { isDocumentAction } from "../shared/actions.js";
+import type { AssistantAction, DocumentAction } from "../shared/actions.js";
+import { commandLabel, isDocumentAction } from "../shared/actions.js";
 import type {
 	AssistantPlace,
 	AssistantStatus,
@@ -2554,35 +2554,6 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 	// --- Proposed changes ------------------------------------------------------------
 
-	const strip = (label: string): string => label.replace(/…$/, "");
-	const COMMAND_LABELS: Readonly<Record<AssistantCommand, string>> = {
-		save: t.save,
-		"save-as": t.saveAs,
-		"save-as-package": t.saveAsPackage,
-		"export-docx": exportLabel(t.exportDocx),
-		"export-html": exportLabel(t.exportHtml),
-		"export-confluence": exportLabel(t.exportConfluence),
-		"export-confluence-wiki": exportLabel(t.exportConfluenceWiki),
-		"version-history": t.versionHistory,
-		find: t.find,
-		replace: t.replace,
-		image: t.image,
-		"attach-file": t.attachFile,
-		diagram: t.diagramInsert,
-		table: t.insertTable,
-		source: t.markdownSource,
-		"read-only": t.readOnly,
-		focus: t.focusMode,
-		"zoom-in": t.zoomIn,
-		"zoom-out": t.zoomOut,
-		"zoom-reset": t.zoomReset,
-		"quick-open": t.quickOpen,
-		"search-folder": t.searchFolder,
-		"format-all-code": t.formatAllCode,
-		undo: t.undo,
-		redo: t.redo,
-	};
-
 	/** The changes of each reply that were applied, by the card's place in the reply. */
 	const applied = new WeakMap<Message, Set<number>>();
 
@@ -2690,7 +2661,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			children.push(card);
 		}
 		for (const command of commandsToRun) {
-			const label = strip(COMMAND_LABELS[command]);
+			const label = commandLabel(t, command);
 			const go = button(t.assistantRun, { icon: "chevron", title: label });
 			go.addEventListener("click", () => host.runCommand(command));
 			children.push(
