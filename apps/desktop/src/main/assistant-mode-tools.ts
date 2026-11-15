@@ -11,6 +11,7 @@ import type { Settings } from "../shared/bridge.js";
 import { format } from "../shared/i18n.js";
 import type { McpPreset } from "../shared/mcp-presets.js";
 import { MCP_PRESETS, presetServer } from "../shared/mcp-presets.js";
+import { runtimeOf } from "../shared/mcp-runtimes.js";
 import type { McpServer } from "../shared/mcp-servers.js";
 import { MAX_SERVERS, parseMcpServer, serverName } from "../shared/mcp-servers.js";
 import type { Mode } from "../shared/mode-config.js";
@@ -18,6 +19,7 @@ import { MODES, resolveMode, storeMode } from "../shared/mode-config.js";
 import { customModeOf, MODE_LABELS, modesUsingServers, renameServerRefs } from "../shared/modes.js";
 import type { KalemTool, ToolContext } from "./assistant-tools.js";
 import { registerTools } from "./assistant-tools.js";
+import { findProgram } from "./mcp-probe.js";
 
 const record = (raw: unknown): Record<string, unknown> =>
 	typeof raw === "object" && raw !== null && !Array.isArray(raw)
@@ -82,6 +84,17 @@ function builtinRef(ctx: ToolContext, mode: Mode): ModeRef {
 /** A server as the model may know it: what it is for, not how it runs. */
 const serverLine = (server: McpServer): string =>
 	`  - ${server.name}${server.enabled ? "" : " (off)"}${server.tools.length === 0 ? " — all tools" : ` — tools: ${server.tools.join(", ")}`}${server.preset === "" ? "" : ` — from ${server.preset}`}${server.purpose === "" ? "" : `\n    for: ${server.purpose}`}`;
+
+/** A server whose command is not on this computer: what to install, for the user. */
+async function missingLine(server: McpServer): Promise<string> {
+	if (server.transport !== "stdio" || (await findProgram(server.command)) !== null) return "";
+	const runtime = runtimeOf(server.command);
+	return `\n    NOT INSTALLED: its command ${server.command} is not on this computer, so it cannot start. ${
+		runtime === null
+			? "Tell the user to install the program it runs with, or to write its full path in Settings › Assistant › MCP servers."
+			: `It comes with ${runtime.label} (${runtime.link}); tell the user to install it (${runtime.install.map((step) => `${step.system}: ${step.command}`).join("; ")}) and to restart Kalem.`
+	}`;
+}
 
 const presetLine = (ctx: ToolContext, preset: McpPreset): string => {
 	const placeholders = [
@@ -200,10 +213,12 @@ const MODE_TOOLS: readonly KalemTool[] = [
 				"The assistant's MCP servers (set up once; each mode chooses which it uses):",
 				...(servers.length === 0
 					? ["  none"]
-					: servers.map((server) => {
-							const using = modes.filter((mode) => mode.mcp.includes(server.name));
-							return `${serverLine(server)}\n    used in: ${using.length === 0 ? "no mode" : using.map((mode) => mode.id).join(", ")}`;
-						})),
+					: await Promise.all(
+							servers.map(async (server) => {
+								const using = modes.filter((mode) => mode.mcp.includes(server.name));
+								return `${serverLine(server)}\n    used in: ${using.length === 0 ? "no mode" : using.map((mode) => mode.id).join(", ")}${await missingLine(server)}`;
+							}),
+						)),
 				"",
 				"Modes and the servers they use:",
 				...modes.map((mode) => {

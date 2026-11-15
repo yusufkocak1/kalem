@@ -1060,6 +1060,8 @@ export interface KalemBridge {
 	assistantCliCommands(folders: readonly string[]): Promise<readonly CliCommandInfo[]>;
 	/** Starts a mode's MCP server and asks it which tools it has. */
 	mcpListTools(server: McpServer): Promise<McpToolList>;
+	/** Where an MCP server's command is on this computer; `null` when it is not found. */
+	mcpFindCommand(command: string): Promise<string | null>;
 	onAssistantApproval(handler: (request: ApprovalRequest) => void): () => void;
 	/** The user's own notes on a document (see `local-notes.ts`), by its key. */
 	localNotes(key: string): Promise<readonly LocalNote[]>;
@@ -1235,4 +1237,5 @@ export const CHANNEL = {
 	assistantCompact: "kalem:assistant-compact",
 	assistantCliCommands: "kalem:assistant-cli-commands",
 	mcpListTools: "kalem:mcp-list-tools",
+	mcpFindCommand: "kalem:mcp-find-command",
 } as const;

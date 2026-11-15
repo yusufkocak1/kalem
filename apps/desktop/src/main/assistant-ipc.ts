@@ -83,7 +83,7 @@ import { cliCommands } from "./cli-commands.js";
 import type { ConfluenceClient } from "./confluence-client.js";
 import type { JiraClient } from "./jira-client.js";
 import { askApi, listModels } from "./llm.js";
-import { listMcpTools } from "./mcp-probe.js";
+import { findProgram, listMcpTools } from "./mcp-probe.js";
 import type { SettingsStore } from "./settings.js";
 import type { TemplateStore } from "./templates.js";
 import type { AppWindow } from "./windows.js";
@@ -1329,6 +1329,10 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		if (server === undefined) return { ok: false, error: ctx.strings().mcpToolsNoProject };
 		return listMcpTools(server);
 	});
+
+	ipcMain.handle(CHANNEL.mcpFindCommand, (_event, command: unknown) =>
+		typeof command === "string" ? findProgram(command.slice(0, 1000)) : null,
+	);
 
 	ipcMain.handle(
 		CHANNEL.assistantCompact,

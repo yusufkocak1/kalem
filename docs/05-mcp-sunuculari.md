@@ -24,6 +24,14 @@ veritabanına da ekler.
 | **uv** (`uvx` ile çalışan sunucular için) | Git ve Fetch. Kurulum: <https://docs.astral.sh/uv/> |
 | Sunucunun kendi gereksinimleri | Örneğin Fortify için `fcli`, Graylog için Graylog 7.0 veya sonrası, GitHub için bir token. |
 
+Bir sunucunun komutu (`npx`, `uvx`, `docker`…) bilgisayarda bulunamazsa
+kartında bir uyarı çıkar: programın ne olduğu, neden gerektiği ve
+sisteminize göre kopyalanabilir kurulum komutları. Kurduktan sonra Kalem'i
+yeniden açın ya da **Yeniden kontrol et**'e basın. Python'un kurulum
+paketinde uv **yoktur**; Python kuruluysa `pip install uv` yeterlidir.
+Asistan da `mode_mcp_list` ile hangi sunucunun komutunun eksik olduğunu
+görür ve size ne kurmanız gerektiğini söyler.
+
 ---
 
 ## 2. Asistana MCP sunucusu eklemek ve modlarda seçmek

@@ -5,7 +5,8 @@
  * events). It is started, asked, and stopped.
  */
 import { spawn } from "node:child_process";
-import { delimiter } from "node:path";
+import { stat } from "node:fs/promises";
+import { delimiter, isAbsolute, join } from "node:path";
 import type { McpServer, McpToolInfo, McpToolList } from "../shared/mcp-servers.js";
 import { parseToolList } from "../shared/mcp-servers.js";
 
@@ -225,4 +226,45 @@ export async function listMcpTools(
 	} catch (error) {
 		return { ok: false, error: errorText(error) };
 	}
+}
+
+/**
+ * Where a server's command is on this computer, as the CLIs would start it
+ * (`PATH`, and on Windows the extensions `PATHEXT` names); `null` when it
+ * is in none of them.
+ */
+export async function findProgram(
+	command: string,
+	env: NodeJS.ProcessEnv = programEnvironment(),
+	platform: NodeJS.Platform = process.platform,
+): Promise<string | null> {
+	const name = command.trim();
+	if (name === "") return null;
+	const windows = platform === "win32";
+	const value = (key: string): string =>
+		Object.entries(env).find(
+			([each]) => each === key || (windows && each.toLocaleUpperCase("en") === key),
+		)?.[1] ?? "";
+	const extensions = windows
+		? ["", ...(value("PATHEXT") || ".COM;.EXE;.BAT;.CMD").split(";").filter((ext) => ext !== "")]
+		: [""];
+	const isFile = (path: string): Promise<boolean> =>
+		stat(path).then(
+			(found) => found.isFile(),
+			() => false,
+		);
+	const separator = windows ? /[\\/]/ : /\//;
+	const folders =
+		isAbsolute(name) || separator.test(name)
+			? [""]
+			: value("PATH")
+					.split(windows ? ";" : delimiter)
+					.filter((folder) => folder !== "");
+	for (const folder of folders) {
+		for (const extension of extensions) {
+			const path = folder === "" ? `${name}${extension}` : join(folder, `${name}${extension}`);
+			if (await isFile(path)) return path;
+		}
+	}
+	return null;
 }

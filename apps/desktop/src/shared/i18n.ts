@@ -995,6 +995,22 @@ const en = {
 	mcpToolsKeepOne: "At least one tool stays on; to use none, turn the server off.",
 	mcpToolsMissing: "not offered by the server",
 	mcpToolsInvalid: "Fill in the server's command or address first.",
+	mcpMissing: "“{0}” is not installed on this computer: this server cannot start.",
+	mcpMissingInstall: "Install {0}:",
+	mcpMissingLink: "More: {0}",
+	mcpMissingRestart:
+		"Once it is installed, close Kalem and open it again so it finds the new command.",
+	mcpMissingAgain: "Check again",
+	mcpMissingOther:
+		"Install the program the server runs with, or write its full path in Command. The server's guide (or its page) says what it needs.",
+	mcpRuntimeNode:
+		"npx comes with Node.js, the JavaScript runtime. npx downloads the server's package the first time it is used and runs it; nothing else needs installing. Install the LTS version.",
+	mcpRuntimeUv:
+		"uvx comes with uv, a small tool for Python programs (Serena is one). uvx downloads the server the first time it is used and runs it in a place of its own, without touching other Python installs; it fetches a suitable Python itself, so Python need not be installed. Python's installer does not include uv; with Python already installed, pip install uv is enough.",
+	mcpRuntimeDocker:
+		"docker is Docker's command: it runs the server in a container. Install Docker Desktop and start it before asking the assistant.",
+	mcpRuntimePython:
+		"The server is a Python program. Install Python 3 (tick “Add python.exe to PATH” on Windows). uv (uvx) is often an easier way to run Python servers.",
 	mcpToolsNoProject:
 		"It works on the folder of each question (${project}): open a folder in the Files pane to list its tools.",
 	mcpRemove: "Remove the server",
@@ -2631,6 +2647,21 @@ const tr: Strings = {
 	mcpToolsKeepOne: "En az bir araç açık kalır; hiçbirini kullanmamak için sunucuyu kapatın.",
 	mcpToolsMissing: "sunucu sunmuyor",
 	mcpToolsInvalid: "Önce sunucunun komutunu ya da adresini doldurun.",
+	mcpMissing: "“{0}” bu bilgisayarda kurulu değil: bu sunucu başlatılamaz.",
+	mcpMissingInstall: "{0} kurulumu:",
+	mcpMissingLink: "Ayrıntı: {0}",
+	mcpMissingRestart: "Kurduktan sonra yeni komutu bulması için Kalem'i kapatıp yeniden açın.",
+	mcpMissingAgain: "Yeniden kontrol et",
+	mcpMissingOther:
+		"Sunucunun çalıştığı programı kurun ya da Komut alanına tam yolunu yazın. Sunucunun kılavuzu (ya da sayfası) neye ihtiyaç duyduğunu yazar.",
+	mcpRuntimeNode:
+		"npx, JavaScript çalıştırma ortamı Node.js ile gelir. npx sunucunun paketini ilk kullanımda indirip çalıştırır; başka bir şey kurmanız gerekmez. LTS sürümünü kurun.",
+	mcpRuntimeUv:
+		"uvx, Python programları için küçük bir araç olan uv ile gelir (Serena da bir Python programıdır). uvx sunucuyu ilk kullanımda indirir ve diğer Python kurulumlarınıza dokunmadan kendi yerinde çalıştırır; uygun Python'u kendisi getirir, ayrıca Python kurmanız gerekmez. Python'un kurulum paketinde uv yoktur; Python zaten kuruluysa pip install uv yeterlidir.",
+	mcpRuntimeDocker:
+		"docker, Docker'ın komutudur: sunucuyu bir konteynerde çalıştırır. Docker Desktop'ı kurun ve asistana sormadan önce başlatın.",
+	mcpRuntimePython:
+		"Sunucu bir Python programı. Python 3'ü kurun (Windows'ta “Add python.exe to PATH” kutusunu işaretleyin). Python sunucularını çalıştırmanın daha kolay yolu çoğu zaman uv'dir (uvx).",
 	mcpToolsNoProject:
 		"Her sorunun klasöründe çalışır (${project}): araçlarını listelemek için Dosyalar panelinde bir klasör açın.",
 	mcpRemove: "Sunucuyu kaldır",

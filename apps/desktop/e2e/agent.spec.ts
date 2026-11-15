@@ -794,6 +794,44 @@ test("one of Kalem's modes uses the assistant's MCP servers too, and the model i
 	await app.close();
 });
 
+test("a server whose command is not on this computer says what it is and how to install it", async () => {
+	const folder = await tempDir("agent-mcp-missing");
+	const doc = join(folder, "notlar.md");
+	await writeFile(doc, "# Notlar\n");
+	const bin = join(folder, "bin");
+	await mkdir(bin);
+	const { app, page, errors } = await launch({
+		args: [doc],
+		settings: { assistant: true },
+		// Neither uv nor anything else is on this PATH.
+		env: { PATH: bin },
+	});
+	await clickMenu(app, "File", "Settings…");
+	const settings = page.locator(".settings-dialog");
+	await settings.locator('[data-category="assistant"]').click();
+	// Serena, which the assistant starts with, needs uvx: what uv is and how it is installed.
+	const missing = settings.locator('.mcp-card[data-server="serena"] .mcp-missing');
+	await expect(missing).toBeVisible();
+	await expect(missing).toHaveAttribute("data-runtime", "uv");
+	await expect(missing).toContainText("“uvx” is not installed on this computer");
+	await expect(missing).toContainText("uvx comes with uv");
+	await expect(missing).toContainText("pip install uv");
+	await expect(missing.locator(".mcp-sample-text").first()).toContainText("install.ps1");
+	// Once it is there, looking again finds it.
+	await writeFile(join(bin, "uvx"), "#!/bin/sh\n");
+	await chmod(join(bin, "uvx"), 0o755);
+	await missing.getByRole("button", { name: "Check again" }).click();
+	await expect(settings.locator('.mcp-card[data-server="serena"] .mcp-missing')).toBeHidden();
+	// A program Kalem does not know: how to go on.
+	await settings.getByRole("button", { name: "Add an MCP server" }).click();
+	const card = settings.locator(".mcp-card").last();
+	await card.getByRole("textbox", { name: "Command" }).fill("kalem-no-such-program");
+	await card.getByRole("textbox", { name: "Command" }).press("Tab");
+	await expect(card.locator(".mcp-missing")).toContainText("write its full path in Command");
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
 test("templates: the team's and the user's own, a default, and new documents from them", async () => {
 	const folder = await tempDir("agent-templates");
 	await mkdir(join(folder, ".kalem", "templates"), { recursive: true });

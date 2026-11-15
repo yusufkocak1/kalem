@@ -2,6 +2,7 @@ import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type { McpPreset } from "../shared/mcp-presets.js";
 import { MCP_PRESETS, presetServer } from "../shared/mcp-presets.js";
+import { runtimeOf } from "../shared/mcp-runtimes.js";
 import type { McpServer, McpToolList } from "../shared/mcp-servers.js";
 import { newMcpServer, RESERVED_SERVER, serverName, toggleTool } from "../shared/mcp-servers.js";
 import { el } from "./dom.js";
@@ -20,6 +21,8 @@ export interface McpSectionOptions {
 	usedIn(name: string): readonly string[];
 	/** Starts a server and asks it which tools it has. */
 	listTools(server: McpServer): Promise<McpToolList>;
+	/** Where a command is on this computer; `null` when it is not found. */
+	findCommand(command: string): Promise<string | null>;
 }
 
 /**
@@ -33,6 +36,9 @@ const reachKey = (server: McpServer): string =>
 			? [server.transport, server.url, server.headers]
 			: [server.transport, server.command, server.args, server.env],
 	);
+
+/** Where each command was found, while Settings is open: a redraw does not look again. */
+const found = new Map<string, Promise<string | null>>();
 
 function mark(name: IconName, className: string): Element {
 	const svg = icon(name);
@@ -140,6 +146,19 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 				redraw,
 			);
 		const http = server.transport === "http";
+		let check = commandCheck(server.command);
+		// The command typed is looked for once it is left.
+		const commandField = (): HTMLElement => {
+			const field = input(t.mcpCommand, server.command, (value) => set({ command: value.trim() }), {
+				placeholder: "npx",
+			});
+			field.querySelector("input")?.addEventListener("change", () => {
+				const next = commandCheck(options.servers()[index]?.command ?? "");
+				check.replaceWith(next);
+				check = next;
+			});
+			return field;
+		};
 		const fields: HTMLElement[] = http
 			? [
 					input(t.mcpUrl, server.url, (value) => set({ url: value.trim() }), {
@@ -154,9 +173,7 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 					),
 				]
 			: [
-					input(t.mcpCommand, server.command, (value) => set({ command: value.trim() }), {
-						placeholder: "npx",
-					}),
+					commandField(),
 					input(
 						t.mcpArgs,
 						server.args.join("\n"),
@@ -231,6 +248,7 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 					class: "mode-section-hint mcp-used-in",
 					text: used.length === 0 ? t.mcpUsedNowhere : format(t.mcpUsedIn, used.join(", ")),
 				}),
+				...(http ? [] : [check]),
 				...fields,
 				toolsField(index, set),
 				input(
@@ -385,6 +403,89 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 				list,
 			],
 		});
+	}
+
+	/**
+	 * A warning when a server's command is not on this computer: what the
+	 * program is, how to install it, and a button to look again.
+	 */
+	function commandCheck(command: string): HTMLElement {
+		const box = el("div", { class: "mcp-missing", attrs: { hidden: "", role: "status" } });
+		const name = command.trim();
+		if (name === "") return box;
+		let looking = found.get(name);
+		if (looking === undefined) {
+			looking = options.findCommand(name).catch(() => null);
+			found.set(name, looking);
+		}
+		void looking.then((path) => {
+			if (path !== null) return;
+			const runtime = runtimeOf(name);
+			const again = el("button", {
+				class: "assistant-link mcp-missing-again",
+				text: t.mcpMissingAgain,
+				attrs: { type: "button" },
+			});
+			again.addEventListener("click", () => {
+				found.delete(name);
+				box.replaceWith(commandCheck(command));
+			});
+			const steps = (runtime?.install ?? []).map((step) => {
+				const copy = el("button", {
+					class: "assistant-link mcp-sample-copy",
+					text: t.copy,
+					attrs: { type: "button" },
+				});
+				copy.addEventListener("click", () => {
+					void navigator.clipboard.writeText(step.command).then(() => {
+						copy.textContent = t.assistantCopied;
+						setTimeout(() => {
+							copy.textContent = t.copy;
+						}, 1500);
+					});
+				});
+				return el("div", {
+					class: "mcp-sample",
+					children: [
+						el("div", {
+							class: "mcp-sample-head",
+							children: [el("span", { class: "mode-label", text: step.system }), copy],
+						}),
+						el("pre", { class: "mcp-sample-text", text: step.command }),
+					],
+				});
+			});
+			box.replaceChildren(
+				el("p", {
+					class: "mcp-missing-title",
+					children: [mark("noteAttention", "mode-icon"), format(t.mcpMissing, name)],
+				}),
+				el("p", {
+					class: "mcp-missing-text",
+					text: runtime === null ? t.mcpMissingOther : t[runtime.about],
+				}),
+				...(runtime === null
+					? []
+					: [
+							el("span", {
+								class: "mode-label",
+								text: format(t.mcpMissingInstall, runtime.label),
+							}),
+							...steps,
+							el("p", {
+								class: "mcp-missing-text",
+								text: format(t.mcpMissingLink, runtime.link),
+							}),
+						]),
+				el("p", {
+					class: "mcp-missing-text",
+					children: [t.mcpMissingRestart, " ", again],
+				}),
+			);
+			box.setAttribute("data-runtime", runtime?.id ?? "");
+			box.hidden = false;
+		});
+		return box;
 	}
 
 	/** A server added from a ready-made one keeps its guide at hand. */

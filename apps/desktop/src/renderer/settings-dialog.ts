@@ -585,6 +585,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 						.map((mode) => mode.name);
 				},
 				listTools: (server) => bridge.mcpListTools(server),
+				findCommand: (command) => bridge.mcpFindCommand(command),
 			}),
 		);
 	}
