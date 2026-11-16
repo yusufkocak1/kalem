@@ -32,6 +32,7 @@ import { createAssistantSettings } from "./assistant-settings.js";
 import { el } from "./dom.js";
 import { createMcpSection } from "./mcp-editor.js";
 import { createModeEditor } from "./mode-settings.js";
+import { installFolds } from "./settings-fold.js";
 import { sourceLabel } from "./template-picker.js";
 import { createToolSettings } from "./tool-settings.js";
 
@@ -132,6 +133,8 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		],
 	});
 	document.body.append(dialog);
+	// Long parts fold under their headings; a search shows them whole.
+	installFolds(body);
 	done.addEventListener("click", () => dialog.close());
 	dialog.addEventListener("click", (event) => {
 		if (event.target === dialog) dialog.close();
@@ -927,6 +930,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 	function filter(): void {
 		const query = search.value.trim();
 		const searching = query !== "";
+		dialog.toggleAttribute("data-searching", searching);
 		const items = SETTING_CATEGORIES.flatMap((category) => [
 			...(contents.get(category)?.children ?? []),
 		]) as HTMLElement[];

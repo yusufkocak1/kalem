@@ -119,7 +119,7 @@ export function createToolSettings(options: ToolSettingsOptions): {
 						class: "tool-settings-group",
 						attrs: { "data-group": group },
 						children: [
-							el("h5", { text: groupLabel(group) }),
+							el("h5", { text: `${groupLabel(group)} (${own.length})` }),
 							...own.map((tool) => {
 								const select = el("select", {
 									attrs: { "data-tool": tool.name, "aria-label": tool.name },
@@ -171,6 +171,8 @@ export function createToolSettings(options: ToolSettingsOptions): {
 
 	function applyFilter(): void {
 		const query = filter.value.trim().toLocaleLowerCase("tr");
+		// A tool looked for is shown, in a folded group too.
+		element.toggleAttribute("data-filtering", query !== "");
 		for (const section of list.querySelectorAll<HTMLElement>(".tool-settings-group")) {
 			let shown = 0;
 			for (const row of section.querySelectorAll<HTMLElement>(".tool-setting")) {

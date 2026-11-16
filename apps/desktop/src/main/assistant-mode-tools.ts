@@ -6,6 +6,10 @@
  * computer, so every change is shown in full and asked about every time,
  * whatever the user allowed before or set in Settings. The model never
  * reads how a server runs (its tokens); it may write what the user gives it.
+ *
+ * And the tool the model changes modes with (`use_mode`) while the user's
+ * choice is automatic: it works the question in the modes it names and the
+ * picker stays where it is.
  */
 import type { Settings } from "../shared/bridge.js";
 import { format } from "../shared/i18n.js";
@@ -16,7 +20,15 @@ import type { McpServer } from "../shared/mcp-servers.js";
 import { MAX_SERVERS, parseMcpServer, serverName } from "../shared/mcp-servers.js";
 import type { Mode } from "../shared/mode-config.js";
 import { MODES, resolveMode, storeMode } from "../shared/mode-config.js";
-import { customModeOf, MODE_LABELS, modesUsingServers, renameServerRefs } from "../shared/modes.js";
+import {
+	autoModes,
+	customModeOf,
+	MODE_LABELS,
+	modePrompt,
+	modesUsingServers,
+	renameServerRefs,
+	USE_MODE,
+} from "../shared/modes.js";
 import type { KalemTool, ToolContext } from "./assistant-tools.js";
 import { registerTools } from "./assistant-tools.js";
 import { findProgram } from "./mcp-probe.js";
@@ -191,7 +203,70 @@ const SERVER_FIELDS = {
 	},
 } as const;
 
+/** The id of a mode the model named, among those that are on: by id, or by its name. */
+function autoModeId(ctx: ToolContext, raw: string): string | null {
+	const wanted = raw.trim().toLocaleLowerCase("tr");
+	const settings = ctx.settings();
+	const ids = autoModes(settings.assistantModes, settings.assistantCustomModes).map(
+		(mode) => mode.id,
+	);
+	return (
+		ids.find((id) => id.toLocaleLowerCase("tr") === wanted) ??
+		ids.find((id) => {
+			const own = customModeOf(id, settings.assistantCustomModes);
+			const name = own === null ? ctx.t[MODE_LABELS[id as Mode]] : own.name;
+			return name.toLocaleLowerCase("tr") === wanted;
+		}) ??
+		null
+	);
+}
+
 const MODE_TOOLS: readonly KalemTool[] = [
+	{
+		definition: {
+			name: USE_MODE,
+			description:
+				"Works this question in the modes you name, when the mode chosen automatically from the question's words does not fit the work or misses a part of it: returns the steps of each mode, to follow in the order given, for this question only. The mode the user sees does not change. Call it before you start the work.",
+			parameters: {
+				type: "object",
+				properties: {
+					modes: {
+						type: "array",
+						items: { type: "string" },
+						description:
+							"The ids of the modes the work needs, in the order to work in (ask, write, review, prompt, code, app, or custom-… for one of the user's).",
+					},
+					reason: { type: "string", description: "Why, in a few words, in the user's language." },
+				},
+				required: ["modes"],
+			},
+		},
+		risk: "read",
+		// Only where the choice is automatic: a mode the user picked is theirs to change.
+		available: (ctx) => ctx.auto === true,
+		async run(input, ctx) {
+			const named = (strings(input.modes) ?? []).filter((name) => name.trim() !== "");
+			const settings = ctx.settings();
+			const all = autoModes(settings.assistantModes, settings.assistantCustomModes);
+			const list = `The modes: ${all.map((mode) => mode.id).join(", ")}.`;
+			if (named.length === 0) return `Name the modes the work needs. ${list}`;
+			const unknown = named.filter((name) => autoModeId(ctx, name) === null);
+			if (unknown.length > 0) {
+				return `There is no mode named ${unknown.map((name) => `"${name}"`).join(", ")} (or it is turned off). ${list}`;
+			}
+			const ids = [...new Set(named.map((name) => autoModeId(ctx, name) as string))];
+			const labels = ids.map((id) => {
+				const own = customModeOf(id, settings.assistantCustomModes);
+				return own === null ? ctx.t[MODE_LABELS[id as Mode]] : own.name;
+			});
+			ctx.step({ tool: USE_MODE, detail: labels.join(" + ") });
+			const steps = modePrompt(ids, settings.assistantModes, settings.assistantCustomModes);
+			return [
+				`This question is now worked in: ${ids.join(", ")}. Follow these instead of the mode you were given before; the tools and MCP servers of these modes are available.`,
+				steps === "" ? "No special steps: answer the question as asked." : steps,
+			].join("\n\n");
+		},
+	},
 	{
 		definition: {
 			name: "mode_mcp_list",

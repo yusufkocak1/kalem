@@ -795,6 +795,14 @@ const en = {
 	assistantDropSelection: "Do not send the selection",
 	assistantSharedDocument: "with “{0}”",
 	assistantSharedSelection: "with the selection",
+	assistantPicture: "Picture {0}",
+	assistantSharedPictures: "with {0} pictures",
+	assistantSharedPicture: "with a picture",
+	assistantPictureFailed:
+		"That could not be added: paste a picture, or a file copied from a folder.",
+	assistantPicturesFull: "A question takes at most {0} pictures.",
+	assistantPicturesCopilot:
+		"The Copilot CLI does not take pictures: the picture will not reach it. Use Claude Code or an API service.",
 	assistantAddSource: "Add files or folders to the chat",
 	assistantAddFiles: "Files…",
 	assistantAddFolder: "Folder…",
@@ -2518,6 +2526,14 @@ const tr: Strings = {
 	assistantDropSelection: "Seçimi gönderme",
 	assistantSharedDocument: "“{0}” ile",
 	assistantSharedSelection: "seçimle",
+	assistantPicture: "Görsel {0}",
+	assistantSharedPictures: "{0} görselle",
+	assistantSharedPicture: "bir görselle",
+	assistantPictureFailed:
+		"Bu eklenemedi: bir görsel ya da klasörden kopyalanmış bir dosya yapıştırın.",
+	assistantPicturesFull: "Bir soruya en çok {0} görsel eklenir.",
+	assistantPicturesCopilot:
+		"Copilot CLI görsel almıyor: görsel ona ulaşmayacak. Claude Code ya da bir API servisi kullanın.",
 	assistantAddSource: "Sohbete dosya ya da klasör ekle",
 	assistantAddFiles: "Dosya…",
 	assistantAddFolder: "Klasör…",
