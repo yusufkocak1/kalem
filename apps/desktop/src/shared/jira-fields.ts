@@ -56,6 +56,30 @@ export interface JiraStatusChange {
 
 export const SPRINT_SCHEMA = "com.pyxis.greenhopper.jira:gh-sprint";
 const TEAM_FIELD = /^(?:takım|takim|TAKIM)$/i;
+/**
+ * An Insight/Assets object field (Jira Server and Data Center): Jira gives its
+ * value as "Name (KEY-1)" text, lists no choices for it, and takes `[{ key }]`.
+ */
+const OBJECT_FIELD = /:rlabs-customfield-default-object$/i;
+export const isObjectField = (custom: string): boolean => OBJECT_FIELD.test(custom);
+const OBJECT_TEXT = /^(.*)\(([A-Z][A-Z0-9_]*-\d+)\)\s*$/s;
+
+/** The objects an Insight field holds: their keys and labels. */
+export function objectOptionsOf(value: unknown): JiraOption[] {
+	const items = Array.isArray(value) ? value : value === null || value === undefined ? [] : [value];
+	return items.flatMap((item): JiraOption[] => {
+		if (typeof item === "string") {
+			const match = OBJECT_TEXT.exec(item.trim());
+			if (match === null) return [];
+			const key = match[2] as string;
+			return [{ id: key, name: (match[1] as string).trim() || key }];
+		}
+		const record = asJson(item);
+		const key = asString(record.objectKey) || asString(record.key);
+		if (key === "") return [];
+		return [{ id: key, name: asString(record.label) || asString(record.name) || key }];
+	});
+}
 const PARENT_LINK_FIELD = /^parent link$/i;
 const EPIC_LINK_FIELD = /^epic link$/i;
 
@@ -102,7 +126,8 @@ export function sprintOf(value: unknown): JiraSprint | null {
 	const all = asArray(value).map((item): JiraSprint | null => {
 		if (typeof item === "string") {
 			const pairs = new Map<string, string>();
-			const body = /\[(.*)\]$/.exec(item)?.[1] ?? "";
+			// A sprint's goal can span lines, so the body is matched across them.
+			const body = /\[([\s\S]*)\]\s*$/.exec(item)?.[1] ?? "";
 			for (const match of body.matchAll(/(\w+)=([^,]*?)(?=,\w+=|$)/g)) {
 				pairs.set(match[1] as string, match[2] as string);
 			}
@@ -137,6 +162,8 @@ export function optionOf(value: unknown): JiraOption | null {
 	if (typeof value === "string" || typeof value === "number") {
 		return { id: String(value), name: String(value) };
 	}
+	// A list holding one value (a multi-select with one choice) reads as that value.
+	if (Array.isArray(value)) return value.length === 1 ? optionOf(value[0]) : null;
 	const record = asJson(value);
 	const id = String(record.id ?? record.key ?? record.value ?? record.name ?? "");
 	const name =
@@ -326,6 +353,7 @@ export function customFieldsOf(raw: unknown, now = Date.now()): IssueCustomField
 		custom: customOf(id),
 	});
 	const optionWithName = (id: string, value: unknown): JiraOption | null => {
+		if (isObjectField(customOf(id))) return objectOptionsOf(value)[0] ?? null;
 		const option = optionOf(value);
 		if (option === null || option.name !== option.id) return option;
 		return allowedOf(id).find((allowed) => allowed.id === option.id) ?? option;
@@ -348,8 +376,10 @@ export function customFieldsOf(raw: unknown, now = Date.now()): IssueCustomField
 		if (/^rank\b/i.test(name) || name === id) continue;
 		const custom = customOf(id);
 		const type = typeOf(id);
+		// An object field is picked from when the edit screen has it and it holds one object at most.
 		const selectable =
-			allowedOf(id).length > 0 && (type === "option" || /tempo-teams/i.test(custom));
+			(allowedOf(id).length > 0 && (type === "option" || /tempo-teams/i.test(custom))) ||
+			(isObjectField(custom) && id in editmeta && objectOptionsOf(value).length <= 1);
 		const base = {
 			id,
 			name,
@@ -425,6 +455,7 @@ export function assigneeBody(userId: string | null, cloud: boolean): Json {
 }
 
 export function fieldValueBody(field: JiraEditableField, option: JiraOption | null): unknown {
+	if (isObjectField(field.custom)) return option === null ? [] : [{ key: option.id }];
 	if (option === null) return null;
 	if (/tempo-teams/i.test(field.custom)) return option.id;
 	if (/:(?:multiselect|multicheckboxes)$/i.test(field.custom)) return [{ id: option.id }];

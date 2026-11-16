@@ -33,7 +33,9 @@ import {
 	assigneeBody,
 	attachmentsOf,
 	fieldValueBody,
+	isObjectField,
 	labelsBody,
+	objectOptionsOf,
 	optionsOf,
 	userOf,
 } from "../shared/jira-fields.js";
@@ -751,10 +753,60 @@ export class JiraClient {
 	}
 
 	async fieldOptions(key: string, field: JiraEditableField): Promise<JiraOption[]> {
+		if (isObjectField(field.custom)) return this.#objectOptions(this.#valid(key), field);
 		const meta = await this.#json(`/rest/api/2/issue/${this.#valid(key)}/editmeta`);
 		const options = optionsOf(asJson(asJson(meta.fields)[field.fieldId]).allowedValues);
 		if (options.length > 0 || !/tempo-teams/i.test(field.custom)) return options;
 		return optionsOf(await this.#get("/rest/tempo-teams/2/team"));
+	}
+
+	/** Insight's REST API, under the name Assets gave it on newer Data Centers when the old one is gone. */
+	async #insight(path: string, assetsPath = path): Promise<Json> {
+		try {
+			return await this.#json(`/rest/insight/1.0${path}`);
+		} catch (error) {
+			if (!(error instanceof JiraError) || error.status !== 404) throw error;
+			return this.#json(`/rest/assets/1.0${assetsPath}`);
+		}
+	}
+
+	/**
+	 * The objects an Insight field can hold: those of the type of the object it
+	 * holds — on this issue, or on the project's latest issue that has one.
+	 */
+	async #objectOptions(key: string, field: JiraEditableField): Promise<JiraOption[]> {
+		const id = field.fieldId;
+		const number = /^customfield_(\d+)$/.exec(id)?.[1];
+		if (number === undefined) throw new Error("Invalid field");
+		const issue = await this.#json(`/rest/api/2/issue/${key}?fields=${id}`);
+		let held = objectOptionsOf(asJson(issue.fields)[id]);
+		if (held.length === 0) {
+			const project = key.slice(0, key.lastIndexOf("-"));
+			const params = new URLSearchParams({
+				jql: `project = "${project}" AND cf[${number}] is not EMPTY ORDER BY updated DESC`,
+				maxResults: "1",
+				fields: id,
+			});
+			const found = await this.#json(`/rest/api/2/search?${params.toString()}`);
+			held = objectOptionsOf(asJson(asJson(asArray(found.issues)[0]).fields)[id]);
+		}
+		const sample = held[0];
+		if (sample === undefined) return [];
+		const object = await this.#insight(`/object/${encodeURIComponent(sample.id)}`);
+		const type = String(asJson(object.objectType).id ?? "");
+		if (!/^\d+$/.test(type)) return [];
+		const query = (name: string): string =>
+			new URLSearchParams({
+				[name]: `objectTypeId = ${type}`,
+				page: "1",
+				resultPerPage: "500",
+				includeAttributes: "false",
+			}).toString();
+		const raw = await this.#insight(
+			`/iql/objects?${query("iql")}`,
+			`/aql/objects?${query("qlQuery")}`,
+		);
+		return objectOptionsOf(raw.objectEntries).sort((a, b) => a.name.localeCompare(b.name, "tr"));
 	}
 
 	async setField(key: string, field: JiraEditableField, option: JiraOption | null): Promise<void> {
