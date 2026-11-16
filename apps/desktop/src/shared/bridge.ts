@@ -690,6 +690,11 @@ export interface AssistantRequest {
 	};
 	/** What the user is doing with the assistant: asking, writing, reviewing… */
 	readonly mode?: string;
+	/**
+	 * Every mode the automatic choice found the question asks for, in order,
+	 * when there are several: the question is worked in all of them.
+	 */
+	readonly modes?: readonly string[];
 	/** The document template the user picked for this question (its id), whatever the mode. */
 	readonly template?: string;
 }

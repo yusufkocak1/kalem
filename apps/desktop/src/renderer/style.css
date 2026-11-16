@@ -7283,6 +7283,58 @@ pre[data-confluence-kind="layout"]::before {
 	font-size: 14px;
 }
 
+/* A heading that folds what follows it: a chevron, turned when it is open. */
+.settings-fold {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+	user-select: none;
+	border-radius: 5px;
+}
+
+.settings-fold::before {
+	content: "";
+	flex: none;
+	width: 6px;
+	height: 6px;
+	border-right: 1.5px solid currentColor;
+	border-bottom: 1.5px solid currentColor;
+	transform: rotate(-45deg);
+	transition: transform 0.12s;
+	opacity: 0.7;
+}
+
+.settings-fold[aria-expanded="true"]::before {
+	transform: rotate(45deg);
+}
+
+.settings-fold:hover::before {
+	opacity: 1;
+}
+
+.settings-fold:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 2px;
+}
+
+/* Folded: what follows the heading is put away, unless a search is looking through it. */
+.settings-dialog:not([data-searching])
+	.settings-fold[aria-expanded="false"]:not(.tool-settings[data-filtering] *)
+	~ * {
+	display: none !important;
+}
+
+.settings-fold[aria-expanded="false"] {
+	margin-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.settings-fold::before {
+		transition: none;
+	}
+}
+
 /* A block after another starts with a rule, so its heading does not read as
    part of the form above it. */
 .settings-block + .settings-block {

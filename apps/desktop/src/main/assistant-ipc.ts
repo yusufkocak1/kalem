@@ -46,7 +46,7 @@ import {
 } from "../shared/mcp-servers.js";
 import type { ModelOption } from "../shared/models.js";
 import { claudeModelName, claudeModelOptions, copilotModelOptions } from "../shared/models.js";
-import { modeServers, modeToolsExcluded } from "../shared/modes.js";
+import { modeServers, modeToolsExcluded, requestedModes } from "../shared/modes.js";
 import type { ChatMessage, ProviderId } from "../shared/providers.js";
 import {
 	checkBaseUrl,
@@ -656,11 +656,13 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		// The mode: one of Kalem's, as the user shaped it, or one the user made (its tools and MCP servers).
 		const modeSettings = ctx.store.settings.assistantModes;
 		const customModes = ctx.store.settings.assistantCustomModes;
+		// One mode, or the several the automatic choice found the question asks for.
+		const askedModes = requestedModes(request);
 		// The user's code folder for `${project}` (Serena's): a folder added to the question,
 		// else one open in the Files pane, else the active document's.
 		const activeTab = typeof request.tabId === "string" ? win.tabs.get(request.tabId) : undefined;
 		const servers = withProject(
-			modeServers(request.mode, modeSettings, customModes, ctx.store.settings.assistantMcpServers),
+			modeServers(askedModes, modeSettings, customModes, ctx.store.settings.assistantMcpServers),
 			projectFolder(
 				// The Files pane's folders go with every question: one added besides them was picked for it.
 				collected.roots.find(
@@ -690,7 +692,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				? null
 				: { name: pickedTemplate.info.name, text: pickedTemplate.text };
 		const modeExcluded = modeToolsExcluded(
-			request.mode,
+			askedModes,
 			modeSettings,
 			customModes,
 			allTools().map((tool) => tool.definition.name),
@@ -756,7 +758,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				confluence: lookups?.site ?? null,
 				jira: jiraLookups?.site ?? null,
 				tools: definitions,
-				mode: request.mode,
+				mode: askedModes,
 				modes: answerModes,
 				custom: customModes,
 				document: tools.document,
@@ -854,7 +856,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			let stopped = false;
 			// A review's checks, each by a reviewer of its own, all at once; the answer then sums up.
 			const plan =
-				request.mode === "review" &&
+				askedModes === "review" &&
 				reviewPrompt !== null &&
 				tools.document !== null &&
 				mcpRun !== null &&
@@ -1217,7 +1219,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 					false,
 					assistantInstructions(t, {
 						way: "none",
-						mode: request.mode,
+						mode: askedModes,
 						modes: ctx.store.settings.assistantModes,
 						custom: ctx.store.settings.assistantCustomModes,
 						template: templateGiven,

@@ -9,6 +9,7 @@ import {
 	storeMode,
 } from "./mode-config.js";
 import { detectMode } from "./mode-detect.js";
+import { modePrompt, modeServerNames, modeToolsExcluded, requestedModes } from "./modes.js";
 
 describe("modes as the user shapes them", () => {
 	it("say what they always said when untouched", () => {
@@ -122,7 +123,40 @@ describe("the automatic mode", () => {
 		expect(detectMode("Bunu Claude Code için bir prompt'a çevir", none).mode).toBe("prompt");
 		expect(detectMode("UserService.java içindeki bug'ı bul", none).mode).toBe("code");
 		expect(detectMode("Koyu moda geç", none).mode).toBe("app");
-		expect(detectMode("KVKK nedir?", none)).toEqual({ mode: "ask", because: [] });
+		expect(detectMode("KVKK nedir?", none)).toEqual({
+			mode: "ask",
+			modes: ["ask"],
+			because: [],
+		});
+	});
+
+	it("finds every mode a question asks for, in the order it asks", () => {
+		const several = detectMode("Bu analizi yaz, review et, sonra kodunu yaz", none);
+		expect(several.modes).toEqual(["write", "review", "code"]);
+		expect(detectMode("Kodunu yaz ve dokümanı incele", none).modes).toEqual(["code", "review"]);
+		// One kind of work is one mode.
+		expect(detectMode("Bu analizi incele", none).modes).toEqual(["review"]);
+		// A word inside another mode's phrase, or inside another word, is not a mode.
+		expect(detectMode("Kodlama ajanı için prompt hazırla", none).modes).toEqual(["prompt"]);
+		expect(detectMode("Sistematik bir sistem nedir?", none).modes).toEqual(["ask"]);
+	});
+
+	it("works several modes together: every step, the tools and servers of each", () => {
+		const prompt = modePrompt(["write", "code"]);
+		expect(prompt).toContain("## Several modes for this question");
+		expect(prompt).toContain(modePrompt("write"));
+		expect(prompt).toContain(modePrompt("code"));
+		expect(modePrompt(["code"])).toBe(modePrompt("code"));
+		const write = modeToolsExcluded("write");
+		const code = modeToolsExcluded("code");
+		expect([...modeToolsExcluded(["write", "code"])].sort()).toEqual(
+			[...write].filter((name) => code.has(name)).sort(),
+		);
+		const settings = parseModeSettings({ write: { mcp: ["a", "b"] }, code: { mcp: ["b", "c"] } });
+		expect(modeServerNames(["write", "code"], settings)).toEqual(["a", "b", "c"]);
+		expect(requestedModes({ mode: "write", modes: ["write", "code"] })).toEqual(["write", "code"]);
+		expect(requestedModes({ mode: "write" })).toBe("write");
+		expect(requestedModes({ mode: "write", modes: ["code"] })).toBe("code");
 	});
 
 	it("follows the user's words, and leaves out modes turned off", () => {

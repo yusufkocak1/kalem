@@ -51,36 +51,78 @@ export function customModeOf(mode: unknown, custom: readonly CustomMode[] = []):
 	return isCustomModeId(mode) ? (custom.find((each) => each.id === mode) ?? null) : null;
 }
 
+/**
+ * The modes a question is asked in: one, or several when the automatic mode
+ * found the question asks for several kinds of work. A mode named twice
+ * counts once; none is "ask".
+ */
+export function modeList(mode: unknown): readonly unknown[] {
+	if (!Array.isArray(mode)) return [mode];
+	const list = [...new Set(mode.filter((each) => typeof each === "string"))];
+	return list.length === 0 ? ["ask"] : list;
+}
+
+/** What the request names: its several modes when it has them, else its one. */
+export function requestedModes(request: {
+	readonly mode?: unknown;
+	readonly modes?: unknown;
+}): unknown {
+	const several = Array.isArray(request.modes) ? modeList(request.modes) : [];
+	return several.length > 1 ? several : (several[0] ?? request.mode);
+}
+
+const SEVERAL =
+	"## Several modes for this question\nThe question asks for several kinds of work. Do every part, each by the steps of the mode it belongs to (below), in the order the user asked for them, in this one reply, each part under its own heading. What an earlier part produced is what the later parts work on.";
+
 /** What the model is told for a mode: one of Kalem's, as the user shaped it, or one of the user's. */
 export function modePrompt(
 	mode: unknown,
 	modes: ModeSettings = {},
 	custom: readonly CustomMode[] = [],
 ): string {
-	const own = customModeOf(mode, custom);
-	return own === null ? modeInstructions(mode, modes) : customInstructions(own);
+	const one = (each: unknown): string => {
+		const own = customModeOf(each, custom);
+		return own === null ? modeInstructions(each, modes) : customInstructions(own);
+	};
+	const list = modeList(mode);
+	if (list.length === 1) return one(list[0]);
+	return [SEVERAL, ...list.map(one)].filter((part) => part !== "").join("\n\n");
 }
 
-/** The tools a mode leaves out; for the user's own, every Kalem tool it did not choose. */
+/**
+ * The tools a mode leaves out; for the user's own, every Kalem tool it did
+ * not choose. Several modes leave out only what all of them do.
+ */
 export function modeToolsExcluded(
 	mode: unknown,
 	modes: ModeSettings = {},
 	custom: readonly CustomMode[] = [],
 	allTools: readonly string[] = [],
 ): ReadonlySet<string> {
-	const own = customModeOf(mode, custom);
-	return own === null ? modeExcluded(mode, modes) : customExcluded(own, allTools);
+	const sets = modeList(mode).map((each): ReadonlySet<string> => {
+		const own = customModeOf(each, custom);
+		return own === null ? modeExcluded(each, modes) : customExcluded(own, allTools);
+	});
+	const [first = new Set<string>(), ...rest] = sets;
+	return rest.length === 0
+		? first
+		: new Set([...first].filter((name) => rest.every((set) => set.has(name))));
 }
 
-/** The names of the assistant's MCP servers a mode uses: one of Kalem's, as the user shaped it, or one of the user's. */
+/**
+ * The names of the assistant's MCP servers a mode uses: one of Kalem's, as
+ * the user shaped it, or one of the user's. Several modes use all of theirs.
+ */
 export function modeServerNames(
 	mode: unknown,
 	modes: ModeSettings = {},
 	custom: readonly CustomMode[] = [],
 ): readonly string[] {
-	const own = customModeOf(mode, custom);
-	if (own !== null) return own.mcp;
-	return resolveMode(isMode(mode) ? mode : "ask", modes).mcp;
+	const names = modeList(mode).flatMap((each) => {
+		const own = customModeOf(each, custom);
+		return own !== null ? own.mcp : resolveMode(isMode(each) ? each : "ask", modes).mcp;
+	});
+	return [...new Set(names)];
 }
 
 /** The assistant's MCP servers a mode connects the CLI to. */

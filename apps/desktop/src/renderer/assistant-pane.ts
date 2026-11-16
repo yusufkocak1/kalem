@@ -3310,6 +3310,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		const notes: string[] = [];
 		/** The mode this question is asked in: the one picked, or the one chosen for it. */
 		let usedMode: ModeChoice = mode === "auto" ? "ask" : mode;
+		/** Every mode the automatic choice found the question asks for; the picker stays on "auto". */
+		let usedModes: readonly ModeChoice[] = [];
 		/** The document template the question is asked by, whatever the mode. */
 		const usedTemplate = pickedTemplate;
 		let prompt: string;
@@ -3356,8 +3358,11 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					host.customModes(),
 				);
 				usedMode = detected.mode;
-				// A plain question stays a question: only a mode chosen for it is said.
-				if (usedMode !== "ask") notes.push(format(t.modeChosen, modeLabel(usedMode)));
+				usedModes = detected.modes;
+				// A plain question stays a question: only the modes chosen for it are said.
+				if (usedMode !== "ask") {
+					notes.push(format(t.modeChosen, usedModes.map(modeLabel).join(" + ")));
+				}
 			}
 			if (sources.length > 0) {
 				notes.push(
@@ -3409,6 +3414,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			// A review asked for now (not a question about an earlier one) may run side by side.
 			if (
 				usedMode === "review" &&
+				usedModes.length <= 1 &&
 				sharing &&
 				isCli(PROVIDER_INFO[provider]) &&
 				resolveMode("review", host.modes()).parallel &&
@@ -3465,6 +3471,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					images: images.map(({ label, mediaType, data }) => ({ label, mediaType, data })),
 					sources: chatSources(chat),
 					mode: usedMode,
+					...(usedModes.length > 1 ? { modes: usedModes } : {}),
 					...(usedTemplate === null ? {} : { template: usedTemplate.id }),
 					...(fullPrompt === undefined ? {} : { fullPrompt }),
 					...(reviewPrompt === undefined ? {} : { reviewPrompt }),

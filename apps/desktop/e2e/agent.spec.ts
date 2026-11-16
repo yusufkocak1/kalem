@@ -559,6 +559,51 @@ test("modes: shaped in Settings (a step off, one of the user's own), and picked 
 	expect(whole).toContain("Check the KVKK consent texts.");
 	expect(whole).toContain("Check the scope");
 	expect(whole).not.toContain("one of several reviewers");
+
+	// One question for three kinds of work: it is worked in all three modes, in the
+	// order asked, and the picker stays on automatic.
+	await pane.getByRole("button", { name: "New chat" }).first().click();
+	await pane.locator(".assistant-input").fill("Bu analizi yaz, review et, sonra kodunu yaz");
+	await pane.locator(".assistant-input").press("Enter");
+	await expect(pane.locator(".assistant-user .assistant-notes")).toContainText(
+		"Mode: Write analysis + Review analysis + Code (chosen automatically)",
+	);
+	await expect(pane.locator(".assistant-assistant")).toContainText("Tamam.");
+	await expect.poll(async () => (await claude.calls()).length).toBe(systems.length + 2);
+	const several = (await claude.calls()).at(-1);
+	const three = several?.args[several.args.indexOf("--append-system-prompt") + 1] ?? "";
+	expect(three).toContain("## Several modes for this question");
+	const order = [
+		"## Mode: write an analysis document",
+		"## Mode: review an analysis document",
+		"## Mode: code",
+	].map((heading) => three.indexOf(heading));
+	expect(order.every((at) => at !== -1)).toBe(true);
+	expect([...order].sort((a, b) => a - b)).toEqual(order);
+	await expect(picker).toHaveAttribute("data-mode", "auto");
+
+	// Settings' long lists fold: a group of tools opens from its heading, and a search opens all.
+	await picker.click();
+	await pane.getByRole("menuitem", { name: "Customize modes…" }).click();
+	await settings.locator('.settings-nav-item[data-category="assistant"]').click();
+	const group = settings.locator('.tool-settings-group[data-group="document"]');
+	const heading = group.locator("h5");
+	await expect(heading).toHaveAttribute("aria-expanded", "false");
+	await expect(group.locator('select[data-tool="document_read"]')).toBeHidden();
+	await heading.click();
+	await expect(group.locator('select[data-tool="document_read"]')).toBeVisible();
+	await heading.press("Enter");
+	await expect(group.locator('select[data-tool="document_read"]')).toBeHidden();
+	await settings.locator(".tool-settings-filter").fill("document_read");
+	await expect(group.locator('select[data-tool="document_read"]')).toBeVisible();
+	await settings.locator(".tool-settings-filter").fill("");
+	const tools = settings.locator('[data-block="tools"] > h4');
+	await tools.click();
+	await expect(settings.locator(".tool-settings-filter")).toBeHidden();
+	await tools.click();
+	await expect(settings.locator(".tool-settings-filter")).toBeVisible();
+	await page.screenshot({ path: process.env.KALEM_SHOT ?? join(folder, "settings.png") });
+	await settings.getByRole("button", { name: "Done" }).click();
 	expect(errors).toEqual([]);
 	await app.close();
 });

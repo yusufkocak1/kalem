@@ -122,7 +122,10 @@ bekleme ve ne yaptığını söyle."*
 
 Bir sunucu **yalnızca seçildiği modlarda** kullanılır. Asistan
 **Otomatik** moddayken her soru için bir mod seçer; sunucu, o soru için
-seçilen modda açıksa kullanılır.
+seçilen modda açıksa kullanılır. Tek soruda birden çok iş istenirse
+("analizi yaz, review et, kodunu yaz") Otomatik o soruyu **bu modların
+hepsinde** çalıştırır: her modun adımları, araçları ve sunucuları o soru
+için birlikte kullanılır; seçici Otomatik'te kalır.
 
 Bu yüzden:
 
