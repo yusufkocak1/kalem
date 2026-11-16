@@ -56,6 +56,9 @@ export interface JiraStatusChange {
 
 export const SPRINT_SCHEMA = "com.pyxis.greenhopper.jira:gh-sprint";
 const TEAM_FIELD = /^(?:takım|takim|TAKIM)$/i;
+const TEAM_SELECT_FIELD = /^team$/i;
+/** An Insight/Assets object field: its value is "Name (KEY-1)" text and it lists no choices. */
+const OBJECT_FIELD = /insight|assets/i;
 const PARENT_LINK_FIELD = /^parent link$/i;
 const EPIC_LINK_FIELD = /^epic link$/i;
 
@@ -102,7 +105,8 @@ export function sprintOf(value: unknown): JiraSprint | null {
 	const all = asArray(value).map((item): JiraSprint | null => {
 		if (typeof item === "string") {
 			const pairs = new Map<string, string>();
-			const body = /\[(.*)\]$/.exec(item)?.[1] ?? "";
+			// A sprint's goal can span lines, so the body is matched across them.
+			const body = /\[([\s\S]*)\]\s*$/.exec(item)?.[1] ?? "";
 			for (const match of body.matchAll(/(\w+)=([^,]*?)(?=,\w+=|$)/g)) {
 				pairs.set(match[1] as string, match[2] as string);
 			}
@@ -306,7 +310,7 @@ export function customFieldsOf(raw: unknown, now = Date.now()): IssueCustomField
 		if (custom === SPRINT_SCHEMA || (custom === "" && /^sprint$/i.test(name))) {
 			sprintIds.push(id);
 			used.add(id);
-		} else if (TEAM_FIELD.test(name)) {
+		} else if (TEAM_FIELD.test(name) && !OBJECT_FIELD.test(custom)) {
 			teamIds.push(id);
 			used.add(id);
 		} else if (PARENT_LINK_FIELD.test(name)) {
@@ -319,7 +323,17 @@ export function customFieldsOf(raw: unknown, now = Date.now()): IssueCustomField
 	const pick = (ids: readonly string[]): string | null =>
 		ids.find((id) => !isEmptyValue(fields[id])) ?? ids[0] ?? null;
 	const sprintId = pick(sprintIds);
-	const teamId = pick(teamIds);
+	// No pickable "Takım": a "Team" select the edit screen lists choices for stands in.
+	const teamId =
+		pick(teamIds) ??
+		Object.keys(fields).find(
+			(id) =>
+				TEAM_SELECT_FIELD.test(nameOf(id).trim()) &&
+				typeOf(id) === "option" &&
+				allowedOf(id).length > 0,
+		) ??
+		null;
+	if (teamId !== null) used.add(teamId);
 	const editable = (id: string): JiraEditableField => ({
 		fieldId: id,
 		name: nameOf(id),

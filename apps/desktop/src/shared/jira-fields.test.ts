@@ -113,6 +113,50 @@ describe("field values", () => {
 		expect(fields.sprintValue?.name).toBe("S5");
 	});
 
+	it("reads a sprint whose goal spans lines", () => {
+		expect(
+			sprintOf([
+				"com.atlassian.greenhopper.service.sprint.Sprint@1[id=26,rapidViewId=5,state=CLOSED,name=Kırmızı Sprint 26,goal=1-) a\n\n1.1) b, c\n2-) d,synced=false]",
+				"com.atlassian.greenhopper.service.sprint.Sprint@2[id=27,rapidViewId=5,state=ACTIVE,name=Kırmızı Sprint 27,completeDate=<null>,goal=1-) a \n    1.1) b,synced=false,incompleteIssuesDestinationId=<null>]",
+			]),
+		).toEqual({ id: "27", name: "Kırmızı Sprint 27", state: "ACTIVE", boardId: "5" });
+	});
+
+	it("takes the Team select when Takım is an Insight object field", () => {
+		const fields = customFieldsOf({
+			names: { customfield_1: "Takım", customfield_2: "Team", customfield_3: "Team" },
+			schema: {
+				customfield_1: {
+					type: "any",
+					custom: "com.riadalabs.jira.plugins.insight:rlabs-customfield-default-object",
+				},
+				customfield_2: { type: "option", custom: "x:select" },
+				customfield_3: { type: "any", custom: "com.atlassian.teams:rm-teams-custom-field-team" },
+			},
+			editmeta: {
+				fields: {
+					customfield_1: {},
+					customfield_2: {
+						allowedValues: [
+							{ id: "512671", value: "Kırmızı" },
+							{ id: "512672", value: "Beyaz" },
+						],
+					},
+				},
+			},
+			fields: {
+				customfield_1: ["Quickres Kırmızı (TK-285799)"],
+				customfield_2: { id: "512671", value: "Kırmızı" },
+				customfield_3: null,
+			},
+		});
+		expect(fields.team?.fieldId).toBe("customfield_2");
+		expect(fields.teamValue).toEqual({ id: "512671", name: "Kırmızı" });
+		expect(fields.allFields.filter((e) => !e.empty).map((e) => [e.name, e.value])).toEqual([
+			["Takım", "Quickres Kırmızı (TK-285799)"],
+		]);
+	});
+
 	it("reads time in status, people, dates and select fields", () => {
 		const fields = customFieldsOf(
 			{
