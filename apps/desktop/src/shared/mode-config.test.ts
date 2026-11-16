@@ -9,7 +9,14 @@ import {
 	storeMode,
 } from "./mode-config.js";
 import { detectMode } from "./mode-detect.js";
-import { modePrompt, modeServerNames, modeToolsExcluded, requestedModes } from "./modes.js";
+import {
+	autoInstructions,
+	autoModes,
+	modePrompt,
+	modeServerNames,
+	modeToolsExcluded,
+	requestedModes,
+} from "./modes.js";
 
 describe("modes as the user shapes them", () => {
 	it("say what they always said when untouched", () => {
@@ -157,6 +164,11 @@ describe("the automatic mode", () => {
 		expect(requestedModes({ mode: "write", modes: ["write", "code"] })).toEqual(["write", "code"]);
 		expect(requestedModes({ mode: "write" })).toBe("write");
 		expect(requestedModes({ mode: "write", modes: ["code"] })).toBe("code");
+		// On automatic the model may change modes: every mode that is on is within reach.
+		const all = autoModes(parseModeSettings({ app: { enabled: false } })).map((mode) => mode.id);
+		expect(all).toEqual(["ask", "write", "review", "prompt", "code"]);
+		expect(modeToolsExcluded(all).size).toBe(0);
+		expect(autoInstructions("ask", autoModes())).toContain("call use_mode");
 	});
 
 	it("follows the user's words, and leaves out modes turned off", () => {

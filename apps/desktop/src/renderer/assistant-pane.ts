@@ -17,11 +17,12 @@ import type {
 	ClaudeEvent,
 	ContextDiagram,
 	PlanStep,
+	PromptImage,
 	ProposedEdit,
 	ReplyDiagram,
 	ReplyPart,
 } from "../shared/claude.js";
-import { composePrompt, lineDiff, splitReply } from "../shared/claude.js";
+import { composePrompt, lineDiff, MAX_PROMPT_IMAGES, splitReply } from "../shared/claude.js";
 import { withoutRequests as withoutLookups } from "../shared/confluence-tool.js";
 import type { CustomMode } from "../shared/custom-modes.js";
 import { isCustomModeId } from "../shared/custom-modes.js";
@@ -74,6 +75,7 @@ import { icon } from "./icons.js";
 import { MODE_ICONS } from "./mode-settings.js";
 import type { Previews } from "./previews.js";
 import type { DocumentImage } from "./prompt-images.js";
+import { encodeImage } from "./prompt-images.js";
 import { sourceLabel } from "./template-picker.js";
 
 /** What the assistant knows of the active document when a question is sent. */
@@ -686,10 +688,88 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		renderSources();
 	}
 
+	/** The pictures pasted for the next question: they go with it once, as pictures. */
+	let pasted: (PromptImage & { readonly preview: string })[] = [];
+
+	/**
+	 * What was pasted into the question: pictures (a screenshot, a copied image
+	 * file) go with the next question; other files copied from a folder are
+	 * added to the chat like the ones picked with "+".
+	 */
+	async function attach(files: readonly File[]): Promise<void> {
+		const paths: string[] = [];
+		let failed = false;
+		for (const file of files) {
+			let path = "";
+			try {
+				path = bridge.pathForFile(file);
+			} catch {
+				// Not a file on disk: a screenshot.
+			}
+			if (file.type.startsWith("image/")) {
+				if (pasted.length >= MAX_PROMPT_IMAGES) {
+					showNotice(format(t.assistantPicturesFull, MAX_PROMPT_IMAGES));
+					break;
+				}
+				const encoded = await encodeImage(file);
+				if (encoded === null) {
+					failed = true;
+					continue;
+				}
+				// Numbered on from the last, so a picture taken out leaves no two alike.
+				const last = pasted.at(-1)?.label.match(/\d+$/)?.[0];
+				pasted = [
+					...pasted,
+					{
+						...encoded,
+						label: `pasted-${Number(last ?? 0) + 1}`,
+						preview: `data:${encoded.mediaType};base64,${encoded.data}`,
+					},
+				];
+			} else if (path !== "") paths.push(path);
+			else failed = true;
+		}
+		if (failed) showNotice(t.assistantPictureFailed);
+		if (pasted.length > 0 && status?.provider === "copilot") {
+			showNotice(t.assistantPicturesCopilot);
+		}
+		addSources(paths);
+		renderSources();
+		input.focus();
+	}
+
 	function renderSources(): void {
 		const open = openFolders(active);
-		sourceList.hidden = active.sources.length === 0 && open.length === 0;
+		sourceList.hidden = active.sources.length === 0 && open.length === 0 && pasted.length === 0;
 		sourceList.replaceChildren(
+			...pasted.map((picture, index) => {
+				const name = format(t.assistantPicture, index + 1);
+				const remove = el("button", {
+					class: "assistant-chip-close",
+					attrs: {
+						type: "button",
+						title: format(t.assistantRemoveSource, name),
+						"aria-label": format(t.assistantRemoveSource, name),
+					},
+					children: [icon("close")],
+				});
+				remove.addEventListener("click", () => {
+					pasted = pasted.filter((each) => each !== picture);
+					renderSources();
+				});
+				return el("span", {
+					class: "assistant-chip assistant-source assistant-picture",
+					attrs: { "data-picture": picture.label },
+					children: [
+						el("img", {
+							class: "assistant-picture-thumb",
+							attrs: { src: picture.preview, alt: "" },
+						}),
+						el("span", { class: "assistant-chip-text", text: name }),
+						remove,
+					],
+				});
+			}),
 			...open.map((path) => {
 				const name = baseName(path);
 				const remove = el("button", {
@@ -736,6 +816,21 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	const input = el("textarea", {
 		class: "assistant-input",
 		attrs: { rows: "1", placeholder: t.assistantPlaceholder, "aria-label": t.assistantPlaceholder },
+	});
+	// A screenshot or copied files pasted into the question are attached; text is pasted as text.
+	input.addEventListener("paste", (event) => {
+		const data = event.clipboardData;
+		const files = [...(data?.files ?? [])];
+		if (files.length === 0) return;
+		// Copied from Word or a spreadsheet: the text is what was meant, its picture is not.
+		if (
+			(data?.getData("text/plain") ?? "") !== "" &&
+			files.every((file) => file.type.startsWith("image/"))
+		) {
+			return;
+		}
+		event.preventDefault();
+		void attach(files);
 	});
 	const sendButton = el("button", {
 		class: "assistant-send",
@@ -3314,6 +3409,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		let usedModes: readonly ModeChoice[] = [];
 		/** The document template the question is asked by, whatever the mode. */
 		const usedTemplate = pickedTemplate;
+		/** The pictures pasted for this question: they go with it, and are not kept for the next. */
+		const usedPictures = pasted.map(({ label, mediaType, data }) => ({ label, mediaType, data }));
 		let prompt: string;
 		// The sections added with "@" go with the question, whether or not the document is shared.
 		let withSections = question;
@@ -3343,6 +3440,16 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				}
 				mentions = [];
 				renderMentions();
+			}
+			if (usedPictures.length > 0) {
+				withSections = `<pictures>The user attached ${usedPictures.length === 1 ? "a picture" : "pictures"} to this question (a screenshot, mostly): ${usedPictures.length === 1 ? "it comes" : "they come"} attached to this message, each after its name: ${usedPictures.map(({ label }) => label).join(", ")}</pictures>\n\n${withSections}`;
+				notes.push(
+					usedPictures.length === 1
+						? t.assistantSharedPicture
+						: format(t.assistantSharedPictures, usedPictures.length),
+				);
+				pasted = [];
+				renderSources();
 			}
 			const selection = droppedSelection === null ? host.selection() : "";
 			const sharing = host.shareDocument();
@@ -3468,10 +3575,15 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					tabId,
 					folder: chat.folder,
 					history: earlier,
-					images: images.map(({ label, mediaType, data }) => ({ label, mediaType, data })),
+					// The pasted pictures first: the limit leaves out the document's, not the user's.
+					images: [
+						...usedPictures,
+						...images.map(({ label, mediaType, data }) => ({ label, mediaType, data })),
+					].slice(0, MAX_PROMPT_IMAGES),
 					sources: chatSources(chat),
 					mode: usedMode,
 					...(usedModes.length > 1 ? { modes: usedModes } : {}),
+					...(mode === "auto" ? { auto: true } : {}),
 					...(usedTemplate === null ? {} : { template: usedTemplate.id }),
 					...(fullPrompt === undefined ? {} : { fullPrompt }),
 					...(reviewPrompt === undefined ? {} : { reviewPrompt }),

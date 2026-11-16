@@ -12,7 +12,7 @@ import type { ApprovalAnswer, ApprovalRequest, ToolPolicy } from "../shared/tool
 vi.mock("electron", () => ({ ipcMain: { handle: () => {} } }));
 
 const { PermissionGate } = await import("./assistant-permissions.js");
-const { approver, runTool } = await import("./assistant-tools.js");
+const { approver, runTool, toolsFor } = await import("./assistant-tools.js");
 await import("./assistant-mode-tools.js");
 type ToolContext = import("./assistant-tools.js").ToolContext;
 
@@ -247,5 +247,21 @@ describe("the assistant setting up its MCP servers and the modes that use them",
 		expect(noMode.text).toContain("Name the mode");
 		// Only the one change that could be made was asked about.
 		expect(asked).toHaveLength(1);
+	});
+
+	it("changes modes for one question, only while the choice is automatic", async () => {
+		const { ctx } = chat(allow);
+		// A mode the user picked is theirs: the tool is not offered.
+		expect(toolsFor(ctx).some((tool) => tool.definition.name === "use_mode")).toBe(false);
+		const auto = { ...ctx, auto: true };
+		expect(toolsFor(auto).some((tool) => tool.definition.name === "use_mode")).toBe(true);
+		const steps = (await runTool("use_mode", { modes: ["write", "Code"] }, auto)).text;
+		expect(steps).toContain("now worked in: write, code");
+		expect(steps).toContain("## Several modes for this question");
+		expect(steps).toContain("## Mode: write an analysis document");
+		expect(steps).toContain("## Mode: code");
+		expect((await runTool("use_mode", { modes: ["nope"] }, auto)).text).toContain(
+			'There is no mode named "nope"',
+		);
 	});
 });

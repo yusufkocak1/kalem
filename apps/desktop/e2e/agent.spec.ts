@@ -573,6 +573,9 @@ test("modes: shaped in Settings (a step off, one of the user's own), and picked 
 	const several = (await claude.calls()).at(-1);
 	const three = several?.args[several.args.indexOf("--append-system-prompt") + 1] ?? "";
 	expect(three).toContain("## Several modes for this question");
+	// On automatic the model may change modes itself, with every mode's tools at hand.
+	expect(three).toContain("## The mode was chosen automatically");
+	expect(several?.args.join(" ")).toContain("mcp__kalem__use_mode");
 	const order = [
 		"## Mode: write an analysis document",
 		"## Mode: review an analysis document",

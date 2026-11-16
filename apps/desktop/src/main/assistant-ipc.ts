@@ -46,7 +46,13 @@ import {
 } from "../shared/mcp-servers.js";
 import type { ModelOption } from "../shared/models.js";
 import { claudeModelName, claudeModelOptions, copilotModelOptions } from "../shared/models.js";
-import { modeServers, modeToolsExcluded, requestedModes } from "../shared/modes.js";
+import {
+	autoModes,
+	modeList,
+	modeServers,
+	modeToolsExcluded,
+	requestedModes,
+} from "../shared/modes.js";
 import type { ChatMessage, ProviderId } from "../shared/providers.js";
 import {
 	checkBaseUrl,
@@ -658,11 +664,18 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		const customModes = ctx.store.settings.assistantCustomModes;
 		// One mode, or the several the automatic choice found the question asks for.
 		const askedModes = requestedModes(request);
+		// On automatic the model may change modes itself: what every mode that is on
+		// can reach (tools, MCP servers) goes with the question, whichever was chosen.
+		const choices = request.auto === true ? autoModes(modeSettings, customModes) : [];
+		const reach =
+			choices.length === 0
+				? askedModes
+				: [...modeList(askedModes), ...choices.map((choice) => choice.id)];
 		// The user's code folder for `${project}` (Serena's): a folder added to the question,
 		// else one open in the Files pane, else the active document's.
 		const activeTab = typeof request.tabId === "string" ? win.tabs.get(request.tabId) : undefined;
 		const servers = withProject(
-			modeServers(askedModes, modeSettings, customModes, ctx.store.settings.assistantMcpServers),
+			modeServers(reach, modeSettings, customModes, ctx.store.settings.assistantMcpServers),
 			projectFolder(
 				// The Files pane's folders go with every question: one added besides them was picked for it.
 				collected.roots.find(
@@ -692,7 +705,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				? null
 				: { name: pickedTemplate.info.name, text: pickedTemplate.text };
 		const modeExcluded = modeToolsExcluded(
-			askedModes,
+			reach,
 			modeSettings,
 			customModes,
 			allTools().map((tool) => tool.definition.name),
@@ -707,6 +720,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				program === null
 					? modeExcluded
 					: new Set([...modeExcluded, "list_files", "search", "read_file"]),
+			auto: choices.length > 0,
 			settings: () => ctx.store.settings,
 			changeSettings: ctx.changeSettings,
 			changeLanguage: ctx.changeLanguage,
@@ -761,6 +775,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				mode: askedModes,
 				modes: answerModes,
 				custom: customModes,
+				autoModes: choices,
 				document: tools.document,
 				template: templateGiven,
 				// The servers are told of only when the CLI is connected to them.

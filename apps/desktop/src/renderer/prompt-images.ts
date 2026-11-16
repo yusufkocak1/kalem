@@ -38,9 +38,12 @@ async function load(url: string): Promise<Blob | null> {
 	return response.ok ? response.blob() : null;
 }
 
-async function encode(url: string): Promise<Omit<PromptImage, "label"> | null> {
+/** A picture file as a model takes it: scaled down and encoded again; `null` when it is not one. */
+export async function encodeImage(
+	source: Blob | string,
+): Promise<Omit<PromptImage, "label"> | null> {
 	try {
-		const file = await load(url);
+		const file = typeof source === "string" ? await load(source) : source;
 		if (file === null) return null;
 		const image = await createImageBitmap(file);
 		const { width, height } = image;
@@ -78,7 +81,7 @@ export async function documentImages(
 		if (src === "" || seen.has(src)) continue;
 		seen.add(src);
 		// A picture another site does not let the app read is left out.
-		const encoded = await encode(image.src);
+		const encoded = await encodeImage(image.src);
 		if (encoded === null) continue;
 		const label = src.startsWith("data:") ? `image-${found.length + 1}` : src;
 		found.push({ src, label, ...encoded });

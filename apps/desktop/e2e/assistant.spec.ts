@@ -91,6 +91,69 @@ test("asks the local Claude about the document and inserts its reply with the di
 	await app.close();
 });
 
+test("a screenshot pasted into the question goes with it as a picture, and a copied file joins the chat", async () => {
+	const folder = await tempDir("assistant-paste");
+	const doc = join(folder, "analiz.md");
+	await writeFile(doc, "# Analiz\n");
+	const claude = await fakeClaude(folder);
+	const { app, page, errors } = await launch({ args: [doc], env: { KALEM_CLAUDE: claude.path } });
+	await clickMenu(app, "View", "AI Assistant");
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
+	const input = pane.locator(".assistant-input");
+	const red =
+		"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
+	/** Pastes into the question as the clipboard would: files, and maybe text. */
+	const paste = (pictures: number, text = ""): Promise<boolean> =>
+		input.evaluate(
+			(element, given) => {
+				const data = new DataTransfer();
+				const bytes = Uint8Array.from(atob(given.red), (c) => c.charCodeAt(0));
+				for (let i = 0; i < given.pictures; i++) {
+					data.items.add(new File([bytes], "image.png", { type: "image/png" }));
+				}
+				if (given.text !== "") data.setData("text/plain", given.text);
+				const event = new ClipboardEvent("paste", {
+					clipboardData: data,
+					bubbles: true,
+					cancelable: true,
+				});
+				return !element.dispatchEvent(event);
+			},
+			{ red, pictures, text },
+		);
+
+	// Text copied with a picture of itself (Word, a spreadsheet) is pasted as text.
+	expect(await paste(1, "hücre")).toBe(false);
+	await expect(pane.locator(".assistant-picture")).toHaveCount(0);
+	// Two screenshots: a chip each; one is taken out again.
+	expect(await paste(2)).toBe(true);
+	await expect(pane.locator(".assistant-picture")).toHaveCount(2);
+	await pane.getByRole("button", { name: "Remove “Picture 1” from the chat" }).click();
+	await expect(pane.locator(".assistant-picture")).toHaveCount(1);
+	await page.screenshot({ path: process.env.KALEM_SHOT ?? join(folder, "paste.png") });
+	await input.fill("Bu ekranda hata ne?");
+	await input.press("Enter");
+	await expect(pane.locator(".assistant-user .assistant-notes")).toContainText("with a picture");
+	await expect(pane.locator(".assistant-assistant .assistant-markdown").last()).toHaveText(
+		"Bitti.",
+	);
+	// Sent once: the next question starts without it.
+	await expect(pane.locator(".assistant-picture")).toHaveCount(0);
+	const [call] = await claude.calls();
+	const [question, ...rest] = JSON.parse(call?.prompt ?? "{}").message.content;
+	expect(question.text).toContain("<pictures>");
+	expect(question.text).toContain("pasted-2");
+	expect(question.text.endsWith("Bu ekranda hata ne?")).toBe(true);
+	expect(rest.map((block: { type: string; text?: string }) => block.text ?? block.type)).toEqual([
+		"[pasted-2]",
+		"image",
+	]);
+	expect(rest[1].source.media_type).toBe("image/webp");
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
 test("sends the document's pictures to Claude instead of their base64", async () => {
 	const folder = await tempDir("assistant-images");
 	const doc = join(folder, "analiz.md");

@@ -695,6 +695,11 @@ export interface AssistantRequest {
 	 * when there are several: the question is worked in all of them.
 	 */
 	readonly modes?: readonly string[];
+	/**
+	 * The picker is on "auto": the mode was chosen for the question, the tools and
+	 * servers of every mode go with it, and the model may change modes (use_mode).
+	 */
+	readonly auto?: boolean;
 	/** The document template the user picked for this question (its id), whatever the mode. */
 	readonly template?: string;
 }

@@ -127,12 +127,16 @@ seçilen modda açıksa kullanılır. Tek soruda birden çok iş istenirse
 hepsinde** çalıştırır: her modun adımları, araçları ve sunucuları o soru
 için birlikte kullanılır; seçici Otomatik'te kalır.
 
+Otomatik'teyken **açık olan bütün modların araçları ve sunucuları** soruyla
+birlikte hazır gelir; model, kelimelerden seçilen mod işe uymuyorsa
+`use_mode` aracıyla o soru için kendisi mod değiştirir. Bir sunucunun
+yalnızca belirli bir modda çalışmasını istiyorsanız modu elle seçin.
+
 Bu yüzden:
 
-- "Bu parametrenin değeri ne?" gibi bir soru Otomatik modda genellikle
-  **Sor** moduna düşer. Parametre sorularını da istiyorsanız DBHub'ı
-  **hem Sor hem Kod** modunda açın, ya da soruyu sormadan önce modu elle
-  seçin.
+- Elle **Sor** modunu seçtiyseniz yalnızca Sor'da açık sunucular çalışır.
+  Parametre sorularını orada da istiyorsanız DBHub'ı **hem Sor hem Kod**
+  modunda açın, ya da Otomatik'te bırakın.
 - Kod yazdırırken **Kod** modunu seçin (ya da Otomatik'in seçmesine
   bırakın); i18n eklemesi orada çalışır.
 - Kendi modunuzu (**Yeni mod**) yalnızca bu iş için oluşturup sunucuyu

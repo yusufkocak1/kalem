@@ -77,6 +77,8 @@ export interface ToolContext {
 	readonly t: Strings;
 	/** The tools the mode leaves out of this answer. */
 	readonly excluded: ReadonlySet<string>;
+	/** The mode was chosen automatically: the model may change it for this question (use_mode). */
+	readonly auto?: boolean;
 	settings(): Settings;
 	changeSettings(patch: Partial<Settings>): void;
 	changeLanguage(language: Lang | null): void;

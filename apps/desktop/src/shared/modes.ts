@@ -89,6 +89,53 @@ export function modePrompt(
 	return [SEVERAL, ...list.map(one)].filter((part) => part !== "").join("\n\n");
 }
 
+/** What each of Kalem's modes is for, as the model is told when it may choose one. */
+const MODE_PURPOSE: Readonly<Record<Mode, string>> = {
+	ask: "a plain question",
+	write: "writing an analysis document or a part of one",
+	review: "reviewing an analysis document for problems",
+	prompt: "turning the document into a prompt for a coding agent",
+	code: "reading, writing or fixing code",
+	app: "doing something in Kalem itself: a setting, a panel, a command",
+};
+
+/** A mode the automatic choice may work in. */
+export interface AutoMode {
+	readonly id: string;
+	readonly purpose: string;
+}
+
+/** Every mode that is on, Kalem's and the user's: what the automatic choice picks from. */
+export function autoModes(
+	modes: ModeSettings = {},
+	custom: readonly CustomMode[] = [],
+): readonly AutoMode[] {
+	return [
+		...MODES.filter((mode) => resolveMode(mode, modes).enabled).map((mode) => ({
+			id: mode as string,
+			purpose: MODE_PURPOSE[mode],
+		})),
+		...custom
+			.filter((mode) => mode.enabled)
+			.map((mode) => ({ id: mode.id, purpose: `the user's own mode "${mode.name}"` })),
+	];
+}
+
+/** The tool the model changes modes with, for one question, when the choice is automatic. */
+export const USE_MODE = "use_mode";
+
+/** What the model is told when the mode was chosen for it and it may choose another. */
+export function autoInstructions(chosen: unknown, all: readonly AutoMode[]): string {
+	if (all.length === 0) return "";
+	const now = modeList(chosen).filter((each) => typeof each === "string");
+	return [
+		"## The mode was chosen automatically",
+		`This question was put in ${now.length > 1 ? "the modes" : "the mode"} ${now.join(", ")} from its words alone, which can be wrong or miss a part. When the work is another kind, or more kinds than that (the user asks for code to be written, a document to be reviewed, a setting to be changed…), call ${USE_MODE} with the modes it needs before you start, and work by the steps it returns, for this question only. The tools and MCP servers of every mode are already available to you. Do not tell the user to change the mode themselves.`,
+		"The modes:",
+		...all.map((mode) => `- ${mode.id}: ${mode.purpose}`),
+	].join("\n");
+}
+
 /**
  * The tools a mode leaves out; for the user's own, every Kalem tool it did
  * not choose. Several modes leave out only what all of them do.

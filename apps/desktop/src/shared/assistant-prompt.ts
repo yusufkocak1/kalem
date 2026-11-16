@@ -21,7 +21,8 @@ import { jiraInstructions } from "./jira-tool.js";
 import type { McpServer } from "./mcp-servers.js";
 import { mcpInstructions } from "./mcp-servers.js";
 import type { ModeSettings } from "./mode-config.js";
-import { modePrompt } from "./modes.js";
+import type { AutoMode } from "./modes.js";
+import { autoInstructions, modePrompt, USE_MODE } from "./modes.js";
 import type { ToolDefinition } from "./tool-protocol.js";
 import { blockInstructions } from "./tool-protocol.js";
 
@@ -43,6 +44,8 @@ export interface PromptOptions {
 	readonly template?: { readonly name: string; readonly text: string } | null;
 	/** The assistant's MCP servers the CLI is connected to in this mode. */
 	readonly servers?: readonly McpServer[];
+	/** The mode was chosen automatically: the modes the model may change to with use_mode. */
+	readonly autoModes?: readonly AutoMode[];
 }
 
 /** The longest template text that goes in the instructions; the rest is read with analysis_template. */
@@ -115,6 +118,10 @@ export function assistantInstructions(t: Strings, options: PromptOptions): strin
 	const tools = options.tools ?? [];
 	const mode = [
 		modePrompt(options.mode, options.modes, options.custom),
+		// Only a model that can call the tool is told it may change modes.
+		options.way !== "none" && tools.some((tool) => tool.name === USE_MODE)
+			? autoInstructions(options.mode, options.autoModes ?? [])
+			: "",
 		mcpInstructions(options.servers ?? []),
 		templateInstructions(options.template),
 	]
