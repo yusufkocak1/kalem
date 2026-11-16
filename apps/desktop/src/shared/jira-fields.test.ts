@@ -6,6 +6,7 @@ import {
 	fieldValueBody,
 	labelsBody,
 	mentionMarkup,
+	objectOptionsOf,
 	sprintOf,
 	statusChangesOf,
 } from "./jira-fields.js";
@@ -122,39 +123,57 @@ describe("field values", () => {
 		).toEqual({ id: "27", name: "Kırmızı Sprint 27", state: "ACTIVE", boardId: "5" });
 	});
 
-	it("takes the Team select when Takım is an Insight object field", () => {
+	it("reads an Insight object field as a choice, Takım or any other", () => {
+		const custom = "com.riadalabs.jira.plugins.insight:rlabs-customfield-default-object";
 		const fields = customFieldsOf({
-			names: { customfield_1: "Takım", customfield_2: "Team", customfield_3: "Team" },
+			names: {
+				customfield_1: "Takım",
+				customfield_2: "Team",
+				customfield_3: "Asset Şirket",
+				customfield_4: "Sunucular",
+				customfield_5: "Salt Okunur",
+			},
 			schema: {
-				customfield_1: {
-					type: "any",
-					custom: "com.riadalabs.jira.plugins.insight:rlabs-customfield-default-object",
-				},
+				customfield_1: { type: "any", custom },
 				customfield_2: { type: "option", custom: "x:select" },
-				customfield_3: { type: "any", custom: "com.atlassian.teams:rm-teams-custom-field-team" },
+				customfield_3: { type: "any", custom },
+				customfield_4: { type: "any", custom },
+				customfield_5: { type: "any", custom },
 			},
 			editmeta: {
 				fields: {
 					customfield_1: {},
-					customfield_2: {
-						allowedValues: [
-							{ id: "512671", value: "Kırmızı" },
-							{ id: "512672", value: "Beyaz" },
-						],
-					},
+					customfield_2: { allowedValues: [{ id: "512671", value: "Kırmızı" }] },
+					customfield_3: {},
+					customfield_4: {},
 				},
 			},
 			fields: {
 				customfield_1: ["Quickres Kırmızı (TK-285799)"],
 				customfield_2: { id: "512671", value: "Kırmızı" },
 				customfield_3: null,
+				customfield_4: ["web (01) (SRV-1)", "db (SRV-2)"],
+				customfield_5: ["Sabit (X-9)"],
 			},
 		});
-		expect(fields.team?.fieldId).toBe("customfield_2");
-		expect(fields.teamValue).toEqual({ id: "512671", name: "Kırmızı" });
-		expect(fields.allFields.filter((e) => !e.empty).map((e) => [e.name, e.value])).toEqual([
-			["Takım", "Quickres Kırmızı (TK-285799)"],
+		expect(fields.team).toEqual({ fieldId: "customfield_1", name: "Takım", custom });
+		expect(fields.teamValue).toEqual({ id: "TK-285799", name: "Quickres Kırmızı" });
+		const entry = (name: string) => fields.allFields.find((field) => field.name === name);
+		expect(entry("Team")?.option).toEqual({ id: "512671", name: "Kırmızı" });
+		// Empty and on the edit screen: a chip to pick from.
+		expect(entry("Asset Şirket")?.field?.fieldId).toBe("customfield_3");
+		expect(entry("Asset Şirket")?.option).toBeNull();
+		// Several objects, or not editable: text.
+		expect(entry("Sunucular")?.field).toBeNull();
+		expect(entry("Sunucular")?.value).toBe("web (01) (SRV-1), db (SRV-2)");
+		expect(entry("Salt Okunur")?.field).toBeNull();
+		expect(objectOptionsOf(["web (01) (SRV-1)", { objectKey: "SRV-2", label: "db" }])).toEqual([
+			{ id: "SRV-1", name: "web (01)" },
+			{ id: "SRV-2", name: "db" },
 		]);
+		const team = fields.team as NonNullable<typeof fields.team>;
+		expect(fieldValueBody(team, { id: "TK-1", name: "x" })).toEqual([{ key: "TK-1" }]);
+		expect(fieldValueBody(team, null)).toEqual([]);
 	});
 
 	it("reads time in status, people, dates and select fields", () => {
