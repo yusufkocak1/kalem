@@ -2394,9 +2394,9 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		}
 		if (!message.done && message.error === null) {
 			const lastStep = message.steps?.at(-1);
-			if (pending !== null) nodes.push(waiting(pending));
+			if (pending !== null) nodes.push(waiting(pending, message));
 			else if (message.text === "" || (lastStep !== undefined && message.text.endsWith("\n\n")))
-				nodes.push(waiting(lastStep ?? t.assistantThinking));
+				nodes.push(waiting(lastStep ?? t.assistantThinking, message));
 			else nodes.push(el("span", { class: "assistant-typing" }));
 		}
 		if (message.error !== null) {
@@ -2549,18 +2549,59 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		return view;
 	}
 
-	function waiting(label: string): HTMLElement {
-		return el("div", {
+	/** When each reply began to be waited for: its clock counts from there. */
+	const waitingSince = new WeakMap<Message, number>();
+	/** The length of the waiting animations' common loop, in milliseconds. */
+	const WAIT_LOOP = 2400;
+
+	/**
+	 * What shows while a reply is on its way: moving dots, the step in hand and
+	 * the time gone by. A reply is drawn again with every piece that comes in,
+	 * so the animations are set to the reply's own clock; started anew each
+	 * time, they would stand still on their first frame.
+	 */
+	function waiting(label: string, message: Message): HTMLElement {
+		let since = waitingSince.get(message);
+		if (since === undefined) {
+			since = Date.now();
+			waitingSince.set(message, since);
+		}
+		const gone = Date.now() - since;
+		const view = el("div", {
 			class: "assistant-waiting",
+			attrs: { role: "status" },
 			children: [
 				el("span", {
 					class: "assistant-dots",
 					attrs: { "aria-hidden": "true" },
 					children: [el("span"), el("span"), el("span")],
 				}),
-				label,
+				el("span", { class: "assistant-wait-label", text: label }),
+				el("span", {
+					class: "assistant-wait-time",
+					text: duration(gone),
+					attrs: { "data-started": String(since), "aria-hidden": "true" },
+				}),
 			],
 		});
+		view.style.setProperty("--wait-phase", `${-(gone % WAIT_LOOP)}ms`);
+		tickWaiting();
+		return view;
+	}
+
+	/** The waiting clocks count up in place, once a second, while any shows. */
+	let waitingTicker: ReturnType<typeof setInterval> | null = null;
+	function tickWaiting(): void {
+		if (waitingTicker !== null) return;
+		waitingTicker = setInterval(() => {
+			const times = log.querySelectorAll<HTMLElement>(".assistant-wait-time[data-started]");
+			const now = Date.now();
+			for (const time of times) time.textContent = duration(now - Number(time.dataset.started));
+			if (times.length === 0 && waitingTicker !== null) {
+				clearInterval(waitingTicker);
+				waitingTicker = null;
+			}
+		}, 1000);
 	}
 
 	function markdown(text: string, done: boolean): HTMLElement {
