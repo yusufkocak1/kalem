@@ -1095,7 +1095,7 @@ test("adds files and folders to a chat, and Claude may read the folders", async 
 	await pane.getByRole("menuitem", { name: "Files…" }).click();
 	// The shared document leads the chips; the files and folders added follow it.
 	await expect(pane.locator(".assistant-source")).toHaveText([
-		"Untitled",
+		"analiz.md",
 		"proje",
 		"gereksinimler.txt",
 	]);
