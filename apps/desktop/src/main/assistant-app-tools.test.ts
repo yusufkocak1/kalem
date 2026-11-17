@@ -113,25 +113,43 @@ describe("the assistant's app tools", () => {
 		expect(settings().autoSave).toBe(false);
 	});
 
-	it("keeps hidden settings and wrong values out", async () => {
-		const { ctx, asked } = context(() => allow);
+	it("reaches every setting, asking every time about those that widen what it may do", async () => {
+		const { ctx, asked, always } = context(() => allow);
 		const set = await runTool(
 			"settings_set",
 			{
 				changes: [
-					{ key: "claudePath", value: "/tmp/evil" },
+					{ key: "claudePath", value: "/tmp/claude" },
 					{ key: "assistantPermissions", value: ["document"] },
+					{ key: "copilotTools", value: "block" },
+					{ key: "assistantCustomModes", value: [] },
 					{ key: "zoom", value: "huge" },
 				],
 			},
 			ctx,
 		);
-		expect(set.text).toContain("claudePath: no such setting");
-		expect(set.text).toContain("assistantPermissions: no such setting");
 		expect(set.text).toContain('zoom: "huge" is not a value it takes');
-		expect(asked).toHaveLength(0);
+		expect(set.text).toContain("assistantCustomModes: change it with mode_save");
+		// Each sensitive one on a card of its own, never kept as allowed.
+		const sensitive = asked.filter((request) => request.mustAsk === true);
+		expect(sensitive.map((request) => request.permission).sort()).toEqual([
+			"settings:sensitive:assistantPermissions",
+			"settings:sensitive:claudePath",
+		]);
+		expect(asked.filter((request) => request.mustAsk !== true)).toHaveLength(1);
+		expect(ctx.settings().claudePath).toBe("/tmp/claude");
+		expect(ctx.settings().copilotTools).toBe("block");
+		expect(always()).not.toContain("settings:sensitive:claudePath");
 		const all = await runTool("settings_find", { query: "" }, ctx);
-		expect(all.text).not.toContain("claudePath");
+		expect(all.text).toContain("claudePath");
+		expect(all.text).toContain("[the user is asked every time]");
+		// A structured setting takes its whole value as JSON; a wrong shape is refused.
+		const pinned = await runTool(
+			"settings_set",
+			{ changes: [{ key: "jiraFavorites", value: '"nope"' }] },
+			ctx,
+		);
+		expect(pinned.text).toContain("is not a value it takes");
 	});
 
 	it("never shows the model how an MCP server runs: its tokens stay out", async () => {

@@ -81,6 +81,7 @@ import "./assistant-analysis-tools.js";
 import "./assistant-external-tools.js";
 import "./assistant-jira-tools.js";
 import "./assistant-mode-tools.js";
+import "./assistant-mode-edit-tools.js";
 import "./assistant-confluence-tools.js";
 import { blockResults, parseApprovalAnswer, toolCalls } from "../shared/tool-protocol.js";
 import { collectSources, MAX_SOURCES, SOURCE_BUDGET } from "./assistant-sources.js";

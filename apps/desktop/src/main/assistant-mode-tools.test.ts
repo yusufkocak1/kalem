@@ -14,6 +14,7 @@ vi.mock("electron", () => ({ ipcMain: { handle: () => {} } }));
 const { PermissionGate } = await import("./assistant-permissions.js");
 const { approver, runTool, toolsFor } = await import("./assistant-tools.js");
 await import("./assistant-mode-tools.js");
+await import("./assistant-mode-edit-tools.js");
 type ToolContext = import("./assistant-tools.js").ToolContext;
 
 /** A chat whose window answers each question as told, with settings of its own. */
@@ -263,5 +264,99 @@ describe("the assistant setting up its MCP servers and the modes that use them",
 		expect((await runTool("use_mode", { modes: ["nope"] }, auto)).text).toContain(
 			'There is no mode named "nope"',
 		);
+	});
+});
+
+describe("the assistant shaping its modes", () => {
+	it("makes a mode of the user's, changes it and removes it, asking each time", async () => {
+		const { ctx, asked, settings } = chat(allow);
+		const made = await runTool(
+			"mode_save",
+			{
+				name: "Toplantı notu",
+				icon: "chats",
+				description: "Toplantı notlarını düzenler",
+				instructions: "Write meeting notes.",
+				steps: ["List the decisions.", { title: "Actions", instruction: "List who does what." }],
+				tools: ["document_read", "document_edit"],
+				keywords: ["toplantı"],
+				language: "tr",
+			},
+			ctx,
+		);
+		expect(made.text).toContain("Done");
+		const [mode] = settings().assistantCustomModes;
+		expect(mode).toMatchObject({
+			name: "Toplantı notu",
+			icon: "chats",
+			prompt: "Write meeting notes.",
+			tools: ["document_read", "document_edit"],
+			language: "tr",
+			enabled: true,
+		});
+		expect(mode?.steps.map((step) => step.instruction)).toEqual([
+			"List the decisions.",
+			"List who does what.",
+		]);
+		expect(asked[0]?.title).toBe("Add the mode Toplantı notu");
+		expect(asked[0]?.mustAsk).toBeUndefined();
+
+		// Only what is given changes; a server the user has not set up is refused.
+		expect(
+			(await runTool("mode_save", { mode: "Toplantı notu", detail: "short" }, ctx)).text,
+		).toContain("Done");
+		expect(settings().assistantCustomModes[0]).toMatchObject({ detail: "short", language: "tr" });
+		expect((await runTool("mode_save", { mode: mode?.id, mcp: ["nope"] }, ctx)).text).toContain(
+			"no MCP servers named nope",
+		);
+		expect((await runTool("mode_save", { mode: "Review", detail: "short" }, ctx)).text).toContain(
+			"mode_configure",
+		);
+
+		const listed = await runTool("mode_list", {}, ctx);
+		expect(listed.text).toContain(`${mode?.id} ("Toplantı notu", the user's)`);
+		expect(listed.text).toContain("List who does what.");
+
+		expect((await runTool("mode_delete", { mode: "Toplantı notu" }, ctx)).text).toContain("Done");
+		expect(settings().assistantCustomModes).toEqual([]);
+		expect((await runTool("mode_delete", { mode: "review" }, ctx)).text).toContain(
+			"cannot be removed",
+		);
+	});
+
+	it("changes one of Kalem's modes: turned off, a step off, a step of the user's added", async () => {
+		const { ctx, asked, settings } = chat(allow);
+		const done = await runTool(
+			"mode_configure",
+			{
+				mode: "Prompt",
+				enabled: false,
+				language: "en",
+				steps: [{ id: resolveMode("prompt").steps[0]?.id, on: false }],
+				add_steps: ["Keep it under 200 words."],
+			},
+			ctx,
+		);
+		expect(done.text).toContain("Done");
+		const prompt = resolveMode("prompt", settings().assistantModes);
+		expect(prompt.enabled).toBe(false);
+		expect(prompt.language).toBe("en");
+		expect(prompt.steps[0]?.on).toBe(false);
+		expect(prompt.steps.at(-1)).toMatchObject({
+			custom: true,
+			instruction: "Keep it under 200 words.",
+		});
+		expect(asked[0]?.lines).toContain("on → off");
+
+		const back = await runTool("mode_configure", { mode: "prompt", reset: true }, ctx);
+		expect(back.text).toContain("Done");
+		expect(settings().assistantModes.prompt).toEqual({});
+	});
+
+	it("changes nothing the user refused", async () => {
+		const { ctx, settings } = chat(refuse);
+		const made = await runTool("mode_save", { name: "X" }, ctx);
+		expect(made.text).toContain("did not allow");
+		expect(settings().assistantCustomModes).toEqual([]);
 	});
 });

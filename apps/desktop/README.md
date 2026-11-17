@@ -772,7 +772,17 @@ verir.
 >   verilenler **Dosya → Ayarlar → Asistan**'da listelenir ve kaldırılabilir.
 >   Yapılan her değişiklik yanıtın altında **Geri al** ile durur (birden
 >   fazlaysa **Tüm Değişiklikleri Geri Al**). Program yolları, API
->   anahtarları, izinler ve bağlantılar asistana hiç gösterilmez.
+>   anahtarları ve bağlantılar asistana hiç gösterilmez.
+> - **Tüm ayarlar ve modlar:** asistan `settings_set` ile uygulamanın her
+>   ayarını değiştirebilir (listeler ve tablolar JSON olarak). Asistanın
+>   izinlerini, araç ayarlarını, onay modunu, Claude Code/Copilot yolunu
+>   ya da güvenilen Git klasörlerini değiştiren ayarlar her seferinde ayrı
+>   bir kartla sorulur, hatırlanmaz ve "Onayları atla" ile de atlanmaz. MCP
+>   sunucularının komutları ve token'ları asistana gösterilmez. Modlar için
+>   `mode_list`, `mode_save` (kendi modunuzu ekleme/değiştirme), `mode_delete`
+>   ve `mode_configure` (Kalem'in modlarını açma/kapama, adımlar, dil,
+>   ayrıntı) araçları vardır; "toplantı notları için bir mod ekle" demek
+>   yeterlidir.
 > - **Az token:** her soruda yalnızca kısa bir tanıtım gider; diyagram
 >   biçimi, menü rehberi, belge değişikliği biçimi, analiz ve prompt
 >   rehberleri `kalem_help` ile gerektiğinde istenir. Uzun belgeler (24 000
