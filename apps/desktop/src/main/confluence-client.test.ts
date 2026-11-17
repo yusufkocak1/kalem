@@ -726,13 +726,31 @@ describe("ConfluenceClient", () => {
 		expect((error as ConfluenceError).status).toBe(409);
 	});
 
-	it("downloads attachments from the same site only", async () => {
+	it("downloads a page's picture at its address, without a REST call", async () => {
+		const { fetch, calls } = fakeFetch([
+			["/download/attachments/42/image-2026-10-24_23-8-8.png", "PNG"],
+		]);
+		const client = new ConfluenceClient(
+			{ site: "https://wiki.example.com/confluence", username: "", token: "t" },
+			fetch,
+		);
+		const response = await client.attachment("42", "image-2026-10-24_23-8-8.png");
+		expect(await response?.text()).toBe("PNG");
+		expect(calls.map((call) => call.url)).toEqual([
+			"https://wiki.example.com/confluence/download/attachments/42/image-2026-10-24_23-8-8.png",
+		]);
+		expect(header(calls[0], "Authorization")).toBe("Bearer t");
+	});
+
+	it("asks the REST API for the address when the file is not at the usual one", async () => {
 		const { fetch, calls } = fakeFetch([
 			[
 				"/child/attachment",
-				{ results: [{ _links: { download: "/download/attachments/42/a.png" } }] },
+				{
+					results: [{ _links: { download: "/download/attachments/42/a.png?version=2&api=v2" } }],
+				},
 			],
-			["/download/attachments/42/a.png", "PNG"],
+			["/download/attachments/42/a.png?version=2", "PNG"],
 		]);
 		const client = new ConfluenceClient(
 			{ site: "https://wiki.example.com", username: "", token: "t" },
@@ -740,8 +758,43 @@ describe("ConfluenceClient", () => {
 		);
 		const response = await client.attachment("42", "a.png");
 		expect(await response?.text()).toBe("PNG");
-		expect(calls[1]?.url).toBe("https://wiki.example.com/download/attachments/42/a.png");
+		expect(calls.map((call) => call.url)).toEqual([
+			"https://wiki.example.com/download/attachments/42/a.png",
+			"https://wiki.example.com/rest/api/content/42/child/attachment?filename=a.png",
+			"https://wiki.example.com/download/attachments/42/a.png?version=2&api=v2",
+		]);
 
+		const missing = new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "", token: "t" },
+			fakeFetch([["/child/attachment", { results: [] }]]).fetch,
+		);
+		expect(await missing.attachment("42", "gone.png")).toBeNull();
+	});
+
+	it("asks Server for a download with a password the way it reads one", async () => {
+		const { fetch, calls } = fakeFetch([
+			["/download/attachments/42/a%20b.png", "PNG"],
+			["/download/attachments/7/c.png", "PNG"],
+		]);
+		const server = new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "ayse", token: "secret" },
+			fetch,
+		);
+		await server.attachment("42", "a b.png");
+		expect(calls[0]?.url).toBe(
+			"https://wiki.example.com/download/attachments/42/a%20b.png?os_authType=basic",
+		);
+		expect(header(calls[0], "Authorization")).toMatch(/^Basic /);
+
+		const cloud = new ConfluenceClient(
+			{ site: "https://acme.atlassian.net", username: "a@b.c", token: "secret" },
+			fetch,
+		);
+		await cloud.attachment("7", "c.png");
+		expect(calls[1]?.url).toBe("https://acme.atlassian.net/wiki/download/attachments/7/c.png");
+	});
+
+	it("downloads attachments from the same site only", async () => {
 		const hostile = fakeFetch([
 			["/child/attachment", { results: [{ _links: { download: "https://evil.example/x.png" } }] }],
 		]);
@@ -750,7 +803,11 @@ describe("ConfluenceClient", () => {
 			hostile.fetch,
 		);
 		await expect(other.attachment("42", "x.png")).rejects.toThrow(/another site/);
-		expect(hostile.calls).toHaveLength(1);
+		expect(hostile.calls.map((call) => new URL(call.url).host)).toEqual([
+			"wiki.example.com",
+			"wiki.example.com",
+		]);
+		await expect(other.attachment("../42", "x.png")).rejects.toThrow(/page id/);
 	});
 
 	it("rejects page ids that are not numbers", async () => {

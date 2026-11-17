@@ -122,6 +122,116 @@ export function attachmentFor(
 	return matches.at(-1) ?? null;
 }
 
+/**
+ * Where JEditor, an HTML editor plug-in for Jira Server and Data Center,
+ * serves the pictures pasted into it: `…/plugins/servlet/jeditor_file_provider?imgId=…&fileName=…`.
+ */
+export const JEDITOR_IMAGE_PATH = "/plugins/servlet/jeditor_file_provider";
+
+/** A picture JEditor serves. */
+export interface JeditorImage {
+	/** The servlet's query, as the address has it. */
+	readonly query: string;
+	/** `imgId`; the attachment's id on the sites where it is a number. */
+	readonly id: string;
+	/** `fileName`; empty when the address has none. */
+	readonly fileName: string;
+	/** The site the address names; `null` for a relative address. */
+	readonly origin: string | null;
+}
+
+/** The JEditor picture an `<img src>` names; `null` for any other address. */
+export function jeditorImageOf(src: string): JeditorImage | null {
+	const absolute = /^[a-z][a-z0-9+.-]*:/i.test(src) || src.startsWith("//");
+	let url: URL;
+	try {
+		// A field's HTML escaped twice reaches here with `&amp;` between the parameters.
+		url = new URL(src.trim().replace(/&amp;/gi, "&"), "https://relative.invalid/");
+	} catch {
+		return null;
+	}
+	if (absolute && url.protocol !== "https:" && url.protocol !== "http:") return null;
+	// kalem-locale-ok: URL paths are ASCII
+	if (!url.pathname.toLowerCase().replace(/\/+$/, "").endsWith(JEDITOR_IMAGE_PATH)) return null;
+	const params = new Map<string, string>();
+	// kalem-locale-ok: parameter names are ASCII
+	for (const [key, value] of url.searchParams) params.set(key.toLowerCase(), value);
+	return {
+		query: url.search.replace(/^\?/, ""),
+		id: params.get("imgid") ?? "",
+		fileName: params.get("filename") ?? params.get("name") ?? "",
+		origin: absolute ? url.origin : null,
+	};
+}
+
+/** Where a picture of an issue is loaded from, in the order to try. */
+export type JiraImageSource =
+	| { readonly kind: "attachment"; readonly file: JiraAttachment }
+	| { readonly kind: "jeditor"; readonly query: string }
+	| { readonly kind: "url"; readonly url: string };
+
+export interface JiraImage {
+	/** What the picture is called, for its caption and the card shown when it cannot be loaded. */
+	readonly name: string;
+	/** The issue's attachment it is, when Kalem could tell. */
+	readonly file: JiraAttachment | null;
+	/** Empty when Kalem cannot load it. */
+	readonly sources: readonly JiraImageSource[];
+}
+
+function lastFileName(src: string): string {
+	const name = src.split(/[?#]/)[0]?.split("/").pop() ?? "";
+	try {
+		return decodeURIComponent(name);
+	} catch {
+		return name;
+	}
+}
+
+/**
+ * An `<img src>` of an issue's text as Kalem loads it. `site` is the Jira
+ * the issue is on: a JEditor picture of that Jira is asked for with the
+ * user's login, as Jira's own page does; one of another site is only an address.
+ */
+export function jiraImageOf(
+	src: string,
+	site: string,
+	attachments: readonly JiraAttachment[],
+): JiraImage {
+	const jeditor = jeditorImageOf(src);
+	let siteOrigin: string | null = null;
+	try {
+		siteOrigin = new URL(site).origin;
+	} catch {}
+	if (jeditor !== null && (jeditor.origin === null || jeditor.origin === siteOrigin)) {
+		const byId = /^\d+$/.test(jeditor.id)
+			? attachments.find((file) => file.id === jeditor.id)
+			: undefined;
+		const byName =
+			jeditor.fileName === ""
+				? undefined
+				: attachments.filter((file) => file.filename === jeditor.fileName).at(-1);
+		const sources: JiraImageSource[] = [];
+		if (byId !== undefined) sources.push({ kind: "attachment", file: byId });
+		sources.push({ kind: "jeditor", query: jeditor.query });
+		// The same name may be another picture: only after the plug-in's own answer.
+		if (byName !== undefined && byName !== byId) sources.push({ kind: "attachment", file: byName });
+		return {
+			name: byId?.filename || jeditor.fileName || byName?.filename || "image",
+			file: byId ?? byName ?? null,
+			sources,
+		};
+	}
+	const file = attachmentFor(src, attachments);
+	if (file !== null) return { name: file.filename, file, sources: [{ kind: "attachment", file }] };
+	const external = /^(?:https?:|data:)/i.test(src);
+	return {
+		name: lastFileName(src) || src,
+		file: null,
+		sources: external ? [{ kind: "url", url: src }] : [],
+	};
+}
+
 export function sprintOf(value: unknown): JiraSprint | null {
 	const all = asArray(value).map((item): JiraSprint | null => {
 		if (typeof item === "string") {

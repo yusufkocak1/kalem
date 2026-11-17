@@ -1,8 +1,8 @@
 import type { Root } from "@kalem-editor/core";
 import type { KalemBridge } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
-import type { JiraAttachment } from "../shared/jira-fields.js";
-import { attachmentFor } from "../shared/jira-fields.js";
+import type { JiraAttachment, JiraImageSource } from "../shared/jira-fields.js";
+import { jiraImageOf } from "../shared/jira-fields.js";
 import type { LinkCard } from "../shared/jira-links.js";
 import { linkCardOf } from "../shared/jira-links.js";
 import { el } from "./dom.js";
@@ -44,14 +44,17 @@ export function holdImages(root: Root): Root {
 export const jiraAttachmentSrc = (file: JiraAttachment): string =>
 	`kalem-doc://jira/${file.id}/${encodeURIComponent(file.filename)}`;
 
-function fileNameOf(src: string): string {
-	const name = src.split(/[?#]/)[0]?.split("/").pop() ?? "";
-	try {
-		return decodeURIComponent(name);
-	} catch {
-		return name;
-	}
+/** A picture JEditor serves, asked for by the main process with the user's login. */
+export const jeditorImageSrc = (query: string): string => `kalem-doc://jira/jeditor?${query}`;
+
+function sourceUrl(source: JiraImageSource): string {
+	if (source.kind === "attachment") return jiraAttachmentSrc(source.file);
+	if (source.kind === "jeditor") return jeditorImageSrc(source.query);
+	return source.url;
 }
+
+/** The site an issue's address is on: `https://jira.example.com/jira/browse/KEY-1` → `https://jira.example.com/jira`. */
+const siteOf = (issueUrl: string): string => issueUrl.replace(/\/browse\/[^/]*$/, "");
 
 function missingImage(name: string, url: string, options: RichContentOptions): HTMLElement {
 	const open = el("a", {
@@ -77,15 +80,14 @@ export function decorateImages(root: HTMLElement, options: RichContentOptions): 
 		const pending = image.getAttribute("src") === PENDING_IMAGE;
 		const src = (pending ? image.getAttribute("title") : image.getAttribute("src")) ?? "";
 		if (pending) image.removeAttribute("title");
-		const file = attachmentFor(src, options.attachments);
-		const external = /^(?:https?:|data:)/i.test(src) && file === null;
-		const name = file?.filename ?? (fileNameOf(src) || src);
+		const { name, file, sources } = jiraImageOf(src, siteOf(options.issueUrl), options.attachments);
 		const openUrl = file?.url || options.issueUrl;
-		if (!external && file === null) {
+		const urls = [...new Set(sources.map(sourceUrl))];
+		if (urls.length === 0) {
 			image.replaceWith(missingImage(name, openUrl, options));
 			continue;
 		}
-		image.src = file === null ? src : jiraAttachmentSrc(file);
+		image.src = urls[0] as string;
 		if (image.getAttribute("alt") === null || image.alt === "") image.alt = name;
 		image.loading = "lazy";
 		const thumb = el("button", {
@@ -103,13 +105,19 @@ export function decorateImages(root: HTMLElement, options: RichContentOptions): 
 				shown.filter((item) => item.isConnected && item.complete),
 			);
 		});
-		image.addEventListener(
-			"error",
-			() => {
-				thumb.replaceWith(missingImage(name, openUrl, options));
-			},
-			{ once: true },
-		);
+		// The next place to load it from, and a card once none is left.
+		let tried = 0;
+		const failed = (): void => {
+			tried++;
+			const next = urls[tried];
+			if (next !== undefined) {
+				image.src = next;
+				return;
+			}
+			image.removeEventListener("error", failed);
+			if (thumb.isConnected) thumb.replaceWith(missingImage(name, openUrl, options));
+		};
+		image.addEventListener("error", failed);
 	}
 }
 

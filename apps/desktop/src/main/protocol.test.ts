@@ -43,3 +43,40 @@ describe("kalem-doc addresses", () => {
 		expect(servedPath(url("kalem-doc://local/share/a.png"), true, none)).toBeNull();
 	});
 });
+
+const { imageResponse } = await import("./protocol.js");
+
+const PNG = Uint8Array.from(
+	atob(
+		"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+	),
+	(char) => char.charCodeAt(0),
+);
+
+describe("pictures from Confluence and Jira", () => {
+	it("passes a picture on with the type its bytes have", async () => {
+		const sent = new Response(PNG, {
+			headers: { "Content-Type": "application/octet-stream", "Cache-Control": "max-age=60" },
+		});
+		const shown = await imageResponse(sent);
+		expect(shown?.headers.get("Content-Type")).toBe("image/png");
+		expect(shown?.headers.get("Cache-Control")).toBe("max-age=60");
+		expect(new Uint8Array((await shown?.arrayBuffer()) ?? new ArrayBuffer(0))).toEqual(PNG);
+	});
+
+	it("turns away a sign-in page, an error and an empty answer sent for a picture", async () => {
+		const signIn = new Response("<!DOCTYPE html><html><title>Log in</title></html>", {
+			headers: { "Content-Type": "text/html;charset=UTF-8" },
+		});
+		expect(await imageResponse(signIn)).toBeNull();
+		expect(await imageResponse(new Response(PNG, { status: 401 }))).toBeNull();
+		expect(await imageResponse(new Response(new Uint8Array(0)))).toBeNull();
+	});
+
+	it("keeps a picture whose bytes it does not know when the server calls it one", async () => {
+		const tiff = new Response(Uint8Array.of(0x49, 0x49, 0x2a, 0x00), {
+			headers: { "Content-Type": "image/tiff" },
+		});
+		expect((await imageResponse(tiff))?.headers.get("Content-Type")).toBe("image/tiff");
+	});
+});

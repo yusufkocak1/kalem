@@ -4,6 +4,8 @@ import {
 	customFieldsOf,
 	fieldText,
 	fieldValueBody,
+	jeditorImageOf,
+	jiraImageOf,
 	labelsBody,
 	mentionMarkup,
 	objectOptionsOf,
@@ -282,5 +284,78 @@ describe("history and attachments", () => {
 			filename: "x.png",
 		});
 		expect(attachmentFor("other.png", files)).toBeNull();
+	});
+
+	it("reads the address JEditor gives a picture pasted into it", () => {
+		expect(
+			jeditorImageOf(
+				"/jira/plugins/servlet/jeditor_file_provider?imgId=ckupload202610242308&fileName=image%201.png",
+			),
+		).toEqual({
+			query: "imgId=ckupload202610242308&fileName=image%201.png",
+			id: "ckupload202610242308",
+			fileName: "image 1.png",
+			origin: null,
+		});
+		expect(
+			jeditorImageOf(
+				"https://jira.example.com/plugins/servlet/jeditor_file_provider?imgId=12&amp;fileName=a.png",
+			),
+		).toMatchObject({ id: "12", fileName: "a.png", origin: "https://jira.example.com" });
+		expect(jeditorImageOf("/secure/attachment/8/a.png")).toBeNull();
+		expect(jeditorImageOf("javascript:/plugins/servlet/jeditor_file_provider?x=1")).toBeNull();
+	});
+
+	it("loads a JEditor picture as the attachment it is, else from the plug-in, with the user's login", () => {
+		const files = [
+			{ id: "12", filename: "image-1.png", mimeType: "image/png", url: "u12" },
+			{ id: "13", filename: "image-2.png", mimeType: "image/png", url: "u13" },
+		];
+		const site = "https://jira.example.com/jira";
+		const servlet = "/jira/plugins/servlet/jeditor_file_provider";
+		expect(jiraImageOf(`${servlet}?imgId=12&fileName=image-1.png`, site, files)).toEqual({
+			name: "image-1.png",
+			file: files[0],
+			sources: [
+				{ kind: "attachment", file: files[0] },
+				{ kind: "jeditor", query: "imgId=12&fileName=image-1.png" },
+			],
+		});
+		// Not an attachment's id: the plug-in first, an attachment of that name after it.
+		expect(jiraImageOf(`${servlet}?imgId=ck1&fileName=image-2.png`, site, files)).toEqual({
+			name: "image-2.png",
+			file: files[1],
+			sources: [
+				{ kind: "jeditor", query: "imgId=ck1&fileName=image-2.png" },
+				{ kind: "attachment", file: files[1] },
+			],
+		});
+		// Its own name, never the servlet's, when nothing else is known of it.
+		expect(jiraImageOf(`${servlet}?imgId=ck2&fileName=eksik.png`, site, files)).toMatchObject({
+			name: "eksik.png",
+			file: null,
+			sources: [{ kind: "jeditor", query: "imgId=ck2&fileName=eksik.png" }],
+		});
+		// Another Jira's picture is only an address: the login is not sent there.
+		expect(
+			jiraImageOf(
+				"https://other.example.com/plugins/servlet/jeditor_file_provider?imgId=1&fileName=x.png",
+				site,
+				files,
+			).sources,
+		).toEqual([
+			{
+				kind: "url",
+				url: "https://other.example.com/plugins/servlet/jeditor_file_provider?imgId=1&fileName=x.png",
+			},
+		]);
+		expect(jiraImageOf("/secure/attachment/13/image-2.png", site, files).sources).toEqual([
+			{ kind: "attachment", file: files[1] },
+		]);
+		expect(jiraImageOf("kayip.png", site, files)).toEqual({
+			name: "kayip.png",
+			file: null,
+			sources: [],
+		});
 	});
 });
