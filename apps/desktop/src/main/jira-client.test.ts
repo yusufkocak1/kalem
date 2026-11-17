@@ -114,3 +114,37 @@ describe("JiraClient", () => {
 		expect((failure as JiraError).message).toBe("HTTP 404: Issue does not exist");
 	});
 });
+
+describe("JiraClient pictures", () => {
+	it("asks JEditor's servlet for a picture pasted into it, with the login", async () => {
+		const server = fakeFetch([["/plugins/servlet/jeditor_file_provider", "PNG"]]);
+		const client = new JiraClient(
+			{ site: "https://jira.example.com/jira", username: "", token: "pat" },
+			server.fetch,
+		);
+		await client.editorImage("imgId=ck1&fileName=image%201.png");
+		expect(server.calls).toEqual([
+			"https://jira.example.com/jira/plugins/servlet/jeditor_file_provider?imgId=ck1&fileName=image+1.png",
+		]);
+		expect(server.auth).toEqual(["Bearer pat"]);
+		await expect(client.editorImage("")).rejects.toThrow(/image address/);
+	});
+
+	it("asks Server's own pages to read a password", async () => {
+		const server = fakeFetch([
+			["/secure/attachment/", "PNG"],
+			["/plugins/servlet/", "PNG"],
+		]);
+		const client = new JiraClient(
+			{ site: "https://jira.example.com", username: "ayse", token: "secret" },
+			server.fetch,
+		);
+		await client.attachment("501", "a b.png");
+		await client.editorImage("imgId=7&os_authType=none");
+		expect(server.calls).toEqual([
+			"https://jira.example.com/secure/attachment/501/a%20b.png?os_authType=basic",
+			"https://jira.example.com/plugins/servlet/jeditor_file_provider?imgId=7&os_authType=basic",
+		]);
+		expect(server.auth.every((value) => value.startsWith("Basic "))).toBe(true);
+	});
+});

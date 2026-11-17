@@ -904,8 +904,27 @@ export class ConfluenceClient {
 		});
 	}
 
+	/**
+	 * A file from Confluence's own pages (`/download/…`), not its REST API.
+	 * Server and Data Center read a password there only when asked to
+	 * (`os_authType=basic`); otherwise they answer with the sign-in page.
+	 */
+	#download(path: string): Promise<Response> {
+		const basic = !this.cloud && !this.bearer;
+		const target = basic ? `${path}${path.includes("?") ? "&" : "?"}os_authType=basic` : path;
+		return this.#request(target, { headers: { Accept: "*/*" } });
+	}
+
 	/** The attachment's bytes, or `null` when the page has no such file. */
 	async attachment(pageId: string, name: string): Promise<Response | null> {
+		if (!/^\d+$/.test(pageId)) throw new Error("Invalid page id");
+		// The address is known without asking: one request a picture, and not a REST call. A Data
+		// Center's rate limit counts those, and a page of pictures spent it all at once.
+		try {
+			return await this.#download(`/download/attachments/${pageId}/${encodeURIComponent(name)}`);
+		} catch {
+			// A name the server spells another way: asked for as the REST API knows it.
+		}
 		const query = `filename=${encodeURIComponent(name)}`;
 		let download = "";
 		if (this.cloud) {
@@ -916,6 +935,6 @@ export class ConfluenceClient {
 			download = asString(asJson(asJson(asArray(body.results)[0])._links).download);
 		}
 		if (download === "") return null;
-		return this.#request(this.#relative(download), { headers: { Accept: "*/*" } });
+		return this.#download(this.#relative(download));
 	}
 }

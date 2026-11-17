@@ -586,6 +586,12 @@ function start(): void {
 				const response = await connection.client.attachment(id, name);
 				return response.ok ? response : null;
 			},
+			loadJiraEditorImage: async (query) => {
+				const connection = await jiraConnection({ jira, confluence });
+				if (connection === null) return null;
+				const response = await connection.client.editorImage(query);
+				return response.ok ? response : null;
+			},
 			openShares: () => {
 				const shares = new Set<string>();
 				const add = (path: string | null): void => {

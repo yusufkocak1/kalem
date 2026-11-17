@@ -94,6 +94,14 @@ export async function fakeJira() {
 			json(res, { errorMessages: ["Alan düzenlenemez"] }, 400);
 			return true;
 		};
+		// JEditor serves the pictures pasted into it from a servlet of its own, not at attachment addresses.
+		if (
+			url.pathname === "/plugins/servlet/jeditor_file_provider" &&
+			url.searchParams.get("imgId") === "ckupload202611171326"
+		) {
+			res.writeHead(200, { "Content-Type": "application/octet-stream" });
+			return res.end(Buffer.from(PNG, "base64"));
+		}
 		if (url.pathname === "/secure/attachment/501/pastedImage_1.png") {
 			res.writeHead(200, { "Content-Type": "image/png" });
 			return res.end(Buffer.from(PNG, "base64"));
@@ -425,7 +433,7 @@ export async function fakeJira() {
 							{
 								author: { name: "gulden", displayName: "GULDEN BAYKARA - Quickres Analist Takimi" },
 								created: "2026-10-07T11:56:00.000+0300",
-								body: `<p>Merhaba <a href="${jiraSite()}/secure/ViewProfile.jspa?name=isil.sen" class="user-hover" rel="isil.sen">ISIL SEN (Gelir Yonetimi Bsk. (Dogrudan Dagitim Kanallari Md.) - Bassorumlu)</a> ,</p><p>&nbsp;</p><p>Analizi tamamladım. Kontrol edebilir misiniz?</p><p><br></p><p>Teşekkürler.</p><p>&nbsp;</p><p>&nbsp;</p>`,
+								body: `<p>Merhaba <a href="${jiraSite()}/secure/ViewProfile.jspa?name=isil.sen" class="user-hover" rel="isil.sen">ISIL SEN (Gelir Yonetimi Bsk. (Dogrudan Dagitim Kanallari Md.) - Bassorumlu)</a> ,</p><p>&nbsp;</p><p>Analizi tamamladım. Kontrol edebilir misiniz?</p><p><br></p><p>Teşekkürler.</p><p><img src="/plugins/servlet/jeditor_file_provider?imgId=ckupload202611171326&amp;fileName=image-2026-11-17-13-26-00-000.png" /></p><p>&nbsp;</p><p>&nbsp;</p>`,
 							},
 							{
 								author: {

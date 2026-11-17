@@ -210,7 +210,18 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await expect(comments.nth(0).locator(".jira-comment-author")).toHaveText("Gulden Baykara");
 	await expect(comments.nth(0).locator(".jira-team-badge")).toHaveText("Quickres Analist Takimi");
 	await expect(comments.nth(0).locator(".jira-mention")).toHaveText("@Isil Sen");
-	await expect(comments.nth(0).locator(".jira-markdown p")).toHaveCount(3);
+	await expect(comments.nth(0).locator(".jira-markdown p")).toHaveCount(4);
+	// A picture pasted into JEditor comes from its servlet, signed in, and shows as a picture.
+	const pasted = comments.nth(0).locator(".jira-thumb img");
+	await expect(pasted).toHaveAttribute(
+		"src",
+		"kalem-doc://jira/jeditor?imgId=ckupload202611171326&fileName=image-2026-11-17-13-26-00-000.png",
+	);
+	await expect.poll(() => pasted.evaluate((node: HTMLImageElement) => node.naturalWidth)).toBe(1);
+	await expect(comments.nth(0).locator(".jira-thumb")).toHaveAttribute(
+		"title",
+		"image-2026-11-17-13-26-00-000.png",
+	);
 	await expect(comments.nth(1)).toHaveClass(/jira-comment-short/);
 	await expect(comments.nth(1).locator(".jira-team-badge")).toHaveText("Gelir Yonetimi Bsk.");
 	await expect(comments.nth(2)).toContainText("Bende de oluyor.");
@@ -226,7 +237,7 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	);
 	// Filters: comments with attachments, a team.
 	await jira.locator(".jira-filter-chip", { hasText: "With attachments" }).click();
-	await expect(comments).toHaveCount(1);
+	await expect(comments).toHaveCount(2);
 	await jira.locator(".jira-filter-chip", { hasText: "With attachments" }).click();
 	await jira.locator(".jira-filter-select").selectOption("team:Quickres Analist Takimi");
 	await expect(comments).toHaveCount(1);

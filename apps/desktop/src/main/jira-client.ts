@@ -34,6 +34,7 @@ import {
 	attachmentsOf,
 	fieldValueBody,
 	isObjectField,
+	JEDITOR_IMAGE_PATH,
 	labelsBody,
 	objectOptionsOf,
 	optionsOf,
@@ -681,11 +682,34 @@ export class JiraClient {
 		return valid;
 	}
 
+	/**
+	 * A page of Jira's own (not its REST API) with this login. Server and
+	 * Data Center read a password there only when asked to (`os_authType=basic`);
+	 * otherwise they answer with the sign-in page.
+	 */
+	#page(path: string, query: URLSearchParams, accept: string): Promise<Response> {
+		if (!this.cloud && !this.bearer) query.set("os_authType", "basic");
+		const search = query.toString();
+		return this.#fetch(`${this.site}${path}${search === "" ? "" : `?${search}`}`, {
+			headers: { Accept: accept, Authorization: this.#auth },
+		});
+	}
+
 	async attachment(id: string, name: string): Promise<Response> {
 		if (!/^\d+$/.test(id)) throw new Error("Invalid attachment id");
-		return this.#fetch(`${this.site}/secure/attachment/${id}/${encodeURIComponent(name)}`, {
-			headers: { Accept: "*/*", Authorization: this.#auth },
-		});
+		return this.#page(
+			`/secure/attachment/${id}/${encodeURIComponent(name)}`,
+			new URLSearchParams(),
+			"*/*",
+		);
+	}
+
+	/** A picture JEditor serves (`imgId`, `fileName`…, as its address has them). */
+	async editorImage(query: string): Promise<Response> {
+		const params = new URLSearchParams(query);
+		params.delete("os_authType");
+		if (params.size === 0 || query.length > 2048) throw new Error("Invalid image address");
+		return this.#page(JEDITOR_IMAGE_PATH, params, "image/*,*/*;q=0.8");
 	}
 
 	async assignableUsers(key: string, query: string): Promise<JiraUser[]> {

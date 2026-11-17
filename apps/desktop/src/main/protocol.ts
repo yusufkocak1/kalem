@@ -1,6 +1,7 @@
 import { pathToFileURL } from "node:url";
 import { net, protocol } from "electron";
 import { DIAGRAM_DATA_SUFFIX, DIAGRAM_SUFFIX } from "../shared/diagram.js";
+import { imageTypeOf } from "../shared/image-type.js";
 import { extension, uncShare, urlPathToFilePath } from "../shared/paths.js";
 
 /**
@@ -56,21 +57,75 @@ export const LOCAL_HOST = "local";
 
 export type AttachmentLoader = (pageId: string, name: string) => Promise<Response | null>;
 
+/** A picture JEditor serves on Jira: `kalem-doc://jira/jeditor?<its query>`. */
+export const JEDITOR_PATH = "/jeditor";
+
+export type EditorImageLoader = (query: string) => Promise<Response | null>;
+
+/** Larger answers are not read into memory to be shown as a picture. */
+const MAX_IMAGE_BYTES = 64 * 1024 * 1024;
+
+const notFound = (): Response => new Response(null, { status: 404 });
+
+/**
+ * The picture in a server's answer, as a clean answer of its own; `null`
+ * when it is not one. Atlassian answers a request it does not take with its
+ * sign-in page, or an error page, with status 200: drawn as a picture,
+ * that is a broken image with no word of why. The type comes from the
+ * bytes, so a picture sent as `application/octet-stream` is still shown.
+ */
+export async function imageResponse(response: Response): Promise<Response | null> {
+	if (!response.ok) {
+		await response.body?.cancel().catch(() => {});
+		return null;
+	}
+	const length = Number(response.headers.get("Content-Length") ?? "0");
+	if (length > MAX_IMAGE_BYTES) {
+		await response.body?.cancel().catch(() => {});
+		return null;
+	}
+	const bytes = new Uint8Array(await response.arrayBuffer());
+	if (bytes.length === 0 || bytes.length > MAX_IMAGE_BYTES) return null;
+	// kalem-locale-ok: media types are ASCII
+	const declared = (response.headers.get("Content-Type") ?? "").split(";")[0]?.trim().toLowerCase();
+	const type = imageTypeOf(bytes) ?? (declared?.startsWith("image/") ? declared : null);
+	if (type === null) return null;
+	const headers = new Headers({ "Content-Type": type, "Content-Length": String(bytes.length) });
+	const cache = response.headers.get("Cache-Control");
+	if (cache !== null) headers.set("Cache-Control", cache);
+	return new Response(bytes, { status: 200, headers });
+}
+
 async function serveAttachment(url: URL, load: AttachmentLoader): Promise<Response> {
 	const match = /^\/(\d+)\/([^/]+)$/.exec(url.pathname);
-	if (match === null) return new Response(null, { status: 404 });
+	if (match === null) return notFound();
 	let name: string;
 	try {
 		name = decodeURIComponent(match[2] as string);
 	} catch {
-		return new Response(null, { status: 404 });
+		return notFound();
 	}
 	if (!served(name)) return new Response(null, { status: 403 });
 	try {
 		const response = await load(match[1] as string, name);
-		return response ?? new Response(null, { status: 404 });
+		if (response === null) return notFound();
+		// The diagram editor's data file is JSON, read with `fetch`; everything else is a picture.
+		// kalem-locale-ok: file names' suffixes are ASCII
+		if (name.toLowerCase().endsWith(DIAGRAM_DATA_SUFFIX)) return response;
+		return (await imageResponse(response)) ?? notFound();
 	} catch {
-		return new Response(null, { status: 404 });
+		return notFound();
+	}
+}
+
+async function serveEditorImage(url: URL, load: EditorImageLoader): Promise<Response> {
+	const query = url.search.replace(/^\?/, "");
+	if (query === "") return notFound();
+	try {
+		const response = await load(query);
+		return (response === null ? null : await imageResponse(response)) ?? notFound();
+	} catch {
+		return notFound();
 	}
 }
 
@@ -95,6 +150,7 @@ function uncached(url: URL, response: Response): Response {
 export interface DocumentSchemeOptions {
 	readonly loadAttachment: AttachmentLoader;
 	readonly loadJiraAttachment: AttachmentLoader;
+	readonly loadJiraEditorImage: EditorImageLoader;
 	/** The network shares open documents are on (`\\server\share`, lower case): only these are read. */
 	openShares(): ReadonlySet<string>;
 }
@@ -128,6 +184,9 @@ async function serve(
 ): Promise<Response> {
 	if (request.method !== "GET") return new Response(null, { status: 405 });
 	if (url.hostname === CONFLUENCE_HOST) return serveAttachment(url, options.loadAttachment);
+	if (url.hostname === JIRA_HOST && url.pathname === JEDITOR_PATH) {
+		return serveEditorImage(url, options.loadJiraEditorImage);
+	}
 	if (url.hostname === JIRA_HOST) return serveAttachment(url, options.loadJiraAttachment);
 	const path = servedPath(url, process.platform === "win32", options.openShares());
 	if (path === null) return new Response(null, { status: 403 });

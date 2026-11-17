@@ -507,6 +507,15 @@ verir.
     tutulur.
   - Sayfanın ekli görselleri editörde görünür. Sayfaya eklenen yeni
     görseller kaydederken sayfaya ek olarak yüklenir.
+    - Görsel doğrudan indirme adresinden (`/download/attachments/<sayfa>/<ad>`)
+      istenir; REST API'ye ancak dosya orada yoksa sorulur. Böylece çok
+      görselli bir sayfa Data Center'ın hız sınırını (REST çağrılarını
+      sayar) bir anda tüketmez.
+    - Server / Data Center'a **kullanıcı adı + parola** ile bağlanılmışsa
+      indirme adresine `os_authType=basic` eklenir: Confluence kendi
+      sayfalarında parolayı ancak böyle okur, yoksa giriş sayfasını döner.
+    - Gelen yanıtın gerçekten görsel olduğu baytlarından anlaşılır; giriş ya
+      da hata sayfası görsel diye gösterilmez.
   - **Değişiklikler** (kaydedilmemiş değişiklik varken kaydetme durumunun
     yanındaki düğme ya da **Dosya → Confluence Değişiklikleri…**): sayfanın
     açıldığı ya da son kaydedildiği hâline göre neyin değiştiğini `git diff`
@@ -598,6 +607,13 @@ verir.
   çizimi (`expand=renderedFields`) kullanılır; uyarı/bilgi/fikir kutuları
   simgeli alıntı olur. HTML güvenli biçimde (çalıştırılmadan) Markdown'a
   çevrilerek gösterilir; asistana düz metni gider.
+  JEditor'a yapıştırılan görseller kendi servlet'inden gelir
+  (`/plugins/servlet/jeditor_file_provider?imgId=…&fileName=…`): Kalem
+  onları Jira girişinizle ister (`kalem-doc://jira/jeditor?…`). `imgId`
+  işin bir ekinin kimliğiyse ek olarak, değilse önce servlet'ten, sonra
+  aynı adlı ekten yüklenir. Yüklenemeyen görselin kartında servlet'in değil
+  görselin adı (`fileName`) yazar. Başka bir Jira sitesindeki görsellere
+  giriş bilgisi gönderilmez.
 - Bölümler (açıklama, alt görevler, bağlantılar, yorumlar) Jira'daki gibi
   katlanır. Bağlantılar ilişkisine göre gruplanır ("blocks", "mentioned in"…);
   Jira dışı bağlantılar da (`/remotelink`) listelenir. **Confluence sayfası**
