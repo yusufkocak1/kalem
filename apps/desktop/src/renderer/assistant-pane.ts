@@ -2356,7 +2356,10 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				}),
 			);
 		}
-		for (const proposed of message.edits ?? []) nodes.push(editCard(proposed));
+		const edits = message.edits ?? [];
+		const bulk = editsBar(edits);
+		if (bulk !== null) nodes.push(bulk);
+		for (const proposed of edits) nodes.push(editCard(proposed, edits));
 		if (message.findings !== undefined && message.findings.length > 0) {
 			nodes.push(
 				findingsCard(
@@ -2424,6 +2427,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				return format(t.assistantStepRead, detail);
 			case "propose_edit":
 				return format(t.assistantStepEdit, detail);
+			case "run_command":
+				return format(t.assistantStepTerminal, detail);
 			case "confluence_search":
 			case "confluence_search_content":
 				return format(t.assistantStepConfluenceSearch, detail);
@@ -2470,9 +2475,82 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		{ kind: "applied" | "discarded" } | { kind: "failed"; text: string }
 	>();
 
-	/** A proposed change to a workspace file: what it takes out and puts in, applied on request. */
-	function editCard(proposed: ProposedEdit): HTMLElement {
+	/** What became of a change: the user's answer, else what the main process did with it at once. */
+	function editState(
+		proposed: ProposedEdit,
+	): { kind: "applied" | "discarded" | "auto" } | { kind: "failed"; text: string } | undefined {
 		const state = editStates.get(proposed.id);
+		if (state !== undefined) return state;
+		if (proposed.applied === true) return { kind: "auto" };
+		if (proposed.failed !== undefined) return { kind: "failed", text: proposed.failed };
+		return undefined;
+	}
+
+	/** Writes a change; what became of it is kept for its card. */
+	async function applyProposed(proposed: ProposedEdit): Promise<void> {
+		try {
+			await bridge.assistantApplyEdit(proposed.id);
+			editStates.set(proposed.id, { kind: "applied" });
+		} catch (error) {
+			editStates.set(proposed.id, { kind: "failed", text: host.errorText(error) });
+		}
+	}
+
+	/** A reply's cards of changes, and the bar over them, drawn again after one is answered. */
+	function redrawEdits(within: Element | null, edits: readonly ProposedEdit[]): void {
+		if (within === null) return;
+		for (const proposed of edits) {
+			within
+				.querySelector(`[data-edit="${CSS.escape(proposed.id)}"]`)
+				?.replaceWith(editCard(proposed, edits));
+		}
+		const bar = editsBar(edits);
+		const shown = within.querySelector("[data-edits-bar]");
+		if (shown !== null) shown.replaceWith(bar ?? "");
+		else if (bar !== null) within.querySelector("[data-edit]")?.before(bar);
+	}
+
+	/**
+	 * Several changes still waiting: applied, or set aside, all at once. They
+	 * are applied in their order, so one change after another in the same
+	 * file finds the text the earlier one left.
+	 */
+	function editsBar(edits: readonly ProposedEdit[]): HTMLElement | null {
+		const open = edits.filter((proposed) => {
+			const state = editState(proposed);
+			return state === undefined || state.kind === "failed";
+		});
+		if (open.length < 2) return null;
+		const applyAll = button(format(t.assistantEditApplyAll, open.length), {
+			class: "assistant-primary",
+			icon: "check",
+		});
+		const discardAll = button(t.assistantEditDiscardAll, { icon: "close" });
+		const bar = el("div", {
+			class: "assistant-edits-bar",
+			attrs: { "data-edits-bar": "" },
+			children: [applyAll, discardAll],
+		});
+		const done = (): void => redrawEdits(bar.parentElement, edits);
+		applyAll.addEventListener("click", async () => {
+			applyAll.disabled = true;
+			discardAll.disabled = true;
+			for (const proposed of open) await applyProposed(proposed);
+			done();
+		});
+		discardAll.addEventListener("click", () => {
+			for (const proposed of open) editStates.set(proposed.id, { kind: "discarded" });
+			done();
+		});
+		return bar;
+	}
+
+	/** A proposed change to a workspace file: what it takes out and puts in, applied on request. */
+	function editCard(
+		proposed: ProposedEdit,
+		edits: readonly ProposedEdit[] = [proposed],
+	): HTMLElement {
+		const state = editState(proposed);
 		const diff = el("pre", { class: "assistant-edit-diff" });
 		for (const line of lineDiff(proposed.oldText, proposed.newText)) {
 			diff.append(
@@ -2486,6 +2564,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		const actions = el("div", { class: "assistant-edit-actions" });
 		if (state?.kind === "applied")
 			status.textContent = format(t.assistantEditApplied, proposed.path);
+		else if (state?.kind === "auto")
+			status.textContent = format(t.assistantEditAuto, proposed.path);
 		else if (state?.kind === "discarded") status.textContent = t.assistantEditDiscarded;
 		else {
 			if (state?.kind === "failed") {
@@ -2496,22 +2576,19 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			const discard = button(t.assistantEditDiscard, { icon: "close" });
 			apply.addEventListener("click", async () => {
 				apply.disabled = true;
-				try {
-					await bridge.assistantApplyEdit(proposed.id);
-					editStates.set(proposed.id, { kind: "applied" });
-				} catch (error) {
-					editStates.set(proposed.id, { kind: "failed", text: host.errorText(error) });
-				}
-				card.replaceWith(editCard(proposed));
+				await applyProposed(proposed);
+				refresh();
 			});
 			discard.addEventListener("click", () => {
 				editStates.set(proposed.id, { kind: "discarded" });
-				card.replaceWith(editCard(proposed));
+				refresh();
 			});
 			actions.append(apply, discard);
 		}
+		/** The card again, and the bar above the reply's cards, which counts what is left. */
+		const refresh = (): void => redrawEdits(card.parentElement, edits);
 		const card = el("div", {
-			class: `assistant-edit${state === undefined || state.kind === "failed" ? "" : ` ${state.kind}`}`,
+			class: `assistant-edit${state === undefined || state.kind === "failed" ? "" : ` ${state.kind === "auto" ? "applied" : state.kind}`}`,
 			attrs: { "data-edit": proposed.id },
 			children: [
 				el("div", {

@@ -314,7 +314,9 @@ function toolRound(request: Received | undefined): number | null {
 }
 
 /** A local stand-in for an OpenAI-compatible service and the Anthropic API, streaming REPLY. */
-async function fakeServices(): Promise<{ url: string; received: Received[]; close(): void }> {
+async function fakeServices(
+	calls: readonly { name: string; input: Record<string, unknown> }[] = TOOL_CALLS,
+): Promise<{ url: string; received: Received[]; close(): void }> {
 	const received: Received[] = [];
 	const chunks = (text: string): string[] => text.match(/[\s\S]{1,9}/g) ?? [];
 	const sse = (response: ServerResponse, events: readonly [string | null, unknown][]): void => {
@@ -360,7 +362,7 @@ async function fakeServices(): Promise<{ url: string; received: Received[]; clos
 				]);
 			} else if (path === "/v1/chat/completions" && toolRound(received.at(-1)) !== null) {
 				const round = toolRound(received.at(-1)) as number;
-				const call = TOOL_CALLS[round];
+				const call = calls[round];
 				if (call === undefined) {
 					sse(response, [
 						[null, { choices: [{ delta: { content: "Main sınıfı boş." } }] }],
@@ -403,7 +405,7 @@ async function fakeServices(): Promise<{ url: string; received: Received[]; clos
 				}
 			} else if (path === "/v1/messages" && toolRound(received.at(-1)) !== null) {
 				const round = toolRound(received.at(-1)) as number;
-				const call = TOOL_CALLS[round];
+				const call = calls[round];
 				const message = {
 					id: `msg_t${round}`,
 					type: "message",
@@ -1271,6 +1273,162 @@ test("lets an API service search and read a workspace folder instead of sending 
 		expect(last).toContain("src/Main.java:1: class Main {}");
 		expect(last).toContain("1  class Main {}");
 	}
+
+	expect(errors).toEqual([]);
+	await app.close();
+	services.close();
+});
+
+test("applies all of a reply's changes at once, or writes them unasked as the approval setting says", async () => {
+	const edit = (path: string, from: string, to: string) => ({
+		name: "propose_edit",
+		input: { path, old_text: from, new_text: to },
+	});
+	const services = await fakeServices([
+		edit("a.txt", "a", "A"),
+		edit("b.txt", "b", "B"),
+		edit("a.txt", "A", "AA"),
+	]);
+	const folder = await tempDir("assistant-apply-all");
+	const code = join(folder, "proje");
+	await mkdir(code, { recursive: true });
+	const reset = async (): Promise<void> => {
+		await writeFile(join(code, "a.txt"), "a\n");
+		await writeFile(join(code, "b.txt"), "b\n");
+	};
+	await reset();
+	const { app, page, errors } = await launch({
+		settings: { assistant: true },
+		env: {
+			KALEM_CLAUDE: join(folder, "nothing-here"),
+			NO_PROXY: "127.0.0.1",
+			no_proxy: "127.0.0.1",
+		},
+	});
+	const pane = page.locator(".assistant");
+	const form = pane.locator(".assistant-settings");
+	const input = pane.locator(".assistant-input");
+	const reply = pane.locator(".assistant-assistant").last();
+	await pane.getByRole("button", { name: "Connect a Service…" }).click();
+	await form.getByLabel("Service").selectOption("custom");
+	await form.getByLabel("Address").fill(`${services.url}/v1`);
+	await form.getByLabel("API key").fill("sk-test");
+	await form.getByLabel("Model").fill("fake-large");
+	await form.getByRole("button", { name: "Save" }).click();
+	await expect(form).toBeHidden();
+	await app.evaluate(
+		({ dialog }, filePaths) => {
+			dialog.showOpenDialog = (async () => ({ canceled: false, filePaths })) as never;
+		},
+		[code],
+	);
+	await pane.getByRole("button", { name: "Add files or folders to the chat" }).click();
+	await pane.getByRole("menuitem", { name: "Folder…" }).click();
+
+	// Asked: the third change follows the first, so it is proposed only once the first is written.
+	await input.fill("Harfleri büyüt");
+	await input.press("Enter");
+	await expect(reply.locator(".assistant-markdown")).toHaveText("Main sınıfı boş.");
+	await expect(reply.locator(".assistant-edit")).toHaveCount(2);
+	expect(await readFile(join(code, "a.txt"), "utf8")).toBe("a\n");
+	await reply.getByRole("button", { name: "Apply All (2)" }).click();
+	await expect(reply.locator(".assistant-edit-state")).toHaveText([
+		"Applied to a.txt.",
+		"Applied to b.txt.",
+	]);
+	await expect(reply.locator(".assistant-edits-bar")).toHaveCount(0);
+	expect(await readFile(join(code, "a.txt"), "utf8")).toBe("A\n");
+	expect(await readFile(join(code, "b.txt"), "utf8")).toBe("B\n");
+
+	// Code changes approved automatically: each is written as it comes, the next one finds it.
+	await reset();
+	await app.evaluate(async ({ BrowserWindow }) => {
+		const win = BrowserWindow.getAllWindows()[0];
+		await win?.webContents.executeJavaScript(
+			"window.kalem.updateSettings({ assistantApprovals: 'edits' })",
+		);
+	});
+	await input.fill("Yine büyüt");
+	await input.press("Enter");
+	await expect(reply.locator(".assistant-markdown")).toHaveText("Main sınıfı boş.");
+	await expect(reply.locator(".assistant-edit-state")).toHaveText([
+		"Applied to a.txt without asking (approval setting).",
+		"Applied to b.txt without asking (approval setting).",
+		"Applied to a.txt without asking (approval setting).",
+	]);
+	await expect(reply.getByRole("button", { name: "Apply to the file" })).toHaveCount(0);
+	expect(await readFile(join(code, "a.txt"), "utf8")).toBe("AA\n");
+	expect(await readFile(join(code, "b.txt"), "utf8")).toBe("B\n");
+
+	expect(errors).toEqual([]);
+	await app.close();
+	services.close();
+});
+
+test("runs a command in the workspace once allowed, and unasked when approvals are bypassed", async () => {
+	const services = await fakeServices([
+		{
+			name: "run_command",
+			input: { command: "node -e \"require('fs').appendFileSync('ran.txt','x')\"" },
+		},
+	]);
+	const folder = await tempDir("assistant-command");
+	const code = join(folder, "proje");
+	await mkdir(code, { recursive: true });
+	await writeFile(join(code, "a.txt"), "a\n");
+	const { app, page, errors } = await launch({
+		settings: { assistant: true },
+		env: {
+			KALEM_CLAUDE: join(folder, "nothing-here"),
+			NO_PROXY: "127.0.0.1",
+			no_proxy: "127.0.0.1",
+		},
+	});
+	const pane = page.locator(".assistant");
+	const form = pane.locator(".assistant-settings");
+	const input = pane.locator(".assistant-input");
+	const reply = pane.locator(".assistant-assistant").last();
+	await pane.getByRole("button", { name: "Connect a Service…" }).click();
+	await form.getByLabel("Service").selectOption("custom");
+	await form.getByLabel("Address").fill(`${services.url}/v1`);
+	await form.getByLabel("API key").fill("sk-test");
+	await form.getByLabel("Model").fill("fake-large");
+	await form.getByRole("button", { name: "Save" }).click();
+	await expect(form).toBeHidden();
+	await app.evaluate(
+		({ dialog }, filePaths) => {
+			dialog.showOpenDialog = (async () => ({ canceled: false, filePaths })) as never;
+		},
+		[code],
+	);
+	await pane.getByRole("button", { name: "Add files or folders to the chat" }).click();
+	await pane.getByRole("menuitem", { name: "Folder…" }).click();
+
+	// Asked, with the command and where it runs; nothing runs before the answer.
+	await input.fill("Testleri çalıştır");
+	await input.press("Enter");
+	const card = pane.locator(".assistant-approval");
+	await expect(card).toContainText("Run a command");
+	await expect(card).toContainText("appendFileSync");
+	await expect(card).toContainText("Runs on this computer");
+	await expect(card.getByRole("button", { name: /session|always/i })).toHaveCount(0);
+	await expect.poll(() => readFile(join(code, "ran.txt"), "utf8").catch(() => "")).toBe("");
+	await card.getByRole("button", { name: "Allow", exact: true }).click();
+	await expect(reply.locator(".assistant-markdown")).toHaveText("Main sınıfı boş.");
+	expect(await readFile(join(code, "ran.txt"), "utf8")).toBe("x");
+
+	// Approvals bypassed: it runs without a card.
+	await app.evaluate(async ({ BrowserWindow }) => {
+		const win = BrowserWindow.getAllWindows()[0];
+		await win?.webContents.executeJavaScript(
+			"window.kalem.updateSettings({ assistantApprovals: 'all' })",
+		);
+	});
+	await input.fill("Yine çalıştır");
+	await input.press("Enter");
+	await expect(reply.locator(".assistant-markdown")).toHaveText("Main sınıfı boş.");
+	expect(await readFile(join(code, "ran.txt"), "utf8")).toBe("xx");
+	await expect(pane.locator(".assistant-approval")).toHaveCount(1);
 
 	expect(errors).toEqual([]);
 	await app.close();

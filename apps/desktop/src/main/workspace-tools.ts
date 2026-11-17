@@ -474,6 +474,18 @@ export interface KeptEdit extends ProposedEdit {
 	readonly absolute: string;
 }
 
+/**
+ * What became of a proposal at once: left for the user to apply, or written
+ * because the user's approval setting lets code changes be made unasked.
+ */
+export type EditOutcome =
+	| { readonly kind: "proposed" }
+	| { readonly kind: "applied" }
+	| { readonly kind: "failed"; readonly text: string };
+
+/** Takes a proposal; what it answers (nothing is "proposed") says what became of it. */
+export type ProposeEdit = (edit: KeptEdit) => EditOutcome | Promise<EditOutcome> | undefined;
+
 /** Why a proposed change cannot be applied as it is; `null` when it can. */
 async function editProblem(edit: KeptEdit): Promise<string | null> {
 	let file: Awaited<ReturnType<typeof readTextFile>>;
@@ -531,14 +543,10 @@ export class Workspace {
 	readonly roots: readonly string[];
 	readonly #indexes: WorkspaceIndexes;
 	/** Takes the changes the model proposes; without it, `propose_edit` is refused. */
-	readonly #propose: ((edit: KeptEdit) => void) | undefined;
+	readonly #propose: ProposeEdit | undefined;
 	#proposed = 0;
 
-	constructor(
-		roots: readonly string[],
-		indexes: WorkspaceIndexes,
-		propose?: (edit: KeptEdit) => void,
-	) {
+	constructor(roots: readonly string[], indexes: WorkspaceIndexes, propose?: ProposeEdit) {
 		this.roots = roots;
 		this.#indexes = indexes;
 		this.#propose = propose;
@@ -570,6 +578,13 @@ export class Workspace {
 		const absolute = normalize(join(root, path));
 		if (!isInside(absolute, [root])) return null;
 		return { root, path: relative(root, absolute).split(sep).join("/") };
+	}
+
+	/** The folder of the workspace the model names; the first one for an empty name, `null` outside. */
+	folderFor(raw: string): string | null {
+		if (raw.trim() === "" || raw.trim() === ".") return this.roots[0] ?? null;
+		const target = this.#resolve(raw);
+		return target === null ? null : join(target.root, target.path);
 	}
 
 	async #all(): Promise<FolderIndex[]> {
@@ -689,7 +704,11 @@ export class Workspace {
 		if (edit.oldText === edit.newText) return "The new text is the same as the old.";
 		const problem = await editProblem(edit);
 		if (problem !== null) return `Not proposed: ${problem}`;
-		this.#propose?.(edit);
+		const outcome = (await this.#propose?.(edit)) ?? { kind: "proposed" };
+		if (outcome.kind === "applied") {
+			return `Applied (${edit.id}): the user lets code changes be written without asking, so ${edit.path} is changed now. Read it again before changing it further. Do not repeat the change in your answer; say what it does.`;
+		}
+		if (outcome.kind === "failed") return `Not applied: ${outcome.text}`;
 		return `Proposed (${edit.id}): the user sees the change and decides whether to apply it. Do not repeat it in your answer; say what it does.`;
 	}
 
@@ -814,7 +833,7 @@ export class Workspace {
 }
 
 /** What the model is told about working with a workspace. */
-export const WORKSPACE_INSTRUCTIONS = `The user gave you a workspace: the folders below. Their files are NOT in the message. When the question needs them, look them up with the tools: \`search\` to find where something is, \`list_files\` to see what is there, \`read_file\` to read a file or only the lines you need. When several look-ups do not depend on each other (searches for different names, files you already know you need), make them together in one turn rather than one after another. Read only what the answer needs, and do not guess at code you have not read. When you name code, give its path and line. When the user asks you to change files of the workspace, propose each change with \`propose_edit\` (after reading the file); the user reviews and applies them.`;
+export const WORKSPACE_INSTRUCTIONS = `The user gave you a workspace: the folders below. Their files are NOT in the message. When the question needs them, look them up with the tools: \`search\` to find where something is, \`list_files\` to see what is there, \`read_file\` to read a file or only the lines you need. When several look-ups do not depend on each other (searches for different names, files you already know you need), make them together in one turn rather than one after another. Read only what the answer needs, and do not guess at code you have not read. When you name code, give its path and line. When the user asks you to change files of the workspace, propose each change with \`propose_edit\` (after reading the file); the user reviews and applies them. To check your work (tests, a build, a linter), run a command in the workspace with \`run_command\` when it is offered; the user approves each one unless they allowed commands to run.`;
 
 /**
  * Whether a reply wrote a tool call out as text instead of making it: some

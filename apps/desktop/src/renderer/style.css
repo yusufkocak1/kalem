@@ -2040,6 +2040,12 @@ button {
 	color: var(--app-muted);
 }
 
+.assistant-edits-bar {
+	display: flex;
+	gap: 6px;
+	margin: 8px 0 4px;
+}
+
 .assistant-edit-state {
 	margin: 6px 10px 0;
 	color: var(--app-muted);

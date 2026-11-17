@@ -410,6 +410,10 @@ export interface ProposedEdit {
 	readonly oldText: string;
 	readonly newText: string;
 	readonly summary: string;
+	/** Written at once: the user's approval setting lets code changes be made unasked. */
+	readonly applied?: true;
+	/** Written at once was tried, and failed: left for the user, with why. */
+	readonly failed?: string;
 }
 
 export type ClaudeEvent =

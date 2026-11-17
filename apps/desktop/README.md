@@ -1053,7 +1053,29 @@ verir.
       değiştirmez. Uygulanırken dosya o arada değiştiyse uygulanmaz ve
       nedeni söylenir. Dosyanın satır sonları ve kodlaması korunur; UTF-8
       dışındaki eski kodlamalı (windows-1254) dosyalar için öneri yapılmaz.
-      Öneriler uygulamanın o çalışmasında geçerlidir.
+      Öneriler uygulamanın o çalışmasında geçerlidir. Bir yanıtta birden
+      fazla öneri bekliyorsa kartların üstünde **Tümünü Uygula (n)** ve
+      **Tümünden Vazgeç** çıkar; öneriler sırayla uygulanır.
+    - **Komut çalıştırma:** model test, derleme ya da `git status` gibi
+      bir komutu `run_command` ile çalışma alanı klasöründe çalıştırabilir
+      (Soru ve Kod modlarında). Her komut için komutun tamamını ve
+      klasörü gösteren bir onay kartı çıkar; bu onay hatırlanmaz. Komut
+      girdi almadan, sistem kabuğunda çalışır; en çok 120 saniye (model
+      600'e kadar isteyebilir) sonra durdurulur, çıktısının başı ve sonu
+      modele döner.
+    - **Onay ayarı** (**Dosya → Ayarlar → Asistan → Asistan neyi onay
+      sormadan yapsın**):
+      - *Her değişiklikten önce sor* (varsayılan): yukarıdaki gibi.
+      - *Kod ve belge değişikliklerini otomatik onayla*: `propose_edit`
+        önerileri anında dosyaya yazılır (kartta "onay sorulmadan
+        uygulandı" yazar) ve açık belgedeki değişiklikler sorulmaz.
+      - *Onayları atla*: buna ek olarak terminal komutları, uygulama
+        ayarları ve Jira/Confluence'a yazan araçlar da sormadan çalışır.
+        Yine de bilgi girilen formlar, MCP sunucusu ekleme ve Ayarlar'da
+        "her seferinde sor" yapılmış araçlar sorulur; "kapalı" araçlar
+        kapalı kalır. Bu modda asistan, okuduğu bir sayfanın ya da
+        dosyanın içindeki talimatlarla da komut çalıştırabilir; yalnızca
+        güvendiğiniz çalışma alanlarında açın.
     - **Araç kullanamayan modeller:** istek hata verirse ya da model
       araç çağrısını yanıta metin olarak yazarsa (`{"name": "search", …}`),
       o yanıt silinir ve klasörlerin metni eskisi gibi soruyla gönderilir

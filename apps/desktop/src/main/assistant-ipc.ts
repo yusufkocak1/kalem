@@ -98,7 +98,7 @@ import type { SettingsStore } from "./settings.js";
 import type { TemplateStore } from "./templates.js";
 import type { AppWindow } from "./windows.js";
 import { errorMessage } from "./windows.js";
-import type { KeptEdit, ToolStep } from "./workspace-tools.js";
+import type { EditOutcome, KeptEdit, ToolStep } from "./workspace-tools.js";
 import {
 	applyEdit,
 	looksLikeToolText,
@@ -311,6 +311,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		setAlways: (permissions) => ctx.changeSettings({ assistantPermissions: permissions }),
 		toolPolicy: (tool) =>
 			ctx.store.settings.assistantToolPolicies[tool.replace(/^mcp__kalem__/, "")],
+		approvalMode: () => ctx.store.settings.assistantApprovals,
 	});
 	/** Tool calls the windows run. */
 	const rendererCalls = new RendererCalls();
@@ -654,10 +655,28 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		const workspace =
 			collected.roots.length === 0
 				? null
-				: new Workspace(collected.roots, indexes, (proposed) => {
-						proposals.set(proposed.id, proposed);
+				: new Workspace(collected.roots, indexes, async (proposed): Promise<EditOutcome> => {
 						const { absolute: _absolute, ...shown } = proposed;
+						// The user lets code changes be written unasked: written now, the card says so.
+						// A tool the user set to be asked about is still left for them to apply.
+						const policy = ctx.store.settings.assistantToolPolicies.propose_edit;
+						if (ctx.store.settings.assistantApprovals !== "ask" && policy !== "ask") {
+							try {
+								await applyEdit(proposed);
+								indexes.forget(proposed.absolute);
+								forward({ kind: "edit", edit: { ...shown, applied: true } });
+								return { kind: "applied" };
+							} catch (error) {
+								const text = errorMessage(error);
+								// Left for the user, with what went wrong.
+								proposals.set(proposed.id, proposed);
+								forward({ kind: "edit", edit: { ...shown, failed: text } });
+								return { kind: "failed", text };
+							}
+						}
+						proposals.set(proposed.id, proposed);
 						forward({ kind: "edit", edit: shown });
+						return { kind: "proposed" };
 					});
 		// The mode: one of Kalem's, as the user shaped it, or one the user made (its tools and MCP servers).
 		const modeSettings = ctx.store.settings.assistantModes;
