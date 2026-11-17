@@ -93,6 +93,8 @@ export interface AssistantHost {
 	readonly previews: Previews;
 	shareDocument(): boolean;
 	setShareDocument(share: boolean): void;
+	/** The active document's name, as its chip shows it. */
+	documentName(): string;
 	/** The panel's width; `setWidth` keeps it. */
 	width(): number;
 	setWidth(width: number): void;
@@ -332,8 +334,6 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		render();
 	}
 
-	const share = el("input", { attrs: { type: "checkbox" } });
-	share.addEventListener("change", () => host.setShareDocument(share.checked));
 	const selectionText = el("span", { class: "assistant-chip-text" });
 	const dropSelection = el("button", {
 		class: "assistant-chip-close",
@@ -627,6 +627,15 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					}),
 				),
 			menuItem(t.assistantUseTemplate, "file", () => void showTemplateMenu()),
+			// The document left out of the chat comes back from here.
+			...(host.shareDocument()
+				? []
+				: [
+						menuItem(format(t.assistantShareDocumentNamed, host.documentName()), "file", () => {
+							host.setShareDocument(true);
+							renderSources();
+						}),
+					]),
 		);
 		addMenu.hidden = false;
 		addButton.setAttribute("aria-expanded", "true");
@@ -743,10 +752,48 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		input.focus();
 	}
 
+	/** What the document chip last showed: drawn again only when it changes. */
+	let documentShown = "";
+	function documentChip(): HTMLElement[] {
+		if (!host.shareDocument()) return [];
+		const name = host.documentName();
+		const remove = el("button", {
+			class: "assistant-chip-close",
+			attrs: {
+				type: "button",
+				title: format(t.assistantUnshareDocument, name),
+				"aria-label": format(t.assistantUnshareDocument, name),
+			},
+			children: [icon("close")],
+		});
+		remove.addEventListener("click", () => {
+			host.setShareDocument(false);
+			renderSources();
+			input.focus();
+		});
+		return [
+			el("span", {
+				class: "assistant-chip assistant-source assistant-source-document",
+				attrs: { title: t.assistantShareDocument, "data-document": "" },
+				children: [icon("file"), el("span", { class: "assistant-chip-text", text: name }), remove],
+			}),
+		];
+	}
+
+	/** Draws the chips again when the shared document changed (another tab, sharing turned off). */
+	function refreshDocumentChip(): void {
+		const now = host.shareDocument() ? host.documentName() : "";
+		if (now !== documentShown) renderSources();
+	}
+
 	function renderSources(): void {
 		const open = openFolders(active);
-		sourceList.hidden = active.sources.length === 0 && open.length === 0 && pasted.length === 0;
+		const doc = documentChip();
+		documentShown = doc.length === 0 ? "" : host.documentName();
+		sourceList.hidden =
+			doc.length === 0 && active.sources.length === 0 && open.length === 0 && pasted.length === 0;
 		sourceList.replaceChildren(
+			...doc,
 			...pasted.map((picture, index) => {
 				const name = format(t.assistantPicture, index + 1);
 				const remove = el("button", {
@@ -883,6 +930,17 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			return resolveMode(choice, host.modes()).steps.filter((step) => step.on).length;
 		return ownMode(choice)?.steps.filter((step) => step.on).length ?? null;
 	};
+	/** How much runs without asking, in the same menu as the mode: what Settings → Assistant keeps. */
+	const approvalLabels: Record<ApprovalMode, [short: string, full: string]> = {
+		ask: [t.approvalsAskShort, t.approvalsAsk],
+		edits: [t.approvalsEditsShort, t.approvalsEdits],
+		all: [t.approvalsAllShort, t.approvalsAll],
+	};
+	const APPROVAL_ICONS: Record<ApprovalMode, IconName> = {
+		ask: "shield",
+		edits: "shieldCheck",
+		all: "shieldAlert",
+	};
 	const modeIcon = el("span", { class: "assistant-mode-icon" });
 	const modeText = el("span", { class: "assistant-mode-text" });
 	const modeButton = el("button", {
@@ -891,15 +949,32 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			type: "button",
 			"aria-haspopup": "menu",
 			"aria-expanded": "false",
-			"aria-label": t.assistantMode,
+			"aria-label": t.assistantChatSettings,
 		},
-		children: [modeIcon, modeText, glyph("chevron", "assistant-mode-chevron")],
+		children: [
+			modeIcon,
+			modeText,
+			el("span", { class: "assistant-mode-shield", attrs: { "aria-hidden": "true" } }),
+			glyph("chevron", "assistant-mode-chevron"),
+		],
 	});
 	const modeMenu = el("div", {
 		class: "assistant-mode-menu",
-		attrs: { role: "menu", "aria-label": t.assistantMode },
+		attrs: { role: "menu", "aria-label": t.assistantChatSettings },
 	});
 	modeMenu.hidden = true;
+	/** The model, in the same menu; kept in it while the menu is closed, so its list is always there. */
+	const modelRow = el("div", {
+		class: "assistant-menu-model-row",
+		children: [
+			el("hr", { class: "assistant-mode-separator" }),
+			el("label", {
+				class: "assistant-menu-model",
+				children: [el("span", { text: t.assistantSectionModel }), modelSelect],
+			}),
+		],
+	});
+	modeMenu.append(modelRow);
 	const modePicker = el("div", {
 		class: "assistant-mode-picker",
 		children: [modeButton, modeMenu],
@@ -910,8 +985,13 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		if (isCustomModeId(mode) && ownMode(mode) === null) mode = "auto";
 		modeIcon.replaceChildren(glyph(modeGlyphName(mode), "assistant-mode-glyph"));
 		modeText.textContent = modeLabel(mode);
-		modeButton.title = `${t.assistantMode}: ${modeLabel(mode)}`;
+		const approvals = host.approvalMode();
+		const shield = modeButton.querySelector(".assistant-mode-shield");
+		shield?.replaceChildren(glyph(APPROVAL_ICONS[approvals], "assistant-mode-shield-glyph"));
+		const model = status?.model ? `\n${t.assistantSectionModel}: ${status.model}` : "";
+		modeButton.title = `${t.assistantMode}: ${modeLabel(mode)}\n${t.assistantSectionApprovals}: ${approvalLabels[approvals][0]}${model}`;
 		modeButton.dataset.mode = mode;
+		modeButton.dataset.approvals = approvals;
 	}
 
 	function closeModeMenu(focus = false): void {
@@ -930,7 +1010,11 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				.filter((each) => each.enabled || each.id === mode)
 				.map((each) => each.id),
 		];
+		const heading = (text: string): HTMLElement =>
+			el("div", { class: "assistant-menu-heading", attrs: { role: "presentation" }, text });
+		const current = host.approvalMode();
 		modeMenu.replaceChildren(
+			heading(t.assistantSectionMode),
 			...choices.map((choice) => {
 				const count = modeStepCount(choice);
 				const steps = count === null ? "" : format(t.modeSteps, count);
@@ -966,6 +1050,39 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				return item;
 			}),
 			el("hr", { class: "assistant-mode-separator" }),
+			heading(t.assistantSectionApprovals),
+			...APPROVAL_MODES.map((each) => {
+				const item = el("button", {
+					class: "assistant-mode-item assistant-approval-item",
+					attrs: {
+						type: "button",
+						role: "menuitemradio",
+						"aria-checked": String(each === current),
+						"data-approvals": each,
+					},
+					children: [
+						el("span", {
+							class: "assistant-mode-item-icon",
+							children: [glyph(APPROVAL_ICONS[each], "assistant-mode-item-glyph")],
+						}),
+						el("span", {
+							class: "assistant-mode-item-text",
+							children: [
+								el("strong", { text: approvalLabels[each][0] }),
+								el("span", { text: approvalLabels[each][1] }),
+							],
+						}),
+					],
+				});
+				item.addEventListener("click", () => {
+					host.setApprovalMode(each);
+					drawModeButton();
+					closeModeMenu(true);
+				});
+				return item;
+			}),
+			modelRow,
+			el("hr", { class: "assistant-mode-separator" }),
 			(() => {
 				const customize = el("button", {
 					class: "assistant-mode-customize",
@@ -995,6 +1112,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			return;
 		}
 		if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+		// The model list takes its own arrows.
+		if (event.target === modelSelect) return;
 		event.preventDefault();
 		const items = [...modeMenu.querySelectorAll<HTMLElement>("button")];
 		const index = items.indexOf(document.activeElement as HTMLElement);
@@ -1017,34 +1136,6 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		}
 	}
 	drawModeButton();
-	/** How much runs without asking, at hand next to the mode: what Settings → Assistant keeps. */
-	const approvalLabels: Record<ApprovalMode, [short: string, full: string]> = {
-		ask: [t.approvalsAskShort, t.approvalsAsk],
-		edits: [t.approvalsEditsShort, t.approvalsEdits],
-		all: [t.approvalsAllShort, t.approvalsAll],
-	};
-	const approvalSelect = el("select", {
-		class: "assistant-approvals",
-		attrs: { "aria-label": t.settingsAssistantApprovals },
-		children: APPROVAL_MODES.map((each) =>
-			el("option", {
-				text: approvalLabels[each][0],
-				attrs: { value: each, title: approvalLabels[each][1] },
-			}),
-		),
-	});
-	function drawApprovals(): void {
-		const current = host.approvalMode();
-		approvalSelect.value = current;
-		approvalSelect.dataset.approvals = current;
-		approvalSelect.title = `${t.settingsAssistantApprovals}: ${approvalLabels[current][1]}`;
-	}
-	approvalSelect.addEventListener("change", () => {
-		const picked = approvalSelect.value as ApprovalMode;
-		if (APPROVAL_MODES.includes(picked)) host.setApprovalMode(picked);
-		drawApprovals();
-	});
-	drawApprovals();
 	const MORE_MODELS = "\u0000more";
 	modelSelect.addEventListener("change", async () => {
 		const picked = modelSelect.value;
@@ -1053,6 +1144,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			void setView("settings");
 			return;
 		}
+		closeModeMenu();
 		await setModel(picked);
 	});
 
@@ -1127,18 +1219,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 						class: "assistant-toolbar",
 						children: [
 							addButton,
-							el("label", {
-								class: "assistant-share",
-								attrs: { title: t.slashShare },
-								children: [
-									share,
-									el("span", { class: "assistant-share-text", text: t.assistantShareDocument }),
-								],
-							}),
 							el("span", { class: "assistant-toolbar-space" }),
 							modePicker,
-							approvalSelect,
-							modelSelect,
 							sendButton,
 						],
 					}),
@@ -1327,6 +1409,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			label: t.slashShare,
 			run() {
 				host.setShareDocument(!host.shareDocument());
+				renderSources();
 				render();
 			},
 		},
@@ -2020,7 +2103,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		log.classList.toggle("busy", busy);
 		updateJump();
 		sendButton.disabled = !ready && !busy;
-		share.checked = host.shareDocument();
+		refreshDocumentChip();
+		drawModeButton();
 		subtitle.textContent = status === null ? t.assistantLooking : status.label;
 		subtitle.title = status?.detail ?? "";
 		settingsButton.setAttribute("aria-pressed", String(view === "settings"));
@@ -2031,6 +2115,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		sendButton.classList.toggle("busy", busy);
 		newChat.disabled = active.messages.length === 0;
 		modelSelect.hidden = !ready;
+		modelRow.hidden = !ready;
 		if (ready && modelSelect.dataset.for !== `${status?.provider}\u0000${status?.model}`) {
 			modelSelect.dataset.for = `${status?.provider}\u0000${status?.model}`;
 			renderModels();
@@ -2046,6 +2131,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	}
 
 	function refreshSelection(): void {
+		// Called on a tab switch too: the document chip follows the active document.
+		refreshDocumentChip();
 		const selection = host.selection().trim();
 		if (droppedSelection !== null && droppedSelection.trim() !== selection) droppedSelection = null;
 		const visible = selection !== "" && droppedSelection === null;
@@ -3801,6 +3888,9 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		refreshSelection,
 		workspaceChanged: () => renderSources(),
 		configured,
-		settingsChanged: drawApprovals,
+		settingsChanged() {
+			drawModeButton();
+			refreshDocumentChip();
+		},
 	};
 }

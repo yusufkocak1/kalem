@@ -80,8 +80,11 @@ test("asks the local Claude about the document and inserts its reply with the di
 		'<diagram src="notlar.assets/Onay-ak%C4%B1%C5%9F%C4%B1.diagram.png">',
 	);
 
-	// Without sharing, only the question goes.
-	await pane.getByLabel("Share the document").uncheck();
+	// Without sharing, only the question goes: the document's chip is taken off.
+	const docChip = pane.locator(".assistant-source-document");
+	await expect(docChip).toHaveText("notlar.md");
+	await docChip.getByRole("button", { name: "Do not share notlar.md" }).click();
+	await expect(docChip).toHaveCount(0);
 	await input.fill("Teşekkürler");
 	await input.press("Enter");
 	await expect(pane.locator(".assistant-assistant")).toHaveCount(3);
@@ -918,6 +921,8 @@ test("picks the model from the panel and keeps the chat going; earlier chats are
 	await input.press("Enter");
 	await expect(pane.getByRole("button", { name: "Insert", exact: true })).toHaveCount(1);
 	expect((await claude.calls())[0]?.args).not.toContain("--model");
+	// The model is in the chat settings menu, with the mode and the approvals.
+	await pane.locator(".assistant-mode").click();
 	await picker.selectOption("sonnet");
 	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code) · sonnet");
 	await input.fill("İki");
@@ -948,6 +953,7 @@ test("picks the model from the panel and keeps the chat going; earlier chats are
 	await input.fill("Üç");
 	await input.press("Enter");
 	await expect(pane.getByRole("button", { name: "Insert", exact: true })).toHaveCount(1);
+	await pane.locator(".assistant-mode").click();
 	await picker.selectOption("fake-small");
 	await input.fill("Dört");
 	await input.press("Enter");
@@ -958,6 +964,7 @@ test("picks the model from the panel and keeps the chat going; earlier chats are
 	await expect(pane.locator(".assistant-reply-model")).toHaveText(["fake-large", "fake-small"]);
 
 	// "Other model…" leads to the settings.
+	await pane.locator(".assistant-mode").click();
 	await picker.selectOption("Other model…");
 	await expect(form).toBeVisible();
 	await expect(picker).toBeHidden();
@@ -1342,9 +1349,15 @@ test("applies all of a reply's changes at once, or writes them unasked as the ap
 
 	// Code changes approved automatically, picked in the panel: each is written as it comes.
 	await reset();
-	const approvals = pane.getByRole("combobox", { name: "What the assistant does without asking" });
-	await expect(approvals).toHaveValue("ask");
-	await approvals.selectOption("edits");
+	const settingsButton = pane.locator(".assistant-mode");
+	await expect(settingsButton).toHaveAttribute("data-approvals", "ask");
+	await settingsButton.click();
+	await expect(pane.getByRole("menuitemradio", { name: /^Ask first/ })).toHaveAttribute(
+		"aria-checked",
+		"true",
+	);
+	await pane.getByRole("menuitemradio", { name: /^Auto-approve edits/ }).click();
+	await expect(settingsButton).toHaveAttribute("data-approvals", "edits");
 	await expect
 		.poll(async () => {
 			const kept = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
@@ -1421,9 +1434,11 @@ test("runs a command in the workspace once allowed, and unasked when approvals a
 	expect(await readFile(join(code, "ran.txt"), "utf8")).toBe("x");
 
 	// Approvals bypassed in the panel: it runs without a card, and the picker shows it.
-	const approvals = pane.getByRole("combobox", { name: "What the assistant does without asking" });
-	await approvals.selectOption("all");
-	await expect(approvals).toHaveAttribute("data-approvals", "all");
+	const settingsButton = pane.locator(".assistant-mode");
+	await settingsButton.click();
+	await page.screenshot({ path: "test-results/assistant-chat-settings.png" });
+	await pane.getByRole("menuitemradio", { name: /^Bypass approvals/ }).click();
+	await expect(settingsButton).toHaveAttribute("data-approvals", "all");
 	await page.screenshot({ path: "test-results/assistant-approvals.png" });
 	await input.fill("Yine çalıştır");
 	await input.press("Enter");
