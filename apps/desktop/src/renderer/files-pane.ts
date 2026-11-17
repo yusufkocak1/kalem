@@ -394,15 +394,49 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 			item.classList.add("git-dirty");
 			item.append(el("span", { class: "files-git-dot", attrs: { "aria-hidden": "true" } }));
 		}
-		// With several folders, each repository's branch is on its heading.
-		if (row.isRoot && row.root.git !== null) {
-			item.append(
-				el("span", {
+		// With several folders, each repository's branch is on its heading: a click there
+		// opens what can be done in it. A repository not trusted yet asks for that instead.
+		if (row.isRoot) {
+			const git = row.root.git;
+			const root = row.root.path;
+			if (git !== null) {
+				const busy = gitBusy.get(root);
+				const branch = el("button", {
 					class: "files-root-branch",
-					text: row.root.git.branch ?? t.gitDetached,
-					attrs: { title: gitSummary(row.root.git) },
-				}),
-			);
+					attrs: {
+						type: "button",
+						title: busy === undefined ? gitSummary(git) : format(t.gitBusy, busy),
+						"aria-label": `${git.branch ?? t.gitDetached} · ${t.gitMore}`,
+					},
+					children: [icon("branch"), el("span", { text: git.branch ?? t.gitDetached })],
+				});
+				branch.tabIndex = -1;
+				branch.disabled = busy !== undefined;
+				branch.classList.toggle("conflicted", git.conflicts > 0 || git.operation !== null);
+				branch.addEventListener("click", (event) => {
+					event.stopPropagation();
+					select(row.path, false);
+					const box = branch.getBoundingClientRect();
+					showMenu(gitMenu(root, git, true), box.left, box.bottom + 2);
+				});
+				item.append(branch);
+			} else if (row.root.untrustedRepo !== null) {
+				const trust = el("button", {
+					class: "files-root-branch untrusted",
+					attrs: {
+						type: "button",
+						title: `${t.gitUntrustedBar}\n${row.root.untrustedRepo}`,
+						"aria-label": `${t.gitUntrustedBar} · ${t.gitTrustButton}`,
+					},
+					children: [icon("branch"), el("span", { text: t.gitTrustButton })],
+				});
+				trust.tabIndex = -1;
+				trust.addEventListener("click", (event) => {
+					event.stopPropagation();
+					trustRepo(root);
+				});
+				item.append(trust);
+			}
 		}
 		if (row.isRoot && current?.opened === true) {
 			const close = iconButton("close", format(t.closeThisFolder, row.name));
@@ -693,6 +727,13 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 		return [git.upstream ?? "", ...parts].filter((part) => part !== "").join(" · ");
 	}
 
+	/** Asks to trust the repository a folder is in; git runs there once the user agrees. */
+	function trustRepo(root: string): void {
+		void bridge.gitTrust(root).then((ok) => {
+			if (ok) void refresh();
+		});
+	}
+
 	function renderGitBar(only: WorkspaceRoot | undefined): void {
 		const git = only?.git ?? null;
 		options.gitChanged?.(only === undefined ? null : git);
@@ -703,11 +744,7 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 				attrs: { type: "button", title: only.untrustedRepo },
 				text: t.gitTrustButton,
 			});
-			trust.addEventListener("click", () => {
-				void bridge.gitTrust(root).then((ok) => {
-					if (ok) void refresh();
-				});
-			});
+			trust.addEventListener("click", () => trustRepo(root));
 			gitBar.hidden = false;
 			gitBar.classList.remove("conflicted");
 			gitBar.removeAttribute("aria-busy");
@@ -919,7 +956,10 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 			}
 		}
 		if (git !== null) items.push(null, ...gitMenu(root, git, false));
-		else if (row.isRoot || row.parent === null) {
+		else if (row.root.untrustedRepo !== null) {
+			// Already a repository, only not trusted yet: never offer to make it one.
+			items.push(null, { label: t.gitTrustMenu, run: () => trustRepo(root) });
+		} else if (row.isRoot || row.parent === null) {
 			items.push(null, { label: t.gitInit, run: () => void runGit(root, { kind: "init" }) });
 		}
 		items.push(

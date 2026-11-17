@@ -2858,15 +2858,53 @@ button {
 }
 
 .files-root-branch {
-	flex: none;
-	max-width: 40%;
-	overflow: hidden;
+	display: inline-flex;
+	flex: 0 1 auto;
+	align-items: center;
+	gap: 3px;
+	min-width: 0;
+	max-width: 45%;
+	padding: 1px 6px;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	background: none;
 	color: var(--app-muted);
+	font: inherit;
 	font-weight: 500;
 	letter-spacing: normal;
-	text-overflow: ellipsis;
 	text-transform: none;
 	white-space: nowrap;
+	cursor: pointer;
+}
+
+.files-root-branch > span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.files-root-branch svg {
+	flex: none;
+	width: 12px;
+	height: 12px;
+}
+
+.files-root-branch:hover:not(:disabled) {
+	border-color: var(--app-border);
+	color: var(--app-text);
+}
+
+.files-root-branch:disabled {
+	cursor: default;
+	opacity: 0.6;
+}
+
+.files-root-branch.conflicted {
+	color: var(--app-error);
+}
+
+.files-root-branch.untrusted {
+	border-color: var(--app-border);
+	font-style: italic;
 }
 
 .git-dialog {
