@@ -490,7 +490,7 @@ test("modes: shaped in Settings (a step off, one of the user's own), and picked 
 	const picker = pane.locator(".assistant-mode");
 	await expect(picker).toHaveAttribute("data-mode", "auto");
 	await picker.click();
-	await expect(pane.locator(".assistant-mode-item")).toHaveCount(7);
+	await expect(pane.locator(".assistant-mode-item[data-mode]")).toHaveCount(7);
 	await expect(pane.locator('.assistant-mode-item[data-mode="review"]')).toContainText("9 steps");
 	await pane.getByRole("menuitem", { name: "Customize modes…" }).click();
 

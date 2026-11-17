@@ -6,6 +6,7 @@ const MAGNIFIER = [circle(11, 11, 6.5), "m20 20-4.4-4.4"];
 const LINES = ["M11 6h10", "M11 12h10", "M11 18h10"];
 const PAGE = ["M6 3h8l4 4v14H6z", "M14 3v4h4"];
 const FRAME = "M4 5h16v14H4z";
+const SHIELD = "M12 3 19 6v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z";
 const BRACES = [
 	"M9 4c-2 0-3 1-3 3v2.5c0 1.4-.8 2.5-2 2.5 1.2 0 2 1.1 2 2.5V17c0 2 1 3 3 3",
 	"M15 4c2 0 3 1 3 3v2.5c0 1.4.8 2.5 2 2.5-1.2 0-2 1.1-2 2.5V17c0 2-1 3-3 3",
@@ -17,6 +18,9 @@ const PATHS = {
 	open: ["M3 6h6l2 2h10v11H3z"],
 	file: PAGE,
 	refresh: ["M20 12a8 8 0 1 1-2.34-5.66", "M20 4v5h-5"],
+	shield: [SHIELD],
+	shieldCheck: [SHIELD, "m9 12 2 2 4-4"],
+	shieldAlert: [SHIELD, "M12 8v4.5", "M12 16h.01"],
 	star: ["m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"],
 	pin: ["M9 3.5h6l-1 5.5 3 3V14H7v-2l3-3z", "M12 14v6.5"],
 	save: ["M5 3h11l3 3v15H5z", "M8 3v5h7V3", "M8 21v-7h8v7"],

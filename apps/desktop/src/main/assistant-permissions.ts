@@ -3,18 +3,20 @@
  * allowed for this run of the app, kinds allowed always (kept in the
  * settings), and the questions waiting for an answer in a window. Anything
  * online is asked every time, whatever was allowed, unless the user set
- * that tool to run without asking in Settings.
+ * that tool to run without asking in Settings, or chose an approval mode
+ * that lets it run (code changes, or everything).
  */
 import type { WebContents } from "electron";
 import { CHANNEL } from "../shared/bridge.js";
 import type {
 	ApprovalAnswer,
+	ApprovalMode,
 	ApprovalRequest,
 	ApprovalScope,
 	ToolPolicy,
 	ToolRisk,
 } from "../shared/tool-protocol.js";
-import { DENIED } from "../shared/tool-protocol.js";
+import { approvedByMode, DENIED } from "../shared/tool-protocol.js";
 
 export interface PermissionStore {
 	/** The kinds of change allowed always. */
@@ -22,6 +24,8 @@ export interface PermissionStore {
 	setAlways(permissions: readonly string[]): void;
 	/** What the user set for a tool in Settings; `undefined` for its risk's way. */
 	toolPolicy?(tool: string): ToolPolicy | undefined;
+	/** How much runs without asking; `ask` when missing. */
+	approvalMode?(): ApprovalMode;
 }
 
 export class PermissionGate {
@@ -39,7 +43,7 @@ export class PermissionGate {
 
 	/** Whether a change of this kind runs without asking. */
 	allowed(permission: string, risk: Exclude<ToolRisk, "read">): boolean {
-		if (risk === "external") return false;
+		if (risk === "external" || risk === "command") return false;
 		return this.#session.has(permission) || this.#store.always().includes(permission);
 	}
 
@@ -63,6 +67,16 @@ export class PermissionGate {
 		if (policy === "auto" && request.fields === undefined && request.mustAsk !== true) {
 			return Promise.resolve({ approved: true, scope: "once" });
 		}
+		// The approval mode lets it run: all of it (every item picked), nothing kept for later.
+		// A tool the user set to be asked about is still asked: that was said of it alone.
+		if (
+			policy !== "ask" &&
+			request.fields === undefined &&
+			request.mustAsk !== true &&
+			approvedByMode(this.#store.approvalMode?.() ?? "ask", request.risk)
+		) {
+			return Promise.resolve({ approved: true, scope: "once" });
+		}
 		const everyTime = policy === "ask" || request.everyTime === true || request.mustAsk === true;
 		if (
 			!everyTime &&
@@ -83,7 +97,12 @@ export class PermissionGate {
 				sender,
 				resolve: (answer) => {
 					sender.removeListener("destroyed", gone);
-					if (answer.approved && request.mustAsk !== true) {
+					// Kept only for as long as the card offered: a command, or anything online, never.
+					if (
+						answer.approved &&
+						request.mustAsk !== true &&
+						request.scopes.includes(answer.scope)
+					) {
 						this.#remember(request.permission, answer.scope);
 					}
 					resolve(answer);

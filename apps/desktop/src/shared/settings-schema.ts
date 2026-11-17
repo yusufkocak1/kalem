@@ -471,6 +471,30 @@ export const SETTINGS_SCHEMA: Schema = {
 		// The assistant may never widen what it is allowed.
 		assistant: "hidden",
 	},
+	assistantApprovals: {
+		key: "assistantApprovals",
+		category: "assistant",
+		label: "settingsAssistantApprovals",
+		type: "enum",
+		values: ["ask", "edits", "all"],
+		valueLabels: ["approvalsAsk", "approvalsEdits", "approvalsAll"],
+		keywords: [
+			"onay",
+			"approval",
+			"izin",
+			"permission",
+			"bypass",
+			"otomatik",
+			"auto",
+			"tümünü onayla",
+			"approve all",
+			"terminal",
+			"komut",
+			"command",
+		],
+		// The assistant may never widen what it is allowed.
+		assistant: "hidden",
+	},
 	copilotTools: {
 		key: "copilotTools",
 		category: "assistant",

@@ -55,8 +55,8 @@ import { isCli, PROVIDER_INFO, providerLabel, SUGGESTED_MODELS } from "../shared
 import type { SlashEntry } from "../shared/slash.js";
 import { findSlash, matchSlash, slashQuery } from "../shared/slash.js";
 import type { TemplateInfo } from "../shared/templates.js";
-import type { ApprovalRequest } from "../shared/tool-protocol.js";
-import { withoutToolCalls } from "../shared/tool-protocol.js";
+import type { ApprovalMode, ApprovalRequest } from "../shared/tool-protocol.js";
+import { APPROVAL_MODES, withoutToolCalls } from "../shared/tool-protocol.js";
 import type { ApprovalState, ChecksView, MadeChange, Usage } from "./assistant-agent.js";
 import {
 	approvalCard,
@@ -93,6 +93,8 @@ export interface AssistantHost {
 	readonly previews: Previews;
 	shareDocument(): boolean;
 	setShareDocument(share: boolean): void;
+	/** The active document's name, as its chip shows it. */
+	documentName(): string;
 	/** The panel's width; `setWidth` keeps it. */
 	width(): number;
 	setWidth(width: number): void;
@@ -136,6 +138,9 @@ export interface AssistantHost {
 	customModes(): readonly CustomMode[];
 	/** Opens Settings on the assistant's modes. */
 	openModeSettings(): void;
+	/** How much the assistant does without asking, and setting it (kept in the settings). */
+	approvalMode(): ApprovalMode;
+	setApprovalMode(mode: ApprovalMode): void;
 }
 
 export interface AssistantPane {
@@ -149,6 +154,8 @@ export interface AssistantPane {
 	workspaceChanged(): void;
 	/** The service was set in the Settings window; `changed` when it is another service. */
 	configured(status: AssistantStatus, changed: boolean): void;
+	/** The settings changed (here or in the Settings window): the approval picker follows. */
+	settingsChanged(): void;
 }
 
 interface Message {
@@ -327,8 +334,6 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		render();
 	}
 
-	const share = el("input", { attrs: { type: "checkbox" } });
-	share.addEventListener("change", () => host.setShareDocument(share.checked));
 	const selectionText = el("span", { class: "assistant-chip-text" });
 	const dropSelection = el("button", {
 		class: "assistant-chip-close",
@@ -622,6 +627,15 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					}),
 				),
 			menuItem(t.assistantUseTemplate, "file", () => void showTemplateMenu()),
+			// The document left out of the chat comes back from here.
+			...(host.shareDocument()
+				? []
+				: [
+						menuItem(format(t.assistantShareDocumentNamed, host.documentName()), "file", () => {
+							host.setShareDocument(true);
+							renderSources();
+						}),
+					]),
 		);
 		addMenu.hidden = false;
 		addButton.setAttribute("aria-expanded", "true");
@@ -738,10 +752,51 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		input.focus();
 	}
 
+	/** What the document chip last showed: drawn again only when it changes. */
+	let documentShown = "";
+	/** A document is open: the app tells the panel so first through `refreshSelection`. */
+	let documentOpen = false;
+	function documentChip(): HTMLElement[] {
+		if (!documentOpen || !host.shareDocument()) return [];
+		const name = host.documentName();
+		if (name === "") return [];
+		const remove = el("button", {
+			class: "assistant-chip-close",
+			attrs: {
+				type: "button",
+				title: format(t.assistantUnshareDocument, name),
+				"aria-label": format(t.assistantUnshareDocument, name),
+			},
+			children: [icon("close")],
+		});
+		remove.addEventListener("click", () => {
+			host.setShareDocument(false);
+			renderSources();
+			input.focus();
+		});
+		return [
+			el("span", {
+				class: "assistant-chip assistant-source assistant-source-document",
+				attrs: { title: t.assistantShareDocument, "data-document": "" },
+				children: [icon("file"), el("span", { class: "assistant-chip-text", text: name }), remove],
+			}),
+		];
+	}
+
+	/** Draws the chips again when the shared document changed (another tab, sharing turned off). */
+	function refreshDocumentChip(): void {
+		const now = documentOpen && host.shareDocument() ? host.documentName() : "";
+		if (now !== documentShown) renderSources();
+	}
+
 	function renderSources(): void {
 		const open = openFolders(active);
-		sourceList.hidden = active.sources.length === 0 && open.length === 0 && pasted.length === 0;
+		const doc = documentChip();
+		documentShown = doc.length === 0 ? "" : host.documentName();
+		sourceList.hidden =
+			doc.length === 0 && active.sources.length === 0 && open.length === 0 && pasted.length === 0;
 		sourceList.replaceChildren(
+			...doc,
 			...pasted.map((picture, index) => {
 				const name = format(t.assistantPicture, index + 1);
 				const remove = el("button", {
@@ -878,6 +933,17 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			return resolveMode(choice, host.modes()).steps.filter((step) => step.on).length;
 		return ownMode(choice)?.steps.filter((step) => step.on).length ?? null;
 	};
+	/** How much runs without asking, in the same menu as the mode: what Settings → Assistant keeps. */
+	const approvalLabels: Record<ApprovalMode, [short: string, full: string]> = {
+		ask: [t.approvalsAskShort, t.approvalsAsk],
+		edits: [t.approvalsEditsShort, t.approvalsEdits],
+		all: [t.approvalsAllShort, t.approvalsAll],
+	};
+	const APPROVAL_ICONS: Record<ApprovalMode, IconName> = {
+		ask: "shield",
+		edits: "shieldCheck",
+		all: "shieldAlert",
+	};
 	const modeIcon = el("span", { class: "assistant-mode-icon" });
 	const modeText = el("span", { class: "assistant-mode-text" });
 	const modeButton = el("button", {
@@ -886,15 +952,32 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			type: "button",
 			"aria-haspopup": "menu",
 			"aria-expanded": "false",
-			"aria-label": t.assistantMode,
+			"aria-label": t.assistantChatSettings,
 		},
-		children: [modeIcon, modeText, glyph("chevron", "assistant-mode-chevron")],
+		children: [
+			modeIcon,
+			modeText,
+			el("span", { class: "assistant-mode-shield", attrs: { "aria-hidden": "true" } }),
+			glyph("chevron", "assistant-mode-chevron"),
+		],
 	});
 	const modeMenu = el("div", {
 		class: "assistant-mode-menu",
-		attrs: { role: "menu", "aria-label": t.assistantMode },
+		attrs: { role: "menu", "aria-label": t.assistantChatSettings },
 	});
 	modeMenu.hidden = true;
+	/** The model, in the same menu; kept in it while the menu is closed, so its list is always there. */
+	const modelRow = el("div", {
+		class: "assistant-menu-model-row",
+		children: [
+			el("hr", { class: "assistant-mode-separator" }),
+			el("label", {
+				class: "assistant-menu-model",
+				children: [el("span", { text: t.assistantSectionModel }), modelSelect],
+			}),
+		],
+	});
+	modeMenu.append(modelRow);
 	const modePicker = el("div", {
 		class: "assistant-mode-picker",
 		children: [modeButton, modeMenu],
@@ -905,8 +988,13 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		if (isCustomModeId(mode) && ownMode(mode) === null) mode = "auto";
 		modeIcon.replaceChildren(glyph(modeGlyphName(mode), "assistant-mode-glyph"));
 		modeText.textContent = modeLabel(mode);
-		modeButton.title = `${t.assistantMode}: ${modeLabel(mode)}`;
+		const approvals = host.approvalMode();
+		const shield = modeButton.querySelector(".assistant-mode-shield");
+		shield?.replaceChildren(glyph(APPROVAL_ICONS[approvals], "assistant-mode-shield-glyph"));
+		const model = status?.model ? `\n${t.assistantSectionModel}: ${status.model}` : "";
+		modeButton.title = `${t.assistantMode}: ${modeLabel(mode)}\n${t.assistantSectionApprovals}: ${approvalLabels[approvals][0]}${model}`;
 		modeButton.dataset.mode = mode;
+		modeButton.dataset.approvals = approvals;
 	}
 
 	function closeModeMenu(focus = false): void {
@@ -925,7 +1013,11 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				.filter((each) => each.enabled || each.id === mode)
 				.map((each) => each.id),
 		];
+		const heading = (text: string): HTMLElement =>
+			el("div", { class: "assistant-menu-heading", attrs: { role: "presentation" }, text });
+		const current = host.approvalMode();
 		modeMenu.replaceChildren(
+			heading(t.assistantSectionMode),
 			...choices.map((choice) => {
 				const count = modeStepCount(choice);
 				const steps = count === null ? "" : format(t.modeSteps, count);
@@ -961,6 +1053,39 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				return item;
 			}),
 			el("hr", { class: "assistant-mode-separator" }),
+			heading(t.assistantSectionApprovals),
+			...APPROVAL_MODES.map((each) => {
+				const item = el("button", {
+					class: "assistant-mode-item assistant-approval-item",
+					attrs: {
+						type: "button",
+						role: "menuitemradio",
+						"aria-checked": String(each === current),
+						"data-approvals": each,
+					},
+					children: [
+						el("span", {
+							class: "assistant-mode-item-icon",
+							children: [glyph(APPROVAL_ICONS[each], "assistant-mode-item-glyph")],
+						}),
+						el("span", {
+							class: "assistant-mode-item-text",
+							children: [
+								el("strong", { text: approvalLabels[each][0] }),
+								el("span", { text: approvalLabels[each][1] }),
+							],
+						}),
+					],
+				});
+				item.addEventListener("click", () => {
+					host.setApprovalMode(each);
+					drawModeButton();
+					closeModeMenu(true);
+				});
+				return item;
+			}),
+			modelRow,
+			el("hr", { class: "assistant-mode-separator" }),
 			(() => {
 				const customize = el("button", {
 					class: "assistant-mode-customize",
@@ -990,6 +1115,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			return;
 		}
 		if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+		// The model list takes its own arrows.
+		if (event.target === modelSelect) return;
 		event.preventDefault();
 		const items = [...modeMenu.querySelectorAll<HTMLElement>("button")];
 		const index = items.indexOf(document.activeElement as HTMLElement);
@@ -1020,6 +1147,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			void setView("settings");
 			return;
 		}
+		closeModeMenu();
 		await setModel(picked);
 	});
 
@@ -1094,17 +1222,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 						class: "assistant-toolbar",
 						children: [
 							addButton,
-							el("label", {
-								class: "assistant-share",
-								attrs: { title: t.slashShare },
-								children: [
-									share,
-									el("span", { class: "assistant-share-text", text: t.assistantShareDocument }),
-								],
-							}),
 							el("span", { class: "assistant-toolbar-space" }),
 							modePicker,
-							modelSelect,
 							sendButton,
 						],
 					}),
@@ -1293,6 +1412,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			label: t.slashShare,
 			run() {
 				host.setShareDocument(!host.shareDocument());
+				renderSources();
 				render();
 			},
 		},
@@ -1986,7 +2106,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		log.classList.toggle("busy", busy);
 		updateJump();
 		sendButton.disabled = !ready && !busy;
-		share.checked = host.shareDocument();
+		refreshDocumentChip();
+		drawModeButton();
 		subtitle.textContent = status === null ? t.assistantLooking : status.label;
 		subtitle.title = status?.detail ?? "";
 		settingsButton.setAttribute("aria-pressed", String(view === "settings"));
@@ -1997,6 +2118,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		sendButton.classList.toggle("busy", busy);
 		newChat.disabled = active.messages.length === 0;
 		modelSelect.hidden = !ready;
+		modelRow.hidden = !ready;
 		if (ready && modelSelect.dataset.for !== `${status?.provider}\u0000${status?.model}`) {
 			modelSelect.dataset.for = `${status?.provider}\u0000${status?.model}`;
 			renderModels();
@@ -2012,6 +2134,9 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	}
 
 	function refreshSelection(): void {
+		// Called on a tab switch too: the document chip follows the active document.
+		documentOpen = true;
+		refreshDocumentChip();
 		const selection = host.selection().trim();
 		if (droppedSelection !== null && droppedSelection.trim() !== selection) droppedSelection = null;
 		const visible = selection !== "" && droppedSelection === null;
@@ -2356,7 +2481,10 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				}),
 			);
 		}
-		for (const proposed of message.edits ?? []) nodes.push(editCard(proposed));
+		const edits = message.edits ?? [];
+		const bulk = editsBar(edits);
+		if (bulk !== null) nodes.push(bulk);
+		for (const proposed of edits) nodes.push(editCard(proposed, edits));
 		if (message.findings !== undefined && message.findings.length > 0) {
 			nodes.push(
 				findingsCard(
@@ -2424,6 +2552,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				return format(t.assistantStepRead, detail);
 			case "propose_edit":
 				return format(t.assistantStepEdit, detail);
+			case "run_command":
+				return format(t.assistantStepTerminal, detail);
 			case "confluence_search":
 			case "confluence_search_content":
 				return format(t.assistantStepConfluenceSearch, detail);
@@ -2470,9 +2600,82 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		{ kind: "applied" | "discarded" } | { kind: "failed"; text: string }
 	>();
 
-	/** A proposed change to a workspace file: what it takes out and puts in, applied on request. */
-	function editCard(proposed: ProposedEdit): HTMLElement {
+	/** What became of a change: the user's answer, else what the main process did with it at once. */
+	function editState(
+		proposed: ProposedEdit,
+	): { kind: "applied" | "discarded" | "auto" } | { kind: "failed"; text: string } | undefined {
 		const state = editStates.get(proposed.id);
+		if (state !== undefined) return state;
+		if (proposed.applied === true) return { kind: "auto" };
+		if (proposed.failed !== undefined) return { kind: "failed", text: proposed.failed };
+		return undefined;
+	}
+
+	/** Writes a change; what became of it is kept for its card. */
+	async function applyProposed(proposed: ProposedEdit): Promise<void> {
+		try {
+			await bridge.assistantApplyEdit(proposed.id);
+			editStates.set(proposed.id, { kind: "applied" });
+		} catch (error) {
+			editStates.set(proposed.id, { kind: "failed", text: host.errorText(error) });
+		}
+	}
+
+	/** A reply's cards of changes, and the bar over them, drawn again after one is answered. */
+	function redrawEdits(within: Element | null, edits: readonly ProposedEdit[]): void {
+		if (within === null) return;
+		for (const proposed of edits) {
+			within
+				.querySelector(`[data-edit="${CSS.escape(proposed.id)}"]`)
+				?.replaceWith(editCard(proposed, edits));
+		}
+		const bar = editsBar(edits);
+		const shown = within.querySelector("[data-edits-bar]");
+		if (shown !== null) shown.replaceWith(bar ?? "");
+		else if (bar !== null) within.querySelector("[data-edit]")?.before(bar);
+	}
+
+	/**
+	 * Several changes still waiting: applied, or set aside, all at once. They
+	 * are applied in their order, so one change after another in the same
+	 * file finds the text the earlier one left.
+	 */
+	function editsBar(edits: readonly ProposedEdit[]): HTMLElement | null {
+		const open = edits.filter((proposed) => {
+			const state = editState(proposed);
+			return state === undefined || state.kind === "failed";
+		});
+		if (open.length < 2) return null;
+		const applyAll = button(format(t.assistantEditApplyAll, open.length), {
+			class: "assistant-primary",
+			icon: "check",
+		});
+		const discardAll = button(t.assistantEditDiscardAll, { icon: "close" });
+		const bar = el("div", {
+			class: "assistant-edits-bar",
+			attrs: { "data-edits-bar": "" },
+			children: [applyAll, discardAll],
+		});
+		const done = (): void => redrawEdits(bar.parentElement, edits);
+		applyAll.addEventListener("click", async () => {
+			applyAll.disabled = true;
+			discardAll.disabled = true;
+			for (const proposed of open) await applyProposed(proposed);
+			done();
+		});
+		discardAll.addEventListener("click", () => {
+			for (const proposed of open) editStates.set(proposed.id, { kind: "discarded" });
+			done();
+		});
+		return bar;
+	}
+
+	/** A proposed change to a workspace file: what it takes out and puts in, applied on request. */
+	function editCard(
+		proposed: ProposedEdit,
+		edits: readonly ProposedEdit[] = [proposed],
+	): HTMLElement {
+		const state = editState(proposed);
 		const diff = el("pre", { class: "assistant-edit-diff" });
 		for (const line of lineDiff(proposed.oldText, proposed.newText)) {
 			diff.append(
@@ -2486,6 +2689,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		const actions = el("div", { class: "assistant-edit-actions" });
 		if (state?.kind === "applied")
 			status.textContent = format(t.assistantEditApplied, proposed.path);
+		else if (state?.kind === "auto")
+			status.textContent = format(t.assistantEditAuto, proposed.path);
 		else if (state?.kind === "discarded") status.textContent = t.assistantEditDiscarded;
 		else {
 			if (state?.kind === "failed") {
@@ -2496,22 +2701,19 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			const discard = button(t.assistantEditDiscard, { icon: "close" });
 			apply.addEventListener("click", async () => {
 				apply.disabled = true;
-				try {
-					await bridge.assistantApplyEdit(proposed.id);
-					editStates.set(proposed.id, { kind: "applied" });
-				} catch (error) {
-					editStates.set(proposed.id, { kind: "failed", text: host.errorText(error) });
-				}
-				card.replaceWith(editCard(proposed));
+				await applyProposed(proposed);
+				refresh();
 			});
 			discard.addEventListener("click", () => {
 				editStates.set(proposed.id, { kind: "discarded" });
-				card.replaceWith(editCard(proposed));
+				refresh();
 			});
 			actions.append(apply, discard);
 		}
+		/** The card again, and the bar above the reply's cards, which counts what is left. */
+		const refresh = (): void => redrawEdits(card.parentElement, edits);
 		const card = el("div", {
-			class: `assistant-edit${state === undefined || state.kind === "failed" ? "" : ` ${state.kind}`}`,
+			class: `assistant-edit${state === undefined || state.kind === "failed" ? "" : ` ${state.kind === "auto" ? "applied" : state.kind}`}`,
 			attrs: { "data-edit": proposed.id },
 			children: [
 				el("div", {
@@ -3690,5 +3892,9 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		refreshSelection,
 		workspaceChanged: () => renderSources(),
 		configured,
+		settingsChanged() {
+			drawModeButton();
+			refreshDocumentChip();
+		},
 	};
 }

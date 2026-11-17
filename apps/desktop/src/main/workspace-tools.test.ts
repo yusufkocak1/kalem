@@ -243,7 +243,9 @@ describe("proposed edits", () => {
 		});
 		await writeFile(join(root, "legacy.txt"), Buffer.from([0x67, 0xfc, 0x6e, 0x0a]));
 		const proposed: KeptEdit[] = [];
-		const workspace = new Workspace([root], new WorkspaceIndexes(), (edit) => proposed.push(edit));
+		const workspace = new Workspace([root], new WorkspaceIndexes(), (edit) => {
+			proposed.push(edit);
+		});
 		const run = (input: Record<string, string>): Promise<string> =>
 			workspace.run("propose_edit", input);
 

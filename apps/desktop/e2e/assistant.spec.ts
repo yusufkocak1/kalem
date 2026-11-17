@@ -80,8 +80,11 @@ test("asks the local Claude about the document and inserts its reply with the di
 		'<diagram src="notlar.assets/Onay-ak%C4%B1%C5%9F%C4%B1.diagram.png">',
 	);
 
-	// Without sharing, only the question goes.
-	await pane.getByLabel("Share the document").uncheck();
+	// Without sharing, only the question goes: the document's chip is taken off.
+	const docChip = pane.locator(".assistant-source-document");
+	await expect(docChip).toHaveText("notlar.md");
+	await docChip.getByRole("button", { name: "Do not share notlar.md" }).click();
+	await expect(docChip).toHaveCount(0);
 	await input.fill("Teşekkürler");
 	await input.press("Enter");
 	await expect(pane.locator(".assistant-assistant")).toHaveCount(3);
@@ -314,7 +317,9 @@ function toolRound(request: Received | undefined): number | null {
 }
 
 /** A local stand-in for an OpenAI-compatible service and the Anthropic API, streaming REPLY. */
-async function fakeServices(): Promise<{ url: string; received: Received[]; close(): void }> {
+async function fakeServices(
+	calls: readonly { name: string; input: Record<string, unknown> }[] = TOOL_CALLS,
+): Promise<{ url: string; received: Received[]; close(): void }> {
 	const received: Received[] = [];
 	const chunks = (text: string): string[] => text.match(/[\s\S]{1,9}/g) ?? [];
 	const sse = (response: ServerResponse, events: readonly [string | null, unknown][]): void => {
@@ -360,7 +365,7 @@ async function fakeServices(): Promise<{ url: string; received: Received[]; clos
 				]);
 			} else if (path === "/v1/chat/completions" && toolRound(received.at(-1)) !== null) {
 				const round = toolRound(received.at(-1)) as number;
-				const call = TOOL_CALLS[round];
+				const call = calls[round];
 				if (call === undefined) {
 					sse(response, [
 						[null, { choices: [{ delta: { content: "Main sınıfı boş." } }] }],
@@ -403,7 +408,7 @@ async function fakeServices(): Promise<{ url: string; received: Received[]; clos
 				}
 			} else if (path === "/v1/messages" && toolRound(received.at(-1)) !== null) {
 				const round = toolRound(received.at(-1)) as number;
-				const call = TOOL_CALLS[round];
+				const call = calls[round];
 				const message = {
 					id: `msg_t${round}`,
 					type: "message",
@@ -916,6 +921,8 @@ test("picks the model from the panel and keeps the chat going; earlier chats are
 	await input.press("Enter");
 	await expect(pane.getByRole("button", { name: "Insert", exact: true })).toHaveCount(1);
 	expect((await claude.calls())[0]?.args).not.toContain("--model");
+	// The model is in the chat settings menu, with the mode and the approvals.
+	await pane.locator(".assistant-mode").click();
 	await picker.selectOption("sonnet");
 	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code) · sonnet");
 	await input.fill("İki");
@@ -946,6 +953,7 @@ test("picks the model from the panel and keeps the chat going; earlier chats are
 	await input.fill("Üç");
 	await input.press("Enter");
 	await expect(pane.getByRole("button", { name: "Insert", exact: true })).toHaveCount(1);
+	await pane.locator(".assistant-mode").click();
 	await picker.selectOption("fake-small");
 	await input.fill("Dört");
 	await input.press("Enter");
@@ -956,6 +964,7 @@ test("picks the model from the panel and keeps the chat going; earlier chats are
 	await expect(pane.locator(".assistant-reply-model")).toHaveText(["fake-large", "fake-small"]);
 
 	// "Other model…" leads to the settings.
+	await pane.locator(".assistant-mode").click();
 	await picker.selectOption("Other model…");
 	await expect(form).toBeVisible();
 	await expect(picker).toBeHidden();
@@ -1084,7 +1093,12 @@ test("adds files and folders to a chat, and Claude may read the folders", async 
 	await pick([notes]);
 	await add.click();
 	await pane.getByRole("menuitem", { name: "Files…" }).click();
-	await expect(pane.locator(".assistant-source")).toHaveText(["proje", "gereksinimler.txt"]);
+	// The shared document leads the chips; the files and folders added follow it.
+	await expect(pane.locator(".assistant-source")).toHaveText([
+		"analiz.md",
+		"proje",
+		"gereksinimler.txt",
+	]);
 
 	const input = pane.locator(".assistant-input");
 	await input.fill("Analiz dokümanını yaz");
@@ -1271,6 +1285,171 @@ test("lets an API service search and read a workspace folder instead of sending 
 		expect(last).toContain("src/Main.java:1: class Main {}");
 		expect(last).toContain("1  class Main {}");
 	}
+
+	expect(errors).toEqual([]);
+	await app.close();
+	services.close();
+});
+
+test("applies all of a reply's changes at once, or writes them unasked as the approval setting says", async () => {
+	const edit = (path: string, from: string, to: string) => ({
+		name: "propose_edit",
+		input: { path, old_text: from, new_text: to },
+	});
+	const services = await fakeServices([
+		edit("a.txt", "a", "A"),
+		edit("b.txt", "b", "B"),
+		edit("a.txt", "A", "AA"),
+	]);
+	const folder = await tempDir("assistant-apply-all");
+	const code = join(folder, "proje");
+	await mkdir(code, { recursive: true });
+	const reset = async (): Promise<void> => {
+		await writeFile(join(code, "a.txt"), "a\n");
+		await writeFile(join(code, "b.txt"), "b\n");
+	};
+	await reset();
+	const { app, page, userData, errors } = await launch({
+		settings: { assistant: true },
+		env: {
+			KALEM_CLAUDE: join(folder, "nothing-here"),
+			NO_PROXY: "127.0.0.1",
+			no_proxy: "127.0.0.1",
+		},
+	});
+	const pane = page.locator(".assistant");
+	const form = pane.locator(".assistant-settings");
+	const input = pane.locator(".assistant-input");
+	const reply = pane.locator(".assistant-assistant").last();
+	await pane.getByRole("button", { name: "Connect a Service…" }).click();
+	await form.getByLabel("Service").selectOption("custom");
+	await form.getByLabel("Address").fill(`${services.url}/v1`);
+	await form.getByLabel("API key").fill("sk-test");
+	await form.getByLabel("Model").fill("fake-large");
+	await form.getByRole("button", { name: "Save" }).click();
+	await expect(form).toBeHidden();
+	await app.evaluate(
+		({ dialog }, filePaths) => {
+			dialog.showOpenDialog = (async () => ({ canceled: false, filePaths })) as never;
+		},
+		[code],
+	);
+	await pane.getByRole("button", { name: "Add files or folders to the chat" }).click();
+	await pane.getByRole("menuitem", { name: "Folder…" }).click();
+
+	// Asked: the third change follows the first, so it is proposed only once the first is written.
+	await input.fill("Harfleri büyüt");
+	await input.press("Enter");
+	await expect(reply.locator(".assistant-markdown")).toHaveText("Main sınıfı boş.");
+	await expect(reply.locator(".assistant-edit")).toHaveCount(2);
+	expect(await readFile(join(code, "a.txt"), "utf8")).toBe("a\n");
+	await reply.getByRole("button", { name: "Apply All (2)" }).click();
+	await expect(reply.locator(".assistant-edit-state")).toHaveText([
+		"Applied to a.txt.",
+		"Applied to b.txt.",
+	]);
+	await expect(reply.locator(".assistant-edits-bar")).toHaveCount(0);
+	expect(await readFile(join(code, "a.txt"), "utf8")).toBe("A\n");
+	expect(await readFile(join(code, "b.txt"), "utf8")).toBe("B\n");
+
+	// Code changes approved automatically, picked in the panel: each is written as it comes.
+	await reset();
+	const settingsButton = pane.locator(".assistant-mode");
+	await expect(settingsButton).toHaveAttribute("data-approvals", "ask");
+	await settingsButton.click();
+	await expect(pane.getByRole("menuitemradio", { name: /^Ask first/ })).toHaveAttribute(
+		"aria-checked",
+		"true",
+	);
+	await pane.getByRole("menuitemradio", { name: /^Auto-approve edits/ }).click();
+	await expect(settingsButton).toHaveAttribute("data-approvals", "edits");
+	await expect
+		.poll(async () => {
+			const kept = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
+			return kept.settings.assistantApprovals;
+		})
+		.toBe("edits");
+	await input.fill("Yine büyüt");
+	await input.press("Enter");
+	await expect(reply.locator(".assistant-markdown")).toHaveText("Main sınıfı boş.");
+	await expect(reply.locator(".assistant-edit-state")).toHaveText([
+		"Applied to a.txt without asking (approval setting).",
+		"Applied to b.txt without asking (approval setting).",
+		"Applied to a.txt without asking (approval setting).",
+	]);
+	await expect(reply.getByRole("button", { name: "Apply to the file" })).toHaveCount(0);
+	expect(await readFile(join(code, "a.txt"), "utf8")).toBe("AA\n");
+	expect(await readFile(join(code, "b.txt"), "utf8")).toBe("B\n");
+
+	expect(errors).toEqual([]);
+	await app.close();
+	services.close();
+});
+
+test("runs a command in the workspace once allowed, and unasked when approvals are bypassed", async () => {
+	const services = await fakeServices([
+		{
+			name: "run_command",
+			input: { command: "node -e \"require('fs').appendFileSync('ran.txt','x')\"" },
+		},
+	]);
+	const folder = await tempDir("assistant-command");
+	const code = join(folder, "proje");
+	await mkdir(code, { recursive: true });
+	await writeFile(join(code, "a.txt"), "a\n");
+	const { app, page, errors } = await launch({
+		settings: { assistant: true },
+		env: {
+			KALEM_CLAUDE: join(folder, "nothing-here"),
+			NO_PROXY: "127.0.0.1",
+			no_proxy: "127.0.0.1",
+		},
+	});
+	const pane = page.locator(".assistant");
+	const form = pane.locator(".assistant-settings");
+	const input = pane.locator(".assistant-input");
+	const reply = pane.locator(".assistant-assistant").last();
+	await pane.getByRole("button", { name: "Connect a Service…" }).click();
+	await form.getByLabel("Service").selectOption("custom");
+	await form.getByLabel("Address").fill(`${services.url}/v1`);
+	await form.getByLabel("API key").fill("sk-test");
+	await form.getByLabel("Model").fill("fake-large");
+	await form.getByRole("button", { name: "Save" }).click();
+	await expect(form).toBeHidden();
+	await app.evaluate(
+		({ dialog }, filePaths) => {
+			dialog.showOpenDialog = (async () => ({ canceled: false, filePaths })) as never;
+		},
+		[code],
+	);
+	await pane.getByRole("button", { name: "Add files or folders to the chat" }).click();
+	await pane.getByRole("menuitem", { name: "Folder…" }).click();
+
+	// Asked, with the command and where it runs; nothing runs before the answer.
+	await input.fill("Testleri çalıştır");
+	await input.press("Enter");
+	const card = pane.locator(".assistant-approval");
+	await expect(card).toContainText("Run a command");
+	await expect(card).toContainText("appendFileSync");
+	await expect(card).toContainText("Runs on this computer");
+	await expect(card.getByRole("button", { name: /session|always/i })).toHaveCount(0);
+	await expect.poll(() => readFile(join(code, "ran.txt"), "utf8").catch(() => "")).toBe("");
+	await card.getByRole("button", { name: "Allow", exact: true }).click();
+	await expect(reply.locator(".assistant-markdown")).toHaveText("Main sınıfı boş.");
+	expect(await readFile(join(code, "ran.txt"), "utf8")).toBe("x");
+
+	// Approvals bypassed in the panel: it runs without a card, and the picker shows it.
+	const settingsButton = pane.locator(".assistant-mode");
+	await settingsButton.click();
+	await page.screenshot({ path: "test-results/assistant-chat-settings.png" });
+	await pane.getByRole("menuitemradio", { name: /^Bypass approvals/ }).click();
+	await expect(settingsButton).toHaveAttribute("data-approvals", "all");
+	await page.screenshot({ path: "test-results/assistant-approvals.png" });
+	await input.fill("Yine çalıştır");
+	await input.press("Enter");
+	await expect(reply.locator(".assistant-markdown")).toHaveText("Main sınıfı boş.");
+	expect(await readFile(join(code, "ran.txt"), "utf8")).toBe("xx");
+	await expect(pane.locator(".assistant-approval")).toHaveCount(1);
 
 	expect(errors).toEqual([]);
 	await app.close();

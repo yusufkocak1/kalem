@@ -273,6 +273,8 @@ const ONLY_IN: Readonly<Record<string, readonly Mode[]>> = {
 	save_prompt: ["prompt", "code"],
 	// Code is changed only where the user works on code.
 	propose_edit: ["ask", "code"],
+	// Commands, as code changes, only where the user works on code.
+	run_command: ["ask", "code"],
 };
 
 export const DETAILS = ["short", "normal", "detailed"] as const;

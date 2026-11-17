@@ -2,8 +2,9 @@
  * The tools that let the assistant use Kalem itself: know where it is
  * (`app_state`, `kalem_help`, `kalem_tools`), find and change settings,
  * move and show panels, run the app's commands, and read and change the
- * document. Each change is asked of the user first; the settings it may
- * not see or change stay out of its reach.
+ * document. Each change is asked of the user first. Every setting can be
+ * read and changed; those that widen what the assistant may do, or name a
+ * program it runs, are asked about every time, whatever the approval mode.
  */
 import type { AssistantCommand, DocumentAction } from "../shared/actions.js";
 import {
@@ -59,10 +60,42 @@ const placeLabel = (ctx: ToolContext, place: PanePlace): string =>
 		hidden: ctx.t.placeHidden,
 	})[place];
 
+/** Settings changed with tools of their own, which show the change the way it reads best. */
+const OWN_TOOL: Partial<Record<keyof Settings, string>> = {
+	panePlaces: "pane_move",
+	assistantMcpServers: "mode_mcp_change",
+	assistantModes: "mode_configure",
+	assistantCustomModes: "mode_save / mode_delete",
+};
+
+/**
+ * Settings that widen what the assistant may do without asking, or name a
+ * program Kalem runs: asked every time, never kept as allowed, and not
+ * skipped by any approval mode.
+ */
+export const SENSITIVE_SETTINGS: ReadonlySet<keyof Settings> = new Set<keyof Settings>([
+	"assistantPermissions",
+	"assistantToolPolicies",
+	"assistantApprovals",
+	"claudePath",
+	"copilotPath",
+	"gitTrustedFolders",
+]);
+
+/** A structured value as the card shows it: its JSON, cut short. */
+const jsonLine = (value: unknown): string => {
+	const shown = JSON.stringify(value) ?? "null";
+	return shown.length > 400 ? `${shown.slice(0, 400)}…` : shown;
+};
+
 /** A setting as the model reads it: its name, where it is, its value and what it takes. */
 export function settingLine(ctx: ToolContext, def: SettingDef): string {
 	// A mode names the MCP servers it uses; how they run (their tokens) is in a hidden setting.
-	const value = ctx.settings()[def.key];
+	// How the MCP servers run (their commands, tokens) is never shown: their names are enough.
+	const value =
+		def.key === "assistantMcpServers"
+			? ctx.settings().assistantMcpServers.map((server) => server.name)
+			: ctx.settings()[def.key];
 	const label = def.label === null ? def.key : ctx.t[def.label];
 	const shown = (raw: unknown): string => JSON.stringify(raw) ?? "null";
 	const takes =
@@ -72,10 +105,12 @@ export function settingLine(ctx: ToolContext, def: SettingDef): string {
 				? `a number from ${def.min} to ${def.max}`
 				: def.type === "boolean"
 					? "true or false"
-					: def.key === "panePlaces"
-						? "use pane_move to change it"
-						: "text";
-	const access = def.assistant === "write" ? "" : " [you may read it only]";
+					: OWN_TOOL[def.key] !== undefined
+						? `change it with ${OWN_TOOL[def.key]}`
+						: def.type === "custom"
+							? "a JSON value of the same shape (the whole new value)"
+							: "text";
+	const access = SENSITIVE_SETTINGS.has(def.key) ? " [the user is asked every time]" : "";
 	return `- ${def.key}: "${label}" (${def.category}) = ${shown(value)}; ${takes}${access}`;
 }
 
@@ -112,7 +147,22 @@ function intended(
 	}
 	if (def.type === "string")
 		return typeof raw === "string" ? { ok: true, value: raw } : { ok: false };
-	return { ok: false };
+	// A structured setting: its whole new value, given as JSON or as JSON text.
+	let value = raw;
+	if (typeof raw === "string") {
+		try {
+			value = JSON.parse(raw);
+		} catch {
+			return { ok: false };
+		}
+	}
+	const parsed = def.parse(value);
+	// What the setting's parser drops is not what the model meant: nothing kept means a wrong shape.
+	const empty = (item: unknown): boolean =>
+		(Array.isArray(item) && item.length === 0) ||
+		(typeof item === "object" && item !== null && Object.keys(item).length === 0);
+	if (empty(parsed) && !empty(value)) return { ok: false };
+	return { ok: true, value: parsed };
 }
 
 /** Applies settings the user allowed; language goes through its own flow (a restart). */
@@ -235,11 +285,12 @@ const SETTING_TOOLS: readonly KalemTool[] = [
 		async run(input, ctx) {
 			const query = text(input, "query");
 			ctx.step({ tool: "settings_find", detail: query });
-			const found = findSettings(ctx.t, query);
+			const found = findSettings(ctx.t, query, { includeHidden: true });
 			if (found.length === 0)
 				return `No setting matches "${query}". Call settings_find with no words to see them all.`;
+			// Every one when asked for them all, as the description says; the best 20 for words.
 			return found
-				.slice(0, 20)
+				.slice(0, query.trim() === "" ? found.length : 20)
 				.map((def) => settingLine(ctx, def))
 				.join("\n");
 		},
@@ -260,7 +311,7 @@ const SETTING_TOOLS: readonly KalemTool[] = [
 			const keys = Array.isArray(input.keys) ? input.keys : [];
 			return keys
 				.map((key) =>
-					isSettingKey(key) && SETTINGS_SCHEMA[key].assistant !== "hidden"
+					isSettingKey(key)
 						? settingLine(ctx, SETTINGS_SCHEMA[key])
 						: `- ${String(key)}: no such setting`,
 				)
@@ -271,7 +322,7 @@ const SETTING_TOOLS: readonly KalemTool[] = [
 		definition: {
 			name: "settings_set",
 			description:
-				"Changes settings; the user is asked first. Give each change's key (from settings_find) and its new value (one of the values settings_find lists).",
+				"Changes any of Kalem's settings; the user is asked first. Give each change's key (from settings_find) and its new value: one of the values settings_find lists, or for a structured setting (a list, a table) its whole new value as JSON (read it first with settings_get). Settings that change what the assistant may do are asked about every time.",
 			parameters: {
 				type: "object",
 				properties: {
@@ -300,17 +351,14 @@ const SETTING_TOOLS: readonly KalemTool[] = [
 					unknown
 				>;
 				const key = change.key;
-				if (!isSettingKey(key) || SETTINGS_SCHEMA[key].assistant === "hidden") {
+				if (!isSettingKey(key)) {
 					problems.push(`${String(key)}: no such setting (find it with settings_find)`);
 					continue;
 				}
 				const def: SettingDef = SETTINGS_SCHEMA[key];
-				if (def.assistant !== "write") {
-					problems.push(`${key}: you may not change it`);
-					continue;
-				}
-				if (def.type === "custom") {
-					problems.push(`${key}: change it with pane_move`);
+				const own = OWN_TOOL[key];
+				if (own !== undefined) {
+					problems.push(`${key}: change it with ${own}`);
 					continue;
 				}
 				const meant = intended(ctx, def, change.value);
@@ -320,27 +368,34 @@ const SETTING_TOOLS: readonly KalemTool[] = [
 					);
 					continue;
 				}
-				const value = parseSetting(key, meant.value);
+				const value = def.type === "custom" ? meant.value : parseSetting(key, meant.value);
 				const now = ctx.settings()[key];
-				if (value === now) continue;
-				const permission = `settings:${def.category}`;
+				if (value === now || (def.type === "custom" && jsonLine(value) === jsonLine(now))) continue;
+				// Each sensitive setting on a card of its own, asked every time.
+				const permission = SENSITIVE_SETTINGS.has(key)
+					? `settings:sensitive:${key}`
+					: `settings:${def.category}`;
 				const group = groups.get(permission) ?? { patch: {}, lines: [] };
 				group.patch[key] = value;
 				const label = def.label === null ? key : ctx.t[def.label];
 				group.lines.push(
-					`${label}: ${valueLabel(ctx.t, def, now)} → ${valueLabel(ctx.t, def, value)}`,
+					def.type === "custom"
+						? `${label}: ${jsonLine(now)} → ${jsonLine(value)}`
+						: `${label}: ${valueLabel(ctx.t, def, now)} → ${valueLabel(ctx.t, def, value)}`,
 				);
 				groups.set(permission, group);
 			}
 			const done: string[] = [];
 			const refused: string[] = [];
 			for (const [permission, group] of groups) {
+				const sensitive = permission.startsWith("settings:sensitive:");
 				const answer = await ctx.approve({
 					tool: "settings_set",
 					risk: "ui",
 					permission,
 					title: ctx.t.approvalSettings,
-					lines: group.lines,
+					lines: sensitive ? [...group.lines, ctx.t.approvalSettingSensitive] : group.lines,
+					...(sensitive ? { mustAsk: true } : {}),
 					...(text(input, "reason") === "" ? {} : { reason: text(input, "reason").slice(0, 300) }),
 				});
 				if (!answer.approved) {

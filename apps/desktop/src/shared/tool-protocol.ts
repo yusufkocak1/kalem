@@ -15,8 +15,22 @@ import { parseFormValues } from "./tool-form.js";
  *   allowed that kind of change for the session or always.
  * - `document`: the open document; asked with what changes, can be undone.
  * - `external`: Jira or Confluence, on the server; asked every time.
+ * - `command`: runs a command on this computer; asked every time.
  */
-export type ToolRisk = "read" | "ui" | "document" | "external";
+export type ToolRisk = "read" | "ui" | "document" | "external" | "command";
+
+/**
+ * How much the assistant may do without asking, whatever each change's way:
+ * - `ask`: each change is asked about as its risk says;
+ * - `edits`: changes to code and documents (the workspace's files, the open
+ *   document) are made at once;
+ * - `all`: everything is, commands in a terminal included. A form to fill
+ *   in, a tool the user set to be asked about and adding an MCP server are
+ *   still asked.
+ */
+export type ApprovalMode = "ask" | "edits" | "all";
+
+export const APPROVAL_MODES: readonly ApprovalMode[] = ["ask", "edits", "all"];
 
 /**
  * What the user set for one tool in Settings:
@@ -124,9 +138,14 @@ export function parseApprovalAnswer(raw: unknown): ApprovalAnswer {
 	};
 }
 
-/** The scopes a kind of change may be allowed for: anything online is asked every time. */
+/** The scopes a kind of change may be allowed for: anything online, and a command, is asked every time. */
 export function scopesFor(risk: Exclude<ToolRisk, "read">): ApprovalScope[] {
-	return risk === "external" ? ["once"] : ["once", "session", "always"];
+	return risk === "external" || risk === "command" ? ["once"] : ["once", "session", "always"];
+}
+
+/** Whether the approval mode lets a change of this risk run without asking. */
+export function approvedByMode(mode: ApprovalMode, risk: Exclude<ToolRisk, "read">): boolean {
+	return mode === "all" || (mode === "edits" && risk === "document");
 }
 
 // --- Calls written in a block ------------------------------------------------------

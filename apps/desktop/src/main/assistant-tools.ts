@@ -27,6 +27,14 @@ import type { PermissionGate } from "./assistant-permissions.js";
 import type { ConfluenceClient } from "./confluence-client.js";
 import type { JiraClient } from "./jira-client.js";
 import type { TemplateStore } from "./templates.js";
+import {
+	COMMAND_TOOL,
+	commandLine,
+	commandReport,
+	DEFAULT_COMMAND_SECONDS,
+	MAX_COMMAND_SECONDS,
+	runCommand,
+} from "./workspace-command.js";
 import type { ToolStep, Workspace } from "./workspace-tools.js";
 import { EDIT_TOOL, WORKSPACE_TOOLS } from "./workspace-tools.js";
 
@@ -130,6 +138,41 @@ const LOOKUP_TOOLS: readonly KalemTool[] = [
 			run: (input, ctx) => (ctx.workspace as Workspace).run(definition.name, input, ctx.step),
 		}),
 	),
+	{
+		definition: COMMAND_TOOL,
+		// Runs on this computer: asked every time, unless the user lets everything run.
+		risk: "command",
+		available: (ctx) => ctx.workspace !== null,
+		run: async (input, ctx) => {
+			const command = commandLine(input.command);
+			if (command === "") return "Give a command.";
+			const given = typeof input.folder === "string" ? input.folder : "";
+			const folder = (ctx.workspace as Workspace).folderFor(given);
+			if (folder === null) return `"${given}" is not a folder of the workspace.`;
+			const seconds =
+				typeof input.timeout_seconds === "number" && Number.isFinite(input.timeout_seconds)
+					? Math.min(Math.max(Math.round(input.timeout_seconds), 1), MAX_COMMAND_SECONDS)
+					: DEFAULT_COMMAND_SECONDS;
+			const reason = typeof input.reason === "string" ? input.reason.trim().slice(0, 300) : "";
+			const answer = await ctx.approve({
+				tool: COMMAND_TOOL.name,
+				risk: "command",
+				permission: "command",
+				title: ctx.t.approvalRunCommand,
+				lines: [folder],
+				preview: command,
+				...(reason === "" ? {} : { reason }),
+			});
+			if (!answer.approved) {
+				return "The user did not allow it: the command was not run. Do not try again unless they ask.";
+			}
+			ctx.step({
+				tool: COMMAND_TOOL.name,
+				detail: command.length > 120 ? `${command.slice(0, 120)}…` : command,
+			});
+			return commandReport(command, await runCommand(command, folder, seconds), seconds);
+		},
+	},
 	...CONFLUENCE_TOOLS.map(
 		(definition): KalemTool => ({
 			definition,

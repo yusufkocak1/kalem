@@ -226,6 +226,11 @@ const assistant = createAssistantPane({
 	previews,
 	shareDocument: () => settings.assistantDocument,
 	setShareDocument: (share) => updateSettings({ assistantDocument: share }),
+	// Empty until the first tab is open.
+	documentName: () =>
+		(session as Session | undefined) === undefined
+			? ""
+			: (session.path?.split(/[\\/]/).pop() ?? session.name),
 	width: () => settings.assistantWidth,
 	setWidth: (width) => updateSettings({ assistantWidth: width }),
 	place: () => settings.assistantPlace,
@@ -261,6 +266,8 @@ const assistant = createAssistantPane({
 	modes: () => settings.assistantModes,
 	customModes: () => settings.assistantCustomModes,
 	openModeSettings: () => void settingsDialog.show("modes"),
+	approvalMode: () => settings.assistantApprovals,
+	setApprovalMode: (mode) => updateSettings({ assistantApprovals: mode }),
 });
 
 // Always at the right edge, so the assistant is never hard to find.
@@ -1059,6 +1066,7 @@ function applySettings(): void {
 	assistant.element.hidden = !settings.assistant;
 	assistantToggle.setAttribute("aria-expanded", String(settings.assistant));
 	if (settings.assistant) assistant.show();
+	assistant.settingsChanged();
 	docks.apply();
 	zoomSlider.value = String(settings.zoom);
 	zoomValue.textContent = `${settings.zoom}%`;

@@ -172,6 +172,9 @@ export function approvalCard(
 	if (request.risk === "external") {
 		children.push(el("p", { class: "assistant-approval-note", text: t.approvalOnline }));
 	}
+	if (request.risk === "command") {
+		children.push(el("p", { class: "assistant-approval-note", text: t.approvalCommandNote }));
+	}
 	if (request.afterExternal === true) {
 		children.push(el("p", { class: "assistant-approval-warning", text: t.approvalAfterExternal }));
 	}

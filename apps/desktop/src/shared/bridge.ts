@@ -36,7 +36,13 @@ import type { PanePlaces, ToolPane } from "./panes.js";
 import { DEFAULT_PANE_PLACES } from "./panes.js";
 import type { AssistantConfig, AssistantUpdate, ChatMessage, ProviderId } from "./providers.js";
 import type { TemplateInfo } from "./templates.js";
-import type { ApprovalAnswer, ApprovalRequest, ToolPolicy, ToolRisk } from "./tool-protocol.js";
+import type {
+	ApprovalAnswer,
+	ApprovalMode,
+	ApprovalRequest,
+	ToolPolicy,
+	ToolRisk,
+} from "./tool-protocol.js";
 export type Theme = "system" | "light" | "dark";
 
 export const PAGE_SIZES = ["A4", "A3", "A5", "Letter", "Legal"] as const;
@@ -136,6 +142,8 @@ export interface Settings {
 	readonly assistantPermissions: readonly string[];
 	/** What the user set for each of Kalem's tools: asked every time, run without asking, or off. */
 	readonly assistantToolPolicies: Readonly<Record<string, ToolPolicy>>;
+	/** How much the assistant does without asking: nothing, code changes, or everything (commands too). */
+	readonly assistantApprovals: ApprovalMode;
 	/** How Copilot reaches Kalem's tools: through MCP, in blocks, or whichever works. */
 	readonly copilotTools: CopilotTools;
 	/** The document template new documents start from and reviews check against; empty for the built-in one. */
@@ -200,6 +208,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	navigationWidth: 248,
 	assistantPermissions: [],
 	assistantToolPolicies: {},
+	assistantApprovals: "ask",
 	copilotTools: "auto",
 	defaultTemplate: "",
 	assistantModes: {},
