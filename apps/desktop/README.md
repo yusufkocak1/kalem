@@ -175,9 +175,12 @@ verir.
     aranabilir listede; yalnızca uzakta olan dal seçilince onu izleyen yerel
     dal açılır), **Yeni Dal…** ve **Değişiklikleri Commit Et…** var.
     Dal adına tıklamak da dal değiştirir. Aynı işlemler dosyaların sağ tık
-    menüsünde de bulunur; birden çok klasör açıkken her deponun dalı kendi
-    başlığında görünür. Git deposu olmayan klasör, sağ tık menüsündeki
-    **Git Deposu Yap** ile depo yapılır.
+    menüsünde de bulunur. Birden çok klasör açıkken her deponun dalı kendi
+    başlığında görünür; dal adına tıklamak o deponun menüsünü açar (dal
+    değiştir, çek, gönder, commit…). Henüz güvenilmemiş bir depoda başlıkta
+    **Güven…** düğmesi, sağ tık menüsünde **Bu Depoya Güven…** çıkar. Git
+    deposu olmayan klasör, sağ tık menüsündeki **Git Deposu Yap** ile depo
+    yapılır.
   - **Değişen dosyalar ağaçta görünür:** değişen dosyanın adı renklenir ve
     yanında bir harf çıkar (**M** değişti, **A** eklendi, **D** silindi,
     **R** yeniden adlandırıldı, **U** yeni/izlenmiyor, **!** çakışma);

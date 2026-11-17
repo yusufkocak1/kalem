@@ -235,3 +235,53 @@ test("lets the assistant write the commit message from the chosen files' changes
 	expect(errors).toEqual([]);
 	await app.close();
 });
+
+test("with two folders open, each repository is trusted and switched from its heading", async () => {
+	const base = await tempDir("git-two");
+	const repos = ["one", "two"].map((name) => {
+		git(base, "init", "--initial-branch=main", name);
+		const work = join(base, name);
+		return work;
+	});
+	for (const work of repos) {
+		await writeFile(join(work, "notes.md"), "# Notes\n");
+		git(work, "add", "--all");
+		git(work, "commit", "-m", "First");
+		git(work, "branch", "draft");
+	}
+
+	const { app, page, errors } = await launch({ env: IDENTITY });
+	await app.evaluate(({ dialog }, folders) => {
+		dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: folders })) as never;
+		// "Trust" in every question.
+		dialog.showMessageBox = (async () => ({ response: 0, checkboxChecked: false })) as never;
+	}, repos);
+	await clickMenu(app, "File", "Open Folder…");
+	const heading = (name: string) => page.locator(".files-root-name", { hasText: name });
+	const chip = (name: string) => heading(name).locator(".files-root-branch");
+
+	// Not trusted yet: each heading asks for it, and the right-click menu offers it too.
+	await expect(chip("one")).toHaveText("Trust…");
+	await expect(chip("two")).toHaveText("Trust…");
+	await heading("two").click({ button: "right" });
+	await expect(page.locator(".files-menu-item", { hasText: "Make a Git Repository" })).toHaveCount(
+		0,
+	);
+	await page.locator(".files-menu-item", { hasText: "Trust This Repository…" }).click();
+	await expect(chip("two")).toHaveText("main");
+	await chip("one").click();
+	await expect(chip("one")).toHaveText("main");
+
+	// The branch on a heading opens that repository's menu; switching changes only it.
+	await chip("one").click();
+	await page.locator(".files-menu-item", { hasText: "Switch Branch…" }).click();
+	await page.locator(".git-branches[open] .quick-open-input").fill("draft");
+	await page.keyboard.press("Enter");
+	await expect(chip("one")).toHaveText("draft");
+	await expect(chip("two")).toHaveText("main");
+	expect(git(repos[0] ?? "", "branch", "--show-current")).toBe("draft");
+	await page.screenshot({ path: "test-results/git-two-folders.png" });
+
+	expect(errors).toEqual([]);
+	await app.close();
+});
