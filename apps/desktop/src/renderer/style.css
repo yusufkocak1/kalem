@@ -1688,6 +1688,26 @@ button {
 	font-size: 12px;
 }
 
+.assistant-approvals {
+	max-width: 45%;
+	min-width: 0;
+	padding: 2px 4px;
+	overflow: hidden;
+	border: 1px solid var(--app-border);
+	border-radius: 5px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 12px;
+	text-overflow: ellipsis;
+}
+
+/* Everything runs unasked: the picker says so at a glance. */
+.assistant-approvals[data-approvals="all"] {
+	border-color: var(--app-warning);
+	background: var(--app-warning-bg);
+}
+
 .assistant-model[hidden],
 .assistant-recent[hidden] {
 	display: none;

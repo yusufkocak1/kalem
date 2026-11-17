@@ -1297,7 +1297,7 @@ test("applies all of a reply's changes at once, or writes them unasked as the ap
 		await writeFile(join(code, "b.txt"), "b\n");
 	};
 	await reset();
-	const { app, page, errors } = await launch({
+	const { app, page, userData, errors } = await launch({
 		settings: { assistant: true },
 		env: {
 			KALEM_CLAUDE: join(folder, "nothing-here"),
@@ -1340,14 +1340,17 @@ test("applies all of a reply's changes at once, or writes them unasked as the ap
 	expect(await readFile(join(code, "a.txt"), "utf8")).toBe("A\n");
 	expect(await readFile(join(code, "b.txt"), "utf8")).toBe("B\n");
 
-	// Code changes approved automatically: each is written as it comes, the next one finds it.
+	// Code changes approved automatically, picked in the panel: each is written as it comes.
 	await reset();
-	await app.evaluate(async ({ BrowserWindow }) => {
-		const win = BrowserWindow.getAllWindows()[0];
-		await win?.webContents.executeJavaScript(
-			"window.kalem.updateSettings({ assistantApprovals: 'edits' })",
-		);
-	});
+	const approvals = pane.getByRole("combobox", { name: "What the assistant does without asking" });
+	await expect(approvals).toHaveValue("ask");
+	await approvals.selectOption("edits");
+	await expect
+		.poll(async () => {
+			const kept = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
+			return kept.settings.assistantApprovals;
+		})
+		.toBe("edits");
 	await input.fill("Yine büyüt");
 	await input.press("Enter");
 	await expect(reply.locator(".assistant-markdown")).toHaveText("Main sınıfı boş.");
@@ -1417,13 +1420,11 @@ test("runs a command in the workspace once allowed, and unasked when approvals a
 	await expect(reply.locator(".assistant-markdown")).toHaveText("Main sınıfı boş.");
 	expect(await readFile(join(code, "ran.txt"), "utf8")).toBe("x");
 
-	// Approvals bypassed: it runs without a card.
-	await app.evaluate(async ({ BrowserWindow }) => {
-		const win = BrowserWindow.getAllWindows()[0];
-		await win?.webContents.executeJavaScript(
-			"window.kalem.updateSettings({ assistantApprovals: 'all' })",
-		);
-	});
+	// Approvals bypassed in the panel: it runs without a card, and the picker shows it.
+	const approvals = pane.getByRole("combobox", { name: "What the assistant does without asking" });
+	await approvals.selectOption("all");
+	await expect(approvals).toHaveAttribute("data-approvals", "all");
+	await page.screenshot({ path: "test-results/assistant-approvals.png" });
 	await input.fill("Yine çalıştır");
 	await input.press("Enter");
 	await expect(reply.locator(".assistant-markdown")).toHaveText("Main sınıfı boş.");

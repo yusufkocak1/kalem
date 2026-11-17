@@ -55,8 +55,8 @@ import { isCli, PROVIDER_INFO, providerLabel, SUGGESTED_MODELS } from "../shared
 import type { SlashEntry } from "../shared/slash.js";
 import { findSlash, matchSlash, slashQuery } from "../shared/slash.js";
 import type { TemplateInfo } from "../shared/templates.js";
-import type { ApprovalRequest } from "../shared/tool-protocol.js";
-import { withoutToolCalls } from "../shared/tool-protocol.js";
+import type { ApprovalMode, ApprovalRequest } from "../shared/tool-protocol.js";
+import { APPROVAL_MODES, withoutToolCalls } from "../shared/tool-protocol.js";
 import type { ApprovalState, ChecksView, MadeChange, Usage } from "./assistant-agent.js";
 import {
 	approvalCard,
@@ -136,6 +136,9 @@ export interface AssistantHost {
 	customModes(): readonly CustomMode[];
 	/** Opens Settings on the assistant's modes. */
 	openModeSettings(): void;
+	/** How much the assistant does without asking, and setting it (kept in the settings). */
+	approvalMode(): ApprovalMode;
+	setApprovalMode(mode: ApprovalMode): void;
 }
 
 export interface AssistantPane {
@@ -149,6 +152,8 @@ export interface AssistantPane {
 	workspaceChanged(): void;
 	/** The service was set in the Settings window; `changed` when it is another service. */
 	configured(status: AssistantStatus, changed: boolean): void;
+	/** The settings changed (here or in the Settings window): the approval picker follows. */
+	settingsChanged(): void;
 }
 
 interface Message {
@@ -1012,6 +1017,34 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		}
 	}
 	drawModeButton();
+	/** How much runs without asking, at hand next to the mode: what Settings → Assistant keeps. */
+	const approvalLabels: Record<ApprovalMode, [short: string, full: string]> = {
+		ask: [t.approvalsAskShort, t.approvalsAsk],
+		edits: [t.approvalsEditsShort, t.approvalsEdits],
+		all: [t.approvalsAllShort, t.approvalsAll],
+	};
+	const approvalSelect = el("select", {
+		class: "assistant-approvals",
+		attrs: { "aria-label": t.settingsAssistantApprovals },
+		children: APPROVAL_MODES.map((each) =>
+			el("option", {
+				text: approvalLabels[each][0],
+				attrs: { value: each, title: approvalLabels[each][1] },
+			}),
+		),
+	});
+	function drawApprovals(): void {
+		const current = host.approvalMode();
+		approvalSelect.value = current;
+		approvalSelect.dataset.approvals = current;
+		approvalSelect.title = `${t.settingsAssistantApprovals}: ${approvalLabels[current][1]}`;
+	}
+	approvalSelect.addEventListener("change", () => {
+		const picked = approvalSelect.value as ApprovalMode;
+		if (APPROVAL_MODES.includes(picked)) host.setApprovalMode(picked);
+		drawApprovals();
+	});
+	drawApprovals();
 	const MORE_MODELS = "\u0000more";
 	modelSelect.addEventListener("change", async () => {
 		const picked = modelSelect.value;
@@ -1104,6 +1137,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 							}),
 							el("span", { class: "assistant-toolbar-space" }),
 							modePicker,
+							approvalSelect,
 							modelSelect,
 							sendButton,
 						],
@@ -3767,5 +3801,6 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		refreshSelection,
 		workspaceChanged: () => renderSources(),
 		configured,
+		settingsChanged: drawApprovals,
 	};
 }
