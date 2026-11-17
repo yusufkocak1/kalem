@@ -226,7 +226,11 @@ const assistant = createAssistantPane({
 	previews,
 	shareDocument: () => settings.assistantDocument,
 	setShareDocument: (share) => updateSettings({ assistantDocument: share }),
-	documentName: () => session.path?.split(/[\\/]/).pop() ?? session.name,
+	// Empty until the first tab is open.
+	documentName: () =>
+		(session as Session | undefined) === undefined
+			? ""
+			: (session.path?.split(/[\\/]/).pop() ?? session.name),
 	width: () => settings.assistantWidth,
 	setWidth: (width) => updateSettings({ assistantWidth: width }),
 	place: () => settings.assistantPlace,

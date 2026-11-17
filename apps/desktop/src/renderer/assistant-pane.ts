@@ -754,9 +754,12 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 	/** What the document chip last showed: drawn again only when it changes. */
 	let documentShown = "";
+	/** A document is open: the app tells the panel so first through `refreshSelection`. */
+	let documentOpen = false;
 	function documentChip(): HTMLElement[] {
-		if (!host.shareDocument()) return [];
+		if (!documentOpen || !host.shareDocument()) return [];
 		const name = host.documentName();
+		if (name === "") return [];
 		const remove = el("button", {
 			class: "assistant-chip-close",
 			attrs: {
@@ -782,7 +785,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 	/** Draws the chips again when the shared document changed (another tab, sharing turned off). */
 	function refreshDocumentChip(): void {
-		const now = host.shareDocument() ? host.documentName() : "";
+		const now = documentOpen && host.shareDocument() ? host.documentName() : "";
 		if (now !== documentShown) renderSources();
 	}
 
@@ -2132,6 +2135,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 	function refreshSelection(): void {
 		// Called on a tab switch too: the document chip follows the active document.
+		documentOpen = true;
 		refreshDocumentChip();
 		const selection = host.selection().trim();
 		if (droppedSelection !== null && droppedSelection.trim() !== selection) droppedSelection = null;
