@@ -1093,7 +1093,12 @@ test("adds files and folders to a chat, and Claude may read the folders", async 
 	await pick([notes]);
 	await add.click();
 	await pane.getByRole("menuitem", { name: "Files…" }).click();
-	await expect(pane.locator(".assistant-source")).toHaveText(["proje", "gereksinimler.txt"]);
+	// The shared document leads the chips; the files and folders added follow it.
+	await expect(pane.locator(".assistant-source")).toHaveText([
+		"Untitled",
+		"proje",
+		"gereksinimler.txt",
+	]);
 
 	const input = pane.locator(".assistant-input");
 	await input.fill("Analiz dokümanını yaz");

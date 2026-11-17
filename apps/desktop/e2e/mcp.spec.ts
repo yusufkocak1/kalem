@@ -278,7 +278,10 @@ test("Serena works on the folder of each question: one added to it, else the Fil
 	await pane.getByRole("button", { name: "Add files or folders to the chat" }).click();
 	await pane.getByRole("menuitem", { name: "Folder…" }).click();
 	// The Files pane's folder goes with every question; this one was added for it.
-	await expect(pane.locator(".assistant-source")).toHaveText(["project", "other-repo"]);
+	await expect(pane.locator(".assistant-source:not(.assistant-source-document)")).toHaveText([
+		"project",
+		"other-repo",
+	]);
 	await shot(pane, "06-folder-added-to-question");
 	await ask(page, "code", "Bu depoda login nerede?", "Tamam.");
 
