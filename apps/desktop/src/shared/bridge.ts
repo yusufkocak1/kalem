@@ -357,6 +357,9 @@ export interface ConfluenceTreePage {
 	readonly hasChildren: boolean | null;
 }
 
+/** Where a moved page goes: under the target as its last child, or just before or after it. */
+export type ConfluenceMovePosition = "append" | "before" | "after";
+
 /** Where a level of the page tree hangs: a space's top-level pages or a page's children. */
 export type ConfluenceTreeParent =
 	| { readonly space: string; readonly page?: undefined }
@@ -853,6 +856,15 @@ export interface KalemBridge {
 	confluenceTree(parent: ConfluenceTreeParent): Promise<readonly ConfluenceTreePage[]>;
 	/** Creates an empty page (under `parent`, or at the top of the space) and opens it in a tab. */
 	confluenceCreatePage(request: ConfluenceNewPage): Promise<ConfluenceTreePage>;
+	/**
+	 * Moves a page, with its children, relative to `target`: a page id or a
+	 * page's address on the connected site.
+	 */
+	confluenceMovePage(
+		pageId: string,
+		target: string,
+		position: ConfluenceMovePosition,
+	): Promise<void>;
 	/** Publishes the tab's document as a new page, with its local files attached. */
 	confluencePublish(tabId: string, request: ConfluencePublishRequest): Promise<ConfluencePublished>;
 	/** Recently changed pages, filtered by title and space when given. */
@@ -1156,6 +1168,7 @@ export const CHANNEL = {
 	confluenceSpaces: "kalem:confluence-spaces",
 	confluenceTree: "kalem:confluence-tree",
 	confluenceCreatePage: "kalem:confluence-create-page",
+	confluenceMovePage: "kalem:confluence-move-page",
 	confluencePublish: "kalem:confluence-publish",
 	confluenceSearch: "kalem:confluence-search",
 	confluenceFind: "kalem:confluence-find",

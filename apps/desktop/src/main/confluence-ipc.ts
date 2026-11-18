@@ -30,7 +30,7 @@ import {
 	opensDirectly,
 } from "./confluence-attachments.js";
 import type { ConfluenceCredentials, Fetch } from "./confluence-client.js";
-import { ConfluenceClient, ConfluenceError } from "./confluence-client.js";
+import { ConfluenceClient, ConfluenceError, pageReference } from "./confluence-client.js";
 import type { ConfluenceStore } from "./confluence-store.js";
 import { checkDiagramBytes, checkDiagramData, diagramFileName } from "./diagram-files.js";
 import type { DraftStore } from "./drafts.js";
@@ -173,6 +173,23 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 		windows.openConfluencePage(await client.page(id), win);
 		return { id, title, hasChildren: false };
 	});
+
+	ipcMain.handle(
+		CHANNEL.confluenceMovePage,
+		async (_event, pageId: unknown, target: unknown, position: unknown) => {
+			const client = await connected();
+			const reference = pageReference(text(target, "target"));
+			if (reference?.kind !== "id") throw new Error("Not a page id or address");
+			// The same id on another site is another page.
+			if (reference.host !== undefined && reference.host !== new URL(client.site).hostname) {
+				throw new Error("The page is on another site");
+			}
+			if (position !== "append" && position !== "before" && position !== "after") {
+				throw new Error("Invalid position");
+			}
+			await client.move(text(pageId, "page id"), position, reference.id);
+		},
+	);
 
 	/**
 	 * A local document as a new page: the page is made where the user chose,

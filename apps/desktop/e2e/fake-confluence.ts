@@ -23,6 +23,8 @@ export async function fakeConfluence() {
 	];
 	/** How page 41's children fail: the heavy request only, or every way of asking. */
 	const failing = { children: "none" as "none" | "expand" | "all" };
+	/** Pages moved through the API: which, where, next to which. */
+	const moves: { id: string; position: string; target: string }[] = [];
 	/** Pages made through the API, under page 41. */
 	const created: {
 		id: string;
@@ -249,6 +251,11 @@ export async function fakeConfluence() {
 			res.writeHead(200, { "Content-Type": attachment.type });
 			return res.end(attachment.bytes);
 		}
+		const move = /^\/rest\/api\/content\/(\d+)\/move\/(\w+)\/(\d+)$/.exec(url.pathname);
+		if (move !== null && req.method === "PUT") {
+			moves.push({ id: move[1] ?? "", position: move[2] ?? "", target: move[3] ?? "" });
+			return json(res, {});
+		}
 		const deleted = attachments.findIndex(
 			(item) => url.pathname === `/rest/api/content/${item.id}`,
 		);
@@ -270,6 +277,7 @@ export async function fakeConfluence() {
 		searches,
 		failing,
 		created,
+		moves,
 		close: () => {
 			server.closeAllConnections();
 			server.close();

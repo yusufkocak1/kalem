@@ -436,6 +436,84 @@ test("adds a child page from the tree and opens it", async () => {
 	await app.close();
 });
 
+test("copies a tree page's id and address from its menu, and moves pages by menu and by dragging", async () => {
+	const confluence = await fakeConfluence();
+	cleanup.push(confluence.close);
+	const { app, page, errors } = await launch();
+
+	const pane = page.locator(".confluence-pane");
+	await clickMenu(app, "File", "Open from Confluence…");
+	const dialog = page.locator(".confluence-dialog");
+	await dialog.locator('input[type="url"]').fill(confluence.site);
+	await dialog.locator('input[type="password"]').fill(TOKEN);
+	await dialog.getByRole("button", { name: "Connect" }).click();
+	await expect(dialog.locator(".quick-open-item")).toHaveCount(1);
+	await page.keyboard.press("Escape");
+	await showPane(page, "confluence");
+	await pane.locator("select").selectOption("DEV");
+
+	// A second child of page 41, to move around.
+	const root = pane.locator('[data-page="41"]');
+	await root.hover();
+	await root.getByRole("button", { name: "Add child page" }).click();
+	const title = pane.getByRole("textbox", { name: "Page title" });
+	await title.fill("Notlar");
+	await title.press("Enter");
+	const sprint = pane.locator('[data-page="42"]');
+	const notes = pane.locator('[data-page="43"]');
+	await expect(notes).toContainText("Notlar");
+
+	const menu = pane.locator(".confluence-popup");
+	const clipboard = () => app.evaluate(({ clipboard }) => clipboard.readText());
+	await sprint.locator(".confluence-row-main").click({ button: "right" });
+	await menu.getByRole("menuitem", { name: "Copy page ID" }).click();
+	await expect.poll(clipboard).toBe("42");
+	await sprint.locator(".confluence-row-main").click({ button: "right" });
+	await menu.getByRole("menuitem", { name: "Copy page URL" }).click();
+	await expect.poll(clipboard).toBe(`${confluence.site}/pages/viewpage.action?pageId=42`);
+
+	// Move…: a page id or address typed in, the page goes under it.
+	await notes.locator(".confluence-row-main").click({ button: "right" });
+	await menu.getByRole("menuitem", { name: "Move…" }).click();
+	const target = menu.getByRole("textbox", { name: "Target page ID or URL, then Enter" });
+	await target.fill(`${confluence.site}/pages/viewpage.action?pageId=42`);
+	await target.press("Enter");
+	await expect
+		.poll(() => confluence.moves)
+		.toEqual([{ id: "43", position: "append", target: "42" }]);
+
+	// Cut, then placed from the menu of another page.
+	await notes.locator(".confluence-row-main").click({ button: "right" });
+	await menu.getByRole("menuitem", { name: "Cut (to move it under another page)" }).click();
+	await expect(notes).toHaveClass(/cut/);
+	await sprint.locator(".confluence-row-main").click({ button: "right" });
+	await menu.getByRole("menuitem", { name: "Move “Notlar” before this page" }).click();
+	await expect
+		.poll(() => confluence.moves.at(-1))
+		.toEqual({
+			id: "43",
+			position: "before",
+			target: "42",
+		});
+	await expect(notes).not.toHaveClass(/cut/);
+
+	// Dragged onto the middle of a row: under it, once the user agrees.
+	page.once("dialog", (asked) => void asked.accept());
+	await notes.dragTo(sprint);
+	await expect
+		.poll(() => confluence.moves.at(-1))
+		.toEqual({
+			id: "43",
+			position: "append",
+			target: "42",
+		});
+	// A page is not dropped on itself or below itself.
+	await root.dragTo(sprint);
+	expect(confluence.moves).toHaveLength(3);
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
 test("saves an edit without rewriting the parts that were not edited", async () => {
 	const confluence = await fakeConfluence();
 	cleanup.push(confluence.close);

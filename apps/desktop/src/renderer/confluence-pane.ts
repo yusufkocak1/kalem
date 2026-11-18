@@ -1,6 +1,7 @@
 import type {
 	ConfluenceAccount,
 	ConfluenceFavorite,
+	ConfluenceMovePosition,
 	ConfluenceSpace,
 	ConfluenceTreePage,
 	ConfluenceTreeParent,
@@ -15,6 +16,7 @@ import type {
 	TextPart,
 } from "../shared/confluence-search.js";
 import { DEFAULT_SEARCH, hasCriteria, markWords } from "../shared/confluence-search.js";
+import { pageAddress } from "../shared/confluence-tool.js";
 import {
 	favoriteSections,
 	groupName,
@@ -490,7 +492,15 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 			readonly run: () => void;
 			readonly checked?: boolean;
 		}[],
-		input?: { readonly placeholder: string; readonly value: string; submit(name: string): void },
+		input?: {
+			readonly placeholder: string;
+			readonly value: string;
+			/** What the box says, cleaned; `null` keeps the box open. Group names by default. */
+			readonly check?: (text: string) => string | null;
+			submit(name: string): void;
+		},
+		/** Where the pointer was, for a menu opened with a right click. */
+		at?: { readonly x: number; readonly y: number },
 	): void {
 		popupReturn = anchor;
 		const children: HTMLElement[] = items.map((item) => {
@@ -516,7 +526,7 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 				event.stopPropagation();
 				if (event.key === "Enter") {
 					event.preventDefault();
-					const name = groupName(field.value);
+					const name = (input.check ?? groupName)(field.value);
 					if (name === null) return;
 					closePopup();
 					input.submit(name);
@@ -532,8 +542,10 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 		popup.hidden = false;
 		const where = anchor.getBoundingClientRect();
 		const size = popup.getBoundingClientRect();
-		popup.style.left = `${Math.max(4, Math.min(where.left, window.innerWidth - size.width - 4))}px`;
-		popup.style.top = `${Math.max(4, Math.min(where.bottom + 2, window.innerHeight - size.height - 4))}px`;
+		const left = at?.x ?? where.left;
+		const top = at?.y ?? where.bottom + 2;
+		popup.style.left = `${Math.max(4, Math.min(left, window.innerWidth - size.width - 4))}px`;
+		popup.style.top = `${Math.max(4, Math.min(top, window.innerHeight - size.height - 4))}px`;
 		if (box !== null) {
 			box.focus();
 			box.select();
@@ -799,6 +811,23 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 		if (group !== undefined) {
 			item.classList.add("confluence-group");
 			dropTarget(item, group);
+		}
+		const spaceKey = row.add?.space;
+		if (page !== null) {
+			const self = { id: page, title: row.title };
+			if (cut?.id === page) item.classList.add("cut");
+			item.addEventListener("contextmenu", (event) => {
+				event.preventDefault();
+				pageMenu(main, self, row.add, { x: event.clientX, y: event.clientY });
+			});
+			// Pages of the tree are moved by dragging them onto another page.
+			if (row.key.startsWith("p:")) treeDrag(item, self);
+		} else if (group === undefined && spaceKey !== undefined) {
+			item.addEventListener("contextmenu", (event) => {
+				event.preventDefault();
+				spaceMenu(main, spaceKey, row.title, { x: event.clientX, y: event.clientY });
+			});
+			spaceDrop(item, spaceKey, row.title);
 		}
 		if (row.branch !== null) item.dataset.branch = row.branch;
 		item.style.setProperty("--depth", String(row.depth));
@@ -1200,6 +1229,25 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 			case "End":
 				focusRow(rows.at(-1));
 				break;
+			case "ContextMenu":
+			case "F10": {
+				if (event.key === "F10" && !event.shiftKey) return;
+				// The row's menu, from the keyboard.
+				const box = target.getBoundingClientRect();
+				item?.dispatchEvent(
+					new MouseEvent("contextmenu", {
+						bubbles: true,
+						cancelable: true,
+						clientX: box.left + 24,
+						clientY: box.bottom,
+					}),
+				);
+				break;
+			}
+			case "Escape":
+				if (cut === null) return;
+				cancelCut();
+				break;
 			case "ArrowRight":
 				if (branch !== undefined && !open) toggle(branch);
 				else if (branch !== undefined) focusRow(rows[at + 1]);
@@ -1224,6 +1272,295 @@ export function createConfluencePane(options: ConfluencePaneOptions): Confluence
 		}
 		event.preventDefault();
 	});
+
+	// --- Page menu, copying and moving -------------------------------------------
+
+	/** A page cut from the menu, to be moved where the user picks next. */
+	let cut: { readonly id: string; readonly title: string } | null = null;
+	/** The tree page being dragged; the drag's data cannot be read until the drop. */
+	let dragging: { readonly id: string; readonly title: string } | null = null;
+	/** What a tree page carries while it is dragged. */
+	const PAGE_DRAGGED = "application/x-kalem-confluence-page";
+
+	const address = (id: string): string => (account === null ? id : pageAddress(account.site, id));
+
+	function copy(text: string): void {
+		navigator.clipboard.writeText(text).then(
+			() => showMessage(format(t.confluenceCopied, text)),
+			(error: unknown) => showMessage(errorText(error)),
+		);
+	}
+
+	/** Which page each listed page hangs under, from the levels listed so far. */
+	function parents(): Map<string, string> {
+		const above = new Map<string, string>();
+		for (const [key, level] of levels) {
+			if (!key.startsWith("p:") || level.status !== "done") continue;
+			for (const page of level.pages) above.set(page.id, key.slice(2));
+		}
+		return above;
+	}
+
+	/** Whether `id` is `ancestor` or somewhere below it, as far as the tree knows. */
+	function within(id: string, ancestor: string): boolean {
+		const above = parents();
+		const seen = new Set<string>();
+		for (let at: string | undefined = id; at !== undefined && !seen.has(at); at = above.get(at)) {
+			if (at === ancestor) return true;
+			seen.add(at);
+		}
+		return false;
+	}
+
+	/** The listed level a page is in. */
+	function levelOf(id: string): string | null {
+		for (const [key, level] of levels) {
+			if (level.status === "done" && level.pages.some((page) => page.id === id)) return key;
+		}
+		return null;
+	}
+
+	/** Moves `page` relative to `target` (an id, or an address typed by the user). */
+	async function movePage(
+		page: { readonly id: string; readonly title: string },
+		target: string,
+		position: ConfluenceMovePosition,
+	): Promise<void> {
+		showMessage(format(t.confluenceMoving, page.title));
+		try {
+			await bridge.confluenceMovePage(page.id, target, position);
+		} catch (error) {
+			showMessage(format(t.confluenceMoveFailed, errorText(error)));
+			return;
+		}
+		if (cut?.id === page.id) cut = null;
+		// The level the page left and the one it went to are listed again; a
+		// target typed by the user may be anywhere, so then the whole tree is.
+		const from = levelOf(page.id);
+		const known = /^\d+$/.test(target);
+		const to = !known ? null : position === "append" ? pageLevel(target) : levelOf(target);
+		if (from === null || to === null) levels.clear();
+		else {
+			levels.delete(from);
+			levels.delete(to);
+		}
+		if (known && position === "append") expanded.add(pageLevel(target));
+		showMessage(format(t.confluenceMoved, page.title));
+		render();
+	}
+
+	/** Asks before a dragged page is moved: a drop is easily made by mistake. */
+	function confirmMove(
+		page: { readonly title: string },
+		position: ConfluenceMovePosition,
+		targetTitle: string,
+	): boolean {
+		const where =
+			position === "append"
+				? t.confluenceMoveUnder
+				: position === "before"
+					? t.confluenceMoveBefore
+					: t.confluenceMoveAfter;
+		return window.confirm(format(t.confluenceMoveConfirm, page.title, where, targetTitle));
+	}
+
+	function moveTo(
+		anchor: HTMLElement,
+		page: { readonly id: string; readonly title: string },
+	): void {
+		showPopup(anchor, [], {
+			placeholder: t.confluenceMoveTarget,
+			value: "",
+			check: (text) => (text.trim() === "" ? null : text.trim()),
+			submit: (target) => void movePage(page, target, "append"),
+		});
+	}
+
+	/** The right-click menu of a page: open, copy its id or address, move it. */
+	function pageMenu(
+		anchor: HTMLElement,
+		page: { readonly id: string; readonly title: string },
+		add: { readonly space: string; readonly parent: string | null } | undefined,
+		at: { readonly x: number; readonly y: number },
+	): void {
+		const moving = cut;
+		const canDrop = moving !== null && moving.id !== page.id && !within(page.id, moving.id);
+		showPopup(
+			anchor,
+			[
+				{ label: t.confluenceOpenPage, run: () => void openPage(page.id) },
+				{ label: t.confluenceCopyPageId, run: () => copy(page.id) },
+				{ label: t.confluenceCopyPageUrl, run: () => copy(address(page.id)) },
+				{ label: t.confluenceMovePage, run: () => moveTo(anchor, page) },
+				...(moving?.id === page.id
+					? []
+					: [
+							{
+								label: t.confluenceMoveCut,
+								run: () => {
+									cut = page;
+									render();
+								},
+							},
+						]),
+				...(moving !== null && canDrop
+					? (
+							[
+								["append", t.confluenceMoveHereChild],
+								["before", t.confluenceMoveHereBefore],
+								["after", t.confluenceMoveHereAfter],
+							] as const
+						).map(([position, text]) => ({
+							label: format(text, moving.title),
+							run: () => void movePage(moving, page.id, position),
+						}))
+					: []),
+				...(moving === null ? [] : [{ label: t.confluenceMoveCancel, run: cancelCut }]),
+				...(add === undefined
+					? []
+					: [{ label: t.confluenceAddChild, run: () => startCreate(add.space, add.parent) }]),
+			],
+			undefined,
+			at,
+		);
+	}
+
+	function cancelCut(): void {
+		cut = null;
+		render();
+	}
+
+	/**
+	 * A space's top-level pages end with its last one: a page moved to the
+	 * space goes after it. `null` when they are not listed yet, or there are none.
+	 */
+	function lastRoot(spaceKey: string, moving: string): string | null {
+		const level = levels.get(spaceLevel(spaceKey));
+		if (level?.status !== "done") return null;
+		const last = level.pages.at(-1)?.id;
+		return last === undefined || last === moving ? null : last;
+	}
+
+	/** The menu of a space row: a cut page can be moved to its top level. */
+	function spaceMenu(
+		anchor: HTMLElement,
+		spaceKey: string,
+		name: string,
+		at: { readonly x: number; readonly y: number },
+	): void {
+		const moving = cut;
+		const last = moving === null ? null : lastRoot(spaceKey, moving.id);
+		showPopup(
+			anchor,
+			[
+				{ label: t.confluenceNewPage, run: () => startCreate(spaceKey, null) },
+				...(moving !== null && last !== null
+					? [
+							{
+								label: `${format(t.confluenceMoveHereChild, moving.title)} (${name})`,
+								run: () => void movePage(moving, last, "after"),
+							},
+						]
+					: []),
+				...(moving === null ? [] : [{ label: t.confluenceMoveCancel, run: cancelCut }]),
+			],
+			undefined,
+			at,
+		);
+	}
+
+	function unmark(item: HTMLElement): void {
+		item.classList.remove("drop-target", "drop-before", "drop-after");
+	}
+
+	/** Where on a row a page is dropped: its top edge, its middle, its bottom edge. */
+	function dropZone(item: HTMLElement, y: number): ConfluenceMovePosition {
+		const box = item.getBoundingClientRect();
+		const at = (y - box.top) / Math.max(box.height, 1);
+		return at < 0.25 ? "before" : at > 0.75 ? "after" : "append";
+	}
+
+	let expandTimer: ReturnType<typeof setTimeout> | undefined;
+
+	function treeDrag(
+		item: HTMLElement,
+		page: { readonly id: string; readonly title: string },
+	): void {
+		item.draggable = true;
+		item.addEventListener("dragstart", (event) => {
+			if (event.dataTransfer === null) return;
+			dragging = page;
+			event.dataTransfer.setData(PAGE_DRAGGED, page.id);
+			// Dropped outside the tree, the page is its address.
+			event.dataTransfer.setData("text/plain", address(page.id));
+			event.dataTransfer.effectAllowed = "copyMove";
+		});
+		item.addEventListener("dragend", () => {
+			dragging = null;
+			clearTimeout(expandTimer);
+		});
+		item.addEventListener("dragover", (event) => {
+			const from = dragging;
+			if (from === null || !event.dataTransfer?.types.includes(PAGE_DRAGGED)) return;
+			if (within(page.id, from.id)) return;
+			event.preventDefault();
+			event.dataTransfer.dropEffect = "move";
+			const zone = dropZone(item, event.clientY);
+			if (!item.classList.contains(zone === "append" ? "drop-target" : `drop-${zone}`)) {
+				unmark(item);
+				item.classList.add(zone === "append" ? "drop-target" : `drop-${zone}`);
+				clearTimeout(expandTimer);
+				// Held over a closed branch, the branch opens to drop further down.
+				const branch = item.dataset.branch;
+				if (zone === "append" && branch !== undefined && !expanded.has(branch)) {
+					expandTimer = setTimeout(() => {
+						if (dragging !== null && !expanded.has(branch)) toggle(branch);
+					}, 700);
+				}
+			}
+		});
+		item.addEventListener("dragleave", (event) => {
+			if (item.contains(event.relatedTarget as Node | null)) return;
+			unmark(item);
+			clearTimeout(expandTimer);
+		});
+		item.addEventListener("drop", (event) => {
+			const from = dragging;
+			unmark(item);
+			clearTimeout(expandTimer);
+			if (from === null || !event.dataTransfer?.types.includes(PAGE_DRAGGED)) return;
+			event.preventDefault();
+			dragging = null;
+			if (within(page.id, from.id)) return;
+			const zone = dropZone(item, event.clientY);
+			if (confirmMove(from, zone, page.title)) void movePage(from, page.id, zone);
+		});
+	}
+
+	/** A space row of all spaces: a page dropped on it goes to the space's top level. */
+	function spaceDrop(item: HTMLElement, spaceKey: string, name: string): void {
+		item.addEventListener("dragover", (event) => {
+			const from = dragging;
+			if (from === null || !event.dataTransfer?.types.includes(PAGE_DRAGGED)) return;
+			if (lastRoot(spaceKey, from.id) === null) return;
+			event.preventDefault();
+			event.dataTransfer.dropEffect = "move";
+			item.classList.add("drop-target");
+		});
+		item.addEventListener("dragleave", (event) => {
+			if (!item.contains(event.relatedTarget as Node | null)) unmark(item);
+		});
+		item.addEventListener("drop", (event) => {
+			const from = dragging;
+			unmark(item);
+			if (from === null || !event.dataTransfer?.types.includes(PAGE_DRAGGED)) return;
+			const last = lastRoot(spaceKey, from.id);
+			if (last === null) return;
+			event.preventDefault();
+			dragging = null;
+			if (confirmMove(from, "append", name)) void movePage(from, last, "after");
+		});
+	}
 
 	// --- Pages ---------------------------------------------------------------
 
