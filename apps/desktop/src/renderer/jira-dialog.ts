@@ -76,6 +76,18 @@ export interface JiraDialog {
 /** What the dialog shows; the back button returns to the one before. */
 type IssueTab = "comments" | "development" | "subtasks" | "links";
 
+/** Where the order comments are shown in is kept, for this computer. */
+const COMMENT_ORDER_KEY = "kalem.jira.commentOrder";
+
+/** The order comments are shown in: oldest first, as Jira does, unless the user chose otherwise. */
+function commentOrder(): "oldest" | "newest" {
+	try {
+		return localStorage.getItem(COMMENT_ORDER_KEY) === "newest" ? "newest" : "oldest";
+	} catch {
+		return "oldest";
+	}
+}
+
 interface IssueFieldView {
 	readonly key: string;
 	readonly label: string;
@@ -934,6 +946,25 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 						: "";
 			if (who.selectedIndex < 0) who.value = "";
 		};
+		const order = el("select", {
+			class: "jira-filter-select jira-comment-order",
+			attrs: { "aria-label": t.jiraCommentOrder, title: t.jiraCommentOrder },
+			children: [
+				el("option", { text: t.jiraCommentsOldest, attrs: { value: "oldest" } }),
+				el("option", { text: t.jiraCommentsNewest, attrs: { value: "newest" } }),
+			],
+		});
+		order.value = commentOrder();
+		order.addEventListener("change", () => {
+			const value = order.value === "newest" ? "newest" : "oldest";
+			try {
+				localStorage.setItem(COMMENT_ORDER_KEY, value);
+			} catch {
+				// Not kept: this dialog still shows them so.
+			}
+			draw();
+		});
+		const newestFirst = (): boolean => order.value === "newest";
 		who.addEventListener("change", () => {
 			const [kind, ...rest] = who.value.split(":");
 			const value = rest.join(":");
@@ -946,7 +977,9 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 		});
 
 		function draw(): void {
+			// Kept oldest first, as Jira gives them (one just sent goes last): newest first turns them round.
 			const shown = filterComments(comments, commentFilter);
+			if (newestFirst()) shown.reverse();
 			listElement.replaceChildren(
 				...(shown.length === 0
 					? [message(comments.length === 0 ? t.jiraNoComments : t.jiraNoMatchingComments)]
@@ -970,7 +1003,12 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 				onAdded(total, uploaded);
 				fillWho();
 				draw();
-				listElement.lastElementChild?.scrollIntoView({ block: "nearest" });
+				(newestFirst()
+					? listElement.firstElementChild
+					: listElement.lastElementChild
+				)?.scrollIntoView({
+					block: "nearest",
+				});
 				options.onIssueChange?.(issue.key);
 			},
 		});
@@ -983,6 +1021,7 @@ export function createJiraDialog(options: JiraDialogOptions): JiraDialog {
 						toggle(t.jiraFilterAttachments, "attachmentsOnly"),
 						toggle(t.jiraFilterHumans, "humansOnly"),
 						who,
+						order,
 					],
 				}),
 				note,

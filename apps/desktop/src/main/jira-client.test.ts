@@ -59,10 +59,44 @@ describe("JiraClient", () => {
 		const first = await client.search("project = DEV");
 		expect(first).toMatchObject({ total: 3, next: "2" });
 		expect(first.issues.map((row) => row.key)).toEqual(["DEV-1", "DEV-2"]);
-		expect(server.calls[0]).toContain("/rest/api/2/search?");
+		expect(server.calls.some((call) => call.includes("/rest/api/2/search?"))).toBe(true);
 		const second = await client.search("project = DEV", first.next);
 		expect(second.next).toBeNull();
 		await expect(client.search("x", "-1")).rejects.toThrow("Invalid search cursor");
+	});
+
+	it("asks a search for the sprint field, found once", async () => {
+		const server = fakeFetch([
+			[
+				"/rest/api/2/field",
+				[
+					{ id: "summary", schema: { type: "string" } },
+					{ id: "customfield_10020", schema: { custom: "com.pyxis.greenhopper.jira:gh-sprint" } },
+				],
+			],
+			[
+				"/rest/api/2/search?",
+				{
+					issues: [
+						{
+							key: "DEV-1",
+							fields: { summary: "x", customfield_10020: [{ id: 5, name: "Sprint 5" }] },
+						},
+					],
+					total: 1,
+				},
+			],
+		]);
+		const client = new JiraClient(
+			{ site: "https://sprints.example.com", username: "", token: "t" },
+			server.fetch,
+		);
+		const found = await client.search("project = DEV");
+		expect(found.issues[0]?.sprintName).toBe("Sprint 5");
+		await client.search("project = DEV");
+		expect(server.calls.filter((call) => call.endsWith("/rest/api/2/field"))).toHaveLength(1);
+		const search = server.calls.find((call) => call.includes("/search?")) ?? "";
+		expect(new URL(search).searchParams.get("fields")).toContain("customfield_10020");
 	});
 
 	it("searches Cloud with /search/jql and its page tokens", async () => {
