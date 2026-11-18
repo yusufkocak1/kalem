@@ -7910,25 +7910,6 @@ details.jira-section > .jira-list {
 	box-shadow: 0 0 0 3px var(--app-pressed);
 }
 
-.jira-pane-list {
-	flex: 1 1 120px;
-	min-width: 0;
-	padding: 6px 8px;
-	border: 1px solid var(--app-border);
-	border-radius: 8px;
-	background: var(--app-raised);
-	color: var(--app-text);
-	font: inherit;
-	font-size: 12px;
-	cursor: pointer;
-}
-
-.jira-pane-list:focus {
-	border-color: var(--app-accent);
-	outline: none;
-	box-shadow: 0 0 0 3px var(--app-pressed);
-}
-
 /* The toolbar's button that chooses what the list can be filtered by. */
 .jira-facets-button {
 	display: inline-flex;

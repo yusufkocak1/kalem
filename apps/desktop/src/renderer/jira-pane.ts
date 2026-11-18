@@ -3,12 +3,17 @@ import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type { IssueTypeKind, JiraIssueRef, JiraIssueRow } from "../shared/jira.js";
 import { groupByParent, issueTypeKind } from "../shared/jira.js";
-import type { Facet, FacetCount } from "../shared/jira-facets.js";
+import type { Condition, Facet, FacetCount } from "../shared/jira-facets.js";
 import {
+	CONDITIONS,
+	composeJql,
+	conditionJql,
+	conditionsFrom,
 	FACETS,
+	facetChoices,
 	facetCounts,
+	facetJql,
 	facetsFrom,
-	filterRows,
 	NONE,
 	splitChips,
 } from "../shared/jira-facets.js";
@@ -37,17 +42,6 @@ function today(): string {
 	return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-/** The pane's ready-made lists, as JQL. */
-const LISTS = {
-	mine: "assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC",
-	reported: "reporter = currentUser() ORDER BY updated DESC",
-	watching: "watcher = currentUser() AND resolution = Unresolved ORDER BY updated DESC",
-	sprint: "assignee = currentUser() AND sprint in openSprints() ORDER BY updated DESC",
-	recent: "ORDER BY updated DESC",
-} as const;
-/** The ready-made lists, and the starred issues, which are asked for by their keys. */
-type List = keyof typeof LISTS | "favorites";
-
 const TYPE_ICONS: Record<IssueTypeKind, IconName> = {
 	bug: "typeBug",
 	story: "typeStory",
@@ -59,21 +53,22 @@ const TYPE_ICONS: Record<IssueTypeKind, IconName> = {
 	other: "typeOther",
 };
 
-/** Where the facets the list is filtered by are kept, for this computer. */
+/** Where the filters the list is shown by are kept, for this computer. */
 const FACETS_KEY = "kalem.jira.facets";
+const CONDITIONS_KEY = "kalem.jira.conditions";
 
-function keptFacets(): Facet[] {
+function kept<T>(key: string, read: (value: unknown) => T): T {
 	try {
-		const kept = localStorage.getItem(FACETS_KEY);
-		return facetsFrom(kept === null ? undefined : JSON.parse(kept));
+		const value = localStorage.getItem(key);
+		return read(value === null ? undefined : JSON.parse(value));
 	} catch {
-		return facetsFrom(undefined);
+		return read(undefined);
 	}
 }
 
-function keepFacets(facets: readonly Facet[]): void {
+function keep(key: string, value: unknown): void {
 	try {
-		localStorage.setItem(FACETS_KEY, JSON.stringify(facets));
+		localStorage.setItem(key, JSON.stringify(value));
 	} catch {
 		// Not kept: the next window starts with the defaults.
 	}
@@ -116,9 +111,10 @@ function avatar(name: string): HTMLElement {
 }
 
 /**
- * Jira in a dock: the user's issues (assigned, reported, watched, recent)
- * or a search by key, words or JQL, narrowed by issue type; sub-tasks fold
- * under their parent. An issue opens in the Jira dialog.
+ * Jira in a dock: issues by filters that can each be taken away (assigned
+ * to me, unresolved, a sprint, a type…) and the words, JQL or key in the
+ * search box, all asked of Jira as one JQL; sub-tasks fold under their
+ * parent. An issue opens in the Jira dialog.
  */
 export function createJiraPane(options: JiraPaneOptions): {
 	readonly element: HTMLElement;
@@ -142,20 +138,6 @@ export function createJiraPane(options: JiraPaneOptions): {
 			title: t.jiraSearchPlaceholder,
 			"aria-label": t.jiraSearchPlaceholder,
 		},
-	});
-	const list = el("select", {
-		class: "jira-pane-list",
-		attrs: { "aria-label": t.jiraSearchTitle },
-		children: (
-			[
-				["mine", t.jiraPaneMine],
-				["reported", t.jiraPaneReported],
-				["watching", t.jiraPaneWatching],
-				["sprint", t.jiraPaneSprint],
-				["recent", t.jiraPaneRecent],
-				["favorites", `★ ${t.jiraFavorites}`],
-			] as const
-		).map(([value, label]) => el("option", { text: label, attrs: { value } })),
 	});
 	const filterButton = el("button", {
 		class: "jira-facets-button",
@@ -191,7 +173,6 @@ export function createJiraPane(options: JiraPaneOptions): {
 						class: "jira-pane-search-field",
 						children: [icon("find"), search],
 					}),
-					list,
 					filterButton,
 				],
 			}),
@@ -218,9 +199,11 @@ export function createJiraPane(options: JiraPaneOptions): {
 	 */
 	const drawers = new Map<string, boolean>();
 	const startsOpen = (group: { row: unknown }): boolean => group.row === null;
+	/** The quick conditions in force; each can be taken away. */
+	let conditions = kept(CONDITIONS_KEY, conditionsFrom);
 	/** What the list can be filtered by, a row of chips each. */
-	let facets = keptFacets();
-	/** The values chosen, by facet; a facet with none chosen keeps every issue. */
+	let facets = kept(FACETS_KEY, facetsFrom);
+	/** The values chosen, by facet; a facet with none chosen does not narrow the list. */
 	const selection = new Map<Facet, Set<string>>();
 	const chosenOf = (facet: Facet): Set<string> => {
 		let chosen = selection.get(facet);
@@ -230,7 +213,13 @@ export function createJiraPane(options: JiraPaneOptions): {
 		}
 		return chosen;
 	};
-	const filtering = (): boolean => [...selection.values()].some((chosen) => chosen.size > 0);
+	const choosing = (): boolean => [...selection.values()].some((chosen) => chosen.size > 0);
+	/** Each facet's values seen in the answers so far, so a choice does not hide the others. */
+	const seen = new Map<Facet, Set<string>>();
+	/** People's ids by the name the list shows, for JQL. */
+	const people = new Map<string, string>();
+	/** The JQL the list was last asked for. */
+	let lastJql = "";
 
 	/** The connected Jira site, which the starred issues are kept by. */
 	let site: string | null = null;
@@ -250,7 +239,7 @@ export function createJiraPane(options: JiraPaneOptions): {
 	}
 
 	function favoritesChanged(): void {
-		if (list.value === "favorites" && search.value.trim() === "") {
+		if (conditions.includes("favorites")) {
 			// The list is the starred issues: one taken off goes, one added comes.
 			const keys = new Set(starred().map((item) => item.key));
 			issues = issues.filter((issue) => keys.has(issue.key));
@@ -274,8 +263,6 @@ export function createJiraPane(options: JiraPaneOptions): {
 		star.title = label;
 	}
 
-	const shownIssues = (): JiraIssueRow[] => filterRows(issues, selection);
-
 	const facetName = (facet: Facet): string =>
 		({
 			type: t.jiraFacetType,
@@ -286,82 +273,154 @@ export function createJiraPane(options: JiraPaneOptions): {
 			project: t.jiraFacetProject,
 			label: t.jiraFacetLabel,
 		})[facet];
+	const conditionName = (condition: Condition): string =>
+		({
+			mine: t.jiraPaneMine,
+			unresolved: t.jiraCondUnresolved,
+			openSprints: t.jiraCondOpenSprints,
+			reported: t.jiraPaneReported,
+			watching: t.jiraPaneWatching,
+			favorites: `★ ${t.jiraFavorites}`,
+		})[condition];
 	const valueName = (facet: Facet, value: string): string =>
 		value !== NONE ? value : facet === "assignee" ? t.jiraUnassigned : t.jiraFacetNone;
 
-	/** A value chosen or let go; every value chosen is the same as none: all are shown. */
+	/** A value chosen or let go (`null`: every value), and the list asked for again. */
 	function toggleValue(facet: Facet, value: string | null): void {
 		const chosen = chosenOf(facet);
 		if (value === null) chosen.clear();
 		else if (chosen.has(value)) chosen.delete(value);
 		else chosen.add(value);
-		const all = facetCounts(issues, facet);
-		if (all.length > 1 && all.every((entry) => chosen.has(entry.value))) chosen.clear();
-		render();
+		void run(false);
+	}
+
+	function toggleCondition(condition: Condition): void {
+		const on = !conditions.includes(condition);
+		conditions = CONDITIONS.filter((each) => (each === condition ? on : conditions.includes(each)));
+		keep(CONDITIONS_KEY, conditions);
+		void run(false);
 	}
 
 	function setFacets(next: readonly Facet[]): void {
 		facets = FACETS.filter((facet) => next.includes(facet));
-		for (const facet of FACETS) if (!facets.includes(facet)) selection.delete(facet);
-		keepFacets(facets);
-		render();
+		let narrowed = false;
+		for (const facet of FACETS) {
+			if (facets.includes(facet)) continue;
+			narrowed ||= (selection.get(facet)?.size ?? 0) > 0;
+			selection.delete(facet);
+		}
+		keep(FACETS_KEY, facets);
+		if (narrowed) void run(false);
+		else render();
 	}
 
 	function renderTypes(): void {
-		// A value no loaded issue has any more (another list, another search) is let go.
-		for (const [facet, chosen] of selection) {
-			const present = new Set(facetCounts(issues, facet).map((entry) => entry.value));
-			for (const value of chosen) if (!present.has(value)) chosen.delete(value);
-		}
-		types.hidden = issues.length === 0 || facets.length === 0;
-		if (types.hidden) {
-			types.replaceChildren();
-			return;
-		}
-		types.replaceChildren(...facets.map(facetRow));
+		types.hidden = false;
+		types.replaceChildren(
+			conditionRow(),
+			...(issues.length === 0 && !choosing() ? [] : facets.map(facetRow)),
+		);
 	}
 
-	function facetRow(facet: Facet): HTMLElement {
-		const chosen = chosenOf(facet);
-		const counts = facetCounts(issues, facet, selection);
-		const { chips, more } = splitChips(counts, chosen);
-		const others = new Map(selection);
-		others.delete(facet);
-		const chip = (entry: FacetCount | null): HTMLButtonElement => {
-			const pressed = entry === null ? chosen.size === 0 : chosen.has(entry.value);
-			const label = entry === null ? t.jiraTypeAll : valueName(facet, entry.value);
-			const count = entry === null ? filterRows(issues, others).length : entry.count;
-			const button = el("button", {
-				class: "jira-type-chip",
-				attrs: {
-					type: "button",
-					"aria-pressed": String(pressed),
-					title: entry === null ? `${facetName(facet)}: ${label}` : label,
-				},
-				children: [
-					...(facet === "type" && entry !== null ? [typeBadge(entry.value)] : []),
-					el("span", { class: "jira-type-chip-label", text: label }),
-					el("span", { class: "jira-type-chip-count", text: String(count) }),
-				],
-			});
-			if (entry !== null) {
-				button.dataset.value = entry.value;
-				if (facet === "type") button.dataset.type = entry.value;
-			}
-			button.addEventListener("click", () => toggleValue(facet, entry?.value ?? null));
-			return button;
-		};
-		const moreChip = el("button", {
+	/** A chip: a value, how many issues have it (none: no count), pressed when chosen. */
+	const chipOf = (
+		label: string,
+		pressed: boolean,
+		count: number | null,
+		click: () => void,
+		lead: HTMLElement | null = null,
+	): HTMLButtonElement => {
+		const button = el("button", {
+			class: "jira-type-chip",
+			attrs: { type: "button", "aria-pressed": String(pressed), title: label },
+			children: [
+				...(lead === null ? [] : [lead]),
+				el("span", { class: "jira-type-chip-label", text: label }),
+				...(count === null || count === 0
+					? []
+					: [el("span", { class: "jira-type-chip-count", text: String(count) })]),
+			],
+		});
+		button.addEventListener("click", click);
+		return button;
+	};
+
+	const moreChipOf = (count: number, open: (anchor: HTMLElement) => void): HTMLElement => {
+		const button = el("button", {
 			class: "jira-type-chip jira-facet-more",
-			text: format(t.jiraFacetMore, more.length),
+			text: format(t.jiraFacetMore, count),
 			attrs: {
 				type: "button",
 				"aria-haspopup": "menu",
 				"aria-expanded": "false",
-				title: format(t.jiraFacetMoreTitle, more.length),
+				title: format(t.jiraFacetMoreTitle, count),
 			},
 		});
-		moreChip.addEventListener("click", () => showValues(facet, moreChip));
+		button.addEventListener("click", () => open(button));
+		return button;
+	};
+
+	/** The quick conditions: the first few as chips, any in force among them, the rest a "+N" away. */
+	function conditionRow(): HTMLElement {
+		const { chips, more } = splitChips(CONDITIONS, new Set(conditions));
+		return el("div", {
+			class: "jira-facet-row jira-condition-row",
+			attrs: { role: "group", "aria-label": t.jiraFacetQuick, "data-facet": "conditions" },
+			children: [
+				...chips.map((condition) => {
+					const chip = chipOf(conditionName(condition), conditions.includes(condition), null, () =>
+						toggleCondition(condition),
+					);
+					chip.dataset.value = condition;
+					return chip;
+				}),
+				...(more.length === 0
+					? []
+					: [
+							moreChipOf(more.length, (anchor) =>
+								openPopup(anchor, [
+									el("div", { class: "jira-menu-heading", text: t.jiraFacetQuick }),
+									...more.map((condition) => {
+										const item = checkItem(
+											conditionName(condition),
+											conditions.includes(condition),
+											null,
+											() => {
+												toggleCondition(condition);
+												item.setAttribute("aria-checked", String(conditions.includes(condition)));
+											},
+										);
+										return item;
+									}),
+								]),
+							),
+						]),
+			],
+		});
+	}
+
+	/** A facet's values, now and seen before, with how many issues of the list have each. */
+	const choicesOf = (facet: Facet): FacetCount[] =>
+		facetChoices(facetCounts(issues, facet), seen.get(facet) ?? [], chosenOf(facet));
+
+	function facetRow(facet: Facet): HTMLElement {
+		const chosen = chosenOf(facet);
+		const { chips, more } = splitChips(choicesOf(facet), chosen);
+		const chip = (entry: FacetCount): HTMLButtonElement => {
+			const button = chipOf(
+				valueName(facet, entry.value),
+				chosen.has(entry.value),
+				entry.count,
+				() => toggleValue(facet, entry.value),
+				facet === "type" ? typeBadge(entry.value) : null,
+			);
+			button.dataset.value = entry.value;
+			if (facet === "type") button.dataset.type = entry.value;
+			return button;
+		};
+		const all = chipOf(t.jiraTypeAll, chosen.size === 0, null, () => toggleValue(facet, null));
+		all.title = `${facetName(facet)}: ${t.jiraTypeAll}`;
+		const moreChip = moreChipOf(more.length, (anchor) => showValues(facet, anchor));
 		const remove = el("button", {
 			class: "jira-facet-remove",
 			attrs: {
@@ -380,7 +439,7 @@ export function createJiraPane(options: JiraPaneOptions): {
 					class: "jira-facet-head",
 					children: [el("span", { class: "jira-facet-name", text: facetName(facet) }), remove],
 				}),
-				chip(null),
+				all,
 				...chips.map(chip),
 				...(more.length === 0 ? [] : [moreChip]),
 			],
@@ -482,7 +541,7 @@ export function createJiraPane(options: JiraPaneOptions): {
 
 	/** All of a facet's values, chosen ones ticked; choosing keeps the popup open. */
 	function showValues(facet: Facet, anchor: HTMLElement): void {
-		const counts = facetCounts(issues, facet, selection);
+		const counts = choicesOf(facet);
 		const chosen = chosenOf(facet);
 		const empty = el("p", { class: "jira-facet-empty", text: t.jiraFacetNoValue });
 		empty.hidden = true;
@@ -490,7 +549,7 @@ export function createJiraPane(options: JiraPaneOptions): {
 			const item = checkItem(
 				valueName(facet, entry.value),
 				chosen.has(entry.value),
-				entry.count,
+				entry.count === 0 ? null : entry.count,
 				() => {
 					toggleValue(facet, entry.value);
 					for (const each of items) {
@@ -540,22 +599,18 @@ export function createJiraPane(options: JiraPaneOptions): {
 	function renderStatus(): void {
 		if (failed) return;
 		status.className = "jira-message jira-pane-message";
+		status.title = lastJql;
 		if (loading) {
 			status.textContent = t.confluenceLoading;
 			return;
 		}
-		const shown = shownIssues().length;
 		status.textContent =
 			issues.length === 0
 				? t.jiraNoIssues
-				: shown === 0
-					? t.jiraNoTypeMatch
-					: filtering()
-						? format(t.jiraFiltered, shown, issues.length)
-						: total === null
-							? ""
-							: format(t.jiraCount, issues.length, total);
-		if (issues.length > 0 && filtering()) {
+				: total === null
+					? ""
+					: format(t.jiraCount, issues.length, total);
+		if (choosing()) {
 			const clear = el("button", {
 				class: "confluence-link jira-facets-clear",
 				text: t.jiraFacetsClear,
@@ -563,9 +618,9 @@ export function createJiraPane(options: JiraPaneOptions): {
 			});
 			clear.addEventListener("click", () => {
 				selection.clear();
-				render();
+				void run(false);
 			});
-			status.append(" ", clear);
+			status.append(status.textContent === "" ? "" : " ", clear);
 		}
 	}
 
@@ -780,7 +835,7 @@ export function createJiraPane(options: JiraPaneOptions): {
 			".jira-pane-row",
 		)?.dataset.key;
 		const byKey = new Map(issues.map((issue) => [issue.key, issue]));
-		const groups = groupByParent(shownIssues());
+		const groups = groupByParent(issues);
 		rows.replaceChildren(
 			...groups.flatMap((group) => {
 				const key = group.parent.key;
@@ -892,6 +947,20 @@ export function createJiraPane(options: JiraPaneOptions): {
 		target.focus();
 	});
 
+	/** The values the answer has, kept for the chips; people's ids, for JQL. */
+	function remember(found: readonly JiraIssueRow[]): void {
+		for (const facet of FACETS) {
+			const values = seen.get(facet) ?? new Set<string>();
+			for (const { value } of facetCounts(found, facet)) values.add(value);
+			seen.set(facet, values);
+		}
+		for (const row of found) {
+			if (row.assignee !== "" && row.assigneeId !== undefined && row.assigneeId !== "") {
+				people.set(row.assignee, row.assigneeId);
+			}
+		}
+	}
+
 	async function run(append: boolean): Promise<void> {
 		const id = ++searchId;
 		if (!append) {
@@ -902,13 +971,13 @@ export function createJiraPane(options: JiraPaneOptions): {
 		}
 		loading = true;
 		failed = false;
+		renderTypes();
 		renderStatus();
 		more.hidden = true;
 		try {
 			site ??= (await bridge.jiraAccount())?.site ?? null;
 			if (id !== searchId) return;
-			const chosen = list.value as List;
-			const favorites = chosen === "favorites" && search.value.trim() === "" ? starred() : null;
+			const favorites = conditions.includes("favorites") ? starred() : null;
 			if (favorites !== null && favorites.length === 0) {
 				loading = false;
 				issues = [];
@@ -916,22 +985,34 @@ export function createJiraPane(options: JiraPaneOptions): {
 				status.textContent = t.jiraNoFavorites;
 				return;
 			}
-			const query =
-				favorites !== null
-					? `key IN (${favorites.map((item) => item.key).join(", ")})`
-					: search.value.trim() === ""
-						? LISTS[chosen as keyof typeof LISTS]
-						: search.value;
+			const filters = [
+				...conditions.flatMap((condition) => {
+					const jql = conditionJql(
+						condition,
+						(favorites ?? []).map((item) => item.key),
+					);
+					return jql === null ? [] : [jql];
+				}),
+				...facets.flatMap((facet) => {
+					const jql = facetJql(facet, chosenOf(facet), (name) => people.get(name));
+					return jql === null ? [] : [jql];
+				}),
+			];
+			const typed = search.value.trim();
+			const query = composeJql(filters, typed);
+			lastJql = query;
+			// The starred issues alone, as they were starred: kept when Jira cannot give one.
+			const onlyFavorites = favorites !== null && filters.length === 1 && typed === "";
 			let found: Awaited<ReturnType<typeof bridge.jiraSearch>>;
 			try {
 				found = await bridge.jiraSearch(query, append ? next : null);
 			} catch (error) {
 				// A starred issue that is gone (or hidden now) fails the whole search: what was kept is shown.
-				if (favorites === null) throw error;
+				if (!onlyFavorites || favorites === null) throw error;
 				found = { jql: query, issues: favorites.map(keptRow), total: null, next: null };
 			}
 			if (id !== searchId) return;
-			if (favorites !== null) {
+			if (onlyFavorites && favorites !== null) {
 				// In the order they were starred; one Jira did not return is shown as it was kept.
 				found = {
 					...found,
@@ -940,6 +1021,7 @@ export function createJiraPane(options: JiraPaneOptions): {
 					),
 				};
 			}
+			remember(found.issues);
 			issues = [...issues, ...found.issues];
 			next = found.next;
 			total = found.total;
@@ -950,7 +1032,7 @@ export function createJiraPane(options: JiraPaneOptions): {
 			if (id !== searchId) return;
 			loading = false;
 			failed = true;
-			types.hidden = issues.length === 0;
+			renderTypes();
 			status.className = "jira-error jira-pane-message";
 			status.textContent = format(t.jiraRequestFailed, errorText(error));
 		}
@@ -990,10 +1072,6 @@ export function createJiraPane(options: JiraPaneOptions): {
 			search.value = "";
 			void run(false);
 		}
-	});
-	list.addEventListener("change", () => {
-		search.value = "";
-		void run(false);
 	});
 	more.addEventListener("click", () => void run(true));
 
