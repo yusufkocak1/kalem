@@ -1,5 +1,6 @@
 import type {
 	ConfluenceAttachment,
+	ConfluenceMovePosition,
 	ConfluencePageContent,
 	ConfluencePageSummary,
 	ConfluenceSpace,
@@ -728,6 +729,44 @@ export class ConfluenceClient {
 		const id = asString(body.id);
 		if (!/^\d+$/.test(id)) throw new Error("Confluence did not return the new page");
 		return id;
+	}
+
+	/**
+	 * Moves a page with its children: under `targetId` as its last child
+	 * (`append`), or next to it (`before`, `after`), in whatever space the
+	 * target is. Older Server versions without the move endpoint get the
+	 * page's parent changed instead, which cannot place it among siblings.
+	 */
+	async move(id: string, position: ConfluenceMovePosition, targetId: string): Promise<void> {
+		if (!/^\d+$/.test(id) || !/^\d+$/.test(targetId)) throw new Error("Invalid page id");
+		if (!["append", "before", "after"].includes(position)) throw new Error("Invalid position");
+		if (id === targetId) throw new Error("A page cannot be moved onto itself");
+		try {
+			await this.#request(`/rest/api/content/${id}/move/${position}/${targetId}`, {
+				method: "PUT",
+			});
+			return;
+		} catch (error) {
+			if (this.cloud || !(error instanceof ConfluenceError) || error.status !== 404) throw error;
+			// Older Server: the move endpoint is missing, not the page.
+			const parent =
+				position === "append" ? targetId : ((await this.ancestors(targetId)).at(-1) ?? null);
+			if (parent === null) throw error;
+			const current = await this.page(id);
+			await this.#json(`/rest/api/content/${id}`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					id,
+					type: "page",
+					title: current.page.title,
+					space: { key: current.page.spaceKey },
+					ancestors: [{ id: parent }],
+					body: { storage: { value: current.storage, representation: "storage" } },
+					version: { number: current.page.version + 1, message: "Kalem" },
+				}),
+			});
+		}
 	}
 
 	/** Writes a new version; a version conflict surfaces as a 409 `ConfluenceError`. */

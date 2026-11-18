@@ -247,6 +247,47 @@ describe("ConfluenceClient", () => {
 		await expect(client.create("DEV", "../1", "x")).rejects.toThrow("Invalid page id");
 	});
 
+	it("moves a page with the move endpoint, and by its parent on older Server", async () => {
+		const cloud = fakeFetch([["/move/", {}]]);
+		await new ConfluenceClient(
+			{ site: "acme.atlassian.net", username: "a@b.c", token: "tok" },
+			cloud.fetch,
+		).move("5", "before", "7");
+		expect(cloud.calls[0]?.url).toBe(
+			"https://acme.atlassian.net/wiki/rest/api/content/5/move/before/7",
+		);
+		expect(cloud.calls[0]?.init?.method).toBe("PUT");
+
+		const old = fakeFetch([
+			["/move/", {}, 404],
+			["/rest/api/content/7?expand=ancestors", { ancestors: [{ id: "1" }, { id: "3" }] }],
+			[
+				"/rest/api/content/5?expand=body.storage",
+				{
+					title: "Sayfa",
+					space: { key: "DEV" },
+					version: { number: 4 },
+					body: { storage: { value: "<p>x</p>" } },
+				},
+			],
+			["/rest/api/content/5", { version: { number: 5 } }],
+		]);
+		const server = new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "", token: "pat" },
+			old.fetch,
+		);
+		await server.move("5", "after", "7");
+		const update = old.calls.at(-1);
+		expect(update?.init?.method).toBe("PUT");
+		expect(JSON.parse(String(update?.init?.body))).toMatchObject({
+			ancestors: [{ id: "3" }],
+			version: { number: 5 },
+			body: { storage: { value: "<p>x</p>" } },
+		});
+		await expect(server.move("5", "append", "5")).rejects.toThrow("onto itself");
+		await expect(server.move("5", "append", "../1")).rejects.toThrow("Invalid page id");
+	});
+
 	it("searches pages with CQL", async () => {
 		const { fetch, calls } = fakeFetch([
 			[
