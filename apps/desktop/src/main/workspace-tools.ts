@@ -531,6 +531,10 @@ export interface ToolStep {
 	readonly tool: string;
 	/** A path, a search, a pattern. */
 	readonly detail: string;
+	/** For a command: the call's id (its output follows), its whole line and why it was run. */
+	readonly id?: string;
+	readonly command?: string;
+	readonly reason?: string;
 }
 
 const clip = (text: string): string =>

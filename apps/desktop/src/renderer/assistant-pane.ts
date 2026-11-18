@@ -168,8 +168,14 @@ interface Message {
 	model?: string;
 	/** What it looked up in the workspace while answering, in this run. */
 	steps?: string[];
+	/** The step in hand, the waiting line says it (a command too). */
+	lastStep?: string;
+	/** Commands it ran in a terminal, with what they printed, in this run. */
+	runs?: CommandRun[];
 	/** Changes to workspace files it proposed, in this run. */
 	edits?: ProposedEdit[];
+	/** Where in the reply's text each proposed change came (by its id). */
+	editAt?: Record<string, number>;
 	/** What it asked the user before changing something, in this run. */
 	approvals?: ApprovalRequest[];
 	/** Its plan for the answer. */
@@ -185,6 +191,20 @@ interface Message {
 	checks?: readonly CheckProgress[];
 	/** Whether Kalem ran the rule checks before them. */
 	rulesRan?: boolean;
+}
+
+/** A command the model ran in a terminal: its line, why, and what it printed once it ended. */
+interface CommandRun {
+	readonly key: string;
+	readonly id?: string;
+	/** Where in the reply's text it was run: the card shows there, after what led to it. */
+	readonly at: number;
+	readonly command: string;
+	readonly reason?: string;
+	done: boolean;
+	output?: string;
+	failed?: boolean;
+	code?: number | null;
 }
 
 /** A reply's text as the user sees it: without the look-ups and tool calls written in it. */
@@ -2434,16 +2454,27 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		const follow = nearBottom();
 		// While a reply streams in, a finished diagram already shows; an open one is a placeholder.
 		// Confluence look-ups show as steps, not as their requests.
-		const shownText = withoutRequests(message.text);
-		const parts: ReplyPart[] = shownText.trim() === "" ? [] : splitReply(shownText);
+		// Commands and proposed changes show where they came in the text, after
+		// what the reply said about them: the text is cut there, each piece drawn alone.
+		const placed = placedCards(message);
+		const cuts = [...new Set(placed.map((card) => card.at))].sort((a, b) => a - b);
+		const pieces: { text: string; parts: ReplyPart[]; cut: number | null }[] = [];
+		let from = 0;
+		for (const cut of [...cuts, null]) {
+			const text = withoutRequests(message.text.slice(from, cut ?? undefined));
+			pieces.push({ text, parts: text.trim() === "" ? [] : splitReply(text), cut });
+			if (cut !== null) from = cut;
+		}
+		const lastPiece = pieces[pieces.length - 1] as (typeof pieces)[number];
+		const tail = lastPiece.parts;
 		let pending: string | null = null;
-		const last = parts.at(-1);
+		const last = tail.at(-1);
 		if (!message.done && last?.kind === "markdown") {
 			const open = OPEN_BLOCK.exec(last.text);
 			if (open !== null) {
-				parts.pop();
+				tail.pop();
 				const before = last.text.slice(0, open.index);
-				if (before.trim() !== "") parts.push({ kind: "markdown", text: before });
+				if (before.trim() !== "") tail.push({ kind: "markdown", text: before });
 				pending =
 					open[1] === "kalem-actions"
 						? t.assistantPreparing
@@ -2456,13 +2487,31 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 									: t.assistantDrawing;
 			}
 		}
-		const nodes: Node[] = parts.map((part, index) =>
-			part.kind === "markdown"
-				? markdown(part.text, message.done)
-				: part.kind === "diagram"
-					? diagramCard(part)
-					: actionsCard(part.actions, message, index),
-		);
+		const parts: ReplyPart[] = pieces.flatMap((piece) => piece.parts);
+		const nodes: Node[] = [];
+		let index = 0;
+		const edits = message.edits ?? [];
+		const bulk = editsBar(edits);
+		for (const piece of pieces) {
+			for (const part of piece.parts) {
+				nodes.push(
+					part.kind === "markdown"
+						? markdown(part.text, message.done)
+						: part.kind === "diagram"
+							? diagramCard(part)
+							: actionsCard(part.actions, message, index),
+				);
+				index++;
+			}
+			for (const card of placed) {
+				if (card.at !== piece.cut) continue;
+				if (card.kind === "edit") {
+					// The bar that applies them all comes before the first.
+					if (bulk !== null && !nodes.includes(bulk)) nodes.push(bulk);
+					nodes.push(editCard(card.edit, edits));
+				} else nodes.push(commandCard(card.run, message));
+			}
+		}
 		const steps = stepsView(message);
 		if (steps !== null) nodes.unshift(steps);
 		if (message.plan !== undefined && message.plan.length > 0)
@@ -2481,10 +2530,6 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				}),
 			);
 		}
-		const edits = message.edits ?? [];
-		const bulk = editsBar(edits);
-		if (bulk !== null) nodes.push(bulk);
-		for (const proposed of edits) nodes.push(editCard(proposed, edits));
 		if (message.findings !== undefined && message.findings.length > 0) {
 			nodes.push(
 				findingsCard(
@@ -2521,7 +2566,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			);
 		}
 		if (!message.done && message.error === null) {
-			const lastStep = message.steps?.at(-1);
+			const lastStep = message.lastStep ?? message.steps?.at(-1);
 			if (pending !== null) nodes.push(waiting(pending, message));
 			else if (message.text === "" || (lastStep !== undefined && message.text.endsWith("\n\n")))
 				nodes.push(waiting(lastStep ?? t.assistantThinking, message));
@@ -2670,6 +2715,167 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		return bar;
 	}
 
+	/** Which folding cards the user opened: a reply is drawn again with every piece that comes in. */
+	const foldOpen = new Map<string, boolean>();
+
+	/**
+	 * A card that folds: a head that says what it is at a glance (an icon, a
+	 * title, a badge), the line that says why, always shown, and the details
+	 * (a diff, what a command printed) that open from the head. Commands and
+	 * proposed changes share it.
+	 */
+	function foldCard(options: {
+		readonly key: string;
+		readonly kind: "command" | "edit";
+		readonly state: string;
+		readonly icon: Parameters<typeof icon>[0];
+		readonly title: Node[];
+		readonly meta: Node[];
+		readonly lead: string;
+		readonly body: Node[];
+		readonly footer: Node[];
+		readonly attrs?: Record<string, string>;
+	}): HTMLElement {
+		const open = foldOpen.get(options.key) ?? false;
+		const bodyId = `fold-${options.key.replace(/[^\w-]/g, "_")}`;
+		const body = el("div", {
+			class: "assistant-fold-body",
+			attrs: { id: bodyId },
+			children: options.body,
+		});
+		body.hidden = !open;
+		const head = el("button", {
+			class: "assistant-fold-head",
+			attrs: {
+				type: "button",
+				"aria-expanded": String(open),
+				"aria-controls": bodyId,
+				title: open ? t.assistantFoldHide : t.assistantFoldShow,
+			},
+			children: [
+				el("span", { class: "assistant-fold-chevron", children: [icon("chevron")] }),
+				el("span", { class: "assistant-fold-icon", children: [icon(options.icon)] }),
+				el("span", { class: "assistant-fold-title", children: options.title }),
+				el("span", { class: "assistant-fold-meta", children: options.meta }),
+			],
+		});
+		const card = el("div", {
+			class: `assistant-fold assistant-fold-${options.kind}${options.kind === "edit" ? " assistant-edit" : ""} ${options.state}${open ? " open" : ""}`,
+			attrs: options.attrs ?? {},
+			children: [
+				head,
+				...(options.lead === ""
+					? []
+					: [el("p", { class: "assistant-fold-lead", text: options.lead })]),
+				body,
+				...options.footer,
+			],
+		});
+		head.addEventListener("click", () => {
+			const now = !card.classList.contains("open");
+			body.hidden = !now;
+			card.classList.toggle("open", now);
+			head.setAttribute("aria-expanded", String(now));
+			head.title = now ? t.assistantFoldHide : t.assistantFoldShow;
+			foldOpen.set(options.key, now);
+		});
+		return card;
+	}
+
+	/** The commands and proposed changes of a reply, each where it came in the text. */
+	function placedCards(
+		message: Message,
+	): ({ at: number } & (
+		| { kind: "run"; run: CommandRun }
+		| { kind: "edit"; edit: ProposedEdit }
+	))[] {
+		const end = message.text.length;
+		const cards: ({ at: number } & (
+			| { kind: "run"; run: CommandRun }
+			| { kind: "edit"; edit: ProposedEdit }
+		))[] = [];
+		for (const run of message.runs ?? [])
+			cards.push({ at: Math.min(run.at, end), kind: "run", run });
+		for (const edit of message.edits ?? []) {
+			cards.push({ at: Math.min(message.editAt?.[edit.id] ?? end, end), kind: "edit", edit });
+		}
+		// In the order they came, at the same place too.
+		return cards
+			.map((card, order) => ({ card, order }))
+			.sort((a, b) => a.card.at - b.card.at || a.order - b.order)
+			.map(({ card }) => card);
+	}
+
+	/** A command the reply ran in a terminal: its line and why; what it printed opens from it. */
+	function commandCard(run: CommandRun, message: Message): HTMLElement {
+		const running = !run.done && !message.done && message.error === null;
+		const state = running ? "running" : run.failed === true ? "failed" : run.done ? "ok" : "ended";
+		const badge =
+			state === "running"
+				? [
+						el("span", { class: "assistant-fold-spinner", attrs: { "aria-hidden": "true" } }),
+						document.createTextNode(t.assistantCommandRunning),
+					]
+				: state === "failed"
+					? [
+							icon("close"),
+							document.createTextNode(
+								run.code === null
+									? t.assistantCommandStopped
+									: run.code === undefined
+										? t.assistantCommandFailed
+										: format(t.assistantCommandExit, run.code),
+							),
+						]
+					: state === "ok"
+						? [
+								icon("check"),
+								document.createTextNode(
+									run.code === undefined || run.code === 0
+										? t.assistantCommandOk
+										: format(t.assistantCommandExit, String(run.code)),
+								),
+							]
+						: [];
+		const output = run.output ?? "";
+		const lines = output === "" ? 0 : output.split("\n").length;
+		return foldCard({
+			key: `run:${run.key}`,
+			kind: "command",
+			state,
+			icon: "terminal",
+			title: [
+				el("span", { class: "assistant-fold-prompt", text: "$", attrs: { "aria-hidden": "true" } }),
+				el("code", { class: "assistant-fold-cmdline", text: run.command.split("\n")[0] ?? "" }),
+			],
+			meta: [
+				...(lines > 0
+					? [
+							el("span", {
+								class: "assistant-fold-count",
+								text: format(t.assistantCommandLines, lines),
+							}),
+						]
+					: []),
+				...(badge.length === 0
+					? []
+					: [el("span", { class: `assistant-fold-badge ${state}`, children: badge })]),
+			],
+			lead: run.reason ?? "",
+			body: [
+				...(run.command.includes("\n") || run.command.length > 80
+					? [el("pre", { class: "assistant-fold-full", text: run.command })]
+					: []),
+				el("pre", {
+					class: `assistant-terminal-output${output === "" ? " empty" : ""}`,
+					attrs: { "aria-label": t.assistantCommandOutput },
+					text: running ? "…" : output === "" ? t.assistantCommandNoOutput : output,
+				}),
+			],
+			footer: [],
+		});
+	}
+
 	/** A proposed change to a workspace file: what it takes out and puts in, applied on request. */
 	function editCard(
 		proposed: ProposedEdit,
@@ -2677,7 +2883,11 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	): HTMLElement {
 		const state = editState(proposed);
 		const diff = el("pre", { class: "assistant-edit-diff" });
+		let added = 0;
+		let removed = 0;
 		for (const line of lineDiff(proposed.oldText, proposed.newText)) {
+			if (line.kind === "+") added++;
+			else if (line.kind === "-") removed++;
 			diff.append(
 				el("span", {
 					class: `assistant-diff-line diff-${line.kind === "+" ? "add" : line.kind === "-" ? "remove" : "keep"}`,
@@ -2712,27 +2922,41 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		}
 		/** The card again, and the bar above the reply's cards, which counts what is left. */
 		const refresh = (): void => redrawEdits(card.parentElement, edits);
-		const card = el("div", {
-			class: `assistant-edit${state === undefined || state.kind === "failed" ? "" : ` ${state.kind === "auto" ? "applied" : state.kind}`}`,
-			attrs: { "data-edit": proposed.id },
-			children: [
-				el("div", {
-					class: "assistant-edit-head",
+		const name = proposed.path.split(/[\\/]/).pop() ?? proposed.path;
+		const folder = proposed.path.slice(0, proposed.path.length - name.length);
+		const card = foldCard({
+			key: `edit:${proposed.id}`,
+			kind: "edit",
+			state:
+				state === undefined || state.kind === "failed"
+					? "pending"
+					: state.kind === "auto"
+						? "applied"
+						: state.kind,
+			icon: "pencil",
+			title: [
+				el("span", {
+					class: "assistant-edit-path",
+					attrs: { title: proposed.path },
 					children: [
-						icon("pencil"),
-						el("span", { class: "assistant-edit-path", text: proposed.path }),
-						...(proposed.oldText === ""
-							? [el("span", { class: "assistant-edit-new", text: t.assistantEditNew })]
-							: []),
+						...(folder === ""
+							? []
+							: [el("span", { class: "assistant-edit-folder", text: folder })]),
+						document.createTextNode(name),
 					],
 				}),
-				...(proposed.summary === ""
-					? []
-					: [el("p", { class: "assistant-edit-summary", text: proposed.summary })]),
-				diff,
-				status,
-				actions,
+				...(proposed.oldText === ""
+					? [el("span", { class: "assistant-edit-new", text: t.assistantEditNew })]
+					: []),
 			],
+			meta: [
+				el("span", { class: "assistant-diff-count add", text: `+${added}` }),
+				el("span", { class: "assistant-diff-count remove", text: `−${removed}` }),
+			],
+			lead: proposed.summary,
+			body: [diff],
+			footer: [status, actions],
+			attrs: { "data-edit": proposed.id },
 		});
 		return card;
 	}
@@ -3149,17 +3373,48 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			case "reset":
 				reply.text = "";
 				reply.steps = [];
+				reply.runs = [];
 				reply.edits = [];
+				reply.editAt = {};
+				delete reply.lastStep;
 				if (chat === active) scheduleRender(reply);
 				return;
 			case "edit":
 				reply.edits = [...(reply.edits ?? []), event.edit];
+				reply.editAt = { ...reply.editAt, [event.edit.id]: reply.text.length };
 				if (chat === active) scheduleRender(reply);
 				return;
-			case "step":
-				reply.steps = [...(reply.steps ?? []), stepLabel(event.tool, event.detail)];
+			case "step": {
+				const label = stepLabel(event.tool, event.detail);
+				reply.lastStep = label;
+				if (event.command !== undefined) {
+					// A command: a card of its own, where the reply ran it, not a line among the look-ups.
+					const runs = reply.runs ?? [];
+					reply.runs = [
+						...runs,
+						{
+							key: event.id ?? `run-${runs.length}`,
+							...(event.id === undefined ? {} : { id: event.id }),
+							at: reply.text.length,
+							command: event.command,
+							...(event.reason === undefined ? {} : { reason: event.reason }),
+							done: false,
+						},
+					];
+				} else reply.steps = [...(reply.steps ?? []), label];
 				if (chat === active) scheduleRender(reply);
 				return;
+			}
+			case "step-output": {
+				const run = reply.runs?.find((candidate) => candidate.id === event.id);
+				if (run === undefined) return;
+				run.done = true;
+				run.output = event.output;
+				run.failed = event.failed;
+				if (event.code !== undefined) run.code = event.code;
+				if (chat === active) scheduleRender(reply);
+				return;
+			}
 			case "plan":
 				reply.plan = event.steps;
 				if (chat === active) scheduleRender(reply);

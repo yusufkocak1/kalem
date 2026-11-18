@@ -5,10 +5,12 @@
  * something asks the user first, through the permission gate; one that
  * works on the window (the document, a command) asks the renderer.
  */
+import { randomUUID } from "node:crypto";
 import type { WebContents } from "electron";
 import type { Settings } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
 import type { ClaudeEvent } from "../shared/claude.js";
+import { clipStepOutput } from "../shared/claude.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type {
@@ -166,11 +168,24 @@ const LOOKUP_TOOLS: readonly KalemTool[] = [
 			if (!answer.approved) {
 				return "The user did not allow it: the command was not run. Do not try again unless they ask.";
 			}
+			const id = randomUUID();
 			ctx.step({
 				tool: COMMAND_TOOL.name,
 				detail: command.length > 120 ? `${command.slice(0, 120)}…` : command,
+				id,
+				command,
+				...(reason === "" ? {} : { reason }),
 			});
-			return commandReport(command, await runCommand(command, folder, seconds), seconds);
+			const result = await runCommand(command, folder, seconds);
+			// The chat's terminal card shows what it printed (Claude Code's stream says it itself).
+			ctx.emit({
+				kind: "step-output",
+				id,
+				output: clipStepOutput(result.output.trimEnd()),
+				failed: result.code !== 0,
+				code: result.code,
+			});
+			return commandReport(command, result, seconds);
 		},
 	},
 	...CONFLUENCE_TOOLS.map(
