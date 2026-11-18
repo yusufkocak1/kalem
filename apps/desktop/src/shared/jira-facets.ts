@@ -115,6 +115,18 @@ export function splitChips(
 	return { chips, more };
 }
 
+/**
+ * The JQL for every issue in the sprints, whoever they are assigned to:
+ * what a sprint chosen in a list of one's own issues widens to. `null`
+ * when no sprint is named (only "none" chosen).
+ */
+export function sprintJql(sprints: Iterable<string>): string | null {
+	const names = [...sprints].filter((name) => name !== NONE);
+	if (names.length === 0) return null;
+	const quoted = names.map((name) => `"${name.replace(/["\\]/g, "\\$&")}"`);
+	return `sprint in (${quoted.join(", ")}) ORDER BY updated DESC`;
+}
+
 /** The facets kept from settings: known ones, each once; the defaults when nothing was kept. */
 export function facetsFrom(value: unknown): Facet[] {
 	if (!Array.isArray(value)) return [...DEFAULT_FACETS];

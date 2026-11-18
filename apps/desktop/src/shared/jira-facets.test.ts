@@ -11,7 +11,20 @@ import {
 	filterRows,
 	NONE,
 	splitChips,
+	sprintJql,
 } from "./jira-facets.js";
+
+describe("sprintJql", () => {
+	it("asks for every issue in the named sprints", () => {
+		expect(sprintJql(["Kırmızı Sprint 27"])).toBe(
+			'sprint in ("Kırmızı Sprint 27") ORDER BY updated DESC',
+		);
+		expect(sprintJql(['A "B"', NONE, "C"])).toBe(
+			'sprint in ("A \\"B\\"", "C") ORDER BY updated DESC',
+		);
+		expect(sprintJql([NONE])).toBeNull();
+	});
+});
 
 const row = (key: string, extra: Partial<JiraIssueRow> = {}): JiraIssueRow => ({
 	key,

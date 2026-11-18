@@ -11,6 +11,7 @@ import {
 	filterRows,
 	NONE,
 	splitChips,
+	sprintJql,
 } from "../shared/jira-facets.js";
 import { formatDuration, QUICK_HOURS, quickEntry } from "../shared/jira-worklog.js";
 import { el } from "./dom.js";
@@ -566,6 +567,21 @@ export function createJiraPane(options: JiraPaneOptions): {
 				render();
 			});
 			status.append(" ", clear);
+		}
+		// A sprint chosen among one's own issues: everyone's issues in it are a click away.
+		const everyone = sprintJql(selection.get("sprint") ?? []);
+		if (issues.length > 0 && everyone !== null && search.value.trim() !== everyone) {
+			const widen = el("button", {
+				class: "confluence-link jira-facets-clear",
+				text: t.jiraSprintEveryone,
+				attrs: { type: "button", title: everyone },
+			});
+			widen.addEventListener("click", () => {
+				clearTimeout(timer);
+				search.value = everyone;
+				void run(false);
+			});
+			status.append(" · ", widen);
 		}
 	}
 
