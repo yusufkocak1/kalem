@@ -16,7 +16,7 @@ import type {
 	JiraSprint,
 	JiraStatusChange,
 } from "./jira-fields.js";
-import { attachmentsOf, customFieldsOf, statusChangesOf } from "./jira-fields.js";
+import { attachmentsOf, customFieldsOf, sprintOf, statusChangesOf } from "./jira-fields.js";
 
 /** Jira's three kinds of status, which give a status its colour. */
 export type StatusCategory = "new" | "indeterminate" | "done" | "";
@@ -39,6 +39,9 @@ export interface JiraIssueRow extends JiraIssueRef {
 	readonly updated: string | null;
 	/** The issue a sub-task belongs to; `null` for any other issue. */
 	readonly parent: JiraIssueRef | null;
+	/** The sprint it is in (its open one, else its last); `""` for none, absent when not asked for. */
+	readonly sprintName?: string;
+	readonly labels?: readonly string[];
 }
 
 export interface JiraComment {
@@ -137,6 +140,7 @@ export const ROW_FIELDS = [
 	"assignee",
 	"updated",
 	"parent",
+	"labels",
 ] as const;
 
 /** Comments kept of an issue: the latest ones. */
@@ -324,7 +328,8 @@ export function issueRefOf(raw: unknown): JiraIssueRef | null {
 	};
 }
 
-export function issueRowOf(raw: unknown): JiraIssueRow | null {
+/** `sprintField`: the id of the site's sprint field, when the search asked for it. */
+export function issueRowOf(raw: unknown, sprintField: string | null = null): JiraIssueRow | null {
 	const ref = issueRefOf(raw);
 	if (ref === null) return null;
 	const fields = asJson(asJson(raw).fields);
@@ -334,6 +339,8 @@ export function issueRowOf(raw: unknown): JiraIssueRow | null {
 		priority: nameOf(fields.priority),
 		updated: date(fields.updated),
 		parent: issueRefOf(fields.parent),
+		labels: names(fields.labels),
+		...(sprintField === null ? {} : { sprintName: sprintOf(fields[sprintField])?.name ?? "" }),
 	};
 }
 

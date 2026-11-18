@@ -2,7 +2,16 @@ import type { JiraFavorite, KalemBridge } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type { IssueTypeKind, JiraIssueRef, JiraIssueRow } from "../shared/jira.js";
-import { groupByParent, issueTypeKind, typeCounts } from "../shared/jira.js";
+import { groupByParent, issueTypeKind } from "../shared/jira.js";
+import type { Facet, FacetCount } from "../shared/jira-facets.js";
+import {
+	FACETS,
+	facetCounts,
+	facetsFrom,
+	filterRows,
+	NONE,
+	splitChips,
+} from "../shared/jira-facets.js";
 import { formatDuration, QUICK_HOURS, quickEntry } from "../shared/jira-worklog.js";
 import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
@@ -33,6 +42,7 @@ const LISTS = {
 	mine: "assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC",
 	reported: "reporter = currentUser() ORDER BY updated DESC",
 	watching: "watcher = currentUser() AND resolution = Unresolved ORDER BY updated DESC",
+	sprint: "assignee = currentUser() AND sprint in openSprints() ORDER BY updated DESC",
 	recent: "ORDER BY updated DESC",
 } as const;
 /** The ready-made lists, and the starred issues, which are asked for by their keys. */
@@ -48,6 +58,29 @@ const TYPE_ICONS: Record<IssueTypeKind, IconName> = {
 	improvement: "typeImprovement",
 	other: "typeOther",
 };
+
+/** Where the facets the list is filtered by are kept, for this computer. */
+const FACETS_KEY = "kalem.jira.facets";
+
+function keptFacets(): Facet[] {
+	try {
+		const kept = localStorage.getItem(FACETS_KEY);
+		return facetsFrom(kept === null ? undefined : JSON.parse(kept));
+	} catch {
+		return facetsFrom(undefined);
+	}
+}
+
+function keepFacets(facets: readonly Facet[]): void {
+	try {
+		localStorage.setItem(FACETS_KEY, JSON.stringify(facets));
+	} catch {
+		// Not kept: the next window starts with the defaults.
+	}
+}
+
+/** A popup's list of more than this many values gets a box to find one by. */
+const FIND_FROM = 8;
 
 /** How many colours the assignees' avatars take turns with. */
 const AVATAR_TONES = 8;
@@ -118,14 +151,26 @@ export function createJiraPane(options: JiraPaneOptions): {
 				["mine", t.jiraPaneMine],
 				["reported", t.jiraPaneReported],
 				["watching", t.jiraPaneWatching],
+				["sprint", t.jiraPaneSprint],
 				["recent", t.jiraPaneRecent],
 				["favorites", `★ ${t.jiraFavorites}`],
 			] as const
 		).map(([value, label]) => el("option", { text: label, attrs: { value } })),
 	});
+	const filterButton = el("button", {
+		class: "jira-facets-button",
+		attrs: {
+			type: "button",
+			"aria-haspopup": "menu",
+			"aria-expanded": "false",
+			title: t.jiraFacetsMenuTitle,
+			"aria-label": t.jiraFacetsMenu,
+		},
+		children: [icon("filter")],
+	});
 	const types = el("div", {
-		class: "jira-type-filter",
-		attrs: { role: "group", "aria-label": t.jiraTypeFilter },
+		class: "jira-facets",
+		attrs: { role: "group", "aria-label": t.jiraFacetsMenu },
 	});
 	types.hidden = true;
 	const status = el("p", { class: "jira-message jira-pane-message" });
@@ -147,6 +192,7 @@ export function createJiraPane(options: JiraPaneOptions): {
 						children: [icon("find"), search],
 					}),
 					list,
+					filterButton,
 				],
 			}),
 			types,
@@ -172,8 +218,19 @@ export function createJiraPane(options: JiraPaneOptions): {
 	 */
 	const drawers = new Map<string, boolean>();
 	const startsOpen = (group: { row: unknown }): boolean => group.row === null;
-	/** The issue types shown; none means all of them. */
-	const selected = new Set<string>();
+	/** What the list can be filtered by, a row of chips each. */
+	let facets = keptFacets();
+	/** The values chosen, by facet; a facet with none chosen keeps every issue. */
+	const selection = new Map<Facet, Set<string>>();
+	const chosenOf = (facet: Facet): Set<string> => {
+		let chosen = selection.get(facet);
+		if (chosen === undefined) {
+			chosen = new Set();
+			selection.set(facet, chosen);
+		}
+		return chosen;
+	};
+	const filtering = (): boolean => [...selection.values()].some((chosen) => chosen.size > 0);
 
 	/** The connected Jira site, which the starred issues are kept by. */
 	let site: string | null = null;
@@ -217,40 +274,267 @@ export function createJiraPane(options: JiraPaneOptions): {
 		star.title = label;
 	}
 
-	const shownIssues = (): JiraIssueRow[] =>
-		selected.size === 0 ? issues : issues.filter((issue) => selected.has(issue.type));
+	const shownIssues = (): JiraIssueRow[] => filterRows(issues, selection);
+
+	const facetName = (facet: Facet): string =>
+		({
+			type: t.jiraFacetType,
+			status: t.jiraFacetStatus,
+			sprint: t.jiraFacetSprint,
+			assignee: t.jiraFacetAssignee,
+			priority: t.jiraFacetPriority,
+			project: t.jiraFacetProject,
+			label: t.jiraFacetLabel,
+		})[facet];
+	const valueName = (facet: Facet, value: string): string =>
+		value !== NONE ? value : facet === "assignee" ? t.jiraUnassigned : t.jiraFacetNone;
+
+	/** A value chosen or let go; every value chosen is the same as none: all are shown. */
+	function toggleValue(facet: Facet, value: string | null): void {
+		const chosen = chosenOf(facet);
+		if (value === null) chosen.clear();
+		else if (chosen.has(value)) chosen.delete(value);
+		else chosen.add(value);
+		const all = facetCounts(issues, facet);
+		if (all.length > 1 && all.every((entry) => chosen.has(entry.value))) chosen.clear();
+		render();
+	}
+
+	function setFacets(next: readonly Facet[]): void {
+		facets = FACETS.filter((facet) => next.includes(facet));
+		for (const facet of FACETS) if (!facets.includes(facet)) selection.delete(facet);
+		keepFacets(facets);
+		render();
+	}
 
 	function renderTypes(): void {
-		const counts = typeCounts(issues);
-		for (const type of selected) {
-			if (!counts.some((entry) => entry.type === type)) selected.delete(type);
+		// A value no loaded issue has any more (another list, another search) is let go.
+		for (const [facet, chosen] of selection) {
+			const present = new Set(facetCounts(issues, facet).map((entry) => entry.value));
+			for (const value of chosen) if (!present.has(value)) chosen.delete(value);
 		}
-		types.hidden = counts.length < 2 && selected.size === 0;
-		const chip = (label: string, count: number, pressed: boolean, type: string | null) => {
+		types.hidden = issues.length === 0 || facets.length === 0;
+		if (types.hidden) {
+			types.replaceChildren();
+			return;
+		}
+		types.replaceChildren(...facets.map(facetRow));
+	}
+
+	function facetRow(facet: Facet): HTMLElement {
+		const chosen = chosenOf(facet);
+		const counts = facetCounts(issues, facet, selection);
+		const { chips, more } = splitChips(counts, chosen);
+		const others = new Map(selection);
+		others.delete(facet);
+		const chip = (entry: FacetCount | null): HTMLButtonElement => {
+			const pressed = entry === null ? chosen.size === 0 : chosen.has(entry.value);
+			const label = entry === null ? t.jiraTypeAll : valueName(facet, entry.value);
+			const count = entry === null ? filterRows(issues, others).length : entry.count;
 			const button = el("button", {
 				class: "jira-type-chip",
-				attrs: { type: "button", "aria-pressed": String(pressed) },
+				attrs: {
+					type: "button",
+					"aria-pressed": String(pressed),
+					title: entry === null ? `${facetName(facet)}: ${label}` : label,
+				},
 				children: [
-					...(type === null ? [] : [typeBadge(type)]),
+					...(facet === "type" && entry !== null ? [typeBadge(entry.value)] : []),
 					el("span", { class: "jira-type-chip-label", text: label }),
 					el("span", { class: "jira-type-chip-count", text: String(count) }),
 				],
 			});
-			if (type !== null) button.dataset.type = type;
-			button.addEventListener("click", () => {
-				if (type === null) selected.clear();
-				else if (selected.has(type)) selected.delete(type);
-				else selected.add(type);
-				// Every type chosen is the same as none: show all.
-				if (selected.size === counts.length) selected.clear();
-				render();
-			});
+			if (entry !== null) {
+				button.dataset.value = entry.value;
+				if (facet === "type") button.dataset.type = entry.value;
+			}
+			button.addEventListener("click", () => toggleValue(facet, entry?.value ?? null));
 			return button;
 		};
-		types.replaceChildren(
-			chip(t.jiraTypeAll, issues.length, selected.size === 0, null),
-			...counts.map(({ type, count }) => chip(type, count, selected.has(type), type)),
+		const moreChip = el("button", {
+			class: "jira-type-chip jira-facet-more",
+			text: format(t.jiraFacetMore, more.length),
+			attrs: {
+				type: "button",
+				"aria-haspopup": "menu",
+				"aria-expanded": "false",
+				title: format(t.jiraFacetMoreTitle, more.length),
+			},
+		});
+		moreChip.addEventListener("click", () => showValues(facet, moreChip));
+		const remove = el("button", {
+			class: "jira-facet-remove",
+			attrs: {
+				type: "button",
+				title: format(t.jiraFacetRemove, facetName(facet)),
+				"aria-label": format(t.jiraFacetRemove, facetName(facet)),
+			},
+			children: [icon("close")],
+		});
+		remove.addEventListener("click", () => setFacets(facets.filter((each) => each !== facet)));
+		return el("div", {
+			class: "jira-facet-row",
+			attrs: { role: "group", "aria-label": facetName(facet), "data-facet": facet },
+			children: [
+				el("span", {
+					class: "jira-facet-head",
+					children: [el("span", { class: "jira-facet-name", text: facetName(facet) }), remove],
+				}),
+				chip(null),
+				...chips.map(chip),
+				...(more.length === 0 ? [] : [moreChip]),
+			],
+		});
+	}
+
+	// --- Popups: the facets the list can be filtered by, and a facet's other values ---
+	const popup = el("div", {
+		class: "dock-menu jira-facet-popup",
+		attrs: { role: "menu", hidden: "" },
+	});
+	document.body.append(popup);
+	let popupFor: HTMLElement | null = null;
+	const closePopup = (refocus = false): void => {
+		if (popup.hidden) return;
+		popup.hidden = true;
+		popupFor?.setAttribute("aria-expanded", "false");
+		if (refocus && popupFor?.isConnected) popupFor.focus();
+		popupFor = null;
+	};
+	document.addEventListener("mousedown", (event) => {
+		const target = event.target instanceof Node ? event.target : null;
+		if (target !== null && (popup.contains(target) || popupFor?.contains(target))) return;
+		closePopup();
+	});
+	popup.addEventListener("keydown", (event) => {
+		if (event.key === "Escape") {
+			event.stopPropagation();
+			closePopup(true);
+			return;
+		}
+		if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+		event.preventDefault();
+		const items = [...popup.querySelectorAll<HTMLElement>("[role=menuitemcheckbox]")].filter(
+			(item) => !item.hidden,
 		);
+		const index = items.indexOf(document.activeElement as HTMLElement);
+		const step = event.key === "ArrowDown" ? 1 : -1;
+		items[(index + step + items.length) % items.length]?.focus();
+	});
+
+	function openPopup(anchor: HTMLElement, children: HTMLElement[]): void {
+		const again = popupFor === anchor;
+		closePopup();
+		if (again) return;
+		popupFor = anchor;
+		anchor.setAttribute("aria-expanded", "true");
+		popup.replaceChildren(...children);
+		popup.hidden = false;
+		place(anchor);
+		popup.querySelector<HTMLElement>("input, [role=menuitemcheckbox]")?.focus();
+	}
+
+	function place(anchor: HTMLElement): void {
+		const at = anchor.getBoundingClientRect();
+		const box = popup.getBoundingClientRect();
+		popup.style.left = `${Math.max(4, Math.min(at.left, window.innerWidth - box.width - 4))}px`;
+		const below = at.bottom + 4;
+		popup.style.top = `${below + box.height > window.innerHeight - 4 ? Math.max(4, at.top - box.height - 4) : below}px`;
+	}
+
+	const checkItem = (
+		label: string,
+		checked: boolean,
+		count: number | null,
+		run: () => void,
+		lead: HTMLElement | null = null,
+	): HTMLButtonElement => {
+		const item = el("button", {
+			class: "dock-menu-item jira-facet-option",
+			attrs: { type: "button", role: "menuitemcheckbox", "aria-checked": String(checked) },
+			children: [
+				el("span", { class: "jira-facet-check", attrs: { "aria-hidden": "true" } }),
+				...(lead === null ? [] : [lead]),
+				el("span", { class: "jira-facet-option-label", text: label }),
+				...(count === null
+					? []
+					: [el("span", { class: "jira-type-chip-count", text: String(count) })]),
+			],
+		});
+		item.addEventListener("click", run);
+		return item;
+	};
+
+	filterButton.addEventListener("click", () => {
+		openPopup(filterButton, [
+			el("div", { class: "jira-menu-heading", text: t.jiraFacetsMenu }),
+			...FACETS.map((facet) => {
+				const item = checkItem(facetName(facet), facets.includes(facet), null, () => {
+					const on = !facets.includes(facet);
+					setFacets(on ? [...facets, facet] : facets.filter((each) => each !== facet));
+					item.setAttribute("aria-checked", String(on));
+					place(filterButton);
+				});
+				return item;
+			}),
+		]);
+	});
+
+	/** All of a facet's values, chosen ones ticked; choosing keeps the popup open. */
+	function showValues(facet: Facet, anchor: HTMLElement): void {
+		const counts = facetCounts(issues, facet, selection);
+		const chosen = chosenOf(facet);
+		const empty = el("p", { class: "jira-facet-empty", text: t.jiraFacetNoValue });
+		empty.hidden = true;
+		const items = counts.map((entry) => {
+			const item = checkItem(
+				valueName(facet, entry.value),
+				chosen.has(entry.value),
+				entry.count,
+				() => {
+					toggleValue(facet, entry.value);
+					for (const each of items) {
+						each.setAttribute(
+							"aria-checked",
+							String(chosenOf(facet).has(each.dataset.value ?? "")),
+						);
+					}
+				},
+				facet === "type" ? typeBadge(entry.value) : null,
+			);
+			item.dataset.value = entry.value;
+			return item;
+		});
+		const find = el("input", {
+			class: "jira-facet-find",
+			attrs: { type: "search", placeholder: t.jiraFacetFind, "aria-label": t.jiraFacetFind },
+		});
+		find.addEventListener("input", () => {
+			// Both ways lower-cased: "I" is "ı" in Turkish and "i" in English.
+			const lower = (text: string): string[] => [
+				text.toLocaleLowerCase("tr"),
+				text.toLocaleLowerCase("en"),
+			];
+			const words = lower(find.value.trim());
+			for (const item of items) {
+				const text = lower(item.textContent ?? "");
+				item.hidden = !text.some((each) => words.some((word) => each.includes(word)));
+			}
+			empty.hidden = items.some((item) => !item.hidden);
+		});
+		find.addEventListener("keydown", (event) => {
+			if (event.key === "ArrowDown") {
+				event.preventDefault();
+				items.find((item) => !item.hidden)?.focus();
+			}
+		});
+		openPopup(anchor, [
+			el("div", { class: "jira-menu-heading", text: facetName(facet) }),
+			...(counts.length > FIND_FROM ? [find] : []),
+			el("div", { class: "jira-facet-options", children: [...items, empty] }),
+		]);
+		// The chips are drawn again on every choice: the popup stays by the facet's row.
+		popupFor = anchor;
 	}
 
 	function renderStatus(): void {
@@ -266,11 +550,23 @@ export function createJiraPane(options: JiraPaneOptions): {
 				? t.jiraNoIssues
 				: shown === 0
 					? t.jiraNoTypeMatch
-					: selected.size > 0
+					: filtering()
 						? format(t.jiraFiltered, shown, issues.length)
 						: total === null
 							? ""
 							: format(t.jiraCount, issues.length, total);
+		if (issues.length > 0 && filtering()) {
+			const clear = el("button", {
+				class: "confluence-link jira-facets-clear",
+				text: t.jiraFacetsClear,
+				attrs: { type: "button" },
+			});
+			clear.addEventListener("click", () => {
+				selection.clear();
+				render();
+			});
+			status.append(" ", clear);
+		}
 	}
 
 	const row = (

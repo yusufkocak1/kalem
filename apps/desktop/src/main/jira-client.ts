@@ -38,6 +38,7 @@ import {
 	labelsBody,
 	objectOptionsOf,
 	optionsOf,
+	SPRINT_SCHEMA,
 	userOf,
 } from "../shared/jira-fields.js";
 import type {
@@ -296,12 +297,28 @@ export class JiraClient {
 		return row;
 	}
 
+	/**
+	 * The id of the site's sprint field (Jira Software's), which a search
+	 * asks for so its rows can be narrowed by sprint; `null` where there is none.
+	 */
+	async #sprintField(): Promise<string | null> {
+		// A site that does not answer has none, for a while: the search goes on without it.
+		return keep(`${this.#keptKey}\nsprint-field`, 12 * 60 * MINUTE, async () => {
+			const fields = await this.#get("/rest/api/2/field", true).catch(() => []);
+			const sprint = asArray(fields)
+				.map(asJson)
+				.find((field) => asString(asJson(field.schema).custom) === SPRINT_SCHEMA);
+			return sprint === undefined ? null : asString(sprint.id) || null;
+		});
+	}
+
 	/** A JQL search's issues; `next` continues an earlier answer. */
 	async search(jql: string, next: string | null = null): Promise<JiraSearchResults> {
+		const sprintField = await this.#sprintField();
 		const params = new URLSearchParams({
 			jql,
 			maxResults: String(JIRA_PAGE_SIZE),
-			fields: ROW_FIELDS.join(","),
+			fields: [...ROW_FIELDS, ...(sprintField === null ? [] : [sprintField])].join(","),
 		});
 		if (this.cloud) {
 			if (next !== null) params.set("nextPageToken", next);
@@ -309,7 +326,7 @@ export class JiraClient {
 			const token = asString(body.nextPageToken);
 			return {
 				jql,
-				issues: rows(body.issues),
+				issues: rows(body.issues, sprintField),
 				total: typeof body.total === "number" ? body.total : null,
 				next: token === "" || body.isLast === true ? null : token,
 			};
@@ -318,7 +335,7 @@ export class JiraClient {
 		if (!Number.isInteger(start) || start < 0) throw new Error("Invalid search cursor");
 		params.set("startAt", String(start));
 		const body = await this.#json(`/rest/api/2/search?${params.toString()}`);
-		const issues = rows(body.issues);
+		const issues = rows(body.issues, sprintField);
 		const total = typeof body.total === "number" ? body.total : null;
 		const end = start + issues.length;
 		return {
@@ -990,8 +1007,8 @@ const nameOf = (value: unknown): string => {
 	return asString(record.displayName) || asString(record.name);
 };
 
-const rows = (value: unknown) =>
+const rows = (value: unknown, sprintField: string | null = null) =>
 	asArray(value).flatMap((item) => {
-		const row = issueRowOf(item);
+		const row = issueRowOf(item, sprintField);
 		return row === null ? [] : [row];
 	});
