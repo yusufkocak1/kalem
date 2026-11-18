@@ -3099,7 +3099,7 @@ button {
 	list-style: none;
 }
 
-.git-files label {
+.git-files li {
 	display: flex;
 	align-items: center;
 	gap: 6px;
@@ -3107,7 +3107,7 @@ button {
 	font-size: 12px;
 }
 
-.git-files label:hover {
+.git-files li:hover {
 	background: var(--app-hover);
 }
 
@@ -3138,6 +3138,72 @@ button {
 	font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+button.git-file-path {
+	flex: 1;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font-size: inherit;
+	text-align: start;
+	cursor: default;
+}
+
+.git-files.can-diff button.git-file-path {
+	cursor: pointer;
+}
+
+.git-files.can-diff button.git-file-path:hover {
+	text-decoration: underline;
+}
+
+.git-files li.selected {
+	background: color-mix(in srgb, var(--app-accent) 16%, transparent);
+}
+
+.git-dialog.git-commit.with-diff {
+	width: min(960px, calc(100vw - 32px));
+	margin-top: 6vh;
+}
+
+.git-commit-diff {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	min-height: 0;
+}
+
+.git-commit-diff[hidden] {
+	display: none;
+}
+
+.git-commit-diff-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	color: var(--app-muted);
+	font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+	font-size: 12px;
+}
+
+.git-commit-diff-path {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.git-commit-diff-close {
+	padding: 0 8px;
+	font-size: 14px;
+	line-height: 20px;
+}
+
+.git-commit-diff .git-diff {
+	height: min(340px, 40vh);
 }
 
 .git-message-head {

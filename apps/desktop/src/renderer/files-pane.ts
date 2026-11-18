@@ -884,6 +884,7 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 			files,
 			suggest: (paths) =>
 				bridge.gitSuggestMessage(root, paths.length === files.length ? undefined : paths),
+			diff: (path) => bridge.gitDiff(root, path),
 		});
 		if (answer === null) return;
 		await runGit(root, {
