@@ -5,6 +5,7 @@ import { format } from "../shared/i18n.js";
 import { mcpInstructions, serversNamed } from "../shared/mcp-servers.js";
 import type { Mode, ResolvedMode, ResolvedStep } from "../shared/mode-config.js";
 import {
+	canRunParallel,
 	DETAILS,
 	MODES,
 	modeInstructions,
@@ -21,6 +22,7 @@ import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
 import { createMcpChoice } from "./mcp-editor.js";
+import { parallelMarks, runOrder, stepRunButton } from "./step-run-ui.js";
 
 /** Each mode's mark, in the picker and in Settings. */
 export const MODE_ICONS: Readonly<Record<Mode | "auto", IconName>> = {
@@ -290,6 +292,9 @@ export function createModeEditor(options: ModeEditorOptions): {
 								]),
 					],
 				}),
+				...(mode.parallel && canRunParallel(selected, step)
+					? [stepRunButton(t, step.parallel, (parallel) => changeStep(step.id, { parallel }))]
+					: []),
 				el("span", {
 					class: "mode-step-actions",
 					children: [
@@ -372,7 +377,11 @@ export function createModeEditor(options: ModeEditorOptions): {
 		}
 		const row = el("li", {
 			class: "mode-step",
-			attrs: { "data-step": step.id, ...(step.on ? {} : { "data-off": "" }) },
+			attrs: {
+				"data-step": step.id,
+				...(step.on ? {} : { "data-off": "" }),
+				...parallelMarks(mode.parallel, mode.steps, index),
+			},
 			children,
 		});
 		return row;
@@ -437,6 +446,7 @@ export function createModeEditor(options: ModeEditorOptions): {
 						titleKey: null,
 						instruction: t.stepAdd,
 						defaultInstruction: "",
+						parallel: selected === "review",
 					},
 				],
 			});
@@ -515,9 +525,6 @@ export function createModeEditor(options: ModeEditorOptions): {
 				const value = Math.max(0, Math.min(200, Math.round(Number(most.value) || 0)));
 				change({ maxFindings: value }, false);
 			});
-			const parallel = el("input", { attrs: { type: "checkbox" } });
-			parallel.checked = mode.parallel;
-			parallel.addEventListener("change", () => change({ parallel: parallel.checked }, false));
 			reviewOnly.push(
 				pills(
 					t.modeMinSeverity,
@@ -530,9 +537,11 @@ export function createModeEditor(options: ModeEditorOptions): {
 					class: "mode-field",
 					children: [el("span", { class: "mode-label", text: t.modeMaxFindings }), most],
 				}),
-				el("label", { class: "settings-check", children: [parallel, t.modeParallel] }),
 			);
 		}
+		const parallel = el("input", { attrs: { type: "checkbox" } });
+		parallel.checked = mode.parallel;
+		parallel.addEventListener("change", () => change({ parallel: parallel.checked }));
 
 		panel.replaceChildren(
 			el("div", {
@@ -565,6 +574,7 @@ export function createModeEditor(options: ModeEditorOptions): {
 					el("h4", { text: t.modeStepsTitle }),
 					el("p", { class: "mode-section-hint", text: t.modeStepsHint }),
 					steps,
+					...(mode.parallel ? [runOrder(t, mode.steps, selected === "review")] : []),
 					add,
 				],
 			}),
@@ -594,6 +604,7 @@ export function createModeEditor(options: ModeEditorOptions): {
 							...reviewOnly,
 						],
 					}),
+					el("label", { class: "settings-check", children: [parallel, t.modeParallel] }),
 					el("label", {
 						class: "mode-field",
 						children: [el("span", { class: "mode-label", text: t.modeKeywords }), keywords],

@@ -292,6 +292,8 @@ export interface StoredStep {
 	readonly title?: string;
 	readonly instruction?: string;
 	readonly custom?: boolean;
+	/** Runs at the same time as the steps next to it that are parallel too; else on its own, in order. */
+	readonly parallel?: boolean;
 }
 
 /** A mode as the user shaped it; a missing field is the default. */
@@ -310,7 +312,10 @@ export interface StoredMode {
 	readonly minSeverity?: SeverityFloor;
 	/** Review: at most this many findings; 0 for no limit. */
 	readonly maxFindings?: number;
-	/** Review: a CLI runs the checks side by side, one reviewer each; on unless turned off. */
+	/**
+	 * A CLI runs the steps marked parallel at the same time, each by a worker
+	 * of its own, and the others one by one; on by default in the review.
+	 */
 	readonly parallel?: boolean;
 	/** The assistant's MCP servers Claude Code and the Copilot CLI connect to in this mode, by name. */
 	readonly mcp?: readonly string[];
@@ -330,6 +335,8 @@ export interface ResolvedStep {
 	/** The text Kalem ships, for a reset; empty for the user's own. */
 	readonly defaultInstruction: string;
 	readonly tool?: string;
+	/** Runs at the same time as the parallel steps next to it. */
+	readonly parallel: boolean;
 }
 
 export interface ResolvedMode {
@@ -355,6 +362,24 @@ export const DEFAULT_MODE_SERVERS: Readonly<Record<Mode, readonly string[]>> = {
 	code: ["serena"],
 	app: [],
 };
+
+/** The review's steps that are not checks: they are never run by a worker of their own. */
+const REVIEW_FIXED: ReadonlySet<string> = new Set(["lint", "report", "summary"]);
+
+/** Whether a step may run parallel: every step, but the review's rules, report and summary. */
+export const canRunParallel = (
+	mode: string,
+	step: { readonly id: string; readonly custom?: boolean },
+): boolean => mode !== "review" || step.custom === true || !REVIEW_FIXED.has(step.id);
+
+/** A step's default: the review's checks run parallel, every other step on its own. */
+const parallelByDefault = (
+	mode: Mode,
+	step: { readonly id: string; readonly custom?: boolean },
+): boolean => mode === "review" && canRunParallel(mode, step);
+
+/** Whether a mode runs its steps by workers unless the user says otherwise: the review does. */
+const modeParallelByDefault = (mode: Mode): boolean => mode === "review";
 
 const sameNames = (a: readonly string[], b: readonly string[]): boolean =>
 	a.length === b.length && a.every((name, index) => name === b[index]);
@@ -395,6 +420,7 @@ export function parseModeSettings(raw: unknown): ModeSettings {
 								...(title === "" ? {} : { title }),
 								...(instruction === "" ? {} : { instruction }),
 								...(custom ? { custom: true } : {}),
+								...(typeof step.parallel === "boolean" ? { parallel: step.parallel } : {}),
 							},
 						];
 					})
@@ -451,6 +477,8 @@ export function resolveMode(mode: Mode, settings: ModeSettings = {}): ResolvedMo
 				instruction: step.instruction ?? builtin.instruction,
 				defaultInstruction: builtin.instruction,
 				...(builtin.tool === undefined ? {} : { tool: builtin.tool }),
+				parallel:
+					canRunParallel(mode, builtin) && (step.parallel ?? parallelByDefault(mode, builtin)),
 			});
 		} else if (step.custom === true && step.instruction !== undefined) {
 			steps.push({
@@ -461,6 +489,7 @@ export function resolveMode(mode: Mode, settings: ModeSettings = {}): ResolvedMo
 				titleKey: null,
 				instruction: step.instruction,
 				defaultInstruction: "",
+				parallel: step.parallel ?? parallelByDefault(mode, step),
 			});
 		}
 	}
@@ -476,6 +505,7 @@ export function resolveMode(mode: Mode, settings: ModeSettings = {}): ResolvedMo
 			instruction: builtin.instruction,
 			defaultInstruction: builtin.instruction,
 			...(builtin.tool === undefined ? {} : { tool: builtin.tool }),
+			parallel: parallelByDefault(mode, builtin),
 		});
 	}
 	return {
@@ -488,7 +518,7 @@ export function resolveMode(mode: Mode, settings: ModeSettings = {}): ResolvedMo
 		keywords: stored.keywords ?? [],
 		minSeverity: stored.minSeverity ?? "low",
 		maxFindings: stored.maxFindings ?? 0,
-		parallel: stored.parallel ?? true,
+		parallel: stored.parallel ?? modeParallelByDefault(mode),
 		mcp: stored.mcp ?? DEFAULT_MODE_SERVERS[mode],
 	};
 }
@@ -506,7 +536,8 @@ export function storeMode(resolved: ResolvedMode): StoredMode {
 				step.id === base.id &&
 				step.on === base.on &&
 				step.title === null &&
-				step.instruction === base.instruction
+				step.instruction === base.instruction &&
+				step.parallel === base.parallel
 			);
 		});
 	return {
@@ -522,6 +553,9 @@ export function storeMode(resolved: ResolvedMode): StoredMode {
 							? { instruction: step.instruction }
 							: {}),
 						...(step.custom ? { custom: true } : {}),
+						...(step.parallel === parallelByDefault(resolved.mode, step)
+							? {}
+							: { parallel: step.parallel }),
 					})),
 				}),
 		...(resolved.detail === "normal" ? {} : { detail: resolved.detail }),
@@ -530,7 +564,9 @@ export function storeMode(resolved: ResolvedMode): StoredMode {
 		...(resolved.keywords.length === 0 ? {} : { keywords: resolved.keywords }),
 		...(resolved.minSeverity === "low" ? {} : { minSeverity: resolved.minSeverity }),
 		...(resolved.maxFindings === 0 ? {} : { maxFindings: resolved.maxFindings }),
-		...(resolved.parallel ? {} : { parallel: false }),
+		...(resolved.parallel === modeParallelByDefault(resolved.mode)
+			? {}
+			: { parallel: resolved.parallel }),
 		...(sameNames(resolved.mcp, DEFAULT_MODE_SERVERS[resolved.mode]) ? {} : { mcp: resolved.mcp }),
 	};
 }

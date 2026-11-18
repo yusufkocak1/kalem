@@ -50,6 +50,8 @@ export interface CustomMode {
 	readonly detail: Detail;
 	readonly language: ReplyLanguage;
 	readonly enabled: boolean;
+	/** A CLI runs the steps marked parallel at the same time, a worker each, and the others one by one. */
+	readonly parallel: boolean;
 }
 
 export const isCustomModeId = (value: unknown): value is string =>
@@ -92,6 +94,7 @@ export function parseCustomModes(raw: unknown): CustomMode[] {
 								title: text(step.title, 120) || instruction.slice(0, 60),
 								instruction,
 								custom: true,
+								...(step.parallel === true ? { parallel: true } : {}),
 							},
 						];
 					})
@@ -113,6 +116,7 @@ export function parseCustomModes(raw: unknown): CustomMode[] {
 						? (mode.language as ReplyLanguage)
 						: "auto",
 					enabled: mode.enabled !== false,
+					parallel: mode.parallel === true,
 				},
 			];
 		})
@@ -137,6 +141,7 @@ export function newCustomMode(name: string, taken: readonly CustomMode[]): Custo
 		detail: "normal",
 		language: "auto",
 		enabled: true,
+		parallel: false,
 	};
 }
 

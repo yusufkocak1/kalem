@@ -547,7 +547,7 @@ test("modes: shaped in Settings (a step off, one of the user's own), and picked 
 	await picker.click();
 	await pane.getByRole("menuitem", { name: "Customize modes…" }).click();
 	await settings.locator('.mode-tab[data-mode="review"]').click();
-	await settings.getByLabel(/Run the checks side by side/).uncheck();
+	await settings.getByLabel(/Run steps in parallel/).uncheck();
 	await settings.getByRole("button", { name: "Done" }).click();
 	await pane.getByRole("button", { name: "New chat" }).first().click();
 	await pane.locator(".assistant-input").fill("Bu analizi geliştirme öncesi incele");

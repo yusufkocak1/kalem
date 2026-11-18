@@ -1,13 +1,16 @@
 /**
- * A review run side by side: each check of the review mode goes to a
- * reviewer of its own (a CLI process), all of them at once, and what they
- * find is put together into one list. The conversation itself then only
+ * A review run by reviewers: each check of the review mode goes to a
+ * reviewer of its own (a CLI process); the checks marked parallel that
+ * stand next to each other run at once, the others one by one, in order,
+ * each told what was found before it. What they find is put together into
+ * one list. The conversation itself then only
  * sums up. This says who checks what and what each is told; running them
  * is the main process's work. Pure.
  */
 import type { Finding, FindingKind } from "./findings.js";
 import type { ModeSettings, ResolvedMode, ResolvedStep } from "./mode-config.js";
 import { resolveMode, storeMode } from "./mode-config.js";
+import { stagesOf } from "./step-stages.js";
 
 /** At most this many reviewers run at once; more checks share them. */
 export const MAX_REVIEWERS = 6;
@@ -24,6 +27,10 @@ export interface Reviewer {
 	readonly steps: readonly ResolvedStep[];
 	/** The modes with the review cut down to its checks and the report. */
 	readonly modes: ModeSettings;
+	/** The stage it runs in: every reviewer of a stage at once, a stage after the ones before it. */
+	readonly stage: number;
+	/** It runs next to others. */
+	readonly parallel: boolean;
 }
 
 export interface ReviewPlan {
@@ -39,7 +46,7 @@ export interface ReviewPlan {
 }
 
 const REVIEWER_NOTE =
-	"You are one of several reviewers reading this document at the same time, each with a check of its own: do only the check above and leave the rest to the others. Report problems with report_findings as you find them (you may call it more than once). The whole document is in the question: do not read it again with the tools. Do not change the document or anything else. When you are done, reply with one short line.";
+	"You are one of several reviewers of this document, each with a check of its own: do only the check above and leave the rest to the others. Report problems with report_findings as you find them (you may call it more than once). The whole document is in the question: do not read it again with the tools. Do not change the document or anything else. When you are done, reply with one short line.";
 
 const SUMMARY_NOTE =
 	"The checks of this review were already made, side by side, and the user sees the findings in the review list: do not check the document again, and do not call report_findings or analysis_lint.";
@@ -85,17 +92,23 @@ export function reviewPlan(
 				(step.id !== CODE || options.hasWorkspace)),
 	);
 	if (checks.length < 2) return null;
-	const groups: ResolvedStep[][] = [];
-	checks.forEach((step, index) => {
-		if (index < MAX_REVIEWERS) groups.push([step]);
-		else groups[index % MAX_REVIEWERS]?.push(step);
+	const groups: { steps: ResolvedStep[]; stage: number; parallel: boolean }[] = [];
+	stagesOf(checks).forEach((stage, at) => {
+		const first = groups.length;
+		stage.steps.forEach((step, index) => {
+			if (index < MAX_REVIEWERS)
+				groups.push({ steps: [step], stage: at, parallel: stage.parallel });
+			else groups[first + (index % MAX_REVIEWERS)]?.steps.push(step);
+		});
 	});
 	const each =
 		resolved.maxFindings === 0 ? 0 : Math.max(1, Math.ceil(resolved.maxFindings / groups.length));
 	return {
 		lint: builtin(LINT),
-		reviewers: groups.map((steps) => ({
+		reviewers: groups.map(({ steps, stage, parallel }) => ({
 			steps,
+			stage,
+			parallel,
 			modes: variant(
 				settings,
 				resolved,
@@ -185,10 +198,35 @@ export class FindingMerger {
 
 const tag = (text: string): string => text.replace(/\s+/g, " ").trim();
 
-/** What a reviewer is asked: the question with the document, and what the rules found already. */
-export function reviewerQuestion(prompt: string, lint: string): string {
-	if (lint.trim() === "") return prompt;
-	return `${prompt}\n\n<already-found>\nKalem's rule checks found these and the user sees them: do not report them again.\n${lint.trim()}\n</already-found>`;
+/**
+ * What a reviewer is asked: the question with the document, what the rules
+ * found already, and what the checks before it found.
+ */
+export function reviewerQuestion(
+	prompt: string,
+	lint: string,
+	found: readonly Finding[] = [],
+): string {
+	const parts = [prompt];
+	if (lint.trim() !== "") {
+		parts.push(
+			`<already-found>\nKalem's rule checks found these and the user sees them: do not report them again.\n${lint.trim()}\n</already-found>`,
+		);
+	}
+	const earlier = found.filter((finding) => finding.rule !== true);
+	if (earlier.length > 0) {
+		parts.push(
+			`<found-by-earlier-checks>\nThe checks before yours found these and the user sees them: do not report them again; build on them where your check needs to.\n${earlier
+				.map(
+					(finding) =>
+						`${finding.id} [${finding.severity}, ${finding.kind}]: ${tag(finding.problem).slice(0, 300)}${
+							finding.quote === "" ? "" : ` — "${tag(finding.quote).slice(0, 160)}"`
+						}`,
+				)
+				.join("\n")}\n</found-by-earlier-checks>`,
+		);
+	}
+	return parts.join("\n\n");
 }
 
 /** What the conversation is asked once the reviewers are done: the question, and what they found. */

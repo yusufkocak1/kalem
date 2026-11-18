@@ -64,10 +64,18 @@ import {
 	SUGGESTED_MODELS,
 } from "../shared/providers.js";
 import { reviewPlan, summaryQuestion } from "../shared/review-plan.js";
+import {
+	FINAL_COMBINE_NOTE,
+	FINAL_REST_NOTE,
+	stepPlan,
+	withEarlierSteps,
+	withOnlySteps,
+	workerNote,
+} from "../shared/step-stages.js";
 import type { ChatStore } from "./assistant-chats.js";
 import { ConfluenceLookups } from "./assistant-confluence.js";
 import { JiraLookups } from "./assistant-jira.js";
-import type { AssistantToolServer } from "./assistant-mcp.js";
+import type { AssistantToolServer, McpRun } from "./assistant-mcp.js";
 import { MCP_SERVER, mcpToolName } from "./assistant-mcp.js";
 import { PermissionGate } from "./assistant-permissions.js";
 import type { Connections, DocumentSnapshot, ToolContext, ToolResult } from "./assistant-tools.js";
@@ -75,6 +83,7 @@ import { allTools, approver, RendererCalls, runTool, toolsFor } from "./assistan
 import { ModelCatalog } from "./model-catalog.js";
 import { networkLog } from "./network-log.js";
 import { ReviewRun, ReviewRuns } from "./review-run.js";
+import { StepRun } from "./step-run.js";
 import "./assistant-app-tools.js";
 import "./assistant-form-tools.js";
 import "./assistant-analysis-tools.js";
@@ -622,7 +631,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			typeof request.sessionId === "string" && /^[\w-]{1,100}$/.test(request.sessionId)
 				? request.sessionId
 				: null;
-		// A review a CLI may run side by side: the question as each reviewer is asked it.
+		// A review, or a mode's steps, a CLI may run by workers: the question as each worker is asked it.
 		const reviewPrompt =
 			typeof request.reviewPrompt === "string" && request.reviewPrompt.trim() !== ""
 				? request.reviewPrompt
@@ -784,8 +793,10 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 						.catch(() => null)
 				: null;
 		let way: LookupWay = program === null ? "tools" : mcpRun === null ? "block" : "mcp";
-		// The modes the answer is given in: a review run side by side leaves it only the summary.
+		// The modes the answer is given in: a review run by reviewers leaves it only the summary,
+		// a mode's steps run by workers only what they left.
 		let answerModes = modeSettings;
+		let answerCustom = customModes;
 		const instructionsFor = (lookupWay: LookupWay): string =>
 			assistantInstructions(t, {
 				way: lookupWay,
@@ -794,7 +805,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				tools: definitions,
 				mode: askedModes,
 				modes: answerModes,
-				custom: customModes,
+				custom: answerCustom,
 				autoModes: choices,
 				document: tools.document,
 				template: templateGiven,
@@ -889,7 +900,81 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 							...(way === "mcp" && mcpRun !== null ? { mcpConfig: mcpRun.copilot } : {}),
 						});
 			let stopped = false;
-			// A review's checks, each by a reviewer of its own, all at once; the answer then sums up.
+			const children = new Set<ChildProcess>();
+			const stopAll = (): void => {
+				stopped = true;
+				gate.cancel(sender, chatId);
+				for (const child of children) child.kill();
+			};
+			const isStopped = (): boolean => stopped || sender.isDestroyed();
+			/** Runs a worker (a reviewer, or a step's) to its end: a CLI of its own, kept nowhere. */
+			const askWorker = async (
+				workerSystem: string,
+				workerQuestion: string,
+				run: McpRun | null,
+				workerTools: readonly string[],
+				sendTo: (event: ClaudeEvent) => void,
+				workerStopped: () => boolean,
+				withServers = false,
+			): Promise<void> => {
+				const persist =
+					program === "claude" && (await clis.claude.help()).includes("--no-session-persistence")
+						? ["--no-session-persistence"]
+						: [];
+				const jsonInput = program === "claude" && images.length > 0;
+				await runCli(
+					launch,
+					folder,
+					program === "claude"
+						? [
+								...claudeArgs({
+									sessionId: null,
+									systemPrompt: workerSystem,
+									model: connection.model,
+									jsonInput,
+									folders: files.folders,
+									...(run === null
+										? {}
+										: {
+												mcp: {
+													config: run.claude,
+													tools: [
+														...workerTools.map(mcpToolName),
+														...(withServers ? claudeAllowed(servers) : []),
+													],
+												},
+												denied,
+											}),
+								}),
+								...persist,
+							]
+						: copilotArgs({
+								sessionId: randomUUID(),
+								model: connection.model,
+								folders: files.folders,
+								...(run === null ? {} : { mcpConfig: run.copilot }),
+							}),
+					program === "claude"
+						? jsonInput
+							? claudeInputLine(workerQuestion, images)
+							: workerQuestion
+						: withInstructions(workerSystem, workerQuestion),
+					program === "claude" ? claudeOutput() : textOutput(),
+					(cliEvent) => {
+						if (cliEvent.kind === "model")
+							void catalog.learn(connection.model, cliEvent.model).catch(() => {});
+						sendTo(cliEvent);
+					},
+					sender,
+					(child) => {
+						children.add(child);
+						child.once("close", () => children.delete(child));
+						if (workerStopped()) child.kill();
+					},
+					env,
+				);
+			};
+			// A review's checks, each by a reviewer of its own, stage by stage; the answer then sums up.
 			const plan =
 				askedModes === "review" &&
 				reviewPrompt !== null &&
@@ -899,12 +984,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 					? reviewPlan(modeSettings, { hasWorkspace: workspace !== null })
 					: null;
 			if (plan !== null) {
-				const children = new Set<ChildProcess>();
-				running.set(runKey, () => {
-					stopped = true;
-					gate.cancel(sender, chatId);
-					for (const child of children) child.kill();
-				});
+				running.set(runKey, stopAll);
 				const review = new ReviewRun({
 					plan,
 					t,
@@ -925,58 +1005,11 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 							template: templateGiven,
 						}),
 					question: withSources(files.text, undefined, reviewPrompt ?? asked),
-					ask: async (system, question, run, reviewerTools, send, isStopped) => {
-						const persist =
-							program === "claude" &&
-							(await clis.claude.help()).includes("--no-session-persistence")
-								? ["--no-session-persistence"]
-								: [];
-						const jsonInput = program === "claude" && images.length > 0;
-						await runCli(
-							launch,
-							folder,
-							program === "claude"
-								? [
-										...claudeArgs({
-											sessionId: null,
-											systemPrompt: system,
-											model: connection.model,
-											jsonInput,
-											folders: files.folders,
-											mcp: { config: run.claude, tools: reviewerTools.map(mcpToolName) },
-											denied,
-										}),
-										...persist,
-									]
-								: copilotArgs({
-										sessionId: randomUUID(),
-										model: connection.model,
-										folders: files.folders,
-										mcpConfig: run.copilot,
-									}),
-							program === "claude"
-								? jsonInput
-									? claudeInputLine(question, images)
-									: question
-								: withInstructions(system, question),
-							program === "claude" ? claudeOutput() : textOutput(),
-							(cliEvent) => {
-								if (cliEvent.kind === "model")
-									void catalog.learn(connection.model, cliEvent.model).catch(() => {});
-								send(cliEvent);
-							},
-							sender,
-							(child) => {
-								children.add(child);
-								child.once("close", () => children.delete(child));
-								if (isStopped()) child.kill();
-							},
-							env,
-						);
-					},
+					ask: (system, question, run, reviewerTools, send, workerStopped) =>
+						askWorker(system, question, run, reviewerTools, send, workerStopped),
 				});
 				reviews.add(review);
-				const reviewed = await review.run(() => stopped || sender.isDestroyed());
+				const reviewed = await review.run(isStopped);
 				if (stopped) {
 					await mcpRun?.close();
 					running.delete(runKey);
@@ -1001,6 +1034,83 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 						if (added.length > 0) forward({ kind: "findings", findings: added, review: review.id });
 					};
 					answerModes = plan.summary;
+					system = instructionsFor(way);
+				}
+			}
+			// A mode's steps by workers: one by one, the parallel ones at once; the answer does the rest.
+			const steps =
+				plan === null &&
+				typeof askedModes === "string" &&
+				reviewPrompt !== null &&
+				(way === "mcp" || !needsMcp)
+					? stepPlan(askedModes, modeSettings, customModes)
+					: null;
+			if (steps !== null) {
+				running.set(runKey, stopAll);
+				const workerServers = ownServers
+					? { claude: claudeServers(servers), copilot: copilotServers(servers) }
+					: undefined;
+				const stepRun = new StepRun({
+					plan: steps,
+					t,
+					tools,
+					forward,
+					open: (workerTools, run) =>
+						workerTools.length === 0 && !ownServers
+							? Promise.resolve(null)
+							: ctx.tools.open(() => workerTools, run, workerServers),
+					instructions: (step, parallel, workerTools) => {
+						const cut = withOnlySteps(
+							askedModes,
+							new Set([step.id]),
+							workerNote(parallel),
+							modeSettings,
+							customModes,
+						);
+						return assistantInstructions(t, {
+							way: "mcp",
+							confluence: lookups?.site ?? null,
+							jira: jiraLookups?.site ?? null,
+							tools: workerTools,
+							mode: askedModes,
+							modes: cut.modes,
+							custom: cut.custom,
+							document: tools.document,
+							template: templateGiven,
+							servers: ownServers ? servers : [],
+						});
+					},
+					question: withSources(files.text, undefined, reviewPrompt ?? asked),
+					ask: (workerSystem, workerQuestion, run, workerTools, sendTo, workerStopped) =>
+						askWorker(
+							workerSystem,
+							workerQuestion,
+							run,
+							workerTools,
+							sendTo,
+							workerStopped,
+							ownServers,
+						),
+				});
+				const done = await stepRun.run(isStopped);
+				if (stopped) {
+					await mcpRun?.close();
+					running.delete(runKey);
+					send({ kind: "done" });
+					return;
+				}
+				// Workers that could not run leave every step to the answer, as before.
+				if (done !== null) {
+					asked = withEarlierSteps(asked, done.results);
+					const cut = withOnlySteps(
+						askedModes,
+						done.left,
+						done.left.size === 0 ? FINAL_COMBINE_NOTE : FINAL_REST_NOTE,
+						modeSettings,
+						customModes,
+					);
+					answerModes = cut.modes;
+					answerCustom = cut.custom;
 					system = instructionsFor(way);
 				}
 			}

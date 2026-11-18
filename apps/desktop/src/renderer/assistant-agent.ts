@@ -370,6 +370,8 @@ export interface ChecksOptions {
 	readonly checks: readonly CheckProgress[];
 	/** Whether Kalem ran the rule checks first. */
 	readonly rules: boolean;
+	/** A mode's steps run by workers, not a review's checks. */
+	readonly steps?: boolean;
 	/** Whether the whole answer has ended: the summary is written. */
 	readonly done: boolean;
 	readonly now: number;
@@ -387,10 +389,13 @@ export interface ChecksOptions {
  */
 export function checksCard(t: Strings, lang: string, options: ChecksOptions): HTMLElement {
 	const { checks, view } = options;
-	const finished = checks.filter((check) => check.status !== "running").length;
+	const finished = checks.filter(
+		(check) => check.status === "done" || check.status === "failed",
+	).length;
 	const failed = checks.filter((check) => check.status === "failed").length;
 	const found = checks.reduce((sum, check) => sum + check.findings, 0);
 	const allEnded = finished === checks.length;
+	const mixed = checks.some((check) => check.parallel !== true);
 	const time = (check: CheckProgress): HTMLElement =>
 		el("span", {
 			class: "assistant-check-time",
@@ -404,7 +409,9 @@ export function checksCard(t: Strings, lang: string, options: ChecksOptions): HT
 			if (check.findings > 0) meta.push(format(t.checksFindings, check.findings), " · ");
 			if (check.started > 0) meta.push(time(check));
 			const below: HTMLElement[] = [];
-			if (check.status === "running") {
+			if (check.status === "waiting") {
+				below.push(el("span", { class: "assistant-check-last", text: t.checksWaiting }));
+			} else if (check.status === "running") {
 				below.push(
 					el("span", {
 						class: "assistant-check-last",
@@ -415,19 +422,21 @@ export function checksCard(t: Strings, lang: string, options: ChecksOptions): HT
 					}),
 				);
 			} else if (check.status === "failed") {
-				const again = el("button", {
-					class: "assistant-link",
-					text: t.checksRetry,
-					attrs: { type: "button" },
-				});
-				again.addEventListener("click", () => options.retry(index));
 				below.push(
 					el("span", {
 						class: "assistant-check-error",
 						text: format(t.checksFailed, check.error ?? ""),
 					}),
-					again,
 				);
+				if (check.noRetry !== true) {
+					const again = el("button", {
+						class: "assistant-link",
+						text: t.checksRetry,
+						attrs: { type: "button" },
+					});
+					again.addEventListener("click", () => options.retry(index));
+					below.push(again);
+				}
 			} else if (allEnded && check.usage !== undefined) {
 				const tokens = check.usage.input + check.usage.output + check.usage.cached;
 				below.push(
@@ -442,7 +451,16 @@ export function checksCard(t: Strings, lang: string, options: ChecksOptions): HT
 				attrs: { "data-check": String(index) },
 				children: [
 					el("span", { class: "assistant-check-icon", attrs: { "aria-hidden": "true" } }),
-					el("span", { class: "assistant-check-title", text: check.title }),
+					el("span", {
+						class: "assistant-check-title",
+						children: [
+							check.title,
+							// Said only where some run on their own: when all run at once it says nothing.
+							...(check.parallel === true && mixed
+								? [el("span", { class: "assistant-check-parallel", text: t.checksParallel })]
+								: []),
+						],
+					}),
 					el("span", { class: "assistant-check-meta", children: meta }),
 					...(below.length > 0
 						? [el("div", { class: "assistant-check-below", children: below })]
@@ -458,12 +476,18 @@ export function checksCard(t: Strings, lang: string, options: ChecksOptions): HT
 		const summary = el("summary", {
 			children: [
 				el("span", {
-					text: format(
-						t.checksSummary,
-						checks.length,
-						found,
-						duration(Number.isFinite(started) ? ended - started : 0),
-					),
+					text: options.steps
+						? format(
+								t.stepsSummary,
+								checks.length,
+								duration(Number.isFinite(started) ? ended - started : 0),
+							)
+						: format(
+								t.checksSummary,
+								checks.length,
+								found,
+								duration(Number.isFinite(started) ? ended - started : 0),
+							),
 				}),
 				...(failed > 0
 					? [
@@ -492,8 +516,14 @@ export function checksCard(t: Strings, lang: string, options: ChecksOptions): HT
 	const stages: HTMLElement[] = [];
 	if (options.rules) stages.push(stage(t.checksStageRules, "done"));
 	stages.push(
-		stage(format(t.checksStageChecks, finished, checks.length), allEnded ? "done" : "active"),
-		stage(t.checksStageSummary, allEnded ? (options.done ? "done" : "active") : "waiting"),
+		stage(
+			format(options.steps ? t.stepsStage : t.checksStageChecks, finished, checks.length),
+			allEnded ? "done" : "active",
+		),
+		stage(
+			options.steps ? t.stepsStageAnswer : t.checksStageSummary,
+			allEnded ? (options.done ? "done" : "active") : "waiting",
+		),
 	);
 	const bar = el("div", {
 		class: "assistant-checks-bar",

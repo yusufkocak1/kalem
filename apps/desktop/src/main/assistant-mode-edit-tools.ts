@@ -19,6 +19,7 @@ import type {
 	SeverityFloor,
 } from "../shared/mode-config.js";
 import {
+	canRunParallel,
 	DETAILS,
 	isMode,
 	MODES,
@@ -72,15 +73,21 @@ function customOf(ctx: ToolContext, raw: string): CustomMode | null {
 }
 
 const stepLine = (
-	step: { id: string; on: boolean; title: string | null; instruction: string },
+	step: {
+		id: string;
+		on: boolean;
+		title: string | null;
+		instruction: string;
+		parallel?: boolean;
+	},
 	index: number,
 ): string =>
-	`    ${index + 1}. [${step.on ? "on" : "off"}] ${step.id}${step.title === null || step.title === "" ? "" : ` "${step.title}"`}: ${step.instruction}`;
+	`    ${index + 1}. [${step.on ? "on" : "off"}${step.parallel === true ? ", parallel" : ""}] ${step.id}${step.title === null || step.title === "" ? "" : ` "${step.title}"`}: ${step.instruction}`;
 
 function builtinBlock(ctx: ToolContext, mode: Mode): string {
 	const resolved = resolveMode(mode, ctx.settings().assistantModes);
 	return [
-		`- ${mode} ("${ctx.t[MODE_LABELS[mode]]}", Kalem's): ${resolved.enabled ? "on" : "off"}; detail ${resolved.detail}; language ${resolved.language}${mode === "review" ? `; minSeverity ${resolved.minSeverity}; maxFindings ${resolved.maxFindings}; parallel ${resolved.parallel}` : ""}`,
+		`- ${mode} ("${ctx.t[MODE_LABELS[mode]]}", Kalem's): ${resolved.enabled ? "on" : "off"}; detail ${resolved.detail}; language ${resolved.language}${mode === "review" ? `; minSeverity ${resolved.minSeverity}; maxFindings ${resolved.maxFindings}` : ""}; parallel ${resolved.parallel}`,
 		`    keywords: ${resolved.keywords.join(", ") || "none"}; MCP servers: ${resolved.mcp.join(", ") || "none"}`,
 		...(resolved.extra === "" ? [] : [`    extra instructions: ${resolved.extra}`]),
 		"    steps:",
@@ -90,7 +97,7 @@ function builtinBlock(ctx: ToolContext, mode: Mode): string {
 
 function customBlock(mode: CustomMode): string {
 	return [
-		`- ${mode.id} ("${mode.name}", the user's): ${mode.enabled ? "on" : "off"}; icon ${mode.icon}; detail ${mode.detail}; language ${mode.language}`,
+		`- ${mode.id} ("${mode.name}", the user's): ${mode.enabled ? "on" : "off"}; icon ${mode.icon}; detail ${mode.detail}; language ${mode.language}; parallel ${mode.parallel}`,
 		`    description: ${mode.description || "none"}`,
 		`    instructions: ${mode.prompt || "none"}`,
 		`    tools: ${mode.tools === "all" ? "all" : mode.tools.join(", ") || "none"}; MCP servers: ${mode.mcp.join(", ") || "none"}; keywords: ${mode.keywords.join(", ") || "none"}`,
@@ -102,7 +109,9 @@ function customBlock(mode: CustomMode): string {
 }
 
 /** Steps the model gave: a line each, or `{ title, instruction, on }`. */
-function givenSteps(raw: unknown): { title: string; instruction: string; on: boolean }[] {
+function givenSteps(
+	raw: unknown,
+): { title: string; instruction: string; on: boolean; parallel?: boolean }[] {
 	if (!Array.isArray(raw)) return [];
 	return raw.flatMap((item) => {
 		if (typeof item === "string") {
@@ -117,6 +126,7 @@ function givenSteps(raw: unknown): { title: string; instruction: string; on: boo
 				title: text(step, "title") || instruction.slice(0, 60),
 				instruction,
 				on: step.on !== false,
+				...(typeof step.parallel === "boolean" ? { parallel: step.parallel } : {}),
 			},
 		];
 	});
@@ -154,7 +164,8 @@ async function change(
 
 const STEP_FIELDS = {
 	type: "array",
-	description: "The mode's steps in order: a line each, or { title, instruction, on }.",
+	description:
+		"The mode's steps in order: a line each, or { title, instruction, on, parallel } (parallel: runs at the same time as the parallel steps next to it).",
 	items: {},
 };
 
@@ -213,6 +224,11 @@ const MODE_EDIT_TOOLS: readonly KalemTool[] = [
 					detail: { type: "string", enum: [...DETAILS] },
 					language: { type: "string", enum: [...REPLY_LANGUAGES] },
 					enabled: { type: "boolean" },
+					parallel: {
+						type: "boolean",
+						description:
+							"With a CLI, run the steps marked parallel at the same time (a worker each) and the others one by one, in order.",
+					},
 					reason: { type: "string", description: "Why, in a few words, in the user's language." },
 				},
 				required: [],
@@ -275,6 +291,7 @@ const MODE_EDIT_TOOLS: readonly KalemTool[] = [
 						title: step.title,
 						instruction: step.instruction,
 						custom: true,
+						...(step.parallel === true ? { parallel: true } : {}),
 					}))
 				: base.steps;
 			const next = {
@@ -287,6 +304,7 @@ const MODE_EDIT_TOOLS: readonly KalemTool[] = [
 				...(detail === "" ? {} : { detail: detail as Detail }),
 				...(language === "" ? {} : { language: language as ReplyLanguage }),
 				...(typeof input.enabled === "boolean" ? { enabled: input.enabled } : {}),
+				...(typeof input.parallel === "boolean" ? { parallel: input.parallel } : {}),
 				steps,
 				tools,
 				mcp,
@@ -378,10 +396,15 @@ const MODE_EDIT_TOOLS: readonly KalemTool[] = [
 						type: "integer",
 						description: "Review: at most this many findings; 0 for no limit.",
 					},
-					parallel: { type: "boolean", description: "Review: checks side by side with a CLI." },
+					parallel: {
+						type: "boolean",
+						description:
+							"With a CLI, run the steps marked parallel at the same time (a worker each) and the others one by one, in order.",
+					},
 					steps: {
 						type: "array",
-						description: "Changes to steps by id: { id, on?, instruction?, title? }.",
+						description:
+							"Changes to steps by id: { id, on?, instruction?, title?, parallel? } (parallel: runs at the same time as the parallel steps next to it).",
 						items: { type: "object" },
 					},
 					add_steps: STEP_FIELDS,
@@ -425,6 +448,9 @@ const MODE_EDIT_TOOLS: readonly KalemTool[] = [
 					...(typeof given.on === "boolean" ? { on: given.on } : {}),
 					...(text(given, "instruction") === "" ? {} : { instruction: text(given, "instruction") }),
 					...(text(given, "title") === "" ? {} : { title: text(given, "title") }),
+					...(typeof given.parallel === "boolean" && canRunParallel(mode, step)
+						? { parallel: given.parallel }
+						: {}),
 				};
 			}
 			for (const id of strings(input.remove_steps)) {
@@ -443,6 +469,7 @@ const MODE_EDIT_TOOLS: readonly KalemTool[] = [
 					titleKey: null,
 					instruction: added.instruction,
 					defaultInstruction: "",
+					parallel: mode === "review",
 				});
 			}
 			const detail = text(input, "detail");
@@ -510,6 +537,8 @@ function describe(ctx: ToolContext, before: ResolvedMode, after: ResolvedMode): 
 		const name = step.title ?? (step.titleKey === null ? step.id : ctx.t[step.titleKey]);
 		if (was === undefined) lines.push(`+ ${name}: ${step.instruction}`);
 		else if (was.on !== step.on) lines.push(`${name}: ${onOff(was.on)} → ${onOff(step.on)}`);
+		else if (was.parallel !== step.parallel)
+			lines.push(`${name}: parallel ${String(was.parallel)} → ${String(step.parallel)}`);
 		else if (was.instruction !== step.instruction || was.title !== step.title)
 			lines.push(`${name}: ${step.instruction}`);
 	}
