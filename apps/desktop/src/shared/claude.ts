@@ -428,7 +428,24 @@ export type ClaudeEvent =
 	/** The model proposes a change to a file of the workspace, for the user to apply. */
 	| { readonly kind: "edit"; readonly edit: ProposedEdit }
 	/** The model looked into the workspace: searched, listed or read a file. */
-	| { readonly kind: "step"; readonly tool: string; readonly detail: string }
+	| {
+			readonly kind: "step";
+			readonly tool: string;
+			readonly detail: string;
+			/** The call's id, for a command whose output follows in a `step-output`. */
+			readonly id?: string;
+			/** A command's whole line, and why it was run, as the model said. */
+			readonly command?: string;
+			readonly reason?: string;
+	  }
+	/** What a command the model ran printed, and how it ended (`code` when known). */
+	| {
+			readonly kind: "step-output";
+			readonly id: string;
+			readonly output: string;
+			readonly failed: boolean;
+			readonly code?: number | null;
+	  }
 	/** The model's plan for the answer, its steps as they get done. */
 	| { readonly kind: "plan"; readonly steps: readonly PlanStep[] }
 	/** Problems a review found in the document; with `review`, for the reply that ran it. */
@@ -522,9 +539,84 @@ export function toolSteps(message: unknown): ClaudeEvent[] {
 		]
 			.map((key) => input[key])
 			.find((value): value is string => typeof value === "string" && value !== "");
-		steps.push({ kind: "step", tool: block.name, detail: (detail ?? "").slice(0, 200) });
+		const shown = (detail ?? "").slice(0, 200);
+		if (isTerminalTool(block.name) && typeof input.command === "string") {
+			const reason = [input.description, input.reason].find(
+				(value): value is string => typeof value === "string" && value.trim() !== "",
+			);
+			steps.push({
+				kind: "step",
+				tool: block.name,
+				detail: shown,
+				...(typeof block.id === "string" ? { id: block.id } : {}),
+				command: input.command.slice(0, MAX_STEP_COMMAND),
+				...(reason === undefined ? {} : { reason: reason.trim().slice(0, 300) }),
+			});
+		} else steps.push({ kind: "step", tool: block.name, detail: shown });
 	}
 	return steps;
+}
+
+/** Characters of a command line, and of what it printed, that the chat keeps. */
+const MAX_STEP_COMMAND = 4000;
+export const MAX_STEP_OUTPUT = 20_000;
+
+/** A tool that runs a command line in a terminal: Claude Code's own, or Kalem's. */
+export function isTerminalTool(name: string): boolean {
+	return name === "Bash" || name.replace(/^mcp__kalem__/, "") === "run_command";
+}
+
+/** The start and end of a command's output, when it is longer than the chat keeps. */
+export function clipStepOutput(text: string, max = MAX_STEP_OUTPUT): string {
+	if (text.length <= max) return text;
+	const half = Math.floor(max / 2);
+	return `${text.slice(0, half)}\n[… ${text.length - 2 * half} …]\n${text.slice(-half)}`;
+}
+
+/** Kalem's `run_command` report starts with how the command ended. */
+const REPORT_HEAD =
+	/^(?:`[\s\S]*` exited with code (-?\d+)\.|Stopped after \d+ s: .*|`[\s\S]*` could not be run\.)\n/;
+
+/**
+ * What the commands among Claude Code's tool calls printed, from the tool
+ * results it sends back (`ids` are the calls that ran a command).
+ */
+export function commandOutputs(message: unknown, ids: ReadonlySet<string>): ClaudeEvent[] {
+	if (!isRecord(message) || !Array.isArray(message.content)) return [];
+	const outputs: ClaudeEvent[] = [];
+	for (const block of message.content) {
+		if (!isRecord(block) || block.type !== "tool_result") continue;
+		const id = block.tool_use_id;
+		if (typeof id !== "string" || !ids.has(id)) continue;
+		let text =
+			typeof block.content === "string"
+				? block.content
+				: Array.isArray(block.content)
+					? block.content
+							.map((part) =>
+								isRecord(part) && part.type === "text" && typeof part.text === "string"
+									? part.text
+									: "",
+							)
+							.join("\n")
+					: "";
+		let code: number | null | undefined;
+		const head = REPORT_HEAD.exec(text);
+		if (head !== null) {
+			code = head[1] === undefined ? null : Number(head[1]);
+			text = text.slice(head[0].length);
+			if (text === "(it printed nothing)") text = "";
+		}
+		const failed = block.is_error === true || (code !== undefined && code !== 0);
+		outputs.push({
+			kind: "step-output",
+			id,
+			output: clipStepOutput(text),
+			failed,
+			...(code === undefined ? {} : { code }),
+		});
+	}
+	return outputs;
 }
 
 /**
@@ -539,6 +631,8 @@ export class ClaudeStreamReader {
 	#sawDelta = false;
 	#session: string | null = null;
 	#finished = false;
+	/** The ids of the tool calls that ran a command: their results are shown. */
+	readonly #commands = new Set<string>();
 
 	/** Whether the CLI reported the end of the turn. */
 	get finished(): boolean {
@@ -582,9 +676,17 @@ export class ClaudeStreamReader {
 					const text = messageText(data.message);
 					if (text !== "") events.push(...this.#write(text));
 				}
-				events.push(...toolSteps(data.message));
+				for (const step of toolSteps(data.message)) {
+					if (step.kind === "step" && step.id !== undefined) this.#commands.add(step.id);
+					events.push(step);
+				}
 				this.#sawDelta = false;
 				this.#newMessage = true;
+				break;
+			}
+			case "user": {
+				// The tools' results: what the commands it ran printed.
+				if (this.#commands.size > 0) events.push(...commandOutputs(data.message, this.#commands));
 				break;
 			}
 			case "result": {

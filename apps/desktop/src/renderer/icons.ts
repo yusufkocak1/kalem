@@ -159,6 +159,7 @@ const PATHS = {
 	diagram: ["M3 3h7v5H3z", "M14 16h7v5h-7z", "M17.5 7l3 3-3 3-3-3z", "M6.5 8v5.5H14", "M17.5 13v3"],
 	attachments: ["M4 4h7l2 2h7v14H4z", "M8 11h8", "M8 15h5"],
 	chevron: ["m9.5 6 6 6-6 6"],
+	terminal: ["M3 5h18v14H3z", "m7 10 3 2-3 2", "M12 15h5"],
 	folderOpen: ["M3 18V6h6l2 2h8v2", "M3 18l3-8h16l-3 8z"],
 	folderNew: ["M3 6h6l2 2h10v11H3z", "M12 11v6", "M9 14h6"],
 	collapseAll: ["M5 4h14", "m8 13 4-4 4 4", "m8 19 4-4 4 4"],

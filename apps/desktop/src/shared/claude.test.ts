@@ -479,6 +479,73 @@ describe("Claude Code's tool calls", () => {
 		]);
 		expect(toolSteps(null)).toEqual([]);
 	});
+
+	it("keeps a command's whole line, its id and why it was run", () => {
+		expect(
+			toolSteps({
+				content: [
+					{
+						type: "tool_use",
+						id: "toolu_1",
+						name: "Bash",
+						input: { command: "pnpm test", description: "Run the tests" },
+					},
+				],
+			}),
+		).toEqual([
+			{
+				kind: "step",
+				tool: "Bash",
+				detail: "pnpm test",
+				id: "toolu_1",
+				command: "pnpm test",
+				reason: "Run the tests",
+			},
+		]);
+	});
+
+	it("passes on what a command printed, and how it ended", () => {
+		const reader = new ClaudeStreamReader();
+		reader.feed(
+			JSON.stringify({
+				type: "assistant",
+				message: {
+					content: [
+						{ type: "tool_use", id: "a", name: "Bash", input: { command: "ls" } },
+						{
+							type: "tool_use",
+							id: "b",
+							name: "mcp__kalem__run_command",
+							input: { command: "false" },
+						},
+						{ type: "tool_use", id: "c", name: "Read", input: { file_path: "x" } },
+					],
+				},
+			}),
+		);
+		const events = reader.feed(
+			JSON.stringify({
+				type: "user",
+				message: {
+					content: [
+						{ type: "tool_result", tool_use_id: "a", content: "a.txt\nb.txt" },
+						{
+							type: "tool_result",
+							tool_use_id: "b",
+							content: [
+								{ type: "text", text: "`false` exited with code 1.\n(it printed nothing)" },
+							],
+						},
+						{ type: "tool_result", tool_use_id: "c", content: "file text" },
+					],
+				},
+			}),
+		);
+		expect(events).toEqual([
+			{ kind: "step-output", id: "a", output: "a.txt\nb.txt", failed: false },
+			{ kind: "step-output", id: "b", output: "", failed: true, code: 1 },
+		]);
+	});
 });
 
 describe("the lines of a proposed change", () => {
