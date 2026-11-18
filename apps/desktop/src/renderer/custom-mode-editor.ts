@@ -9,6 +9,7 @@ import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
 import { createMcpChoice } from "./mcp-editor.js";
+import { parallelMarks, runOrder, stepRunButton } from "./step-run-ui.js";
 
 export interface ToolInfo {
 	readonly name: string;
@@ -188,7 +189,11 @@ export function createCustomModeEditor(options: CustomModeEditorOptions): HTMLEl
 			};
 			return el("li", {
 				class: "mode-step",
-				attrs: { "data-step": step.id, ...(step.on ? {} : { "data-off": "" }) },
+				attrs: {
+					"data-step": step.id,
+					...(step.on ? {} : { "data-off": "" }),
+					...parallelMarks(mode.parallel, mode.steps, index),
+				},
 				children: [
 					el("div", {
 						class: "mode-step-head",
@@ -203,6 +208,15 @@ export function createCustomModeEditor(options: CustomModeEditorOptions): HTMLEl
 								setSteps(mode.steps.map((each, i) => (i === index ? { ...each, on } : each))),
 							),
 							title,
+							...(mode.parallel
+								? [
+										stepRunButton(t, step.parallel === true, (parallel) =>
+											setSteps(
+												mode.steps.map((each, i) => (i === index ? { ...each, parallel } : each)),
+											),
+										),
+									]
+								: []),
 							el("span", {
 								class: "mode-step-actions",
 								children: [
@@ -243,6 +257,7 @@ export function createCustomModeEditor(options: CustomModeEditorOptions): HTMLEl
 			t.modeStepsTitle,
 			t.modeStepsHint,
 			el("ol", { class: "mode-steps", children: rows }),
+			...(mode.parallel ? [runOrder(t, mode.steps)] : []),
 			add,
 		);
 	}
@@ -309,6 +324,14 @@ export function createCustomModeEditor(options: CustomModeEditorOptions): HTMLEl
 	}
 
 	// --- The whole -------------------------------------------------------------------
+
+	/** The switch that runs the steps by workers: parallel ones at once, the others in order. */
+	function parallelSwitch(): HTMLElement {
+		const box = el("input", { attrs: { type: "checkbox" } });
+		box.checked = mode.parallel;
+		box.addEventListener("change", () => keep({ parallel: box.checked }, true));
+		return el("label", { class: "settings-check", children: [box, t.modeParallel] });
+	}
 
 	function draw(): void {
 		const icons = el("div", {
@@ -450,6 +473,7 @@ export function createCustomModeEditor(options: CustomModeEditorOptions): HTMLEl
 						}),
 					],
 				}),
+				parallelSwitch(),
 				input(
 					t.modeKeywords,
 					mode.keywords.join(", "),

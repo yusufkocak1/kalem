@@ -461,6 +461,8 @@ export type ClaudeEvent =
 			readonly checks: readonly CheckProgress[];
 			/** Whether Kalem ran the rule checks before them. */
 			readonly rules: boolean;
+			/** A mode's steps run by workers, not a review's checks. */
+			readonly steps?: boolean;
 	  }
 	/** A setting the assistant changed, with what puts it back. */
 	| {
@@ -482,7 +484,8 @@ export type ClaudeEvent =
 export interface CheckProgress {
 	/** The checks it makes, by name. */
 	readonly title: string;
-	readonly status: "running" | "done" | "failed";
+	/** Waiting is for its turn: the stages before it are not done. */
+	readonly status: "waiting" | "running" | "done" | "failed";
 	/** When it started and ended, in ms since the epoch. */
 	readonly started: number;
 	readonly ended?: number;
@@ -494,6 +497,10 @@ export interface CheckProgress {
 	readonly error?: string;
 	/** What it cost, in tokens, when the CLI says. */
 	readonly usage?: { readonly input: number; readonly output: number; readonly cached: number };
+	/** It runs next to others. */
+	readonly parallel?: boolean;
+	/** It cannot be run again on its own (a step whose result the later steps needed). */
+	readonly noRetry?: boolean;
 }
 
 export interface PlanStep {

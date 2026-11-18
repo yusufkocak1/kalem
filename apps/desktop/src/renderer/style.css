@@ -9297,6 +9297,25 @@ textarea.jira-worklog-input {
 	font-weight: 600;
 }
 
+.check-waiting .assistant-check-icon {
+	border: 2px dotted var(--app-border);
+	border-radius: 50%;
+}
+
+.check-waiting .assistant-check-title {
+	color: var(--app-muted);
+}
+
+.assistant-check-parallel {
+	margin-left: 6px;
+	padding: 0 6px;
+	border-radius: 999px;
+	background: var(--app-pressed);
+	color: var(--app-accent);
+	font-size: 10px;
+	font-weight: 700;
+}
+
 .assistant-check-meta {
 	color: var(--app-muted);
 	font-size: 11px;
@@ -10603,6 +10622,56 @@ h3.mode-panel-name {
 .mode-step[data-off] .mode-step-title,
 .mode-step[data-off] .mode-step-number {
 	opacity: 0.5;
+}
+
+/* A step's run choice: sequential (on its own, in order) or parallel. */
+.mode-step-run {
+	flex: none;
+	padding: 1px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 999px;
+	background: var(--app-surface);
+	color: var(--app-muted);
+	font: inherit;
+	font-size: 11px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.mode-step-run:hover {
+	background: var(--app-hover);
+}
+
+.mode-step-run-parallel {
+	border-color: var(--app-accent);
+	background: var(--app-pressed);
+	color: var(--app-accent);
+}
+
+/* The parallel steps that run at once are drawn joined, with a bar on their side. */
+.mode-step[data-parallel] {
+	border-left: 3px solid var(--app-accent);
+}
+
+.mode-step[data-parallel="first"],
+.mode-step[data-parallel="middle"] {
+	border-bottom-left-radius: 0;
+	border-bottom-right-radius: 0;
+	margin-bottom: -6px;
+	border-bottom-style: dashed;
+}
+
+.mode-step[data-parallel="middle"],
+.mode-step[data-parallel="last"] {
+	border-top-left-radius: 0;
+	border-top-right-radius: 0;
+}
+
+.mode-run-order {
+	margin: 2px 0 0;
+	color: var(--app-muted);
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
 }
 
 .mode-step-actions {

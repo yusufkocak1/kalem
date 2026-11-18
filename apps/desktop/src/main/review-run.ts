@@ -74,6 +74,7 @@ export class ReviewRun {
 	readonly #checks: Mutable<CheckProgress>[];
 	readonly #now: () => number;
 	#question = "";
+	#lint = "";
 	#definitions: readonly ToolDefinition[] = [];
 
 	constructor(options: ReviewRunOptions) {
@@ -85,9 +86,10 @@ export class ReviewRun {
 			step.title ?? (step.titleKey === null ? step.id : options.t[step.titleKey]);
 		this.#checks = options.plan.reviewers.map((reviewer) => ({
 			title: reviewer.steps.map(title).join(", "),
-			status: "running",
+			status: "waiting",
 			started: 0,
 			findings: 0,
+			...(reviewer.parallel ? { parallel: true } : {}),
 		}));
 	}
 
@@ -155,14 +157,31 @@ export class ReviewRun {
 			);
 			if (!result.isError) lint = result.text;
 		}
+		this.#lint = lint;
 		const excluded = this.#reviewerExcluded();
 		this.#definitions = toolsFor(this.#derived(() => {}, excluded)).map((tool) => tool.definition);
 		if (!this.#definitions.some((tool) => tool.name === "report_findings")) return null;
-		this.#question = reviewerQuestion(this.#options.question, lint);
 		const before = this.merger.all.length;
-		const failed = await Promise.all(
-			plan.reviewers.map((_reviewer, index) => this.#review(index, stopped, true)),
+		const failed: boolean[] = plan.reviewers.map(() => false);
+		const stages = [...new Set(plan.reviewers.map((reviewer) => reviewer.stage))].sort(
+			(a, b) => a - b,
 		);
+		this.#publish();
+		// A stage at a time, its reviewers at once; each is told what the checks before it found.
+		for (const stage of stages) {
+			this.#question = reviewerQuestion(
+				this.#options.question,
+				lint,
+				this.merger.all.slice(before),
+			);
+			const indexes = plan.reviewers
+				.map((reviewer, index) => (reviewer.stage === stage ? index : -1))
+				.filter((index) => index >= 0);
+			const results = await Promise.all(indexes.map((index) => this.#review(index, stopped, true)));
+			indexes.forEach((index, at) => {
+				failed[index] = results[at] === true;
+			});
+		}
 		// Nothing came of any of them: the CLI cannot be run this way.
 		if (failed.every(Boolean) && this.merger.all.length === before) return null;
 		const titles = this.#checks.map((check) => check.title);
@@ -173,6 +192,7 @@ export class ReviewRun {
 	async retry(index: number, stopped: () => boolean): Promise<void> {
 		const check = this.#checks[index];
 		if (check === undefined || check.status !== "failed" || this.#question === "") return;
+		this.#question = reviewerQuestion(this.#options.question, this.#lint, this.merger.all);
 		await this.#review(index, stopped, false);
 	}
 

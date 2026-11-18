@@ -818,13 +818,16 @@ verir.
 >     otomatik seçtiren **ek kelimeler**, **ek talimat**; **Asistana
 >     söylenen** önizlemesi değiştikçe güncellenir; **Varsayılana döndür**.
 >     Ayarlar yalnızca varsayılandan farkı saklar (`assistantModes`).
->   - **Yan yana inceleme** (Claude Code ve Copilot CLI; İnceleme modunda
->     **Kontrolleri yan yana çalıştır**, varsayılan açık): inceleme
+>   - **Paralel inceleme** (Claude Code ve Copilot CLI; İnceleme modunda
+>     **Adımları paralel çalıştır**, varsayılan açık): inceleme
 >     istendiğinde Kalem kural denetimini kendisi çalıştırır, sonra her
 >     kontrol adımını (kapsam, çelişkiler, uç durumlar, test edilebilirlik,
 >     güvenlik, varsa kodla karşılaştırma ve kendi adımlarınız) ayrı bir
->     **inceleyiciye** verir; hepsi aynı anda çalışır (en çok 6, fazlası
->     paylaştırılır). Her inceleyici belgenin tamamını alır, yalnızca okuyan
+>     **inceleyiciye** verir. **Paralel** işaretli, art arda gelen kontroller
+>     aynı anda çalışır (en çok 6, fazlası paylaştırılır); **Sıralı**
+>     işaretli bir kontrol öncekiler bitince tek başına çalışır ve onların
+>     bulduklarını görür (varsayılan: hepsi paralel). Her inceleyici belgenin
+>     tamamını alır, yalnızca okuyan
 >     araçları kullanır ve sohbeti sürdürmez. Bulgular geldikçe tek listede
 >     toplanır (yeniden numaralanır, aynı cümle iki kez bildirilmez).
 >     **Kontroller kartı** çalışırken aşamaları (Kurallar › Kontroller n/m ›
@@ -838,6 +841,22 @@ verir.
 >     olur, token harcaması artar. Önceki incelemeyle ilgili bir soru (yeni
 >     inceleme istemeyen) tek yanıt olarak kalır; hiçbir inceleyici
 >     çalışamazsa inceleme eskisi gibi tek yanıtta yapılır.
+>   - **Paralel adımlar, her modda** (Claude Code ve Copilot CLI): bir
+>     modda (Kalem'inkiler ve kendi modlarınız) **Adımları paralel
+>     çalıştır** açılınca her adımın yanında **Sıralı / Paralel** düğmesi
+>     çıkar. Sıralı bir adım öncekiler bitince tek başına çalışır; art arda
+>     gelen paralel adımlar aynı anda, her biri ayrı bir **işçide**
+>     çalışır. Örneğin 1 ve 2 sıralı, 3-4-5 paralel, 6 sıralı ise: önce 1,
+>     sonra 2, sonra 3, 4, 5 aynı anda, hepsi bitince 6. Paralel adımlar
+>     ayarlarda birleşik görünür; altta **Çalışma sırası: 1 → 2 → 3 ‖ 4 ‖ 5
+>     → 6** yazar. Her işçi soruyu ve önceki adımların ürettiklerini alır,
+>     yalnızca kendi adımını yapar; son sıralı adımı sohbetin kendisi yapar
+>     ve hepsini yanıtta birleştirir (son aşama paralelse yalnızca
+>     birleştirir). İlerleme **Adımlar** kartında görünür (sırada, çalışıyor,
+>     bitti; paralel olanlar işaretli). Bir adım tamamlanamazsa kalan adımları
+>     sohbet kendisi yapar; hiçbiri çalışamazsa mod eskisi gibi tek yanıtta
+>     çalışır. Önceki yanıtla ilgili bir soru tek yanıt olarak kalır. Asistan
+>     da `mode_configure` / `mode_save` ile adımları paralel işaretleyebilir.
 >   - **Kendi modlarınız** (Asistan Modları → **Yeni mod**): ad, simge ve
 >     tek satırlık açıklama; asistana söylenen **talimat** (prompt); kendi
 >     **adımlarınız**; Kalem'in **araçlarından** hepsi ya da yalnızca

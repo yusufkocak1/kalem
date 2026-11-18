@@ -54,6 +54,7 @@ import type { ProviderId } from "../shared/providers.js";
 import { isCli, PROVIDER_INFO, providerLabel, SUGGESTED_MODELS } from "../shared/providers.js";
 import type { SlashEntry } from "../shared/slash.js";
 import { findSlash, matchSlash, slashQuery } from "../shared/slash.js";
+import { runsByWorkers } from "../shared/step-stages.js";
 import type { TemplateInfo } from "../shared/templates.js";
 import type { ApprovalMode, ApprovalRequest } from "../shared/tool-protocol.js";
 import { APPROVAL_MODES, withoutToolCalls } from "../shared/tool-protocol.js";
@@ -191,6 +192,8 @@ interface Message {
 	checks?: readonly CheckProgress[];
 	/** Whether Kalem ran the rule checks before them. */
 	rulesRan?: boolean;
+	/** The card is of a mode's steps run by workers, not of a review's checks. */
+	stepsRan?: boolean;
 }
 
 /** A command the model ran in a terminal: its line, why, and what it printed once it ended. */
@@ -2522,6 +2525,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				checksCard(t, host.lang, {
 					checks: message.checks,
 					rules: message.rulesRan === true,
+					steps: message.stepsRan === true,
 					done: message.done,
 					now: Date.now(),
 					view: checksViewOf(message),
@@ -3349,6 +3353,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			else {
 				ran.checks = event.checks;
 				ran.rulesRan = event.rules;
+				if (event.steps === true) ran.stepsRan = true;
 				if (event.checks.some((check) => check.status === "running")) tickChecks();
 				if (chat === active) scheduleRender(ran);
 			}
@@ -4016,27 +4021,35 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					selection,
 				});
 			if (sharing) chat.sharedText = context.text;
-			// A review asked for now (not a question about an earlier one) may run side by side.
+			// A review, or a mode's steps, asked for now (not a question about an earlier answer)
+			// may run by workers: the review's checks, or the steps marked parallel at once.
+			const workspace = sources.length > 0 || chat.folder !== null;
 			if (
-				usedMode === "review" &&
 				usedModes.length <= 1 &&
-				sharing &&
 				isCli(PROVIDER_INFO[provider]) &&
-				resolveMode("review", host.modes()).parallel &&
+				(usedMode !== "review" || sharing) &&
+				runsByWorkers(usedMode, host.modes(), host.customModes()) &&
 				(chat.sessionId === null ||
-					detectMode(question, { hasDocument: true, hasWorkspace: false }, host.modes()).mode ===
-						"review")
+					detectMode(
+						question,
+						usedMode === "review"
+							? { hasDocument: true, hasWorkspace: false }
+							: { hasDocument: sharing, hasWorkspace: workspace },
+						host.modes(),
+						host.customModes(),
+					).mode === usedMode)
 			) {
-				reviewPrompt =
-					fullPrompt ??
-					(unchanged
-						? composePrompt({
-								question: withSections,
-								document: { name: context.name, text: context.text },
-								diagrams: context.diagrams,
-								selection,
-							})
-						: prompt);
+				reviewPrompt = !sharing
+					? prompt
+					: (fullPrompt ??
+						(unchanged
+							? composePrompt({
+									question: withSections,
+									document: { name: context.name, text: context.text },
+									diagrams: context.diagrams,
+									selection,
+								})
+							: prompt));
 			}
 		} catch (error) {
 			chat.reply = null;
