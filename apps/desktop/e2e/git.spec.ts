@@ -173,6 +173,13 @@ test("marks changed files, compares them, commits only some and discards others"
 	await page.locator(".files-menu-item", { hasText: "Commit Changes…" }).click();
 	const commit = page.locator(".git-commit[open]");
 	await expect(commit.locator(".git-file-path")).toHaveText(["notes.md", "docs/new.md"]);
+	// One click on a name shows that file's changes in the same window; again hides them.
+	await commit.getByRole("button", { name: "notes.md", exact: true }).click();
+	await expect(commit.locator(".git-commit-diff .git-diff-line.remove")).toContainText(["-bir"]);
+	await expect(commit.locator(".git-commit-diff .git-diff-line.add")).toContainText(["+iki"]);
+	await expect(commit.getByRole("checkbox", { name: /notes\.md/ })).toBeChecked();
+	await commit.getByRole("button", { name: "notes.md", exact: true }).click();
+	await expect(commit.locator(".git-commit-diff")).toBeHidden();
 	await commit.getByRole("button", { name: "✨ Suggest" }).click();
 	await expect(commit.locator(".git-error")).toContainText("No message could be suggested");
 	await commit.getByRole("checkbox", { name: /notes\.md/ }).uncheck();

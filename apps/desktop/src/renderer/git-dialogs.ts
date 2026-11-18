@@ -22,6 +22,8 @@ export interface CommitRequest {
 	readonly files: readonly GitFileChange[];
 	/** A message written from the chosen files' changes; rejects with why it could not. */
 	suggest?(paths: readonly string[]): Promise<string>;
+	/** How one file changed, as a unified diff; shown when its name is clicked. */
+	diff?(path: string): Promise<string>;
 }
 
 export interface CommitAnswer {
@@ -212,6 +214,21 @@ export function createGitDialogs(t: Strings, lang: string): GitDialogs {
 
 	// --- Commit -----------------------------------------------------------
 	const commitTitle = el("h2");
+	const commitDiffTitle = el("span", { class: "git-commit-diff-path" });
+	const commitDiffClose = el("button", {
+		class: "dialog-button git-commit-diff-close",
+		text: "×",
+		attrs: { type: "button", title: t.close, "aria-label": t.close },
+	});
+	const commitDiff = el("pre", { class: "git-diff", attrs: { tabindex: "0" } });
+	const commitDiffBox = el("div", {
+		class: "git-commit-diff",
+		attrs: { hidden: "" },
+		children: [
+			el("div", { class: "git-commit-diff-head", children: [commitDiffTitle, commitDiffClose] }),
+			commitDiff,
+		],
+	});
 	const allFiles = el("input", { attrs: { type: "checkbox" } });
 	const fileList = el("ul", { class: "git-files", attrs: { "aria-label": t.gitCommitFiles } });
 	const message = el("textarea", {
@@ -248,6 +265,7 @@ export function createGitDialogs(t: Strings, lang: string): GitDialogs {
 				children: [allFiles, el("span", { text: t.gitCommitAll })],
 			}),
 			fileList,
+			commitDiffBox,
 			el("div", {
 				class: "git-message-head",
 				children: [el("span", { text: t.gitCommitMessage }), suggestButton],
@@ -261,6 +279,54 @@ export function createGitDialogs(t: Strings, lang: string): GitDialogs {
 	let committing: ((answer: CommitAnswer | null) => void) | null = null;
 	let commitFiles: readonly GitFileChange[] = [];
 	let suggest: CommitRequest["suggest"];
+	let loadDiff: CommitRequest["diff"];
+	/** The file whose diff is shown; a late answer for another file is dropped. */
+	let diffShown: string | null = null;
+
+	const hideCommitDiff = (): void => {
+		diffShown = null;
+		commitDiffBox.hidden = true;
+		commitDialog.classList.remove("with-diff");
+		for (const row of fileList.querySelectorAll("li.selected")) row.classList.remove("selected");
+	};
+	const showCommitDiff = async (path: string): Promise<void> => {
+		if (loadDiff === undefined) return;
+		if (diffShown === path) {
+			hideCommitDiff();
+			return;
+		}
+		diffShown = path;
+		for (const row of fileList.querySelectorAll<HTMLElement>("li")) {
+			row.classList.toggle("selected", row.dataset.path === path);
+		}
+		commitDiffTitle.textContent = path;
+		commitDiff.replaceChildren(el("span", { class: "git-diff-line", text: "…" }));
+		commitDiffBox.hidden = false;
+		commitDialog.classList.add("with-diff");
+		let text: string;
+		try {
+			text = await loadDiff(path);
+		} catch (error) {
+			if (diffShown !== path) return;
+			commitDiff.replaceChildren(
+				el("span", {
+					class: "git-diff-line remove",
+					text: String((error as Error)?.message ?? error).replace(
+						/^Error invoking remote method '[^']+': (Error: )?/,
+						"",
+					),
+				}),
+			);
+			return;
+		}
+		if (diffShown !== path) return;
+		commitDiff.replaceChildren(...diffLines(text));
+		commitDiff.scrollTop = 0;
+	};
+	commitDiffClose.addEventListener("click", () => {
+		hideCommitDiff();
+		message.focus();
+	});
 
 	const chosen = (): string[] =>
 		[...fileList.querySelectorAll<HTMLInputElement>("input:checked")].map((box) => box.value);
@@ -274,6 +340,7 @@ export function createGitDialogs(t: Strings, lang: string): GitDialogs {
 	const settleCommit = (answer: CommitAnswer | null): void => {
 		const done = committing;
 		committing = null;
+		hideCommitDiff();
 		if (commitDialog.open) commitDialog.close();
 		done?.(answer);
 	};
@@ -328,6 +395,27 @@ export function createGitDialogs(t: Strings, lang: string): GitDialogs {
 	});
 
 	// --- Diff -------------------------------------------------------------
+	/** A unified diff's lines, coloured by what they are. */
+	const diffLines = (text: string): HTMLElement[] =>
+		(text.trim() === "" ? [t.gitNoDiff] : text.replace(/\n$/, "").split("\n")).map((line) =>
+			el("span", {
+				class: `git-diff-line${
+					line.startsWith("+++") ||
+					line.startsWith("---") ||
+					line.startsWith("diff ") ||
+					line.startsWith("index ")
+						? " head"
+						: line.startsWith("@@")
+							? " hunk"
+							: line.startsWith("+")
+								? " add"
+								: line.startsWith("-")
+									? " remove"
+									: ""
+				}`,
+				text: `${line}\n`,
+			}),
+		);
 	const diffTitle = el("h2");
 	const diffBody = el("pre", { class: "git-diff" });
 	const diffClose = el("button", {
@@ -348,26 +436,37 @@ export function createGitDialogs(t: Strings, lang: string): GitDialogs {
 			commitFiles = request.files;
 			suggest = request.suggest;
 			commitTitle.textContent = request.title;
+			loadDiff = request.diff;
+			fileList.classList.toggle("can-diff", loadDiff !== undefined);
 			fileList.replaceChildren(
-				...request.files.map((file) =>
-					el("li", {
+				...request.files.map((file) => {
+					const name = el("button", {
+						class: "git-file-path",
+						text: file.path,
+						attrs: {
+							type: "button",
+							title: loadDiff === undefined ? file.path : `${file.path} · ${t.gitCommitShowDiff}`,
+						},
+					});
+					name.disabled = loadDiff === undefined;
+					name.addEventListener("click", () => void showCommitDiff(file.path));
+					return el("li", {
+						attrs: { "data-path": file.path },
 						children: [
-							el("label", {
-								attrs: { title: file.path },
-								children: [
-									Object.assign(el("input", { attrs: { type: "checkbox", value: file.path } }), {
-										checked: true,
-									}),
-									el("span", {
-										class: `git-letter git-${file.kind}`,
-										text: CHANGE_LETTER[file.kind],
-									}),
-									el("span", { class: "git-file-path", text: file.path }),
-								],
+							Object.assign(
+								el("input", {
+									attrs: { type: "checkbox", value: file.path, "aria-label": file.path },
+								}),
+								{ checked: true },
+							),
+							el("span", {
+								class: `git-letter git-${file.kind}`,
+								text: CHANGE_LETTER[file.kind],
 							}),
+							name,
 						],
-					}),
-				),
+					});
+				}),
 			);
 			message.value = "";
 			commitError.hidden = true;
@@ -380,27 +479,7 @@ export function createGitDialogs(t: Strings, lang: string): GitDialogs {
 		},
 		diff(title, text) {
 			diffTitle.textContent = title;
-			diffBody.replaceChildren(
-				...(text.trim() === "" ? [t.gitNoDiff] : text.replace(/\n$/, "").split("\n")).map((line) =>
-					el("span", {
-						class: `git-diff-line${
-							line.startsWith("+++") ||
-							line.startsWith("---") ||
-							line.startsWith("diff ") ||
-							line.startsWith("index ")
-								? " head"
-								: line.startsWith("@@")
-									? " hunk"
-									: line.startsWith("+")
-										? " add"
-										: line.startsWith("-")
-											? " remove"
-											: ""
-						}`,
-						text: `${line}\n`,
-					}),
-				),
-			);
+			diffBody.replaceChildren(...diffLines(text));
 			diffDialog.showModal();
 			diffClose.focus();
 		},

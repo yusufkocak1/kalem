@@ -133,6 +133,7 @@ const en = {
 	gitSuggesting: "Writing…",
 	gitSuggestFailed: "No message could be suggested: {0}",
 	gitNoDiff: "No change.",
+	gitCommitShowDiff: "Click to see its changes",
 	gitDiverged: "Your branch and the remote one went apart.",
 	gitDivergedDetail:
 		"Merge joins them with a merge commit; Rebase puts your commits on top of the remote ones.",
@@ -1885,6 +1886,7 @@ const tr: Strings = {
 	gitSuggesting: "Yazılıyor…",
 	gitSuggestFailed: "Mesaj önerilemedi: {0}",
 	gitNoDiff: "Değişiklik yok.",
+	gitCommitShowDiff: "Değişiklikleri görmek için tıklayın",
 	gitDiverged: "Sizin dalınız ile uzaktaki dal ayrıştı.",
 	gitDivergedDetail:
 		"Birleştir (merge) ikisini bir birleştirme commit'iyle birleştirir; Rebase sizin commit'lerinizi uzaktakilerin üstüne taşır.",
