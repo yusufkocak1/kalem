@@ -42,6 +42,8 @@ export interface JiraIssueRow extends JiraIssueRef {
 	/** The sprint it is in (its open one, else its last); `""` for none, absent when not asked for. */
 	readonly sprintName?: string;
 	readonly labels?: readonly string[];
+	/** The assignee's username (Server) or account id (Cloud), which JQL names them by. */
+	readonly assigneeId?: string;
 }
 
 export interface JiraComment {
@@ -340,6 +342,7 @@ export function issueRowOf(raw: unknown, sprintField: string | null = null): Jir
 		updated: date(fields.updated),
 		parent: issueRefOf(fields.parent),
 		labels: names(fields.labels),
+		assigneeId: personId(fields.assignee),
 		...(sprintField === null ? {} : { sprintName: sprintOf(fields[sprintField])?.name ?? "" }),
 	};
 }
