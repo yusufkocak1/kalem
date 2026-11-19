@@ -43,6 +43,8 @@ import type {
 	ToolPolicy,
 	ToolRisk,
 } from "./tool-protocol.js";
+import type { Typography } from "./typography.js";
+import { DEFAULT_TYPOGRAPHY } from "./typography.js";
 export type Theme = "system" | "light" | "dark";
 
 export const PAGE_SIZES = ["A4", "A3", "A5", "Letter", "Legal"] as const;
@@ -67,7 +69,8 @@ export const MARGIN_CM: Readonly<Record<PageMargins, readonly [number, number]>>
 	wide: [2.54, 5.08],
 };
 
-export interface Settings {
+/** `Typography` (line spacing, paragraph spacing, typeface…) is part of the settings. */
+export interface Settings extends Typography {
 	readonly theme: Theme;
 	/** The app's colours: a made palette, or the user's own (`paletteCustom`). */
 	readonly palette: PaletteChoice;
@@ -176,6 +179,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	zoom: 100,
 	fullWidth: false,
 	lineNumbers: true,
+	...DEFAULT_TYPOGRAPHY,
 	navigation: true,
 	autoSave: false,
 	spellCheck: true,
@@ -782,6 +786,7 @@ export const COMMANDS = [
 	"source",
 	"read-only",
 	"focus",
+	"typography",
 	"zoom-in",
 	"zoom-out",
 	"zoom-reset",

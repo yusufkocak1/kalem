@@ -3900,7 +3900,7 @@ button.git-file-path {
 
 /* Everything on the page is sized in em, so zoom is a single font-size. */
 .page {
-	width: min(50em, 100%);
+	width: min(var(--doc-width, 50em), 100%);
 	min-height: 64em;
 	margin: 0 auto;
 	/* The side margins shrink with a page narrower than 50em (a side panel open
@@ -3915,7 +3915,28 @@ button.git-file-path {
 }
 
 .page #editor {
-	--kalem-size: 1em;
+	--kalem-size: var(--doc-size, 1em);
+	/* Text & Paragraph settings (typography-dialog.ts); the theme's own values when unset. */
+	--kalem-leading: var(--doc-leading, 1.65);
+	--kalem-space: var(--doc-space, 1em);
+}
+
+.app[data-doc-font] .page #editor,
+.typography-preview[data-doc-font] {
+	--kalem-font: var(--doc-font);
+}
+
+.page #editor :is(h1, h2, h3, h4, h5, h6) {
+	margin-top: var(--doc-heading-space, calc(var(--kalem-space) * 1.8));
+}
+
+/* The first block has nothing above it, a heading neither. */
+.page #editor > :first-child {
+	margin-top: 0;
+}
+
+.page #editor li {
+	margin-bottom: var(--doc-list-space, 0.25em);
 }
 
 /*
@@ -13884,4 +13905,225 @@ dialog {
 .confluence-page-item.cut > .confluence-row-main {
 	opacity: 0.55;
 	font-style: italic;
+}
+
+/* --- Text & Paragraph -------------------------------------------------------- */
+
+.typography {
+	display: none;
+	flex-direction: column;
+	gap: 14px;
+	box-sizing: border-box;
+	width: min(920px, calc(100vw - 32px));
+	max-height: calc(100vh - 32px);
+	padding: 18px 20px 16px;
+	border: 1px solid var(--app-border);
+	border-radius: 10px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: var(--app-shadow);
+}
+
+.typography[open] {
+	display: flex;
+}
+
+/* Light and sharp: the document behind shows each change as it is made. */
+.typography[open]::backdrop {
+	background: rgb(0 0 0 / 6%);
+	backdrop-filter: none;
+}
+
+.typography-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.typography-head h2 {
+	margin: 0;
+	font-size: 17px;
+}
+
+.typography-hint {
+	margin: 4px 0 0;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.typography-body {
+	display: grid;
+	grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+	gap: 18px;
+	min-height: 0;
+	overflow: auto;
+}
+
+@media (max-width: 760px) {
+	.typography-body {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+.typography-controls {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.typography-group {
+	margin: 0;
+	padding: 10px 12px 12px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+}
+
+.typography-group legend {
+	padding: 0 6px;
+	color: var(--app-muted);
+	font-size: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.typography-row {
+	display: grid;
+	grid-template-columns: 11.5em minmax(0, 1fr);
+	align-items: center;
+	gap: 4px 10px;
+	padding: 5px 0;
+}
+
+.typography-row > :nth-child(n + 3) {
+	grid-column: 2;
+}
+
+.typography-label {
+	font-size: 13px;
+}
+
+.typography-control {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+
+.typography-slider {
+	flex: 1;
+	min-width: 60px;
+	accent-color: var(--app-accent);
+}
+
+.typography-number {
+	width: 4.6em;
+	padding: 3px 6px;
+	border: 1px solid var(--app-border);
+	border-radius: 5px;
+	background: var(--app-page);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+}
+
+.typography-unit {
+	width: 2.6em;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.typography-select {
+	flex: 1;
+	padding: 4px 6px;
+	border: 1px solid var(--app-border);
+	border-radius: 5px;
+	background: var(--app-page);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 13px;
+}
+
+.typography-presets {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.typography-preset {
+	min-width: 3em;
+	padding: 2px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 5px;
+	background: var(--app-page);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+	cursor: pointer;
+}
+
+.typography-preset:hover {
+	background: var(--app-hover);
+}
+
+.typography-preset[aria-pressed="true"] {
+	border-color: var(--app-accent);
+	background: var(--app-pressed);
+	font-weight: 600;
+}
+
+.typography-preview-frame {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	/* The page's text size at 100%: the preview's sizes are relative to it, as the page's are. */
+	font-size: 16px;
+}
+
+.typography-preview-frame h3 {
+	margin: 0 0 6px;
+	color: var(--app-muted);
+	font-size: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+/* Set as the page sets the document: the same tokens, from the same settings. */
+.typography-preview.kalem-doc {
+	--kalem-size: var(--doc-size, 1em);
+	--kalem-leading: var(--doc-leading, 1.65);
+	--kalem-space: var(--doc-space, 1em);
+	flex: 1;
+	min-height: 260px;
+	padding: 18px 22px;
+	overflow: auto;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-page);
+}
+
+.typography-preview.kalem-doc h2 {
+	margin-top: var(--doc-heading-space, 1.8em);
+}
+
+.typography-preview.kalem-doc > :first-child {
+	margin-top: 0;
+}
+
+.typography-preview.kalem-doc li {
+	margin-bottom: var(--doc-list-space, 0.25em);
+}
+
+.typography-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.typography-spacer {
+	flex: 1;
 }

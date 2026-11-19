@@ -99,6 +99,14 @@ const PATHS = {
 	zoomOut: [...MAGNIFIER, "M8.5 11h5"],
 	zoomIn: [...MAGNIFIER, "M8.5 11h5", "M11 8.5v5"],
 	fullWidth: ["M3 5v14", "M21 5v14", "M7 12h10", "m10 9-3 3 3 3", "m14 9 3 3-3 3"],
+	lineSpacing: [
+		"M10 6h10",
+		"M10 12h10",
+		"M10 18h10",
+		"M5.5 4v16",
+		"m3 6.5 2.5-2.5L8 6.5",
+		"m3 17.5 2.5 2.5L8 17.5",
+	],
 	lineNumbers: [
 		"m4 5.5 1.5-1v4",
 		"M4 11h2.5l-2.5 3h2.5",

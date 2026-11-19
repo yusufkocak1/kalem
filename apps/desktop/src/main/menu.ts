@@ -415,6 +415,7 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 					checked: settings.fullWidth,
 					click: () => ctx.changeSettings({ fullWidth: !settings.fullWidth }),
 				},
+				{ label: t.typographyOpen, click: send(ctx, "typography") },
 				{
 					label: t.lineNumbers,
 					type: "checkbox",

@@ -29,8 +29,10 @@ import { DEFAULT_MODE_SERVERS, isMode, parseModeSettings } from "./mode-config.j
 import { PALETTE_IDS, parsePaletteCustom } from "./palette.js";
 import { MAX_DOCK_SIZE, MIN_DOCK_SIZE, parsePanePlaces, TOOL_PANES } from "./panes.js";
 import { parseToolPolicies } from "./tool-protocol.js";
+import { DOCUMENT_FONTS, TYPOGRAPHY_RANGES } from "./typography.js";
 export const SETTING_CATEGORIES = [
 	"appearance",
+	"typography",
 	"editor",
 	"panels",
 	"assistant",
@@ -297,6 +299,83 @@ export const SETTINGS_SCHEMA: Schema = {
 		label: "lineNumbers",
 		type: "boolean",
 		keywords: ["satır numarası", "satır numaraları", "line numbers", "satır", "line", "numara"],
+		assistant: "write",
+	},
+	lineSpacing: {
+		key: "lineSpacing",
+		category: "typography",
+		label: "typoLineSpacing",
+		type: "number",
+		...TYPOGRAPHY_RANGES.lineSpacing,
+		keywords: [
+			"satır aralığı",
+			"satır arası",
+			"line spacing",
+			"line height",
+			"aralık",
+			"satır yüksekliği",
+		],
+		assistant: "write",
+	},
+	paragraphSpacing: {
+		key: "paragraphSpacing",
+		category: "typography",
+		label: "typoParagraphSpacing",
+		type: "number",
+		...TYPOGRAPHY_RANGES.paragraphSpacing,
+		keywords: ["paragraf aralığı", "paragraf arası", "paragraph spacing", "boşluk", "spacing"],
+		assistant: "write",
+	},
+	headingSpacing: {
+		key: "headingSpacing",
+		category: "typography",
+		label: "typoHeadingSpacing",
+		type: "number",
+		...TYPOGRAPHY_RANGES.headingSpacing,
+		keywords: ["başlık", "başlık üstü", "heading spacing", "heading", "boşluk"],
+		assistant: "write",
+	},
+	listSpacing: {
+		key: "listSpacing",
+		category: "typography",
+		label: "typoListSpacing",
+		type: "number",
+		...TYPOGRAPHY_RANGES.listSpacing,
+		keywords: ["liste", "madde", "list spacing", "list", "boşluk"],
+		assistant: "write",
+	},
+	documentFont: {
+		key: "documentFont",
+		category: "typography",
+		label: "typoFont",
+		type: "enum",
+		values: DOCUMENT_FONTS,
+		valueLabels: [
+			"typoFontDefault",
+			"typoFontSans",
+			"typoFontSerif",
+			"typoFontWord",
+			"typoFontMono",
+		],
+		keywords: ["yazı tipi", "font", "typeface", "serif", "calibri", "yazı"],
+		assistant: "write",
+	},
+	documentFontSize: {
+		key: "documentFontSize",
+		category: "typography",
+		label: "typoFontSize",
+		type: "number",
+		...TYPOGRAPHY_RANGES.documentFontSize,
+		keywords: ["yazı boyutu", "punto", "font size", "text size", "büyüklük"],
+		assistant: "write",
+	},
+	pageWidth: {
+		key: "pageWidth",
+		category: "typography",
+		label: "typoPageWidth",
+		type: "number",
+		...TYPOGRAPHY_RANGES.pageWidth,
+		keywords: ["sayfa genişliği", "metin genişliği", "page width", "text width", "genişlik"],
 		assistant: "write",
 	},
 	autoSave: {
@@ -751,6 +830,7 @@ export const SETTINGS_SCHEMA: Schema = {
 /** The categories' names in the interface. */
 export const CATEGORY_LABELS: Readonly<Record<SettingCategory, StringKey>> = {
 	appearance: "settingsCatAppearance",
+	typography: "settingsCatTypography",
 	editor: "settingsCatEditor",
 	panels: "settingsCatPanels",
 	assistant: "settingsCatAssistant",
@@ -797,7 +877,8 @@ export function parseSetting<K extends keyof Settings>(key: K, raw: unknown): Se
 			) as Settings[K];
 		case "number": {
 			if (typeof raw !== "number" || !Number.isFinite(raw)) return fallback;
-			const snapped = Math.round(raw / def.step) * def.step;
+			// Rounded again: 23 × 0.05 is 1.1500000000000001.
+			const snapped = Number((Math.round(raw / def.step) * def.step).toFixed(6));
 			return Math.min(def.max, Math.max(def.min, snapped)) as Settings[K];
 		}
 		case "string":

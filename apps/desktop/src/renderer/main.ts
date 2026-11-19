@@ -33,6 +33,7 @@ import {
 } from "../shared/paths.js";
 import { withColumnWidth } from "../shared/table-style.js";
 import { changeCase, collapseSpaces, nextCase } from "../shared/text-case.js";
+import { typographyVars } from "../shared/typography.js";
 import { createAssistantPane } from "./assistant-pane.js";
 import { createAttachmentCard } from "./attachment-card.js";
 import { createChangesDialog } from "./changes-dialog.js";
@@ -75,6 +76,7 @@ import { enableColumnResize } from "./table-styles.js";
 import { createTabStrip } from "./tabs.js";
 import { createTemplatePicker } from "./template-picker.js";
 import { measureDiagramText } from "./text-measure.js";
+import { createTypographyDialog } from "./typography-dialog.js";
 import { createVersionHistory } from "./version-history.js";
 
 import "@kalem-editor/themes/tokens.css";
@@ -350,6 +352,11 @@ function placeAssistant(): void {
 	assistant.element.dataset.place = place;
 }
 assistantRail.prepend(docks.stripes.right);
+const typographyDialog = createTypographyDialog({
+	t,
+	settings: () => settings,
+	update: (patch) => updateSettings(patch),
+});
 const settingsDialog = createSettingsDialog({
 	t,
 	bridge,
@@ -1076,6 +1083,11 @@ function applySettings(): void {
 	paletteStyle.textContent = paletteCss(settings.palette, settings.paletteCustom);
 	app.style.setProperty("--zoom", String(settings.zoom / 100));
 	app.toggleAttribute("data-full-width", settings.fullWidth);
+	for (const [name, value] of Object.entries(typographyVars(settings))) {
+		if (value === null) app.style.removeProperty(name);
+		else app.style.setProperty(name, value);
+	}
+	app.toggleAttribute("data-doc-font", settings.documentFont !== "default");
 	for (const tab of tabs.values()) {
 		tab.lineNumbers.relayout();
 		tab.session.textView?.setLineNumbers(settings.lineNumbers);
@@ -1308,6 +1320,7 @@ const commands: Record<Command, () => void> = {
 	},
 	"jira-open": () => void jiraDialog.showSearch(),
 	settings: () => void settingsDialog.show(),
+	typography: () => typographyDialog.show(),
 	"network-log": () => {
 		if (debugMode) networkPanel.toggle();
 	},
@@ -1438,6 +1451,7 @@ bridge.onSettings((next) => {
 	scheduleRibbonUpdate();
 	// A setting changed from the menu shows in the Settings window at once.
 	void settingsDialog.refresh();
+	typographyDialog.refresh();
 });
 
 // --- Dropped files ----------------------------------------------------------
