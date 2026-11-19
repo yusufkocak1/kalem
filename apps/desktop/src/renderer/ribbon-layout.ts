@@ -407,6 +407,13 @@ export function createAppRibbon(
 							shortcut: `${MOD}+Shift+M`,
 							enabled: () => ctx.canEdit() && ctx.session().editor.canMergeBlocks(),
 						}),
+						{ kind: "separator" },
+						{
+							id: "typography",
+							label: t.typographyOpen,
+							icon: "lineSpacing",
+							run: ctx.commands.typography,
+						},
 					],
 				},
 				{
@@ -555,6 +562,20 @@ export function createAppRibbon(
 							...toggle("focus", t.focusMode, "focus", () => ctx.focusMode(), ctx.commands.focus),
 							shortcut: `${MOD}+Shift+F`,
 						},
+						{
+							id: "typography-view",
+							label: t.typography,
+							icon: "lineSpacing",
+							showLabel: true,
+							run: ctx.commands.typography,
+						},
+						toggle(
+							"line-numbers",
+							t.lineNumbers,
+							"lineNumbers",
+							() => ctx.settings().lineNumbers,
+							() => ctx.updateSettings({ lineNumbers: !ctx.settings().lineNumbers }),
+						),
 					],
 				},
 				{

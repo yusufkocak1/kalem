@@ -828,7 +828,7 @@ test("imports a Confluence page and exports it in both Confluence formats", asyn
 
 	const { app, page: window, errors } = await launch();
 	await stubOpenDialog(app, [page]);
-	await clickMenu(app, "File", "Import from Confluence…");
+	await clickMenu(app, "File", "Import", "From Confluence…");
 	await expect(window.locator("#editor h1").first()).toHaveText("Sprint Planı");
 	await expect(window.locator(".notice")).toContainText("imported from Confluence");
 	expect(await windowTitle(app)).toBe("● Sprint Planı – Kalem");

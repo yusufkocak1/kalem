@@ -33,6 +33,7 @@ import {
 } from "../shared/paths.js";
 import { withColumnWidth } from "../shared/table-style.js";
 import { changeCase, collapseSpaces, nextCase } from "../shared/text-case.js";
+import { typographyVars } from "../shared/typography.js";
 import { createAssistantPane } from "./assistant-pane.js";
 import { createAttachmentCard } from "./attachment-card.js";
 import { createChangesDialog } from "./changes-dialog.js";
@@ -56,6 +57,8 @@ import { icon } from "./icons.js";
 import { createImageViewer } from "./image-viewer.js";
 import { createJiraDialog } from "./jira-dialog.js";
 import { createJiraPane } from "./jira-pane.js";
+import type { LineNumbers } from "./line-numbers.js";
+import { createLineNumbers } from "./line-numbers.js";
 import { createLinkCard } from "./link-card.js";
 import type { NotesTarget } from "./local-notes.js";
 import { createLocalNotes } from "./local-notes.js";
@@ -588,6 +591,8 @@ interface Tab {
 	/** A scroll to go back to once the tab is shown (a restored tab's). */
 	pendingScroll: number | null;
 	readonly desk: HTMLElement;
+	/** The line numbers in the page's margin. */
+	readonly lineNumbers: LineNumbers;
 }
 
 /** The ways to start a document, offered under an empty page; Jira only once it is connected. */
@@ -769,7 +774,15 @@ function createTab(id: string): Tab {
 		onEditorChange: () => {
 			scheduleRibbonUpdate();
 			if (session === tabSession) localNotes.refresh();
+			lineNumbers.refresh();
 		},
+	});
+	const lineNumbers = createLineNumbers({
+		page,
+		canvas: tabCanvas,
+		enabled: () => settings.lineNumbers,
+		available: () => !tabSession.isText,
+		snapshot: () => tabSession.lineSnapshot(),
 	});
 
 	/** Called once the tab's document is loaded, and on each change of its state after. */
@@ -809,6 +822,7 @@ function createTab(id: string): Tab {
 		scroll: 0,
 		pendingScroll: null,
 		desk,
+		lineNumbers,
 	};
 	desk.addEventListener(
 		"scroll",
@@ -1004,6 +1018,7 @@ function discardTab(id: string): void {
 	tabs.delete(id);
 	tabStrip.remove(id);
 	tab.session.dispose();
+	tab.lineNumbers.destroy();
 	for (const view of tab.views) view.remove();
 }
 
@@ -1062,6 +1077,15 @@ function applySettings(): void {
 	paletteStyle.textContent = paletteCss(settings.palette, settings.paletteCustom);
 	app.style.setProperty("--zoom", String(settings.zoom / 100));
 	app.toggleAttribute("data-full-width", settings.fullWidth);
+	for (const [name, value] of Object.entries(typographyVars(settings))) {
+		if (value === null) app.style.removeProperty(name);
+		else app.style.setProperty(name, value);
+	}
+	app.toggleAttribute("data-doc-font", settings.documentFont !== "default");
+	for (const tab of tabs.values()) {
+		tab.lineNumbers.relayout();
+		tab.session.textView?.setLineNumbers(settings.lineNumbers);
+	}
 	placeAssistant();
 	assistant.element.hidden = !settings.assistant;
 	assistantToggle.setAttribute("aria-expanded", String(settings.assistant));
@@ -1290,6 +1314,7 @@ const commands: Record<Command, () => void> = {
 	},
 	"jira-open": () => void jiraDialog.showSearch(),
 	settings: () => void settingsDialog.show(),
+	typography: () => void settingsDialog.show("typography"),
 	"network-log": () => {
 		if (debugMode) networkPanel.toggle();
 	},

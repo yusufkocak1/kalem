@@ -27,7 +27,7 @@ test("edits a Confluence page and saves it back as a new version", async () => {
 	cleanup.push(confluence.close);
 	const { app, page, userData, errors } = await launch();
 
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(TOKEN);
@@ -96,7 +96,7 @@ test("shows a page's changes as a diff, undoes one, and saves the rest from ther
 	cleanup.push(confluence.close);
 	const { app, page, errors } = await launch({ settings: { confluenceReviewBeforeSave: true } });
 
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(TOKEN);
@@ -167,7 +167,7 @@ test("browses a space's page tree in the side pane and stars a page", async () =
 	const pane = page.locator(".confluence-pane");
 	// Without a connection there is no Confluence pane: it comes with the login.
 	await expect(page.locator('.stripe-button[data-pane="confluence"]')).toHaveCount(0);
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
@@ -243,7 +243,7 @@ test("searches inside pages with filters and more results, and finds the open pa
 	const { app, page, errors } = await launch();
 
 	const pane = page.locator(".confluence-pane");
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(TOKEN);
@@ -329,7 +329,7 @@ test("lists a level that fails with an error 500 another way, retries it, and wi
 	const { app, page, userData, errors } = await launch();
 
 	const pane = page.locator(".confluence-pane");
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(TOKEN);
@@ -398,7 +398,7 @@ test("adds a child page from the tree and opens it", async () => {
 	const { app, page, errors } = await launch();
 
 	const pane = page.locator(".confluence-pane");
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(TOKEN);
@@ -442,7 +442,7 @@ test("copies a tree page's id and address from its menu, and moves pages by menu
 	const { app, page, errors } = await launch();
 
 	const pane = page.locator(".confluence-pane");
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(TOKEN);
@@ -524,7 +524,7 @@ test("saves an edit without rewriting the parts that were not edited", async () 
 	confluence.page.storage = `<h1>Sprint Planı</h1>${table}${jira}<p>Hedef</p>`;
 	const { app, page, errors } = await launch();
 
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(TOKEN);
@@ -566,7 +566,7 @@ test("keeps mentions and inline macros in a paragraph that is edited", async () 
 	confluence.page.storage = `<h1>Sprint Planı</h1><p>Sorumlu ${mention}, durum ${status}</p>`;
 	const { app, page, errors } = await launch();
 
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(TOKEN);
@@ -602,7 +602,7 @@ test("mentions a person with @ and adds a Jira issue from the / menu, inside a l
 	confluence.page.storage = "<h1>Sprint Planı</h1><p>Hedef</p>";
 	const { app, page, errors } = await launch();
 
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(TOKEN);
@@ -674,7 +674,7 @@ test("shows what a kept atom is when pointed at, and opens it with a click", asy
 	});
 	const opened = () => app.evaluate(() => (globalThis as { opened?: string[] }).opened ?? []);
 
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(TOKEN);
@@ -761,7 +761,7 @@ test("the assistant searches Confluence and reads pages to answer, with a local 
 	});
 
 	// Connected to Confluence; its pane comes with the connection.
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(TOKEN);
@@ -820,7 +820,7 @@ test("Claude Code searches Confluence with Kalem's own tools, through its MCP se
 		env: { KALEM_CLAUDE: claude.path },
 	});
 
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(TOKEN);
@@ -880,7 +880,7 @@ test("edits a column of a page layout and keeps the layout", async () => {
 	confluence.page.storage = `<h1>Sprint Planı</h1>${layout}`;
 	const { app, page, errors } = await launch();
 
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(TOKEN);
@@ -921,7 +921,7 @@ test("manages the attachments of a page", async () => {
 	const report = join(folder, "rapor.pdf");
 	await writeFile(report, "%PDF-1.4 rapor");
 
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 	const connect = page.locator(".confluence-dialog");
 	await connect.locator('input[type="url"]').fill(confluence.site);
 	await connect.locator('input[type="password"]').fill(TOKEN);
@@ -929,7 +929,7 @@ test("manages the attachments of a page", async () => {
 	await connect.locator(".quick-open-item", { hasText: "Sprint Planı" }).click();
 	await expect(page.locator("#editor h1").first()).toHaveText("Sprint Planı");
 
-	await clickMenu(app, "File", "Confluence Attachments…");
+	await clickMenu(app, "File", "Confluence & Jira", "Confluence Attachments…");
 	const dialog = page.locator(".attachments");
 	await expect(dialog.locator(".attachments-title")).toHaveText("Attachments of “Sprint Planı”");
 	const logo = dialog.locator('[data-name="logo.png"]');
@@ -980,7 +980,7 @@ test("manages the attachments of a page", async () => {
 	await dialog.getByRole("button", { name: "Close" }).click();
 	await page.locator("#editor p", { hasText: "Hedef" }).click();
 	await page.keyboard.press("End");
-	await clickMenu(app, "File", "Confluence Attachments…");
+	await clickMenu(app, "File", "Confluence & Jira", "Confluence Attachments…");
 	await pdf.getByRole("button", { name: "Insert" }).click();
 	await expect(dialog).not.toBeVisible();
 	await expect(page.locator("#editor a", { hasText: "rapor.pdf" })).toBeVisible();
@@ -990,7 +990,7 @@ test("manages the attachments of a page", async () => {
 		'<ac:link><ri:attachment ri:filename="rapor.pdf" /><ac:link-body>rapor.pdf</ac:link-body></ac:link>',
 	);
 
-	await clickMenu(app, "File", "Confluence Attachments…");
+	await clickMenu(app, "File", "Confluence & Jira", "Confluence Attachments…");
 	await expect(pdf.locator(".attachments-used")).toHaveText("On the page");
 	await dialog.getByRole("button", { name: "Close" }).click();
 
@@ -1020,7 +1020,7 @@ test("opens an attachment from its link in the page", async () => {
 	const { app, page, errors } = await launch();
 	const folder = await tempDir("kalem-attachment-link-");
 
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 	const connect = page.locator(".confluence-dialog");
 	await connect.locator('input[type="url"]').fill(confluence.site);
 	await connect.locator('input[type="password"]').fill(TOKEN);
@@ -1071,7 +1071,7 @@ test("draws a diagram on a Confluence page as an attachment", async () => {
 	cleanup.push(confluence.close);
 	const { app, page, errors } = await launch();
 
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 	const connect = page.locator(".confluence-dialog");
 	await connect.locator('input[type="url"]').fill(confluence.site);
 	await connect.locator('input[type="password"]').fill(TOKEN);
@@ -1147,7 +1147,7 @@ test("puts favorites in groups: from a menu or by dragging, renamed, closed and 
 		},
 	});
 	const pane = page.locator(".confluence-pane");
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(TOKEN);
@@ -1227,7 +1227,7 @@ test("publishes a local Markdown file as a new page where the user chooses, with
 	await expect(page.locator(".doc-tab", { hasText: "analiz" })).toBeVisible();
 
 	// Connected first, as the dialog asks.
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 	const login = page.locator(".confluence-dialog");
 	await login.locator('input[type="url"]').fill(confluence.site);
 	await login.locator('input[type="password"]').fill(TOKEN);

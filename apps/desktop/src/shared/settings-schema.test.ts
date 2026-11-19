@@ -129,6 +129,7 @@ describe("resetPatch", () => {
 			language: DEFAULT_SETTINGS.language,
 			zoom: DEFAULT_SETTINGS.zoom,
 			fullWidth: DEFAULT_SETTINGS.fullWidth,
+			lineNumbers: DEFAULT_SETTINGS.lineNumbers,
 		});
 		const panels = resetPatch("panels");
 		expect(panels.panePlaces).toEqual(DEFAULT_SETTINGS.panePlaces);

@@ -3879,6 +3879,10 @@ button.git-file-path {
 		padding: 2em 1em 4em;
 	}
 
+	.desk-column .page[data-line-numbers] {
+		padding-inline-start: 3em;
+	}
+
 	/* The block handle's gutter, too: the handle may sit over the page's margin. */
 	.desk-column .page #editor.kalem-ui {
 		padding-inline-start: 1.75rem;
@@ -3896,7 +3900,7 @@ button.git-file-path {
 
 /* Everything on the page is sized in em, so zoom is a single font-size. */
 .page {
-	width: min(50em, 100%);
+	width: min(var(--doc-width, 50em), 100%);
 	min-height: 64em;
 	margin: 0 auto;
 	/* The side margins shrink with a page narrower than 50em (a side panel open
@@ -3911,7 +3915,90 @@ button.git-file-path {
 }
 
 .page #editor {
-	--kalem-size: 1em;
+	--kalem-size: var(--doc-size, 1em);
+	/* Text & Paragraph settings (typography-dialog.ts); the theme's own values when unset. */
+	--kalem-leading: var(--doc-leading, 1.65);
+	--kalem-space: var(--doc-space, 1em);
+}
+
+.app[data-doc-font] .page #editor,
+.typography-preview[data-doc-font] {
+	--kalem-font: var(--doc-font);
+}
+
+.page #editor :is(h1, h2, h3, h4, h5, h6) {
+	margin-top: var(--doc-heading-space, calc(var(--kalem-space) * 1.8));
+}
+
+/* The first block has nothing above it, a heading neither. */
+.page #editor > :first-child {
+	margin-top: 0;
+}
+
+.page #editor li {
+	margin-bottom: var(--doc-list-space, 0.25em);
+}
+
+/*
+ * Line numbers in the page's left margin (line-numbers.ts). Each number is
+ * placed by script beside its line, at the line's measured height, so a tall
+ * line (an image, a diagram, a wrapped table row) does not push the numbers
+ * under it off their lines. The margin is widened to hold them and the block
+ * handle beside them.
+ */
+.page {
+	position: relative;
+}
+
+/* Only the strip: the editor's own inline padding is the gap to the text (the block handle's room). */
+.page[data-line-numbers],
+.app[data-full-width] .page[data-line-numbers] {
+	padding-inline-start: 3.6em;
+}
+
+.line-numbers {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 3.6em;
+	height: 100%;
+	overflow: hidden;
+	/* A plain grey strip, as in a code editor (Notepad++): it reads as the editor's, not the document's. */
+	border-right: 1px solid color-mix(in srgb, var(--app-text) 12%, var(--app-page));
+	border-radius: 4px 0 0 4px;
+	background: color-mix(in srgb, var(--app-text) 6%, var(--app-page));
+	pointer-events: none;
+	user-select: none;
+}
+
+.line-numbers[hidden] {
+	display: none;
+}
+
+.line-number {
+	position: absolute;
+	right: 0;
+	left: 0;
+	/* Room between the number and the strip's edge: pressed against the rule it looked cramped. */
+	padding-right: 0.9em;
+	overflow: hidden;
+	color: color-mix(in srgb, var(--app-text) 48%, var(--app-page));
+	font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
+	font-size: 0.8em;
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+	white-space: nowrap;
+}
+
+@media print {
+	.line-numbers {
+		display: none;
+	}
+
+	.page[data-line-numbers],
+	.app[data-full-width] .page[data-line-numbers] {
+		padding-inline-start: 0;
+	}
 }
 
 /* In a .txt file a single line break is a line, not a space as in Markdown. */
@@ -6664,9 +6751,12 @@ pre[data-confluence-kind="layout"]::before {
 .text-view-gutter {
 	flex: none;
 	min-width: 3.6em;
+	padding-right: 0.9em;
 	overflow: hidden;
-	background: var(--app-surface);
-	color: var(--app-muted);
+	/* The same strip as a document's line numbers (.line-numbers). */
+	border-right: 1px solid color-mix(in srgb, var(--app-text) 12%, var(--app-page));
+	background: color-mix(in srgb, var(--app-text) 6%, var(--app-page));
+	color: color-mix(in srgb, var(--app-text) 48%, var(--app-page));
 	text-align: right;
 	user-select: none;
 }
@@ -13815,4 +13905,184 @@ dialog {
 .confluence-page-item.cut > .confluence-row-main {
 	opacity: 0.55;
 	font-style: italic;
+}
+
+/* --- Text & Paragraph -------------------------------------------------------- */
+
+.typography-hint {
+	margin: 0;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+/* Controls beside the preview; under each other in a narrow Settings window. */
+.typography-panel {
+	container-type: inline-size;
+}
+
+.typography-body {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 14px;
+	align-items: start;
+}
+
+@container (min-width: 560px) {
+	.typography-body {
+		grid-template-columns: minmax(0, 1.5fr) minmax(190px, 1fr);
+	}
+}
+
+.typography-controls {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.typography-group {
+	margin: 0;
+	padding: 10px 12px 12px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+}
+
+.typography-group legend {
+	padding: 0 6px;
+	color: var(--app-muted);
+	font-size: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.typography-row {
+	display: grid;
+	grid-template-columns: 8.5em minmax(0, 1fr);
+	align-items: center;
+	gap: 4px 10px;
+	padding: 5px 0;
+}
+
+.typography-row > :nth-child(n + 3) {
+	grid-column: 2;
+}
+
+.typography-label {
+	font-size: 13px;
+}
+
+.typography-control {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+
+.typography-slider {
+	flex: 1;
+	min-width: 50px;
+	accent-color: var(--app-accent);
+}
+
+.typography-number {
+	width: 4.6em;
+	padding: 3px 6px;
+	border: 1px solid var(--app-border);
+	border-radius: 5px;
+	background: var(--app-page);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 13px;
+	font-variant-numeric: tabular-nums;
+}
+
+.typography-unit {
+	width: 2.2em;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.typography-select {
+	flex: 1;
+	padding: 4px 6px;
+	border: 1px solid var(--app-border);
+	border-radius: 5px;
+	background: var(--app-page);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 13px;
+}
+
+.typography-presets {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.typography-preset {
+	min-width: 3em;
+	padding: 2px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 5px;
+	background: var(--app-page);
+	color: var(--app-text);
+	font: inherit;
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+	cursor: pointer;
+}
+
+.typography-preset:hover {
+	background: var(--app-hover);
+}
+
+.typography-preset[aria-pressed="true"] {
+	border-color: var(--app-accent);
+	background: var(--app-pressed);
+	font-weight: 600;
+}
+
+.typography-preview-frame {
+	position: sticky;
+	top: 8px;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	/* The page's text size at 100%: the preview's sizes are relative to it, as the page's are. */
+	font-size: 16px;
+}
+
+.typography-preview-frame h3 {
+	margin: 0 0 6px;
+	color: var(--app-muted);
+	font-size: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+/* Set as the page sets the document: the same tokens, from the same settings. */
+.typography-preview.kalem-doc {
+	--kalem-size: var(--doc-size, 1em);
+	--kalem-leading: var(--doc-leading, 1.65);
+	--kalem-space: var(--doc-space, 1em);
+	flex: 1;
+	min-height: 240px;
+	padding: 14px 16px;
+	overflow: auto;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-page);
+}
+
+.typography-preview.kalem-doc h2 {
+	margin-top: var(--doc-heading-space, 1.8em);
+}
+
+.typography-preview.kalem-doc > :first-child {
+	margin-top: 0;
+}
+
+.typography-preview.kalem-doc li {
+	margin-bottom: var(--doc-list-space, 0.25em);
 }
