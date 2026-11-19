@@ -34,7 +34,7 @@ async function connectConfluence(
 	site: string,
 	token: string,
 ): Promise<void> {
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(site);
 	await dialog.locator('input[type="password"]').fill(token);
@@ -54,7 +54,7 @@ for (const theme of ["light", "dark"] as const) {
 		const explorer = await createExplorer(app, page, `jira-${theme}`, errors);
 
 		// Jira's login, asked for from the menu before anything is connected.
-		await clickMenu(app, "File", "Jira…");
+		await clickMenu(app, "File", "Confluence & Jira", "Jira…");
 		const jira = page.locator(".jira-dialog");
 		await expect(jira).toBeVisible();
 		await explorer.scene("jira login, empty");
@@ -168,7 +168,7 @@ for (const theme of ["light", "dark"] as const) {
 		await page.mouse.move(0, 0);
 
 		// The search dialog.
-		await clickMenu(app, "File", "Jira…");
+		await clickMenu(app, "File", "Confluence & Jira", "Jira…");
 		await expect(jira).toBeVisible();
 		await page.waitForTimeout(400);
 		await explorer.scene("jira search dialog");
@@ -280,7 +280,7 @@ for (const theme of ["light", "dark"] as const) {
 		const pane = page.locator(".confluence-pane");
 
 		// Connecting.
-		await clickMenu(app, "File", "Open from Confluence…");
+		await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 		const dialog = page.locator(".confluence-dialog");
 		await expect(dialog).toBeVisible();
 		await explorer.scene("login, empty");
@@ -412,7 +412,7 @@ for (const theme of ["light", "dark"] as const) {
 		await explorer.scene("page edited, unsaved");
 
 		// Attachments.
-		await clickMenu(app, "File", "Confluence Attachments…");
+		await clickMenu(app, "File", "Confluence & Jira", "Confluence Attachments…");
 		const attachments = page.locator(".attachments");
 		await expect(attachments.locator('[data-name="logo.png"]')).toBeVisible();
 		await explorer.scene("attachments");

@@ -115,14 +115,14 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 			accelerator: "CmdOrCtrl+Shift+P",
 			click: send(ctx, "quick-open"),
 		},
-		{ type: "separator" },
 		{
 			label: t.openFolder,
 			click: (_item, window) => ctx.openFolder(targetOf(ctx, window)),
 		},
+		// Only while a folder is open: there is nothing to close otherwise.
 		{
 			label: ctx.workspaces.length > 1 ? t.closeAllFolders : t.closeFolder,
-			enabled: ctx.workspaces.length > 0,
+			visible: ctx.workspaces.length > 0,
 			click: () => ctx.closeFolder(),
 		},
 		{ type: "separator" },
@@ -130,51 +130,64 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 		{ label: t.saveAs, accelerator: "CmdOrCtrl+Shift+S", click: send(ctx, "save-as") },
 		{ label: t.saveAsPackage, click: send(ctx, "save-as-package") },
 		{ label: t.versionHistory, click: send(ctx, "version-history") },
-		{ type: "separator" },
-		{
-			label: t.importWord,
-			accelerator: "CmdOrCtrl+Shift+O",
-			click: (_item, window) => void windows.showWordDialog(targetOf(ctx, window)),
-		},
-		{ label: t.confluenceOpen, click: send(ctx, "confluence-open") },
-		{ label: t.publishMenu, click: send(ctx, "publish-confluence") },
-		{ label: t.changesCommand, click: send(ctx, "confluence-changes") },
-		{ label: t.confluenceAttachmentsMenu, click: send(ctx, "confluence-attachments") },
-		{ label: t.jiraMenu, click: send(ctx, "jira-open") },
-		{
-			label: t.importConfluence,
-			click: (_item, window) => void windows.showConfluenceDialog(targetOf(ctx, window)),
-		},
-		{
-			label: t.export,
-			submenu: [
-				{ label: t.exportHtml, click: send(ctx, "export-html") },
-				{ label: t.exportDocx, click: send(ctx, "export-docx") },
-				{ label: t.exportConfluence, click: send(ctx, "export-confluence") },
-				{ label: t.exportConfluenceWiki, click: send(ctx, "export-confluence-wiki") },
-				{ label: t.exportPdf, click: withWindow(ctx, (win) => ctx.exportPdf(win)) },
-			],
-		},
-		{ label: t.pageSetup, submenu: pageSetupTemplate(ctx) },
-		{
-			label: t.print,
-			accelerator: "CmdOrCtrl+P",
-			click: withWindow(ctx, (win) => ctx.print(win)),
-		},
-		{ type: "separator" },
-		// On macOS the shortcut is on the app menu's entry, where Mac apps keep it.
-		{
-			label: t.settingsMenu,
-			...(isMac ? {} : { accelerator: "CmdOrCtrl+," }),
-			click: send(ctx, "settings"),
-		},
-		{ type: "separator" },
 		{
 			label: t.showInFolder,
 			click: withWindow(ctx, (win) => {
 				const path = windows.activeTab(win)?.path ?? null;
 				if (path !== null) shell.showItemInFolder(path);
 			}),
+		},
+		{ type: "separator" },
+		// What comes in, what goes out, and the Atlassian pages: one item each, the rest under them.
+		{
+			label: t.importMenu,
+			submenu: [
+				{
+					label: t.importFromWord,
+					accelerator: "CmdOrCtrl+Shift+O",
+					click: (_item, window) => void windows.showWordDialog(targetOf(ctx, window)),
+				},
+				{
+					label: t.importFromConfluence,
+					click: (_item, window) => void windows.showConfluenceDialog(targetOf(ctx, window)),
+				},
+			],
+		},
+		{
+			label: t.export,
+			submenu: [
+				{ label: t.exportHtml, click: send(ctx, "export-html") },
+				{ label: t.exportDocx, click: send(ctx, "export-docx") },
+				{ label: t.exportPdf, click: withWindow(ctx, (win) => ctx.exportPdf(win)) },
+				{ type: "separator" },
+				{ label: t.exportConfluence, click: send(ctx, "export-confluence") },
+				{ label: t.exportConfluenceWiki, click: send(ctx, "export-confluence-wiki") },
+			],
+		},
+		{
+			label: t.confluenceJiraMenu,
+			submenu: [
+				{ label: t.confluenceOpen, click: send(ctx, "confluence-open") },
+				{ label: t.publishMenu, click: send(ctx, "publish-confluence") },
+				{ label: t.changesCommand, click: send(ctx, "confluence-changes") },
+				{ label: t.confluenceAttachmentsMenu, click: send(ctx, "confluence-attachments") },
+				{ type: "separator" },
+				{ label: t.jiraMenu, click: send(ctx, "jira-open") },
+			],
+		},
+		{ type: "separator" },
+		{
+			label: t.print,
+			accelerator: "CmdOrCtrl+P",
+			click: withWindow(ctx, (win) => ctx.print(win)),
+		},
+		{ label: t.pageSetup, submenu: pageSetupTemplate(ctx) },
+		{ type: "separator" },
+		// On macOS the shortcut is on the app menu's entry, where Mac apps keep it.
+		{
+			label: t.settingsMenu,
+			...(isMac ? {} : { accelerator: "CmdOrCtrl+," }),
+			click: send(ctx, "settings"),
 		},
 		{ type: "separator" },
 		{ label: t.closeTab, accelerator: "CmdOrCtrl+W", click: send(ctx, "close-tab") },

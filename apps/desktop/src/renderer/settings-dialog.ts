@@ -35,6 +35,7 @@ import { createModeEditor } from "./mode-settings.js";
 import { installFolds } from "./settings-fold.js";
 import { sourceLabel } from "./template-picker.js";
 import { createToolSettings } from "./tool-settings.js";
+import { createTypographyPanel } from "./typography-panel.js";
 
 export interface SettingsDialogOptions {
 	readonly t: Strings;
@@ -921,8 +922,25 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		);
 	}
 
+	// Text & Paragraph: sliders and a preview rather than one row a setting.
+	const typography = createTypographyPanel({
+		t,
+		settings: options.settings,
+		update: options.update,
+	});
+	item(
+		"typography",
+		[
+			t.settingsCatTypography,
+			...SETTING_DEFS.filter((def) => def.category === "typography").map((def) =>
+				searchText(t, def),
+			),
+		].join(" "),
+		typography.element,
+	);
+
 	// The schema's rows, in each category after its own parts.
-	for (const def of SETTING_DEFS) row(def);
+	for (const def of SETTING_DEFS) if (def.category !== "typography") row(def);
 
 	// --- Search ------------------------------------------------------------------
 
@@ -970,6 +988,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 
 	function renderValues(): void {
 		for (const refresh of refreshers) refresh();
+		typography.refresh();
 		renderPalette();
 		renderPanes();
 		renderPermissions();

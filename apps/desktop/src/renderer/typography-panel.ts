@@ -1,12 +1,10 @@
 /**
- * The Text & Paragraph window, as Word's Paragraph dialog: line spacing,
- * the room after paragraphs, above headings and between list items, the
- * typeface, the text size and the page's width. Each change shows at once,
- * in the window's own preview and on the open document behind it; Cancel
- * (or Escape) puts back what was there when it opened.
- *
- * The values are settings (`shared/typography.ts`): the same rows are in
- * the Settings window, and the assistant can change them.
+ * The Text & Paragraph part of the Settings window, as Word's Paragraph
+ * dialog: line spacing (with Word's 1.0 / 1.15 / 1.5 / 2.0), the room after
+ * paragraphs, above headings and between list items, the typeface, the
+ * text size and the page's width, beside a preview. Each change is a
+ * setting (`shared/typography.ts`) and shows at once, here and on the
+ * open documents; the section's Reset puts the defaults back.
  */
 import type { Settings } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
@@ -21,17 +19,16 @@ import {
 	typographyVars,
 } from "../shared/typography.js";
 import { el } from "./dom.js";
-import { icon } from "./icons.js";
 
-export interface TypographyDialogOptions {
+export interface TypographyPanelOptions {
 	readonly t: Strings;
 	settings(): Settings;
 	update(patch: Partial<Settings>): void;
 }
 
-export interface TypographyDialog {
-	show(): void;
-	/** The settings changed elsewhere: the controls follow. */
+export interface TypographyPanel {
+	readonly element: HTMLElement;
+	/** The settings changed: the controls and the preview follow. */
 	refresh(): void;
 }
 
@@ -45,10 +42,8 @@ const FONT_LABELS: Readonly<Record<DocumentFont, keyof Strings>> = {
 	mono: "typoFontMono",
 };
 
-export function createTypographyDialog(options: TypographyDialogOptions): TypographyDialog {
+export function createTypographyPanel(options: TypographyPanelOptions): TypographyPanel {
 	const { t } = options;
-	/** The values when the window opened, for Cancel. */
-	let initial: Typography = pickTypography(options.settings());
 	const refreshers: (() => void)[] = [];
 	let pending: Partial<Settings> = {};
 	let frame = 0;
@@ -65,15 +60,6 @@ export function createTypographyDialog(options: TypographyDialogOptions): Typogr
 			options.update(next);
 			refresh();
 		});
-	}
-
-	function flush(): void {
-		if (frame === 0) return;
-		cancelAnimationFrame(frame);
-		frame = 0;
-		const next = pending;
-		pending = {};
-		options.update(next);
 	}
 
 	// --- A number: slider, box and unit -------------------------------------------
@@ -194,28 +180,7 @@ export function createTypographyDialog(options: TypographyDialogOptions): Typogr
 		preview.toggleAttribute("data-doc-font", typography.documentFont !== "default");
 	}
 
-	// --- The window ---------------------------------------------------------------
-
-	const close = el("button", {
-		class: "icon-button",
-		attrs: { type: "button", "aria-label": t.close, title: t.close },
-		children: [icon("close")],
-	});
-	const reset = el("button", {
-		class: "dialog-button",
-		text: t.typoReset,
-		attrs: { type: "button" },
-	});
-	const cancel = el("button", {
-		class: "dialog-button",
-		text: t.cancel,
-		attrs: { type: "button" },
-	});
-	const ok = el("button", {
-		class: "dialog-button primary",
-		text: t.typoOk,
-		attrs: { type: "button" },
-	});
+	// --- The panel ------------------------------------------------------------------
 
 	const group = (title: string, ...rows: HTMLElement[]): HTMLElement =>
 		el("fieldset", {
@@ -223,113 +188,60 @@ export function createTypographyDialog(options: TypographyDialogOptions): Typogr
 			children: [el("legend", { text: title }), ...rows],
 		});
 
-	const dialog = el("dialog", {
-		class: "typography",
-		attrs: { "aria-labelledby": "typography-title" },
+	const body = el("div", {
+		class: "typography-body",
 		children: [
 			el("div", {
-				class: "typography-head",
+				class: "typography-controls",
 				children: [
-					el("div", {
-						children: [
-							el("h2", { text: t.typographyTitle, attrs: { id: "typography-title" } }),
-							el("p", { class: "typography-hint", text: t.typographyHint }),
-						],
-					}),
-					close,
-				],
-			}),
-			el("div", {
-				class: "typography-body",
-				children: [
-					el("div", {
-						class: "typography-controls",
-						children: [
-							group(
-								t.typoSpacingGroup,
-								numberRow("lineSpacing", t.typoLineSpacing, t.typoUnitLines, presets),
-								numberRow("paragraphSpacing", t.typoParagraphSpacing, t.typoUnitEm),
-								numberRow("headingSpacing", t.typoHeadingSpacing, t.typoUnitEm),
-								numberRow("listSpacing", t.typoListSpacing, t.typoUnitEm),
-							),
-							group(
-								t.typoTextGroup,
-								el("div", {
-									class: "typography-row",
-									children: [
-										el("label", {
-											class: "typography-label",
-											text: t.typoFont,
-											attrs: { for: fontId },
-										}),
-										el("div", { class: "typography-control", children: [font] }),
-									],
+					el("p", { class: "typography-hint", text: t.typographyHint }),
+					group(
+						t.typoSpacingGroup,
+						numberRow("lineSpacing", t.typoLineSpacing, t.typoUnitLines, presets),
+						numberRow("paragraphSpacing", t.typoParagraphSpacing, t.typoUnitEm),
+						numberRow("headingSpacing", t.typoHeadingSpacing, t.typoUnitEm),
+						numberRow("listSpacing", t.typoListSpacing, t.typoUnitEm),
+					),
+					group(
+						t.typoTextGroup,
+						el("div", {
+							class: "typography-row",
+							children: [
+								el("label", {
+									class: "typography-label",
+									text: t.typoFont,
+									attrs: { for: fontId },
 								}),
-								numberRow("documentFontSize", t.typoFontSize, t.typoUnitPx),
-							),
-							group(
-								t.typoPageGroup,
-								numberRow(
-									"pageWidth",
-									t.typoPageWidth,
-									t.typoUnitEm,
-									el("p", { class: "typography-hint", text: t.typoPageWidthHint }),
-								),
-							),
-						],
-					}),
-					el("div", {
-						class: "typography-preview-frame",
-						children: [el("h3", { text: t.typoPreview }), preview],
-					}),
+								el("div", { class: "typography-control", children: [font] }),
+							],
+						}),
+						numberRow("documentFontSize", t.typoFontSize, t.typoUnitPx),
+					),
+					group(
+						t.typoPageGroup,
+						numberRow(
+							"pageWidth",
+							t.typoPageWidth,
+							t.typoUnitEm,
+							el("p", { class: "typography-hint", text: t.typoPageWidthHint }),
+						),
+					),
 				],
 			}),
 			el("div", {
-				class: "typography-actions",
-				children: [reset, el("span", { class: "typography-spacer" }), cancel, ok],
+				class: "typography-preview-frame",
+				children: [el("h3", { text: t.typoPreview }), preview],
 			}),
 		],
 	});
-	document.body.append(dialog);
+
+	const element = el("div", { class: "typography-panel", children: [body] });
 
 	function refresh(): void {
 		for (const refresher of refreshers) refresher();
 		drawPreview(pickTypography(options.settings()));
 	}
+	refresh();
 
-	function revert(): void {
-		flush();
-		options.update({ ...initial });
-	}
-
-	reset.addEventListener("click", () => change({ ...DEFAULT_TYPOGRAPHY }));
-	ok.addEventListener("click", () => {
-		flush();
-		dialog.close();
-	});
-	cancel.addEventListener("click", () => {
-		revert();
-		dialog.close();
-	});
-	close.addEventListener("click", () => {
-		revert();
-		dialog.close();
-	});
-	// Escape is Cancel, as in Word.
-	dialog.addEventListener("cancel", (event) => {
-		event.preventDefault();
-		revert();
-		dialog.close();
-	});
-
-	return {
-		show() {
-			initial = pickTypography(options.settings());
-			refresh();
-			if (!dialog.open) dialog.showModal();
-		},
-		refresh() {
-			if (dialog.open) refresh();
-		},
-	};
+	return { element, refresh };
 }

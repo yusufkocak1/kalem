@@ -13909,60 +13909,27 @@ dialog {
 
 /* --- Text & Paragraph -------------------------------------------------------- */
 
-.typography {
-	display: none;
-	flex-direction: column;
-	gap: 14px;
-	box-sizing: border-box;
-	width: min(920px, calc(100vw - 32px));
-	max-height: calc(100vh - 32px);
-	padding: 18px 20px 16px;
-	border: 1px solid var(--app-border);
-	border-radius: 10px;
-	background: var(--app-raised);
-	color: var(--app-text);
-	box-shadow: var(--app-shadow);
-}
-
-.typography[open] {
-	display: flex;
-}
-
-/* Light and sharp: the document behind shows each change as it is made. */
-.typography[open]::backdrop {
-	background: rgb(0 0 0 / 6%);
-	backdrop-filter: none;
-}
-
-.typography-head {
-	display: flex;
-	align-items: flex-start;
-	justify-content: space-between;
-	gap: 12px;
-}
-
-.typography-head h2 {
-	margin: 0;
-	font-size: 17px;
-}
-
 .typography-hint {
-	margin: 4px 0 0;
+	margin: 0;
 	color: var(--app-muted);
 	font-size: 12px;
 }
 
-.typography-body {
-	display: grid;
-	grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-	gap: 18px;
-	min-height: 0;
-	overflow: auto;
+/* Controls beside the preview; under each other in a narrow Settings window. */
+.typography-panel {
+	container-type: inline-size;
 }
 
-@media (max-width: 760px) {
+.typography-body {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr);
+	gap: 14px;
+	align-items: start;
+}
+
+@container (min-width: 560px) {
 	.typography-body {
-		grid-template-columns: minmax(0, 1fr);
+		grid-template-columns: minmax(0, 1.5fr) minmax(190px, 1fr);
 	}
 }
 
@@ -13990,7 +13957,7 @@ dialog {
 
 .typography-row {
 	display: grid;
-	grid-template-columns: 11.5em minmax(0, 1fr);
+	grid-template-columns: 8.5em minmax(0, 1fr);
 	align-items: center;
 	gap: 4px 10px;
 	padding: 5px 0;
@@ -14013,7 +13980,7 @@ dialog {
 
 .typography-slider {
 	flex: 1;
-	min-width: 60px;
+	min-width: 50px;
 	accent-color: var(--app-accent);
 }
 
@@ -14030,7 +13997,7 @@ dialog {
 }
 
 .typography-unit {
-	width: 2.6em;
+	width: 2.2em;
 	color: var(--app-muted);
 	font-size: 12px;
 }
@@ -14076,6 +14043,8 @@ dialog {
 }
 
 .typography-preview-frame {
+	position: sticky;
+	top: 8px;
 	display: flex;
 	flex-direction: column;
 	min-height: 0;
@@ -14098,8 +14067,8 @@ dialog {
 	--kalem-leading: var(--doc-leading, 1.65);
 	--kalem-space: var(--doc-space, 1em);
 	flex: 1;
-	min-height: 260px;
-	padding: 18px 22px;
+	min-height: 240px;
+	padding: 14px 16px;
 	overflow: auto;
 	border: 1px solid var(--app-border);
 	border-radius: 8px;
@@ -14116,14 +14085,4 @@ dialog {
 
 .typography-preview.kalem-doc li {
 	margin-bottom: var(--doc-list-space, 0.25em);
-}
-
-.typography-actions {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-}
-
-.typography-spacer {
-	flex: 1;
 }

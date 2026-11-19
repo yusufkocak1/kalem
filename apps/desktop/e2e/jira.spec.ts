@@ -32,7 +32,7 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	// The left dock names the pane it shows, as the assistant's panel does.
 	await expect(page.locator(".dock-left .dock-title h2")).toHaveText("Headings");
 
-	await clickMenu(app, "File", "Open from Confluence…");
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
 	const dialog = page.locator(".confluence-dialog");
 	await dialog.locator('input[type="url"]').fill(confluence.site);
 	await dialog.locator('input[type="password"]').fill(CONFLUENCE_TOKEN);

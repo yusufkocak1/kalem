@@ -76,7 +76,6 @@ import { enableColumnResize } from "./table-styles.js";
 import { createTabStrip } from "./tabs.js";
 import { createTemplatePicker } from "./template-picker.js";
 import { measureDiagramText } from "./text-measure.js";
-import { createTypographyDialog } from "./typography-dialog.js";
 import { createVersionHistory } from "./version-history.js";
 
 import "@kalem-editor/themes/tokens.css";
@@ -352,11 +351,6 @@ function placeAssistant(): void {
 	assistant.element.dataset.place = place;
 }
 assistantRail.prepend(docks.stripes.right);
-const typographyDialog = createTypographyDialog({
-	t,
-	settings: () => settings,
-	update: (patch) => updateSettings(patch),
-});
 const settingsDialog = createSettingsDialog({
 	t,
 	bridge,
@@ -1320,7 +1314,7 @@ const commands: Record<Command, () => void> = {
 	},
 	"jira-open": () => void jiraDialog.showSearch(),
 	settings: () => void settingsDialog.show(),
-	typography: () => typographyDialog.show(),
+	typography: () => void settingsDialog.show("typography"),
 	"network-log": () => {
 		if (debugMode) networkPanel.toggle();
 	},
@@ -1451,7 +1445,6 @@ bridge.onSettings((next) => {
 	scheduleRibbonUpdate();
 	// A setting changed from the menu shows in the Settings window at once.
 	void settingsDialog.refresh();
-	typographyDialog.refresh();
 });
 
 // --- Dropped files ----------------------------------------------------------
