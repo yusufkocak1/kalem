@@ -10,6 +10,7 @@ import { format } from "../shared/i18n.js";
 import { extension } from "../shared/paths.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
+import { wrappedRows } from "./line-numbers.js";
 
 export interface TextViewOptions {
 	readonly t: Strings;
@@ -18,6 +19,8 @@ export interface TextViewOptions {
 	readonly text: string;
 	/** The file's path: its extension tells the formatter what the text is. */
 	readonly path: string;
+	/** Line numbers beside the text (the setting). */
+	readonly lineNumbers: boolean;
 	/** The text was edited. */
 	onChange(): void;
 	/** The caret moved; for the status bar. */
@@ -40,6 +43,8 @@ export interface TextView {
 	replaceAll(text: string): boolean;
 	readOnly(): boolean;
 	setReadOnly(readOnly: boolean): void;
+	/** Shows or hides the line numbers. */
+	setLineNumbers(on: boolean): void;
 	destroy(): void;
 }
 
@@ -89,7 +94,8 @@ export function createTextView(options: TextViewOptions): TextView {
 	});
 	area.value = options.text;
 	const gutter = el("pre", { class: "text-view-gutter", attrs: { "aria-hidden": "true" } });
-	gutter.hidden = wrapLines;
+	let numbered = options.lineNumbers;
+	gutter.hidden = !numbered;
 
 	const beautifyButton = el("button", {
 		class: "text-view-button text-view-format",
@@ -131,13 +137,46 @@ export function createTextView(options: TextViewOptions): TextView {
 		children: [toolbar, findBar, el("div", { class: "text-view-body", children: [gutter, area] })],
 	});
 
-	let lines = 0;
+	/** What the gutter shows now, so an edit that adds no line does not redraw it. */
+	let drawn = "";
+	let gutterTimer: ReturnType<typeof setTimeout> | undefined;
+	/**
+	 * One number a line. A wrapped line takes more than one row of the box;
+	 * its number stays on its first row and the rows under it are left
+	 * empty, so the numbers below do not slide away from their lines.
+	 */
 	function updateGutter(): void {
-		const count = countLines(area.value);
-		if (count === lines) return;
-		lines = count;
-		gutter.textContent = Array.from({ length: count }, (_, i) => i + 1).join("\n");
+		clearTimeout(gutterTimer);
+		if (!numbered) return;
+		let text: string;
+		if (wrapLines && area.clientWidth > 0) {
+			const rows = wrappedRows(area, area.value.split("\n"));
+			text = rows.map((count, i) => String(i + 1) + "\n".repeat(count - 1)).join("\n");
+		} else {
+			const count = countLines(area.value);
+			text = Array.from({ length: count }, (_, i) => i + 1).join("\n");
+		}
+		if (text === drawn) return;
+		drawn = text;
+		gutter.textContent = text;
+		gutter.scrollTop = area.scrollTop;
 	}
+
+	/** Measuring wrapped lines takes a moment in a long file: once typing pauses. */
+	function updateGutterSoon(): void {
+		clearTimeout(gutterTimer);
+		if (!wrapLines) updateGutter();
+		else gutterTimer = setTimeout(updateGutter, 80);
+	}
+
+	// A new width wraps the lines again.
+	let lastWidth = 0;
+	const resize = new ResizeObserver(() => {
+		if (area.clientWidth === lastWidth) return;
+		lastWidth = area.clientWidth;
+		if (wrapLines) updateGutter();
+	});
+	resize.observe(area);
 
 	function reportCaret(): void {
 		const at = area.selectionStart;
@@ -175,7 +214,7 @@ export function createTextView(options: TextViewOptions): TextView {
 	}
 
 	area.addEventListener("input", () => {
-		updateGutter();
+		updateGutterSoon();
 		options.onChange();
 		if (!findBar.hidden) runFind(false, true);
 	});
@@ -199,8 +238,7 @@ export function createTextView(options: TextViewOptions): TextView {
 	wrapToggle.addEventListener("change", () => {
 		wrapLines = wrapToggle.checked;
 		area.setAttribute("wrap", wrapLines ? "soft" : "off");
-		// Wrapped lines no longer match the numbers.
-		gutter.hidden = wrapLines;
+		updateGutter();
 	});
 
 	// --- Find ---
@@ -325,6 +363,17 @@ export function createTextView(options: TextViewOptions): TextView {
 			area.readOnly = readOnly;
 			beautifyButton.disabled = readOnly;
 		},
-		destroy: () => element.remove(),
+		setLineNumbers(on) {
+			if (on === numbered) return;
+			numbered = on;
+			gutter.hidden = !on;
+			drawn = "";
+			updateGutter();
+		},
+		destroy: () => {
+			clearTimeout(gutterTimer);
+			resize.disconnect();
+			element.remove();
+		},
 	};
 }

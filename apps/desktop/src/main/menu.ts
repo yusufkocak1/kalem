@@ -415,6 +415,12 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 					checked: settings.fullWidth,
 					click: () => ctx.changeSettings({ fullWidth: !settings.fullWidth }),
 				},
+				{
+					label: t.lineNumbers,
+					type: "checkbox",
+					checked: settings.lineNumbers,
+					click: () => ctx.changeSettings({ lineNumbers: !settings.lineNumbers }),
+				},
 				{ type: "separator" },
 				{ label: t.theme, submenu: themes },
 				{ label: t.language, submenu: languages },

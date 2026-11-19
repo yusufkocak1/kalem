@@ -3879,6 +3879,10 @@ button.git-file-path {
 		padding: 2em 1em 4em;
 	}
 
+	.desk-column .page[data-line-numbers] {
+		padding-inline-start: 3em;
+	}
+
 	/* The block handle's gutter, too: the handle may sit over the page's margin. */
 	.desk-column .page #editor.kalem-ui {
 		padding-inline-start: 1.75rem;
@@ -3912,6 +3916,66 @@ button.git-file-path {
 
 .page #editor {
 	--kalem-size: 1em;
+}
+
+/*
+ * Line numbers in the page's left margin (line-numbers.ts). Each number is
+ * placed by script beside its line, at the line's measured height, so a tall
+ * line (an image, a diagram, a wrapped table row) does not push the numbers
+ * under it off their lines. The margin is widened to hold them and the block
+ * handle beside them.
+ */
+.page {
+	position: relative;
+}
+
+.page[data-line-numbers],
+.app[data-full-width] .page[data-line-numbers] {
+	padding-inline-start: 5.5em;
+}
+
+.line-numbers {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 3em;
+	height: 100%;
+	overflow: hidden;
+	/* A strip of the window's colour, ruled off: it reads as the editor's, not the document's. */
+	border-right: 1px solid color-mix(in srgb, var(--app-accent) 30%, var(--app-border));
+	border-radius: 4px 0 0 4px;
+	background: color-mix(in srgb, var(--app-accent) 7%, var(--app-desk));
+	pointer-events: none;
+	user-select: none;
+}
+
+.line-numbers[hidden] {
+	display: none;
+}
+
+.line-number {
+	position: absolute;
+	right: 0;
+	left: 0;
+	padding-right: 0.45em;
+	overflow: hidden;
+	color: color-mix(in srgb, var(--app-accent) 55%, var(--app-muted));
+	font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
+	font-size: 0.72em;
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+	white-space: nowrap;
+}
+
+@media print {
+	.line-numbers {
+		display: none;
+	}
+
+	.page[data-line-numbers],
+	.app[data-full-width] .page[data-line-numbers] {
+		padding-inline-start: 0;
+	}
 }
 
 /* In a .txt file a single line break is a line, not a space as in Markdown. */
@@ -6665,8 +6729,10 @@ pre[data-confluence-kind="layout"]::before {
 	flex: none;
 	min-width: 3.6em;
 	overflow: hidden;
-	background: var(--app-surface);
-	color: var(--app-muted);
+	/* The same strip as a document's line numbers (.line-numbers). */
+	border-right: 1px solid color-mix(in srgb, var(--app-accent) 30%, var(--app-border));
+	background: color-mix(in srgb, var(--app-accent) 7%, var(--app-desk));
+	color: color-mix(in srgb, var(--app-accent) 55%, var(--app-muted));
 	text-align: right;
 	user-select: none;
 }

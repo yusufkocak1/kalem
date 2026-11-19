@@ -206,6 +206,18 @@ export class Session {
 		return this.#source;
 	}
 
+	/** The document as it is saved and the editor's blocks, for the line numbers; `null` for a text file. */
+	lineSnapshot(): { markdown: string; blocks: { id: string; type: string }[] } | null {
+		if (this.#textView !== null || this.#editor === null) return null;
+		return {
+			markdown: this.#text(),
+			blocks: this.#editor.getDocument().children.map((block) => ({
+				id: block.id ?? "",
+				type: block.type,
+			})),
+		};
+	}
+
 	get path(): string | null {
 		return this.#path;
 	}
@@ -646,6 +658,7 @@ export class Session {
 			lang: language,
 			text,
 			path: this.#path ?? "",
+			lineNumbers: this.#o.settings().lineNumbers,
 			onChange: () => this.#textChanged(),
 			onCaret: (line, column) => {
 				wordCount.textContent = format(t.textPosition, line, column);

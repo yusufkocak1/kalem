@@ -291,6 +291,14 @@ export const SETTINGS_SCHEMA: Schema = {
 		keywords: ["tam genişlik", "full width", "geniş", "wide", "sayfa genişliği"],
 		assistant: "write",
 	},
+	lineNumbers: {
+		key: "lineNumbers",
+		category: "appearance",
+		label: "lineNumbers",
+		type: "boolean",
+		keywords: ["satır numarası", "satır numaraları", "line numbers", "satır", "line", "numara"],
+		assistant: "write",
+	},
 	autoSave: {
 		key: "autoSave",
 		category: "editor",

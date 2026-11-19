@@ -78,6 +78,8 @@ export interface Settings {
 	/** Document zoom in percent. */
 	readonly zoom: number;
 	readonly fullWidth: boolean;
+	/** Line numbers beside the page (the file's lines) and beside a text file. */
+	readonly lineNumbers: boolean;
 	readonly navigation: boolean;
 	readonly autoSave: boolean;
 	readonly spellCheck: boolean;
@@ -173,6 +175,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	language: null,
 	zoom: 100,
 	fullWidth: false,
+	lineNumbers: true,
 	navigation: true,
 	autoSave: false,
 	spellCheck: true,

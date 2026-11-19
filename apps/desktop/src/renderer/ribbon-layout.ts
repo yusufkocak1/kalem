@@ -555,6 +555,13 @@ export function createAppRibbon(
 							...toggle("focus", t.focusMode, "focus", () => ctx.focusMode(), ctx.commands.focus),
 							shortcut: `${MOD}+Shift+F`,
 						},
+						toggle(
+							"line-numbers",
+							t.lineNumbers,
+							"lineNumbers",
+							() => ctx.settings().lineNumbers,
+							() => ctx.updateSettings({ lineNumbers: !ctx.settings().lineNumbers }),
+						),
 					],
 				},
 				{
