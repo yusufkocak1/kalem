@@ -3929,22 +3929,23 @@ button.git-file-path {
 	position: relative;
 }
 
+/* Only the strip: the editor's own inline padding is the gap to the text (the block handle's room). */
 .page[data-line-numbers],
 .app[data-full-width] .page[data-line-numbers] {
-	padding-inline-start: 5.5em;
+	padding-inline-start: 3.6em;
 }
 
 .line-numbers {
 	position: absolute;
 	top: 0;
 	left: 0;
-	width: 3em;
+	width: 3.6em;
 	height: 100%;
 	overflow: hidden;
-	/* A strip of the window's colour, ruled off: it reads as the editor's, not the document's. */
-	border-right: 1px solid color-mix(in srgb, var(--app-accent) 30%, var(--app-border));
+	/* A plain grey strip, as in a code editor (Notepad++): it reads as the editor's, not the document's. */
+	border-right: 1px solid color-mix(in srgb, var(--app-text) 12%, var(--app-page));
 	border-radius: 4px 0 0 4px;
-	background: color-mix(in srgb, var(--app-accent) 7%, var(--app-desk));
+	background: color-mix(in srgb, var(--app-text) 6%, var(--app-page));
 	pointer-events: none;
 	user-select: none;
 }
@@ -3957,11 +3958,12 @@ button.git-file-path {
 	position: absolute;
 	right: 0;
 	left: 0;
-	padding-right: 0.45em;
+	/* Room between the number and the strip's edge: pressed against the rule it looked cramped. */
+	padding-right: 0.9em;
 	overflow: hidden;
-	color: color-mix(in srgb, var(--app-accent) 55%, var(--app-muted));
+	color: color-mix(in srgb, var(--app-text) 48%, var(--app-page));
 	font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
-	font-size: 0.72em;
+	font-size: 0.8em;
 	font-variant-numeric: tabular-nums;
 	text-align: right;
 	white-space: nowrap;
@@ -6728,11 +6730,12 @@ pre[data-confluence-kind="layout"]::before {
 .text-view-gutter {
 	flex: none;
 	min-width: 3.6em;
+	padding-right: 0.9em;
 	overflow: hidden;
 	/* The same strip as a document's line numbers (.line-numbers). */
-	border-right: 1px solid color-mix(in srgb, var(--app-accent) 30%, var(--app-border));
-	background: color-mix(in srgb, var(--app-accent) 7%, var(--app-desk));
-	color: color-mix(in srgb, var(--app-accent) 55%, var(--app-muted));
+	border-right: 1px solid color-mix(in srgb, var(--app-text) 12%, var(--app-page));
+	background: color-mix(in srgb, var(--app-text) 6%, var(--app-page));
+	color: color-mix(in srgb, var(--app-text) 48%, var(--app-page));
 	text-align: right;
 	user-select: none;
 }
