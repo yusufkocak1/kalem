@@ -925,8 +925,11 @@ verir.
 >   gider; asistan o şablona göre yazar, inceler, analiz eder ya da rapor
 >   verir (seçim kaldırılana kadar kalır). Ekip şablonları açık klasörün `.kalem/templates/`
 >   klasöründe (Git ile paylaşılır; aynı adlı kişisel şablonun önüne geçer),
->   kişisel şablonlar uygulama verisinde durur; Kalem ile bir *best practice*
->   şablonu gelir (salt okunur, **Kopyala ve Uyarla** ile kişiselleştirilir).
+>   kişisel şablonlar uygulama verisinde durur; Kalem ile iki şablon gelir:
+>   *best practice* analiz şablonu ve **Kodlama Ajanı için Spec** şablonu
+>   (kabul kriterleri "… OLDUĞUNDA sistem … MALIDIR" kalıbında, bir *Kod
+>   Bağlamı* bölümüyle). İkisi de salt okunurdur, **Kopyala ve Uyarla** ile
+>   kişiselleştirilir.
 >   Şablon sıradan bir Markdown belgesidir; başındaki kısa ön bilgi
 >   (`kalem-template`, `required`, `ids`, `questions`) adını, zorunlu
 >   bölümlerini ve gereksinim kimliklerini söyler. Etkin belge şablon olarak
@@ -973,6 +976,26 @@ verir.
 >   bir kimlik anmamalı. Uymazsa hiçbir şey yazılmaz ve asistan önce
 >   görevleri düzeltir. Her dosyanın ilk satırında, hangi belgeden ve
 >   belgenin hangi hâlinden (hash) üretildiği bir yorum olarak yazar.
+>   - **Spec eskidi uyarısı ve ilerleme:** Analiz açılınca, ondan üretilmiş
+>     spec varsa belgenin üstünde "Spec specs/001-…: 5 görevden 2 tanesi
+>     tamamlandı" yazar; ajan `tasks.md` içinde görevleri `- [x]`
+>     işaretledikçe sayı ilerler. Analiz spec'ten sonra değişip
+>     kaydedilirse uyarı çıkar: spec güncel değil. **Görevleri aç** ile
+>     `tasks.md` açılır; asistana "spec'i güncelle" demek yeterlidir.
+>     Asistan da `spec_status` ile bütün spec'leri, eskiyenleri ve hangi
+>     gereksinimin bittiğini görür.
+>   - **Görevleri Jira'ya açmak:** "görevleri Jira'ya aç" denirse asistan
+>     her görev için `jira_create_issues` ile bir kayıt açar, ardından
+>     `spec_link_jira` ile anahtarları `tasks.md` satırlarının sonuna
+>     (`[ABC-12]`) yazar. İkisi de onaylıdır.
+>   - **AGENTS.md:** Asistan prompt ya da spec yazmadan önce deponun ajan
+>     kurallarını okur (`agent_rules`: `AGENTS.md`, `CLAUDE.md`,
+>     `.github/copilot-instructions.md`, `GEMINI.md`) ve test, lint
+>     komutlarını, kuralları ve yasakları bunlara göre yazar. Depoda
+>     `AGENTS.md` yoksa "AGENTS.md oluştur" denince (`agent_rules_open`,
+>     onaylı) doldurulacak bir taslakla oluşturulur ve sekmede açılır;
+>     Markdown bilmeyen biri de onu Kalem'de düzenleyebilir, Git diff'i
+>     yalnız değişen satırı gösterir.
 > - **Jira ve Confluence'a yazma:** gereksinimlerden toplu story
 >   (`jira_create_issues` — kartta hangilerinin oluşturulacağı seçilir),
 >   yorum, durum değiştirme, Confluence sayfasına ekleme/oluşturma. **Bunlar

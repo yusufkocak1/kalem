@@ -733,6 +733,10 @@ function createTab(id: string): Tab {
 	let started = false;
 	/** The state changes before the document is loaded have nothing to show yet. */
 	let loaded = false;
+	/** Whether it had unsaved changes at the last state change: a save is the change from that. */
+	let wasDirty = false;
+	/** Whether the specs made from it were looked for since it was loaded. */
+	let specsChecked = false;
 	const page = el("div", { class: "page kalem-theme", children: [tabCanvas, start.element] });
 	const desk = el("main", { class: "desk", children: [page] });
 	const outline = el("div", { class: "kalem-theme" });
@@ -759,6 +763,9 @@ function createTab(id: string): Tab {
 		settings: () => settings,
 		connections: () => accounts,
 		onStateChange: () => {
+			const saved = wasDirty && !tabSession.dirty && tabSession.path !== null;
+			wasDirty = tabSession.dirty;
+			if (saved) void checkSpecs(tabSession, false);
 			tabStrip.update(id, {
 				title: tabSession.name,
 				dirty: tabSession.dirty,
@@ -812,6 +819,10 @@ function createTab(id: string): Tab {
 		showStart: () => {
 			loaded = true;
 			showStart();
+			if (!specsChecked && tabSession.path !== null) {
+				specsChecked = true;
+				void checkSpecs(tabSession, true);
+			}
 		},
 		notes: {
 			id,
@@ -1709,6 +1720,44 @@ async function assistantContext() {
 	// The file's own name, with its extension, tells Claude what kind of text it is.
 	const name = tab.path?.split(/[\\/]/).pop() ?? tab.name;
 	return { tabId: tab.id, name, text: tab.styledMarkdown(), diagrams };
+}
+
+/**
+ * The specs in the workspace made from a document: a warning when the
+ * document changed since one was made, else (when asked, as it opens) how
+ * far its tasks are.
+ */
+async function checkSpecs(tab: Session, progress: boolean): Promise<void> {
+	if (tab.path === null || tab.isText) return;
+	const name = tab.path.split(/[\\/]/).pop() ?? "";
+	let specs: Awaited<ReturnType<typeof bridge.specStatus>>;
+	try {
+		specs = await bridge.specStatus(name, tab.styledMarkdown());
+	} catch {
+		return;
+	}
+	const open = (path: string) => [
+		{ label: t.specOpenTasks, run: () => void bridge.openPath(path) },
+	];
+	const stale = specs.find((spec) => spec.stale === true);
+	if (stale !== undefined) {
+		tab.notices.show({
+			id: "spec",
+			kind: "warning",
+			text: format(t.specStale, stale.folder),
+			actions: open(stale.tasksPath),
+		});
+		return;
+	}
+	tab.notices.dismiss("spec");
+	const shown = progress ? specs.find((spec) => spec.total > 0) : undefined;
+	if (shown !== undefined) {
+		tab.notices.show({
+			id: "spec",
+			text: format(t.specProgress, shown.folder, shown.done, shown.total),
+			actions: open(shown.tasksPath),
+		});
+	}
 }
 
 function editableTab(): Session {

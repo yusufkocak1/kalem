@@ -1,27 +1,16 @@
 /**
  * The assistant's tools for analysis work: the document templates it follows, the
  * rule checks a review starts with, the findings it reports to the review
- * list, the plan it keeps while it works, and the prompts and spec files it
- * keeps for a coding agent.
+ * list, the plan it keeps while it works, and the prompts it keeps for a
+ * coding agent.
  */
-import { createHash } from "node:crypto";
-import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { findingsText, lintAnalysis } from "../shared/analysis-lint.js";
 import type { PlanStep } from "../shared/claude.js";
 import { parseFindings } from "../shared/findings.js";
 import { format } from "../shared/i18n.js";
-import type { SpecParts } from "../shared/spec-export.js";
-import {
-	chooseProfile,
-	SPEC_PROFILES,
-	specBase,
-	specCoverage,
-	specFiles,
-	specFolder,
-	withSource,
-} from "../shared/spec-export.js";
-import { templateFileName } from "../shared/templates.js";
+import { BUILTIN_ID, templateFileName } from "../shared/templates.js";
 import type { KalemTool, ToolContext } from "./assistant-tools.js";
 import { registerTools } from "./assistant-tools.js";
 import type { TemplateStore } from "./templates.js";
@@ -38,24 +27,6 @@ async function templateFor(ctx: ToolContext, named: string) {
 		(wanted === "" ? null : await store.find(wanted)) ?? (await store.find("builtin:best-practice"))
 	);
 }
-
-const isFolder = (path: string): Promise<boolean> =>
-	stat(path).then(
-		(found) => found.isDirectory(),
-		() => false,
-	);
-
-/** The folders in a folder; none when it is not there. */
-const foldersIn = (path: string): Promise<string[]> =>
-	readdir(path, { withFileTypes: true }).then(
-		(entries) => entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name),
-		() => [],
-	);
-
-const withEnd = (markdown: string): string =>
-	markdown.endsWith("\n") ? markdown : `${markdown}\n`;
-
-const SPEC_PARTS: readonly (keyof SpecParts)[] = ["requirements", "design", "tasks"];
 
 const PLAN_STATUSES = new Set(["pending", "active", "done"]);
 
@@ -77,7 +48,7 @@ const TOOLS: readonly KalemTool[] = [
 			return all
 				.map(
 					(template) =>
-						`- "${template.name}" (id ${template.id}; ${template.source}${template.id === preferred || (preferred === "" && template.source === "builtin") ? "; the user's default" : ""}${template.id === picked ? "; picked for this question" : ""}): requires ${template.required.join(", ") || "nothing"}`,
+						`- "${template.name}" (id ${template.id}; ${template.source}${template.id === preferred || (preferred === "" && template.id === BUILTIN_ID) ? "; the user's default" : ""}${template.id === picked ? "; picked for this question" : ""}): requires ${template.required.join(", ") || "nothing"}`,
 				)
 				.join("\n");
 		},
@@ -236,137 +207,6 @@ const TOOLS: readonly KalemTool[] = [
 			await writeFile(path, body.endsWith("\n") ? body : `${body}\n`);
 			ctx.step({ tool: "save_prompt", detail: path });
 			return `Saved to ${path}.`;
-		},
-	},
-	{
-		definition: {
-			name: "spec_export",
-			description:
-				"Keeps the analysis in the workspace as spec files a coding agent works from: the requirements, the design and the tasks, in the layout the user chose (GitHub Spec Kit: specs/NNN-name/spec.md, plan.md, tasks.md; Kiro: .kiro/specs/name/requirements.md, design.md, tasks.md; Kalem: .kalem/specs/name/…). A spec of the same name is updated. The tasks are checked against the document: each functional requirement needs a task that names its id, and no task may name an id the document does not have; when one does not, nothing is written and you are told what to fix. The user is asked first.",
-			parameters: {
-				type: "object",
-				properties: {
-					title: { type: "string", description: "The feature's name; its folder is made from it." },
-					requirements: {
-						type: "string",
-						description:
-							"Markdown: the goal, the scope, and each requirement under its id from the document, with its acceptance criteria (WHEN … THE SYSTEM SHALL …).",
-					},
-					design: {
-						type: "string",
-						description:
-							"Markdown: how it is built: the code it touches (paths), the data, the constraints, the risks.",
-					},
-					tasks: {
-						type: "string",
-						description:
-							"Markdown: a `- [ ]` list in the order to do them; each task names the requirement ids it does, the files it touches and its test.",
-					},
-					profile: {
-						type: "string",
-						enum: [...SPEC_PROFILES],
-						description: "Only when the user asks for another layout than the one set.",
-					},
-					accept_gaps: {
-						type: "boolean",
-						description:
-							"True only when the user wants it kept although requirements have no task (part of the work, on purpose).",
-					},
-				},
-				required: ["title", "requirements", "design", "tasks"],
-			},
-		},
-		risk: "document",
-		available: (ctx) => ctx.workspace !== null,
-		async run(input, ctx) {
-			const title = text(input, "title").trim().slice(0, 120);
-			if (title === "") return "Give the feature's title.";
-			const parts: SpecParts = {
-				requirements: text(input, "requirements"),
-				design: text(input, "design"),
-				tasks: text(input, "tasks"),
-			};
-			const empty = SPEC_PARTS.filter((part) => parts[part].trim() === "");
-			if (empty.length > 0) return `Give the ${empty.join(", ")} too.`;
-
-			const template = ctx.templates === null ? null : await templateFor(ctx, "");
-			const coverage = specCoverage(ctx.document?.text ?? null, parts.tasks, template);
-			if (coverage.tasks === 0) {
-				return "Nothing written: write the tasks as a `- [ ] …` list, each naming the requirement ids it does.";
-			}
-			const gaps: string[] = [];
-			if (coverage.unknown.length > 0) {
-				gaps.push(
-					`Tasks name ids the document does not define: ${coverage.unknown.join(", ")}. Use the document's ids, or add the requirement to the document first.`,
-				);
-			}
-			if (coverage.uncovered.length > 0 && input.accept_gaps !== true) {
-				gaps.push(
-					`No task names ${coverage.uncovered.join(", ")}. Add tasks for them, or, when the user wants only part of the work, call again with accept_gaps.`,
-				);
-			}
-			if (gaps.length > 0) return `Nothing written. ${gaps.join(" ")}`;
-
-			const root = ctx.workspace?.roots[0] as string;
-			const profile = chooseProfile(
-				typeof input.profile === "string" ? input.profile : ctx.settings().specProfile,
-				{
-					kiro: await isFolder(join(root, ".kiro")),
-					specKit:
-						(await isFolder(join(root, ".specify"))) || (await isFolder(join(root, "specs"))),
-				},
-			);
-			const { folder, exists } = specFolder(
-				profile,
-				title,
-				await foldersIn(join(root, ...specBase(profile).split("/"))),
-			);
-			const files = specFiles(profile, folder);
-			const source = {
-				name: ctx.document?.name ?? "",
-				hash:
-					ctx.document === null
-						? ""
-						: createHash("sha256").update(ctx.document.text).digest("hex").slice(0, 12),
-			};
-			const written = SPEC_PARTS.map((part) => ({
-				path: files[part],
-				text: source.name === "" ? withEnd(parts[part]) : withSource(parts[part], source),
-			}));
-
-			const answer = await ctx.approve({
-				tool: "spec_export",
-				risk: "document",
-				permission: "prompts",
-				title: ctx.t.approvalSaveSpec,
-				lines: [
-					format(exists ? ctx.t.approvalSaveSpecUpdates : ctx.t.approvalSaveSpecTo, folder),
-					...written.map((file) => file.path),
-					...(coverage.uncovered.length > 0
-						? [format(ctx.t.approvalSpecGaps, coverage.uncovered.join(", "))]
-						: []),
-				],
-				preview: written
-					.map((file) => `# ${file.path}\n${file.text}`)
-					.join("\n")
-					.slice(0, 6000)
-					.split("\n")
-					.map((line) => `+ ${line}`)
-					.join("\n"),
-			});
-			if (!answer.approved)
-				return "The user did not allow it; they can copy the spec from your reply.";
-			for (const file of written) {
-				const path = join(root, ...file.path.split("/"));
-				await mkdir(dirname(path), { recursive: true });
-				await writeFile(path, file.text);
-			}
-			ctx.step({ tool: "spec_export", detail: folder });
-			const covered =
-				coverage.required.length === 0
-					? ""
-					: ` ${coverage.required.length - coverage.uncovered.length} of the document's ${coverage.required.length} functional requirements have tasks${coverage.uncovered.length > 0 ? ` (not ${coverage.uncovered.join(", ")})` : ""}.`;
-			return `${exists ? "Updated" : "Saved"} the spec in ${folder} (${profile}): ${written.map((file) => file.path).join(", ")}.${covered} Tell the user they can give the agent the folder: "implement the tasks in ${files.tasks}".`;
 		},
 	},
 ];

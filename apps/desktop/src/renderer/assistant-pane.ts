@@ -3818,6 +3818,11 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				answer(true, "");
 				return;
 			}
+			if (call.name === "open_path" && typeof input.path === "string") {
+				await bridge.openPath(input.path);
+				answer(true, "");
+				return;
+			}
 			if (call.name === "app_command" && typeof input.command === "string") {
 				host.runCommand(input.command as Command);
 				answer(true, "");

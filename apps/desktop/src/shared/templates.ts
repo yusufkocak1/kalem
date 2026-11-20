@@ -345,7 +345,154 @@ questions: Open Questions
 | FR-01 | | | |
 `;
 
-/** The best-practice template in the interface's language. */
-export function builtinTemplate(lang: Lang): string {
+const AGENT_SPEC_TR = `---
+kalem-template: "Kodlama Ajanı için Spec"
+required: [Amaç, Kapsam, Fonksiyonel Gereksinimler, Fonksiyonel Olmayan Gereksinimler, Kod Bağlamı, Açık Sorular]
+ids: { BR: "BR-", FR: "FR-", NFR: "NFR-" }
+questions: Açık Sorular
+---
+
+# {{başlık}}
+
+<!-- yönerge: Bu belge bir kodlama ajanının (Claude Code, Copilot, Cursor…) okuyup uygulayacağı bir spec'e dönüşür. Bitince asistana Prompt Hazırla modunda "spec olarak kaydet" deyin: gereksinimler, tasarım ve görev listesi depoya yazılır. -->
+
+## Amaç
+
+<!-- yönerge: Ne değişecek ve neden? İki üç cümle; iş bittiğinde neyin ölçüleceğini de yazın. -->
+
+## Kapsam
+
+**Kapsamda:**
+
+-
+
+**Kapsam dışı:**
+
+-
+
+## Terimler
+
+| Terim | Tanım |
+|---|---|
+| | |
+
+## İş Kuralları
+
+- **BR-01:**
+
+## Fonksiyonel Gereksinimler
+
+<!-- yönerge: Her gereksinim tek bir davranış anlatsın. Kabul kriterlerini "… OLDUĞUNDA sistem … MALIDIR" kalıbıyla, hata durumlarıyla birlikte yazın; ajan her kriterden bir test çıkarır. -->
+
+### FR-01:
+
+**Kullanıcı hikâyesi:** Bir … olarak, … istiyorum, böylece …
+
+**Kabul kriterleri:**
+
+- … OLDUĞUNDA sistem … MALIDIR.
+- … geçersiz OLDUĞUNDA sistem … hatası vermeli ve … MALIDIR.
+
+## Fonksiyonel Olmayan Gereksinimler
+
+<!-- yönerge: Sayı verin: yanıt süresi (p95), hacim, güvenlik, geriye uyumluluk. -->
+
+- **NFR-01:**
+
+## Kod Bağlamı
+
+<!-- yönerge: Dokunulacak modüller ve dosyalar, izlenecek mevcut kalıplar, kullanılacak servisler. Bilmiyorsanız boş bırakın; asistan çalışma alanından bulur. -->
+
+## Kısıtlar ve Varsayımlar
+
+## Test Yaklaşımı
+
+<!-- yönerge: Hangi testler yazılacak (birim, entegrasyon, uçtan uca), hangi veriyle? -->
+
+## Açık Sorular
+
+- [ ]
+`;
+
+const AGENT_SPEC_EN = `---
+kalem-template: "Spec for a Coding Agent"
+required: [Goal, Scope, Functional Requirements, Non-Functional Requirements, Code Context, Open Questions]
+ids: { BR: "BR-", FR: "FR-", NFR: "NFR-" }
+questions: Open Questions
+---
+
+# {{title}}
+
+<!-- guide: This document becomes a spec a coding agent (Claude Code, Copilot, Cursor…) reads and builds. When it is done, ask the assistant in the Prepare Prompt mode to "keep it as a spec": the requirements, design and task list are written into the repository. -->
+
+## Goal
+
+<!-- guide: What changes, and why, in two or three sentences; what will be measured when it is done. -->
+
+## Scope
+
+**In scope:**
+
+-
+
+**Out of scope:**
+
+-
+
+## Glossary
+
+| Term | Definition |
+|---|---|
+| | |
+
+## Business Rules
+
+- **BR-01:**
+
+## Functional Requirements
+
+<!-- guide: One behaviour for each requirement. Write the acceptance criteria as "WHEN … THE SYSTEM SHALL …", error cases included; the agent makes a test of each. -->
+
+### FR-01:
+
+**User story:** As a …, I want …, so that …
+
+**Acceptance criteria:**
+
+- WHEN … THE SYSTEM SHALL …
+- WHEN … is invalid THE SYSTEM SHALL reject it with … and …
+
+## Non-Functional Requirements
+
+<!-- guide: Give numbers: response time (p95), volume, security, backward compatibility. -->
+
+- **NFR-01:**
+
+## Code Context
+
+<!-- guide: The modules and files it touches, the patterns to follow, the services it uses. Leave it empty when you do not know: the assistant finds them in the workspace. -->
+
+## Constraints and Assumptions
+
+## Test Approach
+
+<!-- guide: Which tests (unit, integration, end-to-end), with what data? -->
+
+## Open Questions
+
+- [ ]
+`;
+
+/** The template for a spec a coding agent works from. */
+export const AGENT_SPEC_ID = "builtin:agent-spec";
+
+/** The templates that come with Kalem, the default one first. */
+export const BUILTIN_TEMPLATE_IDS: readonly string[] = [BUILTIN_ID, AGENT_SPEC_ID];
+
+export const isBuiltinTemplate = (id: string): boolean => BUILTIN_TEMPLATE_IDS.includes(id);
+
+/** A template that comes with Kalem, in the interface's language: the best-practice one unless named. */
+export function builtinTemplate(lang: Lang, id: string = BUILTIN_ID): string {
+	if (id === AGENT_SPEC_ID) return lang === "tr" ? AGENT_SPEC_TR : AGENT_SPEC_EN;
 	return lang === "tr" ? BEST_PRACTICE_TR : BEST_PRACTICE_EN;
 }

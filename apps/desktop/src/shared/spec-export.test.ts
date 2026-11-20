@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { definedIds } from "./analysis-lint.js";
+import { agentRulesText, agentsStarter, MAX_RULES } from "./agent-rules.js";
+import { definedIds, lintAnalysis } from "./analysis-lint.js";
 import {
 	chooseProfile,
+	linkTasks,
 	sourceOf,
 	specCoverage,
 	specFiles,
 	specFolder,
+	specProgress,
 	specSlug,
 	withSource,
 } from "./spec-export.js";
+import { AGENT_SPEC_ID, builtinTemplate, documentFromTemplate, templateMeta } from "./templates.js";
 
 const ANALYSIS = `# Ödeme İadesi
 
@@ -148,5 +152,76 @@ describe("coverage of the analysis by the tasks", () => {
 			uncovered: [],
 			unknown: [],
 		});
+	});
+});
+
+describe("progress and Jira keys in a task list", () => {
+	const TASKS = `# Tasks
+
+- [x] T1 (FR-01) Validate
+- [ ] T2 (FR-02) Partial refund
+- [x] T3 (FR-02, NFR-01) Measure
+* [X] **T4** (FR-03) Event
+- [ ]
+`;
+
+	it("counts the tasks done, and the requirements all of whose tasks are", () => {
+		expect(specProgress(TASKS, null)).toEqual({
+			total: 4,
+			done: 3,
+			finished: ["FR-01", "NFR-01", "FR-03"],
+			open: ["FR-02"],
+		});
+	});
+
+	it("writes each key at the end of its task's line, once", () => {
+		const first = linkTasks(TASKS, [
+			{ task: "T2", key: "abc-12" },
+			{ task: "T4", key: "ABC-14" },
+			{ task: "T9", key: "ABC-19" },
+			{ task: "T1", key: "not a key" },
+		]);
+		expect(first.linked).toEqual(["T2 → ABC-12", "T4 → ABC-14"]);
+		expect(first.missing).toEqual(["T9", "T1"]);
+		expect(first.text).toContain("- [ ] T2 (FR-02) Partial refund [ABC-12]\n");
+		expect(first.text).toContain("* [X] **T4** (FR-03) Event [ABC-14]\n");
+		const again = linkTasks(first.text, [{ task: "T2", key: "ABC-12" }]);
+		expect(again.text).toBe(first.text);
+	});
+
+	it("does not take T1 for T10, and keeps Windows line ends", () => {
+		const tasks = "- [ ] T10 Ten\r\n- [ ] T1 One\r\n";
+		expect(linkTasks(tasks, [{ task: "T1", key: "A-1" }]).text).toBe(
+			"- [ ] T10 Ten\r\n- [ ] T1 One [A-1]\r\n",
+		);
+	});
+});
+
+describe("the template for a coding agent's spec", () => {
+	it("has every section it requires, and its requirement has acceptance criteria", () => {
+		for (const lang of ["tr", "en"] as const) {
+			const text = builtinTemplate(lang, AGENT_SPEC_ID);
+			const meta = templateMeta(text, "");
+			const findings = lintAnalysis(documentFromTemplate(text, "İade"), meta);
+			expect(findings.filter((finding) => finding.missingSection !== undefined)).toEqual([]);
+			expect(findings.some((finding) => finding.kind === "testability")).toBe(false);
+		}
+	});
+});
+
+describe("the rules for coding agents", () => {
+	it("are given to the model under their paths, cut to a size", () => {
+		const text = agentRulesText([
+			{ path: "AGENTS.md", text: "Run pnpm test." },
+			{ path: "CLAUDE.md", text: "x".repeat(MAX_RULES + 10) },
+		]);
+		expect(text).toContain('<rules file="AGENTS.md">\nRun pnpm test.\n</rules>');
+		expect(text).toContain("… (cut; read_file has the rest)");
+		expect(agentRulesText([])).toContain("agent_rules_open");
+	});
+
+	it("start from an outline in the interface's language", () => {
+		expect(agentsStarter("tr")).toContain("## Yapılmaması gerekenler");
+		expect(agentsStarter("en")).toContain("## Do not");
 	});
 });

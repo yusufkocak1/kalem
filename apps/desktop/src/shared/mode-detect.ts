@@ -72,6 +72,7 @@ const WORDS: Readonly<Record<Exclude<Mode, "ask">, readonly string[]>> = {
 		"spec dosya",
 		"tasks.md",
 		"kiro",
+		"agents.md",
 	],
 	code: [
 		"kod",

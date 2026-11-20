@@ -35,7 +35,7 @@ import { PALETTES } from "./palette.js";
 import type { PanePlaces, ToolPane } from "./panes.js";
 import { DEFAULT_PANE_PLACES } from "./panes.js";
 import type { AssistantConfig, AssistantUpdate, ChatMessage, ProviderId } from "./providers.js";
-import type { SpecProfileChoice } from "./spec-export.js";
+import type { SpecProfileChoice, SpecSummary } from "./spec-export.js";
 import type { TemplateInfo } from "./templates.js";
 import type {
 	ApprovalAnswer,
@@ -1129,6 +1129,8 @@ export interface KalemBridge {
 	setLocalNotes(key: string, notes: readonly LocalNote[]): Promise<void>;
 	/** The document templates: the team's, the user's, and the built-in one. */
 	templates(): Promise<readonly TemplateInfo[]>;
+	/** The specs in the workspace made from a document (by its file's name), and whether each is behind its text. */
+	specStatus(name: string, text: string): Promise<readonly SpecSummary[]>;
 	/** A new tab with a document made from the template. */
 	templateNew(id: string): Promise<void>;
 	/** Opens a template's file in a tab to edit it. */
@@ -1299,6 +1301,7 @@ export const CHANNEL = {
 	assistantEvent: "kalem:assistant-event",
 	assistantApproval: "kalem:assistant-approval",
 	templates: "kalem:templates",
+	specStatus: "kalem:spec-status",
 	localNotes: "kalem:local-notes",
 	setLocalNotes: "kalem:set-local-notes",
 	templateNew: "kalem:template-new",

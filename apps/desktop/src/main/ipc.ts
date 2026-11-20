@@ -76,6 +76,7 @@ import { PACKAGE_ASSETS } from "./package.js";
 import { DOCUMENT_SCHEME } from "./protocol.js";
 import { relocateLinks } from "./relocate.js";
 import type { SettingsStore } from "./settings.js";
+import { specsOf } from "./specs.js";
 import { TemplateStore } from "./templates.js";
 import { registerTemplateIpc } from "./templates-ipc.js";
 import type { AppWindow, WindowManager } from "./windows.js";
@@ -617,6 +618,12 @@ export function registerIpc(ctx: IpcContext): void {
 
 	const listRoots = (paths: readonly string[]) =>
 		Promise.all(paths.map(async (path) => ({ path, ...(await listWorkspace(path, collator())) })));
+
+	ipcMain.handle(CHANNEL.specStatus, (event, name: unknown, text: unknown) =>
+		typeof name === "string" && typeof text === "string"
+			? specsOf(workspaceRoots(senderOf(event)).roots, name, text)
+			: [],
+	);
 
 	ipcMain.handle(CHANNEL.getWorkspace, async (event): Promise<Workspace> => {
 		const { roots, opened } = workspaceRoots(senderOf(event));

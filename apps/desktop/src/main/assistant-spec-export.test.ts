@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { WebContents } from "electron";
@@ -13,7 +13,8 @@ import type { ApprovalRequest } from "../shared/tool-protocol.js";
 vi.mock("electron", () => ({ ipcMain: { handle: () => {} } }));
 
 const { runTool } = await import("./assistant-tools.js");
-await import("./assistant-analysis-tools.js");
+const { specsOf } = await import("./specs.js");
+await import("./assistant-spec-tools.js");
 type ToolContext = import("./assistant-tools.js").ToolContext;
 type Workspace = import("./workspace-tools.js").Workspace;
 
@@ -48,6 +49,7 @@ afterEach(async () => {
 
 function context(approved = true, settings: Partial<Settings> = {}) {
 	const asked: Omit<ApprovalRequest, "id" | "chatId" | "scopes">[] = [];
+	const rendered: { name: string; input: unknown }[] = [];
 	const ctx: ToolContext = {
 		chatId: "chat-1",
 		sender: {} as WebContents,
@@ -70,10 +72,13 @@ function context(approved = true, settings: Partial<Settings> = {}) {
 			asked.push(request);
 			return { approved, scope: "once" };
 		},
-		renderer: async () => ({ ok: true, text: "" }),
+		renderer: async (name, input) => {
+			rendered.push({ name, input });
+			return { ok: true, text: "" };
+		},
 		readExternal: false,
 	};
-	return { ctx, asked };
+	return { ctx, asked, rendered };
 }
 
 describe("spec_export", () => {
@@ -150,5 +155,96 @@ describe("spec_export", () => {
 		expect(modeExcluded("code").has("spec_export")).toBe(false);
 		expect(modeExcluded("review").has("spec_export")).toBe(true);
 		expect(modeExcluded("ask").has("spec_export")).toBe(true);
+	});
+});
+
+describe("a spec after it is written", () => {
+	it("is listed with its progress, and found out of date once the document changes", async () => {
+		const { ctx } = context();
+		await runTool("spec_export", SPEC, ctx);
+		const folder = join(root, "specs", "001-odeme-iadesi");
+		const tasks = await readFile(join(folder, "tasks.md"), "utf8");
+		await writeFile(join(folder, "tasks.md"), tasks.replace("- [ ] T1", "- [x] T1"));
+
+		const fresh = await runTool("spec_status", {}, ctx);
+		expect(fresh.text).toContain("specs/001-odeme-iadesi (spec-kit)");
+		expect(fresh.text).toContain("has not changed since");
+		expect(fresh.text).toContain("Tasks: 1 of 2 done. Finished: FR-01. Open: FR-02.");
+		expect(await specsOf([root], "iade.md", ANALYSIS)).toEqual([
+			{
+				folder: "specs/001-odeme-iadesi",
+				tasksPath: join(folder, "tasks.md"),
+				profile: "spec-kit",
+				stale: false,
+				total: 2,
+				done: 1,
+			},
+		]);
+
+		const changed = `${ANALYSIS}\n### FR-03: Yeni\n`;
+		(ctx.document as { text: string }).text = changed;
+		const stale = await runTool("spec_status", { spec: "odeme-iadesi" }, ctx);
+		expect(stale.text).toContain("CHANGED since");
+		expect(stale.text).toContain('<tasks file="');
+		expect((await specsOf([root], "iade.md", changed))[0]?.stale).toBe(true);
+		expect(await specsOf([root], "other.md", changed)).toEqual([]);
+	});
+
+	it("gets the Jira keys made for its tasks", async () => {
+		const { ctx, asked } = context();
+		await runTool("spec_export", SPEC, ctx);
+		const linked = await runTool(
+			"spec_link_jira",
+			{
+				spec: "specs/001-odeme-iadesi",
+				links: [
+					{ task: "T1", key: "PAY-7" },
+					{ task: "T5", key: "PAY-9" },
+				],
+			},
+			ctx,
+		);
+		expect(linked.text).toContain("Wrote 1 keys");
+		expect(linked.text).toContain("No task was found for T5");
+		expect(asked.at(-1)?.title).toBe("Write the Jira keys into specs/001-odeme-iadesi");
+		const tasks = await readFile(join(root, "specs/001-odeme-iadesi/tasks.md"), "utf8");
+		expect(tasks).toContain("→ 422 [PAY-7]\n");
+		const none = await runTool("spec_link_jira", { spec: "nope", links: [] }, ctx);
+		expect(none.text).toContain("no such spec");
+	});
+});
+
+describe("the rules for coding agents", () => {
+	it("are read from the workspace, and their absence said", async () => {
+		const { ctx } = context();
+		expect((await runTool("agent_rules", {}, ctx)).text).toContain("there are no written rules");
+		await mkdir(join(root, ".github"));
+		await writeFile(join(root, "AGENTS.md"), "Run pnpm test before a commit.\n");
+		await writeFile(join(root, ".github", "copilot-instructions.md"), "Use tabs.\n");
+		const text = (await runTool("agent_rules", {}, ctx)).text;
+		expect(text).toContain('<rules file="AGENTS.md">\nRun pnpm test before a commit.');
+		expect(text).toContain('<rules file=".github/copilot-instructions.md">');
+	});
+
+	it("start an AGENTS.md from an outline and open it, after the user allows it", async () => {
+		const { ctx, asked, rendered } = context();
+		const result = await runTool("agent_rules_open", {}, ctx);
+		expect(result.text).toContain("Started AGENTS.md");
+		expect(asked[0]?.title).toBe("Start AGENTS.md, the rules for coding agents");
+		expect(await readFile(join(root, "AGENTS.md"), "utf8")).toContain("## Do not");
+		expect(rendered).toEqual([{ name: "open_path", input: { path: join(root, "AGENTS.md") } }]);
+
+		await writeFile(join(root, "AGENTS.md"), "mine\n");
+		const again = await runTool("agent_rules_open", {}, ctx);
+		expect(again.text).toContain("Opened AGENTS.md");
+		expect(asked[1]?.title).toBe("Open the rules for coding agents");
+		expect(await readFile(join(root, "AGENTS.md"), "utf8")).toBe("mine\n");
+	});
+
+	it("are not started when the user says no", async () => {
+		const { ctx, rendered } = context(false);
+		expect((await runTool("agent_rules_open", {}, ctx)).text).toContain("did not allow");
+		expect(await readdir(root)).toEqual([]);
+		expect(rendered).toEqual([]);
 	});
 });

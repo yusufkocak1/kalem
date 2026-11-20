@@ -87,6 +87,7 @@ import { StepRun } from "./step-run.js";
 import "./assistant-app-tools.js";
 import "./assistant-form-tools.js";
 import "./assistant-analysis-tools.js";
+import "./assistant-spec-tools.js";
 import "./assistant-external-tools.js";
 import "./assistant-jira-tools.js";
 import "./assistant-mode-tools.js";

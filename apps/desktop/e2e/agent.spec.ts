@@ -909,15 +909,18 @@ test("templates: the team's and the user's own, a default, and new documents fro
 	const dialog = page.locator(".settings-dialog");
 	await dialog.locator('[data-category="templates"]').click();
 	const block = dialog.locator('[data-block="templates"]');
-	await expect(block.locator(".settings-template")).toHaveCount(2);
+	await expect(block.locator(".settings-template")).toHaveCount(3);
 	await expect(block.locator(".settings-template").first()).toContainText("Kurum Analiz Şablonu");
 	await expect(block.locator(".settings-template").first()).toContainText(
 		"Team (open folder) · 2 required sections",
 	);
-	await expect(block.locator(".settings-template").last()).toContainText(
-		"Software Analysis Document (best practice)",
-	);
-	await expect(block.locator(".settings-template").last()).toContainText("Default");
+	// Kalem's own: the best-practice one is the default, the coding agent's spec one is not.
+	const bestPractice = block.locator(".settings-template").nth(1);
+	await expect(bestPractice).toContainText("Software Analysis Document (best practice)");
+	await expect(bestPractice).toContainText("Default");
+	const agentSpec = block.locator(".settings-template").last();
+	await expect(agentSpec).toContainText("Spec for a Coding Agent");
+	await expect(agentSpec).not.toContainText("Default");
 
 	// The active document kept as the user's own template.
 	await block
@@ -925,7 +928,7 @@ test("templates: the team's and the user's own, a default, and new documents fro
 		.click();
 	await block.getByLabel("The document template's name").fill("Benim Şablonum");
 	await block.getByRole("button", { name: "Save" }).click();
-	await expect(block.locator(".settings-template")).toHaveCount(3);
+	await expect(block.locator(".settings-template")).toHaveCount(4);
 	await expect(block.locator(".settings-template").nth(1)).toContainText("Mine");
 
 	// The team's is the default from now on.
@@ -974,7 +977,11 @@ test("document templates in the assistant: picked in any mode, the question is a
 	await pane.locator(".assistant-add").click();
 	await pane.getByRole("menuitem", { name: "Use a Document Template" }).click();
 	const items = pane.locator(".assistant-add-menu .assistant-add-item");
-	await expect(items).toHaveText(["Haftalık Rapor", "Software Analysis Document (best practice)"]);
+	await expect(items).toHaveText([
+		"Haftalık Rapor",
+		"Software Analysis Document (best practice)",
+		"Spec for a Coding Agent",
+	]);
 	await items.first().click();
 	const chip = pane.locator(".assistant-template-chip");
 	await expect(chip).toHaveText("Template: Haftalık Rapor");

@@ -220,3 +220,127 @@ export function specCoverage(
 		.map(([, written]) => written);
 	return { tasks: count, required, uncovered, unknown };
 }
+
+/** The layouts, each with the folder its specs are in and its files' names: where to look for specs. */
+export function specLayouts(): readonly {
+	readonly profile: SpecProfile;
+	readonly base: string;
+	readonly files: { readonly [K in keyof SpecParts]: string };
+}[] {
+	return SPEC_PROFILES.map((profile) => ({
+		profile,
+		base: LAYOUTS[profile].base,
+		files: LAYOUTS[profile].files,
+	}));
+}
+
+const TASK = /^(\s*[-*+]\s+\[)([ xX])(\]\s+)(.*)$/;
+
+/** How far the work on a spec is: its tasks, and the requirements whose tasks are all done. */
+export interface SpecProgress {
+	readonly total: number;
+	readonly done: number;
+	/** Requirement ids every task naming them is done for, as written in the tasks. */
+	readonly finished: readonly string[];
+	/** Requirement ids some task naming them is still open for. */
+	readonly open: readonly string[];
+}
+
+/** Reads a task list's progress: `- [x]` is done; a requirement is finished when all its tasks are. */
+export function specProgress(
+	tasks: string,
+	template: Pick<TemplateMeta, "ids"> | null,
+): SpecProgress {
+	const pattern = new RegExp(
+		`(?<![\\p{L}\\p{N}])(${idPrefixes(template).map(escapeRegExp).join("|")})(\\d+)(?![\\p{L}\\p{N}])`,
+		"gu",
+	);
+	const state = new Map<string, { written: string; open: boolean }>();
+	let total = 0;
+	let done = 0;
+	for (const line of tasks.replace(/\r\n?/g, "\n").split("\n")) {
+		const match = TASK.exec(line);
+		if (match === null || (match[4] as string).trim() === "") continue;
+		total++;
+		const checked = match[2] !== " ";
+		if (checked) done++;
+		for (const id of (match[4] as string).matchAll(pattern)) {
+			const key = `${id[1]}${Number(id[2])}`;
+			const known = state.get(key) ?? { written: id[0], open: false };
+			if (!checked) known.open = true;
+			state.set(key, known);
+		}
+	}
+	const all = [...state.values()];
+	return {
+		total,
+		done,
+		finished: all.filter((id) => !id.open).map((id) => id.written),
+		open: all.filter((id) => id.open).map((id) => id.written),
+	};
+}
+
+/** A task and the Jira issue made for it. */
+export interface TaskLink {
+	/** The task's own id at the start of its text (`T1`), or a few words of it. */
+	readonly task: string;
+	/** The issue's key: `ABC-12`. */
+	readonly key: string;
+}
+
+const JIRA_KEY = /^[A-Z][A-Z0-9_]{0,9}-\d{1,7}$/;
+
+/**
+ * Writes Jira keys into a task list: ` [ABC-12]` at the end of each task's
+ * line, found by its id (`T1`, as a word at the start of its text) or by
+ * the start of its text. A key already on the line is not written again.
+ */
+export function linkTasks(
+	tasks: string,
+	links: readonly TaskLink[],
+): {
+	readonly text: string;
+	readonly linked: readonly string[];
+	readonly missing: readonly string[];
+} {
+	const newline = tasks.includes("\r\n") ? "\r\n" : "\n";
+	const lines = tasks.split(/\r?\n/);
+	const linked: string[] = [];
+	const missing: string[] = [];
+	for (const link of links) {
+		const key = link.key.trim().toLocaleUpperCase("en");
+		const task = link.task.trim();
+		if (!JIRA_KEY.test(key) || task === "") {
+			missing.push(task === "" ? key : task);
+			continue;
+		}
+		const byId = new RegExp(`^(?:\\*\\*)?${escapeRegExp(task)}(?:\\*\\*)?(?![\\p{L}\\p{N}])`, "iu");
+		const byText = new RegExp(`^${escapeRegExp(task)}(?![\\p{L}\\p{N}])`, "iu");
+		const bodies = lines.map((line) => TASK.exec(line)?.[4]?.trim() ?? null);
+		let at = bodies.findIndex((body) => body !== null && byId.test(body));
+		if (at === -1) at = bodies.findIndex((body) => body !== null && byText.test(body));
+		if (at === -1) {
+			missing.push(task);
+			continue;
+		}
+		const line = lines[at] as string;
+		if (!new RegExp(`(?<![A-Z0-9_])${escapeRegExp(key)}(?!\\d)`).test(line)) {
+			lines[at] = `${line.replace(/\s+$/, "")} [${key}]`;
+		}
+		linked.push(`${task} → ${key}`);
+	}
+	return { text: lines.join(newline), linked, missing };
+}
+
+/** A spec made from a document, as the window shows it under the document. */
+export interface SpecSummary {
+	/** Its folder, relative to its workspace folder. */
+	readonly folder: string;
+	/** Its task list's file. */
+	readonly tasksPath: string;
+	readonly profile: SpecProfile;
+	/** Whether the document changed since the spec was made; `null` when the spec keeps no hash. */
+	readonly stale: boolean | null;
+	readonly total: number;
+	readonly done: number;
+}

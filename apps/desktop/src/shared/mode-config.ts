@@ -191,6 +191,14 @@ export const BUILTIN_STEPS: Readonly<Record<Mode, readonly BuiltinStep[]>> = {
 			on: true,
 		},
 		{
+			id: "agent-rules",
+			title: "stepAgentRules",
+			instruction:
+				"Read the repository's rules for coding agents with agent_rules (AGENTS.md and the like) and keep the prompt within them: their commands for tests and lint, their conventions, what they forbid. When there are none and the user wants them, agent_rules_open starts an AGENTS.md.",
+			on: true,
+			tool: "agent_rules",
+		},
+		{
 			id: "tests",
 			title: "stepTests",
 			instruction: "Include the acceptance criteria as test cases, the error cases too.",
@@ -226,9 +234,17 @@ export const BUILTIN_STEPS: Readonly<Record<Mode, readonly BuiltinStep[]>> = {
 			id: "spec",
 			title: "stepSpec",
 			instruction:
-				'When the user wants the work kept in the repository as a spec (spec files, tasks, Spec Kit, Kiro, "for the agent to work from"), write it with spec_export instead of one prompt block: the requirements under the document\'s ids with their acceptance criteria (WHEN … THE SYSTEM SHALL …), the design with the code paths you found, and the tasks as a `- [ ]` list in order, each naming the requirement ids it does, its files and its test. Then say in a line where it is.',
+				"When the user wants the work kept in the repository as a spec (spec files, tasks, Spec Kit, Kiro, \"for the agent to work from\"), write it with spec_export instead of one prompt block: the requirements under the document's ids with their acceptance criteria (WHEN … THE SYSTEM SHALL …), the design with the code paths you found, and the tasks as a `- [ ]` list in order, each starting with its id (T1, T2…) and naming the requirement ids it does, its files and its test. Then say in a line where it is. spec_status lists the workspace's specs and says when one is out of date with the document: update it with spec_export and the same title.",
 			on: true,
 			tool: "spec_export",
+		},
+		{
+			id: "spec-jira",
+			title: "stepSpecJira",
+			instruction:
+				"When the user wants the spec's tasks in Jira, make one issue for each task with jira_create_issues (the task's id at the start of its summary), then write the keys into the task list with spec_link_jira.",
+			on: true,
+			tool: "spec_link_jira",
 		},
 	],
 	code: [
@@ -280,6 +296,8 @@ const ONLY_IN: Readonly<Record<string, readonly Mode[]>> = {
 	analysis_lint: ["review", "write"],
 	save_prompt: ["prompt", "code"],
 	spec_export: ["prompt", "code"],
+	spec_link_jira: ["prompt", "code"],
+	agent_rules_open: ["prompt", "code", "app"],
 	// Code is changed only where the user works on code.
 	propose_edit: ["ask", "code"],
 	// Commands, as code changes, only where the user works on code.
