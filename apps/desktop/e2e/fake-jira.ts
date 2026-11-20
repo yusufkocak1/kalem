@@ -476,18 +476,30 @@ export async function fakeJira() {
 			return json(res, issue("QR-2", "Süreyi ayarla", "Done", "done"));
 		}
 		if (url.pathname === "/rest/api/2/search") {
-			searches.push(url.searchParams.get("jql") ?? "");
-			return json(res, {
-				// Sub-tasks come before and after their parent; one's parent is not in the results.
-				issues: [
-					subtask("QR-2", "Süreyi ayarla", "QR-1"),
-					issue("QR-1", "Giriş zaman aşımı", "In Progress", "indeterminate"),
-					subtask("QR-5", "Ön yüz", "QR-1"),
-					subtask("QR-8", "Bebek ekleme FE", "QR-7"),
-				],
-				total: 4,
-				startAt: 0,
-			});
+			const jql = url.searchParams.get("jql") ?? "";
+			searches.push(jql);
+			// Sub-tasks come before and after their parent; one's parent is not in the results.
+			const all = [
+				subtask("QR-2", "Süreyi ayarla", "QR-1"),
+				issue("QR-1", "Giriş zaman aşımı", "In Progress", "indeterminate"),
+				subtask("QR-5", "Ön yüz", "QR-1"),
+				subtask("QR-8", "Bebek ekleme FE", "QR-7"),
+			];
+			// As Jira does: the issue types and keys the query names (the pane asks for both).
+			const listed = (field: string): string[] | null => {
+				const found = new RegExp(`\\b${field} in \\(([^)]*)\\)`, "i").exec(jql);
+				return found === null
+					? null
+					: (found[1] as string).split(",").map((value) => value.trim().replace(/^"|"$/g, ""));
+			};
+			const types = listed("issuetype");
+			const keys = listed("key");
+			const issues = all.filter(
+				(each) =>
+					(types === null || types.includes(each.fields.issuetype.name)) &&
+					(keys === null || keys.includes(each.key)),
+			);
+			return json(res, { issues, total: issues.length, startAt: 0 });
 		}
 		return json(res, { errorMessages: ["Not found"] }, 404);
 	});
