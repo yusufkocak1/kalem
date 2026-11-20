@@ -1253,8 +1253,13 @@ verir.
     değişikliğin köşesinde **Kabul et / Geri al**, altta "‹ 1 / 2 ›" ve
     **Tümünü kabul et / Tümünü geri al**. Hepsine karar verilince sonuç
     dosyaya yazılıp kaydedilir ve dosyanın metin kutusu geri gelir. Yeni
-    bir dosyanın ya da o arada değişmiş bir dosyanın önerisi sohbetteki
-    kartında açılır. Tümünü
+    bir dosyanın ya da o arada değişmiş bir dosyanın önerisinin farkı
+    sohbetteki satırında açılır.
+  - Sohbette, yanıtın içinde her önerilen dosya için yalnızca tek satırlık
+    bir iz kalır (dosya yolu, +/− satır sayısı, sonra da "uygulandı" ya da
+    "bırakıldı"); düğme yoktur, karar listede ya da editörde verilir.
+    Bekleyen bir satıra tıklamak dosyayı editörde açar; karara bağlanmış
+    olanınki farkı gösterir. Tümünü
     kabul et belgedekileri kabul edip kod önerilerini uygular; tümünü
     geri al belgedekileri geri alıp önerileri bırakır. Karar verilen
     her şey listeden düşer; hiçbir şey kalmayınca liste kaybolur.

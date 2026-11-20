@@ -1255,13 +1255,17 @@ test("lets an API service search and read a workspace folder instead of sending 
 		await expect(card.locator(".diff-remove")).toHaveText(["- class Main {}"]);
 		await expect(card.locator(".diff-add")).toHaveText(["+ class Main {", "+ \tint x;", "+ }"]);
 		expect(await readFile(join(code, "src", "Main.java"), "utf8")).toBe("class Main {}\n");
+		// Decided in the list above the question box (or in the editor), not in the chat.
+		await expect(card.locator("button:not(.assistant-fold-head)")).toHaveCount(0);
+		const listed = pane.locator(".edit-summary .edit-summary-entry");
+		await listed.hover();
 		if (service === "custom") {
-			await card.getByRole("button", { name: "Discard" }).click();
+			await listed.getByRole("button", { name: "Reject: Main.java" }).click();
 			await expect(card.locator(".assistant-edit-state")).toHaveText(
 				"Discarded; the file was not changed.",
 			);
 		} else {
-			await card.getByRole("button", { name: "Apply to the file" }).click();
+			await listed.getByRole("button", { name: "Accept: Main.java" }).click();
 			await expect(card.locator(".assistant-edit-state")).toHaveText("Applied to src/Main.java.");
 			expect(await readFile(join(code, "src", "Main.java"), "utf8")).toBe(
 				"class Main {\n\tint x;\n}\n",
@@ -1344,12 +1348,12 @@ test("applies all of a reply's changes at once, or writes them unasked as the ap
 	await expect(reply.locator(".assistant-markdown")).toHaveText("Main sınıfı boş.");
 	await expect(reply.locator(".assistant-edit")).toHaveCount(2);
 	expect(await readFile(join(code, "a.txt"), "utf8")).toBe("a\n");
-	await reply.getByRole("button", { name: "Apply All (2)" }).click();
+	await pane.locator(".edit-summary-accept").click();
 	await expect(reply.locator(".assistant-edit-state")).toHaveText([
 		"Applied to a.txt.",
 		"Applied to b.txt.",
 	]);
-	await expect(reply.locator(".assistant-edits-bar")).toHaveCount(0);
+	await expect(pane.locator(".edit-summary")).toBeHidden();
 	expect(await readFile(join(code, "a.txt"), "utf8")).toBe("A\n");
 	expect(await readFile(join(code, "b.txt"), "utf8")).toBe("B\n");
 
@@ -1378,7 +1382,8 @@ test("applies all of a reply's changes at once, or writes them unasked as the ap
 		"Applied to b.txt without asking (approval setting).",
 		"Applied to a.txt without asking (approval setting).",
 	]);
-	await expect(reply.getByRole("button", { name: "Apply to the file" })).toHaveCount(0);
+	// Written already: nothing waits in the list.
+	await expect(pane.locator(".edit-summary")).toBeHidden();
 	expect(await readFile(join(code, "a.txt"), "utf8")).toBe("AA\n");
 	expect(await readFile(join(code, "b.txt"), "utf8")).toBe("B\n");
 
@@ -1447,6 +1452,11 @@ test("the files a reply proposes to change are listed above the question box, a 
 		"Discarded; the file was not changed.",
 	);
 
+	// No buttons in the chat: its card is a line for the file, and opens it as the list does.
+	await expect(
+		reply.locator(".assistant-edit").first().locator(".assistant-edit-state"),
+	).toBeHidden();
+	await expect(reply.locator(".assistant-edit button:not(.assistant-fold-head)")).toHaveCount(0);
 	// A click opens the file in the editor, the change a line at a time.
 	await files.first().click();
 	const review = page.locator(".code-review");

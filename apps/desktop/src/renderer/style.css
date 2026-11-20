@@ -2199,14 +2199,8 @@ button {
 	color: var(--app-muted);
 }
 
-.assistant-edits-bar {
-	display: flex;
-	gap: 6px;
-	margin: 8px 0 4px;
-}
-
 .assistant-edit-state {
-	margin: 6px 10px 0;
+	margin: 6px 10px 8px;
 	color: var(--app-muted);
 	font-size: 12px;
 }
@@ -2217,16 +2211,6 @@ button {
 
 .assistant-edit-state.failed {
 	color: var(--app-error);
-}
-
-.assistant-edit-actions {
-	display: flex;
-	gap: 6px;
-	padding: 8px 10px;
-}
-
-.assistant-edit-actions:empty {
-	display: none;
 }
 
 .assistant-steps {
