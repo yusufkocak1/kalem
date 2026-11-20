@@ -78,7 +78,7 @@ export function createEditReview(host: EditReviewHost): EditReviewUi {
 	const wasLabel = el("summary", { class: "edit-review-summary", text: t.editReviewWas });
 	const wasBox = el("details", { class: "edit-review-details", children: [wasLabel, was] });
 	const element = el("div", {
-		class: "notice edit-review",
+		class: "edit-review",
 		attrs: { role: "region", "aria-label": t.editReviewTitle, hidden: "" },
 		children: [
 			el("div", {

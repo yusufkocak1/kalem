@@ -14093,9 +14093,18 @@ dialog {
 	--ai-added: color-mix(in srgb, #16a34a 13%, transparent);
 	--ai-added-edge: #16a34a;
 	--ai-removed-edge: #dc2626;
+	display: flex;
 	flex-direction: column;
 	align-items: stretch;
 	gap: 4px;
+	padding: 5px 8px 5px 14px;
+	border-bottom: 1px solid var(--app-border);
+	background: var(--app-info-bg);
+}
+
+.edit-review button:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 1px;
 }
 
 .edit-review[hidden] {
