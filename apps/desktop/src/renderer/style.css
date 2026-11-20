@@ -3873,6 +3873,17 @@ button.git-file-path {
 	}
 }
 
+/* Narrower still, the line numbers' strip goes too: it would take a fifth of the text's width. */
+@container (max-width: 360px) {
+	.desk-column .line-numbers {
+		display: none;
+	}
+
+	.desk-column .page[data-line-numbers] {
+		padding-inline-start: 1em;
+	}
+}
+
 .desk {
 	flex: 1;
 	min-width: 0;
@@ -3900,6 +3911,8 @@ button.git-file-path {
 
 .page #editor {
 	--kalem-size: var(--doc-size, 1em);
+	/* Text the assistant deleted is drawn in this size, beside a heading too (edit-review.ts). */
+	--review-body-size: var(--kalem-size, 1em);
 	/* Text & Paragraph settings (typography-dialog.ts); the theme's own values when unset. */
 	--kalem-leading: var(--doc-leading, 1.65);
 	--kalem-space: var(--doc-space, 1em);
@@ -14101,9 +14114,13 @@ dialog {
 	background: var(--review-added-strong);
 }
 
-/* What it took out, drawn by the block above itself (below, at the end of the document). */
+/*
+ * What it took out, drawn by a block: above itself (`::before`), the block's
+ * own old text or text deleted before it; under itself (`::after`), text
+ * deleted after it. Each from an attribute, so it is never in the document.
+ */
 .page [data-ai-was]::before,
-.page [data-ai-removed="after"][data-ai-was]::after {
+.page [data-ai-gone]::after {
 	content: attr(data-ai-was);
 	display: block;
 	margin: 0 -0.6em 0.35em;
@@ -14121,22 +14138,54 @@ dialog {
 	user-select: none;
 }
 
+.page [data-ai-gone]::after {
+	content: attr(data-ai-gone);
+	margin: 0.35em -0.6em 0;
+}
+
 /* A changed block: the old text a band of its own above, the new under it on green. */
-.page [data-ai-change][data-ai-was] {
+.page [data-ai-change][data-ai-was-kind="changed"] {
 	padding-bottom: 0.15em;
 }
 
-.page [data-ai-change][data-ai-was]::before {
+.page [data-ai-was-kind="changed"]::before {
 	margin: 0 -0.6em 0.15em;
 	border-radius: 3px 3px 0 0;
 }
 
-.page [data-ai-removed="after"][data-ai-was]::before {
-	content: none;
+/*
+ * Text deleted next to a block is not the block's: it reads as body text,
+ * not in a heading's size or a code block's font. The size is the editor's,
+ * as a length (registered), so a heading's em does not scale it.
+ */
+@property --review-body-size {
+	syntax: "<length>";
+	inherits: true;
+	initial-value: 16px;
 }
 
-.page [data-ai-removed="after"][data-ai-was]::after {
-	margin: 0.35em -0.6em 0;
+.page [data-ai-was-kind="removed"]::before,
+.page [data-ai-gone]::after {
+	font-family: var(--kalem-font, inherit);
+	font-size: var(--review-body-size);
+	font-style: normal;
+	font-weight: 400;
+	line-height: var(--kalem-leading, 1.6);
+	letter-spacing: normal;
+}
+
+/* A code block's own padding: the bands sit at its edges, not inside its green. Its lines
+   wrap in the editor, so nothing is lost when it does not scroll. */
+.page pre:is([data-ai-was], [data-ai-gone]) {
+	overflow: visible;
+}
+
+.page pre[data-ai-was]::before {
+	margin-top: -0.85em;
+}
+
+.page pre[data-ai-gone]::after {
+	margin-bottom: -0.85em;
 }
 
 /* The change in hand: its toolbar, at its top right corner. */
@@ -14261,6 +14310,7 @@ dialog {
 
 .edit-summary-head {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
 	gap: 6px;
 	padding: 5px 6px 5px 4px;
@@ -14268,7 +14318,8 @@ dialog {
 
 .edit-summary-toggle {
 	display: flex;
-	flex: 1;
+	/* In a narrow chat the title keeps its room; Accept All and Reject All go under it. */
+	flex: 1 1 10em;
 	align-items: center;
 	gap: 8px;
 	min-width: 0;

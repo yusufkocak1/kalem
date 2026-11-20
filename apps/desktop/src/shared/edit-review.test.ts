@@ -5,8 +5,10 @@ import {
 	chunksOf,
 	composeLines,
 	composeReview,
+	keptProposals,
 	likeness,
 	lineReview,
+	placeProposals,
 	reviewEdit,
 } from "./edit-review.js";
 
@@ -196,5 +198,55 @@ describe("a code file's proposed change, a line at a time", () => {
 			]),
 		).toBe("AA\nb\n");
 		expect(applyProposals("a\n", [{ oldText: "x", newText: "y" }])).toBeNull();
+	});
+
+	it("keeps where each proposal's new text ended up, as later ones move it", () => {
+		const placed = placeProposals("a\nb\nc\n", [
+			{ oldText: "c", newText: "C1\nC2" },
+			{ oldText: "a", newText: "" },
+			{ oldText: "b", newText: "B" },
+		]);
+		expect(placed?.text).toBe("\nB\nC1\nC2\n");
+		const text = placed?.text ?? "";
+		expect(placed?.ranges.map((range) => text.slice(range.start, range.end))).toEqual([
+			"C1\nC2",
+			"",
+			"B",
+		]);
+		// One inside an earlier one's new text: the earlier one grows over it.
+		const nested = placeProposals("x\n", [
+			{ oldText: "x", newText: "x1 x2" },
+			{ oldText: "x2", newText: "y" },
+		]);
+		expect(nested?.ranges).toEqual([
+			{ start: 0, end: 4 },
+			{ start: 3, end: 4 },
+		]);
+	});
+
+	it("tells which proposals were kept from the lines the user decided", () => {
+		const before = Array.from({ length: 8 }, (_, i) => `line ${i + 1}`).join("\n");
+		const proposals = [
+			{ oldText: "line 2\n", newText: "LINE 2\n" },
+			{ oldText: "line 5\n", newText: "" },
+			{ oldText: "line 7", newText: "LINE 7\nnew 7b" },
+		];
+		const placed = placeProposals(before, proposals);
+		if (placed === null) throw new Error("not placed");
+		const steps = lineReview(before, placed.text);
+		const ids = steps.flatMap((step) => (step.kind === "change" ? [step.change.id] : []));
+		expect(ids).toHaveLength(3);
+		const kept = (...rejected: number[]) =>
+			keptProposals(
+				placed.text,
+				placed.ranges,
+				steps,
+				new Map(rejected.map((id) => [id, "rejected" as ChangeDecision])),
+			);
+		expect(kept()).toEqual([true, true, true]);
+		expect(kept(0)).toEqual([false, true, true]);
+		expect(kept(1)).toEqual([true, false, true]);
+		expect(kept(2)).toEqual([true, true, false]);
+		expect(kept(0, 1, 2)).toEqual([false, false, false]);
 	});
 });

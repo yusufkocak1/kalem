@@ -21,6 +21,33 @@ import {
 	tempDir,
 } from "./launch.js";
 
+/** Turns the Jira pane's quick conditions on or off, from its chips or its "+N" menu. */
+async function setCondition(
+	page: import("@playwright/test").Page,
+	value: string,
+	label: string,
+	on: boolean,
+): Promise<void> {
+	const row = page.locator(".jira-pane .jira-condition-row");
+	const chip = row.locator(`.jira-type-chip[data-value="${value}"]`);
+	if ((await chip.count()) > 0) {
+		if ((await chip.getAttribute("aria-pressed")) !== String(on)) await chip.click();
+		// One taken away may go back under "+N".
+		await expect(
+			row.locator(`.jira-type-chip[data-value="${value}"][aria-pressed="${!on}"]`),
+		).toHaveCount(0);
+		return;
+	}
+	if (!on) return;
+	await row.locator(".jira-facet-more").click();
+	await page.getByRole("menuitemcheckbox", { name: label }).click();
+	await page.keyboard.press("Escape");
+	await expect(row.locator(`.jira-type-chip[data-value="${value}"]`)).toHaveAttribute(
+		"aria-pressed",
+		"true",
+	);
+}
+
 test.setTimeout(420_000);
 
 const cleanup: (() => unknown)[] = [];
@@ -188,9 +215,15 @@ for (const theme of ["light", "dark"] as const) {
 		await explorer.scene("jira pane");
 		await page.locator('.jira-pane .jira-row[data-key="QR-1"] .jira-tree-toggle').click();
 		await explorer.scene("jira pane, tree open");
-		await page.locator(".jira-pane .jira-type-chip").filter({ hasText: "Sub-task" }).click();
+		await page
+			.locator('.jira-pane .jira-facet-row[data-facet="type"] .jira-type-chip')
+			.filter({ hasText: "Sub-task" })
+			.click();
 		await explorer.scene("jira pane, filtered by type");
-		await page.locator(".jira-pane .jira-type-chip").first().click();
+		await page
+			.locator('.jira-pane .jira-facet-row[data-facet="type"] .jira-type-chip')
+			.first()
+			.click();
 		await page.locator('.jira-pane .jira-row[data-key="QR-1"]').click({ button: "right" });
 		await expect(page.locator(".jira-row-menu")).toBeVisible();
 		await explorer.scene("jira pane, row menu", { fixed: true });
@@ -201,10 +234,15 @@ for (const theme of ["light", "dark"] as const) {
 		await explorer.scene("jira pane, logged from the row");
 		await page.locator('.jira-pane .jira-row[data-key="QR-8"]').hover();
 		await page.locator('.jira-pane .jira-row[data-key="QR-8"] .jira-star').click();
-		await page.locator(".jira-pane-list").selectOption("favorites");
+		// The starred issues only: the default conditions taken away.
+		await setCondition(page, "favorites", "★ Favorites", true);
+		await setCondition(page, "mine", "Assigned to me", false);
+		await setCondition(page, "unresolved", "Unresolved", false);
 		await page.waitForTimeout(400);
 		await explorer.scene("jira pane, favorites");
-		await page.locator(".jira-pane-list").selectOption("mine");
+		await setCondition(page, "favorites", "★ Favorites", false);
+		await setCondition(page, "mine", "Assigned to me", true);
+		await setCondition(page, "unresolved", "Unresolved", true);
 		const paneSearch = page.locator(".jira-pane-search");
 		await paneSearch.fill("oturum");
 		await page.waitForTimeout(600);

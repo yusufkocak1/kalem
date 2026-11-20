@@ -89,10 +89,18 @@ function firstLine(element: HTMLElement): { top: number; height: number } | null
 	const rect = element.getBoundingClientRect();
 	if (rect.width === 0 && rect.height === 0) return null;
 	const style = getComputedStyle(element);
-	const top =
+	let top =
 		rect.top +
 		(Number.parseFloat(style.borderTopWidth) || 0) +
 		(Number.parseFloat(style.paddingTop) || 0);
+	// The assistant's change under review draws the old text above the block (edit-review.ts):
+	// the number goes beside the block's own text.
+	if (element.hasAttribute("data-ai-was")) {
+		const range = document.createRange();
+		range.selectNodeContents(element);
+		const own = range.getBoundingClientRect();
+		if (own.height > 0) top = Math.max(top, own.top);
+	}
 	const lineHeight = lineHeightOf(style);
 	// A line can be taller than the line height (an image in it), never shorter.
 	const inner =

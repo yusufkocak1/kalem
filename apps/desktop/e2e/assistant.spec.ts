@@ -1478,6 +1478,115 @@ test("the files a reply proposes to change are listed above the question box, a 
 	services.close();
 });
 
+/** Connects a custom service proposing `calls`, adds a folder of `files` to the chat, and asks it. */
+async function proposing(
+	name: string,
+	files: Record<string, string>,
+	calls: readonly { name: string; input: Record<string, unknown> }[],
+) {
+	const services = await fakeServices(calls);
+	const folder = await tempDir(name);
+	const code = join(folder, "proje");
+	for (const [file, text] of Object.entries(files)) {
+		await mkdir(join(code, file, ".."), { recursive: true });
+		await writeFile(join(code, file), text);
+	}
+	const launched = await launch({
+		settings: { assistant: true },
+		env: {
+			KALEM_CLAUDE: join(folder, "nothing-here"),
+			NO_PROXY: "127.0.0.1",
+			no_proxy: "127.0.0.1",
+		},
+	});
+	const { app, page } = launched;
+	const pane = page.locator(".assistant");
+	const form = pane.locator(".assistant-settings");
+	await pane.getByRole("button", { name: "Connect a Service…" }).click();
+	await form.getByLabel("Service").selectOption("custom");
+	await form.getByLabel("Address").fill(`${services.url}/v1`);
+	await form.getByLabel("API key").fill("sk-test");
+	await form.getByLabel("Model").fill("fake-large");
+	await form.getByRole("button", { name: "Save" }).click();
+	await expect(form).toBeHidden();
+	await app.evaluate(
+		({ dialog }, filePaths) => {
+			dialog.showOpenDialog = (async () => ({ canceled: false, filePaths })) as never;
+		},
+		[code],
+	);
+	await pane.getByRole("button", { name: "Add files or folders to the chat" }).click();
+	await pane.getByRole("menuitem", { name: "Folder…" }).click();
+	await pane.locator(".assistant-input").fill("Değiştir");
+	await pane.locator(".assistant-input").press("Enter");
+	return { ...launched, pane, code, services };
+}
+
+const proposeEdit = (path: string, from: string, to: string) => ({
+	name: "propose_edit",
+	input: { path, old_text: from, new_text: to, summary: "Değiştirir" },
+});
+
+test("a file's proposals decided a line at a time in its tab: the chat says which were applied", async () => {
+	const lines = `${Array.from({ length: 12 }, (_, i) => `satir ${i + 1}`).join("\n")}\n`;
+	const { app, page, pane, code, services, errors } = await proposing(
+		"assistant-edit-partly",
+		{ "src/app.txt": lines },
+		[
+			proposeEdit("src/app.txt", "satir 3\n", "SATIR 3\n"),
+			proposeEdit("src/app.txt", "satir 10\n", "SATIR 10\nyeni 10b\n"),
+		],
+	);
+	const reply = pane.locator(".assistant-assistant").last();
+	await expect(reply.locator(".assistant-edit")).toHaveCount(2);
+	const edits = pane.locator(".edit-summary");
+	await expect(edits.locator(".edit-summary-file .edit-summary-counts")).toHaveText("+3−2");
+	await edits.locator(".edit-summary-file").click();
+	const review = page.locator(".code-review");
+	await expect(review.locator(".edit-review-count")).toHaveText("1 of 2");
+
+	// The first is rejected: the list counts what is left.
+	await review.locator(".code-review-hunk .edit-review-reject").click();
+	await expect(review.locator(".edit-review-count")).toHaveText("1 of 1");
+	await expect(edits.locator(".edit-summary-file .edit-summary-counts")).toHaveText("+2−1");
+	await review.locator(".code-review-hunk .edit-review-accept").click();
+	await expect(review).toBeHidden();
+	await expect
+		.poll(() => readFile(join(code, "src", "app.txt"), "utf8"))
+		.toBe(lines.replace("satir 10\n", "SATIR 10\nyeni 10b\n"));
+	await expect(reply.locator(".assistant-edit-state")).toHaveText([
+		"Discarded; the file was not changed.",
+		"Applied to src/app.txt.",
+	]);
+	expect(errors).toEqual([]);
+	await app.close();
+	services.close();
+});
+
+test("a file's change being reviewed in its tab is applied from the list once the tab is closed", async () => {
+	const { app, page, pane, code, services, errors } = await proposing(
+		"assistant-edit-closed",
+		{ "a.txt": "a\nb\n" },
+		[proposeEdit("a.txt", "a", "A")],
+	);
+	const edits = pane.locator(".edit-summary");
+	await edits.locator(".edit-summary-file").click();
+	await expect(page.locator(".code-review")).toBeVisible();
+	await clickMenu(app, "File", "New");
+	await page.locator(".doc-tab", { hasText: "a.txt" }).locator(".doc-tab-close").click();
+	await expect(page.locator(".doc-tab")).toHaveCount(1);
+	// Still waiting, in the list.
+	await expect(edits.locator(".edit-summary-file .edit-summary-name")).toHaveText("a.txt");
+	await edits.locator(".edit-summary-entry").hover();
+	await edits.getByRole("button", { name: "Accept: a.txt" }).click();
+	await expect.poll(() => readFile(join(code, "a.txt"), "utf8")).toBe("A\nb\n");
+	await expect(edits).toBeHidden();
+	await expect(pane.locator(".assistant-edit-state")).toHaveText("Applied to a.txt.");
+	expect(errors).toEqual([]);
+	await app.close();
+	services.close();
+});
+
 test("runs a command in the workspace once allowed, and unasked when approvals are bypassed", async () => {
 	const services = await fakeServices([
 		{

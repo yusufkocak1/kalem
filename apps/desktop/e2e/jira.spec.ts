@@ -5,6 +5,34 @@ import { CONFLUENCE_TOKEN, fakeJira, fakeJiraConfluence, JIRA_TOKEN } from "./fa
 import { clickMenu, launch, showPane } from "./launch.js";
 
 const cleanup: (() => Promise<void>)[] = [];
+
+/** Turns the Jira pane's quick conditions on or off, from its chips or its "+N" menu. */
+async function setCondition(
+	page: import("@playwright/test").Page,
+	value: string,
+	label: string,
+	on: boolean,
+): Promise<void> {
+	const row = page.locator(".jira-pane .jira-condition-row");
+	const chip = row.locator(`.jira-type-chip[data-value="${value}"]`);
+	if ((await chip.count()) > 0) {
+		if ((await chip.getAttribute("aria-pressed")) !== String(on)) await chip.click();
+		// One taken away may go back under "+N".
+		await expect(
+			row.locator(`.jira-type-chip[data-value="${value}"][aria-pressed="${!on}"]`),
+		).toHaveCount(0);
+		return;
+	}
+	if (!on) return;
+	await row.locator(".jira-facet-more").click();
+	await page.getByRole("menuitemcheckbox", { name: label }).click();
+	await page.keyboard.press("Escape");
+	await expect(row.locator(`.jira-type-chip[data-value="${value}"]`)).toHaveAttribute(
+		"aria-pressed",
+		"true",
+	);
+}
+
 test.afterEach(async () => {
 	for (const close of cleanup.splice(0)) await close();
 });
@@ -239,9 +267,9 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await jira.locator(".jira-filter-chip", { hasText: "With attachments" }).click();
 	await expect(comments).toHaveCount(2);
 	await jira.locator(".jira-filter-chip", { hasText: "With attachments" }).click();
-	await jira.locator(".jira-filter-select").selectOption("team:Quickres Analist Takimi");
+	await jira.getByLabel("Filter by person or team").selectOption("team:Quickres Analist Takimi");
 	await expect(comments).toHaveCount(1);
-	await jira.locator(".jira-filter-select").selectOption("");
+	await jira.getByLabel("Filter by person or team").selectOption("");
 	await expect(comments).toHaveCount(4);
 	// A quick reply, with a mention picked from Jira's users.
 	const reply = jira.locator(".jira-composer-input");
@@ -397,14 +425,17 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await expect(rows).toHaveCount(5);
 	expect(jiraServer.searches.at(-1)).toContain("assignee = currentUser()");
 	// Issue types filter the list: a chip each, with how many there are.
-	const chips = page.locator(".jira-pane .jira-type-chip");
-	await expect(chips).toHaveText(["All4", "Bug3", "Sub-task1"]);
+	const chips = page.locator('.jira-pane .jira-facet-row[data-facet="type"] .jira-type-chip');
+	await expect(chips).toHaveText(["All", "Bug3", "Sub-task1"]);
 	await chips.filter({ hasText: "Sub-task" }).click();
 	await expect(chips.first()).toHaveAttribute("aria-pressed", "false");
 	// The sub-task stays under its parent, which only heads it now.
 	await expect(rows.locator(".jira-key")).toHaveText(["QR-1", "QR-2"]);
 	await expect(page.locator('.jira-pane .jira-tree-context[data-key="QR-1"]')).toBeVisible();
-	await expect(page.locator(".jira-pane .jira-pane-message")).toHaveText("1 of 4 loaded issues");
+	await expect(page.locator(".jira-pane .jira-pane-message")).toHaveText(
+		"1 / 1 issues Clear filters",
+	);
+	expect(jiraServer.searches.at(-1)).toContain('issuetype in ("Sub-task")');
 	await chips.first().click();
 	await expect(rows).toHaveCount(5);
 	await expect(chips.first()).toHaveAttribute("aria-pressed", "true");
@@ -445,9 +476,12 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	);
 	await page.locator('.jira-pane .jira-row[data-key="QR-8"]').hover();
 	await page.locator('.jira-pane .jira-row[data-key="QR-8"] .jira-star').click();
-	await page.locator(".jira-pane-list").selectOption("favorites");
+	// The starred issues only: the default conditions taken away.
+	await setCondition(page, "favorites", "★ Favorites", true);
+	await setCondition(page, "mine", "Assigned to me", false);
+	await setCondition(page, "unresolved", "Unresolved", false);
 	await expect(rows.locator(".jira-key")).toHaveText(["QR-7", "QR-8", "QR-1", "QR-5"]);
-	expect(jiraServer.searches.at(-1)).toBe("key IN (QR-8, QR-5)");
+	expect(jiraServer.searches.at(-1)).toBe("key in (QR-8, QR-5) ORDER BY updated DESC");
 	// Taking a star off takes it out of the list.
 	await page.locator('.jira-pane .jira-row[data-key="QR-8"] .jira-star').click();
 	await expect(rows.locator(".jira-key")).toHaveText(["QR-1", "QR-5"]);
@@ -457,7 +491,9 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 			return stored.settings.jiraFavorites.map((item: { key: string }) => item.key);
 		})
 		.toEqual(["QR-5"]);
-	await page.locator(".jira-pane-list").selectOption("mine");
+	await setCondition(page, "favorites", "★ Favorites", false);
+	await setCondition(page, "mine", "Assigned to me", true);
+	await setCondition(page, "unresolved", "Unresolved", true);
 
 	// Settings: Jira goes to the right dock, the headings under the document.
 	await clickMenu(app, "File", "Settings…");

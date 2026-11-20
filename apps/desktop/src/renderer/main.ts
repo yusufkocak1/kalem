@@ -19,7 +19,7 @@ import { displayUrl } from "../shared/confluence-atoms.js";
 import { attachmentName, linkedAttachment } from "../shared/confluence-common.js";
 import type { Diagram } from "../shared/diagram.js";
 import { DIAGRAM_SUFFIX, serializeDiagram } from "../shared/diagram.js";
-import { applyProposals } from "../shared/edit-review.js";
+import { keptProposals, placeProposals } from "../shared/edit-review.js";
 import { format, stringsFor } from "../shared/i18n.js";
 import { noteKey } from "../shared/local-notes.js";
 import { paletteCss } from "../shared/palette.js";
@@ -262,17 +262,28 @@ async function tabOfPath(path: string): Promise<Tab | undefined> {
 	return undefined;
 }
 
+/** The tab a file's proposed changes are reviewed in, while it is open and the review waits. */
+function codeReviewTab(id: string): Tab | undefined {
+	const tab = codeReviews.get(id);
+	if (tab === undefined) return undefined;
+	if (![...tabs.values()].includes(tab) || !tab.codeReview.active()) {
+		codeReviews.delete(id);
+		return undefined;
+	}
+	return tab;
+}
+
 /** Opens a file's proposed changes in its tab, a line at a time, to accept or reject there. */
 async function reviewEdits(
 	edits: readonly ProposedEdit[],
-	settle: (applied: boolean) => void,
+	settle: (kept: readonly boolean[]) => void,
 ): Promise<boolean> {
 	const first = edits[0];
 	if (first === undefined || first.oldText === "") return false;
 	const path = await bridge.assistantEditPath(first.id).catch(() => null);
 	if (path === null) return false;
-	const reviewing = codeReviews.get(first.id);
-	if (reviewing?.codeReview.active()) {
+	const reviewing = codeReviewTab(first.id);
+	if (reviewing !== undefined) {
 		activateTab([...tabs.entries()].find(([, each]) => each === reviewing)?.[0] ?? "");
 		return true;
 	}
@@ -280,13 +291,15 @@ async function reviewEdits(
 	const tab = await tabOfPath(path);
 	if (tab === undefined || !tab.session.isText || tab.session.textView === null) return false;
 	const before = tab.session.textView.value();
-	const after = applyProposals(before, edits);
-	if (after === null) return false;
-	const count = tab.codeReview.start(before, after, (text) => {
+	const placed = placeProposals(before, edits);
+	if (placed === null) return false;
+	const count = tab.codeReview.start(before, placed.text, ({ text, steps, decisions }) => {
 		codeReviews.delete(first.id);
-		const kept = text !== before.replace(/\r\n?/g, "\n");
-		if (kept && tab.session.replaceText(text)) void tab.session.save();
-		settle(kept);
+		const changed = text !== before.replace(/\r\n?/g, "\n");
+		if (changed && tab.session.replaceText(text)) void tab.session.save();
+		// Each proposal as decided: one whose every line was rejected was not applied.
+		const kept = keptProposals(placed.text, placed.ranges, steps, decisions);
+		settle(changed ? kept : kept.map(() => false));
 	});
 	if (count === 0) return false;
 	codeReviews.set(first.id, tab);
@@ -296,12 +309,14 @@ async function reviewEdits(
 const assistant = createAssistantPane({
 	reviewEdits: (edits, settle) => reviewEdits(edits, settle),
 	decideReview: (id, accept) => {
-		const tab = codeReviews.get(id);
-		if (tab === undefined || !tab.codeReview.active()) return false;
+		// Not when its tab was closed meanwhile: the list applies it to the file as it does any other.
+		const tab = codeReviewTab(id);
+		if (tab === undefined) return false;
 		if (accept) tab.codeReview.acceptAll();
 		else tab.codeReview.rejectAll();
 		return true;
 	},
+	reviewCounts: (id) => codeReviewTab(id)?.codeReview.remaining() ?? null,
 	t,
 	lang: startup.language,
 	bridge,
@@ -939,6 +954,8 @@ function createTab(id: string): Tab {
 				const view = tabSession.textView;
 				if (view !== null) view.element.hidden = !shown;
 			},
+			// The chat's list counts what is left of it.
+			changed: () => assistant.editsChanged(),
 		}),
 	};
 	desk.addEventListener(
@@ -1135,6 +1152,11 @@ function discardTab(id: string): void {
 	}
 	tabs.delete(id);
 	tabStrip.remove(id);
+	// A file's change still being reviewed in it waits in the chat's list again.
+	for (const [edit, reviewing] of codeReviews) {
+		if (reviewing === tab) codeReviews.delete(edit);
+	}
+	tab.codeReview.cancel();
 	tab.session.dispose();
 	tab.lineNumbers.destroy();
 	for (const view of tab.views) view.remove();
