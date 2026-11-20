@@ -51,6 +51,7 @@ import { createDocumentTools } from "./document-tools.js";
 import { el, isTextFieldFocused } from "./dom.js";
 import type { EditReviewUi } from "./edit-review.js";
 import { createEditReview } from "./edit-review.js";
+import { createEditSummary } from "./edit-summary.js";
 import type { TableContext, TableEdit } from "./edits.js";
 import { insertDivider, insertTable, replaceTable, tableAt, toggleTaskList } from "./edits.js";
 import { createFilesPane } from "./files-pane.js";
@@ -224,7 +225,27 @@ const commandPalette = createCommandPalette({
 const lastCarets = new WeakMap<Session, Caret>();
 let lastSelection = "";
 
+/** The assistant's changes waiting in the active document, as the chat lists them. */
+const editSummary = createEditSummary(t);
+
+/** Shows the active document's changes waiting for review in the chat. */
+function syncEdits(): void {
+	const tab = [...tabs.values()].find((each) => each.session === session);
+	const review = tab?.review;
+	editSummary.update(
+		review?.summary() ?? null,
+		review === undefined
+			? null
+			: {
+					acceptAll: () => review.acceptAll(),
+					rejectAll: () => review.rejectAll(),
+					select: (index) => review.select(index),
+				},
+	);
+}
+
 const assistant = createAssistantPane({
+	edits: editSummary.element,
 	t,
 	lang: startup.language,
 	bridge,
@@ -755,11 +776,15 @@ function createTab(id: string): Tab {
 
 	const review = createEditReview({
 		t,
-		bar: noticeHost,
+		page,
+		desk,
 		canvas: tabCanvas,
 		text: () => tabSession.styledMarkdown(),
 		replace: (text) => tabSession.replaceText(text),
 		blockIds: () => tabSession.lineSnapshot()?.blocks.map((block) => block.id) ?? [],
+		updated: () => {
+			if (session === tabSession) syncEdits();
+		},
 	});
 	const tabSession: Session = new Session({
 		id,
@@ -986,6 +1011,7 @@ function activateTab(id: string): void {
 
 	tabStrip.select(id);
 	bridge.tabActivated(id);
+	syncEdits();
 	renderState();
 	refreshFiles();
 	scheduleRibbonUpdate();

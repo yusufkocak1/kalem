@@ -255,27 +255,55 @@ test("the assistant's change is shown in the document, and each part is accepted
 		"İade tek adımda yapılmalı.",
 	]);
 	await expect(page.locator('#editor [data-ai-change="changed"]')).toHaveCount(2);
-	await expect(page.locator('#editor [data-ai-current="change"]')).toHaveText(
+	await expect(page.locator("#editor [data-ai-current]")).toHaveText(
 		"İptal işlemi 2 saniye içinde onaylanmalı.",
 	);
-	await expect(page.locator('#editor [data-ai-removed="after"]')).toHaveCount(1);
-	await bar.locator(".edit-review-summary").click();
-	await expect(bar.locator(".edit-review-was")).toHaveText("İptal işlemi hızlı yapılmalı.");
+	// What it replaced is drawn above, struck through; it is not in the document's text.
+	await expect(page.locator("#editor p").first()).toHaveAttribute(
+		"data-ai-was",
+		"İptal işlemi hızlı yapılmalı.",
+	);
+	await expect(page.locator('#editor [data-ai-removed="after"]')).toHaveAttribute(
+		"data-ai-was",
+		"Son satır.",
+	);
+	const hunk = page.locator(".edit-review-hunk");
+	await expect(hunk).toBeVisible();
 	await shot(page, "edit-review");
 
+	// Listed above the question box too: each change, its lines, and Accept or Reject for all.
+	const edits = pane.locator(".edit-summary");
+	await expect(edits.locator(".edit-summary-title")).toHaveText("3 changes");
+	await expect(edits.locator(".edit-summary-total")).toHaveText("+2−3");
+	await expect(edits.locator(".edit-summary-item")).toHaveText([
+		"İptal işlemi 2 saniye içinde onaylanmalı.+1−1",
+		"İade tek adımda yapılmalı.+1−1",
+		"Son satır.+0−1",
+	]);
+	await edits.locator(".edit-summary-item").nth(1).click();
+	await expect(bar.locator(".edit-review-count")).toHaveText("2 of 3");
+	await expect(edits.locator('.edit-summary-item[aria-current="true"]')).toContainText("İade");
+	await edits.locator(".edit-summary-item").first().click();
+	await expect(bar.locator(".edit-review-count")).toHaveText("1 of 3");
+
 	// The first is taken back, the second kept; the deletion is the one left.
-	await bar.getByRole("button", { name: "Reject", exact: true }).click();
+	await hunk.locator(".edit-review-reject").click();
 	await expect(page.locator("#editor p").first()).toHaveText("İptal işlemi hızlı yapılmalı.");
+	await expect(page.locator("#editor p").first()).not.toHaveAttribute("data-ai-was", /./);
 	await expect(bar.locator(".edit-review-count")).toHaveText("1 of 2");
-	await bar.getByRole("button", { name: "Accept", exact: true }).click();
+	await hunk.locator(".edit-review-accept").click();
 	await expect(bar.locator(".edit-review-count")).toHaveText("1 of 1");
-	await expect(bar.locator(".edit-review-summary")).toHaveText("What it deleted");
-	await expect(page.locator('#editor [data-ai-current="removed"]')).toHaveText(
+	await expect(page.locator('#editor [data-ai-removed="after"][data-ai-current]')).toHaveText(
 		"İade tek adımda yapılmalı.",
 	);
-	await bar.getByRole("button", { name: "Reject All" }).click();
+	await expect(edits.locator(".edit-summary-item")).toHaveCount(1);
+	await edits.locator(".edit-summary-reject").click();
 	await expect(bar).toBeHidden();
-	await expect(page.locator("#editor [data-ai-change], #editor [data-ai-removed]")).toHaveCount(0);
+	await expect(hunk).toBeHidden();
+	await expect(edits).toBeHidden();
+	await expect(
+		page.locator("#editor [data-ai-change], #editor [data-ai-removed], #editor [data-ai-was]"),
+	).toHaveCount(0);
 	await expect(page.locator("#editor p")).toHaveText([
 		"İptal işlemi hızlı yapılmalı.",
 		"İade tek adımda yapılmalı.",

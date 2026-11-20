@@ -14087,97 +14087,352 @@ dialog {
 	margin-bottom: var(--doc-list-space, 0.25em);
 }
 
-/* --- The assistant's changes, reviewed in the document (see edit-review.ts) --- */
+/* --- The assistant's changes, reviewed in the document (see edit-review.ts) ---
+ * As a code editor's inline diff: what was taken out above, struck through on
+ * red; what was put in on green; a bar in the margin; a small toolbar at the
+ * change in hand; a pill at the bottom for all of them. */
 
-.edit-review {
-	--ai-added: color-mix(in srgb, #16a34a 13%, transparent);
-	--ai-added-edge: #16a34a;
-	--ai-removed-edge: #dc2626;
+:root {
+	--review-added: color-mix(in srgb, #2ea043 12%, transparent);
+	--review-added-strong: color-mix(in srgb, #2ea043 20%, transparent);
+	--review-added-bar: #2ea043;
+	/* Opaque: drawn over a changed block's green, it hides it. */
+	--review-removed: color-mix(in srgb, #f85149 13%, var(--app-page));
+	--review-removed-bar: #f85149;
+	--review-removed-text: color-mix(in srgb, var(--app-text) 62%, transparent);
+}
+
+/* Blocks the change put in: tinted, with a bar in the margin; the text does not move. */
+.page [data-ai-change] {
+	margin-right: -0.6em;
+	margin-left: -0.6em;
+	padding-right: 0.6em;
+	padding-left: 0.6em;
+	border-radius: 3px;
+	background: var(--review-added);
+	box-shadow: inset 3px 0 0 var(--review-added-bar);
+}
+
+.page [data-ai-change][data-ai-current] {
+	background: var(--review-added-strong);
+}
+
+/* What it took out, drawn by the block above itself (below, at the end of the document). */
+.page [data-ai-was]::before,
+.page [data-ai-removed="after"][data-ai-was]::after {
+	content: attr(data-ai-was);
+	display: block;
+	margin: 0 -0.6em 0.35em;
+	padding: 0.15em 0.6em;
+	border-radius: 3px;
+	background: var(--review-removed);
+	box-shadow: inset 3px 0 0 var(--review-removed-bar);
+	color: var(--review-removed-text);
+	font-size: inherit;
+	font-weight: inherit;
+	white-space: pre-wrap;
+	text-decoration: line-through;
+	text-decoration-color: color-mix(in srgb, var(--review-removed-bar) 70%, transparent);
+	pointer-events: none;
+	user-select: none;
+}
+
+/* A changed block: the old text a band of its own above, the new under it on green. */
+.page [data-ai-change][data-ai-was] {
+	padding-bottom: 0.15em;
+}
+
+.page [data-ai-change][data-ai-was]::before {
+	margin: 0 -0.6em 0.15em;
+	border-radius: 3px 3px 0 0;
+}
+
+.page [data-ai-removed="after"][data-ai-was]::before {
+	content: none;
+}
+
+.page [data-ai-removed="after"][data-ai-was]::after {
+	margin: 0.35em -0.6em 0;
+}
+
+/* The change in hand: its toolbar, at its top right corner. */
+.edit-review-hunk {
+	position: absolute;
+	z-index: 5;
 	display: flex;
-	flex-direction: column;
-	align-items: stretch;
-	gap: 4px;
-	padding: 5px 8px 5px 14px;
-	border-bottom: 1px solid var(--app-border);
-	background: var(--app-info-bg);
+	gap: 2px;
+	padding: 2px;
+	border: 1px solid var(--app-border);
+	border-radius: 5px;
+	background: var(--app-raised);
+	box-shadow: var(--app-shadow-soft);
+	font-size: 12px;
 }
 
-.edit-review button:focus-visible {
-	outline: 2px solid var(--app-accent);
-	outline-offset: 1px;
-}
-
+.edit-review-hunk[hidden],
 .edit-review[hidden] {
 	display: none;
 }
 
-.edit-review-row {
-	display: flex;
-	flex-wrap: wrap;
+.edit-review-button {
+	display: inline-flex;
 	align-items: center;
-	gap: 6px;
+	gap: 4px;
+	padding: 2px 7px;
+	border: 0;
+	border-radius: 3px;
+	background: none;
+	color: var(--app-text);
+	font: inherit;
+	line-height: 18px;
+	cursor: pointer;
+}
+
+.edit-review-button:hover:not(:disabled) {
+	background: var(--app-hover);
+}
+
+.edit-review-button:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.edit-review-button:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -1px;
+}
+
+.edit-review-icon {
+	width: 14px;
+	height: 14px;
+	fill: none;
+	stroke: currentcolor;
+	stroke-width: 1.6;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+.edit-review-accept .edit-review-icon {
+	stroke: var(--review-added-bar);
+}
+
+.edit-review-reject .edit-review-icon {
+	stroke: var(--review-removed-bar);
+}
+
+/* All of them: a pill that stays at the bottom of the document while it scrolls. */
+.edit-review {
+	position: sticky;
+	bottom: 18px;
+	z-index: 6;
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	width: fit-content;
+	margin: 12px auto 0;
+	padding: 3px;
+	border: 1px solid var(--app-border);
+	border-radius: 999px;
+	background: var(--app-raised);
+	box-shadow: var(--app-shadow);
+	font-size: 12px;
+}
+
+.edit-review .edit-review-button {
+	border-radius: 999px;
+}
+
+.edit-review-step {
+	padding: 3px;
 }
 
 .edit-review-count {
-	min-width: 3.5em;
+	min-width: 3.6em;
+	color: var(--app-muted);
 	text-align: center;
 	font-variant-numeric: tabular-nums;
 }
 
-.edit-review-gap {
+.edit-review-divider {
+	width: 1px;
+	height: 16px;
+	margin: 0 4px;
+	background: var(--app-border);
+}
+
+/* --- The changes waiting, listed above the chat's question box (see edit-summary.ts) --- */
+
+.edit-summary {
+	margin-bottom: 2px;
+	overflow: hidden;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	font-size: 12.5px;
+}
+
+.edit-summary[hidden] {
+	display: none;
+}
+
+.edit-summary-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 5px 6px 5px 4px;
+}
+
+.edit-summary-toggle {
+	display: flex;
 	flex: 1;
-}
-
-.edit-review-accept {
-	border-color: var(--ai-added-edge);
-}
-
-.edit-review-reject {
-	border-color: var(--ai-removed-edge);
-}
-
-.edit-review-summary {
-	cursor: pointer;
-	color: var(--app-muted);
-}
-
-.edit-review-was {
-	max-height: 9em;
-	margin: 4px 0 2px;
-	padding: 6px 8px;
-	overflow: auto;
-	border-left: 3px solid var(--ai-removed-edge);
-	background: color-mix(in srgb, #dc2626 8%, transparent);
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+	padding: 3px 6px;
+	border: 0;
+	border-radius: 4px;
+	background: none;
+	color: var(--app-text);
 	font: inherit;
-	font-size: 12px;
-	white-space: pre-wrap;
+	text-align: left;
+	cursor: pointer;
+}
+
+.edit-summary-toggle::before {
+	content: "";
+	flex: none;
+	width: 6px;
+	height: 6px;
+	margin: 0 2px 2px;
+	border-right: 1.5px solid currentcolor;
+	border-bottom: 1.5px solid currentcolor;
+	transform: rotate(45deg);
+	transition: transform 0.12s;
+}
+
+.edit-summary-toggle[aria-expanded="false"]::before {
+	margin-bottom: 0;
+	transform: rotate(-45deg);
+}
+
+.edit-summary-toggle:hover {
+	background: var(--app-hover);
+}
+
+.edit-summary-title {
+	overflow: hidden;
+	color: var(--app-muted);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.edit-summary-counts {
+	display: inline-flex;
+	flex: none;
+	gap: 5px;
+	font-variant-numeric: tabular-nums;
+}
+
+.edit-summary-added {
+	color: #2ea043;
+}
+
+.edit-summary-removed {
+	color: #f85149;
+}
+
+.edit-summary-accept,
+.edit-summary-reject {
+	flex: none;
+	padding: 4px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 5px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	cursor: pointer;
+}
+
+.edit-summary-accept {
+	border-color: var(--app-accent);
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+}
+
+.edit-summary-accept:hover {
+	background: color-mix(in srgb, var(--app-accent) 86%, var(--app-text));
+}
+
+.edit-summary-reject:hover {
+	background: var(--app-hover);
+}
+
+.edit-summary-accept:focus-visible,
+.edit-summary-reject:focus-visible,
+.edit-summary-toggle:focus-visible,
+.edit-summary-item:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: -2px;
+}
+
+.edit-summary-list {
+	max-height: 168px;
+	margin: 0;
+	padding: 0 0 4px;
+	overflow: auto;
+	list-style: none;
+}
+
+.edit-summary-list[hidden] {
+	display: none;
+}
+
+.edit-summary-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	padding: 4px 10px 4px 12px;
+	border: 0;
+	background: none;
+	color: var(--app-text);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.edit-summary-item:hover {
+	background: var(--app-hover);
+}
+
+.edit-summary-item[aria-current="true"] {
+	background: color-mix(in srgb, var(--app-accent) 10%, transparent);
+}
+
+/* A line for a paragraph, as a file icon is for a file. */
+.edit-summary-mark {
+	flex: none;
+	width: 10px;
+	height: 9px;
+	border-top: 1.5px solid #2ea043;
+	border-bottom: 1.5px solid #2ea043;
+	background: linear-gradient(#2ea043, #2ea043) center / 100% 1.5px no-repeat;
+}
+
+.edit-summary-mark.deleted {
+	border-color: #f85149;
+	background-image: linear-gradient(#f85149, #f85149);
+}
+
+.edit-summary-label {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.edit-summary-label.deleted {
+	color: var(--app-muted);
 	text-decoration: line-through;
-	text-decoration-color: color-mix(in srgb, #dc2626 55%, transparent);
-}
-
-.kalem-theme [data-ai-change="added"],
-.kalem-theme [data-ai-change="changed"] {
-	box-shadow: -6px 0 0 -3px #16a34a;
-	background: color-mix(in srgb, #16a34a 9%, transparent);
-	border-radius: 2px;
-}
-
-.kalem-theme [data-ai-current="change"] {
-	box-shadow:
-		-7px 0 0 -3px #16a34a,
-		0 0 0 1px color-mix(in srgb, #16a34a 45%, transparent);
-	background: color-mix(in srgb, #16a34a 15%, transparent);
-}
-
-.kalem-theme [data-ai-removed="before"] {
-	border-top: 3px solid #dc2626;
-}
-
-.kalem-theme [data-ai-removed="after"] {
-	border-bottom: 3px solid #dc2626;
-}
-
-.kalem-theme [data-ai-current="removed"] {
-	outline: 1px dashed color-mix(in srgb, #dc2626 60%, transparent);
-	outline-offset: 2px;
 }

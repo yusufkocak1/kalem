@@ -92,6 +92,8 @@ export interface AssistantHost {
 	readonly lang: Lang;
 	readonly bridge: KalemBridge;
 	readonly previews: Previews;
+	/** The assistant's changes waiting in the document, listed above the question box. */
+	readonly edits?: HTMLElement;
 	shareDocument(): boolean;
 	setShareDocument(share: boolean): void;
 	/** The active document's name, as its chip shows it. */
@@ -1235,6 +1237,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	const composer = el("div", {
 		class: "assistant-composer",
 		children: [
+			...(host.edits === undefined ? [] : [host.edits]),
 			context,
 			sourceList,
 			templateList,

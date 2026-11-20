@@ -1228,20 +1228,27 @@ verir.
   Ekle** gösterilmez.
 - **Asistanın değişikliklerini belgede kabul ya da geri almak:** asistan
   belgeyi kendi aracıyla (`document_edit`) değiştirdiğinde önce onay
-  sorulmaz; değişiklik belgeye yazılır ve **yerinde işaretlenir**:
-  değişen ve eklenen bloklar yeşil, silinen metnin yeri kırmızı bir
-  çizgiyle görünür. Belgenin üstündeki **Asistanın değişiklikleri**
-  çubuğu değişiklikleri tek tek gezer ("1 / 3", ‹ ›); **Kabul et** o
-  değişikliği tutar, **Geri al** o kısmı eski hâline döndürür, **Tümünü
-  kabul et** / **Tümünü geri al** kalanların hepsine uygulanır.
-  **Önceki hâli** (ya da **Silinen metin**) değişiklikten önceki metni
-  gösterir. Değişiklikler blok blok ayrılır: yeniden yazılan her paragraf
-  en çok benzediği eski paragrafla eşleşir, yalnız eklenen ya da silinen
-  bloklar ayrı birer değişikliktir (`src/shared/edit-review.ts`). Karar
-  verilmemiş değişiklik asistanın yazdığı gibi kalır; kullanıcı belgeye
-  yazmaya başlarsa inceleme o anki hâliyle biter. Eski davranış (önce
-  onay kartı, hepsi birden) **Dosya → Ayarlar → Asistan → Asistanın
-  değişikliklerini belgede göster** kapatılarak geri gelir.
+  sorulmaz; değişiklik belgeye yazılır ve bir kod editörünün satır içi
+  farkı gibi **yerinde** gösterilir: değiştirilen ya da silinen metin
+  üstte, kırmızı zeminde üstü çizili; yeni metin altında yeşil zeminde;
+  ikisinin de kenarında renkli bir şerit. Eski metin yalnızca çizilir,
+  belgenin metnine girmez ve içine yazılamaz.
+  - Elinizdeki değişikliğin sağ üst köşesinde **Kabul et** / **Geri al**
+    vardır; fareyle başka bir değişikliğin üstüne gelmek onu seçer.
+  - Sayfanın altında duran kapsül değişiklikleri gezer (‹ "1 / 3" ›) ve
+    **Tümünü kabul et** / **Tümünü geri al** sunar.
+  - Asistan panelinde, soru kutusunun üstünde aynı değişikliklerin
+    listesi durur: "3 değişiklik +2 −3", **Tümünü kabul et**, **Tümünü
+    geri al** ve her değişiklik kendi satırında (+/− satır sayısıyla);
+    satıra tıklamak belgede o değişikliğe gider. Belgede verilen her
+    karar listeden düşer; hiçbiri kalmayınca liste kaybolur.
+  - Değişiklikler blok blok ayrılır: yeniden yazılan her paragraf en çok
+    benzediği eski paragrafla eşleşir, yalnız eklenen ya da silinen
+    bloklar ayrı birer değişikliktir (`src/shared/edit-review.ts`). Karar
+    verilmemiş değişiklik asistanın yazdığı gibi kalır; kullanıcı belgeye
+    yazmaya başlarsa inceleme o anki hâliyle biter. Eski davranış (önce
+    onay kartı, hepsi birden) **Dosya → Ayarlar → Asistan → Asistanın
+    değişikliklerini belgede göster** kapatılarak geri gelir.
 - **Sohbet ekranı:** soru kutusu ile paylaşım, kaynak ekleme ve model
   seçimi tek bir çerçevededir. Belgede metin seçiliyken kutunun üstünde
   **İyileştir, Kısalt, Yazımı düzelt, Çevir, Açıkla** düğmeleri çıkar.

@@ -1,10 +1,14 @@
 /**
- * The assistant's change to the document, reviewed where it is: each
- * changed block is marked in the page, a deleted one by a line where it
- * was, and a bar above the document goes through them, one at a time,
- * with Accept and Reject (and both for all). Until it is decided a change
- * stays as the assistant wrote it; a rejected one is put back as it was.
- * The user typing in the document ends the review with what is there.
+ * The assistant's change to the document, reviewed where it is, as a code
+ * editor shows an inline diff: the text it replaced or deleted is drawn
+ * above, struck through on red, the text it put in on green, each with a
+ * bar in the margin. The change in hand has a small toolbar at its corner
+ * (Accept, Reject); a pill at the bottom of the page goes from one change
+ * to the next and takes them all at once. The old text is drawn by the
+ * block's own `::before` (from an attribute), so it is never part of the
+ * document, cannot be typed into, and goes when the mark does. A rejected
+ * change is put back as it was; the user typing in the document ends the
+ * review with what is there.
  */
 import type { ChangeDecision, EditReview, PendingChange } from "../shared/edit-review.js";
 import { composeReview, reviewEdit } from "../shared/edit-review.js";
@@ -14,9 +18,11 @@ import { el } from "./dom.js";
 
 export interface EditReviewHost {
 	readonly t: Strings;
-	/** Where the bar goes: above the document. */
-	readonly bar: HTMLElement;
-	/** The page the editor draws the document in. */
+	/** The page the document is drawn on: the change's toolbar is placed on it. */
+	readonly page: HTMLElement;
+	/** The scrolled area around the page: the pill stays at its bottom. */
+	readonly desk: HTMLElement;
+	/** Where the editor draws the document. */
 	readonly canvas: HTMLElement;
 	/** The document's Markdown now. */
 	text(): string;
@@ -24,7 +30,30 @@ export interface EditReviewHost {
 	replace(text: string): boolean;
 	/** The ids of the editor's top-level blocks, in order. */
 	blockIds(): readonly string[];
+	/** The changes waiting, or the one in hand, changed (for the chat's list of them). */
+	updated?(): void;
 }
+
+/** A change waiting, as the chat lists it. */
+export interface ReviewItem {
+	/** A few words of what it put in, or of what it took out. */
+	readonly label: string;
+	/** Whether it only took text out. */
+	readonly deletion: boolean;
+	/** Lines it put in and took out. */
+	readonly added: number;
+	readonly removed: number;
+}
+
+export interface ReviewSummary {
+	readonly items: readonly ReviewItem[];
+	/** The one in hand. */
+	readonly current: number;
+}
+
+/** The lines a piece of Markdown has, blank ones left out. */
+const lineCount = (markdown: string): number =>
+	markdown.split("\n").filter((line) => line.trim() !== "").length;
 
 export interface EditReviewUi {
 	/** Shows a change made from `before` to `after` for review; resolves how many changes it has. */
@@ -37,17 +66,62 @@ export interface EditReviewUi {
 	acceptAll(): void;
 	/** Puts back every change still waiting, and ends the review. */
 	rejectAll(): void;
+	/** Makes a change the one in hand, and shows it. */
+	select(index: number): void;
+	/** The changes waiting; `null` when there are none. */
+	summary(): ReviewSummary | null;
 }
 
 /** On a block the change put in: `added` or `changed`. */
 const MARK = "data-ai-change";
 /** On the block text was deleted before (`before`) or, at the end, after (`after`). */
 const REMOVED = "data-ai-removed";
-/** On the blocks of the change in hand: `change`, or `removed` for a deletion. */
+/** The text the change took out, drawn above the block (below it, at the end). */
+const WAS = "data-ai-was";
+/** On the blocks of the change in hand. */
 const CURRENT = "data-ai-current";
+/** Which change a marked block belongs to. */
+const INDEX = "data-ai-index";
+const ATTRIBUTES = [MARK, REMOVED, WAS, CURRENT, INDEX];
 
-const clip = (text: string, max: number): string =>
-	text.length > max ? `${text.slice(0, max)}…` : text;
+/** Markdown as it reads: without the marks of headings, emphasis, code and links. */
+export function plainText(markdown: string, max = 2000): string {
+	const text = markdown
+		.replace(/\r\n?/g, "\n")
+		.split("\n")
+		.map((line) =>
+			line
+				.replace(/^\s{0,3}#{1,6}\s+/, "")
+				.replace(/^(\s*)[-*+]\s+\[[ xX]\]\s+/, "$1☐ ")
+				.replace(/^(\s*)[-*+]\s+/, "$1• ")
+				.replace(/^\s*>\s?/, "")
+				.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+				.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+				.replace(/(\*\*|__|~~|`)/g, "")
+				.replace(/(^|[^\p{L}\p{N}*_])[*_]([^*_\n]+)[*_](?=[^\p{L}\p{N}*_]|$)/gu, "$1$2"),
+		)
+		.filter((line) => !/^\s*(?:`{3,}|~{3,}|<!--.*-->)\s*$/.test(line))
+		.join("\n")
+		.replace(/\n{3,}/g, "\n\n")
+		.trim();
+	return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
+const icon = (path: string): SVGSVGElement => {
+	const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+	svg.setAttribute("viewBox", "0 0 16 16");
+	svg.setAttribute("aria-hidden", "true");
+	svg.classList.add("edit-review-icon");
+	const shape = document.createElementNS("http://www.w3.org/2000/svg", "path");
+	shape.setAttribute("d", path);
+	svg.append(shape);
+	return svg;
+};
+
+const CHECK = "M3.5 8.5l3 3 6-7";
+const UNDO = "M6 4L3 7l3 3M3.5 7H10a3 3 0 010 6H8";
+const UP = "M4 10l4-4 4 4";
+const DOWN = "M4 6l4 4 4-4";
 
 export function createEditReview(host: EditReviewHost): EditReviewUi {
 	const { t } = host;
@@ -59,52 +133,66 @@ export function createEditReview(host: EditReviewHost): EditReviewUi {
 	let expected = "";
 	let replacing = false;
 
-	const count = el("span", { class: "edit-review-count", attrs: { "aria-live": "polite" } });
-	const button = (label: string, title: string, kind = ""): HTMLButtonElement =>
-		el("button", {
-			class: `notice-action${kind === "" ? "" : ` ${kind}`}`,
-			text: label,
-			attrs: { type: "button", title },
+	const button = (
+		label: string,
+		title: string,
+		kind: string,
+		path: string | null,
+		showLabel = true,
+	): HTMLButtonElement => {
+		const made = el("button", {
+			class: `edit-review-button ${kind}`,
+			attrs: { type: "button", title, "aria-label": title },
 		});
-	const previous = button("‹", t.editReviewPrevious);
-	const next = button("›", t.editReviewNext);
-	previous.setAttribute("aria-label", t.editReviewPrevious);
-	next.setAttribute("aria-label", t.editReviewNext);
-	const accept = button(t.editReviewAccept, t.editReviewAcceptHint, "edit-review-accept");
-	const reject = button(t.editReviewReject, t.editReviewRejectHint, "edit-review-reject");
-	const acceptAllButton = button(t.editReviewAcceptAll, t.editReviewAcceptAll);
-	const rejectAllButton = button(t.editReviewRejectAll, t.editReviewRejectAll);
-	const was = el("pre", { class: "edit-review-was" });
-	const wasLabel = el("summary", { class: "edit-review-summary", text: t.editReviewWas });
-	const wasBox = el("details", { class: "edit-review-details", children: [wasLabel, was] });
+		if (path !== null) made.append(icon(path));
+		if (showLabel) made.append(el("span", { text: label }));
+		return made;
+	};
+
+	// The change in hand: its toolbar at its corner.
+	const accept = button(t.editReviewAccept, t.editReviewAcceptHint, "edit-review-accept", CHECK);
+	const reject = button(t.editReviewReject, t.editReviewRejectHint, "edit-review-reject", UNDO);
+	const hunk = el("div", {
+		class: "edit-review-hunk",
+		attrs: { role: "toolbar", "aria-label": t.editReviewTitle, hidden: "" },
+		children: [accept, reject],
+	});
+	host.page.append(hunk);
+
+	// All of them: the pill at the bottom.
+	const previous = button("", t.editReviewPrevious, "edit-review-step", UP, false);
+	const next = button("", t.editReviewNext, "edit-review-step", DOWN, false);
+	const count = el("span", { class: "edit-review-count", attrs: { "aria-live": "polite" } });
+	const acceptAllButton = button(
+		t.editReviewAcceptAll,
+		t.editReviewAcceptAll,
+		"edit-review-all",
+		CHECK,
+	);
+	const rejectAllButton = button(
+		t.editReviewRejectAll,
+		t.editReviewRejectAll,
+		"edit-review-all",
+		UNDO,
+	);
 	const element = el("div", {
 		class: "edit-review",
 		attrs: { role: "region", "aria-label": t.editReviewTitle, hidden: "" },
 		children: [
-			el("div", {
-				class: "edit-review-row",
-				children: [
-					el("strong", { class: "edit-review-title", text: t.editReviewTitle }),
-					previous,
-					count,
-					next,
-					accept,
-					reject,
-					el("span", { class: "edit-review-gap" }),
-					acceptAllButton,
-					rejectAllButton,
-				],
-			}),
-			wasBox,
+			previous,
+			count,
+			next,
+			el("span", { class: "edit-review-divider", attrs: { "aria-hidden": "true" } }),
+			acceptAllButton,
+			rejectAllButton,
 		],
 	});
-	host.bar.prepend(element);
+	host.desk.append(element);
 
 	function clearMarks(): void {
-		for (const marked of host.canvas.querySelectorAll(`[${MARK}], [${REMOVED}], [${CURRENT}]`)) {
-			marked.removeAttribute(MARK);
-			marked.removeAttribute(REMOVED);
-			marked.removeAttribute(CURRENT);
+		const selector = ATTRIBUTES.map((name) => `[${name}]`).join(", ");
+		for (const marked of host.canvas.querySelectorAll(selector)) {
+			for (const name of ATTRIBUTES) marked.removeAttribute(name);
 		}
 	}
 
@@ -114,50 +202,69 @@ export function createEditReview(host: EditReviewHost): EditReviewUi {
 		return host.canvas.querySelector<HTMLElement>(`[data-kalem-id="${CSS.escape(id)}"]`);
 	}
 
-	/** Where a change is in the page: the blocks it put in, else where it took text out. */
-	function elementsOf(change: PendingChange): {
-		elements: HTMLElement[];
-		attribute: string;
-		kind: string;
-	} {
+	/** Marks a change's blocks; resolves the first, where its toolbar goes. */
+	function markChange(change: PendingChange, index: number): HTMLElement | null {
+		const was = plainText(change.removed);
+		const tag = (found: HTMLElement): void => {
+			found.setAttribute(INDEX, String(index));
+			if (index === current) found.setAttribute(CURRENT, "");
+		};
 		if (change.blocks.length > 0) {
 			const elements = change.blocks
 				.map(blockElement)
 				.filter((found): found is HTMLElement => found !== null);
-			return { elements, attribute: MARK, kind: change.removed === "" ? "added" : "changed" };
+			for (const found of elements) {
+				found.setAttribute(MARK, change.removed === "" ? "added" : "changed");
+				tag(found);
+			}
+			if (was !== "") elements[0]?.setAttribute(WAS, was);
+			return elements[0] ?? null;
 		}
-		if (change.before !== null) {
-			const found = blockElement(change.before);
-			return { elements: found === null ? [] : [found], attribute: REMOVED, kind: "before" };
+		const found =
+			change.before !== null
+				? blockElement(change.before)
+				: blockElement(host.blockIds().length - 1);
+		if (found === null) return null;
+		found.setAttribute(REMOVED, change.before !== null ? "before" : "after");
+		found.setAttribute(WAS, was);
+		tag(found);
+		return found;
+	}
+
+	let anchor: HTMLElement | null = null;
+
+	/** Puts the toolbar at the top right of the change in hand (under it, for a deletion at the end). */
+	function place(): void {
+		if (anchor === null || !anchor.isConnected || review === null) {
+			hunk.hidden = true;
+			return;
 		}
-		const last = blockElement(host.blockIds().length - 1);
-		return { elements: last === null ? [] : [last], attribute: REMOVED, kind: "after" };
+		hunk.hidden = false;
+		const page = host.page.getBoundingClientRect();
+		const block = anchor.getBoundingClientRect();
+		const end = anchor.getAttribute(REMOVED) === "after";
+		const top = end ? block.bottom - page.top + 2 : block.top - page.top - hunk.offsetHeight - 2;
+		hunk.style.top = `${Math.max(0, top)}px`;
+		hunk.style.right = `${Math.max(0, page.right - block.right)}px`;
 	}
 
 	function mark(scroll: boolean): void {
 		clearMarks();
+		anchor = null;
 		for (const [index, change] of pending.entries()) {
-			const { elements, attribute, kind } = elementsOf(change);
-			for (const found of elements) {
-				found.setAttribute(attribute, kind);
-				if (index === current)
-					found.setAttribute(CURRENT, attribute === MARK ? "change" : "removed");
-			}
-			if (scroll && index === current) elements[0]?.scrollIntoView({ block: "nearest" });
+			const first = markChange(change, index);
+			if (index === current) anchor = first;
 		}
+		place();
+		if (scroll) anchor?.scrollIntoView({ block: "nearest" });
 	}
 
-	function renderBar(): void {
-		const change = pending[current];
-		element.hidden = change === undefined;
-		if (change === undefined) return;
+	function renderPill(): void {
+		host.updated?.();
+		element.hidden = pending.length === 0;
 		count.textContent = format(t.editReviewCount, current + 1, pending.length);
 		previous.disabled = pending.length < 2;
 		next.disabled = pending.length < 2;
-		const removed = change.removed.trim();
-		wasBox.hidden = removed === "";
-		wasLabel.textContent = change.added === "" ? t.editReviewRemoved : t.editReviewWas;
-		was.textContent = clip(removed, 4000);
 	}
 
 	/** Puts the document together as decided, and shows what is left to decide. */
@@ -177,7 +284,7 @@ export function createEditReview(host: EditReviewHost): EditReviewUi {
 			return;
 		}
 		current = Math.min(current, pending.length - 1);
-		renderBar();
+		renderPill();
 		// The editor draws the new blocks first.
 		requestAnimationFrame(() => mark(scroll));
 	}
@@ -187,8 +294,11 @@ export function createEditReview(host: EditReviewHost): EditReviewUi {
 		decisions = new Map();
 		pending = [];
 		current = 0;
+		anchor = null;
 		clearMarks();
 		element.hidden = true;
+		hunk.hidden = true;
+		host.updated?.();
 	}
 
 	function decide(decision: ChangeDecision): void {
@@ -203,30 +313,45 @@ export function createEditReview(host: EditReviewHost): EditReviewUi {
 		apply(false);
 	}
 
-	const move = (by: number): void => {
+	const select = (index: number, scroll: boolean): void => {
 		if (pending.length === 0) return;
-		current = (current + by + pending.length) % pending.length;
-		renderBar();
-		mark(true);
+		const wanted = (index + pending.length) % pending.length;
+		if (wanted === current) return;
+		current = wanted;
+		renderPill();
+		mark(scroll);
 	};
 
-	previous.addEventListener("click", () => move(-1));
-	next.addEventListener("click", () => move(1));
+	previous.addEventListener("click", () => select(current - 1, true));
+	next.addEventListener("click", () => select(current + 1, true));
 	accept.addEventListener("click", () => decide("accepted"));
 	reject.addEventListener("click", () => decide("rejected"));
 	acceptAllButton.addEventListener("click", () => decideAll("accepted"));
 	rejectAllButton.addEventListener("click", () => decideAll("rejected"));
+	// Pointing at another change makes it the one in hand, as a diff's toolbar follows the mouse.
+	host.canvas.addEventListener("mouseover", (event) => {
+		if (review === null || !(event.target instanceof Element)) return;
+		const marked = event.target.closest(`[${INDEX}]`);
+		if (marked === null) return;
+		select(Number(marked.getAttribute(INDEX)), false);
+	});
+	window.addEventListener("resize", () => {
+		if (review !== null) place();
+	});
+	new ResizeObserver(() => {
+		if (review !== null) place();
+	}).observe(host.canvas);
 
 	return {
 		start(before, after) {
 			if (review !== null) decideAll("accepted");
-			const next = reviewEdit(before, after);
-			if (next.changes.length === 0) return 0;
-			review = next;
+			const made = reviewEdit(before, after);
+			if (made.changes.length === 0) return 0;
+			review = made;
 			decisions = new Map();
 			current = 0;
 			apply(true);
-			return next.changes.length;
+			return made.changes.length;
 		},
 		changed() {
 			if (review === null || replacing) return;
@@ -235,5 +360,30 @@ export function createEditReview(host: EditReviewHost): EditReviewUi {
 		active: () => review !== null,
 		acceptAll: () => decideAll("accepted"),
 		rejectAll: () => decideAll("rejected"),
+		select(index) {
+			if (index === current) {
+				anchor?.scrollIntoView({ block: "nearest" });
+				return;
+			}
+			select(index, true);
+		},
+		summary() {
+			if (review === null || pending.length === 0) return null;
+			return {
+				current,
+				items: pending.map((change) => {
+					const deletion = change.added === "";
+					const words = plainText(deletion ? change.removed : change.added, 200)
+						.split("\n")
+						.find((line) => line.trim() !== "");
+					return {
+						label: words ?? "",
+						deletion,
+						added: lineCount(change.added),
+						removed: lineCount(change.removed),
+					};
+				}),
+			};
+		},
 	};
 }
