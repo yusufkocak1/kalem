@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { BUILTIN_ID } from "../shared/templates.js";
+import { AGENT_SPEC_ID, BUILTIN_ID } from "../shared/templates.js";
 import { TemplateStore, WORKSPACE_TEMPLATES } from "./templates.js";
 import { renamed } from "./templates-ipc.js";
 
@@ -31,9 +31,16 @@ describe("TemplateStore", () => {
 		expect(list.map((template) => [template.name, template.source])).toEqual([
 			["Kurum", "workspace"],
 			["Yazılım Analiz Dokümanı (best practice)", "builtin"],
+			["Kodlama Ajanı için Spec", "builtin"],
 		]);
 		expect((await store.find("kurum"))?.source).toBe("workspace");
 		expect((await store.read(BUILTIN_ID)).text).toContain("## Açık Sorular");
+		const spec = await store.read(AGENT_SPEC_ID);
+		expect(spec.info.required).toContain("Kod Bağlamı");
+		expect(spec.text).toContain("OLDUĞUNDA sistem");
+		// The ones that come with Kalem are neither removed nor opened as files.
+		await expect(store.remove(AGENT_SPEC_ID)).rejects.toThrow();
+		expect(store.isFile(AGENT_SPEC_ID)).toBe(false);
 
 		const saved = await store.save(
 			"personal",

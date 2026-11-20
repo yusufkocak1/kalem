@@ -94,7 +94,7 @@ const MODE_PURPOSE: Readonly<Record<Mode, string>> = {
 	ask: "a plain question",
 	write: "writing an analysis document or a part of one",
 	review: "reviewing an analysis document for problems",
-	prompt: "turning the document into a prompt for a coding agent",
+	prompt: "turning the document into a prompt or spec files for a coding agent",
 	code: "reading, writing or fixing code",
 	app: "doing something in Kalem itself: a setting, a panel, a command",
 };

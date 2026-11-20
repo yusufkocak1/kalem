@@ -925,8 +925,11 @@ verir.
 >   gider; asistan o şablona göre yazar, inceler, analiz eder ya da rapor
 >   verir (seçim kaldırılana kadar kalır). Ekip şablonları açık klasörün `.kalem/templates/`
 >   klasöründe (Git ile paylaşılır; aynı adlı kişisel şablonun önüne geçer),
->   kişisel şablonlar uygulama verisinde durur; Kalem ile bir *best practice*
->   şablonu gelir (salt okunur, **Kopyala ve Uyarla** ile kişiselleştirilir).
+>   kişisel şablonlar uygulama verisinde durur; Kalem ile iki şablon gelir:
+>   *best practice* analiz şablonu ve **Kodlama Ajanı için Spec** şablonu
+>   (kabul kriterleri "… OLDUĞUNDA sistem … MALIDIR" kalıbında, bir *Kod
+>   Bağlamı* bölümüyle). İkisi de salt okunurdur, **Kopyala ve Uyarla** ile
+>   kişiselleştirilir.
 >   Şablon sıradan bir Markdown belgesidir; başındaki kısa ön bilgi
 >   (`kalem-template`, `required`, `ids`, `questions`) adını, zorunlu
 >   bölümlerini ve gereksinim kimliklerini söyler. Etkin belge şablon olarak
@@ -961,6 +964,38 @@ verir.
 >   yalnızca bulguyu yeniden açar.
 > - **Prompt Hazırla:** belgeden (ya da seçili kısımdan) kodlama ajanı için
 >   prompt; istenirse `.kalem/prompts/` altına kaydedilir (onaylı).
+>   "Spec olarak kaydet" denirse (`spec_export`) analiz, ajanın doğrudan
+>   okuduğu **spec dosyalarına** dönüşür: gereksinimler, tasarım ve
+>   `- [ ]` görev listesi. Düzen **Dosya → Ayarlar → Şablonlar → Kodlama
+>   ajanları için spec dosyaları** ayarından seçilir: GitHub Spec Kit
+>   (`specs/NNN-ad/spec.md`, `plan.md`, `tasks.md`), Kiro
+>   (`.kiro/specs/ad/…`) ya da Kalem (`.kalem/specs/ad/…`). Otomatik
+>   seçenekte klasörün zaten kullandığı düzen seçilir, yoksa Spec Kit.
+>   Aynı adlı spec varsa güncellenir. Görevler analize göre denetlenir:
+>   her `FR-…` en az bir görevde geçmeli, hiçbir görev analizde olmayan
+>   bir kimlik anmamalı. Uymazsa hiçbir şey yazılmaz ve asistan önce
+>   görevleri düzeltir. Her dosyanın ilk satırında, hangi belgeden ve
+>   belgenin hangi hâlinden (hash) üretildiği bir yorum olarak yazar.
+>   - **Spec eskidi uyarısı ve ilerleme:** Analiz açılınca, ondan üretilmiş
+>     spec varsa belgenin üstünde "Spec specs/001-…: 5 görevden 2 tanesi
+>     tamamlandı" yazar; ajan `tasks.md` içinde görevleri `- [x]`
+>     işaretledikçe sayı ilerler. Analiz spec'ten sonra değişip
+>     kaydedilirse uyarı çıkar: spec güncel değil. **Görevleri aç** ile
+>     `tasks.md` açılır; asistana "spec'i güncelle" demek yeterlidir.
+>     Asistan da `spec_status` ile bütün spec'leri, eskiyenleri ve hangi
+>     gereksinimin bittiğini görür.
+>   - **Görevleri Jira'ya açmak:** "görevleri Jira'ya aç" denirse asistan
+>     her görev için `jira_create_issues` ile bir kayıt açar, ardından
+>     `spec_link_jira` ile anahtarları `tasks.md` satırlarının sonuna
+>     (`[ABC-12]`) yazar. İkisi de onaylıdır.
+>   - **AGENTS.md:** Asistan prompt ya da spec yazmadan önce deponun ajan
+>     kurallarını okur (`agent_rules`: `AGENTS.md`, `CLAUDE.md`,
+>     `.github/copilot-instructions.md`, `GEMINI.md`) ve test, lint
+>     komutlarını, kuralları ve yasakları bunlara göre yazar. Depoda
+>     `AGENTS.md` yoksa "AGENTS.md oluştur" denince (`agent_rules_open`,
+>     onaylı) doldurulacak bir taslakla oluşturulur ve sekmede açılır;
+>     Markdown bilmeyen biri de onu Kalem'de düzenleyebilir, Git diff'i
+>     yalnız değişen satırı gösterir.
 > - **Jira ve Confluence'a yazma:** gereksinimlerden toplu story
 >   (`jira_create_issues` — kartta hangilerinin oluşturulacağı seçilir),
 >   yorum, durum değiştirme, Confluence sayfasına ekleme/oluşturma. **Bunlar
@@ -1191,6 +1226,50 @@ verir.
   değişmez), **Geri Al** eski metni getirir; önerilen her komut kendi
   **Çalıştır** düğmesiyle çalışır. Değişiklik öneren bir yanıtta **Belgeye
   Ekle** gösterilmez.
+- **Asistanın değişikliklerini belgede kabul ya da geri almak:** asistan
+  belgeyi kendi aracıyla (`document_edit`) değiştirdiğinde önce onay
+  sorulmaz; değişiklik belgeye yazılır ve bir kod editörünün satır içi
+  farkı gibi **yerinde** gösterilir: değiştirilen ya da silinen metin
+  üstte, kırmızı zeminde üstü çizili; yeni metin altında yeşil zeminde;
+  ikisinin de kenarında renkli bir şerit. Eski metin yalnızca çizilir,
+  belgenin metnine girmez ve içine yazılamaz.
+  - Elinizdeki değişikliğin sağ üst köşesinde **Kabul et** / **Geri al**
+    vardır; fareyle başka bir değişikliğin üstüne gelmek onu seçer.
+  - Sayfanın altında duran kapsül değişiklikleri gezer (‹ "1 / 3" ›) ve
+    **Tümünü kabul et** / **Tümünü geri al** sunar.
+  - Asistan panelinde, soru kutusunun üstünde, bir kod editöründeki gibi
+    **dosya dosya** bir liste durur: "2 dosya değişti +5 −4",
+    **Tümünü kabul et** ve **Tümünü geri al**. Açık belge bir satırdır
+    ("analiz.md — belgede 3 değişiklik"), değişiklikleri altında tek tek
+    durur ve tıklanınca belgede o değişikliğe gidilir. Asistanın **kod**
+    için önerdiği ve henüz uygulanmamış değişiklikler (`propose_edit`)
+    de burada, her dosya kendi satırında (klasörüyle ve +/− satır
+    sayısıyla) listelenir; aynı dosyaya gelen öneriler tek satırdır.
+    Satırın üstüne gelince **✓** (uygula / kabul et) ve **↶** (vazgeç /
+    geri al) çıkar. Bir kod dosyasının satırına tıklamak dosyayı
+    **ortadaki editörde** açar ve öneriyi orada, bir kod editörünün fark
+    görünümü gibi satır satır gösterir: iki sütun satır numarası,
+    çıkarılan satırlar kırmızı (−), eklenenler yeşil (+); elinizdeki
+    değişikliğin köşesinde **Kabul et / Geri al**, altta "‹ 1 / 2 ›" ve
+    **Tümünü kabul et / Tümünü geri al**. Hepsine karar verilince sonuç
+    dosyaya yazılıp kaydedilir ve dosyanın metin kutusu geri gelir. Yeni
+    bir dosyanın ya da o arada değişmiş bir dosyanın önerisinin farkı
+    sohbetteki satırında açılır.
+  - Sohbette, yanıtın içinde her önerilen dosya için yalnızca tek satırlık
+    bir iz kalır (dosya yolu, +/− satır sayısı, sonra da "uygulandı" ya da
+    "bırakıldı"); düğme yoktur, karar listede ya da editörde verilir.
+    Bekleyen bir satıra tıklamak dosyayı editörde açar; karara bağlanmış
+    olanınki farkı gösterir. Tümünü
+    kabul et belgedekileri kabul edip kod önerilerini uygular; tümünü
+    geri al belgedekileri geri alıp önerileri bırakır. Karar verilen
+    her şey listeden düşer; hiçbir şey kalmayınca liste kaybolur.
+  - Değişiklikler blok blok ayrılır: yeniden yazılan her paragraf en çok
+    benzediği eski paragrafla eşleşir, yalnız eklenen ya da silinen
+    bloklar ayrı birer değişikliktir (`src/shared/edit-review.ts`). Karar
+    verilmemiş değişiklik asistanın yazdığı gibi kalır; kullanıcı belgeye
+    yazmaya başlarsa inceleme o anki hâliyle biter. Eski davranış (önce
+    onay kartı, hepsi birden) **Dosya → Ayarlar → Asistan → Asistanın
+    değişikliklerini belgede göster** kapatılarak geri gelir.
 - **Sohbet ekranı:** soru kutusu ile paylaşım, kaynak ekleme ve model
   seçimi tek bir çerçevededir. Belgede metin seçiliyken kutunun üstünde
   **İyileştir, Kısalt, Yazımı düzelt, Çevir, Açıkla** düğmeleri çıkar.

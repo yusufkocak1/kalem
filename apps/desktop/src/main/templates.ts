@@ -9,8 +9,9 @@ import { basename, join, relative, sep } from "node:path";
 import type { Lang } from "../shared/i18n.js";
 import type { TemplateInfo, TemplateSource } from "../shared/templates.js";
 import {
-	BUILTIN_ID,
+	BUILTIN_TEMPLATE_IDS,
 	builtinTemplate,
+	isBuiltinTemplate,
 	templateFileName,
 	templateMeta,
 } from "../shared/templates.js";
@@ -81,15 +82,18 @@ export class TemplateStore {
 				found.push({ ...meta, id: path, source, path });
 			}
 		}
-		const builtin = templateMeta(builtinTemplate(this.#options.language()), "");
-		found.push({ ...builtin, id: BUILTIN_ID, source: "builtin", path: null });
+		for (const id of BUILTIN_TEMPLATE_IDS) {
+			const builtin = templateMeta(builtinTemplate(this.#options.language(), id), "");
+			found.push({ ...builtin, id, source: "builtin", path: null });
+		}
 		return found;
 	}
 
 	async read(id: string): Promise<{ info: TemplateInfo; text: string }> {
 		const info = (await this.list()).find((template) => template.id === id);
 		if (info === undefined) throw new Error("There is no such template.");
-		if (info.path === null) return { info, text: builtinTemplate(this.#options.language()) };
+		if (info.path === null)
+			return { info, text: builtinTemplate(this.#options.language(), info.id) };
 		return { info, text: (await readFile(info.path, "utf8")).slice(0, MAX_TEMPLATE) };
 	}
 
@@ -130,14 +134,14 @@ export class TemplateStore {
 	}
 
 	async remove(id: string): Promise<void> {
-		if (id === BUILTIN_ID || !this.#isTemplate(id))
+		if (isBuiltinTemplate(id) || !this.#isTemplate(id))
 			throw new Error("This template cannot be removed.");
 		await rm(id);
 	}
 
 	/** Whether the id is a template file of these folders (for opening it in a tab). */
 	isFile(id: string): boolean {
-		return id !== BUILTIN_ID && this.#isTemplate(id);
+		return !isBuiltinTemplate(id) && this.#isTemplate(id);
 	}
 }
 

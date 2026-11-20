@@ -35,6 +35,7 @@ import { PALETTES } from "./palette.js";
 import type { PanePlaces, ToolPane } from "./panes.js";
 import { DEFAULT_PANE_PLACES } from "./panes.js";
 import type { AssistantConfig, AssistantUpdate, ChatMessage, ProviderId } from "./providers.js";
+import type { SpecProfileChoice, SpecSummary } from "./spec-export.js";
 import type { TemplateInfo } from "./templates.js";
 import type {
 	ApprovalAnswer,
@@ -151,6 +152,10 @@ export interface Settings extends Typography {
 	readonly assistantApprovals: ApprovalMode;
 	/** How Copilot reaches Kalem's tools: through MCP, in blocks, or whichever works. */
 	readonly copilotTools: CopilotTools;
+	/** The layout spec files for a coding agent are written in; "auto" is the one the folder uses. */
+	readonly specProfile: SpecProfileChoice;
+	/** The assistant's changes to the document are shown in it, each accepted or rejected; else asked first, all at once. */
+	readonly assistantEditReview: boolean;
 	/** The document template new documents start from and reviews check against; empty for the built-in one. */
 	readonly defaultTemplate: string;
 	/** The assistant's modes as the user shaped them: steps, options; what is missing is the default. */
@@ -217,6 +222,8 @@ export const DEFAULT_SETTINGS: Settings = {
 	assistantToolPolicies: {},
 	assistantApprovals: "ask",
 	copilotTools: "auto",
+	specProfile: "auto",
+	assistantEditReview: true,
 	defaultTemplate: "",
 	assistantModes: {},
 	assistantCustomModes: [],
@@ -1101,6 +1108,8 @@ export interface KalemBridge {
 	assistantPickSources(kind: "files" | "folder"): Promise<string[]>;
 	/** Writes a change the assistant proposed to a workspace file. */
 	assistantApplyEdit(id: string): Promise<void>;
+	/** The full path of a proposed change's file; `null` when the change is gone. */
+	assistantEditPath(id: string): Promise<string | null>;
 	/** The user's answer to a tool that asked before changing something. */
 	assistantApprove(id: string, answer: ApprovalAnswer): Promise<void>;
 	/** What the window did with a tool call it ran. */
@@ -1125,6 +1134,8 @@ export interface KalemBridge {
 	setLocalNotes(key: string, notes: readonly LocalNote[]): Promise<void>;
 	/** The document templates: the team's, the user's, and the built-in one. */
 	templates(): Promise<readonly TemplateInfo[]>;
+	/** The specs in the workspace made from a document (by its file's name), and whether each is behind its text. */
+	specStatus(name: string, text: string): Promise<readonly SpecSummary[]>;
 	/** A new tab with a document made from the template. */
 	templateNew(id: string): Promise<void>;
 	/** Opens a template's file in a tab to edit it. */
@@ -1292,9 +1303,11 @@ export const CHANNEL = {
 	assistantRetryCheck: "kalem:assistant-retry-check",
 	assistantPickSources: "kalem:assistant-pick-sources",
 	assistantApplyEdit: "kalem:assistant-apply-edit",
+	assistantEditPath: "kalem:assistant-edit-path",
 	assistantEvent: "kalem:assistant-event",
 	assistantApproval: "kalem:assistant-approval",
 	templates: "kalem:templates",
+	specStatus: "kalem:spec-status",
 	localNotes: "kalem:local-notes",
 	setLocalNotes: "kalem:set-local-notes",
 	templateNew: "kalem:template-new",

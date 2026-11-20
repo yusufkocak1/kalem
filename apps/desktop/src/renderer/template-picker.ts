@@ -6,6 +6,7 @@ import type { KalemBridge } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type { TemplateInfo } from "../shared/templates.js";
+import { BUILTIN_ID } from "../shared/templates.js";
 import { el } from "./dom.js";
 
 export function sourceLabel(t: Strings, template: TemplateInfo): string {
@@ -59,7 +60,7 @@ export function createTemplatePicker(options: {
 			}
 			const preferred = options.defaultTemplate();
 			const isDefault = (template: TemplateInfo): boolean =>
-				template.id === preferred || (preferred === "" && template.source === "builtin");
+				template.id === preferred || (preferred === "" && template.id === BUILTIN_ID);
 			const sorted = [...templates].sort((a, b) => Number(isDefault(b)) - Number(isDefault(a)));
 			list.replaceChildren(
 				...sorted.map((template) => {

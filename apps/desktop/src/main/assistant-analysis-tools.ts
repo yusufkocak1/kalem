@@ -10,7 +10,7 @@ import { findingsText, lintAnalysis } from "../shared/analysis-lint.js";
 import type { PlanStep } from "../shared/claude.js";
 import { parseFindings } from "../shared/findings.js";
 import { format } from "../shared/i18n.js";
-import { templateFileName } from "../shared/templates.js";
+import { BUILTIN_ID, templateFileName } from "../shared/templates.js";
 import type { KalemTool, ToolContext } from "./assistant-tools.js";
 import { registerTools } from "./assistant-tools.js";
 import type { TemplateStore } from "./templates.js";
@@ -48,7 +48,7 @@ const TOOLS: readonly KalemTool[] = [
 			return all
 				.map(
 					(template) =>
-						`- "${template.name}" (id ${template.id}; ${template.source}${template.id === preferred || (preferred === "" && template.source === "builtin") ? "; the user's default" : ""}${template.id === picked ? "; picked for this question" : ""}): requires ${template.required.join(", ") || "nothing"}`,
+						`- "${template.name}" (id ${template.id}; ${template.source}${template.id === preferred || (preferred === "" && template.id === BUILTIN_ID) ? "; the user's default" : ""}${template.id === picked ? "; picked for this question" : ""}): requires ${template.required.join(", ") || "nothing"}`,
 				)
 				.join("\n");
 		},

@@ -28,6 +28,7 @@ import { DEFAULT_MODE_SERVERS, isMode, parseModeSettings } from "./mode-config.j
 /** The Settings window's categories, in its order. */
 import { PALETTE_IDS, parsePaletteCustom } from "./palette.js";
 import { MAX_DOCK_SIZE, MIN_DOCK_SIZE, parsePanePlaces, TOOL_PANES } from "./panes.js";
+import { SPEC_PROFILE_CHOICES } from "./spec-export.js";
 import { parseToolPolicies } from "./tool-protocol.js";
 import { DOCUMENT_FONTS, TYPOGRAPHY_RANGES } from "./typography.js";
 export const SETTING_CATEGORIES = [
@@ -464,6 +465,25 @@ export const SETTINGS_SCHEMA: Schema = {
 		keywords: ["belgeyi paylaş", "share document", "bağlam", "context"],
 		assistant: "write",
 	},
+	assistantEditReview: {
+		key: "assistantEditReview",
+		category: "assistant",
+		label: "settingsEditReview",
+		type: "boolean",
+		keywords: [
+			"kabul",
+			"accept",
+			"reddet",
+			"reject",
+			"geri al",
+			"değişiklik",
+			"change",
+			"öneri",
+			"suggestion",
+			"track changes",
+		],
+		assistant: "read",
+	},
 	assistantPlace: {
 		key: "assistantPlace",
 		category: "assistant",
@@ -634,6 +654,16 @@ export const SETTINGS_SCHEMA: Schema = {
 		keywords: ["mcp", "sunucu", "server", "araç", "tool", "dbhub", "github", "context7"],
 		// It runs programs on this computer: changed only by the user, or with the mode_mcp tools.
 		assistant: "hidden",
+	},
+	specProfile: {
+		key: "specProfile",
+		category: "templates",
+		label: "settingsSpecProfile",
+		type: "enum",
+		values: [...SPEC_PROFILE_CHOICES],
+		valueLabels: ["specProfileAuto", "specProfileSpecKit", "specProfileKiro", "specProfileKalem"],
+		keywords: ["spec", "spec kit", "kiro", "tasks.md", "ajan", "agent", "görev", "task", "prompt"],
+		assistant: "write",
 	},
 	defaultTemplate: {
 		key: "defaultTemplate",

@@ -13,12 +13,13 @@ import type {
 	TabDocument,
 } from "../shared/bridge.js";
 import { clampZoom, MAX_ZOOM, MIN_ZOOM, pageRule, ZOOM_STEP } from "../shared/bridge.js";
-import type { ContextDiagram, ReplyDiagram } from "../shared/claude.js";
+import type { ContextDiagram, ProposedEdit, ReplyDiagram } from "../shared/claude.js";
 import { splitReply } from "../shared/claude.js";
 import { displayUrl } from "../shared/confluence-atoms.js";
 import { attachmentName, linkedAttachment } from "../shared/confluence-common.js";
 import type { Diagram } from "../shared/diagram.js";
 import { DIAGRAM_SUFFIX, serializeDiagram } from "../shared/diagram.js";
+import { applyProposals } from "../shared/edit-review.js";
 import { format, stringsFor } from "../shared/i18n.js";
 import { noteKey } from "../shared/local-notes.js";
 import { paletteCss } from "../shared/palette.js";
@@ -37,6 +38,8 @@ import { typographyVars } from "../shared/typography.js";
 import { createAssistantPane } from "./assistant-pane.js";
 import { createAttachmentCard } from "./attachment-card.js";
 import { createChangesDialog } from "./changes-dialog.js";
+import type { CodeReviewUi } from "./code-review.js";
+import { createCodeReview } from "./code-review.js";
 import { createCommandPalette } from "./command-palette.js";
 import { createAttachmentsDialog, linkedAttachments } from "./confluence-attachments.js";
 import { createConfluenceDialog } from "./confluence-dialog.js";
@@ -49,6 +52,8 @@ import { createDocks } from "./docks.js";
 import { markQuotes, revealQuote } from "./document-marks.js";
 import { createDocumentTools } from "./document-tools.js";
 import { el, isTextFieldFocused } from "./dom.js";
+import type { EditReviewUi } from "./edit-review.js";
+import { createEditReview } from "./edit-review.js";
 import type { TableContext, TableEdit } from "./edits.js";
 import { insertDivider, insertTable, replaceTable, tableAt, toggleTaskList } from "./edits.js";
 import { createFilesPane } from "./files-pane.js";
@@ -222,7 +227,81 @@ const commandPalette = createCommandPalette({
 const lastCarets = new WeakMap<Session, Caret>();
 let lastSelection = "";
 
+/** Shows the active document's changes waiting for review in the chat's list of changes. */
+function syncEdits(): void {
+	const tab = [...tabs.values()].find((each) => each.session === session);
+	const review = tab?.review;
+	const summary = review?.summary() ?? null;
+	assistant.documentEdits(
+		review === undefined || summary === null
+			? null
+			: {
+					name: session.path?.split(/[\\/]/).pop() ?? session.name,
+					summary,
+					acceptAll: () => review.acceptAll(),
+					rejectAll: () => review.rejectAll(),
+					select: (index) => review.select(index),
+				},
+	);
+}
+
+/** The files whose proposed changes are reviewed in their tab, by the first change's id. */
+const codeReviews = new Map<string, Tab>();
+
+/** The tab of a file, once it is open (opening one is asked of the main process). */
+async function tabOfPath(path: string): Promise<Tab | undefined> {
+	// kalem-locale-ok: a file path, compared as Windows does (case does not matter)
+	const key = (value: string | null): string => (value ?? "").replace(/\\/g, "/").toLowerCase();
+	for (let tries = 0; tries < 60; tries++) {
+		const found = [...tabs.values()].find((each) => key(each.session.path) === key(path));
+		if (found !== undefined && (found.session.textView !== null || !found.session.isText)) {
+			return found;
+		}
+		await new Promise((resolve) => setTimeout(resolve, 50));
+	}
+	return undefined;
+}
+
+/** Opens a file's proposed changes in its tab, a line at a time, to accept or reject there. */
+async function reviewEdits(
+	edits: readonly ProposedEdit[],
+	settle: (applied: boolean) => void,
+): Promise<boolean> {
+	const first = edits[0];
+	if (first === undefined || first.oldText === "") return false;
+	const path = await bridge.assistantEditPath(first.id).catch(() => null);
+	if (path === null) return false;
+	const reviewing = codeReviews.get(first.id);
+	if (reviewing?.codeReview.active()) {
+		activateTab([...tabs.entries()].find(([, each]) => each === reviewing)?.[0] ?? "");
+		return true;
+	}
+	await bridge.openPath(path);
+	const tab = await tabOfPath(path);
+	if (tab === undefined || !tab.session.isText || tab.session.textView === null) return false;
+	const before = tab.session.textView.value();
+	const after = applyProposals(before, edits);
+	if (after === null) return false;
+	const count = tab.codeReview.start(before, after, (text) => {
+		codeReviews.delete(first.id);
+		const kept = text !== before.replace(/\r\n?/g, "\n");
+		if (kept && tab.session.replaceText(text)) void tab.session.save();
+		settle(kept);
+	});
+	if (count === 0) return false;
+	codeReviews.set(first.id, tab);
+	return true;
+}
+
 const assistant = createAssistantPane({
+	reviewEdits: (edits, settle) => reviewEdits(edits, settle),
+	decideReview: (id, accept) => {
+		const tab = codeReviews.get(id);
+		if (tab === undefined || !tab.codeReview.active()) return false;
+		if (accept) tab.codeReview.acceptAll();
+		else tab.codeReview.rejectAll();
+		return true;
+	},
 	t,
 	lang: startup.language,
 	bridge,
@@ -248,7 +327,7 @@ const assistant = createAssistantPane({
 		return workspace?.opened === true ? workspace.roots.map((root) => root.path) : [];
 	},
 	insert: (text) => insertReply(text),
-	applyActions: (actions) => applyAssistantActions(actions),
+	applyActions: (actions, review) => applyAssistantActions(actions, review === true),
 	insertDiagram: (diagram) => insertReplyDiagram(diagram),
 	openDiagram: (diagram) =>
 		newDiagram(diagram.diagram, diagram.title, lastCarets.get(session) ?? null),
@@ -593,6 +672,10 @@ interface Tab {
 	readonly desk: HTMLElement;
 	/** The line numbers in the page's margin. */
 	readonly lineNumbers: LineNumbers;
+	/** The assistant's changes to it, waiting to be accepted or rejected. */
+	readonly review: EditReviewUi;
+	/** A code file's: the assistant's proposed change, a line at a time. */
+	readonly codeReview: CodeReviewUi;
 }
 
 /** The ways to start a document, offered under an empty page; Jira only once it is connected. */
@@ -733,6 +816,10 @@ function createTab(id: string): Tab {
 	let started = false;
 	/** The state changes before the document is loaded have nothing to show yet. */
 	let loaded = false;
+	/** Whether it had unsaved changes at the last state change: a save is the change from that. */
+	let wasDirty = false;
+	/** Whether the specs made from it were looked for since it was loaded. */
+	let specsChecked = false;
 	const page = el("div", { class: "page kalem-theme", children: [tabCanvas, start.element] });
 	const desk = el("main", { class: "desk", children: [page] });
 	const outline = el("div", { class: "kalem-theme" });
@@ -745,6 +832,18 @@ function createTab(id: string): Tab {
 	outlineArea.append(outline);
 	wordCountArea.append(wordCount);
 
+	const review = createEditReview({
+		t,
+		page,
+		desk,
+		canvas: tabCanvas,
+		text: () => tabSession.styledMarkdown(),
+		replace: (text) => tabSession.replaceText(text),
+		blockIds: () => tabSession.lineSnapshot()?.blocks.map((block) => block.id) ?? [],
+		updated: () => {
+			if (session === tabSession) syncEdits();
+		},
+	});
 	const tabSession: Session = new Session({
 		id,
 		bridge,
@@ -759,6 +858,10 @@ function createTab(id: string): Tab {
 		settings: () => settings,
 		connections: () => accounts,
 		onStateChange: () => {
+			review.changed();
+			const saved = wasDirty && !tabSession.dirty && tabSession.path !== null;
+			wasDirty = tabSession.dirty;
+			if (saved) void checkSpecs(tabSession, false);
 			tabStrip.update(id, {
 				title: tabSession.name,
 				dirty: tabSession.dirty,
@@ -772,6 +875,7 @@ function createTab(id: string): Tab {
 			if (loaded) showStart();
 		},
 		onEditorChange: () => {
+			review.changed();
 			scheduleRibbonUpdate();
 			if (session === tabSession) localNotes.refresh();
 			lineNumbers.refresh();
@@ -812,6 +916,10 @@ function createTab(id: string): Tab {
 		showStart: () => {
 			loaded = true;
 			showStart();
+			if (!specsChecked && tabSession.path !== null) {
+				specsChecked = true;
+				void checkSpecs(tabSession, true);
+			}
 		},
 		notes: {
 			id,
@@ -823,6 +931,15 @@ function createTab(id: string): Tab {
 		pendingScroll: null,
 		desk,
 		lineNumbers,
+		review,
+		codeReview: createCodeReview({
+			t,
+			container: tabCanvas,
+			showText: (shown) => {
+				const view = tabSession.textView;
+				if (view !== null) view.element.hidden = !shown;
+			},
+		}),
 	};
 	desk.addEventListener(
 		"scroll",
@@ -960,6 +1077,7 @@ function activateTab(id: string): void {
 
 	tabStrip.select(id);
 	bridge.tabActivated(id);
+	syncEdits();
 	renderState();
 	refreshFiles();
 	scheduleRibbonUpdate();
@@ -1711,6 +1829,44 @@ async function assistantContext() {
 	return { tabId: tab.id, name, text: tab.styledMarkdown(), diagrams };
 }
 
+/**
+ * The specs in the workspace made from a document: a warning when the
+ * document changed since one was made, else (when asked, as it opens) how
+ * far its tasks are.
+ */
+async function checkSpecs(tab: Session, progress: boolean): Promise<void> {
+	if (tab.path === null || tab.isText) return;
+	const name = tab.path.split(/[\\/]/).pop() ?? "";
+	let specs: Awaited<ReturnType<typeof bridge.specStatus>>;
+	try {
+		specs = await bridge.specStatus(name, tab.styledMarkdown());
+	} catch {
+		return;
+	}
+	const open = (path: string) => [
+		{ label: t.specOpenTasks, run: () => void bridge.openPath(path) },
+	];
+	const stale = specs.find((spec) => spec.stale === true);
+	if (stale !== undefined) {
+		tab.notices.show({
+			id: "spec",
+			kind: "warning",
+			text: format(t.specStale, stale.folder),
+			actions: open(stale.tasksPath),
+		});
+		return;
+	}
+	tab.notices.dismiss("spec");
+	const shown = progress ? specs.find((spec) => spec.total > 0) : undefined;
+	if (shown !== undefined) {
+		tab.notices.show({
+			id: "spec",
+			text: format(t.specProgress, shown.folder, shown.done, shown.total),
+			actions: open(shown.tasksPath),
+		});
+	}
+}
+
 function editableTab(): Session {
 	const tab = session;
 	if (tab.readOnly) throw new Error(t.readOnlyBlocked);
@@ -1750,7 +1906,10 @@ const excerpt = (text: string): string => {
  * as one edit (one undo brings the text back), then the insertions at the
  * cursor. Resolves with how many changes were made.
  */
-async function applyAssistantActions(actions: readonly DocumentAction[]): Promise<number> {
+async function applyAssistantActions(
+	actions: readonly DocumentAction[],
+	review = false,
+): Promise<number> {
 	const tab = editableTab();
 	const edits = actions.filter((action) => action.type !== "insert" || action.at !== "cursor");
 	const atCursor = actions.filter((action) => action.type === "insert" && action.at === "cursor");
@@ -1768,7 +1927,11 @@ async function applyAssistantActions(actions: readonly DocumentAction[]): Promis
 				),
 			);
 		}
-		if (result.text !== before.replace(/\r\n?/g, "\n")) {
+		const reviewing = review ? [...tabs.values()].find((each) => each.session === tab) : undefined;
+		if (reviewing !== undefined && !tab.isText) {
+			// Shown in the document, each part to accept or reject.
+			changes += reviewing.review.start(before, result.text);
+		} else if (result.text !== before.replace(/\r\n?/g, "\n")) {
 			if (!tab.replaceText(result.text)) throw new Error(t.readOnlyBlocked);
 			changes += result.changes;
 		}

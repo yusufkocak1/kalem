@@ -161,7 +161,8 @@ test("Copilot without MCP calls Kalem's tools in blocks and changes the document
 	]);
 	const { app, page, errors } = await launch({
 		args: [doc],
-		settings: { assistant: true },
+		// Asked first, all at once: the changes are not reviewed in the document.
+		settings: { assistant: true, assistantEditReview: false },
 		env: { KALEM_COPILOT: copilot.path, KALEM_CLAUDE: join(folder, "none") },
 	});
 	const pane = page.locator(".assistant");
@@ -201,6 +202,174 @@ test("Copilot without MCP calls Kalem's tools in blocks and changes the document
 	await reply.locator(".assistant-change").getByRole("button", { name: "Undo" }).click();
 	await expect(page.locator("#editor p")).toHaveText("İptal işlemi hızlı yapılmalı.");
 	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("the assistant's change is shown in the document, and each part is accepted or rejected there", async () => {
+	const folder = await tempDir("agent-review");
+	const doc = join(folder, "analiz.md");
+	const original =
+		"# Analiz\n\nİptal işlemi hızlı yapılmalı.\n\nİade kolayca yapılmalı.\n\nSon satır.\n";
+	await writeFile(doc, original);
+	const block = [
+		"Düzeltiyorum.",
+		"",
+		"```kalem-tool",
+		JSON.stringify([
+			{
+				tool: "document_edit",
+				input: {
+					actions: [
+						{ type: "replace", find: "hızlı yapılmalı", replace: "2 saniye içinde onaylanmalı" },
+						{ type: "replace", find: "kolayca yapılmalı", replace: "tek adımda yapılmalı" },
+						{ type: "replace", find: "\n\nSon satır.", replace: "" },
+					],
+				},
+			},
+		]),
+		"```",
+	].join("\n");
+	const copilot = await fakeCopilot(folder, [
+		['<result tool="document_edit">', "İki gereksinimi değiştirdim, son satırı sildim."],
+		["", block],
+	]);
+	const { app, page, errors } = await launch({
+		args: [doc],
+		settings: { assistant: true },
+		env: { KALEM_COPILOT: copilot.path, KALEM_CLAUDE: join(folder, "none") },
+	});
+	const pane = page.locator(".assistant");
+	await pane.getByRole("button", { name: "Connection settings" }).click();
+	await pane.locator(".assistant-settings").getByLabel("Service").selectOption("copilot");
+	await pane.locator(".assistant-settings").getByRole("button", { name: "Save" }).click();
+	await pane.locator(".assistant-input").fill("Gereksinimleri ölçülebilir yap");
+	await pane.locator(".assistant-input").press("Enter");
+
+	// Nothing to allow first: the change is in the document, marked.
+	const bar = page.locator(".edit-review");
+	await expect(bar).toBeVisible();
+	await expect(pane.locator(".assistant-approval")).toHaveCount(0);
+	await expect(bar.locator(".edit-review-count")).toHaveText("1 of 3");
+	await expect(page.locator("#editor p")).toHaveText([
+		"İptal işlemi 2 saniye içinde onaylanmalı.",
+		"İade tek adımda yapılmalı.",
+	]);
+	await expect(page.locator('#editor [data-ai-change="changed"]')).toHaveCount(2);
+	await expect(page.locator("#editor [data-ai-current]")).toHaveText(
+		"İptal işlemi 2 saniye içinde onaylanmalı.",
+	);
+	// What it replaced is drawn above, struck through; it is not in the document's text.
+	await expect(page.locator("#editor p").first()).toHaveAttribute(
+		"data-ai-was",
+		"İptal işlemi hızlı yapılmalı.",
+	);
+	await expect(page.locator('#editor [data-ai-removed="after"]')).toHaveAttribute(
+		"data-ai-was",
+		"Son satır.",
+	);
+	const hunk = page.locator(".edit-review-hunk");
+	await expect(hunk).toBeVisible();
+	await shot(page, "edit-review");
+
+	// Listed above the question box too: each change, its lines, and Accept or Reject for all.
+	const edits = pane.locator(".edit-summary");
+	await expect(edits.locator(".edit-summary-title")).toHaveText("1 file changed");
+	await expect(edits.locator(".edit-summary-total")).toHaveText("+2−3");
+	await expect(edits.locator(".edit-summary-file .edit-summary-name")).toHaveText("analiz.md");
+	await expect(edits.locator(".edit-summary-file .edit-summary-folder")).toHaveText(
+		"3 changes in the document",
+	);
+	await expect(edits.locator(".edit-summary-item")).toHaveText([
+		"İptal işlemi 2 saniye içinde onaylanmalı.+1−1",
+		"İade tek adımda yapılmalı.+1−1",
+		"Son satır.+0−1",
+	]);
+	await edits.locator(".edit-summary-item").nth(1).click();
+	await expect(bar.locator(".edit-review-count")).toHaveText("2 of 3");
+	await expect(edits.locator('.edit-summary-item[aria-current="true"]')).toContainText("İade");
+	await edits.locator(".edit-summary-item").first().click();
+	await expect(bar.locator(".edit-review-count")).toHaveText("1 of 3");
+
+	// The first is taken back, the second kept; the deletion is the one left.
+	await hunk.locator(".edit-review-reject").click();
+	await expect(page.locator("#editor p").first()).toHaveText("İptal işlemi hızlı yapılmalı.");
+	await expect(page.locator("#editor p").first()).not.toHaveAttribute("data-ai-was", /./);
+	await expect(bar.locator(".edit-review-count")).toHaveText("1 of 2");
+	await hunk.locator(".edit-review-accept").click();
+	await expect(bar.locator(".edit-review-count")).toHaveText("1 of 1");
+	await expect(page.locator('#editor [data-ai-removed="after"][data-ai-current]')).toHaveText(
+		"İade tek adımda yapılmalı.",
+	);
+	await expect(edits.locator(".edit-summary-item")).toHaveCount(1);
+	await edits.locator(".edit-summary-reject").click();
+	await expect(bar).toBeHidden();
+	await expect(hunk).toBeHidden();
+	await expect(edits).toBeHidden();
+	await expect(
+		page.locator("#editor [data-ai-change], #editor [data-ai-removed], #editor [data-ai-was]"),
+	).toHaveCount(0);
+	await expect(page.locator("#editor p")).toHaveText([
+		"İptal işlemi hızlı yapılmalı.",
+		"İade tek adımda yapılmalı.",
+		"Son satır.",
+	]);
+	const [, second] = await copilot.calls();
+	expect(second?.prompt).toContain("each part marked for the user to accept or reject");
+
+	await page.locator('[data-command="save"]').click();
+	await expect
+		.poll(() => readFile(doc, "utf8"))
+		.toBe(original.replace("kolayca yapılmalı", "tek adımda yapılmalı"));
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("typing in the document ends the review of the assistant's change, with what is there", async () => {
+	const folder = await tempDir("agent-review-typing");
+	const doc = join(folder, "analiz.md");
+	await writeFile(doc, "# Analiz\n\nBir.\n\nİki.\n");
+	const block = [
+		"```kalem-tool",
+		JSON.stringify([
+			{
+				tool: "document_edit",
+				input: {
+					actions: [
+						{ type: "replace", find: "Bir.", replace: "Bir!" },
+						{ type: "replace", find: "İki.", replace: "İki!" },
+					],
+				},
+			},
+		]),
+		"```",
+	].join("\n");
+	const copilot = await fakeCopilot(folder, [
+		['<result tool="document_edit">', "Tamam."],
+		["", block],
+	]);
+	const { app, page, errors } = await launch({
+		args: [doc],
+		settings: { assistant: true },
+		env: { KALEM_COPILOT: copilot.path, KALEM_CLAUDE: join(folder, "none") },
+	});
+	const pane = page.locator(".assistant");
+	await pane.getByRole("button", { name: "Connection settings" }).click();
+	await pane.locator(".assistant-settings").getByLabel("Service").selectOption("copilot");
+	await pane.locator(".assistant-settings").getByRole("button", { name: "Save" }).click();
+	await pane.locator(".assistant-input").fill("Ünlem koy");
+	await pane.locator(".assistant-input").press("Enter");
+	const bar = page.locator(".edit-review");
+	await expect(bar.locator(".edit-review-count")).toHaveText("1 of 2");
+
+	await page.locator("#editor p").last().click();
+	await page.keyboard.press("End");
+	await page.keyboard.type(" Üç.");
+	await expect(bar).toBeHidden();
+	await expect(page.locator("#editor [data-ai-change]")).toHaveCount(0);
+	await expect(page.locator("#editor p")).toHaveText(["Bir!", "İki! Üç."]);
+	expect(errors).toEqual([]);
+	// Unsaved: closing does not save it.
+	await stubMessageBox(app, 1);
 	await app.close();
 });
 
@@ -909,15 +1078,18 @@ test("templates: the team's and the user's own, a default, and new documents fro
 	const dialog = page.locator(".settings-dialog");
 	await dialog.locator('[data-category="templates"]').click();
 	const block = dialog.locator('[data-block="templates"]');
-	await expect(block.locator(".settings-template")).toHaveCount(2);
+	await expect(block.locator(".settings-template")).toHaveCount(3);
 	await expect(block.locator(".settings-template").first()).toContainText("Kurum Analiz Şablonu");
 	await expect(block.locator(".settings-template").first()).toContainText(
 		"Team (open folder) · 2 required sections",
 	);
-	await expect(block.locator(".settings-template").last()).toContainText(
-		"Software Analysis Document (best practice)",
-	);
-	await expect(block.locator(".settings-template").last()).toContainText("Default");
+	// Kalem's own: the best-practice one is the default, the coding agent's spec one is not.
+	const bestPractice = block.locator(".settings-template").nth(1);
+	await expect(bestPractice).toContainText("Software Analysis Document (best practice)");
+	await expect(bestPractice).toContainText("Default");
+	const agentSpec = block.locator(".settings-template").last();
+	await expect(agentSpec).toContainText("Spec for a Coding Agent");
+	await expect(agentSpec).not.toContainText("Default");
 
 	// The active document kept as the user's own template.
 	await block
@@ -925,7 +1097,7 @@ test("templates: the team's and the user's own, a default, and new documents fro
 		.click();
 	await block.getByLabel("The document template's name").fill("Benim Şablonum");
 	await block.getByRole("button", { name: "Save" }).click();
-	await expect(block.locator(".settings-template")).toHaveCount(3);
+	await expect(block.locator(".settings-template")).toHaveCount(4);
 	await expect(block.locator(".settings-template").nth(1)).toContainText("Mine");
 
 	// The team's is the default from now on.
@@ -974,7 +1146,11 @@ test("document templates in the assistant: picked in any mode, the question is a
 	await pane.locator(".assistant-add").click();
 	await pane.getByRole("menuitem", { name: "Use a Document Template" }).click();
 	const items = pane.locator(".assistant-add-menu .assistant-add-item");
-	await expect(items).toHaveText(["Haftalık Rapor", "Software Analysis Document (best practice)"]);
+	await expect(items).toHaveText([
+		"Haftalık Rapor",
+		"Software Analysis Document (best practice)",
+		"Spec for a Coding Agent",
+	]);
 	await items.first().click();
 	const chip = pane.locator(".assistant-template-chip");
 	await expect(chip).toHaveText("Template: Haftalık Rapor");

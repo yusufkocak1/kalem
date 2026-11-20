@@ -235,6 +235,8 @@ describe("the assistant's app tools", () => {
 			"# Analiz\n\n## Amaç\n\nSipariş iptali hızlı olmalı.\n\n## Kapsam\n\nWeb ve mobil.\n";
 		const document = { tabId: "tab-1", name: "analiz.md", text, selection: "" };
 		const { ctx, asked, rendered } = context(() => allow, { document });
+		// Asked first, all at once, when changes are not reviewed in the document.
+		ctx.changeSettings({ assistantEditReview: false });
 		expect(toolsFor(ctx).map((tool) => tool.definition.name)).toEqual(
 			expect.arrayContaining(["document_outline", "document_read", "document_edit"]),
 		);
@@ -263,6 +265,24 @@ describe("the assistant's app tools", () => {
 		expect(asked[0]).toMatchObject({ risk: "document", permission: "document" });
 		expect(asked[0]?.preview).toBe("- hızlı olmalı\n+ 2 sn içinde onaylanmalı");
 		expect(rendered[0]).toMatchObject({ name: "document_edit", input: { tabId: "tab-1" } });
+		expect(document.text).toBe("# Yeni\n");
+	});
+
+	it("shows a change in the document for review, without asking first", async () => {
+		const text = "# Analiz\n\nSipariş iptali hızlı olmalı.\n";
+		const document = { tabId: "tab-1", name: "analiz.md", text, selection: "" };
+		const { ctx, asked, rendered } = context(() => allow, { document });
+		const edited = await runTool(
+			"document_edit",
+			{ actions: [{ type: "replace", find: "hızlı olmalı", replace: "2 sn içinde onaylanmalı" }] },
+			ctx,
+		);
+		expect(edited.text).toContain("each part marked for the user to accept or reject");
+		expect(asked).toHaveLength(0);
+		expect(rendered[0]).toMatchObject({
+			name: "document_edit",
+			input: { tabId: "tab-1", review: true },
+		});
 		expect(document.text).toBe("# Yeni\n");
 	});
 

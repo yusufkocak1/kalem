@@ -87,6 +87,7 @@ import { StepRun } from "./step-run.js";
 import "./assistant-app-tools.js";
 import "./assistant-form-tools.js";
 import "./assistant-analysis-tools.js";
+import "./assistant-spec-tools.js";
 import "./assistant-external-tools.js";
 import "./assistant-jira-tools.js";
 import "./assistant-mode-tools.js";
@@ -351,6 +352,11 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		if (typeof id === "string") rendererCalls.answer(id, answer);
 	});
 	ipcMain.handle(CHANNEL.assistantForgetPermissions, () => gate.forgetSession());
+
+	// Where a proposed change's file is, so the window can open it and review the change there.
+	ipcMain.handle(CHANNEL.assistantEditPath, (_event, id: unknown) =>
+		typeof id === "string" ? (proposals.get(id)?.absolute ?? null) : null,
+	);
 
 	ipcMain.handle(CHANNEL.assistantApplyEdit, async (_event, id: unknown) => {
 		const kept = typeof id === "string" ? proposals.get(id) : undefined;

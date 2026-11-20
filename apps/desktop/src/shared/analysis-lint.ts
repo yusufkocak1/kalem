@@ -91,6 +91,72 @@ function sectionAt(headings: readonly { title: string; line: number }[], line: n
 
 const DEFAULT_IDS: Readonly<Record<string, string>> = { BR: "BR-", FR: "FR-", NFR: "NFR-" };
 
+/** Which lines are prose: not in a code block or a comment. */
+function proseLines(lines: readonly string[]): boolean[] {
+	const prose: boolean[] = [];
+	let fence = false;
+	let comment = false;
+	for (const line of lines) {
+		if (/^ {0,3}(`{3,}|~{3,})/.test(line)) {
+			fence = !fence;
+			prose.push(false);
+			continue;
+		}
+		const opens = line.includes("<!--");
+		const closes = line.includes("-->");
+		const inComment = comment || (opens && !closes) || /^\s*<!--.*-->\s*$/.test(line);
+		if (opens && !closes) comment = true;
+		if (comment && closes) comment = false;
+		prose.push(!fence && !inComment);
+	}
+	return prose;
+}
+
+/** The prefixes a document's requirement ids take: the template's, else BR-, FR- and NFR-. */
+export function idPrefixes(template: Pick<TemplateMeta, "ids"> | null): string[] {
+	return Object.values(
+		template !== null && Object.keys(template.ids).length > 0 ? template.ids : DEFAULT_IDS,
+	);
+}
+
+/** A requirement id a document defines: its prefix, its number, and the lines it is defined on. */
+export interface DefinedId {
+	readonly prefix: string;
+	readonly number: number;
+	readonly lines: number[];
+}
+
+/**
+ * The requirement ids a document defines, as written (`FR-01`), each with
+ * the lines it is defined on: in a heading or at the start of an item, not
+ * in code or comments.
+ */
+export function definedIds(
+	markdown: string,
+	template: Pick<TemplateMeta, "ids"> | null,
+): Map<string, DefinedId> {
+	const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
+	const prose = proseLines(lines);
+	const idPattern = new RegExp(
+		`^\\s*(?:#{1,6}\\s+|[-*+]\\s+|\\d+[.)]\\s+)?(?:\\*\\*)?(${idPrefixes(template)
+			.map((prefix) => prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+			.join("|")})(\\d+)\\b`,
+		"u",
+	);
+	const defined = new Map<string, DefinedId>();
+	for (const [i, line] of lines.entries()) {
+		if (!prose[i]) continue;
+		const match = idPattern.exec(line);
+		if (match === null) continue;
+		const prefix = match[1] as string;
+		const id = `${prefix}${match[2]}`;
+		const known = defined.get(id) ?? { prefix, number: Number(match[2]), lines: [] };
+		known.lines.push(i + 1);
+		defined.set(id, known);
+	}
+	return defined;
+}
+
 /** How the findings say what they found: `{0}`, `{1}` are filled in. English unless given. */
 export interface LintMessages {
 	readonly missingSection: string;
@@ -132,23 +198,7 @@ export function lintAnalysis(
 		findings.push({ ...finding, rule: true });
 	};
 
-	// Lines in code blocks and comments are not prose.
-	const prose: boolean[] = [];
-	let fence = false;
-	let comment = false;
-	for (const line of lines) {
-		if (/^ {0,3}(`{3,}|~{3,})/.test(line)) {
-			fence = !fence;
-			prose.push(false);
-			continue;
-		}
-		const opens = line.includes("<!--");
-		const closes = line.includes("-->");
-		const inComment = comment || (opens && !closes) || /^\s*<!--.*-->\s*$/.test(line);
-		if (opens && !closes) comment = true;
-		if (comment && closes) comment = false;
-		prose.push(!fence && !inComment);
-	}
+	const prose = proseLines(lines);
 
 	// Required sections.
 	for (const required of template?.required ?? []) {
@@ -229,25 +279,8 @@ export function lintAnalysis(
 	}
 
 	// Requirement ids: where each is defined, in a heading or at the start of an item.
-	const prefixes = Object.values(
-		template !== null && Object.keys(template.ids).length > 0 ? template.ids : DEFAULT_IDS,
-	);
-	const idPattern = new RegExp(
-		`^\\s*(?:#{1,6}\\s+|[-*+]\\s+|\\d+[.)]\\s+)?(?:\\*\\*)?(${prefixes.map((prefix) => prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(\\d+)\\b`,
-		"u",
-	);
-	const defined = new Map<string, { prefix: string; number: number; lines: number[] }>();
-	for (const [i, line] of lines.entries()) {
-		if (!prose[i]) continue;
-		const match = idPattern.exec(line);
-		if (match === null) continue;
-		const prefix = match[1] as string;
-		const number = Number(match[2]);
-		const id = `${prefix}${match[2]}`;
-		const known = defined.get(id) ?? { prefix, number, lines: [] };
-		known.lines.push(i + 1);
-		defined.set(id, known);
-	}
+	const prefixes = idPrefixes(template);
+	const defined = definedIds(text, template);
 	for (const [id, { lines: at }] of defined) {
 		if (at.length < 2) continue;
 		add({

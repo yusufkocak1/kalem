@@ -28,6 +28,7 @@ import {
 	valueLabel,
 } from "../shared/settings-schema.js";
 import type { TemplateInfo } from "../shared/templates.js";
+import { BUILTIN_ID } from "../shared/templates.js";
 import { createAssistantSettings } from "./assistant-settings.js";
 import { el } from "./dom.js";
 import { createMcpSection } from "./mcp-editor.js";
@@ -741,8 +742,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		templateList.replaceChildren(
 			...templates.map((template) => {
 				const isDefault =
-					template.id === preferred ||
-					(template.source === "builtin" && (preferred === "" || !known));
+					template.id === preferred || (template.id === BUILTIN_ID && (preferred === "" || !known));
 				const radio = el("input", {
 					attrs: {
 						type: "radio",
@@ -752,7 +752,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 				});
 				radio.checked = isDefault;
 				radio.addEventListener("change", () => {
-					options.update({ defaultTemplate: template.source === "builtin" ? "" : template.id });
+					options.update({ defaultTemplate: template.id === BUILTIN_ID ? "" : template.id });
 				});
 				const actions: HTMLElement[] = [
 					templateAction(t.templateNewDoc, async () => {

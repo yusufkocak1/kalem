@@ -8,6 +8,7 @@ import { parseDiagram } from "../src/shared/diagram.js";
 import type { Call } from "./fake-claude.js";
 import { fakeClaude, REPLY } from "./fake-claude.js";
 import { clickMenu, launch, tempDir } from "./launch.js";
+import { shot } from "./shots.js";
 
 test("asks the local Claude about the document and inserts its reply with the diagram", async () => {
 	const folder = await tempDir("assistant");
@@ -1254,13 +1255,17 @@ test("lets an API service search and read a workspace folder instead of sending 
 		await expect(card.locator(".diff-remove")).toHaveText(["- class Main {}"]);
 		await expect(card.locator(".diff-add")).toHaveText(["+ class Main {", "+ \tint x;", "+ }"]);
 		expect(await readFile(join(code, "src", "Main.java"), "utf8")).toBe("class Main {}\n");
+		// Decided in the list above the question box (or in the editor), not in the chat.
+		await expect(card.locator("button:not(.assistant-fold-head)")).toHaveCount(0);
+		const listed = pane.locator(".edit-summary .edit-summary-entry");
+		await listed.hover();
 		if (service === "custom") {
-			await card.getByRole("button", { name: "Discard" }).click();
+			await listed.getByRole("button", { name: "Reject: Main.java" }).click();
 			await expect(card.locator(".assistant-edit-state")).toHaveText(
 				"Discarded; the file was not changed.",
 			);
 		} else {
-			await card.getByRole("button", { name: "Apply to the file" }).click();
+			await listed.getByRole("button", { name: "Accept: Main.java" }).click();
 			await expect(card.locator(".assistant-edit-state")).toHaveText("Applied to src/Main.java.");
 			expect(await readFile(join(code, "src", "Main.java"), "utf8")).toBe(
 				"class Main {\n\tint x;\n}\n",
@@ -1343,12 +1348,12 @@ test("applies all of a reply's changes at once, or writes them unasked as the ap
 	await expect(reply.locator(".assistant-markdown")).toHaveText("Main sınıfı boş.");
 	await expect(reply.locator(".assistant-edit")).toHaveCount(2);
 	expect(await readFile(join(code, "a.txt"), "utf8")).toBe("a\n");
-	await reply.getByRole("button", { name: "Apply All (2)" }).click();
+	await pane.locator(".edit-summary-accept").click();
 	await expect(reply.locator(".assistant-edit-state")).toHaveText([
 		"Applied to a.txt.",
 		"Applied to b.txt.",
 	]);
-	await expect(reply.locator(".assistant-edits-bar")).toHaveCount(0);
+	await expect(pane.locator(".edit-summary")).toBeHidden();
 	expect(await readFile(join(code, "a.txt"), "utf8")).toBe("A\n");
 	expect(await readFile(join(code, "b.txt"), "utf8")).toBe("B\n");
 
@@ -1377,10 +1382,97 @@ test("applies all of a reply's changes at once, or writes them unasked as the ap
 		"Applied to b.txt without asking (approval setting).",
 		"Applied to a.txt without asking (approval setting).",
 	]);
-	await expect(reply.getByRole("button", { name: "Apply to the file" })).toHaveCount(0);
+	// Written already: nothing waits in the list.
+	await expect(pane.locator(".edit-summary")).toBeHidden();
 	expect(await readFile(join(code, "a.txt"), "utf8")).toBe("AA\n");
 	expect(await readFile(join(code, "b.txt"), "utf8")).toBe("B\n");
 
+	expect(errors).toEqual([]);
+	await app.close();
+	services.close();
+});
+
+test("the files a reply proposes to change are listed above the question box, a line for each", async () => {
+	const edit = (path: string, from: string, to: string) => ({
+		name: "propose_edit",
+		input: { path, old_text: from, new_text: to },
+	});
+	const services = await fakeServices([edit("src/a.txt", "a", "A\nA2"), edit("b.txt", "b", "B")]);
+	const folder = await tempDir("assistant-edit-list");
+	const code = join(folder, "proje");
+	await mkdir(join(code, "src"), { recursive: true });
+	await writeFile(join(code, "src", "a.txt"), "a\n");
+	await writeFile(join(code, "b.txt"), "b\n");
+	const { app, page, errors } = await launch({
+		settings: { assistant: true },
+		env: {
+			KALEM_CLAUDE: join(folder, "nothing-here"),
+			NO_PROXY: "127.0.0.1",
+			no_proxy: "127.0.0.1",
+		},
+	});
+	const pane = page.locator(".assistant");
+	const form = pane.locator(".assistant-settings");
+	const input = pane.locator(".assistant-input");
+	const reply = pane.locator(".assistant-assistant").last();
+	await pane.getByRole("button", { name: "Connect a Service…" }).click();
+	await form.getByLabel("Service").selectOption("custom");
+	await form.getByLabel("Address").fill(`${services.url}/v1`);
+	await form.getByLabel("API key").fill("sk-test");
+	await form.getByLabel("Model").fill("fake-large");
+	await form.getByRole("button", { name: "Save" }).click();
+	await expect(form).toBeHidden();
+	await app.evaluate(
+		({ dialog }, filePaths) => {
+			dialog.showOpenDialog = (async () => ({ canceled: false, filePaths })) as never;
+		},
+		[code],
+	);
+	await pane.getByRole("button", { name: "Add files or folders to the chat" }).click();
+	await pane.getByRole("menuitem", { name: "Folder…" }).click();
+	await input.fill("Harfleri büyüt");
+	await input.press("Enter");
+	await expect(reply.locator(".assistant-edit")).toHaveCount(2);
+
+	const edits = pane.locator(".edit-summary");
+	await expect(edits.locator(".edit-summary-title")).toHaveText("2 files changed");
+	await expect(edits.locator(".edit-summary-total")).toHaveText("+3−2");
+	const files = edits.locator(".edit-summary-file");
+	await expect(files.locator(".edit-summary-name")).toHaveText(["a.txt", "b.txt"]);
+	await expect(files.first().locator(".edit-summary-folder")).toHaveText("src");
+	await expect(files.locator(".edit-summary-counts")).toHaveText(["+2−1", "+1−1"]);
+	await shot(page, "edit-summary-files");
+
+	// A line's own buttons set it aside (or apply it) without opening it.
+	await files.last().hover();
+	await edits.getByRole("button", { name: "Reject: b.txt" }).click();
+	await expect(files).toHaveCount(1);
+	await expect(edits.locator(".edit-summary-title")).toHaveText("1 file changed");
+	await expect(reply.locator(".assistant-edit-state").last()).toHaveText(
+		"Discarded; the file was not changed.",
+	);
+
+	// No buttons in the chat: its card is a line for the file, and opens it as the list does.
+	await expect(
+		reply.locator(".assistant-edit").first().locator(".assistant-edit-state"),
+	).toBeHidden();
+	await expect(reply.locator(".assistant-edit button:not(.assistant-fold-head)")).toHaveCount(0);
+	// A click opens the file in the editor, the change a line at a time.
+	await files.first().click();
+	const review = page.locator(".code-review");
+	await expect(review).toBeVisible();
+	await expect(page.locator(".text-view textarea")).toBeHidden();
+	await expect(review.locator(".code-review-line.remove .code-review-text")).toHaveText(["a"]);
+	await expect(review.locator(".code-review-line.add .code-review-text")).toHaveText(["A", "A2"]);
+	await expect(review.locator(".edit-review-count")).toHaveText("1 of 1");
+	await shot(page, "code-review");
+	await review.locator(".code-review-hunk .edit-review-accept").click();
+	await expect(review).toBeHidden();
+	await expect(page.locator(".text-view textarea")).toHaveValue("A\nA2\n");
+	await expect.poll(() => readFile(join(code, "src", "a.txt"), "utf8")).toBe("A\nA2\n");
+	await expect(edits).toBeHidden();
+	await expect(reply.locator(".assistant-edit-state").first()).toHaveText("Applied to src/a.txt.");
+	expect(await readFile(join(code, "b.txt"), "utf8")).toBe("b\n");
 	expect(errors).toEqual([]);
 	await app.close();
 	services.close();

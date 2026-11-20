@@ -71,6 +71,8 @@ import type { FindingState, ReviewView } from "./assistant-review.js";
 import { findingsCard, reviewView } from "./assistant-review.js";
 import { createAssistantSettings } from "./assistant-settings.js";
 import { el } from "./dom.js";
+import type { DocumentEdits, FileEdits } from "./edit-summary.js";
+import { createEditSummary } from "./edit-summary.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
 import { MODE_ICONS } from "./mode-settings.js";
@@ -94,6 +96,17 @@ export interface AssistantHost {
 	readonly previews: Previews;
 	shareDocument(): boolean;
 	setShareDocument(share: boolean): void;
+	/**
+	 * Opens a file's proposed changes in its tab, to review them there a line at a time;
+	 * `settle` is told whether any was kept once all are decided. Resolves `false` when it
+	 * cannot (a new file, a file changed since): the chat shows the change instead.
+	 */
+	reviewEdits?(
+		edits: readonly ProposedEdit[],
+		settle: (applied: boolean) => void,
+	): Promise<boolean>;
+	/** Accepts or rejects all of a file's changes being reviewed in its tab; `false` when none is. */
+	decideReview?(id: string, accept: boolean): boolean;
 	/** The active document's name, as its chip shows it. */
 	documentName(): string;
 	/** The panel's width; `setWidth` keeps it. */
@@ -113,8 +126,11 @@ export interface AssistantHost {
 	workspaceFolders(): readonly string[];
 	/** Puts a reply's Markdown at the caret, its Kalem diagrams as pictures. */
 	insert(text: string): Promise<void>;
-	/** Applies proposed changes to the active document; resolves with how many were made. */
-	applyActions(actions: readonly DocumentAction[]): Promise<number>;
+	/**
+	 * Applies proposed changes to the active document; resolves with how many were made. With
+	 * `review`, they are shown in the document for the user to accept or reject one by one.
+	 */
+	applyActions(actions: readonly DocumentAction[], review?: boolean): Promise<number>;
 	insertDiagram(diagram: ReplyDiagram): Promise<void>;
 	openDiagram(diagram: ReplyDiagram): void;
 	/** Whether the document shows the diagram picture at `src`. */
@@ -157,6 +173,8 @@ export interface AssistantPane {
 	configured(status: AssistantStatus, changed: boolean): void;
 	/** The settings changed (here or in the Settings window): the approval picker follows. */
 	settingsChanged(): void;
+	/** The active document's changes waiting for review in it; `null` when there are none. */
+	documentEdits(edits: DocumentEdits | null): void;
 }
 
 interface Message {
@@ -280,6 +298,9 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	/** The chats opened in this run, by id. */
 	const chats = new Map<string, Chat>();
 	let active: Chat = blankChat();
+	/** The changes waiting above the question box: the document's, and the files' still to apply. */
+	const editSummary = createEditSummary(t);
+	let documentEdits: DocumentEdits | null = null;
 	chats.set(active.id, active);
 	let view: "chat" | "settings" | "history" = "chat";
 	/** The box was asked for the focus before it could take it. */
@@ -1232,6 +1253,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	const composer = el("div", {
 		class: "assistant-composer",
 		children: [
+			editSummary.element,
 			context,
 			sourceList,
 			templateList,
@@ -2108,6 +2130,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	}
 
 	function render(): void {
+		refreshEditSummary();
 		const ready = status?.ready === true;
 		const busy = active.reply !== null;
 		const chatting = view === "chat";
@@ -2452,6 +2475,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		/^ {0,3}(?:`{3,}|~{3,})[ \t]*(kalem-diagram|kalem-actions|kalem-confluence|kalem-jira|kalem-tool)[ \t]*$/m;
 
 	function renderReply(message: Message): void {
+		refreshEditSummary();
 		const view = shown.get(message);
 		if (view === undefined) return;
 		const follow = nearBottom();
@@ -2493,8 +2517,6 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		const parts: ReplyPart[] = pieces.flatMap((piece) => piece.parts);
 		const nodes: Node[] = [];
 		let index = 0;
-		const edits = message.edits ?? [];
-		const bulk = editsBar(edits);
 		for (const piece of pieces) {
 			for (const part of piece.parts) {
 				nodes.push(
@@ -2508,11 +2530,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			}
 			for (const card of placed) {
 				if (card.at !== piece.cut) continue;
-				if (card.kind === "edit") {
-					// The bar that applies them all comes before the first.
-					if (bulk !== null && !nodes.includes(bulk)) nodes.push(bulk);
-					nodes.push(editCard(card.edit, edits));
-				} else nodes.push(commandCard(card.run, message));
+				if (card.kind === "edit") nodes.push(editCard(card.edit));
+				else nodes.push(commandCard(card.run, message));
 			}
 		}
 		const steps = stepsView(message);
@@ -2660,6 +2679,97 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		return undefined;
 	}
 
+	/** The changes waiting above the question box: the document's, and the files' still to apply. */
+
+	/** The reply a proposed change came in. */
+	const replyOf = (id: string): Message | undefined =>
+		active.messages.find((message) => message.edits?.some((proposed) => proposed.id === id));
+
+	/** Draws a reply's cards again, once its changes were applied or set aside from the list. */
+	function redrawReplyOf(id: string): void {
+		const message = replyOf(id);
+		const card = log.querySelector(`[data-edit="${CSS.escape(id)}"]`);
+		if (message?.edits !== undefined && card !== null)
+			redrawEdits(card.parentElement, message.edits);
+		else refreshEditSummary();
+	}
+
+	/** The changes the active chat proposed to a file and that wait for the user, in order. */
+	function waitingFor(path: string): ProposedEdit[] {
+		return active.messages.flatMap((message) =>
+			(message.edits ?? []).filter((proposed) => {
+				const state = editState(proposed);
+				return proposed.path === path && (state === undefined || state.kind === "failed");
+			}),
+		);
+	}
+
+	/**
+	 * Opens a file's waiting changes in its tab, a line at a time; what is decided there
+	 * comes back to the chat. Resolves `false` when it cannot (a new file, one changed since).
+	 */
+	async function openFile(path: string): Promise<boolean> {
+		const edits = waitingFor(path);
+		const first = edits[0];
+		if (first === undefined || host.reviewEdits === undefined) return false;
+		return host.reviewEdits(edits, (applied) => {
+			for (const proposed of edits) {
+				editStates.set(proposed.id, { kind: applied ? "applied" : "discarded" });
+			}
+			redrawReplyOf(first.id);
+		});
+	}
+
+	/** The files the active chat proposed to change and that wait for the user, a line for each. */
+	function pendingFiles(): FileEdits[] {
+		const byPath = new Map<string, ProposedEdit[]>();
+		for (const message of active.messages) {
+			for (const proposed of message.edits ?? []) {
+				const state = editState(proposed);
+				if (state !== undefined && state.kind !== "failed") continue;
+				byPath.set(proposed.path, [...(byPath.get(proposed.path) ?? []), proposed]);
+			}
+		}
+		return [...byPath.entries()].map(([path, edits]) => {
+			let added = 0;
+			let removed = 0;
+			for (const proposed of edits) {
+				for (const line of lineDiff(proposed.oldText, proposed.newText)) {
+					if (line.kind === "+") added++;
+					else if (line.kind === "-") removed++;
+				}
+			}
+			const first = edits[0] as ProposedEdit;
+			return {
+				path,
+				added,
+				removed,
+				created: first.oldText === "",
+				// In their order: a later change to the file finds the text the earlier one left.
+				async apply() {
+					if (host.decideReview?.(first.id, true) === true) return;
+					for (const proposed of edits) await applyProposed(proposed);
+					redrawReplyOf(first.id);
+				},
+				discard() {
+					if (host.decideReview?.(first.id, false) === true) return;
+					for (const proposed of edits) editStates.set(proposed.id, { kind: "discarded" });
+					redrawReplyOf(first.id);
+				},
+				// The file opens in its tab with the change a line at a time; else its card shows it.
+				show() {
+					const card = log.querySelector<HTMLElement>(`[data-edit="${CSS.escape(first.id)}"]`);
+					card?.scrollIntoView({ block: "nearest" });
+					card?.querySelector<HTMLElement>(".assistant-fold-head")?.click();
+				},
+			};
+		});
+	}
+
+	function refreshEditSummary(): void {
+		editSummary.update(documentEdits, pendingFiles());
+	}
+
 	/** Writes a change; what became of it is kept for its card. */
 	async function applyProposed(proposed: ProposedEdit): Promise<void> {
 		try {
@@ -2670,53 +2780,15 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		}
 	}
 
-	/** A reply's cards of changes, and the bar over them, drawn again after one is answered. */
+	/** A reply's cards of changes, drawn again after one is decided. */
 	function redrawEdits(within: Element | null, edits: readonly ProposedEdit[]): void {
+		refreshEditSummary();
 		if (within === null) return;
 		for (const proposed of edits) {
 			within
 				.querySelector(`[data-edit="${CSS.escape(proposed.id)}"]`)
-				?.replaceWith(editCard(proposed, edits));
+				?.replaceWith(editCard(proposed));
 		}
-		const bar = editsBar(edits);
-		const shown = within.querySelector("[data-edits-bar]");
-		if (shown !== null) shown.replaceWith(bar ?? "");
-		else if (bar !== null) within.querySelector("[data-edit]")?.before(bar);
-	}
-
-	/**
-	 * Several changes still waiting: applied, or set aside, all at once. They
-	 * are applied in their order, so one change after another in the same
-	 * file finds the text the earlier one left.
-	 */
-	function editsBar(edits: readonly ProposedEdit[]): HTMLElement | null {
-		const open = edits.filter((proposed) => {
-			const state = editState(proposed);
-			return state === undefined || state.kind === "failed";
-		});
-		if (open.length < 2) return null;
-		const applyAll = button(format(t.assistantEditApplyAll, open.length), {
-			class: "assistant-primary",
-			icon: "check",
-		});
-		const discardAll = button(t.assistantEditDiscardAll, { icon: "close" });
-		const bar = el("div", {
-			class: "assistant-edits-bar",
-			attrs: { "data-edits-bar": "" },
-			children: [applyAll, discardAll],
-		});
-		const done = (): void => redrawEdits(bar.parentElement, edits);
-		applyAll.addEventListener("click", async () => {
-			applyAll.disabled = true;
-			discardAll.disabled = true;
-			for (const proposed of open) await applyProposed(proposed);
-			done();
-		});
-		discardAll.addEventListener("click", () => {
-			for (const proposed of open) editStates.set(proposed.id, { kind: "discarded" });
-			done();
-		});
-		return bar;
 	}
 
 	/** Which folding cards the user opened: a reply is drawn again with every piece that comes in. */
@@ -2739,6 +2811,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		readonly body: Node[];
 		readonly footer: Node[];
 		readonly attrs?: Record<string, string>;
+		/** Opens it elsewhere instead of unfolding it; resolves `false` when it cannot. */
+		readonly open?: () => Promise<boolean>;
 	}): HTMLElement {
 		const open = foldOpen.get(options.key) ?? false;
 		const bodyId = `fold-${options.key.replace(/[^\w-]/g, "_")}`;
@@ -2775,13 +2849,21 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				...options.footer,
 			],
 		});
-		head.addEventListener("click", () => {
+		const toggle = (): void => {
 			const now = !card.classList.contains("open");
 			body.hidden = !now;
 			card.classList.toggle("open", now);
 			head.setAttribute("aria-expanded", String(now));
 			head.title = now ? t.assistantFoldHide : t.assistantFoldShow;
 			foldOpen.set(options.key, now);
+		};
+		head.addEventListener("click", () => {
+			const open = options.open;
+			if (open === undefined || card.classList.contains("open")) toggle();
+			else
+				void open().then((opened) => {
+					if (!opened) toggle();
+				});
 		});
 		return card;
 	}
@@ -2881,10 +2963,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	}
 
 	/** A proposed change to a workspace file: what it takes out and puts in, applied on request. */
-	function editCard(
-		proposed: ProposedEdit,
-		edits: readonly ProposedEdit[] = [proposed],
-	): HTMLElement {
+	function editCard(proposed: ProposedEdit): HTMLElement {
 		const state = editState(proposed);
 		const diff = el("pre", { class: "assistant-edit-diff" });
 		let added = 0;
@@ -2900,32 +2979,16 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			);
 		}
 		const status = el("p", { class: "assistant-edit-state", attrs: { role: "status" } });
-		const actions = el("div", { class: "assistant-edit-actions" });
+		const waiting = state === undefined || state.kind === "failed";
 		if (state?.kind === "applied")
 			status.textContent = format(t.assistantEditApplied, proposed.path);
 		else if (state?.kind === "auto")
 			status.textContent = format(t.assistantEditAuto, proposed.path);
 		else if (state?.kind === "discarded") status.textContent = t.assistantEditDiscarded;
-		else {
-			if (state?.kind === "failed") {
-				status.textContent = format(t.assistantEditFailed, state.text);
-				status.classList.add("failed");
-			}
-			const apply = button(t.assistantEditApply, { class: "assistant-primary", icon: "check" });
-			const discard = button(t.assistantEditDiscard, { icon: "close" });
-			apply.addEventListener("click", async () => {
-				apply.disabled = true;
-				await applyProposed(proposed);
-				refresh();
-			});
-			discard.addEventListener("click", () => {
-				editStates.set(proposed.id, { kind: "discarded" });
-				refresh();
-			});
-			actions.append(apply, discard);
+		else if (state?.kind === "failed") {
+			status.textContent = format(t.assistantEditFailed, state.text);
+			status.classList.add("failed");
 		}
-		/** The card again, and the bar above the reply's cards, which counts what is left. */
-		const refresh = (): void => redrawEdits(card.parentElement, edits);
 		const name = proposed.path.split(/[\\/]/).pop() ?? proposed.path;
 		const folder = proposed.path.slice(0, proposed.path.length - name.length);
 		const card = foldCard({
@@ -2959,8 +3022,10 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			],
 			lead: proposed.summary,
 			body: [diff],
-			footer: [status, actions],
+			footer: [status],
 			attrs: { "data-edit": proposed.id },
+			// Waiting: it opens in the editor, decided there or in the list; the diff only when it cannot.
+			...(waiting ? { open: () => openFile(proposed.path) } : {}),
 		});
 		return card;
 	}
@@ -3818,6 +3883,11 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				answer(true, "");
 				return;
 			}
+			if (call.name === "open_path" && typeof input.path === "string") {
+				await bridge.openPath(input.path);
+				answer(true, "");
+				return;
+			}
 			if (call.name === "app_command" && typeof input.command === "string") {
 				host.runCommand(input.command as Command);
 				answer(true, "");
@@ -3829,7 +3899,10 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					answer(false, "the user switched to another document; ask them to go back to it");
 					return;
 				}
-				const made = await host.applyActions(input.actions as DocumentAction[]);
+				const made = await host.applyActions(
+					input.actions as DocumentAction[],
+					input.review === true,
+				);
 				const after = await host.context();
 				const reply = chats.get(call.chatId)?.reply;
 				if (reply != null) {
@@ -4163,6 +4236,10 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		settingsChanged() {
 			drawModeButton();
 			refreshDocumentChip();
+		},
+		documentEdits(edits) {
+			documentEdits = edits;
+			refreshEditSummary();
 		},
 	};
 }
