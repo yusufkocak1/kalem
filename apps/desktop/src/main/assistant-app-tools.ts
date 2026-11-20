@@ -686,6 +686,18 @@ const DOCUMENT_TOOLS: readonly KalemTool[] = [
 			if (!tried.ok) {
 				return `Action ${tried.index + 1} cannot be applied: its "find" text is ${tried.reason === "missing" ? "not in the document (copy it exactly; read the part again)" : 'in the document more than once (give more of it, or "all": true)'}. Nothing was changed.`;
 			}
+			// Shown in the document instead, each part for the user to accept or reject.
+			if (ctx.settings().assistantEditReview) {
+				const shown = await ctx.renderer("document_edit", {
+					tabId: document.tabId,
+					actions,
+					review: true,
+				});
+				if (!shown.ok) return `Not changed: ${shown.text}`;
+				if (shown.document !== undefined) document.text = shown.document;
+				ctx.step({ tool: "document_edit", detail: text(input, "reason") || document.name });
+				return `The change is in the document (${shown.text}), each part marked for the user to accept or reject there; what they reject goes back as it was. Do not ask them to confirm it, and do not repeat the new text in your answer.`;
+			}
 			const answer = await ctx.approve({
 				tool: "document_edit",
 				risk: "document",

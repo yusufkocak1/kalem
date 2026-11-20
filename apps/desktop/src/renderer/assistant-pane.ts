@@ -113,8 +113,11 @@ export interface AssistantHost {
 	workspaceFolders(): readonly string[];
 	/** Puts a reply's Markdown at the caret, its Kalem diagrams as pictures. */
 	insert(text: string): Promise<void>;
-	/** Applies proposed changes to the active document; resolves with how many were made. */
-	applyActions(actions: readonly DocumentAction[]): Promise<number>;
+	/**
+	 * Applies proposed changes to the active document; resolves with how many were made. With
+	 * `review`, they are shown in the document for the user to accept or reject one by one.
+	 */
+	applyActions(actions: readonly DocumentAction[], review?: boolean): Promise<number>;
 	insertDiagram(diagram: ReplyDiagram): Promise<void>;
 	openDiagram(diagram: ReplyDiagram): void;
 	/** Whether the document shows the diagram picture at `src`. */
@@ -3834,7 +3837,10 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					answer(false, "the user switched to another document; ask them to go back to it");
 					return;
 				}
-				const made = await host.applyActions(input.actions as DocumentAction[]);
+				const made = await host.applyActions(
+					input.actions as DocumentAction[],
+					input.review === true,
+				);
 				const after = await host.context();
 				const reply = chats.get(call.chatId)?.reply;
 				if (reply != null) {

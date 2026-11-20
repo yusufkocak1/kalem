@@ -49,6 +49,8 @@ import { createDocks } from "./docks.js";
 import { markQuotes, revealQuote } from "./document-marks.js";
 import { createDocumentTools } from "./document-tools.js";
 import { el, isTextFieldFocused } from "./dom.js";
+import type { EditReviewUi } from "./edit-review.js";
+import { createEditReview } from "./edit-review.js";
 import type { TableContext, TableEdit } from "./edits.js";
 import { insertDivider, insertTable, replaceTable, tableAt, toggleTaskList } from "./edits.js";
 import { createFilesPane } from "./files-pane.js";
@@ -248,7 +250,7 @@ const assistant = createAssistantPane({
 		return workspace?.opened === true ? workspace.roots.map((root) => root.path) : [];
 	},
 	insert: (text) => insertReply(text),
-	applyActions: (actions) => applyAssistantActions(actions),
+	applyActions: (actions, review) => applyAssistantActions(actions, review === true),
 	insertDiagram: (diagram) => insertReplyDiagram(diagram),
 	openDiagram: (diagram) =>
 		newDiagram(diagram.diagram, diagram.title, lastCarets.get(session) ?? null),
@@ -593,6 +595,8 @@ interface Tab {
 	readonly desk: HTMLElement;
 	/** The line numbers in the page's margin. */
 	readonly lineNumbers: LineNumbers;
+	/** The assistant's changes to it, waiting to be accepted or rejected. */
+	readonly review: EditReviewUi;
 }
 
 /** The ways to start a document, offered under an empty page; Jira only once it is connected. */
@@ -749,6 +753,14 @@ function createTab(id: string): Tab {
 	outlineArea.append(outline);
 	wordCountArea.append(wordCount);
 
+	const review = createEditReview({
+		t,
+		bar: noticeHost,
+		canvas: tabCanvas,
+		text: () => tabSession.styledMarkdown(),
+		replace: (text) => tabSession.replaceText(text),
+		blockIds: () => tabSession.lineSnapshot()?.blocks.map((block) => block.id) ?? [],
+	});
 	const tabSession: Session = new Session({
 		id,
 		bridge,
@@ -763,6 +775,7 @@ function createTab(id: string): Tab {
 		settings: () => settings,
 		connections: () => accounts,
 		onStateChange: () => {
+			review.changed();
 			const saved = wasDirty && !tabSession.dirty && tabSession.path !== null;
 			wasDirty = tabSession.dirty;
 			if (saved) void checkSpecs(tabSession, false);
@@ -779,6 +792,7 @@ function createTab(id: string): Tab {
 			if (loaded) showStart();
 		},
 		onEditorChange: () => {
+			review.changed();
 			scheduleRibbonUpdate();
 			if (session === tabSession) localNotes.refresh();
 			lineNumbers.refresh();
@@ -834,6 +848,7 @@ function createTab(id: string): Tab {
 		pendingScroll: null,
 		desk,
 		lineNumbers,
+		review,
 	};
 	desk.addEventListener(
 		"scroll",
@@ -1799,7 +1814,10 @@ const excerpt = (text: string): string => {
  * as one edit (one undo brings the text back), then the insertions at the
  * cursor. Resolves with how many changes were made.
  */
-async function applyAssistantActions(actions: readonly DocumentAction[]): Promise<number> {
+async function applyAssistantActions(
+	actions: readonly DocumentAction[],
+	review = false,
+): Promise<number> {
 	const tab = editableTab();
 	const edits = actions.filter((action) => action.type !== "insert" || action.at !== "cursor");
 	const atCursor = actions.filter((action) => action.type === "insert" && action.at === "cursor");
@@ -1817,7 +1835,11 @@ async function applyAssistantActions(actions: readonly DocumentAction[]): Promis
 				),
 			);
 		}
-		if (result.text !== before.replace(/\r\n?/g, "\n")) {
+		const reviewing = review ? [...tabs.values()].find((each) => each.session === tab) : undefined;
+		if (reviewing !== undefined && !tab.isText) {
+			// Shown in the document, each part to accept or reject.
+			changes += reviewing.review.start(before, result.text);
+		} else if (result.text !== before.replace(/\r\n?/g, "\n")) {
 			if (!tab.replaceText(result.text)) throw new Error(t.readOnlyBlocked);
 			changes += result.changes;
 		}

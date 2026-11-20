@@ -161,7 +161,8 @@ test("Copilot without MCP calls Kalem's tools in blocks and changes the document
 	]);
 	const { app, page, errors } = await launch({
 		args: [doc],
-		settings: { assistant: true },
+		// Asked first, all at once: the changes are not reviewed in the document.
+		settings: { assistant: true, assistantEditReview: false },
 		env: { KALEM_COPILOT: copilot.path, KALEM_CLAUDE: join(folder, "none") },
 	});
 	const pane = page.locator(".assistant");
@@ -201,6 +202,142 @@ test("Copilot without MCP calls Kalem's tools in blocks and changes the document
 	await reply.locator(".assistant-change").getByRole("button", { name: "Undo" }).click();
 	await expect(page.locator("#editor p")).toHaveText("İptal işlemi hızlı yapılmalı.");
 	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("the assistant's change is shown in the document, and each part is accepted or rejected there", async () => {
+	const folder = await tempDir("agent-review");
+	const doc = join(folder, "analiz.md");
+	const original =
+		"# Analiz\n\nİptal işlemi hızlı yapılmalı.\n\nİade kolayca yapılmalı.\n\nSon satır.\n";
+	await writeFile(doc, original);
+	const block = [
+		"Düzeltiyorum.",
+		"",
+		"```kalem-tool",
+		JSON.stringify([
+			{
+				tool: "document_edit",
+				input: {
+					actions: [
+						{ type: "replace", find: "hızlı yapılmalı", replace: "2 saniye içinde onaylanmalı" },
+						{ type: "replace", find: "kolayca yapılmalı", replace: "tek adımda yapılmalı" },
+						{ type: "replace", find: "\n\nSon satır.", replace: "" },
+					],
+				},
+			},
+		]),
+		"```",
+	].join("\n");
+	const copilot = await fakeCopilot(folder, [
+		['<result tool="document_edit">', "İki gereksinimi değiştirdim, son satırı sildim."],
+		["", block],
+	]);
+	const { app, page, errors } = await launch({
+		args: [doc],
+		settings: { assistant: true },
+		env: { KALEM_COPILOT: copilot.path, KALEM_CLAUDE: join(folder, "none") },
+	});
+	const pane = page.locator(".assistant");
+	await pane.getByRole("button", { name: "Connection settings" }).click();
+	await pane.locator(".assistant-settings").getByLabel("Service").selectOption("copilot");
+	await pane.locator(".assistant-settings").getByRole("button", { name: "Save" }).click();
+	await pane.locator(".assistant-input").fill("Gereksinimleri ölçülebilir yap");
+	await pane.locator(".assistant-input").press("Enter");
+
+	// Nothing to allow first: the change is in the document, marked.
+	const bar = page.locator(".edit-review");
+	await expect(bar).toBeVisible();
+	await expect(pane.locator(".assistant-approval")).toHaveCount(0);
+	await expect(bar.locator(".edit-review-count")).toHaveText("1 of 3");
+	await expect(page.locator("#editor p")).toHaveText([
+		"İptal işlemi 2 saniye içinde onaylanmalı.",
+		"İade tek adımda yapılmalı.",
+	]);
+	await expect(page.locator('#editor [data-ai-change="changed"]')).toHaveCount(2);
+	await expect(page.locator('#editor [data-ai-current="change"]')).toHaveText(
+		"İptal işlemi 2 saniye içinde onaylanmalı.",
+	);
+	await expect(page.locator('#editor [data-ai-removed="after"]')).toHaveCount(1);
+	await bar.locator(".edit-review-summary").click();
+	await expect(bar.locator(".edit-review-was")).toHaveText("İptal işlemi hızlı yapılmalı.");
+	await shot(page, "edit-review");
+
+	// The first is taken back, the second kept; the deletion is the one left.
+	await bar.getByRole("button", { name: "Reject", exact: true }).click();
+	await expect(page.locator("#editor p").first()).toHaveText("İptal işlemi hızlı yapılmalı.");
+	await expect(bar.locator(".edit-review-count")).toHaveText("1 of 2");
+	await bar.getByRole("button", { name: "Accept", exact: true }).click();
+	await expect(bar.locator(".edit-review-count")).toHaveText("1 of 1");
+	await expect(bar.locator(".edit-review-summary")).toHaveText("What it deleted");
+	await expect(page.locator('#editor [data-ai-current="removed"]')).toHaveText(
+		"İade tek adımda yapılmalı.",
+	);
+	await bar.getByRole("button", { name: "Reject All" }).click();
+	await expect(bar).toBeHidden();
+	await expect(page.locator("#editor [data-ai-change], #editor [data-ai-removed]")).toHaveCount(0);
+	await expect(page.locator("#editor p")).toHaveText([
+		"İptal işlemi hızlı yapılmalı.",
+		"İade tek adımda yapılmalı.",
+		"Son satır.",
+	]);
+	const [, second] = await copilot.calls();
+	expect(second?.prompt).toContain("each part marked for the user to accept or reject");
+
+	await page.locator('[data-command="save"]').click();
+	await expect
+		.poll(() => readFile(doc, "utf8"))
+		.toBe(original.replace("kolayca yapılmalı", "tek adımda yapılmalı"));
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("typing in the document ends the review of the assistant's change, with what is there", async () => {
+	const folder = await tempDir("agent-review-typing");
+	const doc = join(folder, "analiz.md");
+	await writeFile(doc, "# Analiz\n\nBir.\n\nİki.\n");
+	const block = [
+		"```kalem-tool",
+		JSON.stringify([
+			{
+				tool: "document_edit",
+				input: {
+					actions: [
+						{ type: "replace", find: "Bir.", replace: "Bir!" },
+						{ type: "replace", find: "İki.", replace: "İki!" },
+					],
+				},
+			},
+		]),
+		"```",
+	].join("\n");
+	const copilot = await fakeCopilot(folder, [
+		['<result tool="document_edit">', "Tamam."],
+		["", block],
+	]);
+	const { app, page, errors } = await launch({
+		args: [doc],
+		settings: { assistant: true },
+		env: { KALEM_COPILOT: copilot.path, KALEM_CLAUDE: join(folder, "none") },
+	});
+	const pane = page.locator(".assistant");
+	await pane.getByRole("button", { name: "Connection settings" }).click();
+	await pane.locator(".assistant-settings").getByLabel("Service").selectOption("copilot");
+	await pane.locator(".assistant-settings").getByRole("button", { name: "Save" }).click();
+	await pane.locator(".assistant-input").fill("Ünlem koy");
+	await pane.locator(".assistant-input").press("Enter");
+	const bar = page.locator(".edit-review");
+	await expect(bar.locator(".edit-review-count")).toHaveText("1 of 2");
+
+	await page.locator("#editor p").last().click();
+	await page.keyboard.press("End");
+	await page.keyboard.type(" Üç.");
+	await expect(bar).toBeHidden();
+	await expect(page.locator("#editor [data-ai-change]")).toHaveCount(0);
+	await expect(page.locator("#editor p")).toHaveText(["Bir!", "İki! Üç."]);
+	expect(errors).toEqual([]);
+	// Unsaved: closing does not save it.
+	await stubMessageBox(app, 1);
 	await app.close();
 });
 

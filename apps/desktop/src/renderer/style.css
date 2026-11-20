@@ -14086,3 +14086,89 @@ dialog {
 .typography-preview.kalem-doc li {
 	margin-bottom: var(--doc-list-space, 0.25em);
 }
+
+/* --- The assistant's changes, reviewed in the document (see edit-review.ts) --- */
+
+.edit-review {
+	--ai-added: color-mix(in srgb, #16a34a 13%, transparent);
+	--ai-added-edge: #16a34a;
+	--ai-removed-edge: #dc2626;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 4px;
+}
+
+.edit-review[hidden] {
+	display: none;
+}
+
+.edit-review-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+}
+
+.edit-review-count {
+	min-width: 3.5em;
+	text-align: center;
+	font-variant-numeric: tabular-nums;
+}
+
+.edit-review-gap {
+	flex: 1;
+}
+
+.edit-review-accept {
+	border-color: var(--ai-added-edge);
+}
+
+.edit-review-reject {
+	border-color: var(--ai-removed-edge);
+}
+
+.edit-review-summary {
+	cursor: pointer;
+	color: var(--app-muted);
+}
+
+.edit-review-was {
+	max-height: 9em;
+	margin: 4px 0 2px;
+	padding: 6px 8px;
+	overflow: auto;
+	border-left: 3px solid var(--ai-removed-edge);
+	background: color-mix(in srgb, #dc2626 8%, transparent);
+	font: inherit;
+	font-size: 12px;
+	white-space: pre-wrap;
+	text-decoration: line-through;
+	text-decoration-color: color-mix(in srgb, #dc2626 55%, transparent);
+}
+
+.kalem-theme [data-ai-change="added"],
+.kalem-theme [data-ai-change="changed"] {
+	box-shadow: -6px 0 0 -3px #16a34a;
+	background: color-mix(in srgb, #16a34a 9%, transparent);
+	border-radius: 2px;
+}
+
+.kalem-theme [data-ai-current="change"] {
+	box-shadow:
+		-7px 0 0 -3px #16a34a,
+		0 0 0 1px color-mix(in srgb, #16a34a 45%, transparent);
+	background: color-mix(in srgb, #16a34a 15%, transparent);
+}
+
+.kalem-theme [data-ai-removed="before"] {
+	border-top: 3px solid #dc2626;
+}
+
+.kalem-theme [data-ai-removed="after"] {
+	border-bottom: 3px solid #dc2626;
+}
+
+.kalem-theme [data-ai-current="removed"] {
+	outline: 1px dashed color-mix(in srgb, #dc2626 60%, transparent);
+	outline-offset: 2px;
+}

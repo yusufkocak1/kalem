@@ -154,6 +154,8 @@ export interface Settings extends Typography {
 	readonly copilotTools: CopilotTools;
 	/** The layout spec files for a coding agent are written in; "auto" is the one the folder uses. */
 	readonly specProfile: SpecProfileChoice;
+	/** The assistant's changes to the document are shown in it, each accepted or rejected; else asked first, all at once. */
+	readonly assistantEditReview: boolean;
 	/** The document template new documents start from and reviews check against; empty for the built-in one. */
 	readonly defaultTemplate: string;
 	/** The assistant's modes as the user shaped them: steps, options; what is missing is the default. */
@@ -221,6 +223,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	assistantApprovals: "ask",
 	copilotTools: "auto",
 	specProfile: "auto",
+	assistantEditReview: true,
 	defaultTemplate: "",
 	assistantModes: {},
 	assistantCustomModes: [],
