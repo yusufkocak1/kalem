@@ -71,6 +71,8 @@ import type { FindingState, ReviewView } from "./assistant-review.js";
 import { findingsCard, reviewView } from "./assistant-review.js";
 import { createAssistantSettings } from "./assistant-settings.js";
 import { el } from "./dom.js";
+import type { DocumentEdits, FileEdits } from "./edit-summary.js";
+import { createEditSummary } from "./edit-summary.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
 import { MODE_ICONS } from "./mode-settings.js";
@@ -92,8 +94,6 @@ export interface AssistantHost {
 	readonly lang: Lang;
 	readonly bridge: KalemBridge;
 	readonly previews: Previews;
-	/** The assistant's changes waiting in the document, listed above the question box. */
-	readonly edits?: HTMLElement;
 	shareDocument(): boolean;
 	setShareDocument(share: boolean): void;
 	/** The active document's name, as its chip shows it. */
@@ -162,6 +162,8 @@ export interface AssistantPane {
 	configured(status: AssistantStatus, changed: boolean): void;
 	/** The settings changed (here or in the Settings window): the approval picker follows. */
 	settingsChanged(): void;
+	/** The active document's changes waiting for review in it; `null` when there are none. */
+	documentEdits(edits: DocumentEdits | null): void;
 }
 
 interface Message {
@@ -285,6 +287,9 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	/** The chats opened in this run, by id. */
 	const chats = new Map<string, Chat>();
 	let active: Chat = blankChat();
+	/** The changes waiting above the question box: the document's, and the files' still to apply. */
+	const editSummary = createEditSummary(t);
+	let documentEdits: DocumentEdits | null = null;
 	chats.set(active.id, active);
 	let view: "chat" | "settings" | "history" = "chat";
 	/** The box was asked for the focus before it could take it. */
@@ -1237,7 +1242,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	const composer = el("div", {
 		class: "assistant-composer",
 		children: [
-			...(host.edits === undefined ? [] : [host.edits]),
+			editSummary.element,
 			context,
 			sourceList,
 			templateList,
@@ -2114,6 +2119,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	}
 
 	function render(): void {
+		refreshEditSummary();
 		const ready = status?.ready === true;
 		const busy = active.reply !== null;
 		const chatting = view === "chat";
@@ -2458,6 +2464,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		/^ {0,3}(?:`{3,}|~{3,})[ \t]*(kalem-diagram|kalem-actions|kalem-confluence|kalem-jira|kalem-tool)[ \t]*$/m;
 
 	function renderReply(message: Message): void {
+		refreshEditSummary();
 		const view = shown.get(message);
 		if (view === undefined) return;
 		const follow = nearBottom();
@@ -2666,6 +2673,70 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		return undefined;
 	}
 
+	/** The changes waiting above the question box: the document's, and the files' still to apply. */
+
+	/** The reply a proposed change came in. */
+	const replyOf = (id: string): Message | undefined =>
+		active.messages.find((message) => message.edits?.some((proposed) => proposed.id === id));
+
+	/** Draws a reply's cards again, once its changes were applied or set aside from the list. */
+	function redrawReplyOf(id: string): void {
+		const message = replyOf(id);
+		const card = log.querySelector(`[data-edit="${CSS.escape(id)}"]`);
+		if (message?.edits !== undefined && card !== null)
+			redrawEdits(card.parentElement, message.edits);
+		else refreshEditSummary();
+	}
+
+	/** The files the active chat proposed to change and that wait for the user, a line for each. */
+	function pendingFiles(): FileEdits[] {
+		const byPath = new Map<string, ProposedEdit[]>();
+		for (const message of active.messages) {
+			for (const proposed of message.edits ?? []) {
+				const state = editState(proposed);
+				if (state !== undefined && state.kind !== "failed") continue;
+				byPath.set(proposed.path, [...(byPath.get(proposed.path) ?? []), proposed]);
+			}
+		}
+		return [...byPath.entries()].map(([path, edits]) => {
+			let added = 0;
+			let removed = 0;
+			for (const proposed of edits) {
+				for (const line of lineDiff(proposed.oldText, proposed.newText)) {
+					if (line.kind === "+") added++;
+					else if (line.kind === "-") removed++;
+				}
+			}
+			const first = edits[0] as ProposedEdit;
+			return {
+				path,
+				added,
+				removed,
+				created: first.oldText === "",
+				// In their order: a later change to the file finds the text the earlier one left.
+				async apply() {
+					for (const proposed of edits) await applyProposed(proposed);
+					redrawReplyOf(first.id);
+				},
+				discard() {
+					for (const proposed of edits) editStates.set(proposed.id, { kind: "discarded" });
+					redrawReplyOf(first.id);
+				},
+				show() {
+					const card = log.querySelector<HTMLElement>(`[data-edit="${CSS.escape(first.id)}"]`);
+					if (card === null) return;
+					const head = card.querySelector<HTMLElement>(".assistant-fold-head");
+					if (head?.getAttribute("aria-expanded") === "false") head.click();
+					card.scrollIntoView({ block: "nearest" });
+				},
+			};
+		});
+	}
+
+	function refreshEditSummary(): void {
+		editSummary.update(documentEdits, pendingFiles());
+	}
+
 	/** Writes a change; what became of it is kept for its card. */
 	async function applyProposed(proposed: ProposedEdit): Promise<void> {
 		try {
@@ -2684,6 +2755,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				.querySelector(`[data-edit="${CSS.escape(proposed.id)}"]`)
 				?.replaceWith(editCard(proposed, edits));
 		}
+		refreshEditSummary();
 		const bar = editsBar(edits);
 		const shown = within.querySelector("[data-edits-bar]");
 		if (shown !== null) shown.replaceWith(bar ?? "");
@@ -4177,6 +4249,10 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		settingsChanged() {
 			drawModeButton();
 			refreshDocumentChip();
+		},
+		documentEdits(edits) {
+			documentEdits = edits;
+			refreshEditSummary();
 		},
 	};
 }

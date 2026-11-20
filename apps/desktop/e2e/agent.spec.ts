@@ -273,8 +273,12 @@ test("the assistant's change is shown in the document, and each part is accepted
 
 	// Listed above the question box too: each change, its lines, and Accept or Reject for all.
 	const edits = pane.locator(".edit-summary");
-	await expect(edits.locator(".edit-summary-title")).toHaveText("3 changes");
+	await expect(edits.locator(".edit-summary-title")).toHaveText("1 file changed");
 	await expect(edits.locator(".edit-summary-total")).toHaveText("+2−3");
+	await expect(edits.locator(".edit-summary-file .edit-summary-name")).toHaveText("analiz.md");
+	await expect(edits.locator(".edit-summary-file .edit-summary-folder")).toHaveText(
+		"3 changes in the document",
+	);
 	await expect(edits.locator(".edit-summary-item")).toHaveText([
 		"İptal işlemi 2 saniye içinde onaylanmalı.+1−1",
 		"İade tek adımda yapılmalı.+1−1",

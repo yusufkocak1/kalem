@@ -1237,11 +1237,19 @@ verir.
     vardır; fareyle başka bir değişikliğin üstüne gelmek onu seçer.
   - Sayfanın altında duran kapsül değişiklikleri gezer (‹ "1 / 3" ›) ve
     **Tümünü kabul et** / **Tümünü geri al** sunar.
-  - Asistan panelinde, soru kutusunun üstünde aynı değişikliklerin
-    listesi durur: "3 değişiklik +2 −3", **Tümünü kabul et**, **Tümünü
-    geri al** ve her değişiklik kendi satırında (+/− satır sayısıyla);
-    satıra tıklamak belgede o değişikliğe gider. Belgede verilen her
-    karar listeden düşer; hiçbiri kalmayınca liste kaybolur.
+  - Asistan panelinde, soru kutusunun üstünde, bir kod editöründeki gibi
+    **dosya dosya** bir liste durur: "2 dosya değişti +5 −4",
+    **Tümünü kabul et** ve **Tümünü geri al**. Açık belge bir satırdır
+    ("analiz.md — belgede 3 değişiklik"), değişiklikleri altında tek tek
+    durur ve tıklanınca belgede o değişikliğe gidilir. Asistanın **kod**
+    için önerdiği ve henüz uygulanmamış değişiklikler (`propose_edit`)
+    de burada, her dosya kendi satırında (klasörüyle ve +/− satır
+    sayısıyla) listelenir; aynı dosyaya gelen öneriler tek satırdır.
+    Satırın üstüne gelince **✓** (uygula / kabul et) ve **↶** (vazgeç /
+    geri al) çıkar; satıra tıklamak sohbetteki kartını açar. Tümünü
+    kabul et belgedekileri kabul edip kod önerilerini uygular; tümünü
+    geri al belgedekileri geri alıp önerileri bırakır. Karar verilen
+    her şey listeden düşer; hiçbir şey kalmayınca liste kaybolur.
   - Değişiklikler blok blok ayrılır: yeniden yazılan her paragraf en çok
     benzediği eski paragrafla eşleşir, yalnız eklenen ya da silinen
     bloklar ayrı birer değişikliktir (`src/shared/edit-review.ts`). Karar

@@ -8,6 +8,7 @@ import { parseDiagram } from "../src/shared/diagram.js";
 import type { Call } from "./fake-claude.js";
 import { fakeClaude, REPLY } from "./fake-claude.js";
 import { clickMenu, launch, tempDir } from "./launch.js";
+import { shot } from "./shots.js";
 
 test("asks the local Claude about the document and inserts its reply with the diagram", async () => {
 	const folder = await tempDir("assistant");
@@ -1381,6 +1382,80 @@ test("applies all of a reply's changes at once, or writes them unasked as the ap
 	expect(await readFile(join(code, "a.txt"), "utf8")).toBe("AA\n");
 	expect(await readFile(join(code, "b.txt"), "utf8")).toBe("B\n");
 
+	expect(errors).toEqual([]);
+	await app.close();
+	services.close();
+});
+
+test("the files a reply proposes to change are listed above the question box, a line for each", async () => {
+	const edit = (path: string, from: string, to: string) => ({
+		name: "propose_edit",
+		input: { path, old_text: from, new_text: to },
+	});
+	const services = await fakeServices([edit("src/a.txt", "a", "A\nA2"), edit("b.txt", "b", "B")]);
+	const folder = await tempDir("assistant-edit-list");
+	const code = join(folder, "proje");
+	await mkdir(join(code, "src"), { recursive: true });
+	await writeFile(join(code, "src", "a.txt"), "a\n");
+	await writeFile(join(code, "b.txt"), "b\n");
+	const { app, page, errors } = await launch({
+		settings: { assistant: true },
+		env: {
+			KALEM_CLAUDE: join(folder, "nothing-here"),
+			NO_PROXY: "127.0.0.1",
+			no_proxy: "127.0.0.1",
+		},
+	});
+	const pane = page.locator(".assistant");
+	const form = pane.locator(".assistant-settings");
+	const input = pane.locator(".assistant-input");
+	const reply = pane.locator(".assistant-assistant").last();
+	await pane.getByRole("button", { name: "Connect a Service…" }).click();
+	await form.getByLabel("Service").selectOption("custom");
+	await form.getByLabel("Address").fill(`${services.url}/v1`);
+	await form.getByLabel("API key").fill("sk-test");
+	await form.getByLabel("Model").fill("fake-large");
+	await form.getByRole("button", { name: "Save" }).click();
+	await expect(form).toBeHidden();
+	await app.evaluate(
+		({ dialog }, filePaths) => {
+			dialog.showOpenDialog = (async () => ({ canceled: false, filePaths })) as never;
+		},
+		[code],
+	);
+	await pane.getByRole("button", { name: "Add files or folders to the chat" }).click();
+	await pane.getByRole("menuitem", { name: "Folder…" }).click();
+	await input.fill("Harfleri büyüt");
+	await input.press("Enter");
+	await expect(reply.locator(".assistant-edit")).toHaveCount(2);
+
+	const edits = pane.locator(".edit-summary");
+	await expect(edits.locator(".edit-summary-title")).toHaveText("2 files changed");
+	await expect(edits.locator(".edit-summary-total")).toHaveText("+3−2");
+	const files = edits.locator(".edit-summary-file");
+	await expect(files.locator(".edit-summary-name")).toHaveText(["a.txt", "b.txt"]);
+	await expect(files.first().locator(".edit-summary-folder")).toHaveText("src");
+	await expect(files.locator(".edit-summary-counts")).toHaveText(["+2−1", "+1−1"]);
+	await shot(page, "edit-summary-files");
+
+	// A line shows its change in the chat; its own buttons apply it or set it aside.
+	await files.last().click();
+	await expect(
+		reply.locator(".assistant-edit").last().locator(".assistant-edit-diff"),
+	).toBeVisible();
+	await files.last().hover();
+	await edits.getByRole("button", { name: "Reject: b.txt" }).click();
+	await expect(files).toHaveCount(1);
+	await expect(edits.locator(".edit-summary-title")).toHaveText("1 file changed");
+	await expect(reply.locator(".assistant-edit-state").last()).toHaveText(
+		"Discarded; the file was not changed.",
+	);
+	await files.first().hover();
+	await edits.getByRole("button", { name: "Accept: a.txt" }).click();
+	await expect(edits).toBeHidden();
+	await expect(reply.locator(".assistant-edit-state").first()).toHaveText("Applied to src/a.txt.");
+	expect(await readFile(join(code, "src", "a.txt"), "utf8")).toBe("A\nA2\n");
+	expect(await readFile(join(code, "b.txt"), "utf8")).toBe("b\n");
 	expect(errors).toEqual([]);
 	await app.close();
 	services.close();

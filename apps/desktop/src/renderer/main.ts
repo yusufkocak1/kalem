@@ -51,7 +51,6 @@ import { createDocumentTools } from "./document-tools.js";
 import { el, isTextFieldFocused } from "./dom.js";
 import type { EditReviewUi } from "./edit-review.js";
 import { createEditReview } from "./edit-review.js";
-import { createEditSummary } from "./edit-summary.js";
 import type { TableContext, TableEdit } from "./edits.js";
 import { insertDivider, insertTable, replaceTable, tableAt, toggleTaskList } from "./edits.js";
 import { createFilesPane } from "./files-pane.js";
@@ -225,18 +224,17 @@ const commandPalette = createCommandPalette({
 const lastCarets = new WeakMap<Session, Caret>();
 let lastSelection = "";
 
-/** The assistant's changes waiting in the active document, as the chat lists them. */
-const editSummary = createEditSummary(t);
-
-/** Shows the active document's changes waiting for review in the chat. */
+/** Shows the active document's changes waiting for review in the chat's list of changes. */
 function syncEdits(): void {
 	const tab = [...tabs.values()].find((each) => each.session === session);
 	const review = tab?.review;
-	editSummary.update(
-		review?.summary() ?? null,
-		review === undefined
+	const summary = review?.summary() ?? null;
+	assistant.documentEdits(
+		review === undefined || summary === null
 			? null
 			: {
+					name: session.path?.split(/[\\/]/).pop() ?? session.name,
+					summary,
 					acceptAll: () => review.acceptAll(),
 					rejectAll: () => review.rejectAll(),
 					select: (index) => review.select(index),
@@ -245,7 +243,6 @@ function syncEdits(): void {
 }
 
 const assistant = createAssistantPane({
-	edits: editSummary.element,
 	t,
 	lang: startup.language,
 	bridge,
