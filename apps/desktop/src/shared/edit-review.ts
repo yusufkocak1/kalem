@@ -58,8 +58,8 @@ export interface EditReview {
 	readonly steps: readonly Step[];
 }
 
-/** The longest run of blocks the two have in common, in order: the blocks no change touched. */
-function common(a: readonly string[], b: readonly string[]): [number, number][] {
+/** The longest run of items the two have in common, in order, as pairs of their indexes: what no change touched. */
+export function common(a: readonly string[], b: readonly string[]): [number, number][] {
 	let start = 0;
 	while (start < a.length && start < b.length && a[start] === b[start]) start++;
 	let endA = a.length;
@@ -267,4 +267,78 @@ export function composeReview(
 	}
 	pending.sort((a, b) => a.id - b.id);
 	return { text, pending };
+}
+
+/** A run of lines that differ in a file: the old lines it takes out, the new ones it puts in. */
+export interface LineChange {
+	readonly id: number;
+	readonly removed: readonly string[];
+	readonly added: readonly string[];
+}
+
+/** A file's text as lines, each the same or a change, in order. */
+export type LineStep =
+	| { readonly kind: "same"; readonly text: string; readonly old: number; readonly new: number }
+	| { readonly kind: "change"; readonly change: LineChange };
+
+/** The changes between two texts, a run of lines each, with the lines between them. */
+export function lineReview(before: string, after: string): LineStep[] {
+	const a = before.replace(/\r\n?/g, "\n").split("\n");
+	const b = after.replace(/\r\n?/g, "\n").split("\n");
+	const steps: LineStep[] = [];
+	let i = 0;
+	let j = 0;
+	let id = 0;
+	for (const [x, y] of [...common(a, b), [a.length, b.length] as [number, number]]) {
+		if (i < x || j < y) {
+			steps.push({
+				kind: "change",
+				change: { id: id++, removed: a.slice(i, x), added: b.slice(j, y) },
+			});
+		}
+		if (x < a.length && y < b.length) {
+			steps.push({ kind: "same", text: a[x] as string, old: x + 1, new: y + 1 });
+			i = x + 1;
+			j = y + 1;
+		}
+	}
+	return steps;
+}
+
+/** The text with each change as decided: a rejected one as it was, the others as proposed. */
+export function composeLines(
+	steps: readonly LineStep[],
+	decisions: ReadonlyMap<number, ChangeDecision>,
+): string {
+	const lines: string[] = [];
+	for (const step of steps) {
+		if (step.kind === "same") lines.push(step.text);
+		else if (decisions.get(step.change.id) === "rejected") lines.push(...step.change.removed);
+		else lines.push(...step.change.added);
+	}
+	return lines.join("\n");
+}
+
+/**
+ * A file's text with the changes the assistant proposed to it applied in
+ * order, each in place of the text it names; `null` when one's text is not
+ * there (the file changed since).
+ */
+export function applyProposals(
+	text: string,
+	proposals: readonly { readonly oldText: string; readonly newText: string }[],
+): string | null {
+	let result = text.replace(/\r\n?/g, "\n");
+	for (const proposal of proposals) {
+		const from = proposal.oldText.replace(/\r\n?/g, "\n");
+		const to = proposal.newText.replace(/\r\n?/g, "\n");
+		if (from === "") {
+			result = to;
+			continue;
+		}
+		const at = result.indexOf(from);
+		if (at === -1) return null;
+		result = `${result.slice(0, at)}${to}${result.slice(at + from.length)}`;
+	}
+	return result;
 }

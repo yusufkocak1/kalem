@@ -1108,6 +1108,8 @@ export interface KalemBridge {
 	assistantPickSources(kind: "files" | "folder"): Promise<string[]>;
 	/** Writes a change the assistant proposed to a workspace file. */
 	assistantApplyEdit(id: string): Promise<void>;
+	/** The full path of a proposed change's file; `null` when the change is gone. */
+	assistantEditPath(id: string): Promise<string | null>;
 	/** The user's answer to a tool that asked before changing something. */
 	assistantApprove(id: string, answer: ApprovalAnswer): Promise<void>;
 	/** What the window did with a tool call it ran. */
@@ -1301,6 +1303,7 @@ export const CHANNEL = {
 	assistantRetryCheck: "kalem:assistant-retry-check",
 	assistantPickSources: "kalem:assistant-pick-sources",
 	assistantApplyEdit: "kalem:assistant-apply-edit",
+	assistantEditPath: "kalem:assistant-edit-path",
 	assistantEvent: "kalem:assistant-event",
 	assistantApproval: "kalem:assistant-approval",
 	templates: "kalem:templates",

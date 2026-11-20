@@ -1438,11 +1438,7 @@ test("the files a reply proposes to change are listed above the question box, a 
 	await expect(files.locator(".edit-summary-counts")).toHaveText(["+2−1", "+1−1"]);
 	await shot(page, "edit-summary-files");
 
-	// A line shows its change in the chat; its own buttons apply it or set it aside.
-	await files.last().click();
-	await expect(
-		reply.locator(".assistant-edit").last().locator(".assistant-edit-diff"),
-	).toBeVisible();
+	// A line's own buttons set it aside (or apply it) without opening it.
 	await files.last().hover();
 	await edits.getByRole("button", { name: "Reject: b.txt" }).click();
 	await expect(files).toHaveCount(1);
@@ -1450,11 +1446,22 @@ test("the files a reply proposes to change are listed above the question box, a 
 	await expect(reply.locator(".assistant-edit-state").last()).toHaveText(
 		"Discarded; the file was not changed.",
 	);
-	await files.first().hover();
-	await edits.getByRole("button", { name: "Accept: a.txt" }).click();
+
+	// A click opens the file in the editor, the change a line at a time.
+	await files.first().click();
+	const review = page.locator(".code-review");
+	await expect(review).toBeVisible();
+	await expect(page.locator(".text-view textarea")).toBeHidden();
+	await expect(review.locator(".code-review-line.remove .code-review-text")).toHaveText(["a"]);
+	await expect(review.locator(".code-review-line.add .code-review-text")).toHaveText(["A", "A2"]);
+	await expect(review.locator(".edit-review-count")).toHaveText("1 of 1");
+	await shot(page, "code-review");
+	await review.locator(".code-review-hunk .edit-review-accept").click();
+	await expect(review).toBeHidden();
+	await expect(page.locator(".text-view textarea")).toHaveValue("A\nA2\n");
+	await expect.poll(() => readFile(join(code, "src", "a.txt"), "utf8")).toBe("A\nA2\n");
 	await expect(edits).toBeHidden();
 	await expect(reply.locator(".assistant-edit-state").first()).toHaveText("Applied to src/a.txt.");
-	expect(await readFile(join(code, "src", "a.txt"), "utf8")).toBe("A\nA2\n");
 	expect(await readFile(join(code, "b.txt"), "utf8")).toBe("b\n");
 	expect(errors).toEqual([]);
 	await app.close();

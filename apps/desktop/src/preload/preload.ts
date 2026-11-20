@@ -194,6 +194,7 @@ const bridge: KalemBridge = {
 		ipcRenderer.invoke(CHANNEL.assistantRetryCheck, review, index),
 	assistantPickSources: (kind) => ipcRenderer.invoke(CHANNEL.assistantPickSources, kind),
 	assistantApplyEdit: (id) => ipcRenderer.invoke(CHANNEL.assistantApplyEdit, id),
+	assistantEditPath: (id) => ipcRenderer.invoke(CHANNEL.assistantEditPath, id),
 	onAssistantEvent: (handler) => listen<[string, ClaudeEvent]>(CHANNEL.assistantEvent, handler),
 	setDebugMode: (on) => ipcRenderer.invoke(CHANNEL.setDebugMode, on),
 	onDebugMode: (handler) => listen<[boolean]>(CHANNEL.debugMode, handler),

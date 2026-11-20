@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { ChangeDecision } from "./edit-review.js";
-import { chunksOf, composeReview, likeness, reviewEdit } from "./edit-review.js";
+import {
+	applyProposals,
+	chunksOf,
+	composeLines,
+	composeReview,
+	likeness,
+	lineReview,
+	reviewEdit,
+} from "./edit-review.js";
 
 const BEFORE = `# Başlık
 
@@ -156,5 +164,37 @@ describe("an edit to review", () => {
 		expect(composeReview(reviewEdit("# Eski\n", ""), decide([0, "rejected"])).text).toBe(
 			"# Eski\n",
 		);
+	});
+});
+
+describe("a code file's proposed change, a line at a time", () => {
+	const before = "a\nb\nc\nd\n";
+	const after = "A\nb\nc\nd2\nd3\n";
+
+	it("finds each run of lines that differ", () => {
+		const changes = lineReview(before, after).flatMap((step) =>
+			step.kind === "change" ? [step.change] : [],
+		);
+		expect(changes).toEqual([
+			{ id: 0, removed: ["a"], added: ["A"] },
+			{ id: 1, removed: ["d"], added: ["d2", "d3"] },
+		]);
+	});
+
+	it("puts the file together as decided", () => {
+		const steps = lineReview(before, after);
+		expect(composeLines(steps, new Map())).toBe(after);
+		expect(composeLines(steps, decide([0, "rejected"]))).toBe("a\nb\nc\nd2\nd3\n");
+		expect(composeLines(steps, decide([0, "rejected"], [1, "rejected"]))).toBe(before);
+	});
+
+	it("applies the proposals in order, or says the file changed since", () => {
+		expect(
+			applyProposals("a\r\nb\n", [
+				{ oldText: "a", newText: "A" },
+				{ oldText: "A", newText: "AA" },
+			]),
+		).toBe("AA\nb\n");
+		expect(applyProposals("a\n", [{ oldText: "x", newText: "y" }])).toBeNull();
 	});
 });

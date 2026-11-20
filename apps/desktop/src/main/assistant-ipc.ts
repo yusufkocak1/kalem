@@ -353,6 +353,11 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 	});
 	ipcMain.handle(CHANNEL.assistantForgetPermissions, () => gate.forgetSession());
 
+	// Where a proposed change's file is, so the window can open it and review the change there.
+	ipcMain.handle(CHANNEL.assistantEditPath, (_event, id: unknown) =>
+		typeof id === "string" ? (proposals.get(id)?.absolute ?? null) : null,
+	);
+
 	ipcMain.handle(CHANNEL.assistantApplyEdit, async (_event, id: unknown) => {
 		const kept = typeof id === "string" ? proposals.get(id) : undefined;
 		if (kept === undefined) throw new Error(ctx.strings().assistantEditGone);

@@ -96,6 +96,17 @@ export interface AssistantHost {
 	readonly previews: Previews;
 	shareDocument(): boolean;
 	setShareDocument(share: boolean): void;
+	/**
+	 * Opens a file's proposed changes in its tab, to review them there a line at a time;
+	 * `settle` is told whether any was kept once all are decided. Resolves `false` when it
+	 * cannot (a new file, a file changed since): the chat shows the change instead.
+	 */
+	reviewEdits?(
+		edits: readonly ProposedEdit[],
+		settle: (applied: boolean) => void,
+	): Promise<boolean>;
+	/** Accepts or rejects all of a file's changes being reviewed in its tab; `false` when none is. */
+	decideReview?(id: string, accept: boolean): boolean;
 	/** The active document's name, as its chip shows it. */
 	documentName(): string;
 	/** The panel's width; `setWidth` keeps it. */
@@ -2715,14 +2726,24 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				created: first.oldText === "",
 				// In their order: a later change to the file finds the text the earlier one left.
 				async apply() {
+					if (host.decideReview?.(first.id, true) === true) return;
 					for (const proposed of edits) await applyProposed(proposed);
 					redrawReplyOf(first.id);
 				},
 				discard() {
+					if (host.decideReview?.(first.id, false) === true) return;
 					for (const proposed of edits) editStates.set(proposed.id, { kind: "discarded" });
 					redrawReplyOf(first.id);
 				},
-				show() {
+				// The file opens in its tab with the change a line at a time; else its card in the chat.
+				async show() {
+					const settle = (applied: boolean): void => {
+						for (const proposed of edits) {
+							editStates.set(proposed.id, { kind: applied ? "applied" : "discarded" });
+						}
+						redrawReplyOf(first.id);
+					};
+					if ((await host.reviewEdits?.(edits, settle)) === true) return;
 					const card = log.querySelector<HTMLElement>(`[data-edit="${CSS.escape(first.id)}"]`);
 					if (card === null) return;
 					const head = card.querySelector<HTMLElement>(".assistant-fold-head");

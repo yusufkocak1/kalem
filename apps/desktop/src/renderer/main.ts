@@ -13,12 +13,13 @@ import type {
 	TabDocument,
 } from "../shared/bridge.js";
 import { clampZoom, MAX_ZOOM, MIN_ZOOM, pageRule, ZOOM_STEP } from "../shared/bridge.js";
-import type { ContextDiagram, ReplyDiagram } from "../shared/claude.js";
+import type { ContextDiagram, ProposedEdit, ReplyDiagram } from "../shared/claude.js";
 import { splitReply } from "../shared/claude.js";
 import { displayUrl } from "../shared/confluence-atoms.js";
 import { attachmentName, linkedAttachment } from "../shared/confluence-common.js";
 import type { Diagram } from "../shared/diagram.js";
 import { DIAGRAM_SUFFIX, serializeDiagram } from "../shared/diagram.js";
+import { applyProposals } from "../shared/edit-review.js";
 import { format, stringsFor } from "../shared/i18n.js";
 import { noteKey } from "../shared/local-notes.js";
 import { paletteCss } from "../shared/palette.js";
@@ -37,6 +38,8 @@ import { typographyVars } from "../shared/typography.js";
 import { createAssistantPane } from "./assistant-pane.js";
 import { createAttachmentCard } from "./attachment-card.js";
 import { createChangesDialog } from "./changes-dialog.js";
+import type { CodeReviewUi } from "./code-review.js";
+import { createCodeReview } from "./code-review.js";
 import { createCommandPalette } from "./command-palette.js";
 import { createAttachmentsDialog, linkedAttachments } from "./confluence-attachments.js";
 import { createConfluenceDialog } from "./confluence-dialog.js";
@@ -242,7 +245,63 @@ function syncEdits(): void {
 	);
 }
 
+/** The files whose proposed changes are reviewed in their tab, by the first change's id. */
+const codeReviews = new Map<string, Tab>();
+
+/** The tab of a file, once it is open (opening one is asked of the main process). */
+async function tabOfPath(path: string): Promise<Tab | undefined> {
+	// kalem-locale-ok: a file path, compared as Windows does (case does not matter)
+	const key = (value: string | null): string => (value ?? "").replace(/\\/g, "/").toLowerCase();
+	for (let tries = 0; tries < 60; tries++) {
+		const found = [...tabs.values()].find((each) => key(each.session.path) === key(path));
+		if (found !== undefined && (found.session.textView !== null || !found.session.isText)) {
+			return found;
+		}
+		await new Promise((resolve) => setTimeout(resolve, 50));
+	}
+	return undefined;
+}
+
+/** Opens a file's proposed changes in its tab, a line at a time, to accept or reject there. */
+async function reviewEdits(
+	edits: readonly ProposedEdit[],
+	settle: (applied: boolean) => void,
+): Promise<boolean> {
+	const first = edits[0];
+	if (first === undefined || first.oldText === "") return false;
+	const path = await bridge.assistantEditPath(first.id).catch(() => null);
+	if (path === null) return false;
+	const reviewing = codeReviews.get(first.id);
+	if (reviewing?.codeReview.active()) {
+		activateTab([...tabs.entries()].find(([, each]) => each === reviewing)?.[0] ?? "");
+		return true;
+	}
+	await bridge.openPath(path);
+	const tab = await tabOfPath(path);
+	if (tab === undefined || !tab.session.isText || tab.session.textView === null) return false;
+	const before = tab.session.textView.value();
+	const after = applyProposals(before, edits);
+	if (after === null) return false;
+	const count = tab.codeReview.start(before, after, (text) => {
+		codeReviews.delete(first.id);
+		const kept = text !== before.replace(/\r\n?/g, "\n");
+		if (kept && tab.session.replaceText(text)) void tab.session.save();
+		settle(kept);
+	});
+	if (count === 0) return false;
+	codeReviews.set(first.id, tab);
+	return true;
+}
+
 const assistant = createAssistantPane({
+	reviewEdits: (edits, settle) => reviewEdits(edits, settle),
+	decideReview: (id, accept) => {
+		const tab = codeReviews.get(id);
+		if (tab === undefined || !tab.codeReview.active()) return false;
+		if (accept) tab.codeReview.acceptAll();
+		else tab.codeReview.rejectAll();
+		return true;
+	},
 	t,
 	lang: startup.language,
 	bridge,
@@ -615,6 +674,8 @@ interface Tab {
 	readonly lineNumbers: LineNumbers;
 	/** The assistant's changes to it, waiting to be accepted or rejected. */
 	readonly review: EditReviewUi;
+	/** A code file's: the assistant's proposed change, a line at a time. */
+	readonly codeReview: CodeReviewUi;
 }
 
 /** The ways to start a document, offered under an empty page; Jira only once it is connected. */
@@ -871,6 +932,14 @@ function createTab(id: string): Tab {
 		desk,
 		lineNumbers,
 		review,
+		codeReview: createCodeReview({
+			t,
+			container: tabCanvas,
+			showText: (shown) => {
+				const view = tabSession.textView;
+				if (view !== null) view.element.hidden = !shown;
+			},
+		}),
 	};
 	desk.addEventListener(
 		"scroll",

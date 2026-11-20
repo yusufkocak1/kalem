@@ -14528,3 +14528,95 @@ dialog {
 	color: var(--app-muted);
 	text-decoration: line-through;
 }
+
+/* --- A code file's proposed change, reviewed in its tab (see code-review.ts) --- */
+
+.code-review {
+	position: relative;
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	overflow: auto;
+	background: var(--app-page);
+}
+
+.code-review[hidden] {
+	display: none;
+}
+
+.code-review-lines {
+	flex: 1;
+	padding: 8px 0 72px;
+	font-family: "Cascadia Mono", Consolas, "Courier New", monospace;
+	font-size: 1em;
+	line-height: 1.55;
+}
+
+.code-review-line {
+	display: flex;
+	min-width: max-content;
+	white-space: pre;
+}
+
+.code-review-number {
+	flex: none;
+	width: 3.6em;
+	padding-right: 0.6em;
+	color: var(--app-muted);
+	text-align: right;
+	user-select: none;
+}
+
+.code-review-sign {
+	flex: none;
+	width: 1.4em;
+	color: var(--app-muted);
+	text-align: center;
+	user-select: none;
+}
+
+.code-review-text {
+	padding-right: 16px;
+}
+
+.code-review-line.add {
+	background: var(--review-added);
+	box-shadow: inset 3px 0 0 var(--review-added-bar);
+}
+
+.code-review-line.add .code-review-sign {
+	color: var(--review-added-bar);
+}
+
+.code-review-line.remove {
+	background: var(--review-removed);
+	box-shadow: inset 3px 0 0 var(--review-removed-bar);
+}
+
+.code-review-line.remove .code-review-sign {
+	color: var(--review-removed-bar);
+}
+
+.code-review-change {
+	position: relative;
+}
+
+.code-review-change[data-current] .code-review-line.add {
+	background: var(--review-added-strong);
+}
+
+/* The toolbar of the change in hand: inside it, at its top right, over the ends of its lines. */
+.code-review-hunk {
+	top: 2px;
+	right: 12px;
+	font-family: system-ui, sans-serif;
+}
+
+.code-review-pill {
+	position: sticky;
+	bottom: 18px;
+	margin-top: -52px;
+	font-family: system-ui, sans-serif;
+}

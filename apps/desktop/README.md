@@ -1246,7 +1246,15 @@ verir.
     de burada, her dosya kendi satırında (klasörüyle ve +/− satır
     sayısıyla) listelenir; aynı dosyaya gelen öneriler tek satırdır.
     Satırın üstüne gelince **✓** (uygula / kabul et) ve **↶** (vazgeç /
-    geri al) çıkar; satıra tıklamak sohbetteki kartını açar. Tümünü
+    geri al) çıkar. Bir kod dosyasının satırına tıklamak dosyayı
+    **ortadaki editörde** açar ve öneriyi orada, bir kod editörünün fark
+    görünümü gibi satır satır gösterir: iki sütun satır numarası,
+    çıkarılan satırlar kırmızı (−), eklenenler yeşil (+); elinizdeki
+    değişikliğin köşesinde **Kabul et / Geri al**, altta "‹ 1 / 2 ›" ve
+    **Tümünü kabul et / Tümünü geri al**. Hepsine karar verilince sonuç
+    dosyaya yazılıp kaydedilir ve dosyanın metin kutusu geri gelir. Yeni
+    bir dosyanın ya da o arada değişmiş bir dosyanın önerisi sohbetteki
+    kartında açılır. Tümünü
     kabul et belgedekileri kabul edip kod önerilerini uygular; tümünü
     geri al belgedekileri geri alıp önerileri bırakır. Karar verilen
     her şey listeden düşer; hiçbir şey kalmayınca liste kaybolur.
