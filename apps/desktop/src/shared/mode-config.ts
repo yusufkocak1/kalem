@@ -222,6 +222,14 @@ export const BUILTIN_STEPS: Readonly<Record<Mode, readonly BuiltinStep[]>> = {
 			on: true,
 			tool: "save_prompt",
 		},
+		{
+			id: "spec",
+			title: "stepSpec",
+			instruction:
+				'When the user wants the work kept in the repository as a spec (spec files, tasks, Spec Kit, Kiro, "for the agent to work from"), write it with spec_export instead of one prompt block: the requirements under the document\'s ids with their acceptance criteria (WHEN … THE SYSTEM SHALL …), the design with the code paths you found, and the tasks as a `- [ ]` list in order, each naming the requirement ids it does, its files and its test. Then say in a line where it is.',
+			on: true,
+			tool: "spec_export",
+		},
 	],
 	code: [
 		{
@@ -271,6 +279,7 @@ const ONLY_IN: Readonly<Record<string, readonly Mode[]>> = {
 	report_findings: ["review"],
 	analysis_lint: ["review", "write"],
 	save_prompt: ["prompt", "code"],
+	spec_export: ["prompt", "code"],
 	// Code is changed only where the user works on code.
 	propose_edit: ["ask", "code"],
 	// Commands, as code changes, only where the user works on code.

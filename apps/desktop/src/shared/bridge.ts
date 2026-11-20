@@ -35,6 +35,7 @@ import { PALETTES } from "./palette.js";
 import type { PanePlaces, ToolPane } from "./panes.js";
 import { DEFAULT_PANE_PLACES } from "./panes.js";
 import type { AssistantConfig, AssistantUpdate, ChatMessage, ProviderId } from "./providers.js";
+import type { SpecProfileChoice } from "./spec-export.js";
 import type { TemplateInfo } from "./templates.js";
 import type {
 	ApprovalAnswer,
@@ -151,6 +152,8 @@ export interface Settings extends Typography {
 	readonly assistantApprovals: ApprovalMode;
 	/** How Copilot reaches Kalem's tools: through MCP, in blocks, or whichever works. */
 	readonly copilotTools: CopilotTools;
+	/** The layout spec files for a coding agent are written in; "auto" is the one the folder uses. */
+	readonly specProfile: SpecProfileChoice;
 	/** The document template new documents start from and reviews check against; empty for the built-in one. */
 	readonly defaultTemplate: string;
 	/** The assistant's modes as the user shaped them: steps, options; what is missing is the default. */
@@ -217,6 +220,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	assistantToolPolicies: {},
 	assistantApprovals: "ask",
 	copilotTools: "auto",
+	specProfile: "auto",
 	defaultTemplate: "",
 	assistantModes: {},
 	assistantCustomModes: [],

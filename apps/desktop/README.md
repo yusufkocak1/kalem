@@ -961,6 +961,18 @@ verir.
 >   yalnızca bulguyu yeniden açar.
 > - **Prompt Hazırla:** belgeden (ya da seçili kısımdan) kodlama ajanı için
 >   prompt; istenirse `.kalem/prompts/` altına kaydedilir (onaylı).
+>   "Spec olarak kaydet" denirse (`spec_export`) analiz, ajanın doğrudan
+>   okuduğu **spec dosyalarına** dönüşür: gereksinimler, tasarım ve
+>   `- [ ]` görev listesi. Düzen **Dosya → Ayarlar → Şablonlar → Kodlama
+>   ajanları için spec dosyaları** ayarından seçilir: GitHub Spec Kit
+>   (`specs/NNN-ad/spec.md`, `plan.md`, `tasks.md`), Kiro
+>   (`.kiro/specs/ad/…`) ya da Kalem (`.kalem/specs/ad/…`). Otomatik
+>   seçenekte klasörün zaten kullandığı düzen seçilir, yoksa Spec Kit.
+>   Aynı adlı spec varsa güncellenir. Görevler analize göre denetlenir:
+>   her `FR-…` en az bir görevde geçmeli, hiçbir görev analizde olmayan
+>   bir kimlik anmamalı. Uymazsa hiçbir şey yazılmaz ve asistan önce
+>   görevleri düzeltir. Her dosyanın ilk satırında, hangi belgeden ve
+>   belgenin hangi hâlinden (hash) üretildiği bir yorum olarak yazar.
 > - **Jira ve Confluence'a yazma:** gereksinimlerden toplu story
 >   (`jira_create_issues` — kartta hangilerinin oluşturulacağı seçilir),
 >   yorum, durum değiştirme, Confluence sayfasına ekleme/oluşturma. **Bunlar
