@@ -19,6 +19,15 @@ export interface CodeReviewHost {
 	readonly container: HTMLElement;
 	/** Sets the file's text box aside while the review is shown, and back. */
 	showText(shown: boolean): void;
+	/** A change was decided (or the review ended): what is left changed. */
+	changed?(): void;
+}
+
+/** How the review ended: the text as decided, and what was decided about each run of lines. */
+export interface CodeReviewResult {
+	readonly text: string;
+	readonly steps: readonly LineStep[];
+	readonly decisions: ReadonlyMap<number, ChangeDecision>;
 }
 
 export interface CodeReviewUi {
@@ -26,11 +35,15 @@ export interface CodeReviewUi {
 	 * Shows the change from `before` to `after` for review; `done` gets the
 	 * text as decided, once nothing is left. Resolves how many changes there are.
 	 */
-	start(before: string, after: string, done: (text: string) => void): number;
+	start(before: string, after: string, done: (result: CodeReviewResult) => void): number;
 	/** Whether a change waits. */
 	active(): boolean;
 	acceptAll(): void;
 	rejectAll(): void;
+	/** Ends the review with nothing decided and nothing written (its tab is closed). */
+	cancel(): void;
+	/** The lines the changes still waiting put in and take out. */
+	remaining(): { readonly added: number; readonly removed: number };
 }
 
 const SVG = "http://www.w3.org/2000/svg";
@@ -55,7 +68,7 @@ export function createCodeReview(host: CodeReviewHost): CodeReviewUi {
 	let steps: LineStep[] = [];
 	let decisions = new Map<number, ChangeDecision>();
 	let current = 0;
-	let finish: ((text: string) => void) | null = null;
+	let finish: ((result: CodeReviewResult) => void) | null = null;
 
 	const button = (
 		label: string,
@@ -212,12 +225,14 @@ export function createCodeReview(host: CodeReviewHost): CodeReviewUi {
 		if (pending().length > 0) {
 			current = Math.min(current, pending().length - 1);
 			render(true);
+			host.changed?.();
 			return;
 		}
-		const text = composeLines(steps, decisions);
+		const result = { text: composeLines(steps, decisions), steps, decisions };
 		const done = finish;
 		end();
-		done?.(text);
+		done?.(result);
+		host.changed?.();
 	}
 
 	function decide(id: number, decision: ChangeDecision): void {
@@ -270,5 +285,21 @@ export function createCodeReview(host: CodeReviewHost): CodeReviewUi {
 		active: () => finish !== null,
 		acceptAll: () => decideAll("accepted"),
 		rejectAll: () => decideAll("rejected"),
+		cancel() {
+			if (finish === null) return;
+			end();
+			host.changed?.();
+		},
+		remaining() {
+			const open = new Set(pending());
+			let added = 0;
+			let removed = 0;
+			for (const step of steps) {
+				if (step.kind !== "change" || !open.has(step.change.id)) continue;
+				added += step.change.added.length;
+				removed += step.change.removed.length;
+			}
+			return { added, removed };
+		},
 	};
 }

@@ -327,6 +327,8 @@ export interface MadeChange {
 	readonly settings?: Readonly<Record<string, unknown>>;
 	/** The document's text before it, in its tab. */
 	readonly document?: { readonly tabId: string; readonly text: string };
+	/** Shown in the document for the user to accept or reject, a part at a time. */
+	readonly review?: boolean;
 	undone?: boolean;
 }
 
@@ -340,7 +342,15 @@ export function changeLine(t: Strings, change: MadeChange, undo: () => void): HT
 	button.addEventListener("click", undo);
 	return el("div", {
 		class: "assistant-change",
-		children: [el("span", { text: format(t.assistantChanged, change.label) }), button],
+		children: [
+			el("span", {
+				text: format(
+					change.review === true ? t.assistantProposed : t.assistantChanged,
+					change.label,
+				),
+			}),
+			button,
+		],
 	});
 }
 

@@ -263,10 +263,11 @@ test("the assistant's change is shown in the document, and each part is accepted
 		"data-ai-was",
 		"İptal işlemi hızlı yapılmalı.",
 	);
-	await expect(page.locator('#editor [data-ai-removed="after"]')).toHaveAttribute(
-		"data-ai-was",
-		"Son satır.",
-	);
+	// The last paragraph's own old text above it, the line deleted after it under it: both shown.
+	const last = page.locator("#editor p").last();
+	await expect(last).toHaveAttribute("data-ai-was", "İade kolayca yapılmalı.");
+	await expect(last).toHaveAttribute("data-ai-gone", "Son satır.");
+	await expect(last).toHaveAttribute("data-ai-gone-index", "2");
 	const hunk = page.locator(".edit-review-hunk");
 	await expect(hunk).toBeVisible();
 	await shot(page, "edit-review");
@@ -297,16 +298,17 @@ test("the assistant's change is shown in the document, and each part is accepted
 	await expect(bar.locator(".edit-review-count")).toHaveText("1 of 2");
 	await hunk.locator(".edit-review-accept").click();
 	await expect(bar.locator(".edit-review-count")).toHaveText("1 of 1");
-	await expect(page.locator('#editor [data-ai-removed="after"][data-ai-current]')).toHaveText(
+	await expect(page.locator('#editor [data-ai-gone-index="0"]')).toHaveText(
 		"İade tek adımda yapılmalı.",
 	);
+	await expect(page.locator("#editor p").last()).not.toHaveAttribute("data-ai-was", /./);
 	await expect(edits.locator(".edit-summary-item")).toHaveCount(1);
 	await edits.locator(".edit-summary-reject").click();
 	await expect(bar).toBeHidden();
 	await expect(hunk).toBeHidden();
 	await expect(edits).toBeHidden();
 	await expect(
-		page.locator("#editor [data-ai-change], #editor [data-ai-removed], #editor [data-ai-was]"),
+		page.locator("#editor [data-ai-change], #editor [data-ai-gone], #editor [data-ai-was]"),
 	).toHaveCount(0);
 	await expect(page.locator("#editor p")).toHaveText([
 		"İptal işlemi hızlı yapılmalı.",
@@ -321,6 +323,147 @@ test("the assistant's change is shown in the document, and each part is accepted
 		.poll(() => readFile(doc, "utf8"))
 		.toBe(original.replace("kolayca yapılmalı", "tek adımda yapılmalı"));
 	expect(errors).toEqual([]);
+	await app.close();
+});
+
+/** Starts Copilot answering with a document_edit of `actions` on `markdown`, and asks it. */
+async function reviewing(name: string, markdown: string, actions: readonly unknown[]) {
+	const folder = await tempDir(name);
+	const doc = join(folder, "analiz.md");
+	await writeFile(doc, markdown);
+	const block = [
+		"```kalem-tool",
+		JSON.stringify([{ tool: "document_edit", input: { actions } }]),
+		"```",
+	].join("\n");
+	const copilot = await fakeCopilot(folder, [
+		['<result tool="document_edit">', "Tamam."],
+		["", block],
+	]);
+	const launched = await launch({
+		args: [doc],
+		settings: { assistant: true },
+		env: { KALEM_COPILOT: copilot.path, KALEM_CLAUDE: join(folder, "none") },
+	});
+	const pane = launched.page.locator(".assistant");
+	await pane.getByRole("button", { name: "Connection settings" }).click();
+	await pane.locator(".assistant-settings").getByLabel("Service").selectOption("copilot");
+	await pane.locator(".assistant-settings").getByRole("button", { name: "Save" }).click();
+	await pane.locator(".assistant-input").fill("Düzelt");
+	await pane.locator(".assistant-input").press("Enter");
+	return { ...launched, pane, doc };
+}
+
+test("a deletion next to a changed block is drawn too, and each is decided on its own", async () => {
+	const { app, page, pane, errors } = await reviewing(
+		"agent-review-together",
+		"# Analiz\n\nSilinecek paragraf burada.\n\nKalan paragraf eski hali.\n\nSon.\n",
+		[
+			{ type: "replace", find: "Silinecek paragraf burada.\n\n", replace: "" },
+			{ type: "replace", find: "eski hali", replace: "yeni hali" },
+		],
+	);
+	const bar = page.locator(".edit-review");
+	await expect(bar.locator(".edit-review-count")).toHaveText("1 of 2");
+	// Under the heading, the deleted paragraph; above the changed one, its own old text.
+	const heading = page.locator("#editor h1");
+	const changed = page.locator("#editor p").first();
+	await expect(heading).toHaveAttribute("data-ai-gone", "Silinecek paragraf burada.");
+	await expect(changed).toHaveAttribute("data-ai-was", "Kalan paragraf eski hali.");
+	await expect(changed).toHaveAttribute("data-ai-change", "changed");
+	await expect(pane.locator(".assistant-change")).toContainText(
+		"Proposed, to accept or reject in the document: 2 change(s) to the document",
+	);
+	await page.mouse.move(5, 400);
+	await shot(page, "edit-review-together");
+
+	// Pointing at the changed paragraph's text makes it the one in hand; under the heading, the deletion.
+	const text = (await changed.boundingBox()) as {
+		x: number;
+		y: number;
+		width: number;
+		height: number;
+	};
+	await page.mouse.move(text.x + 40, text.y + text.height - 6);
+	await expect(bar.locator(".edit-review-count")).toHaveText("2 of 2");
+	const above = (await heading.boundingBox()) as {
+		x: number;
+		y: number;
+		width: number;
+		height: number;
+	};
+	await page.mouse.move(above.x + 40, above.y + above.height - 6);
+	await expect(bar.locator(".edit-review-count")).toHaveText("1 of 2");
+
+	// The deletion is taken back; the rewrite is kept.
+	await page.locator(".edit-review-hunk .edit-review-reject").click();
+	await expect(bar.locator(".edit-review-count")).toHaveText("1 of 1");
+	await page.locator(".edit-review-hunk .edit-review-accept").click();
+	await expect(bar).toBeHidden();
+	await expect(page.locator("#editor p")).toHaveText([
+		"Silinecek paragraf burada.",
+		"Kalan paragraf yeni hali.",
+		"Son.",
+	]);
+	expect(errors).toEqual([]);
+	await stubMessageBox(app, 1);
+	await app.close();
+});
+
+test("a code block's old text is drawn without its fence, a table's as its cells", async () => {
+	const { app, page, pane, errors } = await reviewing(
+		"agent-review-code",
+		"# T\n\n| a | b |\n| - | - |\n| 1 | 2 |\n\n```js\nconst x = 1;\n```\n\n> alıntı\n",
+		[
+			{ type: "replace", find: "| 1 | 2 |", replace: "| 1 | 20 |" },
+			{ type: "replace", find: "const x = 1;", replace: "const x = 2;" },
+			{ type: "replace", find: "\n\n> alıntı", replace: "" },
+		],
+	);
+	await expect(page.locator(".edit-review-count")).toHaveText("1 of 3");
+	const code = page.locator("#editor pre");
+	await expect(code).toHaveAttribute("data-ai-was", "const x = 1;");
+	await expect(code).toHaveAttribute("data-ai-gone", "alıntı");
+	await expect(page.locator("#editor [data-ai-was]").first()).toHaveAttribute(
+		"data-ai-was",
+		"a   b\n1   2",
+	);
+	await expect(pane.locator(".edit-summary-item .edit-summary-label")).toHaveText([
+		"a   b",
+		"const x = 2;",
+		"alıntı",
+	]);
+	await page.mouse.move(5, 400);
+	await shot(page, "edit-review-code");
+	expect(errors).toEqual([]);
+	await stubMessageBox(app, 1);
+	await app.close();
+});
+
+test("in a narrow chat, the list of changes keeps its title and its buttons inside it", async () => {
+	const { app, page, pane, errors } = await reviewing(
+		"agent-review-narrow",
+		"# Analiz\n\nBir.\n\nİki.\n",
+		[{ type: "replace", find: "Bir.", replace: "Bir!" }],
+	);
+	await expect(page.locator(".edit-review-count")).toHaveText("1 of 1");
+	await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(760, 700));
+	const edits = pane.locator(".edit-summary");
+	await expect(edits.locator(".edit-summary-title")).toBeVisible();
+	await expect
+		.poll(async () => (await edits.locator(".edit-summary-title").boundingBox())?.width ?? 0)
+		.toBeGreaterThan(40);
+	const box = (await edits.boundingBox()) as { x: number; width: number };
+	for (const button of [
+		edits.locator(".edit-summary-accept"),
+		edits.locator(".edit-summary-reject"),
+	]) {
+		const inside = (await button.boundingBox()) as { x: number; width: number };
+		expect(inside.x + inside.width).toBeLessThanOrEqual(box.x + box.width);
+	}
+	await shot(page, "edit-summary-narrow");
+	expect(errors).toEqual([]);
+	await stubMessageBox(app, 1);
 	await app.close();
 });
 

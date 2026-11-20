@@ -103,10 +103,12 @@ export interface AssistantHost {
 	 */
 	reviewEdits?(
 		edits: readonly ProposedEdit[],
-		settle: (applied: boolean) => void,
+		settle: (kept: readonly boolean[]) => void,
 	): Promise<boolean>;
 	/** Accepts or rejects all of a file's changes being reviewed in its tab; `false` when none is. */
 	decideReview?(id: string, accept: boolean): boolean;
+	/** The lines still waiting of a file's changes being reviewed in its tab; `null` when none is. */
+	reviewCounts?(id: string): { readonly added: number; readonly removed: number } | null;
 	/** The active document's name, as its chip shows it. */
 	documentName(): string;
 	/** The panel's width; `setWidth` keeps it. */
@@ -175,6 +177,8 @@ export interface AssistantPane {
 	settingsChanged(): void;
 	/** The active document's changes waiting for review in it; `null` when there are none. */
 	documentEdits(edits: DocumentEdits | null): void;
+	/** A file's changes being reviewed in its tab were decided in part, or the review ended. */
+	editsChanged(): void;
 }
 
 interface Message {
@@ -2712,9 +2716,9 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		const edits = waitingFor(path);
 		const first = edits[0];
 		if (first === undefined || host.reviewEdits === undefined) return false;
-		return host.reviewEdits(edits, (applied) => {
-			for (const proposed of edits) {
-				editStates.set(proposed.id, { kind: applied ? "applied" : "discarded" });
+		return host.reviewEdits(edits, (kept) => {
+			for (const [index, proposed] of edits.entries()) {
+				editStates.set(proposed.id, { kind: kept[index] === true ? "applied" : "discarded" });
 			}
 			redrawReplyOf(first.id);
 		});
@@ -2740,10 +2744,12 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				}
 			}
 			const first = edits[0] as ProposedEdit;
+			// Being reviewed in its tab: what is left of it there.
+			const left = host.reviewCounts?.(first.id) ?? null;
 			return {
 				path,
-				added,
-				removed,
+				added: left?.added ?? added,
+				removed: left?.removed ?? removed,
 				created: first.oldText === "",
 				// In their order: a later change to the file finds the text the earlier one left.
 				async apply() {
@@ -3911,6 +3917,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 						{
 							label: format(t.approvalChanges, made),
 							document: { tabId: before.tabId, text: before.text },
+							// A text file is changed at once even then: only a review that started is "proposed".
+							review: input.review === true && documentEdits !== null,
 						},
 					];
 					scheduleRender(reply);
@@ -4239,6 +4247,9 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		},
 		documentEdits(edits) {
 			documentEdits = edits;
+			refreshEditSummary();
+		},
+		editsChanged() {
 			refreshEditSummary();
 		},
 	};

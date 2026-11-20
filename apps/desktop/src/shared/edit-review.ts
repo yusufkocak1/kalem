@@ -319,6 +319,96 @@ export function composeLines(
 	return lines.join("\n");
 }
 
+/** Where a proposal's new text is in a file, as character offsets (`end` not included). */
+export interface ProposalRange {
+	readonly start: number;
+	readonly end: number;
+}
+
+/**
+ * A file's text with the changes the assistant proposed to it applied in
+ * order, each in place of the text it names, and where each one's new text
+ * ended up; `null` when one's text is not there (the file changed since).
+ */
+export function placeProposals(
+	text: string,
+	proposals: readonly { readonly oldText: string; readonly newText: string }[],
+): { readonly text: string; readonly ranges: readonly ProposalRange[] } | null {
+	let result = text.replace(/\r\n?/g, "\n");
+	const ranges: { start: number; end: number }[] = [];
+	for (const proposal of proposals) {
+		const from = proposal.oldText.replace(/\r\n?/g, "\n");
+		const to = proposal.newText.replace(/\r\n?/g, "\n");
+		if (from === "") {
+			result = to;
+			for (const range of ranges) {
+				range.start = 0;
+				range.end = to.length;
+			}
+			ranges.push({ start: 0, end: to.length });
+			continue;
+		}
+		const at = result.indexOf(from);
+		if (at === -1) return null;
+		const end = at + from.length;
+		const shift = to.length - from.length;
+		// The earlier ones' places move with the text, and grow over this one where they meet it.
+		for (const range of ranges) {
+			if (range.start >= end) {
+				range.start += shift;
+				range.end += shift;
+			} else if (range.end > at) {
+				range.start = Math.min(range.start, at);
+				range.end = Math.max(range.end + shift, at + to.length);
+			}
+		}
+		result = `${result.slice(0, at)}${to}${result.slice(end)}`;
+		ranges.push({ start: at, end: at + to.length });
+	}
+	return { text: result, ranges };
+}
+
+/**
+ * Which of a file's proposals the user kept, from what they decided about
+ * its lines: a proposal is kept unless every run of lines it touched was
+ * rejected (one that touched none changed nothing, and is kept).
+ */
+export function keptProposals(
+	after: string,
+	ranges: readonly ProposalRange[],
+	steps: readonly LineStep[],
+	decisions: ReadonlyMap<number, ChangeDecision>,
+): boolean[] {
+	const text = after.replace(/\r\n?/g, "\n");
+	const lineAt = (offset: number): number => text.slice(0, offset).split("\n").length - 1;
+	// Each run's lines in the text as proposed: [from, to), `to === from` when it only took lines out.
+	const runs: { from: number; to: number; rejected: boolean }[] = [];
+	let line = 0;
+	for (const step of steps) {
+		if (step.kind === "same") {
+			line++;
+			continue;
+		}
+		const { change } = step;
+		runs.push({
+			from: line,
+			to: line + change.added.length,
+			rejected: decisions.get(change.id) === "rejected",
+		});
+		line += change.added.length;
+	}
+	return ranges.map((range) => {
+		const first = lineAt(range.start);
+		const last = lineAt(Math.max(range.start, range.end - 1));
+		const touched = runs.filter((run) =>
+			run.to > run.from
+				? run.from <= last && run.to - 1 >= first
+				: run.from >= first && run.from <= last + 1,
+		);
+		return touched.length === 0 || touched.some((run) => !run.rejected);
+	});
+}
+
 /**
  * A file's text with the changes the assistant proposed to it applied in
  * order, each in place of the text it names; `null` when one's text is not
@@ -328,17 +418,5 @@ export function applyProposals(
 	text: string,
 	proposals: readonly { readonly oldText: string; readonly newText: string }[],
 ): string | null {
-	let result = text.replace(/\r\n?/g, "\n");
-	for (const proposal of proposals) {
-		const from = proposal.oldText.replace(/\r\n?/g, "\n");
-		const to = proposal.newText.replace(/\r\n?/g, "\n");
-		if (from === "") {
-			result = to;
-			continue;
-		}
-		const at = result.indexOf(from);
-		if (at === -1) return null;
-		result = `${result.slice(0, at)}${to}${result.slice(at + from.length)}`;
-	}
-	return result;
+	return placeProposals(text, proposals)?.text ?? null;
 }
