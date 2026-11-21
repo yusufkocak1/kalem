@@ -900,6 +900,13 @@ export interface KalemBridge {
 	/** Opens the page in a tab of this window. */
 	confluenceOpenPage(pageId: string): Promise<void>;
 	confluenceReloadPage(tabId: string): Promise<ConfluencePageContent>;
+	/** The page as it is on Confluence now, without loading it into the tab: to merge with. */
+	confluenceLatestPage(tabId: string): Promise<ConfluencePageContent>;
+	/**
+	 * After a merge, the version last fetched with `confluenceLatestPage` is
+	 * what the tab's text is based on; `false` when that version is not the one.
+	 */
+	confluenceRebasePage(tabId: string, version: number): Promise<boolean>;
 	confluenceSavePage(tabId: string, request: ConfluenceSaveRequest): Promise<ConfluenceSaveResult>;
 	/** Attaches the image to the tab's page; resolves with the attachment's file name. */
 	confluenceAttachImage(tabId: string, image: ImageFile): Promise<string>;
@@ -1197,6 +1204,8 @@ export const CHANNEL = {
 	confluenceJiraServer: "kalem:confluence-jira-server",
 	confluenceOpenPage: "kalem:confluence-open-page",
 	confluenceReloadPage: "kalem:confluence-reload-page",
+	confluenceLatestPage: "kalem:confluence-latest-page",
+	confluenceRebasePage: "kalem:confluence-rebase-page",
 	confluenceSavePage: "kalem:confluence-save-page",
 	confluenceAttachImage: "kalem:confluence-attach-image",
 	confluenceAttachments: "kalem:confluence-attachments",

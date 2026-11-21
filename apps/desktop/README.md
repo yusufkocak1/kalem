@@ -389,6 +389,25 @@ verir.
   tüm genişliğini kullanır. Gezinme bölmesi sağ kenarından sürüklenerek
   genişletilir (ok tuşları da çalışır, çift tık varsayılana döndürür);
   genişlik hatırlanır.
+- **Blok blok birleştirme:** siz bir Confluence sayfasını düzenlerken biri
+  sayfayı kaydetmişse, kaydedince çıkan uyarıda **Birleştir…** düğmesi
+  vardır (sayfayı ezmeden ya da kendi değişikliklerinizi atmadan). Sayfanın
+  açtığınızdaki hali, sizin sürümünüz ve Confluence'taki yeni sürüm
+  paragraf, başlık, liste, tablo ve kilitli makro düzeyinde karşılaştırılır.
+  Yalnızca bir tarafın değiştirdiği bloklar kendiliğinden birleşir; art
+  arda değişen bloklar da birbirine en çok benzeyenlerle eşlenip ayrı ayrı
+  değerlendirilir. İki tarafın da farklı değiştirdiği her blok bir
+  **çakışma** olur: pencerede iki sürüm yan yana, farklı sözcükler
+  işaretli gösterilir ve her biri için **Sizin sürümünüz**, **Confluence'taki**
+  ya da **İkisini de tut** seçilir (bloğun açtığınızdaki hali de
+  açılabilir; **Hepsinde Sizinki** / **Hepsinde Confluence'taki** tümüne
+  birden uygular). **Belgeye Uygula** sonucu tek bir düzenleme olarak
+  belgeye koyar (`Ctrl+Z` kendi metninizi geri getirir); **Birleştir ve
+  Kaydet** ayrıca yeni sürüm olarak kaydeder. Kayıt yeni sürümün üzerine
+  yapılır: öbür kişinin blokları Confluence'taki XML'leriyle bayt bayt geri
+  yazılır, yalnızca sizin değiştirdiğiniz bloklar Markdown'dan çevrilir;
+  sizin bloklarınızdaki bahsetmeler ve makrolar da korunur. Birleştirirken
+  sayfa yeniden değişirse bu söylenir ve yeniden birleştirilir.
 - **Favori grupları:** favoriler adlandırılmış gruplara ayrılabilir. Bir
   favorinin satırındaki klasör düğmesi (**Bir gruba koy…**) mevcut
   grupları, **Grupsuz**'u ve yeni grup adı kutusunu gösterir (adı yazıp

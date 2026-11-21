@@ -5,6 +5,7 @@ import type { IpcMainInvokeEvent } from "electron";
 import { app, dialog, ipcMain, net, shell } from "electron";
 import type {
 	ConfluenceAccount,
+	ConfluencePageContent,
 	ConfluencePublished,
 	ConfluenceSaveResult,
 	ConfluenceUpload,
@@ -360,6 +361,27 @@ export function registerConfluenceIpc(ctx: ConfluenceIpcContext): void {
 		const content = await client.page(page.id);
 		windows.setRemote(win, tab.id, content.page, content.storage);
 		return content;
+	});
+
+	// The newest version fetched to merge with, by tab: a merge builds on exactly that version.
+	const latest = new Map<string, ConfluencePageContent>();
+
+	ipcMain.handle(CHANNEL.confluenceLatestPage, async (event, tabId: unknown) => {
+		const win = senderOf(event);
+		const { client, tab, page } = await remoteOf(win, tabId);
+		const content = await client.page(page.id);
+		latest.set(tab.id, content);
+		return content;
+	});
+
+	ipcMain.handle(CHANNEL.confluenceRebasePage, async (event, tabId: unknown, version: unknown) => {
+		const win = senderOf(event);
+		const { tab } = await remoteOf(win, tabId);
+		const content = latest.get(tab.id);
+		if (content === undefined || content.page.version !== version) return false;
+		latest.delete(tab.id);
+		windows.setRemote(win, tab.id, content.page, content.storage);
+		return true;
 	});
 
 	ipcMain.handle(

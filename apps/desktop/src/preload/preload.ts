@@ -82,6 +82,9 @@ const bridge: KalemBridge = {
 		ipcRenderer.invoke(CHANNEL.confluenceSearch, query, spaceKey),
 	confluenceOpenPage: (pageId) => ipcRenderer.invoke(CHANNEL.confluenceOpenPage, pageId),
 	confluenceReloadPage: (tabId) => ipcRenderer.invoke(CHANNEL.confluenceReloadPage, tabId),
+	confluenceLatestPage: (tabId) => ipcRenderer.invoke(CHANNEL.confluenceLatestPage, tabId),
+	confluenceRebasePage: (tabId, version) =>
+		ipcRenderer.invoke(CHANNEL.confluenceRebasePage, tabId, version),
 	confluenceSavePage: (tabId, request) =>
 		ipcRenderer.invoke(CHANNEL.confluenceSavePage, tabId, request),
 	confluenceAttachImage: (tabId, image) =>

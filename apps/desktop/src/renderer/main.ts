@@ -67,12 +67,14 @@ import { createLineNumbers } from "./line-numbers.js";
 import { createLinkCard } from "./link-card.js";
 import type { NotesTarget } from "./local-notes.js";
 import { createLocalNotes } from "./local-notes.js";
+import { createMergeDialog } from "./merge-dialog.js";
 import { createNetworkPanel } from "./network-panel.js";
 import { createNotices } from "./notices.js";
 import { Previews } from "./previews.js";
 import { documentImages } from "./prompt-images.js";
 import { createQuickOpen } from "./quick-open.js";
 import { createAppRibbon } from "./ribbon-layout.js";
+import type { ConfluenceMergePlan } from "./session.js";
 import { ipcErrorMessage, Session } from "./session.js";
 import { createSettingsDialog } from "./settings-dialog.js";
 import type { StartAction } from "./start-page.js";
@@ -159,6 +161,7 @@ const publishDialog = createPublishDialog({
 	setSpace: (key) => updateSettings({ confluenceSpace: key }),
 	connect: () => void confluenceDialog.show(),
 });
+const mergeDialog = createMergeDialog(t);
 const changesDialog = createChangesDialog({
 	t,
 	reviewBeforeSave: () => settings.confluenceReviewBeforeSave,
@@ -612,6 +615,46 @@ function updatePublishButton(): void {
 }
 
 /** Shows what changed in the active Confluence page; `false` for a tab that is not one. */
+/** Merges a tab's edits with the newer version someone saved on Confluence meanwhile. */
+async function showConfluenceMerge(tab: Session): Promise<void> {
+	const remote = tab.remote;
+	if (remote === null) return;
+	let plan: ConfluenceMergePlan | null;
+	try {
+		plan = await tab.confluenceMergePlan();
+	} catch (error) {
+		tab.notices.show({
+			id: "save",
+			kind: "error",
+			text: format(t.confluenceRequestFailed, ipcErrorMessage(error)),
+		});
+		return;
+	}
+	if (plan === null) {
+		tab.notices.show({ id: "save", kind: "warning", text: t.mergeTooBig });
+		return;
+	}
+	const merging = plan;
+	mergeDialog.show({
+		title: remote.title,
+		merge: merging.merge,
+		apply: async (text, save) => {
+			const applied = await tab.applyConfluenceMerge(merging, text);
+			if (applied === "edited") return t.mergeEdited;
+			if (applied === "stale") return t.mergeStale;
+			if (applied === "read-only") return t.mergeReadOnly;
+			// The merge was seen and decided here: saving asks nothing more. The
+			// text is in the document either way; a failed save says why in its notice.
+			if (save) await tab.saveReviewed();
+			// The notice that opened the dialog is gone: writing goes on in the document.
+			setTimeout(() => {
+				if (session === tab) tab.focus();
+			});
+			return null;
+		},
+	});
+}
+
 function showConfluenceChanges(): boolean {
 	const tab = session;
 	const remote = tab.remote;
@@ -889,6 +932,7 @@ function createTab(id: string): Tab {
 			}
 			if (loaded) showStart();
 		},
+		onConfluenceMerge: () => void showConfluenceMerge(tabSession),
 		onEditorChange: () => {
 			review.changed();
 			scheduleRibbonUpdate();

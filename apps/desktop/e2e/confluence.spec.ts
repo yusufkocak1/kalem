@@ -557,6 +557,84 @@ test("saves an edit without rewriting the parts that were not edited", async () 
 	await app.close();
 });
 
+test("merges a page someone else saved meanwhile a block at a time, deciding the one conflict", async () => {
+	const confluence = await fakeConfluence();
+	cleanup.push(confluence.close);
+	const table =
+		'<table><tbody><tr><td colspan="2" style="background-color: #fffae6;"><p>birleşik</p></td></tr></tbody></table>';
+	confluence.page.storage = `<h1>Sprint Planı</h1><p>Hedef</p>${table}<p>Kapsam</p><p>Son</p>`;
+	const { app, page, errors } = await launch();
+
+	await clickMenu(app, "File", "Confluence & Jira", "Open from Confluence…");
+	const dialog = page.locator(".confluence-dialog");
+	await dialog.locator('input[type="url"]').fill(confluence.site);
+	await dialog.locator('input[type="password"]').fill(TOKEN);
+	await dialog.getByRole("button", { name: "Connect" }).click();
+	await dialog.locator(".quick-open-item", { hasText: "Sprint Planı" }).click();
+	await expect(dialog).not.toBeVisible();
+
+	// The user edits two paragraphs.
+	await page.locator("#editor p", { hasText: "Hedef" }).click();
+	await page.keyboard.press("End");
+	await page.keyboard.type(" net");
+	await page.locator("#editor p", { hasText: "Son" }).click();
+	await page.keyboard.press("End");
+	await page.keyboard.type(" benim");
+
+	// Meanwhile someone changes the table, another paragraph and the same last one.
+	const theirTable = table.replace("birleşik", "güncel");
+	confluence.page.storage = `<h1>Sprint Planı</h1><p>Hedef</p>${theirTable}<p>Kapsam geniş</p><p>Son onların</p>`;
+	confluence.page.version = 4;
+
+	const asked = await recordMessageBoxes(app, 0);
+	await page.locator('[data-command="save"]').click();
+	const changes = page.locator("dialog.changes");
+	if (await changes.isVisible()) {
+		await changes.getByRole("button", { name: "Save to Confluence" }).click();
+	}
+	const notice = page.locator(".notice", { hasText: "changed on Confluence" });
+	await expect(notice).toBeVisible();
+	expect(confluence.saves).toHaveLength(0);
+	await notice.getByRole("button", { name: "Merge…" }).click();
+
+	const merge = page.locator("dialog.merge-dialog");
+	await expect(merge).toBeVisible();
+	await expect(merge.locator(".changes-summary")).toContainText(
+		"1 change(s) of yours and 2 made on Confluence merged on their own.",
+	);
+	await expect(merge.locator(".merge-conflict")).toHaveCount(1);
+	await expect(merge.locator(".merge-option.yours .merge-text")).toHaveText("Son benim");
+	await expect(merge.locator(".merge-option.theirs .merge-text")).toHaveText("Son onların");
+	await expect(merge.locator(".merge-option.yours mark")).toHaveText("benim");
+	// Nothing is written until the conflict is decided.
+	await expect(merge.getByRole("button", { name: "Merge and Save" })).toBeDisabled();
+	await expect(merge.locator(".merge-status")).toHaveText("1 conflict(s) left to decide.");
+	await merge.getByText("Keep both (yours first)").click();
+	await merge.getByRole("button", { name: "Merge and Save" }).click();
+
+	await expect(merge).not.toBeVisible();
+	await expect(page.locator(".save-status")).toHaveText("Saved");
+	// Only the first save asked; the merge was seen and decided, so saving it asks nothing more.
+	expect(await asked()).toEqual(["Update the page on Confluence?"]);
+	expect(confluence.saves).toHaveLength(1);
+	expect(confluence.saves[0]?.version).toBe(5);
+	// Their table goes back as their XML, byte for byte; only the edited blocks are converted.
+	expect(confluence.saves[0]?.storage).toBe(
+		`<h1>Sprint Planı</h1><p>Hedef net</p>${theirTable}<p>Kapsam geniş</p><p>Son benim</p><p>Son onların</p>`,
+	);
+	await expect(page.locator("#editor p", { hasText: "Kapsam geniş" })).toBeVisible();
+
+	// Writing goes on in the document; the merge is one edit: undo brings the user's own text back.
+	await expect
+		.poll(() => page.evaluate(() => document.activeElement?.closest("#editor") !== null))
+		.toBe(true);
+	await page.keyboard.press("Control+z");
+	await expect(page.locator("#editor p", { hasText: "Kapsam geniş" })).toHaveCount(0);
+	await expect(page.locator("#editor p", { hasText: "Son benim" })).toBeVisible();
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
 test("keeps mentions and inline macros in a paragraph that is edited", async () => {
 	const confluence = await fakeConfluence();
 	cleanup.push(confluence.close);
