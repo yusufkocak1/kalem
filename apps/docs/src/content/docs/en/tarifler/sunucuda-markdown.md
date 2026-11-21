@@ -15,7 +15,7 @@ export function markdownToHtml(md: string): string {
 }
 ```
 
-16.3 kB in total (min+gzip), and no third-party dependencies.
+16.9 kB in total (min+gzip), and no third-party dependencies.
 
 ## A gate guards this
 
@@ -118,4 +118,4 @@ visit(parse(md), (node) => {
 });
 ```
 
-`@kalem-editor/core` on its own is 13.4 kB and doesn't need `@kalem-editor/viewer`.
+`@kalem-editor/core` on its own is 14.0 kB and doesn't need `@kalem-editor/viewer`.

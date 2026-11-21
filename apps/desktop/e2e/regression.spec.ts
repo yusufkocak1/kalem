@@ -34,17 +34,7 @@ const sets = [
  * choice: the test is expected to fail, and turns red the day the bug is
  * fixed so that the entry is removed.
  */
-const KNOWN: Record<string, string> = {
-	"14-kacis-ve-varliklar.md":
-		"Escapes that are not needed are dropped (`\\*` → `*`, `\\#` → `#`), `[a]()` is written `[a](<>)` and emphasis in an image's alt text is lost",
-	"15-kod-bloklari.md":
-		"A fenced code block indented by two spaces loses its indent, and its lines are moved two columns left",
-	"18-bosluk-sekme.md":
-		"A tab after a list marker eats the item's first characters (`-\\tsekmeli` → `- meli`); a tab-indented code block loses columns on every save; a paragraph's leading spaces and an empty `> ` line are dropped",
-	"21-masaustu-ozel.md": "A `$$` math block is read as Markdown, so `\\,` loses its backslash",
-};
-const KNOWN_SAVE = KNOWN;
-const KNOWN_EDIT = KNOWN;
+const KNOWN: Record<string, string> = {};
 
 const corpus = (
 	await Promise.all(
@@ -118,7 +108,7 @@ test("the regression set is not empty", () => {
 for (const { name, path } of corpus) {
 	test.describe(name, () => {
 		test("is saved byte for byte after source mode and back", async () => {
-			test.fail(KNOWN_SAVE[name] !== undefined, KNOWN_SAVE[name]);
+			test.fail(KNOWN[name] !== undefined, KNOWN[name]);
 			const launched = await opened(name, path);
 			const { app, page, errors, original } = launched;
 
@@ -137,7 +127,7 @@ for (const { name, path } of corpus) {
 		});
 
 		test("keeps the rest of the file when a paragraph is added in source mode", async () => {
-			test.fail(KNOWN_EDIT[name] !== undefined, KNOWN_EDIT[name]);
+			test.fail(KNOWN[name] !== undefined, KNOWN[name]);
 			const { app, page, errors, file, original } = await opened(name, path);
 
 			await sourceMode(page, true);

@@ -29,6 +29,12 @@ export interface TableStyle {
 	readonly color: TableColor | null;
 	/** Column widths in CSS pixels at 100% zoom; `null` means automatic. */
 	readonly widths: readonly (number | null)[];
+	/**
+	 * The file had the comment right above the table, with no blank line
+	 * between them. Kalem writes a blank line; a file written either way is
+	 * saved back the way it was.
+	 */
+	readonly tight?: boolean;
 }
 
 export const NO_STYLE: TableStyle = { color: null, widths: [] };
@@ -142,7 +148,11 @@ export function extractTableStyles(markdown: string): ExtractedStyles {
 			styles.push(NO_STYLE);
 			continue;
 		}
-		styles.push(style);
+		const directiveEnd = previous?.position?.end.line;
+		const tableStart = block.position?.start.line;
+		const tight =
+			directiveEnd !== undefined && tableStart !== undefined && tableStart === directiveEnd + 1;
+		styles.push(tight ? { ...style, tight: true } : style);
 		cuts.push([from, to]);
 	}
 
@@ -165,7 +175,19 @@ export function injectTableStyles(
 	for (const block of doc.children) {
 		const style = block.type === "table" ? styleOf(block) : undefined;
 		if (style !== undefined && !isPlain(style)) {
-			children.push({ type: "html", value: formatDirective(style) });
+			// Where the comment was cut out, the table took its line; the comment
+			// gets that line back, so the gap above it is kept, and ends one line
+			// (tight) or two lines above the table.
+			const at = block.position?.start;
+			const position =
+				at === undefined
+					? undefined
+					: { start: at, end: { ...at, line: at.line - (style.tight === true ? 1 : 2) } };
+			children.push({
+				type: "html",
+				value: formatDirective(style),
+				...(position === undefined ? {} : { position }),
+			});
 			changed = true;
 		}
 		children.push(block);

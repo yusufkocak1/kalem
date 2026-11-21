@@ -30,7 +30,7 @@ write.
 would be bundled twice. But a CDN user has no bundler, and a bare
 `import "@kalem-editor/editor"` line can't be resolved in the browser.
 
-`kalem-editor.iife.js` includes everything: **33.7 kB** (gzip), one request,
+`kalem-editor.iife.js` includes everything: **34.3 kB** (gzip), one request,
 not even `type="module"` needed.
 
 ## The element registers itself

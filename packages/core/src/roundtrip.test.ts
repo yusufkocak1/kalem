@@ -125,4 +125,49 @@ describe("gidiş-dönüş — nokta atışı", () => {
 	it("boş belge", () => {
 		birebir("");
 	});
+
+	it("işaretten sonra sekme: içerik yenmiyor, sekme korunuyor", () => {
+		// Sekme sütun olarak sayılıp karakter olarak kesiliyordu:
+		// `-\tsekmeli` → `- meli`.
+		const madde = parse("-\tsekmeli madde\n").children[0];
+		expect(JSON.stringify(madde)).toContain('"sekmeli madde"');
+		birebir("-\tsekmeli madde\n-\tikinci\n");
+		birebir("1.\tbir\n2.\tiki\n");
+		birebir("-\ta\n\n\tdevam paragrafı\n");
+		birebir("-\ta\n\t-\tiç madde\n");
+	});
+
+	it("girintili kod çiti ve sekmeyle girintili kod korunuyor", () => {
+		birebir("  ```\n  a\n    b\n  ```\n");
+		birebir("   ~~~js\n   x\n\n   y\n   ~~~\n");
+		birebir("\tkod\n\n\tikinci\n");
+		birebir("- a\n\n  ```\n  x\n  ```\n");
+	});
+
+	it("paragrafın baştaki boşluğu korunuyor", () => {
+		birebir("   üç boşluk\n");
+		birebir("- a\n\n   b\n");
+	});
+
+	it("alıntının baştaki boş satırları korunuyor", () => {
+		birebir("> \n> boş satırdan sonra\n");
+		birebir(">\n>\n> iki boş satır\n");
+		birebir("> > \n> > iç alıntı\n");
+		birebir(">\n");
+	});
+
+	it("yazarın koyduğu gereksiz kaçışlar korunuyor", () => {
+		birebir("\\* \\_ \\# \\\\ \\> \\- \\+ \\. \\| \\~ \\{ \\}\n");
+		birebir("1\\. bu liste değil\n");
+		birebir("[\\[köşeli\\]](/u)\n");
+		birebir("$$\n\\int x \\, dx\n$$\n");
+	});
+
+	it("düzenlenmiş metinde eski kaçış kaydı kullanılmıyor", () => {
+		const root = parse("a \\* b\n");
+		const text = (root.children[0] as { children: { value: string }[] }).children[0];
+		if (text === undefined) throw new Error("metin yok");
+		text.value = "yeni * metin";
+		expect(serialize(root)).toBe("yeni * metin\n");
+	});
 });
