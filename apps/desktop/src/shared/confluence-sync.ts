@@ -293,7 +293,7 @@ export function atomsOf(storage: string): Map<string, string> {
 }
 
 /** Top-level blocks as their Markdown source; Kalem's table style comments are not content. */
-function blockTexts(markdown: string): string[] {
+export function blockTexts(markdown: string): string[] {
 	const doc = parse(markdown);
 	return doc.children.flatMap((block) => {
 		if (block.type === "yaml" || block.type === "toml") return [];
@@ -306,7 +306,7 @@ function blockTexts(markdown: string): string[] {
 }
 
 /** Pairs of indices of a longest common subsequence of `a` and `b`. */
-function commonBlocks(a: readonly string[], b: readonly string[]): [number, number][] {
+export function commonBlocks(a: readonly string[], b: readonly string[]): [number, number][] {
 	const n = a.length;
 	const m = b.length;
 	const length = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
@@ -350,8 +350,17 @@ const MAX_PAIRS = 4_000_000;
 /**
  * The page's new storage: unchanged parts as they were in `base`, the rest
  * converted from Markdown. Without a base it is a plain conversion.
+ *
+ * `earlier` are older storages of the same page the text was also made from
+ * (the page before a merge with a newer version): their mentions, inline
+ * macros and locked parts are still written as their XML where the text
+ * keeps them, though `base` no longer has them.
  */
-export function exportPage(markdown: string, base: string | null): ExportedPage {
+export function exportPage(
+	markdown: string,
+	base: string | null,
+	earlier: readonly string[] = [],
+): ExportedPage {
 	const segments = base === null ? [] : segmentsOf(base);
 	const current = blockTexts(markdown);
 	const original: { text: string; segment: number }[] = segments.flatMap((segment, index) =>
@@ -359,7 +368,10 @@ export function exportPage(markdown: string, base: string | null): ExportedPage 
 			? []
 			: blockTexts(segment.markdown).map((text) => ({ text, segment: index })),
 	);
-	const atoms = base === null ? new Map<string, string>() : atomsOf(base);
+	const atoms = new Map<string, string>();
+	for (const storage of [...earlier, ...(base === null ? [] : [base])]) {
+		for (const [link, xml] of atomsOf(storage)) atoms.set(link, xml);
+	}
 	if (segments.length === 0 || original.length * current.length > MAX_PAIRS) {
 		return { storage: markdownToStorage(markdown, atoms), losses: lossesOf(segments) };
 	}
@@ -379,6 +391,11 @@ export function exportPage(markdown: string, base: string | null): ExportedPage 
 		if (blocks.every((block, k) => matched.get(block) === first + k)) keptAt.set(first, index);
 	}
 	const locked = new Map<string, string>();
+	for (const storage of earlier) {
+		for (const segment of segmentsOf(storage)) {
+			if (segment.locked && segment.layout === undefined) locked.set(segment.markdown, segment.xml);
+		}
+	}
 	const marks = new Map<string, LayoutMark>();
 	for (const segment of segments) {
 		if (segment.layout !== undefined) marks.set(segment.markdown, segment.layout);

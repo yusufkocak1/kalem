@@ -22,6 +22,7 @@ import { wordCountPlugin } from "@kalem-editor/plugin-word-count";
 import type { Ui } from "@kalem-editor/ui";
 import { labelsFor, mountUi } from "@kalem-editor/ui";
 import type {
+	ConfluencePageContent,
 	DocumentPayload,
 	ImageFile,
 	KalemBridge,
@@ -31,6 +32,8 @@ import type {
 import { confluenceToMarkdown } from "../shared/confluence.js";
 import { fileUrl } from "../shared/confluence-common.js";
 import { insertedAtomXml } from "../shared/confluence-insert.js";
+import type { BlockMerge } from "../shared/confluence-merge.js";
+import { mergeBlocks } from "../shared/confluence-merge.js";
 import { atomsOf, exportPage, importPage } from "../shared/confluence-sync.js";
 import type { TextFormat } from "../shared/encoding.js";
 import { DEFAULT_FORMAT, formatLabel, willConvertToUtf8 } from "../shared/encoding.js";
@@ -89,6 +92,18 @@ export interface SessionOptions {
 	onStateChange(): void;
 	/** Selection or content changed. */
 	onEditorChange(): void;
+	/** Saving found a newer version of the page on Confluence: the user may merge the two. */
+	onConfluenceMerge?(): void;
+}
+
+/** A merge of the tab's edits with the newer version of its page, before anything is decided. */
+export interface ConfluenceMergePlan {
+	readonly merge: BlockMerge;
+	readonly latest: ConfluencePageContent;
+	/** The tab's text the merge was made from. */
+	readonly yours: string;
+	/** The storage that text was based on. */
+	readonly storage: string;
 }
 
 const MAX_UPLOAD_SIZE = 32 * 1024 * 1024;
@@ -129,6 +144,11 @@ export class Session {
 	 * not change are written back from it as they were (`confluence-sync.ts`).
 	 */
 	#storage: string | null = null;
+	/**
+	 * Older storages of the page the text was also made from: after a merge,
+	 * the user's own blocks may still hold their mentions and macros.
+	 */
+	#earlier: string[] = [];
 	/** What relative links resolve against: the path, or a package's unpacked text. */
 	#base: string | null = null;
 	#name = "";
@@ -266,7 +286,11 @@ export class Session {
 		if (inserted !== null) return inserted;
 		if (this.#storage === null) return null;
 		if (this.#atoms?.storage !== this.#storage) {
-			this.#atoms = { storage: this.#storage, map: atomsOf(this.#storage) };
+			const map = new Map<string, string>();
+			for (const storage of [...this.#earlier, this.#storage]) {
+				for (const [link, xml] of atomsOf(storage)) map.set(link, xml);
+			}
+			this.#atoms = { storage: this.#storage, map };
 		}
 		return this.#atoms.map.get(href) ?? null;
 	}
@@ -372,6 +396,7 @@ export class Session {
 		this.#remote = null;
 		this.#losses = [];
 		this.#storage = null;
+		this.#earlier = [];
 		this.#base = null;
 		this.#name = t.untitled;
 		this.#format = DEFAULT_FORMAT;
@@ -883,7 +908,7 @@ export class Session {
 			const remote = this.#remote;
 			if (this.#editor !== editor || remote === null) return false;
 			const text = this.#text();
-			const exported = exportPage(text, this.#storage);
+			const exported = exportPage(text, this.#storage, this.#earlier);
 			const result = await bridge.confluenceSavePage(this.id, {
 				storage: exported.storage,
 				version: remote.version,
@@ -899,6 +924,9 @@ export class Session {
 						kind: "warning",
 						text: t.confluenceConflict,
 						actions: [
+							...(this.#o.onConfluenceMerge === undefined
+								? []
+								: [{ label: t.mergeAction, run: () => this.#o.onConfluenceMerge?.() }]),
 							{ label: t.confluenceLoadTheirs, run: () => void this.reloadRemote() },
 							{
 								label: t.confluenceOverwrite,
@@ -911,6 +939,7 @@ export class Session {
 			}
 			this.#remote = result.page;
 			this.#storage = exported.storage;
+			this.#earlier = [];
 			this.#name = result.page.title;
 			this.#losses = [];
 			this.#savedText = text;
@@ -931,6 +960,60 @@ export class Session {
 			this.#report();
 			this.#o.onStateChange();
 		}
+	}
+
+	/**
+	 * Fetches the page as it is on Confluence now and merges the tab's edits
+	 * with it a block at a time. `null` when the page is too big to compare.
+	 */
+	async confluenceMergePlan(): Promise<ConfluenceMergePlan | null> {
+		const storage = this.#storage;
+		if (this.#remote === null || storage === null) return null;
+		const latest = await this.#o.bridge.confluenceLatestPage(this.id);
+		const yours = this.#text();
+		const merge = mergeBlocks(
+			importPage(storage).markdown,
+			yours,
+			importPage(latest.storage).markdown,
+		);
+		return merge === null ? null : { merge, latest, yours, storage };
+	}
+
+	/**
+	 * Puts the merged `text` in the editor as one edit (undo brings the
+	 * user's own text back) and makes the newer version the one the tab is
+	 * based on, so the next save builds on it. Resolves to why it could not:
+	 * `"edited"` when the text or the page's base changed since the plan was
+	 * made, `"read-only"` when the text cannot be changed, `"stale"` when the
+	 * page's newest version is no longer the one merged with.
+	 */
+	async applyConfluenceMerge(
+		plan: ConfluenceMergePlan,
+		text: string,
+	): Promise<"ok" | "edited" | "read-only" | "stale"> {
+		if (this.#remote === null || this.#storage !== plan.storage || this.#text() !== plan.yours) {
+			return "edited";
+		}
+		if (this.readOnly || this.#source?.isSource() === true) return "read-only";
+		if (!(await this.#o.bridge.confluenceRebasePage(this.id, plan.latest.page.version))) {
+			return "stale";
+		}
+		if (this.#storage !== plan.storage || this.#text() !== plan.yours) return "edited";
+		const { page, storage } = plan.latest;
+		const imported = importPage(storage);
+		this.#earlier = [...this.#earlier, plan.storage];
+		this.#remote = page;
+		this.#storage = storage;
+		this.#name = page.title;
+		this.#losses = imported.losses;
+		this.#savedText = imported.markdown;
+		this.#saveFailed = false;
+		this.#o.notices.dismiss("save");
+		if (text !== plan.yours) this.replaceText(text);
+		this.#refreshDirty(this.#text());
+		this.#report();
+		this.#o.onStateChange();
+		return "ok";
 	}
 
 	/** Replaces the tab's text with the page as it is on Confluence now. */

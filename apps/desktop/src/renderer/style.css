@@ -5476,7 +5476,8 @@ button.git-file-path {
 
 /* --- Confluence changes: a page's diff (see changes-dialog.ts) ------------- */
 
-.changes {
+.changes,
+.merge-dialog {
 	--diff-add: color-mix(in srgb, #16a34a 14%, transparent);
 	--diff-add-strong: color-mix(in srgb, #16a34a 34%, transparent);
 	--diff-remove: color-mix(in srgb, #dc2626 12%, transparent);
@@ -5495,11 +5496,13 @@ button.git-file-path {
 	box-shadow: var(--app-shadow);
 }
 
-.changes[open] {
+.changes[open],
+.merge-dialog[open] {
 	display: flex;
 }
 
-.changes::backdrop {
+.changes::backdrop,
+.merge-dialog::backdrop {
 	background: rgb(0 0 0 / 18%);
 }
 
@@ -5760,6 +5763,132 @@ button.git-file-path {
 .changes-actions .dialog-button.primary svg {
 	width: 15px;
 	height: 15px;
+}
+
+/* --- Merging with a newer page version (see merge-dialog.ts) --------------- */
+
+.merge-body {
+	padding: 4px 2px;
+}
+
+.merge-conflict {
+	padding-bottom: 6px;
+}
+
+.merge-sides {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 8px;
+	padding: 8px 10px 0;
+}
+
+.merge-option {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 0;
+	padding: 8px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	cursor: pointer;
+}
+
+.merge-option:hover {
+	border-color: color-mix(in srgb, var(--app-accent) 50%, var(--app-border));
+}
+
+.merge-option:has(input:checked) {
+	border-color: var(--app-accent);
+	box-shadow: 0 0 0 1px var(--app-accent);
+}
+
+.merge-option:has(input:focus-visible) {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 2px;
+}
+
+.merge-option-head {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+/* Neither side is wrong: the two versions are told apart by hue, not by red and green. */
+.merge-option.yours {
+	--merge-side: var(--app-accent);
+}
+
+.merge-option.theirs {
+	--merge-side: #7c3aed;
+}
+
+.merge-text {
+	padding: 6px 8px;
+	border-radius: 4px;
+	font-family: var(--app-mono, ui-monospace, monospace);
+	font-size: 12px;
+	line-height: 1.5;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.merge-text.deleted {
+	background: repeating-linear-gradient(
+		-45deg,
+		transparent 0 4px,
+		color-mix(in srgb, var(--app-border) 50%, transparent) 4px 5px
+	);
+	color: var(--app-muted);
+	font-family: inherit;
+	font-style: italic;
+}
+
+.merge-option .merge-text:not(.deleted) {
+	background: color-mix(in srgb, var(--merge-side) 9%, transparent);
+}
+
+.merge-option .changes-word {
+	background: color-mix(in srgb, var(--merge-side) 28%, transparent);
+}
+
+.merge-extra {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 8px 16px;
+	padding: 8px 10px 0;
+}
+
+.merge-extra .merge-option {
+	flex-direction: row;
+	padding: 4px 10px;
+}
+
+.merge-base {
+	flex: 1;
+	min-width: 200px;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.merge-base summary {
+	padding: 5px 0;
+	cursor: pointer;
+}
+
+.merge-status,
+.merge-status:empty {
+	display: block;
+	flex: 1;
+	min-width: 160px;
+}
+
+@media (max-width: 720px) {
+	.merge-sides {
+		grid-template-columns: minmax(0, 1fr);
+	}
 }
 
 /* --- Diagram and math previews (see previews.ts) ---------------------------- */
