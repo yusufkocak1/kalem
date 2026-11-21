@@ -7,6 +7,7 @@
 # klonda CRLF testi sessizce anlamsızlaşırdı — tam olarak testin ölçmek
 # istediği şeyi ortadan kaldırarak.
 packages/core/fixtures/** -text
+apps/desktop/e2e/regresyon/** -text
 
 # Metin muamelesi görmemesi gerekenler
 *.png binary
