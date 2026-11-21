@@ -428,7 +428,12 @@ function readFencedCode(
 		lang,
 		meta,
 		value: body.length === 0 ? "" : `${body.join("\n")}\n`,
-		syntax: { style: "fenced", fence: marker, fenceLength: fence.length },
+		syntax: {
+			style: "fenced",
+			fence: marker,
+			fenceLength: fence.length,
+			...(openIndent > 0 ? { indent: openIndent } : {}),
+		},
 		position: span(openLine, endLine),
 	} satisfies Code);
 	return i;
@@ -474,13 +479,17 @@ function readIndentedCode(lines: readonly Line[], start: number, blocks: Block[]
 
 	const kept = body.slice(0, lastContent - start + 1);
 	const endLine = must(lines[lastContent], "indented code closing line");
+	// Her dolu satırı sekmeyle girintileyen yazarın sekmesi korunuyor.
+	const tab = lines
+		.slice(start, lastContent + 1)
+		.every((line) => isBlank(line.value) || line.value.startsWith("\t"));
 
 	blocks.push({
 		type: "code",
 		lang: null,
 		meta: null,
 		value: `${kept.join("\n")}\n`,
-		syntax: { style: "indented" },
+		syntax: { style: "indented", ...(tab ? { tab: true } : {}) },
 		position: span(openLine, endLine),
 	} satisfies Code);
 	return lastContent + 1;
@@ -566,9 +575,11 @@ function makeParagraph(collected: readonly Line[], inline: InlineParser): Paragr
 	const first = must(collected[0], "paragraph first line");
 	const last = must(collected[collected.length - 1], "paragraph last line");
 
+	const indent = /^ */.exec(first.value)?.[0].length ?? 0;
 	return {
 		type: "paragraph",
 		children: inline(paragraphContent(collected, true)),
+		...(indent > 0 ? { syntax: { indent } } : {}),
 		position: span(first, last),
 	};
 }
@@ -909,9 +920,16 @@ function readBlockquote(
 	// `>` ile bitiyor ve ardından sekme de gelmiyor.
 	const sonraki = openLine.value[ilk.length];
 	const compact = ilk.endsWith(">") && sonraki !== undefined && sonraki !== "\t";
+	// İlk çocuktan önceki boş `>` satırları, yazıldıkları gibi.
+	const leading: string[] = [];
+	for (let k = 0; k < inner.length && children.length > 0; k++) {
+		if (!isBlank(inner[k]?.value ?? "")) break;
+		leading.push(lines[start + k]?.value ?? "");
+	}
 	const syntax = {
 		...(lazy.length > 0 ? { lazy } : {}),
 		...(compact ? { compact: true } : {}),
+		...(leading.length > 0 ? { leading } : {}),
 	};
 	blocks.push({
 		type: "blockquote",
@@ -956,6 +974,8 @@ interface MarkerGeometry {
 	readonly indent: number;
 	/** İşaretle içerik arasındaki etkin boşluk (1–4); boş maddede 1. */
 	readonly spacing: number;
+	/** İşaretle içerik arasında tek bir sekme mi var. */
+	readonly tab: boolean;
 	/** İçeriğin başladığı sütun — devam satırlarının uyması gereken girinti. */
 	readonly contentColumn: number;
 	/** İşaret ve ardındaki boşluğun karakter uzunluğu. */
@@ -1039,18 +1059,27 @@ function geometry(p: {
 	// `-metin` paragraftır. `-` tek başına ise boş maddedir.
 	if (p.spaces === "" && p.content !== "") return null;
 
-	const spaceWidth = indentWidth(p.spaces);
+	// Sekme, işaretin bittiği sütundan bir sonraki durağa uzanır: `-\t` için
+	// 3 sütun, `10.\t` için 1. Sütun 0'dan sayılırsa genişlik yanlış çıkar.
+	const markerEnd = indent + p.markerWidth;
+	const spaceWidth = indentWidth(" ".repeat(markerEnd) + p.spaces) - markerEnd;
 	// Boş madde ya da 5+ boşluk: içerik sütunu işaret + 1. Fazla boşluk
 	// maddenin İÇİNDE girintili kod olur.
-	const effective = p.content === "" || spaceWidth > MAX_MARKER_SPACES ? 1 : spaceWidth;
+	const fallback = p.content === "" || spaceWidth > MAX_MARKER_SPACES;
+	const effective = fallback ? 1 : spaceWidth;
+	const tab = !fallback && p.spaces === "\t";
 
 	return {
 		indent,
-		// Sekmeli boşluk korunmuyor: genişliği sütuna bağlı ve serileştirici
-		// boşluk yazıyor.
+		// Karışık boşluk ve sekme korunmuyor; tek sekme `tab` olarak korunuyor.
 		spacing: /^ *$/.test(p.spaces) ? effective : 1,
-		contentColumn: indent + p.markerWidth + effective,
-		markerChars: indent + p.markerWidth + (p.content === "" ? p.spaces.length : effective),
+		tab,
+		contentColumn: markerEnd + effective,
+		// Satırdan **karakter** olarak kesilen uzunluk. Sütun sayısı değil:
+		// bir sekme tek karakterdir ama 1–4 sütun tutar; sütun kadar karakter
+		// kesmek içeriğin baş harflerini yiyordu (`-\tsekmeli` → `meli`).
+		markerChars:
+			markerEnd + (p.content === "" || !fallback ? p.spaces.length : p.spaces[0] === " " ? 1 : 0),
 		content: p.content,
 	};
 }
@@ -1114,6 +1143,7 @@ function readList(
 	const indent = {
 		...(first.indent > 0 ? { indent: first.indent } : {}),
 		...(first.spacing > 1 ? { spacing: first.spacing } : {}),
+		...(first.tab ? { tab: true } : {}),
 	};
 	blocks.push({
 		type: "list",

@@ -105,6 +105,8 @@ interface InlineTail {
 	url: string;
 	title: string | null;
 	delimiter: '"' | "'" | "(" | undefined;
+	/** Hedef `<...>` içinde yazılmış. */
+	angle: boolean;
 	length: number;
 }
 
@@ -221,7 +223,8 @@ function parseInlineTail(rest: string): InlineTail | null {
 	}
 
 	if (rest[i] !== ")") return null;
-	return { url: destination.value, title, delimiter, length: i + 1 };
+	const angle = rest[skipTailSpace(rest, 2)] === "<";
+	return { url: destination.value, title, delimiter, angle, length: i + 1 };
 }
 
 /** `][etiket]`, `][]` ya da yalnızca `]` — başvurulu bağlantının kapanışı. */
@@ -238,6 +241,16 @@ const LITERAL_EMAIL = /^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/;
 
 /** Metin düğümü kısayolu. */
 const text = (value: string): Text => ({ type: "text", value });
+
+/** Kaçış içeren metin: kaynaktaki yazılışı `syntax.raw`da. */
+function escapedText(value: string, escapes: readonly number[]): Text {
+	// Sondan başa: araya konan ters bölü öndeki konumları kaydırmasın.
+	const raw = escapes.reduceRight((r, at) => `${r.slice(0, at)}\\${r.slice(at)}`, value);
+	return { type: "text", value, syntax: { raw } };
+}
+
+/** Metnin kaynaktaki yazılışı. */
+const rawText = (node: Text): string => node.syntax?.raw ?? node.value;
 
 /**
  * Bağlantı etiketini eşleştirme için normalleştirir.
@@ -300,11 +313,15 @@ function tokenize(raw: string): TokenizeResult {
 		},
 	};
 
+	/** `buffer` içinde ters bölüyle kaçırılmış karakterlerin konumları. */
+	let escapes: number[] = [];
+
 	/** Biriken düz metni düğüm olarak boşaltır. */
 	const flush = (): void => {
 		if (buffer !== "") {
-			nodes.push(text(buffer));
+			nodes.push(escapes.length === 0 ? text(buffer) : escapedText(buffer, escapes));
 			buffer = "";
+			escapes = [];
 		}
 	};
 
@@ -315,6 +332,7 @@ function tokenize(raw: string): TokenizeResult {
 		if (ch === "\\") {
 			const next = raw[i + 1];
 			if (next !== undefined && ESCAPABLE.includes(next)) {
+				escapes.push(buffer.length);
 				buffer += next;
 				i += 2;
 				continue;
@@ -599,16 +617,20 @@ function closeBracket(
 	for (const b of brackets) if (b.index >= open.index) b.active = false;
 
 	if (inlineTail !== null) {
-		const { url, title, delimiter } = inlineTail;
+		const { url, title, delimiter, angle } = inlineTail;
+		const alt = plainText(children);
 		// Başlık ayracı kaynak yazım tercihidir: `'x'` yazan kullanıcı geri
 		// yazıldığında `"x"` görmemeli (F1-01 kararı).
-		const syntax: LinkSyntax =
-			delimiter === undefined
-				? { style: "inline" }
-				: { style: "inline", titleDelimiter: delimiter };
+		const syntax: LinkSyntax = {
+			style: "inline",
+			...(delimiter === undefined ? {} : { titleDelimiter: delimiter }),
+			...(angle ? { angle: true } : {}),
+			// Alt metin düz yazıya indirgeniyor; kaynakta biçimliyse yazılışı saklanıyor.
+			...(open.image && innerRaw !== alt ? { alt: { raw: innerRaw, value: alt } } : {}),
+		};
 		(slots[open.index] as Inline[]).push(
 			open.image
-				? { type: "image", url, alt: plainText(children), title, syntax }
+				? { type: "image", url, alt, title, syntax }
 				: { type: "link", url, title, children, syntax },
 		);
 		return closeIndex + inlineTail.length;
@@ -878,6 +900,9 @@ function mergeText(nodes: readonly Inline[]): Inline[] {
 
 		const last = out[out.length - 1];
 		if (last !== undefined && last.type === "text" && node.type === "text") {
+			if (last.syntax || node.syntax) {
+				last.syntax = { raw: rawText(last) + rawText(node) };
+			}
 			last.value += node.value;
 			continue;
 		}

@@ -16,9 +16,9 @@ download what you don't use.
 | What you want to do | Package | Size (min+gzip) |
 |---|---|---|
 | **Display** Markdown (read-only) | `@kalem-editor/viewer` | 2.9 kB |
-| **Parse** Markdown (on the server, in scripts) | `@kalem-editor/core` | 13.4 kB |
-| **Edit**, with your own UI | `@kalem-editor/editor` | 33.1 kB |
-| The full **Word-like** experience | `@kalem-editor/editor` + `@kalem-editor/ui` | 42.0 kB |
+| **Parse** Markdown (on the server, in scripts) | `@kalem-editor/core` | 14.0 kB |
+| **Edit**, with your own UI | `@kalem-editor/editor` | 33.7 kB |
+| The full **Word-like** experience | `@kalem-editor/editor` + `@kalem-editor/ui` | 42.6 kB |
 
 The framework wrappers add a few hundred bytes on top:
 `@kalem-editor/react` 907 B, `@kalem-editor/vue` 686 B, `@kalem-editor/wc` 1.99 kB.

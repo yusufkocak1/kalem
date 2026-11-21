@@ -81,6 +81,17 @@ export interface NodeBase {
 // düşer. Kullanıcının `*` yazdığı yerde `-` üretmemenin tek yolu bu.
 // ---------------------------------------------------------------------------
 
+/** Paragrafın yazılışı. */
+export interface ParagraphSyntax {
+	/**
+	 * İlk satırdan önceki boşluk (1–3). CommonMark bunu atar; atılırsa
+	 * dokunulmamış paragraf ilk kaydetmede değişir.
+	 *
+	 * Yalnızca ilk satır: devam satırlarının girintisi korunmuyor.
+	 */
+	indent?: number;
+}
+
 /** `# Başlık` (atx) mi `Başlık\n=====` (setext) mi. */
 export interface HeadingSyntax {
 	style: "atx" | "setext";
@@ -106,6 +117,13 @@ export interface CodeSyntax {
 	fence?: "`" | "~";
 	/** Çit uzunluğu (en az 3). İç içe kod bloklarında 4+ olabilir. */
 	fenceLength?: number;
+	/**
+	 * Açılış çitinden önceki boşluk (1–3). İçerik satırlarından bu kadarı
+	 * soyulduğu için geri yazarken çitlere ve satırlara eklenir.
+	 */
+	indent?: number;
+	/** Girintili kod dört boşluk yerine sekmeyle girintilenmiş. */
+	tab?: boolean;
 }
 
 /**
@@ -140,6 +158,13 @@ export interface ListSyntax {
 	 * Devam satırlarının girintisi de buna göre.
 	 */
 	spacing?: number;
+	/**
+	 * İşaretten sonra boşluk yerine tek bir sekme: `-\tmetin`.
+	 *
+	 * Sekmenin genişliği işaretin sütununa bağlı, yani boşluğa çevirmek
+	 * dosyayı değiştirir. Doluysa `spacing` yok sayılır.
+	 */
+	tab?: boolean;
 }
 
 /** Vurgu işaretleyicisi. `**` ve `__` aynı anlama gelir, farklı yazılır. */
@@ -192,6 +217,11 @@ export interface BlockquoteSyntax {
 	lazy?: readonly (readonly [number, number])[];
 	/** `>metin` — işaretten sonra boşluk yok. İlk satır belirliyor. */
 	compact?: boolean;
+	/**
+	 * İlk çocuktan önceki boş satırlar, yazıldıkları gibi (`>` ya da `> `).
+	 * CommonMark'ta anlamsızlar ama dosyada duruyorlar.
+	 */
+	leading?: readonly string[];
 }
 
 /**
@@ -214,6 +244,14 @@ export interface LinkSyntax {
 	style: "inline" | "autolink" | "literal";
 	/** Başlığı saran karakter. */
 	titleDelimiter?: '"' | "'" | "(";
+	/** Hedef gerekmediği hâlde `<...>` içinde yazılmış: `[a](<url>)`. */
+	angle?: boolean;
+	/**
+	 * Yalnızca görsel: alt metnin kaynaktaki yazılışı (`*vurgulu*`) ve o an
+	 * düz yazıya indirgenmiş hâli. `Image.alt` hâlâ `value` ise `raw`
+	 * yazılır; alt değiştiyse kayıt bayatlamıştır ve yok sayılır.
+	 */
+	alt?: { readonly raw: string; readonly value: string };
 }
 
 /** Başvurulu bağlantı/görselin yazılış biçimi. */
@@ -282,6 +320,7 @@ export interface Root extends NodeBase {
 export interface Paragraph extends NodeBase {
 	type: "paragraph";
 	children: Inline[];
+	syntax?: ParagraphSyntax;
 }
 
 export interface Heading extends NodeBase {
@@ -425,6 +464,20 @@ export type Structural = ListItem | TableRow | TableCell;
 export interface Text extends NodeBase {
 	type: "text";
 	value: string;
+	syntax?: TextSyntax;
+}
+
+/** Metnin yazılışı. */
+export interface TextSyntax {
+	/**
+	 * Kaynaktaki hâli, ters bölü kaçışlarıyla: `1\. madde değil`.
+	 *
+	 * Yazarın koyduğu kaçış gerekli olmasa da korunuyor (`\*`, `\#`).
+	 * Serileştirici bunu yalnızca kaçışları çözülünce `value` ile aynıysa
+	 * kullanır; düzenlenmiş metinde kayıt bayatlar ve yok sayılır. Yalnızca
+	 * kaçış içeren metinlerde bulunur.
+	 */
+	raw?: string;
 }
 
 export interface Emphasis extends NodeBase {

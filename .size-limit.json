@@ -209,7 +209,7 @@
   {
     "name": "@kalem-editor/wc — <script> ile düşen tam paket (çekirdek + editör dâhil)",
     "path": "packages/wc/dist/kalem-editor.iife.js",
-    "limit": "34 kB",
+    "limit": "34.5 kB",
     "gzip": true
   }
 ]

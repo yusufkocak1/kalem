@@ -109,11 +109,11 @@ since the project's first day, and they have their own self-tests
 
 | Package | min+gzip |
 |---|---|
-| `@kalem-editor/core` | 13.4 kB |
+| `@kalem-editor/core` | 14.0 kB |
 | `@kalem-editor/viewer` | 2.9 kB |
-| `@kalem-editor/editor` (core included) | 33.1 kB |
-| `@kalem-editor/editor` + `@kalem-editor/ui` | 42.0 kB |
-| `@kalem-editor/wc` — the single `<script>` build | 33.7 kB |
+| `@kalem-editor/editor` (core included) | 33.7 kB |
+| `@kalem-editor/editor` + `@kalem-editor/ui` | 42.6 kB |
+| `@kalem-editor/wc` — the single `<script>` build | 34.3 kB |
 | Wrappers (react / vue / wc) | 907 B / 686 B / 1.99 kB |
 
 Verification: over 1,400 unit tests, over 1,200 browser tests (Chromium ·

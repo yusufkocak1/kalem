@@ -40,11 +40,13 @@ import type {
 	Root,
 	Table,
 	TableRow,
+	Text,
 	ThematicBreak,
 } from "./ast.js";
 import { cellInlines, splitRow } from "./blocks.js";
 import { colorOfOpenTag, colorOpenTag, sanitizeColor } from "./color.js";
 import { parseInline } from "./inline.js";
+import { indentWidth } from "./scanner.js";
 
 /** Yeni düğümler için yazım varsayılanları. */
 export interface SerializeOptions {
@@ -281,7 +283,8 @@ function block(node: Block, o: Resolved): string {
 
 function paragraph(node: Paragraph, o: Resolved): string {
 	// Paragraf, blok işaretlerinin anlamlı olduğu tek yer.
-	return inlines(node.children, o, true);
+	const metin = inlines(node.children, o, true);
+	return " ".repeat(node.syntax?.indent ?? 0) + metin;
 }
 
 function heading(node: Heading, o: Resolved): string {
@@ -305,10 +308,11 @@ function thematicBreak(node: ThematicBreak, o: Resolved): string {
 
 function code(node: Code, o: Resolved): string {
 	if (node.syntax?.style === "indented") {
+		const girinti = node.syntax.tab === true ? "\t" : "    ";
 		return node.value
 			.replace(/\n$/, "")
 			.split("\n")
-			.map((line) => (line === "" ? "" : `    ${line}`))
+			.map((line) => (line === "" ? "" : `${girinti}${line}`))
 			.join("\n");
 	}
 
@@ -320,7 +324,10 @@ function code(node: Code, o: Resolved): string {
 	const fence = marker.repeat(length);
 	const info = [node.lang, node.meta].filter((x) => x !== null && x !== "").join(" ");
 	const body = node.value.replace(/\n$/, "");
-	return `${fence}${info}\n${body}\n${fence}`;
+	// Girintili çit: içerikten soyulan girinti çitlere ve satırlara geri ekleniyor.
+	const indent = " ".repeat(node.syntax?.indent ?? 0);
+	const govde = body.replace(/^(?=.)/gm, indent);
+	return `${indent}${fence}${info}\n${govde}\n${indent}${fence}`;
 }
 
 /** İçerikteki en uzun ardışık çit karakteri dizisi. */
@@ -368,7 +375,10 @@ function blockquote(node: Blockquote, o: Resolved): string {
 			})
 			.join("\n"),
 	);
-	let out = parts[0] ?? "";
+	// Baştaki boş satırlar yalnızca boşsa yazılıyor: bayatlamış bir kayıt
+	// alıntıya içerik sokamaz.
+	const leading = (node.syntax?.leading ?? []).filter((line) => /^ {0,3}> ?[ \t]*$/.test(line));
+	let out = leading.map((line) => `${line}\n`).join("") + (parts[0] ?? "");
 	for (let i = 1; i < parts.length; i++) {
 		// Çocuklar arasındaki boş satırlar da alıntının içinde: `>`.
 		const ara = gap(node.children[i - 1], node.children[i], "\n\n");
@@ -396,7 +406,7 @@ function itemMarker(node: List, index: number, o: Resolved): string {
 	// `listItem`de işaret uzunluğu kadar girintileniyor, yani içerik sütunu
 	// kendiliğinden doğru kalıyor.
 	const girinti = " ".repeat(node.syntax?.indent ?? 0);
-	const bosluk = " ".repeat(node.syntax?.spacing ?? 1);
+	const bosluk = node.syntax?.tab === true ? "\t" : " ".repeat(node.syntax?.spacing ?? 1);
 	if (!node.ordered) return `${girinti}${node.syntax?.marker ?? o.bulletMarker}${bosluk}`;
 
 	const delimiter = node.syntax?.delimiter ?? o.orderedDelimiter;
@@ -421,7 +431,13 @@ function listItem(node: ListItem, isaret: string, o: Resolved): string {
 	// olmak zorunda: CommonMark 5+ boşluğu içeriğin parçası sayıyor ve
 	// kaydedilmiş `spacing` kodun girintisine eklenirdi.
 	const marker = /^[ \t]/.test(inner) ? `${isaret.trimEnd()} ` : isaret;
-	const indent = " ".repeat(marker.length);
+	// Devam satırları içerik sütununa girintileniyor. İşarette sekme varsa
+	// karakter sayısı sütunu vermez, ve sekmeyle yazan yazarın devam
+	// satırları da sekmeyle girintilenir.
+	// Sekmeli işaret her zaman bir sekme durağında biter.
+	const indent = marker.includes("\t")
+		? "\t".repeat(indentWidth(marker.replace(/[^\t]/g, " ")) / 4)
+		: " ".repeat(marker.length);
 
 	const lines = inner.split("\n");
 	return lines
@@ -723,7 +739,7 @@ function trimBreaks(list: readonly Inline[]): readonly Inline[] {
 function inline(node: Inline, o: Resolved, startsLine = false, enclosing = ""): string {
 	switch (node.type) {
 		case "text":
-			return escapeText(node.value, startsLine, enclosing);
+			return escapeText(node.value, startsLine, enclosing, authorEscapes(node));
 		case "emphasis": {
 			const m = node.syntax?.marker ?? o.emphasisMarker;
 			// Sarılan metin, kendisini saran işareti artık kaçırmak zorunda.
@@ -823,11 +839,13 @@ function link(node: Extract<Inline, { type: "link" }>, o: Resolved): string {
 	if (style === "autolink") return `<${plain(node.children)}>`;
 	if (style === "literal") return plain(node.children);
 
-	return `[${label}](${destination(node.url)}${titlePart(node.title, node.syntax?.titleDelimiter)})`;
+	return `[${label}](${destination(node.url, node.title, node.syntax?.angle)}${titlePart(node.title, node.syntax?.titleDelimiter)})`;
 }
 
 function image(node: Extract<Inline, { type: "image" }>): string {
-	return `![${node.alt ?? ""}](${destination(node.url)}${titlePart(node.title, node.syntax?.titleDelimiter)})`;
+	const kaynak = node.syntax?.alt;
+	const alt = kaynak !== undefined && kaynak.value === node.alt ? kaynak.raw : (node.alt ?? "");
+	return `![${alt}](${destination(node.url, node.title, node.syntax?.angle)}${titlePart(node.title, node.syntax?.titleDelimiter)})`;
 }
 
 function reference(
@@ -853,8 +871,11 @@ function reference(
  *   böyle yazılabilir ve gidiş-dönüş byte-birebir kalır. Dengesizse
  *   hepsi kaçışlanır, yoksa bağlantı erken kapanır.
  */
-function destination(url: string): string {
-	if (url === "" || /[\s<>]/.test(url)) return `<${url.replace(/[\\<>]/g, "\\$&")}>`;
+function destination(url: string, title: string | null = null, angle = false): string {
+	// `[a]()`: boş hedef ancak başlık yoksa yazılmadan kalabilir; başlıkla
+	// `[a]("t")` başlığı hedef sanılırdı.
+	if (url === "" && title === null && !angle) return "";
+	if (angle || url === "" || /[\s<>]/.test(url)) return `<${url.replace(/[\\<>]/g, "\\$&")}>`;
 	const escaped = url.replace(/\\/g, "\\\\");
 	return balancedParens(escaped) ? escaped : escaped.replace(/[()]/g, "\\$&");
 }
@@ -909,19 +930,45 @@ function plain(nodes: readonly Inline[]): string {
  * karakteri kaçırmak teknik olarak doğru olurdu ama çıktı okunmaz hale
  * gelir — Markdown'ın amacı okunabilirlik.
  */
-function escapeText(value: string, startsLine: boolean, enclosing = ""): string {
-	return value
-		.split("\n")
-		.map((line, i) => escapeLine(line, i > 0 || startsLine, enclosing))
-		.join("\n");
-}
-
-function escapeLine(line: string, atLineStart: boolean, enclosing: string): string {
+function escapeText(
+	value: string,
+	startsLine: boolean,
+	enclosing = "",
+	forced: ReadonlySet<number> = new Set(),
+): string {
+	let at = 0;
 	let out = "";
-	for (let i = 0; i < line.length; i++) {
-		out += needsEscape(line, i, atLineStart, enclosing) ? `\\${line[i]}` : line[i];
+	for (const line of value.split("\n")) {
+		if (at > 0) out += "\n";
+		for (let i = 0; i < line.length; i++) {
+			const kacir = forced.has(at + i) || needsEscape(line, i, at > 0 || startsLine, enclosing);
+			out += kacir ? `\\${line[i]}` : line[i];
+		}
+		at += line.length + 1;
 	}
 	return out;
+}
+
+/**
+ * Yazarın kaçırdığı karakterler (`value` içindeki konumlarıyla).
+ *
+ * Gereksiz kaçış da korunuyor: `\*` yazan yazar ilk kaydetmede `*`
+ * görmemeli. Gerekli kaçışlarla **birleştiriliyor**, yerine geçmiyor —
+ * komşu düğüm değiştiyse kaynakta gereksiz olan kaçış artık gerekli
+ * olabilir. Kayıt `value` ile tutmuyorsa (metin düzenlendi) yok sayılır.
+ */
+function authorEscapes(node: Text): ReadonlySet<number> {
+	const raw = node.syntax?.raw ?? "";
+	const out = new Set<number>();
+	let value = "";
+	for (let k = 0; k < raw.length; k++) {
+		if (raw[k] === "\\" && KACIRILABILIR.includes(raw[k + 1] ?? "x")) {
+			out.add(value.length);
+			k++;
+		}
+		value += raw[k];
+	}
+	return value === node.value ? out : new Set();
 }
 
 /** CommonMark'ta ters bölüyle kaçırılabilen ASCII noktalama. */

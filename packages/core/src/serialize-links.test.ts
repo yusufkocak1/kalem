@@ -57,8 +57,29 @@ describe("hedef yazımı", () => {
 		expect(baglanti("bir iki")).toBe("[a](<bir iki>)");
 	});
 
-	it("boş hedef açılı ayraca alınıyor", () => {
-		expect(baglanti("")).toBe("[a](<>)");
+	it("boş hedef yazılmıyor, başlık varsa açılı ayraca alınıyor", () => {
+		expect(baglanti("")).toBe("[a]()");
+		// `[a]("t")` başlığı hedef sanardı.
+		expect(baglanti("", "t")).toBe('[a](<> "t")');
+	});
+
+	it("açılı ayraç ve boş hedef yazıldığı gibi kalıyor", () => {
+		expect(tur("[a]()")).toBe("[a]()");
+		expect(tur("[a](<>)")).toBe("[a](<>)");
+		expect(tur("[a](</yol>)")).toBe("[a](</yol>)");
+	});
+
+	it("görselin biçimli alt metni yazıldığı gibi kalıyor", () => {
+		expect(tur("![*vurgulu* `kod`](a.png)")).toBe("![*vurgulu* `kod`](a.png)");
+	});
+
+	it("alt metni değişen görselde eski yazılış kullanılmıyor", () => {
+		const root = parse("![*eski*](a.png)");
+		const image = (root.children[0] as { children: Inline[] }).children[0] as Inline & {
+			alt: string | null;
+		};
+		image.alt = "yeni";
+		expect(serialize(root)).toBe("![yeni](a.png)");
 	});
 
 	it("ters bölü kaçışlanıyor", () => {

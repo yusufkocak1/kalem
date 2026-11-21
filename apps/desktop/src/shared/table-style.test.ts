@@ -94,7 +94,8 @@ describe("extractTableStyles", () => {
 		expect(styles).toEqual([
 			{ color: "green", widths: [90, 150] },
 			NO_STYLE,
-			{ color: "red", widths: [] },
+			// Right above its table: saved back without a blank line between them.
+			{ color: "red", widths: [], tight: true },
 		]);
 	});
 
@@ -124,6 +125,27 @@ describe("injectTableStyles", () => {
 	it("returns the same document when nothing is styled", () => {
 		const doc = parse(TABLE);
 		expect(injectTableStyles(doc, () => undefined)).toBe(doc);
+	});
+
+	it("keeps a comment right above its table, and one with a blank line, as they were", () => {
+		for (const source of [
+			`# A\n\n<!-- kalem:table color=blue -->\n${TABLE}`,
+			`# A\n\n<!-- kalem:table color=blue -->\n\n${TABLE}`,
+			`# A\n\n\n<!-- kalem:table color=blue -->\n${TABLE}`,
+		]) {
+			const extracted = extractTableStyles(source);
+			const doc = parse(extracted.markdown);
+			expect(serialize(injectTableStyles(doc, styleByOrder(doc, extracted.styles)))).toBe(source);
+		}
+	});
+
+	it("keeps the comment tight when the style changes", () => {
+		const extracted = extractTableStyles(`<!-- kalem:table color=blue -->\n${TABLE}`);
+		const doc = parse(extracted.markdown);
+		const style = extracted.styles[0] as TableStyle;
+		expect(serialize(injectTableStyles(doc, () => ({ ...style, color: "red" })))).toBe(
+			`<!-- kalem:table color=red -->\n${TABLE}`,
+		);
 	});
 
 	it("survives a save and reopen", () => {

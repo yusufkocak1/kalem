@@ -48,22 +48,17 @@ describe("belge → metin → belge", () => {
 	}
 });
 
-describe("gereksiz kaçış normalleşiyor", () => {
+describe("gereksiz kaçış korunuyor", () => {
 	/**
-	 * Tek bilinen fark ve bir kayıp **değil**.
-	 *
 	 * `yıldız \* kaçırılmış` içindeki ters bölü gereksiz: o yıldız zaten
-	 * vurgu başlatmıyor (iki yanında boşluk var). Serileştirici onu
-	 * atıyor, metin aynı kalıyor ve ikinci tur kararlı.
-	 *
-	 * Kaynak kipine bunun bir bedeli yok: kullanıcı kaynağa bakıp
-	 * değiştirmeden dönerse belgeye hiç dokunulmuyor, değiştirirse zaten
-	 * editörün her kaydetmede yaptığı normalleştirme oluyor.
+	 * vurgu başlatmıyor (iki yanında boşluk var). Eskiden serileştirici onu
+	 * atıyordu; yazarın dosyası kaynak kipinde değişmeden dönüp kaydedilince
+	 * değişiyordu. Artık metin düğümü kaynaktaki yazılışı taşıyor.
 	 */
 	const md = "yıldız \\* kaçırılmış\n";
 
-	it("ters bölü düşüyor ama metin aynı", () => {
-		expect(serialize(assignIds(parse(md)))).toBe("yıldız * kaçırılmış\n");
+	it("ters bölü kalıyor", () => {
+		expect(serialize(assignIds(parse(md)))).toBe(md);
 	});
 
 	it("ikinci tur kararlı", () => {
