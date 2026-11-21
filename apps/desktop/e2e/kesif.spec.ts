@@ -8,6 +8,7 @@ import { join } from "node:path";
 import type { ElectronApplication } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import { PNG_1X1 } from "../src/main/sample-docx.test-helper.js";
+import { fakeClaude } from "./fake-claude.js";
 import { clickMenu, launch, stubOpenDialog, tempDir } from "./launch.js";
 
 /** Answers every message box and keeps what each said, its detail too. */
@@ -101,6 +102,80 @@ test("settings search finds a setting by a word with a Turkish ending", async ()
 	await dialog.locator(".settings-search").fill("yazım");
 	await expect(dialog.locator('input[data-setting="spellCheck"]')).toBeVisible();
 	await expect(dialog.locator('[data-setting="zoom"]')).toBeHidden();
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("K-15: in a small window the assistant's empty chat and a long question keep within the pane", async () => {
+	const folder = await tempDir("kesif-assistant-narrow");
+	const doc = join(folder, "analiz.md");
+	await writeFile(doc, "# Analiz\n\nGiriş\n");
+	const claude = await fakeClaude(folder);
+	const { app, page, errors } = await launch({ args: [doc], env: { KALEM_CLAUDE: claude.path } });
+	await stubOpenDialog(app, [folder]);
+	await clickMenu(app, "File", "Open Folder…");
+	await clickMenu(app, "View", "AI Assistant");
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toContainText("Claude Code");
+	await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(700, 600));
+	// The suggestions were a 150px column in a pane narrower than that: the empty chat scrolled sideways.
+	const empty = pane.locator(".assistant-empty");
+	await expect
+		.poll(() => empty.evaluate((box) => box.scrollWidth - box.clientWidth))
+		.toBeLessThanOrEqual(0);
+	// The folder's chip is cut short, not run past the pane.
+	const composer = pane.locator(".assistant-composer");
+	expect(await composer.evaluate((box) => box.scrollWidth - box.clientWidth)).toBeLessThanOrEqual(
+		0,
+	);
+
+	// A long question scrolls in its box: the chat above keeps most of its room.
+	await pane.locator(".assistant-input").fill("Bu belgeyi özetle, çok uzun bir soru: ".repeat(12));
+	const paneHeight = (await pane.boundingBox())?.height ?? 0;
+	const composerHeight = (await composer.boundingBox())?.height ?? 0;
+	expect(composerHeight).toBeLessThan(paneHeight * 0.75);
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("K-16: a reply with a diagram stays scrolled to its end once the picture has loaded", async () => {
+	const folder = await tempDir("kesif-assistant-follow");
+	const doc = join(folder, "analiz.md");
+	await writeFile(doc, "# Analiz\n\nGiriş\n");
+	const claude = await fakeClaude(folder);
+	const { app, page, errors } = await launch({
+		args: [doc],
+		settings: { assistant: true },
+		env: { KALEM_CLAUDE: claude.path },
+	});
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toContainText("Claude Code");
+	const input = pane.locator(".assistant-input");
+	await input.fill("Onay sürecini çiz");
+	await input.press("Enter");
+	const reply = pane.locator(".assistant-assistant").last();
+	await expect(reply.locator(".assistant-diagram img")).toBeVisible();
+	await expect(reply.locator(".assistant-markdown").last()).toHaveText("Bitti.");
+	// The picture loaded after the log went to its end, and left the reply's buttons under the box
+	// with the button down to them on top.
+	const log = pane.locator(".assistant-log");
+	await expect
+		.poll(() => log.evaluate((box) => box.scrollHeight - box.scrollTop - box.clientHeight))
+		.toBeLessThan(2);
+	await expect(pane.locator(".assistant-jump")).toBeHidden();
+	// A smaller window keeps it at its end too: the scroll the resize makes is not the user's.
+	await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(700, 600));
+	await expect
+		.poll(() => log.evaluate((box) => box.scrollHeight - box.scrollTop - box.clientHeight))
+		.toBeLessThan(2);
+	await expect(pane.locator(".assistant-jump")).toBeHidden();
+	// Scrolled up by the user, it stays where they left it and offers the way down.
+	await log.evaluate((box) => {
+		box.scrollTop = 0;
+	});
+	await expect(pane.locator(".assistant-jump")).toBeVisible();
+	await page.waitForTimeout(300);
+	expect(await log.evaluate((box) => box.scrollTop)).toBe(0);
 	expect(errors).toEqual([]);
 	await app.close();
 });
