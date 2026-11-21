@@ -961,7 +961,8 @@ button {
 
 .assistant-suggestions {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+	/* A narrow pane: one column as wide as the pane, not a 150px one running past it. */
+	grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr));
 	gap: 8px;
 }
 
@@ -1398,7 +1399,7 @@ button {
 }
 
 .assistant-source {
-	max-width: 180px;
+	max-width: min(180px, 100%);
 }
 
 /* A picture pasted for the next question: what it is, small, by its name. */
@@ -1447,7 +1448,8 @@ button {
 
 .assistant-input {
 	min-height: 40px;
-	max-height: 200px;
+	/* A low window: a long question scrolls in its box rather than hide the chat. */
+	max-height: min(200px, 22vh);
 	padding: 10px 12px 4px;
 	border: 0;
 	border-radius: 12px 12px 0 0;

@@ -2472,7 +2472,40 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	function updateJump(): void {
 		jump.hidden = log.hidden || view !== "chat" || nearBottom();
 	}
-	log.addEventListener("scroll", () => updateJump(), { passive: true });
+	/** Whether the log was at its end when last scrolled: what grows later keeps it there. */
+	let pinned = true;
+	/** The log's sizes when last looked at: a scroll that comes with a change in them is the layout's, not the user's. */
+	let sizes = "";
+	const measure = (): string => `${log.scrollHeight}:${log.clientHeight}:${log.clientWidth}`;
+	log.addEventListener(
+		"scroll",
+		() => {
+			const now = measure();
+			if (now === sizes) pinned = nearBottom();
+			else if (pinned) log.scrollTop = log.scrollHeight;
+			sizes = measure();
+			updateJump();
+		},
+		{ passive: true },
+	);
+	/**
+	 * A reply's diagram loads after it is drawn, and a long question grows the
+	 * box under the log: either would leave the end of the reply under the box
+	 * and the button down to it over the reply's own buttons.
+	 */
+	function keepAtEnd(): void {
+		if (pinned) log.scrollTop = log.scrollHeight;
+		sizes = measure();
+		updateJump();
+	}
+	log.addEventListener(
+		"load",
+		(event) => {
+			if (event.target instanceof HTMLImageElement) keepAtEnd();
+		},
+		true,
+	);
+	new ResizeObserver(() => keepAtEnd()).observe(log);
 
 	/** The start of a diagram or of actions still coming in: shown as a placeholder, not as JSON. */
 	const OPEN_BLOCK =
@@ -2609,6 +2642,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		}
 		view.body.replaceChildren(...nodes);
 		if (follow) log.scrollTop = log.scrollHeight;
+		// What the reply added is not the user scrolling: their next scroll is judged against it.
+		sizes = measure();
 		updateJump();
 	}
 
