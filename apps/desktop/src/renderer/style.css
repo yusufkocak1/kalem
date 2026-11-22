@@ -5728,6 +5728,38 @@ button.git-file-path {
 	align-content: start;
 }
 
+/* Beside their lines (`align` in local-notes.ts): each card at its words'
+   height, moved by the page's scroll; the pane does not scroll itself. */
+.notes-pane[data-aligned] {
+	overflow: hidden;
+}
+
+.notes-pane[data-aligned] .notes-list {
+	position: relative;
+	display: block;
+	flex: 1;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.notes-pane[data-aligned] .note-balloon {
+	position: absolute;
+	right: 0;
+	left: 0;
+	transition: top 120ms var(--app-ease);
+}
+
+.notes-pane[data-aligned] .note-balloon:focus-within,
+.notes-pane[data-aligned] .note-balloon.active {
+	z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.notes-pane[data-aligned] .note-balloon {
+		transition: none;
+	}
+}
+
 .notes-empty {
 	margin: 8px 2px;
 	color: var(--app-muted);

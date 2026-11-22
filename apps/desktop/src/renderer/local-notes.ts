@@ -45,6 +45,11 @@ export interface LocalNotesOptions {
 	reveal(): void;
 	/** Says something to the user, with buttons. */
 	notify(text: string, actions?: readonly { label: string; run(): void }[]): void;
+	/**
+	 * The page's scroller while the cards go beside their lines (the setting,
+	 * and the pane at the page's side); `null` for a list.
+	 */
+	aligned?(): HTMLElement | null;
 }
 
 export interface LocalNotes {
@@ -53,6 +58,8 @@ export interface LocalNotes {
 	attach(target: NotesTarget): void;
 	/** The document or the page's size changed: the notes find their words again. */
 	refresh(): void;
+	/** The page scrolled, or the window changed: the cards beside the lines follow them. */
+	align(): void;
 	/** A note on the selection (or the word at the caret). */
 	add(): void;
 	/** Goes to the next or the previous note. */
@@ -376,7 +383,51 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 			list.children.length === wantedChildren.length &&
 			wantedChildren.every((child, i) => list.children[i] === child);
 		if (!same) list.replaceChildren(...wantedChildren);
+		alignedOrder = ordered.map((note) => note.id);
+		align();
 	}
+
+	// --- Beside their lines ------------------------------------------------------------
+
+	/** The cards in the list's order: by where their words are, the lost ones last. */
+	let alignedOrder: readonly string[] = [];
+	let alignFrame = 0;
+	const GAP = 8;
+
+	/**
+	 * Each card at the height of its words on the page (as Word and Google
+	 * Docs put comments), pushed down past the one above when they would
+	 * overlap; the lost ones follow the last. The page's scroll moves them;
+	 * the pane does not scroll by itself then.
+	 */
+	function align(): void {
+		cancelAnimationFrame(alignFrame);
+		alignFrame = 0;
+		const desk = options.aligned?.() ?? null;
+		const on = desk !== null && views.size > 0 && target?.available() === true;
+		element.toggleAttribute("data-aligned", on);
+		if (!on) {
+			for (const view of views.values()) view.element.style.removeProperty("top");
+			return;
+		}
+		const origin = list.getBoundingClientRect().top;
+		let floor = Number.NEGATIVE_INFINITY;
+		for (const id of alignedOrder) {
+			const view = views.get(id);
+			if (view === undefined) continue;
+			const words = placed.get(id)?.range.getBoundingClientRect();
+			const wanted = words === undefined ? floor : words.top - origin - 6;
+			const top = Math.max(wanted, floor);
+			view.element.style.top = `${Math.round(top)}px`;
+			floor = top + view.element.offsetHeight + GAP;
+		}
+	}
+
+	function alignSoon(): void {
+		if (alignFrame !== 0) return;
+		alignFrame = requestAnimationFrame(align);
+	}
+	window.addEventListener("resize", alignSoon);
 
 	// --- A balloon -----------------------------------------------------------------------
 
@@ -648,6 +699,7 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 
 	return {
 		element,
+		align: alignSoon,
 		attach(next) {
 			if (target === next) {
 				refresh();

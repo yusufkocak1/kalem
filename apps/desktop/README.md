@@ -332,6 +332,12 @@ verir.
   **Önceki / Sonraki Not** notlar arasında gezer. Gözden Geçir şeridindeki
   **Notlarım** paneli açıp kapatır; **Görünüm → Notlarımın sözcüklerini
   metinde boya** boyamayı kapatır.
+  - **Kenar notları:** panel sayfanın yanındayken (sol ya da sağ yuva) her
+    kart, notun bağlı olduğu sözcüklerin hizasında durur ve sayfa kaydıkça
+    onlarla birlikte kayar (Word ve Google Docs'un açıklamaları gibi); üst
+    üste binecek kartlar aşağı itilir, sözcükleri kaybolan notlar sonda
+    kalır. **Görünüm → Notlarım Satırlarının Hizasında** kapatılırsa kartlar
+    eskisi gibi alt alta bir liste olur.
   - Notlar **yalnızca bu bilgisayarda** saklanır
     (`%APPDATA%\kalem-desktop\local-notes.json`, belge yoluna ya da
     Confluence sayfasına göre). Markdown'a, Confluence'a, dışa aktarmaya ve

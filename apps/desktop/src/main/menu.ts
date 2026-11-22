@@ -462,6 +462,12 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 					checked: settings.localNotes,
 					click: () => ctx.changeSettings({ localNotes: !settings.localNotes }),
 				},
+				{
+					label: t.notesAligned,
+					type: "checkbox",
+					checked: settings.notesAligned,
+					click: () => ctx.changeSettings({ notesAligned: !settings.notesAligned }),
+				},
 				{ label: t.focusMode, accelerator: "CmdOrCtrl+Shift+F", click: send(ctx, "focus") },
 				{
 					label: t.typewriterScroll,

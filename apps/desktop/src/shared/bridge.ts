@@ -135,6 +135,8 @@ export interface Settings extends Typography {
 	readonly restoreSession: boolean;
 	/** The user's own notes (balloons beside the text, kept on this computer) are shown. */
 	readonly localNotes: boolean;
+	/** The My Notes pane's cards beside the lines they are on, moving with the page. */
+	readonly notesAligned: boolean;
 	/** Jira issues the user starred, newest first. */
 	readonly jiraFavorites: readonly JiraFavorite[];
 	/** How the Jira issue popup lays out its fields: columns, and which fields in what order. */
@@ -227,6 +229,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	confluenceReviewBeforeSave: true,
 	restoreSession: true,
 	localNotes: true,
+	notesAligned: true,
 	jiraFavorites: [],
 	jiraIssueLayout: DEFAULT_ISSUE_LAYOUT,
 	pinnedFiles: [],

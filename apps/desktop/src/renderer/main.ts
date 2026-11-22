@@ -187,6 +187,12 @@ const localNotes = createLocalNotes({
 	},
 	notify: (text, actions) =>
 		session.notices.show({ id: "notes", text, ...(actions === undefined ? {} : { actions }) }),
+	// Beside the lines while the pane is at the page's side (not under it) and the setting is on.
+	aligned: () => {
+		if (!settings.notesAligned || !docks.shown().has("notes")) return null;
+		if (settings.panePlaces.notes === "bottom") return null;
+		return tabs.get(session.id)?.desk ?? null;
+	},
 });
 const jiraDialog = createJiraDialog({
 	t,
@@ -1240,6 +1246,14 @@ function createTab(id: string): Tab {
 	let specsChecked = false;
 	const page = el("div", { class: "page kalem-theme", children: [tabCanvas, start.element] });
 	const desk = el("main", { class: "desk", children: [page] });
+	// My Notes' cards beside their lines follow the active page's scroll.
+	desk.addEventListener(
+		"scroll",
+		() => {
+			if (tabs.get(session.id)?.desk === desk) localNotes.align();
+		},
+		{ passive: true },
+	);
 	const outline = el("div", { class: "kalem-theme" });
 	const wordCount = el("div", { class: "kalem-theme" });
 	const views = [noticeHost, desk, outline, wordCount];

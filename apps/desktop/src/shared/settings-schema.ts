@@ -781,6 +781,14 @@ export const SETTINGS_SCHEMA: Schema = {
 		],
 		assistant: "write",
 	},
+	notesAligned: {
+		key: "notesAligned",
+		category: "editor",
+		label: "notesAligned",
+		type: "boolean",
+		keywords: ["not", "notlarım", "notes", "kenar", "margin", "hizala", "align", "satır", "line"],
+		assistant: "write",
+	},
 	localNotes: {
 		key: "localNotes",
 		category: "editor",
