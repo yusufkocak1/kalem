@@ -92,6 +92,11 @@ export interface Settings extends Typography {
 	readonly codeLineNumbers: boolean;
 	/** The simplified ribbon: one row of buttons, the groups' names left out (Ctrl+F1). */
 	readonly ribbonSimple: boolean;
+	/**
+	 * The documents' tabs in the window's title bar, which Kalem draws itself;
+	 * off, the system's title bar. A window takes it when it opens.
+	 */
+	readonly tabsInTitleBar: boolean;
 	readonly navigation: boolean;
 	readonly autoSave: boolean;
 	readonly spellCheck: boolean;
@@ -194,6 +199,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	lineNumbers: false,
 	codeLineNumbers: true,
 	ribbonSimple: false,
+	tabsInTitleBar: true,
 	...DEFAULT_TYPOGRAPHY,
 	navigation: true,
 	autoSave: false,
@@ -531,7 +537,18 @@ export interface Startup {
 	readonly active?: string;
 	/** URL scheme that serves document-relative images. */
 	readonly documentScheme: string;
+	/**
+	 * How this window's title bar is drawn: by Kalem, with the system's window
+	 * buttons laid over its right end ("overlay": Windows, Linux) or its
+	 * traffic lights at its left ("inset": macOS); `null`, by the system.
+	 */
+	readonly titleBar: TitleBar;
 }
+
+export type TitleBar = "overlay" | "inset" | null;
+
+/** The title bar Kalem draws, for the system's window buttons over it. */
+export const TITLE_BAR_HEIGHT = 38;
 
 /** What the renderer knows of a tab that is moving to another window. */
 export interface MovedTab {
@@ -993,6 +1010,8 @@ export interface KalemBridge {
 	reloadDocument(tabId: string): Promise<OpenedFile | null>;
 	reportState(tabId: string, state: WindowState): void;
 	tabActivated(tabId: string): void;
+	/** The title bar's colours, for the system's window buttons drawn over it. */
+	titleBarColors(color: string, symbolColor: string): void;
 	/** Asks the user what to do with an unsaved tab that is about to close. */
 	confirmCloseTab(tabId: string): Promise<CloseChoice>;
 	tabClosed(tabId: string): void;
@@ -1263,6 +1282,7 @@ export const CHANNEL = {
 	reloadDocument: "kalem:reload-document",
 	reportState: "kalem:report-state",
 	tabActivated: "kalem:tab-activated",
+	titleBarColors: "kalem:title-bar-colors",
 	confirmCloseTab: "kalem:confirm-close-tab",
 	tabClosed: "kalem:tab-closed",
 	answerSave: "kalem:answer-save",

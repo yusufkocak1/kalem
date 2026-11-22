@@ -310,6 +310,23 @@ export const SETTINGS_SCHEMA: Schema = {
 		],
 		assistant: "write",
 	},
+	tabsInTitleBar: {
+		key: "tabsInTitleBar",
+		category: "appearance",
+		label: "tabsInTitleBar",
+		type: "boolean",
+		keywords: [
+			"başlık çubuğu",
+			"title bar",
+			"sekme",
+			"tab",
+			"pencere",
+			"window",
+			"çerçeve",
+			"frame",
+		],
+		assistant: "write",
+	},
 	ribbonSimple: {
 		key: "ribbonSimple",
 		category: "appearance",

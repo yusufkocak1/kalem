@@ -109,6 +109,8 @@ const bridge: KalemBridge = {
 	reloadDocument: (tabId) => ipcRenderer.invoke(CHANNEL.reloadDocument, tabId),
 	reportState: (tabId, state) => ipcRenderer.send(CHANNEL.reportState, tabId, state),
 	tabActivated: (tabId) => ipcRenderer.send(CHANNEL.tabActivated, tabId),
+	titleBarColors: (color, symbolColor) =>
+		ipcRenderer.send(CHANNEL.titleBarColors, color, symbolColor),
 	confirmCloseTab: (tabId) => ipcRenderer.invoke(CHANNEL.confirmCloseTab, tabId),
 	tabClosed: (tabId) => ipcRenderer.send(CHANNEL.tabClosed, tabId),
 	answerSave: (tabId, saved) => ipcRenderer.send(CHANNEL.answerSave, tabId, saved),

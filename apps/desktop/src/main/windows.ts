@@ -13,9 +13,10 @@ import type {
 	SessionSnapshot,
 	Settings,
 	TabDocument,
+	TitleBar,
 	WindowState,
 } from "../shared/bridge.js";
-import { CHANNEL } from "../shared/bridge.js";
+import { CHANNEL, TITLE_BAR_HEIGHT } from "../shared/bridge.js";
 import type { LegacyEncoding } from "../shared/encoding.js";
 import { DEFAULT_FORMAT, toTextFormat } from "../shared/encoding.js";
 import type { Lang, Strings } from "../shared/i18n.js";
@@ -78,6 +79,8 @@ export interface AppWindow {
 	sessionRequest: ((snapshot: unknown) => void) | null;
 	/** Closed with the app: its drafts are kept, to come back next time. */
 	keepDrafts: boolean;
+	/** How its title bar is drawn, fixed when it opened (`tabsInTitleBar`). */
+	readonly titleBar: TitleBar;
 }
 
 /** How a window is opened: where (a restored window's place) and which tab is active. */
@@ -159,6 +162,11 @@ export class WindowManager {
 		// A window opened after the app's last window closed (macOS, the tray) starts a new session.
 		if (!this.#quitting && this.#windows.size === 0) this.#session.clear();
 		const bounds = options.bounds ?? this.#initialBounds();
+		const titleBar: TitleBar = !this.#options.store.settings.tabsInTitleBar
+			? null
+			: process.platform === "darwin"
+				? "inset"
+				: "overlay";
 		const window = new BrowserWindow({
 			width: bounds.width,
 			height: bounds.height,
@@ -170,6 +178,19 @@ export class WindowManager {
 			icon: join(__dirname, "icon.png"),
 			backgroundColor: this.backgroundColor(),
 			autoHideMenuBar: true,
+			// The tabs take the title bar's row; the system's window buttons stay, over it.
+			...(titleBar === "inset"
+				? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 14, y: 12 } }
+				: titleBar === "overlay"
+					? {
+							titleBarStyle: "hidden" as const,
+							titleBarOverlay: {
+								color: this.backgroundColor(),
+								symbolColor: nativeTheme.shouldUseDarkColors ? "#e8e6e1" : "#22201d",
+								height: TITLE_BAR_HEIGHT,
+							},
+						}
+					: {}),
 			webPreferences: {
 				preload: this.#options.preloadPath,
 				contextIsolation: true,
@@ -191,6 +212,7 @@ export class WindowManager {
 			saveRequests: new Map(),
 			sessionRequest: null,
 			keepDrafts: false,
+			titleBar,
 		};
 		const initial = documents.length > 0 ? documents : [this.#emptyDocument()];
 		for (const document of initial) {

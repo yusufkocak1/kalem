@@ -263,6 +263,14 @@ verir.
   arasında gezer. Her sekmenin kendi geri alma geçmişi, kayıt durumu ve
   kurtarma taslağı vardır. Zaten açık olan belge yeniden açılmaz, sekmesi
   öne gelir. Son sekme kapanınca pencere kapanır.
+- **Sekmeler başlık çubuğunda:** pencerenin başlık çubuğunu Kalem çizer;
+  belgelerin sekmeleri onun satırındadır, böylece ayrı bir sekme satırı
+  kalmaz. Sistemin pencere düğmeleri (küçült, büyüt, kapat) Windows ve
+  Linux'ta satırın sağ ucunda, macOS'ta trafik ışıkları solundadır;
+  renkleri tema ve paletle değişir. Satırın boş yeri pencereyi sürükler,
+  çift tıklamak büyütür. **Ayarlar → Görünüm → Sekmeler Başlık Çubuğunda**
+  kapatılırsa sistemin başlık çubuğu döner ve sekmeler şeridin altına iner;
+  değişiklik yeni açılan pencerelerde geçerlidir.
 - **Hızlı Not** (**Dosya → Hızlı Not**, `Ctrl+Shift+Alt+N`): açık
   klasörde, klasör yoksa `Belgeler\Kalem Notları` içinde
   `Not 2026-10-05 14.30.md` gibi tarihli bir not açar. Dosya ancak bir şey

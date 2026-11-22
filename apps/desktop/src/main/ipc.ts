@@ -16,7 +16,7 @@ import type {
 	WindowState,
 	Workspace,
 } from "../shared/bridge.js";
-import { CHANNEL } from "../shared/bridge.js";
+import { CHANNEL, TITLE_BAR_HEIGHT } from "../shared/bridge.js";
 import { COMMIT_MESSAGE_PROMPT, cleanCommitMessage } from "../shared/commit-message.js";
 import { toTextFormat } from "../shared/encoding.js";
 import type { Lang, Strings } from "../shared/i18n.js";
@@ -202,6 +202,7 @@ export function registerIpc(ctx: IpcContext): void {
 			documents: await windows.takePending(win),
 			...(win.activeTabId === null ? {} : { active: win.activeTabId }),
 			documentScheme: DOCUMENT_SCHEME,
+			titleBar: win.titleBar,
 		};
 	});
 
@@ -375,6 +376,15 @@ export function registerIpc(ctx: IpcContext): void {
 
 	on(CHANNEL.tabActivated, (win, tabId) => {
 		if (typeof tabId === "string") windows.setActiveTab(win, tabId);
+	});
+
+	on(CHANNEL.titleBarColors, (win, color, symbolColor) => {
+		if (win.titleBar !== "overlay" || typeof color !== "string" || typeof symbolColor !== "string")
+			return;
+		// Only colours the renderer computed: #rrggbb or rgb()/rgba().
+		const valid = (value: string): boolean => /^(#[0-9a-f]{6}|rgba?\([\d.,\s%]+\))$/i.test(value);
+		if (!valid(color) || !valid(symbolColor)) return;
+		win.window.setTitleBarOverlay({ color, symbolColor, height: TITLE_BAR_HEIGHT });
 	});
 
 	ipcMain.handle(CHANNEL.confirmCloseTab, (event, tabId: unknown) => {

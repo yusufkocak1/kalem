@@ -690,11 +690,38 @@ const tabStrip = createTabStrip({
 	onDragOut: (id, x, y) => moveTab(id, { x, y }),
 });
 
+/**
+ * The window's title bar, when Kalem draws it (`tabsInTitleBar`): the
+ * documents' tabs, in the row the system's title bar took, which drags the
+ * window; the system's window buttons are over its right end (Windows,
+ * Linux) or its traffic lights at its left (macOS).
+ */
+const titleBar =
+	startup.titleBar === null
+		? null
+		: el("div", {
+				class: "title-bar",
+				attrs: { "data-kind": startup.titleBar },
+				children: [tabStrip.element],
+			});
+
+/** The system's window buttons take the title bar's colours, the theme's and the palette's. */
+let titleBarColors = "";
+function syncTitleBar(): void {
+	if (titleBar === null || startup.titleBar !== "overlay") return;
+	const style = getComputedStyle(titleBar);
+	const colors = `${style.backgroundColor}|${style.color}`;
+	if (colors === titleBarColors) return;
+	titleBarColors = colors;
+	bridge.titleBarColors(style.backgroundColor, style.color);
+}
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", syncTitleBar);
+
 const app = document.getElementById("app") ?? document.body.appendChild(el("div"));
 app.className = "app";
+app.toggleAttribute("data-title-bar", titleBar !== null);
 app.append(
-	ribbonHost,
-	tabStrip.element,
+	...(titleBar === null ? [ribbonHost, tabStrip.element] : [titleBar, ribbonHost]),
 	noticeArea,
 	el("div", {
 		class: "body",
@@ -1352,6 +1379,7 @@ function applySettings(): void {
 	localNotes.refresh();
 	foldEmptyOutline();
 	fitSidePanes();
+	syncTitleBar();
 }
 
 function updateSettings(patch: Partial<Settings>): void {

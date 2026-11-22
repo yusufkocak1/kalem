@@ -740,6 +740,58 @@ button {
 	opacity: 0.4;
 }
 
+/* --- Title bar: drawn by Kalem, with the documents' tabs (`tabsInTitleBar`) --- */
+
+.title-bar {
+	display: flex;
+	flex: none;
+	align-items: flex-end;
+	/* TITLE_BAR_HEIGHT in bridge.ts: the system's window buttons are as tall. */
+	height: 38px;
+	/* Clear of the window buttons the system draws over the right end. */
+	padding-left: env(titlebar-area-x, 0px);
+	padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));
+	border-bottom: 1px solid var(--app-border);
+	background: var(--app-desk);
+	color: var(--app-text);
+	user-select: none;
+	/* The empty part drags the window; double-clicking it maximizes it. */
+	app-region: drag;
+}
+
+/* macOS: the traffic lights are at the left. */
+.title-bar[data-kind="inset"] {
+	padding-left: 80px;
+}
+
+.title-bar > .tabstrip {
+	flex: 1;
+	min-width: 0;
+	height: 100%;
+	border-bottom: 0;
+	background: none;
+}
+
+.title-bar .doc-tab,
+.title-bar .doc-tab-new {
+	app-region: no-drag;
+}
+
+/* The active tab is of a piece with the ribbon under it. */
+.title-bar .doc-tab[aria-selected="true"] {
+	position: relative;
+	z-index: 1;
+	height: 31px;
+	margin-bottom: -1px;
+	background: var(--app-surface);
+}
+
+/* Focus mode keeps the bar (it drags the window, the window's buttons are on
+   it) without the tabs; the way out is below it. */
+.app[data-title-bar] .focus-exit {
+	top: 48px;
+}
+
 /* --- Document tabs ------------------------------------------------------- */
 
 .tabstrip {
