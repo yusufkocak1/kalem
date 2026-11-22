@@ -2,6 +2,7 @@ import { parse } from "@kalem-editor/core";
 import { renderToDOM } from "@kalem-editor/viewer";
 import type { AssistantAction, DocumentAction } from "../shared/actions.js";
 import { commandLabel, isDocumentAction } from "../shared/actions.js";
+import { suggestionsFor } from "../shared/assistant-suggestions.js";
 import type {
 	AssistantPlace,
 	AssistantStatus,
@@ -92,6 +93,8 @@ export interface AssistantContext {
 export interface AssistantHost {
 	/** The assistant is at work on an answer, or not any more: the status bar says it. */
 	activity?(busy: boolean): void;
+	/** The active document's Markdown, for the empty chat's suggestions. */
+	documentText?(): string;
 	readonly t: Strings;
 	readonly lang: Lang;
 	readonly bridge: KalemBridge;
@@ -181,6 +184,8 @@ export interface AssistantPane {
 	documentEdits(edits: DocumentEdits | null): void;
 	/** A file's changes being reviewed in its tab were decided in part, or the review ended. */
 	editsChanged(): void;
+	/** The active document changed, or another is active: the empty chat's suggestions follow it. */
+	documentChanged(): void;
 	/** A question from elsewhere (the command box): sent when the service is ready, else left in the box. */
 	ask(question: string): void;
 }
@@ -1866,25 +1871,21 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	// --- States --------------------------------------------------------------------
 
 	function renderEmpty(): void {
-		const suggestions = (
-			[
-				[t.assistantSuggestSummary, "file"],
-				[t.assistantSuggestDiagram, "diagram"],
-				[t.assistantSuggestFix, "pencil"],
-				[t.assistantSuggestTable, "table"],
-			] as const
-		).map(([text, name]) => {
-			const suggestion = el("button", {
-				class: "assistant-suggestion",
-				attrs: { type: "button" },
-				children: [icon(name), el("span", { text })],
-			});
-			suggestion.addEventListener("click", () => {
-				input.value = text;
-				void send();
-			});
-			return suggestion;
-		});
+		// What this document has (an issue, an analysis' headings, tables, code) comes first.
+		const suggestions = suggestionsFor(host.documentText?.() ?? "", t).map(
+			({ text, icon: name }) => {
+				const suggestion = el("button", {
+					class: "assistant-suggestion",
+					attrs: { type: "button" },
+					children: [icon(name), el("span", { text })],
+				});
+				suggestion.addEventListener("click", () => {
+					input.value = text;
+					void send();
+				});
+				return suggestion;
+			},
+		);
 		empty.replaceChildren(
 			el("div", { class: "assistant-empty-icon", children: [icon("assistant")] }),
 			el("p", { class: "assistant-empty-title", text: t.assistantWelcome }),
@@ -4294,6 +4295,9 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		},
 		editsChanged() {
 			refreshEditSummary();
+		},
+		documentChanged() {
+			if (active.messages.length === 0) renderEmpty();
 		},
 		ask(question) {
 			if (view !== "chat") void setView("chat");

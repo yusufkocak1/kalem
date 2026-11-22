@@ -107,6 +107,11 @@ export function createVersionHistory(options: VersionHistoryOptions): {
 					text: dateFormat.format(version.time),
 					attrs: { role: "option", tabindex: "0", "data-id": version.id, "aria-selected": "false" },
 				});
+				// The text before the assistant changed it: a way back past what it did.
+				if (version.kind === "assistant") {
+					item.classList.add("versions-assistant");
+					item.append(el("span", { class: "versions-kind", text: t.versionsBeforeAssistant }));
+				}
 				item.addEventListener("click", () => void select(version, item));
 				list.append(item);
 			}

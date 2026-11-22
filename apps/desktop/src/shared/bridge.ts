@@ -672,6 +672,8 @@ export interface Version {
 	readonly time: number;
 	/** In bytes. */
 	readonly size: number;
+	/** `assistant`: the text before the assistant changed it; a save otherwise. */
+	readonly kind?: "assistant";
 }
 
 export interface SearchResult {
@@ -1033,6 +1035,10 @@ export interface KalemBridge {
 	tabActivated(tabId: string): void;
 	/** The title bar's colours, for the system's window buttons drawn over it. */
 	titleBarColors(color: string, symbolColor: string): void;
+	/** The assistant started or finished an answer: the taskbar shows it, and a notification ends it. */
+	assistantActivity(busy: boolean): void;
+	/** The tab's text before the assistant changes it, kept in its version history. */
+	assistantCheckpoint(tabId: string, text: string): void;
 	/** Asks the user what to do with an unsaved tab that is about to close. */
 	confirmCloseTab(tabId: string): Promise<CloseChoice>;
 	tabClosed(tabId: string): void;
@@ -1304,6 +1310,8 @@ export const CHANNEL = {
 	reportState: "kalem:report-state",
 	tabActivated: "kalem:tab-activated",
 	titleBarColors: "kalem:title-bar-colors",
+	assistantActivity: "kalem:assistant-activity",
+	assistantCheckpoint: "kalem:assistant-checkpoint",
 	confirmCloseTab: "kalem:confirm-close-tab",
 	tabClosed: "kalem:tab-closed",
 	answerSave: "kalem:answer-save",

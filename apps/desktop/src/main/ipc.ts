@@ -2,7 +2,7 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { IpcMainEvent, IpcMainInvokeEvent } from "electron";
-import { app, dialog, ipcMain, shell } from "electron";
+import { app, dialog, ipcMain, Notification, shell } from "electron";
 import type {
 	Attachment,
 	DraftRequest,
@@ -379,6 +379,44 @@ export function registerIpc(ctx: IpcContext): void {
 
 	on(CHANNEL.tabActivated, (win, tabId) => {
 		if (typeof tabId === "string") windows.setActiveTab(win, tabId);
+	});
+
+	/**
+	 * The assistant at work: the taskbar's (or the Dock's) progress shows it
+	 * for the window, and when the answer is ready in a window not in front,
+	 * a notification says so; a click on it brings the window.
+	 */
+	const working = new WeakSet<object>();
+	on(CHANNEL.assistantActivity, (win, busy) => {
+		if (typeof busy !== "boolean" || busy === working.has(win)) return;
+		if (busy) {
+			working.add(win);
+			// Above 1: an indeterminate bar where the system has one (Windows).
+			win.window.setProgressBar(2);
+			return;
+		}
+		working.delete(win);
+		win.window.setProgressBar(-1);
+		if (win.window.isFocused() || !Notification.isSupported()) return;
+		const t = ctx.strings();
+		const notice = new Notification({
+			title: t.appName,
+			body: t.assistantDoneNotice,
+			silent: true,
+		});
+		notice.on("click", () => {
+			if (win.window.isDestroyed()) return;
+			if (win.window.isMinimized()) win.window.restore();
+			win.window.focus();
+		});
+		notice.show();
+	});
+
+	// The path is the window's own tab's, not one the renderer names.
+	on(CHANNEL.assistantCheckpoint, (win, tabId, text) => {
+		if (typeof tabId !== "string" || typeof text !== "string") return;
+		const path = win.tabs.get(tabId)?.path ?? null;
+		if (path !== null) void ctx.versions.checkpoint(path, text).catch(() => {});
 	});
 
 	on(CHANNEL.titleBarColors, (win, color, symbolColor) => {

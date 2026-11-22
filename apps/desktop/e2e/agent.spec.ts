@@ -1640,3 +1640,76 @@ test("the selection's bubble and Ctrl+J ask the assistant where the text is, its
 	await stubMessageBox(app, 1);
 	await app.close();
 });
+
+test("the empty chat suggests for this document, a change leaves a point before it in the history, and the taskbar shows the work", async () => {
+	const folder = await tempDir("agent-context");
+	const doc = join(folder, "analiz.md");
+	await writeFile(
+		doc,
+		"# Analiz\n\nBkz. https://jira.example.com/browse/SIP-142\n\n## Kabul Kriterleri\n\nİptal hızlı yapılmalı.\n",
+	);
+	const block = [
+		"Düzeltiyorum.",
+		"",
+		"```kalem-tool",
+		JSON.stringify([
+			{
+				tool: "document_edit",
+				input: {
+					actions: [
+						{ type: "replace", find: "hızlı yapılmalı", replace: "2 saniyede onaylanmalı" },
+					],
+				},
+			},
+		]),
+		"```",
+	].join("\n");
+	const copilot = await fakeCopilot(folder, [
+		['<result tool="document_edit">', "Değiştirdim."],
+		["", block],
+	]);
+	const { app, page, errors } = await launch({
+		args: [doc],
+		settings: { assistant: true, assistantEditReview: false },
+		env: { KALEM_COPILOT: copilot.path, KALEM_CLAUDE: join(folder, "none") },
+	});
+	const pane = page.locator(".assistant");
+	await pane.getByRole("button", { name: "Connection settings" }).click();
+	await pane.locator(".assistant-settings").getByLabel("Service").selectOption("copilot");
+	await pane.locator(".assistant-settings").getByRole("button", { name: "Save" }).click();
+
+	// What this document has comes first: the issue it names, the gaps of an analysis.
+	const suggestions = pane.locator(".assistant-suggestion");
+	await expect(suggestions.first()).toHaveText("Compare this document with SIP-142 in Jira");
+	await expect(suggestions.nth(1)).toHaveText(
+		"Find the missing sections and the requirements that are not testable",
+	);
+
+	// The taskbar's progress while it works, and off after.
+	await app.evaluate(({ BrowserWindow }) => {
+		const calls: number[] = [];
+		(globalThis as { progress?: number[] }).progress = calls;
+		const window = BrowserWindow.getAllWindows()[0];
+		if (window !== undefined) window.setProgressBar = (value: number) => void calls.push(value);
+	});
+	await pane.locator(".assistant-input").fill("Gereksinimi ölçülebilir yap");
+	await pane.locator(".assistant-input").press("Enter");
+	await pane.locator(".assistant-approval").getByRole("button", { name: "Allow" }).click();
+	await expect(page.locator("#editor p").last()).toHaveText("İptal 2 saniyede onaylanmalı.");
+	await expect
+		.poll(() => app.evaluate(() => (globalThis as { progress?: number[] }).progress ?? []))
+		.toEqual([2, -1]);
+
+	// The text before the change: a point of its own in the version history.
+	await clickMenu(app, "File", "Version History…");
+	const versions = page.locator(".versions");
+	await expect(versions).toBeVisible();
+	await expect(versions.locator(".versions-assistant .versions-kind")).toHaveText(
+		"Before the assistant",
+	);
+	await versions.locator(".versions-assistant").click();
+	await expect(versions.locator(".versions-preview")).toContainText("İptal hızlı yapılmalı.");
+	expect(errors).toEqual([]);
+	await stubMessageBox(app, 1);
+	await app.close();
+});

@@ -843,6 +843,19 @@ verir.
   asistanın değişikliği belgede, kabul edilecek ya da geri alınacak öneri
   olarak gelir (panel kapalıysa açılır). Asistan hazır değilse soru panelin
   kutusunda bekler.
+- **Belgeye göre öneriler:** boş sohbetin önerileri açık belgeye bakar. Boş
+  belgede taslak ve başlık iskeleti önerir; Jira anahtarı geçen belgede o
+  kaydı özetlemeyi, analiz başlıkları olan belgede eksik bölümleri ve test
+  edilemeyen gereksinimleri bulmayı, tablolu belgede eksik ya da çelişen
+  satırları, kod bloğu olan belgede kodu adım adım açıklamayı önerir. Sekme
+  değişince ya da belge değişince öneriler yenilenir.
+- **Geri dönüş noktası:** asistan kayıtlı bir belgeyi değiştirmeden önce
+  belgenin o hâli **Sürüm Geçmişi**'ne **Asistan öncesi** etiketiyle yazılır;
+  sonraki kayıtlar bu noktanın yerine geçmez. Oradan tek tıkla geri
+  yüklenir.
+- **Arka planda iş:** asistan çalışırken görev çubuğundaki simgede belirsiz
+  ilerleme görünür; pencere öndeyken değilse iş bitince bir bildirim gelir
+  (tıklayınca pencere öne gelir).
 
 > **3.0'da yeni — analiz öncelikli ajan.** Asistan artık uygulamanın içinde
 > olduğunu biliyor ve Kalem'i kendi araçlarıyla, **izin isteyerek** kullanıyor:

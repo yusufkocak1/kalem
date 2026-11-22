@@ -319,6 +319,13 @@ const quickOpen = createQuickOpen({
 	open: (path) => void bridge.openPath(path),
 	commands: (query) => void commandPalette.show(query, "commands"),
 });
+/** The empty chat's suggestions follow the document, once its typing pauses. */
+let suggestTimer: ReturnType<typeof setTimeout> | undefined;
+function suggestSoon(): void {
+	clearTimeout(suggestTimer);
+	suggestTimer = setTimeout(() => assistant.documentChanged(), 600);
+}
+
 /** Who the app is set up for: asked at its first start, and from the View menu. */
 const rolePicker = createRolePicker({
 	t,
@@ -455,6 +462,9 @@ async function reviewEdits(
 	return true;
 }
 
+/** Set once the first tab is shown: before it, `session` is not there to read. */
+let firstTabShown = false;
+
 /** The assistant at work on an answer: a click shows its panel. */
 const assistantChip = statusChip("status-assistant", t.statusAssistantBusy, "assistant", () => {
 	if (!settings.assistant) updateSettings({ assistant: true });
@@ -464,6 +474,12 @@ const assistantChip = statusChip("status-assistant", t.statusAssistantBusy, "ass
 const assistant = createAssistantPane({
 	activity: (busy) => {
 		assistantChip.hidden = !busy;
+		bridge.assistantActivity(busy);
+	},
+	// Built before the first tab (and before `session` exists): nothing to suggest about till then.
+	documentText: () => {
+		if (!firstTabShown || session.isText) return "";
+		return session.styledMarkdown();
 	},
 	reviewEdits: (edits, settle) => reviewEdits(edits, settle),
 	decideReview: (id, accept) => {
@@ -1412,6 +1428,7 @@ function createTab(id: string): Tab {
 				foldEmptyOutlineSoon();
 				showGoalSoon();
 				documentMap.refresh();
+				suggestSoon();
 			}
 			lineNumbers.refresh();
 		},
@@ -1618,12 +1635,14 @@ function activateTab(id: string): void {
 
 	tabStrip.select(id);
 	bridge.tabActivated(id);
+	firstTabShown = true;
 	clearTimeout(foldTimer);
 	foldEmptyOutline();
 	fitSidePanes();
 	showSelectionCount("");
 	showGoalSoon();
 	documentMap.refresh();
+	assistant.documentChanged();
 	syncEdits();
 	renderState();
 	refreshFiles();
@@ -2646,6 +2665,10 @@ async function applyAssistantActions(
 					excerpt(text),
 				),
 			);
+		}
+		// The text before the assistant's change: a point to go back to in the version history.
+		if (tab.path !== null && result.text !== before.replace(/\r\n?/g, "\n")) {
+			bridge.assistantCheckpoint(tab.id, before);
 		}
 		const reviewing = review ? [...tabs.values()].find((each) => each.session === tab) : undefined;
 		if (reviewing !== undefined && !tab.isText) {
