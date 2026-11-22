@@ -4182,6 +4182,13 @@ button.git-file-path {
 	display: none;
 }
 
+/* A narrow desk has little room above the page: the bar would sit on its edge. */
+@container (max-width: 520px) {
+	.path-bar {
+		display: none;
+	}
+}
+
 /* Only at the top of the page: scrolled, the text goes under where it was. */
 .path-bar[data-away] {
 	opacity: 0;
@@ -6104,6 +6111,9 @@ button.git-file-path {
 
 .notes-list {
 	display: grid;
+	/* As wide as the pane, not as the widest card's head: a narrow pane
+	   wraps the cards' heads instead of scrolling sideways. */
+	grid-template-columns: minmax(0, 1fr);
 	gap: 8px;
 	align-content: start;
 }
@@ -6188,6 +6198,7 @@ button.git-file-path {
 
 .note-head {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
 	gap: 6px;
 	min-height: 22px;

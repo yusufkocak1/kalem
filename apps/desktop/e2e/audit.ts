@@ -173,7 +173,9 @@ export async function auditPage(page: Page): Promise<string[]> {
 			) {
 				if (getComputedStyle(parent).overflowY === "visible") continue;
 				const rect = parent.getBoundingClientRect();
-				if (y < rect.top || y > rect.bottom) {
+				// A pixel's tolerance: a control half scrolled out has its middle
+				// on the list's edge, where what follows the list begins.
+				if (y < rect.top + 1 || y > rect.bottom - 1) {
 					inView = false;
 					break;
 				}
