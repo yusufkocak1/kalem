@@ -15444,3 +15444,99 @@ dialog {
 	flex: none;
 	white-space: nowrap;
 }
+
+/* --- High contrast ------------------------------------------------------------ */
+
+/*
+ * "More contrast" asked of the system (macOS, Windows, GNOME): the greys
+ * move toward the text and the borders and the focus ring are stronger.
+ * The palette's accent stays.
+ */
+@media (prefers-contrast: more) {
+	:root {
+		--app-muted: color-mix(in srgb, var(--app-text) 82%, var(--app-page));
+		--app-border: color-mix(in srgb, var(--app-text) 55%, var(--app-page));
+		--app-hover: color-mix(in srgb, var(--app-text) 14%, transparent);
+		--app-focus-ring: 3px solid var(--app-accent);
+	}
+}
+
+/*
+ * Windows' contrast themes (forced colours): the system paints with its own
+ * few colours, and a background or a shadow that was all that told a state
+ * apart is gone. Here a state is a border, an outline or the system's
+ * Highlight; colours that carry meaning (swatches, file kinds, the goal's
+ * ring, the assistant's changes) keep theirs.
+ */
+@media (forced-colors: active) {
+	:root {
+		--app-focus-ring: 2px solid Highlight;
+	}
+
+	/* What is chosen, pressed, open or current: an outline, not a tint. */
+	:is(
+		[aria-pressed="true"],
+		[aria-selected="true"],
+		[aria-current="true"],
+		[aria-checked="true"],
+		[aria-expanded="true"]
+	):not(input) {
+		outline: 1px solid Highlight;
+		outline-offset: -1px;
+	}
+
+	.ribbon-tab[aria-selected="true"],
+	.doc-tab[aria-selected="true"] {
+		outline: 0;
+		border-bottom: 2px solid Highlight;
+	}
+
+	/* The caret's block: its mark in the margin, drawn by the system. */
+	.kalem-editor > [contenteditable="true"]:focus {
+		border-image: none;
+		border-inline-start: 2px solid Highlight;
+		margin-inline-start: -2px;
+	}
+
+	/* The page had only its white and a shadow to stand out from the desk. */
+	.page {
+		border: 1px solid CanvasText;
+	}
+
+	/* Popovers and menus had only a shadow to stand out from the page. */
+	:is(
+		.selection-ai-menu,
+		.selection-ai-prompt,
+		.ribbon-fold-popup,
+		.status-popover,
+		.command-palette,
+		.link-card,
+		.table-picker,
+		.color-menu
+	) {
+		border: 1px solid CanvasText;
+	}
+
+	/* Colours that say something. */
+	:is(.ribbon-swatch, .palette-swatch, .color-menu, .files-icon, .status-goal-ring, .boot-nib) {
+		forced-color-adjust: none;
+	}
+
+	/* The assistant's change: added text underlined, what it took out struck, each with a bar. */
+	.page [data-ai-change] {
+		border-inline-start: 3px solid Highlight;
+		text-decoration: underline;
+	}
+
+	.page [data-ai-was]::before,
+	.page [data-ai-gone]::after {
+		border-inline-start: 3px solid GrayText;
+		color: GrayText;
+	}
+
+	/* Focus mode's quiet paragraphs: the system's dimmed text, not a lighter opacity. */
+	.app[data-focus] .kalem-editor:has(> [contenteditable]:focus) > [contenteditable]:not(:focus) {
+		opacity: 1;
+		color: GrayText;
+	}
+}

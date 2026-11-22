@@ -1537,6 +1537,15 @@ verir.
 - İmlecin olduğu blok, sol kenar boşluğunda ince bir çizgiyle gösterilir;
   çevresine kutu çizilmez, metin yerinden oynamaz. Yazdırırken ve PDF'te
   çizgi çıkmaz.
+- **Yüksek kontrast:** Windows'un Kontrast temalarında (zorlanmış renkler)
+  basılı, seçili, açık ve geçerli olan her şey sistemin vurgu rengiyle bir
+  çizgi ya da kenarlık olarak gösterilir; yalnızca renk tonuyla ayrılan
+  durumlar kaybolmaz. Sayfanın, menülerin ve açılır kutuların kenarı vardır;
+  imlecin bloğu kenarda bir çizgidir; asistanın eklediği metnin altı çizilir,
+  çıkardığı soluk ve üstü çizili kalır. Anlam taşıyan renkler (renk
+  örnekleri, dosya türleri, hedef halkası) korunur. Sistemde **daha fazla
+  kontrast** istenmişse (macOS, Windows, GNOME) griler ve kenarlıklar
+  koyulaşır, odak halkası kalınlaşır.
 - Klavyeyle odaklanılan her düğme, kutu ve liste öğesi aynı odak halkasını
   gösterir: seçilen paletin vurgu renginde, 2 px. Kendi halkası olmayan bir
   denetim de tarayıcının varsayılanına (Linux'ta turuncu) düşmez.
