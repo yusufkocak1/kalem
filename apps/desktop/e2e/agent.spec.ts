@@ -82,6 +82,11 @@ test("Claude Code changes a setting through Kalem's tools once the user allows i
 	});
 	const pane = page.locator(".assistant");
 	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
+	// Ready, the title does not show the version: the connection settings do.
+	await expect(pane.locator(".assistant-subtitle")).toBeHidden();
+	await pane.getByRole("button", { name: "Connection settings" }).click();
+	await expect(pane.locator(".assistant-in-use")).toHaveText("In use: 9.9.9 (Claude Code)");
+	await pane.locator(".assistant-settings").getByRole("button", { name: "Cancel" }).click();
 	await pane.locator(".assistant-input").fill("Koyu temaya geç, dosyaları alta al");
 	await pane.locator(".assistant-input").press("Enter");
 

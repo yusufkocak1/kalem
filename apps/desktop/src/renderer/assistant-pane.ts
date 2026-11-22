@@ -2158,8 +2158,11 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		sendButton.disabled = !ready && !busy;
 		refreshDocumentChip();
 		drawModeButton();
+		// The service's version is the settings' business (Settings → Assistant): the
+		// title says it only while there is something to say, looking or missing.
 		subtitle.textContent = status === null ? t.assistantLooking : status.label;
 		subtitle.title = status?.detail ?? "";
+		subtitle.hidden = ready;
 		settingsButton.setAttribute("aria-pressed", String(view === "settings"));
 		historyButton.setAttribute("aria-pressed", String(view === "history"));
 		sendButton.replaceChildren(icon(busy ? "stop" : "send"));

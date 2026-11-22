@@ -1045,7 +1045,9 @@ verir.
   sohbet paneli açar (düğmeye yeniden basmak kapatır). Panelin sol kenarı
   sürüklenerek genişletilip daraltılır (odaktayken ok tuşları da çalışır,
   çift tıklamak varsayılan genişliğe döndürür); genişlik hatırlanır. Paneldeki ⚙ (**Bağlantı ayarları**) asistanın hangi
-  hizmeti kullanacağını seçer:
+  hizmeti kullanacağını seçer; hizmet listesinin altında kullanılanın sürümü
+  ya da modeli yazar ("Kullanılan: 2.1.330 (Claude Code)"). Panelin başlığı
+  bunu yalnızca hizmet aranırken ya da bulunamadığında gösterir:
 
   | Hizmet | Nasıl bağlanır |
   |---|---|
