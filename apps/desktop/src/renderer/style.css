@@ -12157,6 +12157,33 @@ dialog[open]::backdrop {
 	height: 14px;
 }
 
+.palette-icon {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+}
+
+/* A command's icon is quiet; a document's keeps the colour of its kind (`.tone-*`). */
+.palette-icon:not(.files-icon) {
+	color: var(--app-muted);
+}
+
+.palette-icon > .icon {
+	width: 16px;
+	height: 16px;
+}
+
+.palette-icon > .icon-letter {
+	font-size: 13px;
+	line-height: 16px;
+}
+
+.palette-item[aria-selected="true"] .palette-icon:not(.files-icon) {
+	color: var(--app-accent);
+}
+
 .palette-name {
 	flex: none;
 	font-weight: 500;

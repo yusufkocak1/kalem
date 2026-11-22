@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PaletteCommand } from "../shared/bridge.js";
-import { rankCommands } from "./command-palette.js";
+import { paletteIcon, rankCommands } from "./command-palette.js";
 
 const command = (label: string, group: string): PaletteCommand => ({
 	id: label,
@@ -8,6 +8,8 @@ const command = (label: string, group: string): PaletteCommand => ({
 	group,
 	accelerator: "",
 	checked: null,
+	action: null,
+	path: null,
 });
 
 const commands = [
@@ -42,5 +44,27 @@ describe("command palette", () => {
 	it("keeps the menu's order with nothing typed", () => {
 		expect(rankCommands(commands, "", "tr")).toHaveLength(commands.length);
 		expect(rankCommands(commands, "", "tr")[0]?.label).toBe("Kaydet");
+	});
+
+	it("finds a recent document by its name first, and by any part of its path", () => {
+		const recent: PaletteCommand = {
+			...command("/home/ali/proje/specs/siparis-iptali.md", "Dosya › Son Kullanılanlar"),
+			path: "/home/ali/proje/specs/siparis-iptali.md",
+		};
+		const all = [command("Sipariş Şablonu", "Ekle"), recent];
+		expect(rankCommands(all, "siparis", "tr")[0]).toBe(recent);
+		expect(rankCommands(all, "specs", "tr")).toEqual([recent]);
+	});
+
+	it("draws a command with its own icon, a menu item and a role with theirs, a document with its kind's", () => {
+		const iconOf = (action: string | null, path: string | null = null) =>
+			paletteIcon({ ...command("x", "y"), action, path });
+		expect(iconOf("bullet-list")).toEqual({ name: "bulletList", tone: null });
+		expect(iconOf("export-docx")).toEqual({ name: "word", tone: null });
+		expect(iconOf("item:open-folder")).toEqual({ name: "folderOpen", tone: null });
+		expect(iconOf("role:copy")).toEqual({ name: "copy", tone: null });
+		expect(iconOf(null, "/a/b/notlar.md")).toEqual({ name: "file", tone: "markdown" });
+		expect(iconOf("heading-9-nothing")).toBeNull();
+		expect(iconOf(null)).toBeNull();
 	});
 });

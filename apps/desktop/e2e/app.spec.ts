@@ -2071,7 +2071,10 @@ test("offers ways to start and the recent documents under an empty page, until s
 });
 
 test("runs a menu command by name from the command palette, and from > in Quick Open", async () => {
-	const { app, page, errors } = await launch();
+	const folder = await tempDir("palette");
+	const doc = join(folder, "siparis-iptali.md");
+	await writeFile(doc, "# Sipariş\n");
+	const { app, page, errors } = await launch({ args: [doc] });
 	await clickMenu(app, "View", "Command Palette…");
 	const palette = page.locator(".command-palette");
 	await expect(palette).toBeVisible();
@@ -2091,6 +2094,13 @@ test("runs a menu command by name from the command palette, and from > in Quick 
 	await expect(items.first().locator(".palette-check svg")).toHaveCount(1);
 	await input.fill("save as");
 	await expect(items.first().locator(".palette-key")).toHaveText(/Shift\+S$/);
+	// Each command has its icon.
+	await expect(items.first().locator(".palette-icon svg")).toHaveCount(1);
+	// A recent document by its name and folder, not its whole path; found by the folder too.
+	await input.fill(basename(folder));
+	await expect(items.first().locator(".palette-name")).toHaveText("siparis-iptali.md");
+	await expect(items.first().locator(".palette-group")).toContainText(basename(folder));
+	await expect(items.first().locator(".palette-icon.tone-markdown svg")).toHaveCount(1);
 	await page.keyboard.press("Escape");
 
 	// In Quick Open, ">" turns the search into one for commands.

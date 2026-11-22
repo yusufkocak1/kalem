@@ -224,6 +224,12 @@ const LETTERS = {
 
 export type IconName = keyof typeof PATHS | keyof typeof LETTERS;
 
+/** Every icon's name, to tell a name made at run time (a command's) from a missing one. */
+export const iconNames: ReadonlySet<string> = new Set([
+	...Object.keys(PATHS),
+	...Object.keys(LETTERS),
+]);
+
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 /** Decorative: the accessible name comes from the button. */

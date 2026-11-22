@@ -246,6 +246,12 @@ verir.
 - **Hızlı Aç** (`Ctrl+Shift+P`): açık klasörlerdeki dosyaları adla bulup
   açar; yazılan her sözcük yolda geçmeli, adı sözcükle başlayanlar öne
   gelir.
+- **Komut paleti** (`F1`, **Görünüm → Komut Paleti…**; Hızlı Aç'ta `>` ile
+  de): menüdeki her komut adıyla aranır ve `Enter` ile çalışır. Her komutun
+  yanında şeritteki simgesi, menüdeki yeri ve kısayolu görünür; son
+  kullanılan belgeler tam yolla değil, dosya adı ve son iki klasörüyle
+  (türünün renkli simgesiyle) listelenir, yolun herhangi bir parçasıyla
+  bulunur.
 - **Farklı Kaydet** belgeyi başka bir klasöre taşırsa bağlantı verdiği
   görsel ve dosyalar da yeni yerin `.assets` klasörüne kopyalanır ve
   bağlantılar güncellenir (yeni yerden zaten ulaşılabilen dosyalara

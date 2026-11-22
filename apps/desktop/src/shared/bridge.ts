@@ -848,6 +848,14 @@ export interface PaletteCommand {
 	readonly accelerator: string;
 	/** For a check or radio item, whether it is on; `null` for the rest. */
 	readonly checked: boolean | null;
+	/**
+	 * What the item does, which gives it its icon: an app command (`save`), a
+	 * menu item's own name (`item:open`) or an Electron role (`role:copy`);
+	 * `null` when nothing names it.
+	 */
+	readonly action: string | null;
+	/** For a recent document, its path: the palette shows its name and folder. */
+	readonly path: string | null;
 }
 
 export type Command = (typeof COMMANDS)[number];
