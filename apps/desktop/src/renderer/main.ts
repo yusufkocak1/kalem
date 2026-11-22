@@ -618,7 +618,8 @@ showAssistantBusy = (busy) => assistantToggle.toggleAttribute("data-busy", busy)
 /** The assistant's changes waiting in the document, on its button. */
 function showAssistantEdits(count: number): void {
 	assistantBadge.hidden = count <= 0;
-	assistantBadge.textContent = count > 99 ? "99+" : String(count);
+	// Nothing in the button's text without a count: its name is its label.
+	assistantBadge.textContent = count <= 0 ? "" : count > 99 ? "99+" : String(count);
 	assistantToggle.setAttribute(
 		"aria-label",
 		count > 0 ? `${t.assistantPane} (${count})` : t.assistantPane,

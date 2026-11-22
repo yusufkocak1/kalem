@@ -16330,13 +16330,14 @@ dialog {
 	background: var(--app-accent);
 }
 
+/* Against the edge, and no further: the window must not scroll sideways. */
 .stripe-left .stripe-button[aria-pressed="true"]::before {
-	left: -2px;
+	left: -1px;
 }
 
 .stripe-right .stripe-button[aria-pressed="true"]::before,
 .assistant-rail-button[aria-expanded="true"]::before {
-	right: -2px;
+	right: -1px;
 }
 
 .stripe-left .stripe-button:not([aria-pressed="true"]) .icon,
