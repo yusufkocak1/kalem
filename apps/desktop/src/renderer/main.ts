@@ -92,6 +92,7 @@ import { enableColumnResize } from "./table-styles.js";
 import { createTabStrip } from "./tabs.js";
 import { createTemplatePicker } from "./template-picker.js";
 import { measureDiagramText } from "./text-measure.js";
+import { attachTip } from "./tip.js";
 import { createVersionHistory } from "./version-history.js";
 
 import "@kalem-editor/themes/tokens.css";
@@ -285,6 +286,13 @@ const changesDialog = createChangesDialog({
 	reviewBeforeSave: () => settings.confluenceReviewBeforeSave,
 	setReviewBeforeSave: (value) => updateSettings({ confluenceReviewBeforeSave: value }),
 });
+/**
+ * The counts on the edges' buttons follow the notes and the assistant's
+ * changes; set once the buttons are built (the notes come first).
+ */
+let refreshBadges: () => void = () => undefined;
+let showAssistantBusy: (busy: boolean) => void = () => undefined;
+
 // The user's own notes beside the text: on this computer only, never in the document.
 const localNotes = createLocalNotes({
 	t,
@@ -299,7 +307,10 @@ const localNotes = createLocalNotes({
 	},
 	notify: (text, actions) =>
 		session.notices.show({ id: "notes", text, ...(actions === undefined ? {} : { actions }) }),
-	changed: () => documentMap.refresh(),
+	changed: () => {
+		documentMap.refresh();
+		refreshBadges();
+	},
 	// Beside the lines while the pane is at the page's side (not under it) and the setting is on.
 	aligned: () => {
 		if (!settings.notesAligned || !docks.shown().has("notes")) return null;
@@ -412,6 +423,7 @@ function syncEdits(): void {
 	const tab = [...tabs.values()].find((each) => each.session === session);
 	const review = tab?.review;
 	const summary = review?.summary() ?? null;
+	showAssistantEdits(summary?.items.length ?? 0);
 	assistant.documentEdits(
 		review === undefined || summary === null
 			? null
@@ -498,6 +510,7 @@ const assistantChip = statusChip("status-assistant", t.statusAssistantBusy, "ass
 const assistant = createAssistantPane({
 	activity: (busy) => {
 		assistantChip.hidden = !busy;
+		showAssistantBusy(busy);
 		bridge.assistantActivity(busy);
 	},
 	// Built before the first tab (and before `session` exists): nothing to suggest about till then.
@@ -590,6 +603,27 @@ assistantToggle.addEventListener("click", () => {
 	}
 });
 const assistantRail = el("div", { class: "assistant-rail", children: [assistantToggle] });
+const assistantShortcut = `${startup.platform === "darwin" ? "Cmd" : "Ctrl"}+Shift+L`;
+attachTip(
+	assistantToggle,
+	() => `${assistantToggle.getAttribute("aria-label") ?? t.assistantPane} (${assistantShortcut})`,
+	"left",
+);
+const assistantBadge = el("span", {
+	class: "stripe-badge",
+	attrs: { "aria-hidden": "true", hidden: "" },
+});
+assistantToggle.append(assistantBadge);
+showAssistantBusy = (busy) => assistantToggle.toggleAttribute("data-busy", busy);
+/** The assistant's changes waiting in the document, on its button. */
+function showAssistantEdits(count: number): void {
+	assistantBadge.hidden = count <= 0;
+	assistantBadge.textContent = count > 99 ? "99+" : String(count);
+	assistantToggle.setAttribute(
+		"aria-label",
+		count > 0 ? `${t.assistantPane} (${count})` : t.assistantPane,
+	);
+}
 
 // --- Docks: the tool panes on the left, on the right and under the document ---------
 
@@ -637,7 +671,9 @@ const docks = createDocks({
 		fitSidePanes();
 		return true;
 	},
+	badge: (pane) => (pane === "notes" ? localNotes.count() : null),
 });
+refreshBadges = () => docks.refreshBadges();
 const deskColumn = el("div", { class: "desk-column", children: [deskArea, docks.elements.bottom] });
 
 /** The assistant's panel where the settings put it; its button stays at the right edge. */

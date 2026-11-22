@@ -760,9 +760,13 @@ verir.
   yerleştirilir ya da gizlenir. Bir yuva aynı anda bir paneli gösterir ve
   başlığında, asistan paneli gibi, o panelin simgesi ve adı yazar. Panellerin
   sekmeleri pencerenin kenarındadır: sol ve sağ yuvanınkiler asistanın düğmesi
-  gibi **dikey** (solda kendi şeridi, sağda asistanın üstü), alt yuvanınkiler
-  durum çubuğunda **yatay**. Sekme paneli açar; o panel zaten açıksa yuvayı
-  kapatır.
+  gibi **simge** (solda kendi şeridi, sağda asistanın üstü); üzerine gelince
+  ya da klavyeyle odaklanınca adı yanında görünür. Açık panelin düğmesinin
+  kenar tarafında bir çizgi vardır. **Notlarım**'ın düğmesinde belgedeki not
+  sayısı, asistanınkinde belgede bekleyen değişikliklerin sayısı yazar;
+  asistan çalışırken düğmesinde bir nokta yanıp söner. Alt yuvanınkiler durum
+  çubuğunda **yatay** ve adlıdır. Sekme paneli açar; o panel zaten açıksa
+  yuvayı kapatır.
 - Bir panelin sekmesine ya da yuvanın başlığına sağ tıklamak (ya da yuvanın
   **⋯** düğmesi) onu **Sola / Sağa / Alta Taşı** ya da **Gizle** seçeneklerini
   verir. Sağ ve alt yuvalar da kenarlarından sürüklenerek boyutlandırılır

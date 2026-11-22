@@ -19,6 +19,7 @@ import {
 import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
+import { attachTip } from "./tip.js";
 
 export interface DockPane {
 	readonly id: ToolPane;
@@ -42,6 +43,8 @@ export interface DocksOptions {
 	 * it, and nothing is saved. True when it did.
 	 */
 	reveal?(pane: ToolPane): boolean;
+	/** A count on a pane's button (the notes in the document); `null` for none. */
+	badge?(pane: ToolPane): number | null;
 }
 
 export interface Docks {
@@ -53,6 +56,8 @@ export interface Docks {
 	apply(): void;
 	/** The panes on the screen now. */
 	shown(): Set<ToolPane>;
+	/** What the panes' buttons count changed (`badge`). */
+	refreshBadges(): void;
 }
 
 const DEFAULT_SIZE: Readonly<Record<Dock, number>> = {
@@ -282,18 +287,43 @@ export function createDocks(options: DocksOptions): Docks {
 	});
 
 	// --- Laying out -------------------------------------------------------------------
-	function stripeButton(pane: DockPane, pressed: boolean): HTMLButtonElement {
+	/** A pane's count on its button, and in its name for screen readers. */
+	function showBadge(button: HTMLButtonElement, pane: DockPane): void {
+		const count = options.badge?.(pane.id) ?? null;
+		let badge = button.querySelector<HTMLElement>(".stripe-badge");
+		if (count === null || count <= 0) {
+			badge?.remove();
+			button.setAttribute("aria-label", pane.label);
+			return;
+		}
+		if (badge === null) {
+			badge = el("span", { class: "stripe-badge", attrs: { "aria-hidden": "true" } });
+			button.append(badge);
+		}
+		badge.textContent = count > 99 ? "99+" : String(count);
+		button.setAttribute("aria-label", `${pane.label} (${count})`);
+	}
+
+	function stripeButton(pane: DockPane, pressed: boolean, dock: Dock): HTMLButtonElement {
 		const button = el("button", {
 			class: "stripe-button",
 			attrs: {
 				type: "button",
-				title: pane.label,
 				"aria-label": pane.label,
 				"aria-pressed": String(pressed),
 				"data-pane": pane.id,
 			},
 			children: [icon(pane.icon), el("span", { class: "stripe-label", text: pane.label })],
 		});
+		// On the side edges the button is its icon; its name shows beside it.
+		if (dock === "bottom") button.title = pane.label;
+		else
+			attachTip(
+				button,
+				() => button.getAttribute("aria-label") ?? pane.label,
+				dock === "left" ? "right" : "left",
+			);
+		showBadge(button, pane);
 		button.addEventListener("click", () => {
 			if (options.reveal?.(pane.id) === true) return;
 			options.update(togglePane(options.settings(), pane.id, options.available));
@@ -323,7 +353,9 @@ export function createDocks(options: DocksOptions): Docks {
 				pane.element.hidden = id !== active;
 			}
 			view.stripe.replaceChildren(
-				...panes.map((id) => stripeButton(entries.get(id) as DockPane, open && id === active)),
+				...panes.map((id) =>
+					stripeButton(entries.get(id) as DockPane, open && id === active, dock),
+				),
 			);
 			view.stripe.hidden = panes.length === 0;
 		}
@@ -345,6 +377,16 @@ export function createDocks(options: DocksOptions): Docks {
 		},
 		stripes: { left: views.left.stripe, right: views.right.stripe, bottom: views.bottom.stripe },
 		apply,
+		refreshBadges() {
+			for (const dock of DOCKS) {
+				for (const button of views[dock].stripe.querySelectorAll<HTMLButtonElement>(
+					".stripe-button",
+				)) {
+					const pane = entries.get(button.dataset.pane as ToolPane);
+					if (pane !== undefined) showBadge(button, pane);
+				}
+			}
+		},
 		shown: () =>
 			new Set(
 				TOOL_PANES.filter((pane) => isPaneShown(options.settings(), pane, options.available)),

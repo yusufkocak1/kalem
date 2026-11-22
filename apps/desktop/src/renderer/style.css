@@ -16284,3 +16284,153 @@ dialog {
 :root[data-density="comfortable"] .note-balloon {
 	padding-block: 11px 10px;
 }
+
+/* --- The edges' buttons: icons, their names beside them (tip.ts) ----------
+   The panes' buttons on the side edges and the assistant's are their icons;
+   the open pane's has a bar on the edge's side, a count sits on its corner
+   (the notes, the assistant's changes), and its name shows beside it when
+   pointed at. The names stay for screen readers. */
+.stripe-left .stripe-button,
+.stripe-right .stripe-button,
+.assistant-rail-button {
+	position: relative;
+	justify-content: center;
+	width: 30px;
+	height: 32px;
+	padding: 0;
+}
+
+.stripe-left .stripe-label,
+.stripe-right .stripe-label,
+.assistant-rail-label {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.stripe-left .stripe-button .icon,
+.stripe-right .stripe-button .icon,
+.assistant-rail-button .icon {
+	width: 18px;
+	height: 18px;
+}
+
+.stripe-left .stripe-button[aria-pressed="true"]::before,
+.stripe-right .stripe-button[aria-pressed="true"]::before,
+.assistant-rail-button[aria-expanded="true"]::before {
+	content: "";
+	position: absolute;
+	top: 7px;
+	bottom: 7px;
+	width: 2px;
+	border-radius: 2px;
+	background: var(--app-accent);
+}
+
+.stripe-left .stripe-button[aria-pressed="true"]::before {
+	left: -2px;
+}
+
+.stripe-right .stripe-button[aria-pressed="true"]::before,
+.assistant-rail-button[aria-expanded="true"]::before {
+	right: -2px;
+}
+
+.stripe-left .stripe-button:not([aria-pressed="true"]) .icon,
+.stripe-right .stripe-button:not([aria-pressed="true"]) .icon,
+.assistant-rail-button:not([aria-expanded="true"]) .icon {
+	color: var(--app-muted);
+}
+
+.stripe-left .stripe-button:hover .icon,
+.stripe-right .stripe-button:hover .icon,
+.assistant-rail-button:hover .icon {
+	color: var(--app-accent);
+}
+
+.stripe-badge {
+	position: absolute;
+	top: 1px;
+	right: -1px;
+	min-width: 15px;
+	height: 15px;
+	padding: 0 4px;
+	border: 1.5px solid var(--app-surface);
+	border-radius: 8px;
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+	font-size: 9.5px;
+	font-weight: 700;
+	line-height: 12px;
+	text-align: center;
+	box-sizing: border-box;
+}
+
+.stripe-badge[hidden] {
+	display: none;
+}
+
+.stripe-bottom .stripe-badge {
+	position: static;
+	margin-left: 2px;
+}
+
+/* The assistant at work: a dot on its button that breathes. */
+.assistant-rail-button[data-busy]::after {
+	content: "";
+	position: absolute;
+	right: 3px;
+	bottom: 4px;
+	width: 7px;
+	height: 7px;
+	border: 1.5px solid var(--app-surface);
+	border-radius: 50%;
+	background: var(--app-accent);
+	animation: rail-busy 1.4s ease-in-out infinite;
+}
+
+@keyframes rail-busy {
+	50% {
+		opacity: 0.35;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.assistant-rail-button[data-busy]::after {
+		animation: none;
+	}
+}
+
+.app-tip {
+	position: fixed;
+	z-index: 80;
+	padding: 4px 9px;
+	border-radius: 6px;
+	background: var(--app-text);
+	color: var(--app-page);
+	font-size: 12px;
+	font-weight: 500;
+	white-space: nowrap;
+	pointer-events: none;
+	box-shadow: var(--app-shadow-soft);
+}
+
+.app-tip[hidden] {
+	display: none;
+}
+
+@media (forced-colors: active) {
+	.app-tip {
+		border: 1px solid CanvasText;
+	}
+
+	.stripe-badge {
+		border-color: Canvas;
+		forced-color-adjust: none;
+		background: Highlight;
+		color: HighlightText;
+	}
+}
