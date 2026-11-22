@@ -430,10 +430,16 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 				},
 				{ label: t.typographyOpen, click: send(ctx, "typography") },
 				{
-					label: t.lineNumbers,
+					label: t.lineNumbersDocuments,
 					type: "checkbox",
 					checked: settings.lineNumbers,
 					click: () => ctx.changeSettings({ lineNumbers: !settings.lineNumbers }),
+				},
+				{
+					label: t.lineNumbersCode,
+					type: "checkbox",
+					checked: settings.codeLineNumbers,
+					click: () => ctx.changeSettings({ codeLineNumbers: !settings.codeLineNumbers }),
 				},
 				{ type: "separator" },
 				{ label: t.theme, submenu: themes },

@@ -943,7 +943,11 @@ function createTab(id: string): Tab {
 	const lineNumbers = createLineNumbers({
 		page,
 		canvas: tabCanvas,
-		enabled: () => settings.lineNumbers,
+		// The file's lines while its source is shown; on the page, not in focus mode.
+		enabled: () =>
+			tabSession.source?.isSource() === true
+				? settings.codeLineNumbers
+				: settings.lineNumbers && !app.hasAttribute("data-focus"),
 		available: () => !tabSession.isText,
 		snapshot: () => tabSession.lineSnapshot(),
 	});
@@ -1268,7 +1272,7 @@ function applySettings(): void {
 	app.toggleAttribute("data-doc-font", settings.documentFont !== "default");
 	for (const tab of tabs.values()) {
 		tab.lineNumbers.relayout();
-		tab.session.textView?.setLineNumbers(settings.lineNumbers);
+		tab.session.textView?.setLineNumbers(settings.codeLineNumbers);
 	}
 	placeAssistant();
 	assistant.element.hidden = !settings.assistant;
@@ -1310,6 +1314,7 @@ deskArea.addEventListener(
 
 function toggleFocusMode(): void {
 	app.toggleAttribute("data-focus");
+	for (const tab of tabs.values()) tab.lineNumbers.refresh();
 	scheduleRibbonUpdate();
 }
 

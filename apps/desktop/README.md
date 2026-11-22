@@ -1457,6 +1457,13 @@ verir.
   pencerede yeni sekme olur.
 - Açık / koyu / sistem teması, yakınlaştırma, tam genişlik, odak modu,
   salt okunur kip, yazım denetimi.
+- **Satır numaraları:** belgenin sayfasında başta kapalıdır; sayfa bir
+  sayfa gibi okunur. **Görünüm → Belgelerde Satır Numaraları** (ya da
+  Görünüm şeridindeki düğme) açar: her bloğun yanında Markdown dosyasındaki
+  satırı yazar. Odak modunda gizlenir. Metin ve kod sekmelerinde ve Markdown
+  kaynağı kipinde numaralar başta açıktır, **Görünüm → Metin Dosyalarında ve
+  Kaynak Kipinde Satır Numaraları** ile ayrıca kapatılır. Şeritteki düğme
+  bulunduğunuz yerinkini (belge ya da metin/kaynak) açıp kapatır.
 - Klavyeyle odaklanılan her düğme, kutu ve liste öğesi aynı odak halkasını
   gösterir: seçilen paletin vurgu renginde, 2 px. Kendi halkası olmayan bir
   denetim de tarayıcının varsayılanına (Linux'ta turuncu) düşmez.

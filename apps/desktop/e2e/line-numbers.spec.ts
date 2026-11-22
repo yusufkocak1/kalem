@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { deflateSync } from "node:zlib";
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
-import { launch, stubMessageBox, tempDir } from "./launch.js";
+import { clickMenu, launch, stubMessageBox, tempDir } from "./launch.js";
 
 /** A plain grey PNG of the given size. */
 function png(width: number, height: number): Buffer {
@@ -99,7 +99,7 @@ test("numbers a document's lines beside them, below a tall image too", async () 
 	await writeFile(join(folder, "tall.png"), png(60, 400));
 	const path = join(folder, "belge.md");
 	await writeFile(path, DOC);
-	const { app, page, errors } = await launch({ args: [path] });
+	const { app, page, errors } = await launch({ args: [path], settings: { lineNumbers: true } });
 	try {
 		await expect(page.locator("#editor h1")).toHaveText("Amaç ve Kapsam");
 		await page
@@ -153,6 +153,44 @@ test("numbers a document's lines beside them, below a tall image too", async () 
 		expect(errors).toEqual([]);
 		// Closing does not save the edit.
 		await stubMessageBox(app, 1);
+	} finally {
+		await app.close();
+	}
+});
+
+test("a document's page has no numbers at first; its source has, and focus mode hides the page's", async () => {
+	const folder = await tempDir("lines-default");
+	const path = join(folder, "belge.md");
+	await writeFile(path, "# Başlık\n\nBir paragraf.\n");
+	const { app, page } = await launch({ args: [path] });
+	try {
+		await expect(page.locator("#editor h1")).toHaveText("Başlık");
+		const numbersOnPage = page.locator(".page:not([hidden]) .line-number");
+		await expect(page.locator(".page:not([hidden])")).not.toHaveAttribute("data-line-numbers");
+		await expect(numbersOnPage).toHaveCount(0);
+
+		// Source mode is a code editor's view: its lines are numbered.
+		await page.locator('[data-tab="view"]').click();
+		await clickMenu(app, "View", "Markdown Source");
+		await expect(numbersOnPage.first()).toBeVisible();
+		await expect(page.locator('[data-command="line-numbers"]')).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		);
+		await clickMenu(app, "View", "Markdown Source");
+		await expect(numbersOnPage).toHaveCount(0);
+		await expect(page.locator('[data-command="line-numbers"]')).toHaveAttribute(
+			"aria-pressed",
+			"false",
+		);
+
+		// Turned on for the page, they still give way to focus mode.
+		await page.locator('[data-command="line-numbers"]').click();
+		await expect(numbersOnPage.first()).toBeVisible();
+		await clickMenu(app, "View", "Focus Mode");
+		await expect(numbersOnPage).toHaveCount(0);
+		await clickMenu(app, "View", "Focus Mode");
+		await expect(numbersOnPage.first()).toBeVisible();
 	} finally {
 		await app.close();
 	}

@@ -683,7 +683,7 @@ export class Session {
 			lang: language,
 			text,
 			path: this.#path ?? "",
-			lineNumbers: this.#o.settings().lineNumbers,
+			lineNumbers: this.#o.settings().codeLineNumbers,
 			onChange: () => this.#textChanged(),
 			onCaret: (line, column) => {
 				wordCount.textContent = format(t.textPosition, line, column);

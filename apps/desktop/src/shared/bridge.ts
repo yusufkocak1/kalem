@@ -82,8 +82,14 @@ export interface Settings extends Typography {
 	/** Document zoom in percent. */
 	readonly zoom: number;
 	readonly fullWidth: boolean;
-	/** Line numbers beside the page (the file's lines) and beside a text file. */
+	/**
+	 * Line numbers beside a document's page (the file's lines). Off at first:
+	 * a page is read as a page, and the Markdown file's lines mean little to
+	 * someone who does not write Markdown.
+	 */
 	readonly lineNumbers: boolean;
+	/** Line numbers beside a text or code file, and beside a document in source mode. */
+	readonly codeLineNumbers: boolean;
 	readonly navigation: boolean;
 	readonly autoSave: boolean;
 	readonly spellCheck: boolean;
@@ -183,7 +189,8 @@ export const DEFAULT_SETTINGS: Settings = {
 	language: null,
 	zoom: 100,
 	fullWidth: false,
-	lineNumbers: true,
+	lineNumbers: false,
+	codeLineNumbers: true,
 	...DEFAULT_TYPOGRAPHY,
 	navigation: true,
 	autoSave: false,

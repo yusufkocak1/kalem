@@ -130,6 +130,7 @@ describe("resetPatch", () => {
 			zoom: DEFAULT_SETTINGS.zoom,
 			fullWidth: DEFAULT_SETTINGS.fullWidth,
 			lineNumbers: DEFAULT_SETTINGS.lineNumbers,
+			codeLineNumbers: DEFAULT_SETTINGS.codeLineNumbers,
 		});
 		const panels = resetPatch("panels");
 		expect(panels.panePlaces).toEqual(DEFAULT_SETTINGS.panePlaces);

@@ -81,6 +81,11 @@ export function createAppRibbon(
 		return ctx.inCodeBlock();
 	}
 
+	/** A text file, or a document's source: the numbers there are a code editor's, set apart. */
+	function codeLines(): boolean {
+		return ctx.session().isText || ctx.inSource();
+	}
+
 	function isList(ordered: boolean): boolean {
 		const block = currentBlock();
 		return block?.type === "list" && block.ordered === ordered;
@@ -573,8 +578,11 @@ export function createAppRibbon(
 							"line-numbers",
 							t.lineNumbers,
 							"lineNumbers",
-							() => ctx.settings().lineNumbers,
-							() => ctx.updateSettings({ lineNumbers: !ctx.settings().lineNumbers }),
+							() => (codeLines() ? ctx.settings().codeLineNumbers : ctx.settings().lineNumbers),
+							() =>
+								codeLines()
+									? ctx.updateSettings({ codeLineNumbers: !ctx.settings().codeLineNumbers })
+									: ctx.updateSettings({ lineNumbers: !ctx.settings().lineNumbers }),
 						),
 					],
 				},
