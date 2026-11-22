@@ -807,6 +807,16 @@ verir.
 
 **Yapay Zekâ Asistanı**
 
+- **Metnin yanında asistan:** bir şey seçince çıkan balonda **✦ Asistan**
+  düğmesi var. Asistan panelinin seçim için sunduklarını (İyileştir, Kısalt,
+  Yazımı düzelt, Çevir, Açıkla) seçimin yanında açar ve **Kendi isteğini
+  yaz…** ile isteğin yazılır. `Ctrl+J` (**Görünüm → Burada Asistana Sor…**)
+  aynı kutuyu imlecin altında açar, seçim olsun olmasın: `Enter` gönderir,
+  `Esc` kutuyu kapatır ve imleci yerine koyar. Soru seçimle birlikte gider;
+  asistanın değişikliği belgede, kabul edilecek ya da geri alınacak öneri
+  olarak gelir (panel kapalıysa açılır). Asistan hazır değilse soru panelin
+  kutusunda bekler.
+
 > **3.0'da yeni — analiz öncelikli ajan.** Asistan artık uygulamanın içinde
 > olduğunu biliyor ve Kalem'i kendi araçlarıyla, **izin isteyerek** kullanıyor:
 >

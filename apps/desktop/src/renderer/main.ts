@@ -75,6 +75,7 @@ import { Previews } from "./previews.js";
 import { documentImages } from "./prompt-images.js";
 import { createQuickOpen, workspaceItems } from "./quick-open.js";
 import { createAppRibbon } from "./ribbon-layout.js";
+import { createSelectionAssistant } from "./selection-assistant.js";
 import type { ConfluenceMergePlan } from "./session.js";
 import { ipcErrorMessage, Session } from "./session.js";
 import { createSettingsDialog } from "./settings-dialog.js";
@@ -219,6 +220,15 @@ const quickOpen = createQuickOpen({
 	open: (path) => void bridge.openPath(path),
 	commands: (query) => void commandPalette.show(query, "commands"),
 });
+/** The assistant where the text is: in the selection's bubble, and under the caret (Ctrl+J). */
+const selectionAssistant = createSelectionAssistant({
+	t,
+	ask: (prompt) => {
+		if (!settings.assistant) updateSettings({ assistant: true });
+		assistant.ask(prompt);
+	},
+});
+
 /** The menu's commands by name (F1, or `>` in Quick Open). */
 const commandPalette = createCommandPalette({
 	t,
@@ -977,6 +987,7 @@ function createTab(id: string): Tab {
 			if (loaded) showStart();
 		},
 		onConfluenceMerge: () => void showConfluenceMerge(tabSession),
+		decorateBubble: (bubble) => selectionAssistant.decorate(bubble),
 		onEditorChange: () => {
 			review.changed();
 			scheduleRibbonUpdate();
@@ -1633,6 +1644,10 @@ const commands: Record<Command, () => void> = {
 		}),
 	"collapse-spaces": () => rewriteText(collapseSpaces),
 	assistant: () => toggleAssistant(),
+	"assistant-prompt": () => {
+		if (session.isText || !canEdit()) return;
+		selectionAssistant.prompt();
+	},
 	"version-history": () => {
 		const tab = session;
 		void versionHistory.show({
@@ -1702,6 +1717,15 @@ ribbon.setSimple(settings.ribbonSimple);
 document.addEventListener("selectionchange", scheduleRibbonUpdate);
 
 // Shift+F3 cycles the case, as in Word; the menu only shows the shortcut.
+// Ctrl+J opens the assistant's box under the caret, in the document; the menu only shows the shortcut.
+document.addEventListener("keydown", (event) => {
+	if (event.key !== "j" && event.key !== "J") return;
+	if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey) return;
+	if (!(document.activeElement instanceof Node) || !canvas.contains(document.activeElement)) return;
+	event.preventDefault();
+	commands["assistant-prompt"]();
+});
+
 document.addEventListener("keydown", (event) => {
 	if (event.key !== "F3" || !event.shiftKey || event.ctrlKey || event.altKey || event.metaKey)
 		return;

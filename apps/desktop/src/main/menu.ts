@@ -445,6 +445,12 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 					click: send(ctx, "assistant"),
 				},
 				{
+					label: t.selectionAssistantMenu,
+					// The document takes the key itself, where the caret is.
+					...editorShortcut("CmdOrCtrl+J"),
+					click: send(ctx, "assistant-prompt"),
+				},
+				{
 					label: t.markdownSource,
 					...editorShortcut("CmdOrCtrl+Shift+M"),
 					click: send(ctx, "source"),

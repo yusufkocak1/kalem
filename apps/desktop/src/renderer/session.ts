@@ -93,6 +93,8 @@ export interface SessionOptions {
 	onStateChange(): void;
 	/** Selection or content changed. */
 	onEditorChange(): void;
+	/** A new editor's selection bubble: the app adds its own buttons to it. */
+	decorateBubble?(bubble: HTMLElement): void;
 	/** Saving found a newer version of the page on Confluence: the user may merge the two. */
 	onConfluenceMerge?(): void;
 }
@@ -657,6 +659,8 @@ export class Session {
 				},
 			],
 		});
+		const bubble = this.#ui.bubbleToolbar?.element;
+		if (bubble !== undefined) this.#o.decorateBubble?.(bubble);
 		this.#pickerItems.clear();
 		this.connectionsChanged();
 		this.#picker = createAtomPicker({

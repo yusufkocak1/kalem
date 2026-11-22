@@ -15086,3 +15086,128 @@ dialog {
 	margin-top: -52px;
 	font-family: system-ui, sans-serif;
 }
+
+/* --- The assistant where the text is: the bubble's button, its menu, Ctrl+J --- */
+
+.bubble-assistant-separator {
+	align-self: stretch;
+	width: 1px;
+	margin: 3px 2px;
+	background: var(--kalem-border);
+}
+
+.kalem-bubble-button.bubble-assistant {
+	gap: 5px;
+	padding: 0 8px 0 6px;
+	color: var(--app-accent);
+	font-weight: 600;
+}
+
+.bubble-assistant > .icon {
+	width: 15px;
+	height: 15px;
+}
+
+.bubble-assistant[aria-expanded="true"] {
+	background: color-mix(in srgb, var(--app-accent) 14%, transparent);
+}
+
+/* Over the bubble (900 in the theme). */
+.selection-ai-menu,
+.selection-ai-prompt {
+	position: fixed;
+	z-index: 950;
+	border: 1px solid var(--app-border);
+	border-radius: 10px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: var(--app-shadow);
+}
+
+.selection-ai-menu {
+	display: grid;
+	min-width: 220px;
+	padding: 4px;
+}
+
+.selection-ai-menu[hidden],
+.selection-ai-prompt[hidden] {
+	display: none;
+}
+
+.selection-ai-item {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	padding: 6px 8px;
+	border: 0;
+	border-radius: 6px;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: start;
+}
+
+.selection-ai-item:hover,
+.selection-ai-item:focus-visible {
+	background: var(--app-hover);
+}
+
+.selection-ai-item > .icon {
+	width: 16px;
+	height: 16px;
+	color: var(--app-muted);
+}
+
+.selection-ai-item > span {
+	flex: 1;
+}
+
+.selection-ai-item > kbd,
+.selection-ai-hint {
+	color: var(--app-muted);
+	font-family: inherit;
+	font-size: 11px;
+}
+
+.selection-ai-separator {
+	height: 1px;
+	margin: 4px 6px;
+	background: var(--app-border);
+}
+
+.selection-ai-prompt {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: min(520px, calc(100vw - 16px));
+	padding: 6px 10px;
+	border-color: color-mix(in srgb, var(--app-accent) 45%, var(--app-border));
+}
+
+.selection-ai-glyph {
+	display: inline-flex;
+	color: var(--app-accent);
+}
+
+.selection-ai-glyph > .icon {
+	width: 16px;
+	height: 16px;
+}
+
+.selection-ai-input {
+	flex: 1;
+	min-width: 0;
+	padding: 6px 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	font-size: 14px;
+	outline: none;
+}
+
+.selection-ai-hint {
+	flex: none;
+	white-space: nowrap;
+}

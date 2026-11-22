@@ -116,6 +116,7 @@ const ACTION_ICONS: Readonly<Record<string, IconName>> = {
 	"command-palette": "find",
 	"network-log": "terminal",
 	typography: "lineSpacing",
+	"assistant-prompt": "assistant",
 	"item:new": "new",
 	"item:new-window": "plus",
 	"item:quick-note": "noteNew",

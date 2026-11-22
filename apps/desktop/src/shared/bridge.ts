@@ -852,6 +852,7 @@ export const COMMANDS = [
 	"format-code",
 	"format-all-code",
 	"assistant",
+	"assistant-prompt",
 	"new-from-template",
 	"command-palette",
 	"network-log",
