@@ -1504,6 +1504,16 @@ verir.
   pencerede yeni sekme olur.
 - Açık / koyu / sistem teması, yakınlaştırma, tam genişlik, odak modu,
   salt okunur kip, yazım denetimi.
+- **Durum çubuğu:** solda Git dalı (açık klasör bir depoysa), bağlıyken
+  **Confluence** ve **Jira** (tıklamak panelini açar), kelime/karakter
+  sayısı, bir şey seçiliyken **seçili kelime sayısı** ve **kelime hedefi**:
+  hedefe tıklayıp bu belge için bir sayı yazılır, ilerlemesi bir halka ve
+  "940 / 1500" olarak görünür; hedef bu bilgisayarda belgenin yoluna (ya da
+  Confluence sayfasına) göre saklanır, **Kaldır** siler. Sağda asistan bir
+  yanıt üzerinde çalışırken **Asistan çalışıyor…** (tıklamak paneli açar),
+  **kayıt durumu** (eskiden şeridin sağ üstündeydi; kaydedilmemişken
+  tıklamak kaydeder), kodlama ve yakınlık; yakınlık değerine tıklamak
+  %80–200 arası hazır değerleri açar.
 - **Odak modu** (`Ctrl+Shift+F`, **Görünüm → Odak Modu**): şerit, sekmeler,
   paneller ve durum çubuğu gizlenir. İmlecin olduğu paragraf tam renkte
   kalır, ötekiler soluklaşır (belgede imleç yokken, okurken, hiçbiri).

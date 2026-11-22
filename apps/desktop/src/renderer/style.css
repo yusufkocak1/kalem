@@ -4321,8 +4321,179 @@ button.git-file-path {
 
 .zoom-value {
 	min-width: 38px;
+	padding: 1px 4px;
+	border-radius: 4px;
 	text-align: right;
 	font-variant-numeric: tabular-nums;
+	cursor: default;
+}
+
+.zoom-value:hover {
+	background: var(--app-hover);
+	color: var(--app-text);
+}
+
+/* The status bar's chips: each does something when clicked. */
+.status-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	height: 20px;
+	padding: 0 6px;
+	border: 0;
+	border-radius: 4px;
+	background: none;
+	color: inherit;
+	font: inherit;
+	white-space: nowrap;
+}
+
+.status-chip:hover {
+	background: var(--app-hover);
+	color: var(--app-text);
+}
+
+.status-chip > .icon {
+	width: 13px;
+	height: 13px;
+}
+
+/* The connections only say they are there: their names are in the tooltip. */
+.status-confluence .status-chip-text,
+.status-jira .status-chip-text {
+	font-size: 11px;
+}
+
+.status-assistant {
+	color: var(--app-accent);
+}
+
+.status-assistant > .icon {
+	animation: status-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes status-pulse {
+	50% {
+		opacity: 0.35;
+	}
+}
+
+.status-selection {
+	color: var(--app-text);
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+}
+
+.status-goal {
+	font-variant-numeric: tabular-nums;
+}
+
+.status-goal:not([data-goal]) {
+	opacity: 0.7;
+}
+
+/* The goal's progress: a ring filled as far as the words have come. */
+.status-goal-ring {
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	background: conic-gradient(var(--app-accent) var(--goal, 0%), var(--app-border) 0);
+	mask: radial-gradient(circle, transparent 3px, #000 3.5px);
+}
+
+.status-goal[data-reached] .status-goal-ring {
+	background: var(--app-ok);
+}
+
+.status-popover {
+	position: fixed;
+	z-index: 60;
+	padding: 6px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: var(--app-shadow);
+	font-size: 12.5px;
+}
+
+.status-popover[hidden] {
+	display: none;
+}
+
+.status-goal-form {
+	display: grid;
+	grid-template-columns: 90px auto auto;
+	gap: 6px;
+	align-items: center;
+	padding: 8px;
+}
+
+.status-goal-form > label {
+	grid-column: 1 / -1;
+	color: var(--app-muted);
+}
+
+.status-goal-input {
+	padding: 4px 6px;
+	border: 1px solid var(--app-border);
+	border-radius: 5px;
+	background: var(--app-surface);
+	color: inherit;
+	font: inherit;
+}
+
+.status-goal-save,
+.status-goal-remove {
+	padding: 4px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 5px;
+	background: var(--app-raised);
+	color: inherit;
+	font: inherit;
+}
+
+.status-goal-save {
+	border-color: var(--app-accent);
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+}
+
+.zoom-menu {
+	display: grid;
+	min-width: 80px;
+}
+
+.zoom-menu-item {
+	padding: 4px 10px;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: end;
+	font-variant-numeric: tabular-nums;
+}
+
+.zoom-menu-item:hover,
+.zoom-menu-item:focus-visible {
+	background: var(--app-hover);
+}
+
+.zoom-menu-item[aria-checked="true"] {
+	color: var(--app-accent);
+	font-weight: 600;
+}
+
+/* The save status, at the status bar's right since the tabs show unsaved ones too. */
+.statusbar .save-status {
+	margin-left: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.status-assistant > .icon {
+		animation: none;
+	}
 }
 
 /* --- Focus mode ---------------------------------------------------------- */

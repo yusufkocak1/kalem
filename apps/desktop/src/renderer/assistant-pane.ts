@@ -90,6 +90,8 @@ export interface AssistantContext {
 }
 
 export interface AssistantHost {
+	/** The assistant is at work on an answer, or not any more: the status bar says it. */
+	activity?(busy: boolean): void;
 	readonly t: Strings;
 	readonly lang: Lang;
 	readonly bridge: KalemBridge;
@@ -2139,6 +2141,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		refreshEditSummary();
 		const ready = status?.ready === true;
 		const busy = active.reply !== null;
+		host.activity?.(busy);
 		const chatting = view === "chat";
 		missing.hidden = status === null || ready || !chatting;
 		if (!missing.hidden) renderMissing();

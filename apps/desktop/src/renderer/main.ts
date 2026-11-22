@@ -3,6 +3,7 @@ import type { BlockType, MarkType } from "@kalem-editor/core/commands";
 import type { Caret, EditResult } from "@kalem-editor/editor";
 import { holderIn, indentItem, outdentItem, selectRange, toggleList } from "@kalem-editor/editor";
 import { outlineOf } from "@kalem-editor/plugin-outline";
+import { countWords } from "@kalem-editor/plugin-word-count";
 import type { DocumentAction } from "../shared/actions.js";
 import { applyActions } from "../shared/actions.js";
 import type {
@@ -59,6 +60,7 @@ import type { TableContext, TableEdit } from "./edits.js";
 import { insertDivider, insertTable, replaceTable, tableAt, toggleTaskList } from "./edits.js";
 import { createFilesPane } from "./files-pane.js";
 import { createGitDialogs } from "./git-dialogs.js";
+import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
 import { createImageViewer } from "./image-viewer.js";
 import { createJiraDialog } from "./jira-dialog.js";
@@ -329,7 +331,16 @@ async function reviewEdits(
 	return true;
 }
 
+/** The assistant at work on an answer: a click shows its panel. */
+const assistantChip = statusChip("status-assistant", t.statusAssistantBusy, "assistant", () => {
+	if (!settings.assistant) updateSettings({ assistant: true });
+	assistant.focus();
+});
+
 const assistant = createAssistantPane({
+	activity: (busy) => {
+		assistantChip.hidden = !busy;
+	},
 	reviewEdits: (edits, settle) => reviewEdits(edits, settle),
 	decideReview: (id, accept) => {
 		// Not when its tab was closed meanwhile: the list applies it to the file as it does any other.
@@ -545,6 +556,8 @@ async function refreshAccounts(): Promise<void> {
 	]);
 	accounts.confluence = confluence !== null;
 	accounts.jira = jira !== null;
+	confluenceChip.hidden = !accounts.confluence;
+	jiraChip.hidden = !accounts.jira;
 	for (const tab of tabs.values()) tab.session.connectionsChanged();
 	updatePublishButton();
 	docks.apply();
@@ -589,13 +602,270 @@ function showGitStatus(git: GitStatus | null): void {
 	gitStatus.title = format(t.statusGitTitle, branch, git.changed, git.ahead, git.behind);
 }
 
+// --- Status bar: what changes as one works, each a way to it -----------------
+
+/** Saved, unsaved, saving, failed: at the status bar's right, as a click saves. */
+const saveStatus = el("div", { class: "save-status", attrs: { role: "status" } });
+// Unsaved or failed: a click saves, as Ctrl+S does.
+saveStatus.addEventListener("click", () => {
+	if (session.status === "unsaved" || session.status === "error") commands.save();
+});
+
+/** A chip of the status bar that does something when clicked. */
+function statusChip(
+	className: string,
+	label: string,
+	glyph: IconName,
+	run: () => void,
+): HTMLButtonElement {
+	const chip = el("button", {
+		class: `status-chip ${className}`,
+		attrs: { type: "button", title: label },
+		children: [icon(glyph), el("span", { class: "status-chip-text", text: label })],
+	});
+	chip.addEventListener("click", run);
+	chip.hidden = true;
+	return chip;
+}
+
+/** Confluence and Jira while connected: a click shows their pane. */
+const confluenceChip = statusChip("status-confluence", "Confluence", "confluence", () => {
+	if (!docks.shown().has("confluence")) updateSettings(revealPane(settings, "confluence"));
+});
+const jiraChip = statusChip("status-jira", "Jira", "target", () => {
+	if (!docks.shown().has("jira")) updateSettings(revealPane(settings, "jira"));
+});
+
+/** The selection's words, while there is one. */
+const selectionCount = el("span", { class: "status-selection" });
+selectionCount.hidden = true;
+function showSelectionCount(text: string): void {
+	const words = text.trim() === "" ? 0 : countWords(text, startup.language);
+	selectionCount.hidden = words === 0;
+	selectionCount.textContent = format(t.statusSelection, words);
+}
+
+/**
+ * A goal in words for the document, kept on this computer by its path (or
+ * its Confluence page); its progress is a ring. A click sets or removes it.
+ */
+const GOALS_KEY = "kalem.wordGoals";
+function readGoals(): Record<string, number> {
+	try {
+		const kept = JSON.parse(localStorage.getItem(GOALS_KEY) ?? "{}") as unknown;
+		return typeof kept === "object" && kept !== null ? (kept as Record<string, number>) : {};
+	} catch {
+		return {};
+	}
+}
+/** Goals of documents not saved yet, for as long as the window is open. */
+const unsavedGoals = new WeakMap<Session, number>();
+function goalKey(tab: Session): string | null {
+	if (tab.path !== null) return `path:${tab.path}`;
+	if (tab.remote !== null) return `confluence:${tab.remote.site}#${tab.remote.id}`;
+	return null;
+}
+function goalOf(tab: Session): number | null {
+	const key = goalKey(tab);
+	const goal = key === null ? unsavedGoals.get(tab) : readGoals()[key];
+	return typeof goal === "number" && goal > 0 ? goal : null;
+}
+function setGoal(tab: Session, goal: number | null): void {
+	const key = goalKey(tab);
+	if (key === null) {
+		if (goal === null) unsavedGoals.delete(tab);
+		else unsavedGoals.set(tab, goal);
+	} else {
+		const goals = readGoals();
+		if (goal === null) delete goals[key];
+		else goals[key] = goal;
+		try {
+			localStorage.setItem(GOALS_KEY, JSON.stringify(goals));
+		} catch {
+			// Storage may be unavailable: the goal lasts as long as the window.
+			unsavedGoals.set(tab, goal ?? 0);
+		}
+	}
+	showGoal();
+}
+
+const goalRing = el("span", { class: "status-goal-ring", attrs: { "aria-hidden": "true" } });
+const goalText = el("span", { class: "status-goal-text" });
+const goalButton = el("button", {
+	class: "status-chip status-goal",
+	attrs: { type: "button", "aria-haspopup": "dialog" },
+	children: [goalRing, goalText],
+});
+const goalInput = el("input", {
+	class: "status-goal-input",
+	attrs: { type: "number", min: "1", step: "50", "aria-label": t.goalLabel },
+});
+const goalSave = el("button", {
+	class: "status-goal-save",
+	text: t.goalSave,
+	attrs: { type: "button" },
+});
+const goalRemove = el("button", {
+	class: "status-goal-remove",
+	text: t.goalRemove,
+	attrs: { type: "button" },
+});
+// Not a <form>: the page's policy (form-action 'none') stops a form's submission.
+const goalForm = el("div", {
+	class: "status-popover status-goal-form",
+	attrs: { role: "dialog", "aria-label": t.goalLabel, hidden: "" },
+	children: [
+		el("label", { text: t.goalLabel, attrs: { for: "status-goal-input" } }),
+		goalInput,
+		goalSave,
+		goalRemove,
+	],
+});
+goalInput.id = "status-goal-input";
+document.body.append(goalForm);
+
+function showGoal(): void {
+	const tab = session as Session | undefined;
+	if (tab === undefined) return;
+	goalButton.hidden = tab.isText;
+	const goal = goalOf(tab);
+	const words = tab.wordCounts()?.words ?? 0;
+	goalButton.toggleAttribute("data-goal", goal !== null);
+	if (goal === null) {
+		goalRing.style.removeProperty("--goal");
+		goalText.textContent = t.goalSet;
+		goalButton.title = t.goalSet;
+		return;
+	}
+	const share = Math.min(1, words / goal);
+	goalRing.style.setProperty("--goal", `${Math.round(share * 100)}%`);
+	goalButton.toggleAttribute("data-reached", words >= goal);
+	goalText.textContent = `${words.toLocaleString(startup.language)} / ${goal.toLocaleString(startup.language)}`;
+	goalButton.title = format(t.goalTitle, words, goal, Math.round(share * 100));
+}
+let goalTimer: ReturnType<typeof setTimeout> | undefined;
+/** The counter counts a moment after a change: the ring follows it. */
+function showGoalSoon(): void {
+	clearTimeout(goalTimer);
+	goalTimer = setTimeout(showGoal, 400);
+}
+
+goalButton.addEventListener("click", () => {
+	if (!goalForm.hidden) {
+		goalForm.hidden = true;
+		return;
+	}
+	goalInput.value = String(goalOf(session) ?? "");
+	goalRemove.hidden = goalOf(session) === null;
+	goalForm.hidden = false;
+	const box = goalButton.getBoundingClientRect();
+	goalForm.style.left = `${Math.max(8, Math.min(box.left, window.innerWidth - goalForm.offsetWidth - 8))}px`;
+	goalForm.style.top = `${box.top - goalForm.offsetHeight - 6}px`;
+	goalInput.focus();
+	goalInput.select();
+});
+function saveGoal(): void {
+	const goal = Math.round(Number(goalInput.value));
+	setGoal(session, Number.isFinite(goal) && goal > 0 ? goal : null);
+	goalForm.hidden = true;
+}
+goalSave.addEventListener("click", saveGoal);
+goalInput.addEventListener("keydown", (event) => {
+	if (event.key === "Enter") {
+		event.preventDefault();
+		saveGoal();
+	}
+});
+goalRemove.addEventListener("click", () => {
+	setGoal(session, null);
+	goalForm.hidden = true;
+});
+goalForm.addEventListener("keydown", (event) => {
+	if (event.key === "Escape") goalForm.hidden = true;
+});
+document.addEventListener(
+	"mousedown",
+	(event) => {
+		const target = event.target as Node;
+		if (!goalForm.hidden && !goalForm.contains(target) && !goalButton.contains(target))
+			goalForm.hidden = true;
+	},
+	true,
+);
+
+/** The zoom's value opens the usual sizes. */
+// On the zoom's steps (ZOOM_STEP): another would be rounded to one.
+const ZOOM_PRESETS = [80, 90, 100, 110, 120, 150, 200] as const;
+const zoomMenu = el("div", {
+	class: "status-popover zoom-menu",
+	attrs: { role: "menu", hidden: "" },
+});
+document.body.append(zoomMenu);
+zoomValue.setAttribute("role", "button");
+zoomValue.setAttribute("tabindex", "0");
+zoomValue.setAttribute("aria-haspopup", "menu");
+zoomValue.title = t.zoom;
+function openZoomMenu(): void {
+	zoomMenu.replaceChildren(
+		...ZOOM_PRESETS.filter((zoom) => zoom >= MIN_ZOOM && zoom <= MAX_ZOOM).map((zoom) => {
+			const item = el("button", {
+				class: "zoom-menu-item",
+				text: `${zoom}%`,
+				attrs: {
+					type: "button",
+					role: "menuitemradio",
+					"aria-checked": String(zoom === settings.zoom),
+				},
+			});
+			item.addEventListener("click", () => {
+				zoomMenu.hidden = true;
+				setZoom(zoom);
+			});
+			return item;
+		}),
+	);
+	zoomMenu.hidden = false;
+	const box = zoomValue.getBoundingClientRect();
+	zoomMenu.style.left = `${Math.min(box.left, window.innerWidth - zoomMenu.offsetWidth - 8)}px`;
+	zoomMenu.style.top = `${box.top - zoomMenu.offsetHeight - 6}px`;
+	zoomMenu.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
+}
+zoomValue.addEventListener("click", () => {
+	if (zoomMenu.hidden) openZoomMenu();
+	else zoomMenu.hidden = true;
+});
+zoomValue.addEventListener("keydown", (event) => {
+	if (event.key === "Enter" || event.key === " ") {
+		event.preventDefault();
+		openZoomMenu();
+	}
+});
+document.addEventListener(
+	"mousedown",
+	(event) => {
+		const target = event.target as Node;
+		if (!zoomMenu.hidden && !zoomMenu.contains(target) && target !== zoomValue)
+			zoomMenu.hidden = true;
+	},
+	true,
+);
+document.addEventListener("keydown", (event) => {
+	if (event.key === "Escape") zoomMenu.hidden = true;
+});
+
 const statusBar = el("footer", {
 	class: "statusbar",
 	children: [
 		docks.stripes.bottom,
 		gitStatus,
+		confluenceChip,
+		jiraChip,
 		wordCountArea,
+		selectionCount,
+		goalButton,
 		el("span", { class: "status-spacer" }),
+		assistantChip,
+		saveStatus,
 		readOnlyBadge,
 		formatBadge,
 		el("div", { class: "zoom", children: [zoomSlider, zoomValue] }),
@@ -606,11 +876,6 @@ const exitFocus = el("button", {
 	class: "focus-exit",
 	text: t.exitFocus,
 	attrs: { type: "button" },
-});
-const saveStatus = el("div", { class: "save-status", attrs: { role: "status" } });
-// Unsaved or failed: a click saves, as Ctrl+S does.
-saveStatus.addEventListener("click", () => {
-	if (session.status === "unsaved" || session.status === "error") commands.save();
 });
 // Publishing to Confluence, always at hand next to the save status while Confluence is connected.
 const publishButton = el("button", {
@@ -632,7 +897,7 @@ changesButton.hidden = true;
 changesButton.addEventListener("click", () => commands["confluence-changes"]());
 const ribbonTrailing = el("div", {
 	class: "ribbon-trailing",
-	children: [publishButton, changesButton, saveStatus],
+	children: [publishButton, changesButton],
 });
 
 /** The publish button is there for a local document, once Confluence is connected. */
@@ -994,6 +1259,7 @@ function createTab(id: string): Tab {
 			if (session === tabSession) {
 				localNotes.refresh();
 				foldEmptyOutlineSoon();
+				showGoalSoon();
 			}
 			lineNumbers.refresh();
 		},
@@ -1203,6 +1469,8 @@ function activateTab(id: string): void {
 	clearTimeout(foldTimer);
 	foldEmptyOutline();
 	fitSidePanes();
+	showSelectionCount("");
+	showGoalSoon();
 	syncEdits();
 	renderState();
 	refreshFiles();
@@ -2060,6 +2328,7 @@ document.addEventListener("selectionchange", () => {
 	if (text !== lastSelection) {
 		lastSelection = text;
 		assistant.refreshSelection();
+		showSelectionCount(text);
 	}
 });
 

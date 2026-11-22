@@ -19,6 +19,7 @@ import type { OutlineItem, OutlinePlugin } from "@kalem-editor/plugin-outline";
 import { outlinePlugin } from "@kalem-editor/plugin-outline";
 import type { SourceModePlugin } from "@kalem-editor/plugin-source-mode";
 import { sourceModePlugin } from "@kalem-editor/plugin-source-mode";
+import type { Counts, WordCountPlugin } from "@kalem-editor/plugin-word-count";
 import { wordCountPlugin } from "@kalem-editor/plugin-word-count";
 import type { Ui } from "@kalem-editor/ui";
 import { labelsFor, mountUi } from "@kalem-editor/ui";
@@ -126,6 +127,7 @@ export class Session {
 	#source: SourceModePlugin | null = null;
 	#images: ImageUploadPlugin | null = null;
 	#outline: OutlinePlugin | null = null;
+	#wordCount: WordCountPlugin | null = null;
 	/** The `@` mention box and the Jira issue box of the `/` menu. */
 	#picker: AtomPicker | null = null;
 	/** The `/` menu items of the picker already in this editor's menu. */
@@ -178,6 +180,11 @@ export class Session {
 	/** The document's headings, as the headings pane lists them; none for a text file. */
 	headings(): readonly OutlineItem[] {
 		return this.isText ? [] : (this.#outline?.items() ?? []);
+	}
+
+	/** The document's counts as the status bar shows them; `null` for a text file. */
+	wordCounts(): Counts | null {
+		return this.isText ? null : (this.#wordCount?.counts() ?? null);
 	}
 
 	/** Moves the caret to a heading of `headings()` and brings it into view. */
@@ -636,11 +643,12 @@ export class Session {
 		});
 
 		this.#outline = outlinePlugin({ container: outline });
+		this.#wordCount = wordCountPlugin({ container: wordCount });
 		const plugins = [
 			codeHighlightPlugin(),
 			find,
 			this.#outline,
-			wordCountPlugin({ container: wordCount }),
+			this.#wordCount,
 			source,
 			images,
 			autosavePlugin({ delay: AUTOSAVE_DELAY, save: () => this.#autoSave() }),
