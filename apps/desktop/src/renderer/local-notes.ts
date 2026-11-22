@@ -410,6 +410,10 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 			for (const view of views.values()) view.element.style.removeProperty("top");
 			return;
 		}
+		// A card's text taking the focus scrolls them into view, hidden overflow or not:
+		// here the page's scroll places the cards, theirs stays at 0.
+		if (list.scrollTop !== 0) list.scrollTop = 0;
+		if (element.scrollTop !== 0) element.scrollTop = 0;
 		const origin = list.getBoundingClientRect().top;
 		let floor = Number.NEGATIVE_INFINITY;
 		for (const id of alignedOrder) {
@@ -428,6 +432,12 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 		alignFrame = requestAnimationFrame(align);
 	}
 	window.addEventListener("resize", alignSoon);
+	list.addEventListener("scroll", () => {
+		if (element.hasAttribute("data-aligned")) alignSoon();
+	});
+	element.addEventListener("scroll", () => {
+		if (element.hasAttribute("data-aligned")) alignSoon();
+	});
 
 	// --- A balloon -----------------------------------------------------------------------
 
