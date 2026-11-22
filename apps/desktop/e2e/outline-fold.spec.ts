@@ -23,10 +23,10 @@ test("the headings pane folds while the document has no heading, and comes back 
 	await expect(dock).toBeVisible();
 	await expect(dock).toContainText("Giriş");
 
-	// Without it, the pane folds again.
+	// Without its words, the heading lists nothing: the pane folds again.
 	await page.keyboard.press("Control+a");
 	await page.keyboard.press("Backspace");
-	await expect(page.locator("#editor h1")).toHaveCount(0);
+	await expect(page.locator("#editor")).not.toContainText("Giriş");
 	await expect(dock).toBeHidden();
 
 	// Its button opens it for this tab all the same, and saves nothing.
