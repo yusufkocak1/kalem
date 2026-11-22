@@ -4490,6 +4490,36 @@ button.git-file-path {
 	margin-left: 0;
 }
 
+/* A narrow window (or panes' tabs in the bar): the bar gives up what can be
+   reached another way before it runs past the window's edge. */
+.statusbar {
+	container-type: inline-size;
+	min-width: 0;
+}
+
+.status-counts {
+	min-width: 0;
+	overflow: hidden;
+}
+
+@container (max-width: 900px) {
+	/* The zoom's value opens its sizes. */
+	.zoom-slider,
+	.status-confluence .status-chip-text,
+	.status-jira .status-chip-text,
+	.status-counts .kalem-wordcount-item:not(:first-child) {
+		display: none;
+	}
+}
+
+@container (max-width: 640px) {
+	.status-format,
+	.status-assistant .status-chip-text,
+	.status-goal[data-goal] .status-goal-text {
+		display: none;
+	}
+}
+
 @media (prefers-reduced-motion: reduce) {
 	.status-assistant > .icon {
 		animation: none;
