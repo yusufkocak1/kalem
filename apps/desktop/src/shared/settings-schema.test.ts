@@ -133,6 +133,7 @@ describe("resetPatch", () => {
 			typewriterScroll: DEFAULT_SETTINGS.typewriterScroll,
 			documentMap: DEFAULT_SETTINGS.documentMap,
 			tabsInTitleBar: DEFAULT_SETTINGS.tabsInTitleBar,
+			windowMaterial: DEFAULT_SETTINGS.windowMaterial,
 			ribbonSimple: DEFAULT_SETTINGS.ribbonSimple,
 			codeLineNumbers: DEFAULT_SETTINGS.codeLineNumbers,
 		});

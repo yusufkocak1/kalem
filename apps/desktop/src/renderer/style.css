@@ -181,6 +181,12 @@ button {
 	padding-right: 10px;
 }
 
+.ribbon-head {
+	display: flex;
+	flex: none;
+	align-items: stretch;
+}
+
 .ribbon-file {
 	padding: 0 18px;
 	border: 0;
@@ -784,6 +790,115 @@ button {
 	height: 31px;
 	margin-bottom: -1px;
 	background: var(--app-surface);
+}
+
+/* The File button and the quick access buttons, at the bar's left (ribbon.ts `head`). */
+.title-bar > .ribbon-head {
+	align-self: center;
+	height: 28px;
+	margin: 0 6px 0 8px;
+	app-region: no-drag;
+}
+
+.title-bar .ribbon-file {
+	padding: 0 16px;
+	border-radius: 6px;
+}
+
+.title-bar .ribbon-quick {
+	padding: 0 6px 0 8px;
+}
+
+/* A narrow window keeps the bar for the tabs: Save, Undo and Redo have their shortcuts. */
+@media (max-width: 900px) {
+	.title-bar .ribbon-quick {
+		display: none;
+	}
+}
+
+/* The simplified ribbon under the title bar: one row, its tabs a menu at its start. */
+.ribbon[data-one-row] .ribbon-top {
+	display: none;
+}
+
+.ribbon[data-one-row] .ribbon-panels {
+	display: flex;
+	align-items: center;
+	border-top: 0;
+}
+
+.ribbon[data-one-row] .ribbon-panel {
+	flex: 1;
+	min-width: 0;
+}
+
+.ribbon[data-one-row] .ribbon-trailing {
+	flex: none;
+	padding-right: 34px;
+}
+
+.ribbon-switch {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	gap: 4px;
+	height: 30px;
+	margin: 0 4px 0 8px;
+	padding: 0 8px 0 10px;
+	border: 0;
+	border-radius: 6px;
+	background: color-mix(in srgb, var(--app-accent) 11%, transparent);
+	color: var(--app-accent);
+	font: inherit;
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.ribbon-switch:hover {
+	background: var(--app-hover);
+}
+
+.ribbon-switch > .icon {
+	width: 14px;
+	height: 14px;
+	transform: rotate(90deg);
+}
+
+.ribbon-switch-menu {
+	position: fixed;
+	z-index: 56;
+	display: flex;
+	flex-direction: column;
+	min-width: 170px;
+	padding: 4px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	box-shadow: var(--app-shadow);
+}
+
+.ribbon-switch-menu[hidden] {
+	display: none;
+}
+
+.ribbon-switch-item {
+	padding: 7px 12px;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: var(--app-text);
+	font: inherit;
+	text-align: start;
+}
+
+.ribbon-switch-item:hover,
+.ribbon-switch-item:focus-visible {
+	background: var(--app-hover);
+}
+
+.ribbon-switch-item[aria-checked="true"] {
+	color: var(--app-accent);
+	font-weight: 600;
 }
 
 /* Focus mode keeps the bar (it drags the window, the window's buttons are on
@@ -4033,6 +4148,139 @@ button.git-file-path {
 	min-height: 0;
 }
 
+/* --- Where the document is, above its page (path-bar.ts) ---------------- */
+
+.path-bar {
+	position: absolute;
+	z-index: 3;
+	top: 4px;
+	left: 22px;
+	max-width: calc(100% - 80px);
+	transition: opacity 0.15s ease;
+}
+
+.path-bar[hidden],
+.app[data-focus] .path-bar {
+	display: none;
+}
+
+/* Only at the top of the page: scrolled, the text goes under where it was. */
+.path-bar[data-away] {
+	opacity: 0;
+	pointer-events: none;
+}
+
+.path-bar-list {
+	display: flex;
+	align-items: center;
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	color: var(--app-muted);
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.path-bar-part {
+	display: flex;
+	align-items: center;
+	min-width: 0;
+}
+
+.path-bar-part + .path-bar-part::before {
+	content: "›";
+	padding: 0 2px;
+	opacity: 0.7;
+}
+
+.path-bar-button,
+.path-bar-label {
+	overflow: hidden;
+	padding: 1px 6px;
+	text-overflow: ellipsis;
+}
+
+.path-bar-button {
+	border: 0;
+	border-radius: 4px;
+	background: none;
+	color: inherit;
+	font: inherit;
+}
+
+.path-bar-button:hover,
+.path-bar-button[aria-expanded="true"] {
+	background: var(--app-hover);
+	color: var(--app-text);
+}
+
+.path-bar [aria-current="page"] {
+	color: var(--app-text);
+}
+
+.path-bar-menu {
+	position: fixed;
+	z-index: 56;
+	display: flex;
+	flex-direction: column;
+	width: 280px;
+	max-height: min(360px, 60vh);
+	overflow-y: auto;
+	padding: 4px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	box-shadow: var(--app-shadow);
+}
+
+.path-bar-menu[hidden] {
+	display: none;
+}
+
+.path-bar-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 10px;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: var(--app-text);
+	font: inherit;
+	font-size: 13px;
+	text-align: start;
+}
+
+.path-bar-item > span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.path-bar-item > .icon {
+	flex: none;
+	width: 15px;
+	height: 15px;
+	color: var(--app-muted);
+}
+
+.path-bar-item:hover,
+.path-bar-item:focus-visible {
+	background: var(--app-hover);
+}
+
+.path-bar-item[aria-current="page"] {
+	font-weight: 600;
+}
+
+.path-bar-empty {
+	margin: 0;
+	padding: 8px 10px;
+	color: var(--app-muted);
+	font-size: 13px;
+}
+
 /* --- The document map, beside the scrollbar (document-map.ts) ------------ */
 
 .doc-map {
@@ -4640,6 +4888,7 @@ button.git-file-path {
 /* --- Focus mode ---------------------------------------------------------- */
 
 .app[data-focus] .ribbon-host,
+.app[data-focus] .ribbon-head,
 .app[data-focus] .tabstrip,
 .app[data-focus] .navigation,
 .app[data-focus] .assistant,
@@ -4722,6 +4971,8 @@ button.git-file-path {
 	}
 
 	.ribbon-host,
+	.ribbon-head,
+	.path-bar,
 	.tabstrip,
 	.notices,
 	.navigation,
@@ -15903,3 +16154,32 @@ dialog {
 	font-weight: 600;
 	white-space: nowrap;
 }
+
+/* --- The system's material behind the frame (`windowMaterial`) ------------
+   Mica (Windows 11) or vibrancy (macOS) shows through the title bar, the
+   desk around the page and the side panels; the page itself stays opaque,
+   and so does everything when the user asked for more contrast. */
+@media not (prefers-contrast: more) {
+	:root[data-material] body {
+		background: transparent;
+	}
+
+	:root[data-material] .title-bar {
+		background: color-mix(in srgb, var(--app-desk) 55%, transparent);
+	}
+
+	:root[data-material] .desk-column {
+		background: color-mix(in srgb, var(--app-desk) 70%, transparent);
+	}
+
+	:root[data-material] :is(.navigation, .tool-dock, .dock-stripe, .statusbar) {
+		background: color-mix(in srgb, var(--app-surface) 78%, transparent);
+	}
+}
+
+@media (forced-colors: active) {
+	:root[data-material] body {
+		background: Canvas;
+	}
+}
+

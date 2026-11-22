@@ -276,7 +276,18 @@ verir.
   renkleri tema ve paletle değişir. Satırın boş yeri pencereyi sürükler,
   çift tıklamak büyütür. **Ayarlar → Görünüm → Sekmeler Başlık Çubuğunda**
   kapatılırsa sistemin başlık çubuğu döner ve sekmeler şeridin altına iner;
-  değişiklik yeni açılan pencerelerde geçerlidir.
+  değişiklik yeni açılan pencerelerde geçerlidir. **Dosya** düğmesi ile
+  Kaydet / Geri Al / Yinele de bu satırda, sekmelerin solundadır.
+- **Yol çubuğu:** sayfanın üstünde belgenin yeri yazar: çalışma klasörü ›
+  alt klasörler › dosya (Confluence sayfasında alan › sayfa). Bir klasöre
+  tıklamak içindekileri listeler; listede bir klasör onun içine girer, bir
+  dosya onu açar. Dosyanın adına tıklamak yanındaki dosyaları listeler.
+  Sayfa kaydırılınca çubuk çekilir; odak modunda ve yazdırırken görünmez.
+- **Yarı saydam pencere** (**Ayarlar → Görünüm**, açık): Windows 11'de
+  (22H2 ve sonrası) Mica, macOS'ta vibrancy pencerenin çerçevesinden,
+  sayfanın çevresinden ve yan panellerden hafifçe görünür; sayfa opak kalır.
+  Yüksek kontrastta kapalıdır; değişiklik yeni pencerelerde geçerlidir.
+  Linux'ta ve eski Windows'ta bir şey değiştirmez.
 - **Ana sayfa** (`Ctrl+Shift+H`, **Görünüm → Ana Sayfa**): boş ve adsız bir
   sekmenin başlangıç sayfasıdır; açık bir tane varsa ona geçilir, yoksa
   yenisi açılır. En üstte **Kaldığınız yerden devam edin** (en son açılan
@@ -1479,7 +1490,10 @@ verir.
     dar bir pencerede satır yana kayar.
   - **Sade şerit** (`Ctrl+F1`, **Görünüm → Sade Şerit** ya da şeridin sağ
     altındaki ok): grup adları gizlenir, şerit tek satır kalır ve belgeye
-    daha çok yer açılır. Seçim saklanır.
+    daha çok yer açılır. Sekmeler başlık çubuğundayken şeridin sekme satırı
+    da kalkar: Giriş / Ekle / Gözden Geçir / Görünüm, satırın başındaki
+    **Giriş ▾** menüsünden seçilir. Böylece sayfanın üstünde başlık çubuğuyla
+    birlikte iki satır (yaklaşık 80 px) kalır. Seçim saklanır.
 - Tabloda **Tab** sonraki, **Shift+Tab** önceki hücreye geçer ve içeriğini
   seçer (yazınca değişir); son hücrede Tab yeni bir satır ekler.
 - İmleç tablodayken **Tablo** sekmesi: satır/sütun ekleme-silme, hizalama,

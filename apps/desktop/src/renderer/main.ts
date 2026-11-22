@@ -76,6 +76,7 @@ import { createLocalNotes } from "./local-notes.js";
 import { createMergeDialog } from "./merge-dialog.js";
 import { createNetworkPanel } from "./network-panel.js";
 import { createNotices } from "./notices.js";
+import { createPathBar } from "./path-bar.js";
 import { Previews } from "./previews.js";
 import { documentImages } from "./prompt-images.js";
 import { createQuickOpen, workspaceItems } from "./quick-open.js";
@@ -207,6 +208,29 @@ const documentMap = createDocumentMap({
 });
 deskArea.append(documentMap.element);
 window.addEventListener("resize", () => documentMap.refresh());
+
+/** Where the active document is, above its page: `project › specs › payment.md`. */
+const pathBar = createPathBar({
+	t,
+	lang: startup.language,
+	where: () => {
+		const tab = tabs.get(session.id);
+		// A text file's own toolbar is at the top of its view, and names it.
+		if (tab === undefined || tab.session.isText) return null;
+		return { path: tab.session.path, remote: tab.session.remote };
+	},
+	workspace: () => bridge.getWorkspace(),
+	open: (path) => void bridge.openPath(path),
+});
+deskArea.append(pathBar.element);
+/** The path last shown, so a state change that keeps it does not ask for the workspace again. */
+let pathShown: string | undefined;
+function refreshPathBar(force = false): void {
+	const where = `${session.path ?? ""}|${session.remote?.id ?? ""}`;
+	if (!force && where === pathShown) return;
+	pathShown = where;
+	pathBar.refresh();
+}
 // What the search finds changes as it is typed in its box.
 document.addEventListener("input", (event) => {
 	if (event.target instanceof Element && event.target.closest(".kalem-find") !== null)
@@ -1144,6 +1168,8 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", syn
 const app = document.getElementById("app") ?? document.body.appendChild(el("div"));
 app.className = "app";
 app.toggleAttribute("data-title-bar", titleBar !== null);
+// The system's material behind the frame (`windowMaterial`): the shell lets it through.
+if (startup.material !== null) document.documentElement.dataset.material = startup.material;
 app.append(
 	...(titleBar === null ? [ribbonHost, tabStrip.element] : [titleBar, ribbonHost]),
 	noticeArea,
@@ -1354,7 +1380,9 @@ function createTab(id: string): Tab {
 	desk.addEventListener(
 		"scroll",
 		() => {
-			if (tabs.get(session.id)?.desk === desk) documentMap.scrolled();
+			if (tabs.get(session.id)?.desk !== desk) return;
+			documentMap.scrolled();
+			pathBar.scrolled(desk.scrollTop);
 		},
 		{ passive: true },
 	);
@@ -1415,6 +1443,7 @@ function createTab(id: string): Tab {
 				renderState();
 				// Saved for the first time, or under another name: its notes go with it.
 				localNotes.refresh();
+				if (firstTabShown) refreshPathBar();
 			}
 			if (loaded) showStart();
 		},
@@ -1642,6 +1671,8 @@ function activateTab(id: string): void {
 	showSelectionCount("");
 	showGoalSoon();
 	documentMap.refresh();
+	refreshPathBar();
+	pathBar.scrolled(tab.desk.scrollTop);
 	assistant.documentChanged();
 	syncEdits();
 	renderState();
@@ -2240,6 +2271,11 @@ const ribbon = createAppRibbon(ribbonHost, ribbonTrailing, {
 	editTable,
 });
 setRibbonSimple = ribbon.setSimple;
+// With Kalem's title bar, File and the quick access buttons are at its left, before the tabs.
+if (titleBar !== null) {
+	titleBar.prepend(ribbon.head);
+	ribbon.headMoved();
+}
 ribbon.setSimple(settings.ribbonSimple);
 
 // The editor reports no selection inside code blocks, so moving into or between
@@ -2279,7 +2315,10 @@ bridge.onSaveRequest((tabId) => {
 	const saving = tab === undefined ? Promise.resolve(false) : tab.session.save();
 	void saving.then((saved) => bridge.answerSave(tabId, saved));
 });
-bridge.onWorkspaceChange(() => void filesPane.refresh());
+bridge.onWorkspaceChange(() => {
+	void filesPane.refresh();
+	refreshPathBar(true);
+});
 bridge.onTabMoved((id) => discardTab(id));
 bridge.onTabMenu((id, action) => {
 	if (action === "move") moveTab(id);

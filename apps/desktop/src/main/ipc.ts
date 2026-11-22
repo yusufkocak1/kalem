@@ -205,6 +205,7 @@ export function registerIpc(ctx: IpcContext): void {
 			...(win.activeTabId === null ? {} : { active: win.activeTabId }),
 			documentScheme: DOCUMENT_SCHEME,
 			titleBar: win.titleBar,
+			material: win.material,
 			firstRun: ctx.firstRun(),
 		};
 	});

@@ -97,6 +97,12 @@ export interface Settings extends Typography {
 	 * off, the system's title bar. A window takes it when it opens.
 	 */
 	readonly tabsInTitleBar: boolean;
+	/**
+	 * The window's frame and side panels show the system's material through
+	 * them (Mica on Windows 11, vibrancy on macOS); the page stays opaque. A
+	 * window takes it when it opens; elsewhere it does nothing.
+	 */
+	readonly windowMaterial: boolean;
 	/** In focus mode, the line being written is kept at the middle of the view, as on a typewriter. */
 	readonly typewriterScroll: boolean;
 	/** Whom the app was set up for (the first start's question); `""` until asked. */
@@ -208,6 +214,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	codeLineNumbers: true,
 	ribbonSimple: false,
 	tabsInTitleBar: true,
+	windowMaterial: true,
 	typewriterScroll: true,
 	role: "",
 	...DEFAULT_TYPOGRAPHY,
@@ -555,11 +562,17 @@ export interface Startup {
 	 * traffic lights at its left ("inset": macOS); `null`, by the system.
 	 */
 	readonly titleBar: TitleBar;
+	/**
+	 * The system material behind the window's frame (`windowMaterial`): Mica on
+	 * Windows 11, vibrancy on macOS; `null` when the window has none.
+	 */
+	readonly material: WindowMaterial;
 	/** The app's first start on this computer: the window offers to set it up for its user. */
 	readonly firstRun: boolean;
 }
 
 export type TitleBar = "overlay" | "inset" | null;
+export type WindowMaterial = "mica" | "vibrancy" | null;
 
 /** Whom the app is set up for: the ribbon, the panes and the line numbers follow. */
 export type UserRole = "writer" | "analyst" | "developer";

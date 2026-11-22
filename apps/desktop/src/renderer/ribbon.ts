@@ -64,6 +64,14 @@ export interface Ribbon {
 	update(): void;
 	/** The simplified ribbon: one row of buttons, no group names under them. */
 	setSimple(simple: boolean): void;
+	/**
+	 * The File button and the quick access buttons, which can go elsewhere
+	 * (the window's title bar): then the simplified ribbon is a single row,
+	 * its tabs a menu at its start.
+	 */
+	readonly head: HTMLElement;
+	/** The head was put elsewhere ({@link head}). */
+	headMoved(): void;
 	selectTab(id: string): void;
 	selectedTab(): string;
 }
@@ -293,6 +301,7 @@ export function createRibbon(container: HTMLElement, options: RibbonOptions): Ri
 			tab.tabIndex = active ? 0 : -1;
 			panel.hidden = !active;
 		}
+		switchLabel.textContent = options.tabs.find((tab) => tab.id === id)?.label ?? "";
 		fit();
 	}
 
@@ -324,6 +333,93 @@ export function createRibbon(container: HTMLElement, options: RibbonOptions): Ri
 	}
 	new ResizeObserver(() => fit()).observe(panels);
 
+	// --- The simplified ribbon's tabs, as a menu at the start of its row ----------
+	const switchLabel = el("span", { class: "ribbon-switch-label" });
+	const tabSwitch = el("button", {
+		class: "ribbon-switch",
+		attrs: {
+			type: "button",
+			"aria-haspopup": "menu",
+			"aria-expanded": "false",
+			"data-command": "ribbon-tabs",
+			title: options.label,
+		},
+		children: [switchLabel, icon("chevron")],
+	});
+	keepSelection(tabSwitch);
+	const tabMenu = el("div", {
+		class: "ribbon-switch-menu",
+		attrs: { role: "menu", "aria-label": options.label, hidden: "" },
+	});
+	document.body.append(tabMenu);
+
+	function closeTabMenu(focus = false): void {
+		if (tabMenu.hidden) return;
+		tabMenu.hidden = true;
+		tabSwitch.setAttribute("aria-expanded", "false");
+		if (focus) tabSwitch.focus();
+	}
+
+	function openTabMenu(): void {
+		closeFold();
+		const items = options.tabs
+			.filter((tab) => tab.visible?.() !== false)
+			.map((tab) => {
+				const item = el("button", {
+					class: "ribbon-switch-item",
+					text: tab.label,
+					attrs: {
+						type: "button",
+						role: "menuitemradio",
+						"aria-checked": String(tab.id === selected),
+						"data-tab": tab.id,
+					},
+				});
+				keepSelection(item);
+				item.addEventListener("click", () => {
+					selectTab(tab.id);
+					closeTabMenu();
+				});
+				return item;
+			});
+		tabMenu.replaceChildren(...items);
+		tabMenu.hidden = false;
+		tabSwitch.setAttribute("aria-expanded", "true");
+		const box = tabSwitch.getBoundingClientRect();
+		tabMenu.style.left = `${Math.max(4, box.left)}px`;
+		tabMenu.style.top = `${box.bottom + 4}px`;
+		(items.find((item) => item.getAttribute("aria-checked") === "true") ?? items[0])?.focus();
+	}
+
+	tabSwitch.addEventListener("click", () => (tabMenu.hidden ? openTabMenu() : closeTabMenu()));
+	tabSwitch.addEventListener("keydown", (event) => {
+		if (event.key !== "ArrowDown") return;
+		event.preventDefault();
+		openTabMenu();
+	});
+	tabMenu.addEventListener("keydown", (event) => {
+		const items = [...tabMenu.querySelectorAll<HTMLButtonElement>(".ribbon-switch-item")];
+		const at = items.indexOf(document.activeElement as HTMLButtonElement);
+		if (event.key === "Escape") {
+			event.preventDefault();
+			closeTabMenu(true);
+		} else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+			event.preventDefault();
+			const step = event.key === "ArrowDown" ? 1 : -1;
+			items[(at + step + items.length) % items.length]?.focus();
+		}
+	});
+	document.addEventListener(
+		"mousedown",
+		(event) => {
+			const target = event.target as Node;
+			if (tabMenu.contains(target) || tabSwitch.contains(target)) return;
+			closeTabMenu();
+		},
+		true,
+	);
+	window.addEventListener("resize", () => closeTabMenu());
+
 	const simplify =
 		options.simplify === undefined
 			? null
@@ -339,8 +435,30 @@ export function createRibbon(container: HTMLElement, options: RibbonOptions): Ri
 		panels.append(simplify);
 	}
 
+	let simpleNow = false;
+	let headElsewhere = false;
+
+	/**
+	 * With the head elsewhere, the simplified ribbon is one row: the tab menu,
+	 * the shown tab's buttons, then what was at the end of the tab row.
+	 */
+	function arrange(): void {
+		const oneRow = simpleNow && headElsewhere;
+		element.toggleAttribute("data-one-row", oneRow);
+		if (oneRow) {
+			panels.prepend(tabSwitch);
+			if (options.trailing !== undefined) panels.append(options.trailing);
+		} else {
+			tabSwitch.remove();
+			closeTabMenu();
+			if (options.trailing !== undefined) top.append(options.trailing);
+		}
+	}
+
 	function setSimple(simple: boolean): void {
+		simpleNow = simple;
 		element.toggleAttribute("data-simple", simple);
+		arrange();
 		if (simplify !== null && options.simplify !== undefined) {
 			const label = simple ? options.simplify.fullLabel : options.simplify.simpleLabel;
 			simplify.title = `${label} (${options.simplify.shortcut})`;
@@ -362,21 +480,15 @@ export function createRibbon(container: HTMLElement, options: RibbonOptions): Ri
 		for (const widget of widgets) widget.update?.();
 	}
 
+	const head = el("div", { class: "ribbon-head", children: [fileButton, quickAccess] });
+	const top = el("div", {
+		class: "ribbon-top",
+		children: [head, tabList, ...(options.trailing === undefined ? [] : [options.trailing])],
+	});
 	const element = el("div", {
 		class: "ribbon",
 		attrs: { role: "region", "aria-label": options.label },
-		children: [
-			el("div", {
-				class: "ribbon-top",
-				children: [
-					fileButton,
-					quickAccess,
-					tabList,
-					...(options.trailing === undefined ? [] : [options.trailing]),
-				],
-			}),
-			panels,
-		],
+		children: [top, panels],
 	});
 	container.append(element);
 
@@ -384,7 +496,19 @@ export function createRibbon(container: HTMLElement, options: RibbonOptions): Ri
 	setSimple(false);
 	update();
 
-	return { element, update, setSimple, selectTab, selectedTab: () => selected };
+	return {
+		element,
+		update,
+		setSimple,
+		head,
+		headMoved() {
+			headElsewhere = true;
+			arrange();
+			fit();
+		},
+		selectTab,
+		selectedTab: () => selected,
+	};
 }
 
 // --- Style gallery ----------------------------------------------------------

@@ -346,6 +346,23 @@ export const SETTINGS_SCHEMA: Schema = {
 		],
 		assistant: "write",
 	},
+	windowMaterial: {
+		key: "windowMaterial",
+		category: "appearance",
+		label: "windowMaterial",
+		type: "boolean",
+		keywords: [
+			"mica",
+			"vibrancy",
+			"saydam",
+			"translucent",
+			"akrilik",
+			"acrylic",
+			"pencere",
+			"window",
+		],
+		assistant: "write",
+	},
 	ribbonSimple: {
 		key: "ribbonSimple",
 		category: "appearance",
