@@ -131,6 +131,7 @@ describe("resetPatch", () => {
 			fullWidth: DEFAULT_SETTINGS.fullWidth,
 			lineNumbers: DEFAULT_SETTINGS.lineNumbers,
 			typewriterScroll: DEFAULT_SETTINGS.typewriterScroll,
+			documentMap: DEFAULT_SETTINGS.documentMap,
 			tabsInTitleBar: DEFAULT_SETTINGS.tabsInTitleBar,
 			ribbonSimple: DEFAULT_SETTINGS.ribbonSimple,
 			codeLineNumbers: DEFAULT_SETTINGS.codeLineNumbers,

@@ -50,6 +50,8 @@ export interface LocalNotesOptions {
 	 * and the pane at the page's side); `null` for a list.
 	 */
 	aligned?(): HTMLElement | null;
+	/** The notes were drawn again (added, moved, resolved): what shows them elsewhere follows. */
+	changed?(): void;
 }
 
 export interface LocalNotes {
@@ -385,6 +387,7 @@ export function createLocalNotes(options: LocalNotesOptions): LocalNotes {
 		if (!same) list.replaceChildren(...wantedChildren);
 		alignedOrder = ordered.map((note) => note.id);
 		align();
+		options.changed?.();
 	}
 
 	// --- Beside their lines ------------------------------------------------------------

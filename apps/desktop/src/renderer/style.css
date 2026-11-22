@@ -4026,10 +4026,121 @@ button.git-file-path {
 }
 
 .desk-area {
+	position: relative;
 	display: flex;
 	flex: 1;
 	min-width: 0;
 	min-height: 0;
+}
+
+/* --- The document map, beside the scrollbar (document-map.ts) ------------ */
+
+.doc-map {
+	position: absolute;
+	top: 6px;
+	right: 14px;
+	bottom: 6px;
+	z-index: 4;
+	width: 10px;
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.doc-map[hidden] {
+	display: none;
+}
+
+.doc-map:hover {
+	background: color-mix(in srgb, var(--app-text) 6%, transparent);
+}
+
+/* The part of the document in view, shown when the map is pointed at. */
+.doc-map-view {
+	position: absolute;
+	right: 0;
+	left: 0;
+	border-radius: 3px;
+	background: color-mix(in srgb, var(--app-accent) 14%, transparent);
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+
+.doc-map:hover .doc-map-view {
+	opacity: 1;
+}
+
+.doc-map-ticks {
+	position: absolute;
+	inset: 0;
+}
+
+.doc-map-tick {
+	position: absolute;
+	right: 1px;
+	width: 8px;
+	height: 2px;
+	border-radius: 1px;
+	background: var(--app-muted);
+	transform: translateY(-1px);
+}
+
+.doc-map-heading {
+	opacity: 0.55;
+}
+
+.doc-map-heading[data-detail="h1"] {
+	height: 3px;
+	opacity: 0.8;
+}
+
+.doc-map-heading[data-detail="h3"] {
+	width: 5px;
+}
+
+.doc-map-change {
+	width: 4px;
+	height: 6px;
+	right: 0;
+	background: var(--review-added-bar, #2da44e);
+}
+
+.doc-map-note {
+	width: 6px;
+	height: 4px;
+	right: auto;
+	left: 0;
+	background: var(--note-note, var(--app-accent));
+}
+
+.doc-map-note[data-detail="question"] {
+	background: var(--note-question, var(--app-accent));
+}
+
+.doc-map-note[data-detail="attention"] {
+	background: var(--note-attention, var(--app-warning));
+}
+
+.doc-map-note[data-detail="later"] {
+	background: var(--note-later, var(--app-muted));
+}
+
+.doc-map-found {
+	width: 10px;
+	height: 3px;
+	right: 0;
+	background: var(--app-warning);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.doc-map-view {
+		transition: none;
+	}
+}
+
+@media (forced-colors: active) {
+	.doc-map-tick {
+		forced-color-adjust: none;
+	}
 }
 
 /* The document, with the bottom dock under it. */

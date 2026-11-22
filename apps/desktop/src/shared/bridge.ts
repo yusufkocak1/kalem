@@ -137,6 +137,8 @@ export interface Settings extends Typography {
 	readonly localNotes: boolean;
 	/** The My Notes pane's cards beside the lines they are on, moving with the page. */
 	readonly notesAligned: boolean;
+	/** The document's map beside the scrollbar: headings, notes, the assistant's changes, what was found. */
+	readonly documentMap: boolean;
 	/** Jira issues the user starred, newest first. */
 	readonly jiraFavorites: readonly JiraFavorite[];
 	/** How the Jira issue popup lays out its fields: columns, and which fields in what order. */
@@ -230,6 +232,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	restoreSession: true,
 	localNotes: true,
 	notesAligned: true,
+	documentMap: true,
 	jiraFavorites: [],
 	jiraIssueLayout: DEFAULT_ISSUE_LAYOUT,
 	pinnedFiles: [],

@@ -463,6 +463,12 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 					click: () => ctx.changeSettings({ localNotes: !settings.localNotes }),
 				},
 				{
+					label: t.documentMapSetting,
+					type: "checkbox",
+					checked: settings.documentMap,
+					click: () => ctx.changeSettings({ documentMap: !settings.documentMap }),
+				},
+				{
 					label: t.notesAligned,
 					type: "checkbox",
 					checked: settings.notesAligned,

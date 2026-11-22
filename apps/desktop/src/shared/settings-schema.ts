@@ -781,6 +781,14 @@ export const SETTINGS_SCHEMA: Schema = {
 		],
 		assistant: "write",
 	},
+	documentMap: {
+		key: "documentMap",
+		category: "appearance",
+		label: "documentMapSetting",
+		type: "boolean",
+		keywords: ["harita", "map", "minimap", "kaydırma", "scroll", "işaret", "mark"],
+		assistant: "write",
+	},
 	notesAligned: {
 		key: "notesAligned",
 		category: "editor",

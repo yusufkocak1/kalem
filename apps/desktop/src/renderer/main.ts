@@ -52,6 +52,8 @@ import { createDiagramButton, isDiagramImage } from "./diagram-button.js";
 import { createDiagramEditor } from "./diagram-editor.js";
 import { diagramFromImage, diagramToPng } from "./diagram-image.js";
 import { createDocks } from "./docks.js";
+import type { MapMark } from "./document-map.js";
+import { createDocumentMap } from "./document-map.js";
 import { markQuotes, revealQuote } from "./document-marks.js";
 import { createDocumentTools } from "./document-tools.js";
 import { el, isTextFieldFocused } from "./dom.js";
@@ -124,6 +126,92 @@ const ribbonHost = el("header", { class: "ribbon-host" });
 // Each tab brings its own notices, page, outline and word count; these hold them.
 const noticeArea = el("div", { class: "notice-area" });
 const deskArea = el("div", { class: "desk-area" });
+
+/** The note kinds' highlights (local-notes.ts), read for the document map. */
+const NOTE_HIGHLIGHTS = ["question", "attention", "later", "note"] as const;
+
+/**
+ * The document's map beside the scrollbar (`documentMap`): where the
+ * headings, the notes, the assistant's changes and what was found are.
+ */
+const documentMap = createDocumentMap({
+	t,
+	desk: () => {
+		if (!settings.documentMap || app.hasAttribute("data-focus")) return null;
+		const tab = tabs.get(session.id);
+		return tab === undefined || tab.session.isText ? null : tab.desk;
+	},
+	extent: (desk) => {
+		const tab = tabs.get(session.id);
+		if (tab === undefined) return 0;
+		return (
+			tab.canvas.getBoundingClientRect().bottom - desk.getBoundingClientRect().top + desk.scrollTop
+		);
+	},
+	marks: (desk) => {
+		const tab = tabs.get(session.id);
+		if (tab === undefined) return [];
+		const origin = desk.getBoundingClientRect().top - desk.scrollTop;
+		const at = (box: DOMRect): number => box.top - origin;
+		const marks: MapMark[] = [];
+		for (const heading of tab.canvas.querySelectorAll<HTMLElement>(
+			".kalem-editor > :is(h1, h2, h3)",
+		)) {
+			const text = heading.textContent?.trim() ?? "";
+			if (text === "") continue;
+			marks.push({
+				kind: "heading",
+				top: at(heading.getBoundingClientRect()),
+				label: text,
+				detail: heading.localName,
+			});
+		}
+		for (const changed of tab.canvas.querySelectorAll<HTMLElement>(
+			"[data-ai-change], [data-ai-was], [data-ai-gone]",
+		)) {
+			marks.push({
+				kind: "change",
+				top: at(changed.getBoundingClientRect()),
+				label: t.documentMapChange,
+			});
+		}
+		const registry = (CSS as { highlights?: Map<string, Iterable<AbstractRange>> }).highlights;
+		for (const kind of NOTE_HIGHLIGHTS) {
+			for (const range of registry?.get(`kalem-note-${kind}`) ?? []) {
+				if (!(range instanceof Range)) continue;
+				marks.push({
+					kind: "note",
+					top: at(range.getBoundingClientRect()),
+					label: range.toString(),
+					detail: kind,
+				});
+			}
+		}
+		// The canvas is the editor's element itself, or holds it.
+		const editor = tab.canvas.matches(".kalem-editor")
+			? tab.canvas
+			: tab.canvas.querySelector(".kalem-editor");
+		const blocks = editor?.children;
+		const found = new Set((tab.session.find?.matches() ?? []).map((match) => match.blockIndex));
+		for (const index of found) {
+			const block = blocks?.[index];
+			if (block !== undefined)
+				marks.push({
+					kind: "found",
+					top: at(block.getBoundingClientRect()),
+					label: t.documentMapFound,
+				});
+		}
+		return marks;
+	},
+});
+deskArea.append(documentMap.element);
+window.addEventListener("resize", () => documentMap.refresh());
+// What the search finds changes as it is typed in its box.
+document.addEventListener("input", (event) => {
+	if (event.target instanceof Element && event.target.closest(".kalem-find") !== null)
+		documentMap.refresh();
+});
 const outlineArea = el("div", { class: "navigation-content" });
 const wordCountArea = el("div", { class: "status-counts" });
 
@@ -187,6 +275,7 @@ const localNotes = createLocalNotes({
 	},
 	notify: (text, actions) =>
 		session.notices.show({ id: "notes", text, ...(actions === undefined ? {} : { actions }) }),
+	changed: () => documentMap.refresh(),
 	// Beside the lines while the pane is at the page's side (not under it) and the setting is on.
 	aligned: () => {
 		if (!settings.notesAligned || !docks.shown().has("notes")) return null;
@@ -1246,6 +1335,13 @@ function createTab(id: string): Tab {
 	let specsChecked = false;
 	const page = el("div", { class: "page kalem-theme", children: [tabCanvas, start.element] });
 	const desk = el("main", { class: "desk", children: [page] });
+	desk.addEventListener(
+		"scroll",
+		() => {
+			if (tabs.get(session.id)?.desk === desk) documentMap.scrolled();
+		},
+		{ passive: true },
+	);
 	// My Notes' cards beside their lines follow the active page's scroll.
 	desk.addEventListener(
 		"scroll",
@@ -1315,6 +1411,7 @@ function createTab(id: string): Tab {
 				localNotes.refresh();
 				foldEmptyOutlineSoon();
 				showGoalSoon();
+				documentMap.refresh();
 			}
 			lineNumbers.refresh();
 		},
@@ -1526,6 +1623,7 @@ function activateTab(id: string): void {
 	fitSidePanes();
 	showSelectionCount("");
 	showGoalSoon();
+	documentMap.refresh();
 	syncEdits();
 	renderState();
 	refreshFiles();
@@ -1730,6 +1828,7 @@ function applySettings(): void {
 	foldEmptyOutline();
 	fitSidePanes();
 	syncTitleBar();
+	documentMap.refresh();
 }
 
 function updateSettings(patch: Partial<Settings>): void {
@@ -1764,6 +1863,7 @@ function toggleFocusMode(): void {
 	scheduleRibbonUpdate();
 	// The page stays where it is: what is read does not move. Typing centres the line.
 	wakeFocusExit();
+	documentMap.refresh();
 }
 
 exitFocus.addEventListener("click", toggleFocusMode);

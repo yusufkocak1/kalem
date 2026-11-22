@@ -353,6 +353,12 @@ verir.
   sayfa ortada kalır; ilk başlık yazılınca, yazmaya ara verildiğinde geri
   açılır. Ayar değişmez. Panelin kenardaki düğmesi onu o sekme için yine
   açar.
+- **Belge haritası** (**Görünüm → Kaydırma Çubuğunun Yanında Belge
+  Haritası**, başta açık): görünüme sığmayan bir belgede kaydırma
+  çubuğunun yanında ince bir şerit; başlıklar gri, notlarım türlerinin
+  renginde, asistanın değişiklikleri yeşil, aramanın bulduğu yerler turuncu
+  çizgiyle işaretlenir. Şeride tıklamak belgenin o yerini görünümün ortasına
+  getirir; üzerine gelince görünen kısım gösterilir. Odak modunda gizlenir.
 - **Okunan yer korunur:** tam genişlik, yakınlaştırma, odak modu, panel
   açıp kapama ve pencere boyutu satırları yeniden kırar. Uygulama okunan
   bloğu (imlecin olduğu blok, imleç görünmüyorsa ekranın üçte birindeki
