@@ -932,11 +932,17 @@ button {
 
 .doc-tab {
 	display: flex;
-	flex: none;
+	/* Many tabs share the row: they narrow, down to their icon and a few
+	   letters, before the row scrolls. */
+	flex: 0 1 220px;
 	align-items: center;
 	gap: 6px;
-	min-width: 96px;
+	min-width: 64px;
 	max-width: 220px;
+	/* A size container (the close button below), whose own width it would
+	   otherwise not have: as wide as it would like, till the row is full. */
+	container-type: inline-size;
+	contain-intrinsic-inline-size: 220px;
 	height: 28px;
 	padding: 0 4px 0 12px;
 	border: 1px solid transparent;
@@ -968,6 +974,18 @@ button {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+/* The shown tab narrows least: its name stays readable next to its close button. */
+.doc-tab[aria-selected="true"] {
+	min-width: 116px;
+}
+
+/* A narrowed tab keeps its name; its close button only while it is the shown one. */
+@container (max-width: 104px) {
+	.doc-tab:not([aria-selected="true"]) .doc-tab-close {
+		display: none;
+	}
 }
 
 /* Unsaved changes: a dot before the name, as in the window title. */
@@ -12636,7 +12654,9 @@ h3.mode-panel-name {
 
 .start-actions {
 	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
+	/* Two to a row where there is room; one under the other on a narrow page
+	   (the side panels open), so their names are not broken. */
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
 	gap: 8px;
 	max-width: 40rem;
 }
