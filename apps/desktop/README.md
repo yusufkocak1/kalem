@@ -1457,6 +1457,9 @@ verir.
   pencerede yeni sekme olur.
 - Açık / koyu / sistem teması, yakınlaştırma, tam genişlik, odak modu,
   salt okunur kip, yazım denetimi.
+- Klavyeyle odaklanılan her düğme, kutu ve liste öğesi aynı odak halkasını
+  gösterir: seçilen paletin vurgu renginde, 2 px. Kendi halkası olmayan bir
+  denetim de tarayıcının varsayılanına (Linux'ta turuncu) düşmez.
 - Arayüz Türkçe ve İngilizce (sistem diline göre; **Görünüm → Dil**).
 
 ## Simge
