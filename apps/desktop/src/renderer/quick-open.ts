@@ -61,6 +61,21 @@ function relativeTo(root: string, path: string): string {
 		.replace(/\\/g, "/");
 }
 
+/** The workspace's files, each with its path below its folder (named first when there are several). */
+export function workspaceItems(workspace: Workspace): QuickOpenItem[] {
+	const { roots } = workspace;
+	const prefix = (root: string): string => (roots.length > 1 ? `${fileName(root)}/` : "");
+	return roots.flatMap((root) =>
+		root.entries
+			.filter((entry) => !entry.folder)
+			.map((entry) => ({
+				path: entry.path,
+				name: entry.name,
+				relative: `${prefix(root.path)}${relativeTo(root.path, entry.path)}`,
+			})),
+	);
+}
+
 /** A palette that opens a document of the workspace by name. */
 export function createQuickOpen(options: QuickOpenOptions): { show(): Promise<void> } {
 	const { t } = options;
@@ -150,18 +165,10 @@ export function createQuickOpen(options: QuickOpenOptions): { show(): Promise<vo
 
 	return {
 		async show() {
-			const { roots } = await options.workspace();
+			const workspace = await options.workspace();
+			const { roots } = workspace;
 			// With several folders, a path says which one it is in.
-			const prefix = (root: string): string => (roots.length > 1 ? `${fileName(root)}/` : "");
-			items = roots.flatMap((root) =>
-				root.entries
-					.filter((entry) => !entry.folder)
-					.map((entry) => ({
-						path: entry.path,
-						name: entry.name,
-						relative: `${prefix(root.path)}${relativeTo(root.path, entry.path)}`,
-					})),
-			);
+			items = workspaceItems(workspace);
 			input.value = "";
 			selected = 0;
 			render();

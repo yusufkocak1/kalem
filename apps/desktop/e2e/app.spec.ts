@@ -530,6 +530,60 @@ for (const language of ["en", "tr"]) {
 	});
 }
 
+test("folds a narrow window's ribbon groups into buttons, and has a simplified ribbon", async () => {
+	const folder = await tempDir("ribbon-fold");
+	const path = join(folder, "belge.md");
+	await writeFile(path, "Bir paragraf.\n");
+	const { app, page, userData, errors } = await launch({ args: [path] });
+	await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(760, 700));
+	const panel = page.locator("#panel-home");
+	await expect(panel.locator(".ribbon-group[data-folded]").first()).toBeVisible();
+	const tops = await panel
+		.locator(".ribbon-group")
+		.evaluateAll((groups) => groups.map((group) => Math.round(group.getBoundingClientRect().top)));
+	expect(new Set(tops).size).toBe(1);
+
+	// A folded group opens under its button; a command run from it closes it.
+	const paragraph = panel.locator('.ribbon-group[aria-label="Paragraph"]');
+	await expect(paragraph).toHaveAttribute("data-folded", "");
+	await page.locator("#editor p").first().click();
+	await paragraph.locator(".ribbon-group-fold").click();
+	const popup = page.locator(".ribbon-fold-popup");
+	await expect(popup).toBeVisible();
+	await popup.locator('[data-command="bullet-list"]').click();
+	await expect(page.locator("#editor ul li")).toHaveText("Bir paragraf.");
+	await expect(popup).toBeHidden();
+	// Escape closes it too, and its buttons go back into the group.
+	await paragraph.locator(".ribbon-group-fold").click();
+	await expect(popup).toBeVisible();
+	await page.keyboard.press("Escape");
+	await expect(popup).toBeHidden();
+	await expect(paragraph.locator('[data-command="bullet-list"]')).toHaveCount(1);
+
+	// Wide again, nothing is folded.
+	await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(1440, 900));
+	await expect(panel.locator(".ribbon-group[data-folded]")).toHaveCount(0);
+
+	// The simplified ribbon: no group names, shorter; kept in the settings.
+	const height = await page
+		.locator(".ribbon")
+		.evaluate((ribbon) => (ribbon as HTMLElement).offsetHeight);
+	await page.locator(".ribbon-simplify").click();
+	await expect(page.locator(".ribbon")).toHaveAttribute("data-simple", "");
+	await expect(panel.locator(".ribbon-group-label").first()).toBeHidden();
+	expect(
+		await page.locator(".ribbon").evaluate((ribbon) => (ribbon as HTMLElement).offsetHeight),
+	).toBeLessThan(height);
+	await expect
+		.poll(async () => JSON.parse(await readFile(join(userData, "settings.json"), "utf8")).settings)
+		.toMatchObject({ ribbonSimple: true });
+	await clickMenu(app, "View", "Simplified Ribbon");
+	await expect(page.locator(".ribbon")).not.toHaveAttribute("data-simple", "");
+	expect(errors).toEqual([]);
+	await stubMessageBox(app, 1);
+	await app.close();
+});
+
 test("removes the loading screen once the editor is ready", async () => {
 	const { app, page, errors } = await launch();
 	await expect(page.locator("#editor")).toBeVisible();
@@ -2071,7 +2125,10 @@ test("offers ways to start and the recent documents under an empty page, until s
 });
 
 test("runs a menu command by name from the command palette, and from > in Quick Open", async () => {
-	const { app, page, errors } = await launch();
+	const folder = await tempDir("palette");
+	const doc = join(folder, "siparis-iptali.md");
+	await writeFile(doc, "# Sipariş\n");
+	const { app, page, errors } = await launch({ args: [doc] });
 	await clickMenu(app, "View", "Command Palette…");
 	const palette = page.locator(".command-palette");
 	await expect(palette).toBeVisible();
@@ -2091,6 +2148,13 @@ test("runs a menu command by name from the command palette, and from > in Quick 
 	await expect(items.first().locator(".palette-check svg")).toHaveCount(1);
 	await input.fill("save as");
 	await expect(items.first().locator(".palette-key")).toHaveText(/Shift\+S$/);
+	// Each command has its icon.
+	await expect(items.first().locator(".palette-icon svg")).toHaveCount(1);
+	// A recent document by its name and folder, not its whole path; found by the folder too.
+	await input.fill(basename(folder));
+	await expect(items.first().locator(".palette-name")).toHaveText("siparis-iptali.md");
+	await expect(items.first().locator(".palette-group")).toContainText(basename(folder));
+	await expect(items.first().locator(".palette-icon.tone-markdown svg")).toHaveCount(1);
 	await page.keyboard.press("Escape");
 
 	// In Quick Open, ">" turns the search into one for commands.
@@ -2101,6 +2165,60 @@ test("runs a menu command by name from the command palette, and from > in Quick 
 	await input.press("Enter");
 	await expect(page.locator(".app")).not.toHaveAttribute("data-full-width", "");
 	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("one box finds commands, the folder's files and the document's headings, and asks the assistant", async () => {
+	const folder = await tempDir("everything");
+	const doc = join(folder, "analiz.md");
+	await writeFile(doc, "# Amaç\n\nMetin.\n\n## Kabul Ölçütleri\n\nSon.\n");
+	await writeFile(join(folder, "kabul-testleri.md"), "# Testler\n");
+	const { app, page, errors } = await launch({
+		args: [doc],
+		env: { KALEM_CLAUDE: join(folder, "nothing-here") },
+	});
+	await expect(page.locator("#editor h1")).toHaveText("Amaç");
+	const palette = page.locator(".command-palette");
+	const input = palette.locator(".palette-input");
+	const items = palette.locator(".palette-item");
+
+	// Everything at once, by kind: the folder's file and the heading both match.
+	await clickMenu(app, "View", "Command Palette…");
+	await input.fill("kabul");
+	await expect(palette.locator(".palette-section")).toContainText(["Files", "In this document"]);
+	await expect(palette.locator(".palette-file .palette-name")).toHaveText("kabul-testleri.md");
+	await expect(palette.locator(".palette-heading .palette-name")).toHaveText("Kabul Ölçütleri");
+	await expect(items.last()).toHaveText(/Ask the assistant: “kabul”/);
+
+	// # for the headings only: Enter puts the caret there.
+	await input.fill("#ölçüt");
+	await expect(palette.locator(".palette-prompt")).toHaveText("#");
+	await expect(input).toHaveValue("ölçüt");
+	await expect(items).toHaveCount(1);
+	await input.press("Enter");
+	await expect(palette).toBeHidden();
+	await expect
+		.poll(() => page.evaluate(() => document.activeElement?.closest("h2")?.textContent ?? ""))
+		.toBe("Kabul Ölçütleri");
+
+	// A command run from the box comes first next time, with nothing typed.
+	await clickMenu(app, "View", "Command Palette…");
+	await input.fill(">full width");
+	await input.press("Enter");
+	await clickMenu(app, "View", "Command Palette…");
+	await expect(palette.locator(".palette-section").first()).toHaveText("Used lately");
+	await expect(items.first().locator(".palette-name")).toHaveText("Full Width");
+	await page.keyboard.press("Escape");
+
+	// ? asks the assistant: without a service yet, the question waits in its box.
+	await clickMenu(app, "View", "Command Palette…");
+	await input.fill("?bu belgeyi özetle");
+	await expect(palette.locator(".palette-prompt")).toHaveText("?");
+	await input.press("Enter");
+	await expect(page.locator(".assistant")).toBeVisible();
+	await expect(page.locator(".assistant-input")).toHaveValue("bu belgeyi özetle");
+	expect(errors).toEqual([]);
+	await stubMessageBox(app, 1);
 	await app.close();
 });
 

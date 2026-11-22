@@ -81,6 +81,11 @@ export function createAppRibbon(
 		return ctx.inCodeBlock();
 	}
 
+	/** A text file, or a document's source: the numbers there are a code editor's, set apart. */
+	function codeLines(): boolean {
+		return ctx.session().isText || ctx.inSource();
+	}
+
 	function isList(ordered: boolean): boolean {
 		const block = currentBlock();
 		return block?.type === "list" && block.ordered === ordered;
@@ -333,6 +338,8 @@ export function createAppRibbon(
 			groups: [
 				{
 					label: t.groupClipboard,
+					// Folds second: Ctrl+V, X and C are what most use.
+					rank: -1,
 					items: [
 						{
 							id: "paste",
@@ -418,6 +425,8 @@ export function createAppRibbon(
 				},
 				{
 					label: t.groupEditing,
+					// Folds first: Ctrl+F and Ctrl+H reach it without the ribbon.
+					rank: -2,
 					items: [
 						{
 							id: "find",
@@ -573,8 +582,11 @@ export function createAppRibbon(
 							"line-numbers",
 							t.lineNumbers,
 							"lineNumbers",
-							() => ctx.settings().lineNumbers,
-							() => ctx.updateSettings({ lineNumbers: !ctx.settings().lineNumbers }),
+							() => (codeLines() ? ctx.settings().codeLineNumbers : ctx.settings().lineNumbers),
+							() =>
+								codeLines()
+									? ctx.updateSettings({ codeLineNumbers: !ctx.settings().codeLineNumbers })
+									: ctx.updateSettings({ lineNumbers: !ctx.settings().lineNumbers }),
 						),
 					],
 				},
@@ -804,5 +816,11 @@ export function createAppRibbon(
 		},
 		tabs: ribbonTabs,
 		trailing,
+		simplify: {
+			simpleLabel: t.ribbonSimple,
+			fullLabel: t.ribbonFull,
+			shortcut: `${MOD}+F1`,
+			toggle: () => ctx.updateSettings({ ribbonSimple: !ctx.settings().ribbonSimple }),
+		},
 	});
 }

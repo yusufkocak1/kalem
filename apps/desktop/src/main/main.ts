@@ -19,6 +19,7 @@ import { format, pickLanguage, stringsFor } from "../shared/i18n.js";
 import { quickNoteName } from "../shared/notes.js";
 import { isPaneShown, revealPane } from "../shared/panes.js";
 import { isEditablePath, isPackagePath, isProgramPath, uncShare } from "../shared/paths.js";
+import { watchSystemAccent } from "./accent.js";
 import { ChatStore } from "./assistant-chats.js";
 import { AssistantStore } from "./assistant-store.js";
 import { confluenceClient } from "./confluence-ipc.js";
@@ -87,6 +88,9 @@ function documentArguments(argv: readonly string[], cwd: string): string[] {
 			}
 		});
 }
+
+/** Set while the app starts for the first time on this computer, until its first window asks. */
+let firstRun = false;
 
 function start(): void {
 	const store = new SettingsStore(join(app.getPath("userData"), "settings.json"));
@@ -317,6 +321,11 @@ function start(): void {
 			});
 		}
 	}
+
+	// The system's accent, for the windows that take it (`accentSource`).
+	watchSystemAccent((accent) => {
+		for (const win of windows.all()) win.window.webContents.send(CHANNEL.systemAccent, accent);
+	});
 
 	const workspaceChanged = (): void => {
 		for (const win of windows.all()) win.window.webContents.send(CHANNEL.workspaceChange);
@@ -612,6 +621,12 @@ function start(): void {
 		applyPermissions();
 		installUserTasks();
 		registerIpc({
+			// The app's first start on this computer: the first window offers to set it up.
+			firstRun: () => {
+				const was = firstRun;
+				firstRun = false;
+				return was;
+			},
 			windows,
 			store,
 			drafts,
@@ -658,7 +673,10 @@ function start(): void {
 		if (BrowserWindow.getAllWindows().length === 0) {
 			windows.open(store.state.welcomed ? [] : [welcomeDocument()]);
 		}
-		if (!store.state.welcomed) store.update({ welcomed: true });
+		if (!store.state.welcomed) {
+			firstRun = true;
+			store.update({ welcomed: true });
+		}
 		// Not in the way of startup.
 		setTimeout(() => updater.checkInBackground(), 10_000);
 	});

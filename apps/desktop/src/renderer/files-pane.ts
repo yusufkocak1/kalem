@@ -212,9 +212,11 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 			message,
 			emptyOpen,
 			list,
-			menu,
 		],
 	});
+	// On the page, not in the pane: the pane is a size container, which would
+	// hold a fixed menu inside it and cut it at its edge.
+	document.body.append(menu);
 
 	function showMessage(text: string): void {
 		message.textContent = text;

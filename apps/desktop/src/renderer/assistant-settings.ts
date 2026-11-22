@@ -77,6 +77,9 @@ export function createAssistantSettings(options: AssistantSettingsOptions): Assi
 	});
 	const modelsNote = el("p", { class: "assistant-field-note", attrs: { role: "status" } });
 	const cliNote = el("p", { class: "assistant-empty-hint", text: t.assistantCliNote });
+	// The service in use, as found: a CLI's version, or a service and its model.
+	const inUse = el("p", { class: "assistant-field-note assistant-in-use", attrs: { hidden: "" } });
+	let status: AssistantStatus | null = null;
 	const keyNote = el("p", { class: "assistant-field-note" });
 	const error = el("p", { class: "assistant-error", attrs: { role: "alert", hidden: "" } });
 	const save = el("button", {
@@ -106,7 +109,7 @@ export function createAssistantSettings(options: AssistantSettingsOptions): Assi
 		attrs: { "aria-label": t.assistantSettings, hidden: "" },
 		children: [
 			el("p", { class: "assistant-empty-title", text: t.assistantSettings }),
-			field(t.assistantProvider, provider),
+			field(t.assistantProvider, provider, [inUse]),
 			cliNote,
 			urlField,
 			keyField,
@@ -145,6 +148,14 @@ export function createAssistantSettings(options: AssistantSettingsOptions): Assi
 		modelsNote.textContent = "";
 		error.hidden = true;
 		renderKey();
+		renderInUse();
+	}
+
+	function renderInUse(): void {
+		const shown = status !== null && status.ready && status.provider === selected();
+		inUse.hidden = !shown;
+		inUse.textContent = shown ? format(t.assistantInUse, status?.label ?? "") : "";
+		inUse.title = shown ? (status?.detail ?? "") : "";
 	}
 
 	function renderKey(): void {
@@ -234,6 +245,10 @@ export function createAssistantSettings(options: AssistantSettingsOptions): Assi
 			config = await bridge.assistantConfig();
 			provider.value = config.provider;
 			fill();
+			void bridge.assistantStatus().then((found) => {
+				status = found;
+				renderInUse();
+			});
 			provider.focus();
 		},
 	};

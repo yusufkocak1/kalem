@@ -2,6 +2,7 @@ import { parse } from "@kalem-editor/core";
 import { renderToDOM } from "@kalem-editor/viewer";
 import type { AssistantAction, DocumentAction } from "../shared/actions.js";
 import { commandLabel, isDocumentAction } from "../shared/actions.js";
+import { suggestionsFor } from "../shared/assistant-suggestions.js";
 import type {
 	AssistantPlace,
 	AssistantStatus,
@@ -90,6 +91,10 @@ export interface AssistantContext {
 }
 
 export interface AssistantHost {
+	/** The assistant is at work on an answer, or not any more: the status bar says it. */
+	activity?(busy: boolean): void;
+	/** The active document's Markdown, for the empty chat's suggestions. */
+	documentText?(): string;
 	readonly t: Strings;
 	readonly lang: Lang;
 	readonly bridge: KalemBridge;
@@ -179,6 +184,10 @@ export interface AssistantPane {
 	documentEdits(edits: DocumentEdits | null): void;
 	/** A file's changes being reviewed in its tab were decided in part, or the review ended. */
 	editsChanged(): void;
+	/** The active document changed, or another is active: the empty chat's suggestions follow it. */
+	documentChanged(): void;
+	/** A question from elsewhere (the command box): sent when the service is ready, else left in the box. */
+	ask(question: string): void;
 }
 
 interface Message {
@@ -1823,16 +1832,20 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			showWidth(width);
 		};
 		const up = (): void => {
-			resizer.removeEventListener("pointermove", move);
-			resizer.removeEventListener("pointerup", up);
-			resizer.removeEventListener("pointercancel", up);
+			window.removeEventListener("pointermove", move);
+			window.removeEventListener("pointerup", up);
+			window.removeEventListener("pointercancel", up);
 			element.classList.remove("resizing");
 			if (place === "bottom") host.setHeight(height);
 			else host.setWidth(width);
 		};
-		resizer.addEventListener("pointermove", move);
-		resizer.addEventListener("pointerup", up);
-		resizer.addEventListener("pointercancel", up);
+		// On the window, not the handle: the capture above keeps the events
+		// coming outside it, but when the system does not give it (it can
+		// miss a press made as the window settles) the drag still follows
+		// the pointer over the page and ends where it is let go.
+		window.addEventListener("pointermove", move);
+		window.addEventListener("pointerup", up);
+		window.addEventListener("pointercancel", up);
 	});
 	resizer.addEventListener("keydown", (event) => {
 		const place = host.place();
@@ -1862,25 +1875,21 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	// --- States --------------------------------------------------------------------
 
 	function renderEmpty(): void {
-		const suggestions = (
-			[
-				[t.assistantSuggestSummary, "file"],
-				[t.assistantSuggestDiagram, "diagram"],
-				[t.assistantSuggestFix, "pencil"],
-				[t.assistantSuggestTable, "table"],
-			] as const
-		).map(([text, name]) => {
-			const suggestion = el("button", {
-				class: "assistant-suggestion",
-				attrs: { type: "button" },
-				children: [icon(name), el("span", { text })],
-			});
-			suggestion.addEventListener("click", () => {
-				input.value = text;
-				void send();
-			});
-			return suggestion;
-		});
+		// What this document has (an issue, an analysis' headings, tables, code) comes first.
+		const suggestions = suggestionsFor(host.documentText?.() ?? "", t).map(
+			({ text, icon: name }) => {
+				const suggestion = el("button", {
+					class: "assistant-suggestion",
+					attrs: { type: "button" },
+					children: [icon(name), el("span", { text })],
+				});
+				suggestion.addEventListener("click", () => {
+					input.value = text;
+					void send();
+				});
+				return suggestion;
+			},
+		);
 		empty.replaceChildren(
 			el("div", { class: "assistant-empty-icon", children: [icon("assistant")] }),
 			el("p", { class: "assistant-empty-title", text: t.assistantWelcome }),
@@ -2137,6 +2146,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		refreshEditSummary();
 		const ready = status?.ready === true;
 		const busy = active.reply !== null;
+		host.activity?.(busy);
 		const chatting = view === "chat";
 		missing.hidden = status === null || ready || !chatting;
 		if (!missing.hidden) renderMissing();
@@ -2158,8 +2168,11 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		sendButton.disabled = !ready && !busy;
 		refreshDocumentChip();
 		drawModeButton();
+		// The service's version is the settings' business (Settings → Assistant): the
+		// title says it only while there is something to say, looking or missing.
 		subtitle.textContent = status === null ? t.assistantLooking : status.label;
 		subtitle.title = status?.detail ?? "";
+		subtitle.hidden = ready;
 		settingsButton.setAttribute("aria-pressed", String(view === "settings"));
 		historyButton.setAttribute("aria-pressed", String(view === "history"));
 		sendButton.replaceChildren(icon(busy ? "stop" : "send"));
@@ -4286,6 +4299,15 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		},
 		editsChanged() {
 			refreshEditSummary();
+		},
+		documentChanged() {
+			if (active.messages.length === 0) renderEmpty();
+		},
+		ask(question) {
+			if (view !== "chat") void setView("chat");
+			input.value = question;
+			if (status?.ready === true && active.reply === null) void send();
+			else input.focus();
 		},
 	};
 }

@@ -2,6 +2,8 @@ import type { Root } from "@kalem-editor/core";
 import type { BlockType, MarkType } from "@kalem-editor/core/commands";
 import type { Caret, EditResult } from "@kalem-editor/editor";
 import { holderIn, indentItem, outdentItem, selectRange, toggleList } from "@kalem-editor/editor";
+import { outlineOf } from "@kalem-editor/plugin-outline";
+import { countWords } from "@kalem-editor/plugin-word-count";
 import type { DocumentAction } from "../shared/actions.js";
 import { applyActions } from "../shared/actions.js";
 import type {
@@ -22,9 +24,9 @@ import { DIAGRAM_SUFFIX, serializeDiagram } from "../shared/diagram.js";
 import { keptProposals, placeProposals } from "../shared/edit-review.js";
 import { format, stringsFor } from "../shared/i18n.js";
 import { noteKey } from "../shared/local-notes.js";
-import { paletteCss } from "../shared/palette.js";
+import { paletteCss, systemAccentCss } from "../shared/palette.js";
 import type { ToolPane } from "../shared/panes.js";
-import { revealPane, togglePane } from "../shared/panes.js";
+import { isPaneShown, revealPane, togglePane } from "../shared/panes.js";
 import {
 	extension,
 	isEditablePath,
@@ -32,6 +34,7 @@ import {
 	isWordPath,
 	TEXT_EXTENSIONS,
 } from "../shared/paths.js";
+import { rolePreset } from "../shared/roles.js";
 import { withColumnWidth } from "../shared/table-style.js";
 import { changeCase, collapseSpaces, nextCase } from "../shared/text-case.js";
 import { typographyVars } from "../shared/typography.js";
@@ -49,6 +52,8 @@ import { createDiagramButton, isDiagramImage } from "./diagram-button.js";
 import { createDiagramEditor } from "./diagram-editor.js";
 import { diagramFromImage, diagramToPng } from "./diagram-image.js";
 import { createDocks } from "./docks.js";
+import type { MapMark } from "./document-map.js";
+import { createDocumentMap } from "./document-map.js";
 import { markQuotes, revealQuote } from "./document-marks.js";
 import { createDocumentTools } from "./document-tools.js";
 import { el, isTextFieldFocused } from "./dom.js";
@@ -58,6 +63,7 @@ import type { TableContext, TableEdit } from "./edits.js";
 import { insertDivider, insertTable, replaceTable, tableAt, toggleTaskList } from "./edits.js";
 import { createFilesPane } from "./files-pane.js";
 import { createGitDialogs } from "./git-dialogs.js";
+import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
 import { createImageViewer } from "./image-viewer.js";
 import { createJiraDialog } from "./jira-dialog.js";
@@ -70,10 +76,13 @@ import { createLocalNotes } from "./local-notes.js";
 import { createMergeDialog } from "./merge-dialog.js";
 import { createNetworkPanel } from "./network-panel.js";
 import { createNotices } from "./notices.js";
+import { createPathBar } from "./path-bar.js";
 import { Previews } from "./previews.js";
 import { documentImages } from "./prompt-images.js";
-import { createQuickOpen } from "./quick-open.js";
+import { createQuickOpen, workspaceItems } from "./quick-open.js";
 import { createAppRibbon } from "./ribbon-layout.js";
+import { createRolePicker } from "./role-picker.js";
+import { createSelectionAssistant } from "./selection-assistant.js";
 import type { ConfluenceMergePlan } from "./session.js";
 import { ipcErrorMessage, Session } from "./session.js";
 import { createSettingsDialog } from "./settings-dialog.js";
@@ -83,6 +92,7 @@ import { enableColumnResize } from "./table-styles.js";
 import { createTabStrip } from "./tabs.js";
 import { createTemplatePicker } from "./template-picker.js";
 import { measureDiagramText } from "./text-measure.js";
+import { attachTip } from "./tip.js";
 import { createVersionHistory } from "./version-history.js";
 
 import "@kalem-editor/themes/tokens.css";
@@ -118,6 +128,115 @@ const ribbonHost = el("header", { class: "ribbon-host" });
 // Each tab brings its own notices, page, outline and word count; these hold them.
 const noticeArea = el("div", { class: "notice-area" });
 const deskArea = el("div", { class: "desk-area" });
+
+/** The note kinds' highlights (local-notes.ts), read for the document map. */
+const NOTE_HIGHLIGHTS = ["question", "attention", "later", "note"] as const;
+
+/**
+ * The document's map beside the scrollbar (`documentMap`): where the
+ * headings, the notes, the assistant's changes and what was found are.
+ */
+const documentMap = createDocumentMap({
+	t,
+	desk: () => {
+		if (!settings.documentMap || app.hasAttribute("data-focus")) return null;
+		const tab = tabs.get(session.id);
+		return tab === undefined || tab.session.isText ? null : tab.desk;
+	},
+	extent: (desk) => {
+		const tab = tabs.get(session.id);
+		if (tab === undefined) return 0;
+		return (
+			tab.canvas.getBoundingClientRect().bottom - desk.getBoundingClientRect().top + desk.scrollTop
+		);
+	},
+	marks: (desk) => {
+		const tab = tabs.get(session.id);
+		if (tab === undefined) return [];
+		const origin = desk.getBoundingClientRect().top - desk.scrollTop;
+		const at = (box: DOMRect): number => box.top - origin;
+		const marks: MapMark[] = [];
+		for (const heading of tab.canvas.querySelectorAll<HTMLElement>(
+			".kalem-editor > :is(h1, h2, h3)",
+		)) {
+			const text = heading.textContent?.trim() ?? "";
+			if (text === "") continue;
+			marks.push({
+				kind: "heading",
+				top: at(heading.getBoundingClientRect()),
+				label: text,
+				detail: heading.localName,
+			});
+		}
+		for (const changed of tab.canvas.querySelectorAll<HTMLElement>(
+			"[data-ai-change], [data-ai-was], [data-ai-gone]",
+		)) {
+			marks.push({
+				kind: "change",
+				top: at(changed.getBoundingClientRect()),
+				label: t.documentMapChange,
+			});
+		}
+		const registry = (CSS as { highlights?: Map<string, Iterable<AbstractRange>> }).highlights;
+		for (const kind of NOTE_HIGHLIGHTS) {
+			for (const range of registry?.get(`kalem-note-${kind}`) ?? []) {
+				if (!(range instanceof Range)) continue;
+				marks.push({
+					kind: "note",
+					top: at(range.getBoundingClientRect()),
+					label: range.toString(),
+					detail: kind,
+				});
+			}
+		}
+		// The canvas is the editor's element itself, or holds it.
+		const editor = tab.canvas.matches(".kalem-editor")
+			? tab.canvas
+			: tab.canvas.querySelector(".kalem-editor");
+		const blocks = editor?.children;
+		const found = new Set((tab.session.find?.matches() ?? []).map((match) => match.blockIndex));
+		for (const index of found) {
+			const block = blocks?.[index];
+			if (block !== undefined)
+				marks.push({
+					kind: "found",
+					top: at(block.getBoundingClientRect()),
+					label: t.documentMapFound,
+				});
+		}
+		return marks;
+	},
+});
+deskArea.append(documentMap.element);
+window.addEventListener("resize", () => documentMap.refresh());
+
+/** Where the active document is, above its page: `project › specs › payment.md`. */
+const pathBar = createPathBar({
+	t,
+	lang: startup.language,
+	where: () => {
+		const tab = tabs.get(session.id);
+		// A text file's own toolbar is at the top of its view, and names it.
+		if (tab === undefined || tab.session.isText) return null;
+		return { path: tab.session.path, remote: tab.session.remote };
+	},
+	workspace: () => bridge.getWorkspace(),
+	open: (path) => void bridge.openPath(path),
+});
+deskArea.append(pathBar.element);
+/** The path last shown, so a state change that keeps it does not ask for the workspace again. */
+let pathShown: string | undefined;
+function refreshPathBar(force = false): void {
+	const where = `${session.path ?? ""}|${session.remote?.id ?? ""}`;
+	if (!force && where === pathShown) return;
+	pathShown = where;
+	pathBar.refresh();
+}
+// What the search finds changes as it is typed in its box.
+document.addEventListener("input", (event) => {
+	if (event.target instanceof Element && event.target.closest(".kalem-find") !== null)
+		documentMap.refresh();
+});
 const outlineArea = el("div", { class: "navigation-content" });
 const wordCountArea = el("div", { class: "status-counts" });
 
@@ -167,6 +286,13 @@ const changesDialog = createChangesDialog({
 	reviewBeforeSave: () => settings.confluenceReviewBeforeSave,
 	setReviewBeforeSave: (value) => updateSettings({ confluenceReviewBeforeSave: value }),
 });
+/**
+ * The counts on the edges' buttons follow the notes and the assistant's
+ * changes; set once the buttons are built (the notes come first).
+ */
+let refreshBadges: () => void = () => undefined;
+let showAssistantBusy: (busy: boolean) => void = () => undefined;
+
 // The user's own notes beside the text: on this computer only, never in the document.
 const localNotes = createLocalNotes({
 	t,
@@ -181,6 +307,16 @@ const localNotes = createLocalNotes({
 	},
 	notify: (text, actions) =>
 		session.notices.show({ id: "notes", text, ...(actions === undefined ? {} : { actions }) }),
+	changed: () => {
+		documentMap.refresh();
+		refreshBadges();
+	},
+	// Beside the lines while the pane is at the page's side (not under it) and the setting is on.
+	aligned: () => {
+		if (!settings.notesAligned || !docks.shown().has("notes")) return null;
+		if (settings.panePlaces.notes === "bottom") return null;
+		return tabs.get(session.id)?.desk ?? null;
+	},
 });
 const jiraDialog = createJiraDialog({
 	t,
@@ -216,14 +352,66 @@ const quickOpen = createQuickOpen({
 	lang: startup.language,
 	workspace: () => bridge.getWorkspace(),
 	open: (path) => void bridge.openPath(path),
-	commands: (query) => void commandPalette.show(query),
+	commands: (query) => void commandPalette.show(query, "commands"),
 });
+/** The empty chat's suggestions follow the document, once its typing pauses. */
+let suggestTimer: ReturnType<typeof setTimeout> | undefined;
+function suggestSoon(): void {
+	clearTimeout(suggestTimer);
+	suggestTimer = setTimeout(() => assistant.documentChanged(), 600);
+}
+
+/** Who the app is set up for: asked at its first start, and from the View menu. */
+const rolePicker = createRolePicker({
+	t,
+	pick: (role) => updateSettings(rolePreset(role, settings)),
+});
+
+/**
+ * Home is an empty, untitled tab: its start page is it. One open already is
+ * brought forward; else a new one is opened.
+ */
+function openHome(): void {
+	for (const [id, tab] of tabs) {
+		const doc = tab.session;
+		const empty =
+			!doc.isText &&
+			doc.path === null &&
+			doc.remote === null &&
+			!doc.dirty &&
+			doc.styledMarkdown().trim() === "";
+		if (empty) {
+			activateTab(id);
+			return;
+		}
+	}
+	bridge.newTab();
+}
+
+/** The assistant where the text is: in the selection's bubble, and under the caret (Ctrl+J). */
+const selectionAssistant = createSelectionAssistant({
+	t,
+	ask: (prompt) => {
+		if (!settings.assistant) updateSettings({ assistant: true });
+		assistant.ask(prompt);
+	},
+});
+
 /** The menu's commands by name (F1, or `>` in Quick Open). */
 const commandPalette = createCommandPalette({
 	t,
 	lang: startup.language,
 	commands: () => bridge.paletteCommands(),
 	run: (id) => bridge.runPaletteCommand(id),
+	files: async () => workspaceItems(await bridge.getWorkspace()),
+	openFile: (path) => void bridge.openPath(path),
+	headings: () =>
+		session.headings().map((heading) => ({ text: heading.text, level: heading.level })),
+	goToHeading: (index) => session.goToHeading(index),
+	ask: (question) => {
+		if (!settings.assistant) updateSettings({ assistant: true });
+		assistant.ask(question);
+	},
 });
 
 /** Where the caret last was in each tab's document, and the text last selected in it. */
@@ -235,6 +423,7 @@ function syncEdits(): void {
 	const tab = [...tabs.values()].find((each) => each.session === session);
 	const review = tab?.review;
 	const summary = review?.summary() ?? null;
+	showAssistantEdits(summary?.items.length ?? 0);
 	assistant.documentEdits(
 		review === undefined || summary === null
 			? null
@@ -309,7 +498,26 @@ async function reviewEdits(
 	return true;
 }
 
+/** Set once the first tab is shown: before it, `session` is not there to read. */
+let firstTabShown = false;
+
+/** The assistant at work on an answer: a click shows its panel. */
+const assistantChip = statusChip("status-assistant", t.statusAssistantBusy, "assistant", () => {
+	if (!settings.assistant) updateSettings({ assistant: true });
+	assistant.focus();
+});
+
 const assistant = createAssistantPane({
+	activity: (busy) => {
+		assistantChip.hidden = !busy;
+		showAssistantBusy(busy);
+		bridge.assistantActivity(busy);
+	},
+	// Built before the first tab (and before `session` exists): nothing to suggest about till then.
+	documentText: () => {
+		if (!firstTabShown || session.isText) return "";
+		return session.styledMarkdown();
+	},
 	reviewEdits: (edits, settle) => reviewEdits(edits, settle),
 	decideReview: (id, accept) => {
 		// Not when its tab was closed meanwhile: the list applies it to the file as it does any other.
@@ -395,6 +603,28 @@ assistantToggle.addEventListener("click", () => {
 	}
 });
 const assistantRail = el("div", { class: "assistant-rail", children: [assistantToggle] });
+const assistantShortcut = `${startup.platform === "darwin" ? "Cmd" : "Ctrl"}+Shift+L`;
+attachTip(
+	assistantToggle,
+	() => `${assistantToggle.getAttribute("aria-label") ?? t.assistantPane} (${assistantShortcut})`,
+	"left",
+);
+const assistantBadge = el("span", {
+	class: "stripe-badge",
+	attrs: { "aria-hidden": "true", hidden: "" },
+});
+assistantToggle.append(assistantBadge);
+showAssistantBusy = (busy) => assistantToggle.toggleAttribute("data-busy", busy);
+/** The assistant's changes waiting in the document, on its button. */
+function showAssistantEdits(count: number): void {
+	assistantBadge.hidden = count <= 0;
+	// Nothing in the button's text without a count: its name is its label.
+	assistantBadge.textContent = count <= 0 ? "" : count > 99 ? "99+" : String(count);
+	assistantToggle.setAttribute(
+		"aria-label",
+		count > 0 ? `${t.assistantPane} (${count})` : t.assistantPane,
+	);
+}
 
 // --- Docks: the tool panes on the left, on the right and under the document ---------
 
@@ -435,7 +665,16 @@ const docks = createDocks({
 	update: (patch) => updateSettings(patch),
 	available: paneAvailable,
 	openLayout: () => void settingsDialog.show("panels"),
+	reveal: (pane) => {
+		if (pane !== "outline" || app.dataset.fold === undefined) return false;
+		outlineWanted = session;
+		foldEmptyOutline();
+		fitSidePanes();
+		return true;
+	},
+	badge: (pane) => (pane === "notes" ? localNotes.count() : null),
 });
+refreshBadges = () => docks.refreshBadges();
 const deskColumn = el("div", { class: "desk-column", children: [deskArea, docks.elements.bottom] });
 
 /** The assistant's panel where the settings put it; its button stays at the right edge. */
@@ -518,6 +757,8 @@ async function refreshAccounts(): Promise<void> {
 	]);
 	accounts.confluence = confluence !== null;
 	accounts.jira = jira !== null;
+	confluenceChip.hidden = !accounts.confluence;
+	jiraChip.hidden = !accounts.jira;
 	for (const tab of tabs.values()) tab.session.connectionsChanged();
 	updatePublishButton();
 	docks.apply();
@@ -562,13 +803,270 @@ function showGitStatus(git: GitStatus | null): void {
 	gitStatus.title = format(t.statusGitTitle, branch, git.changed, git.ahead, git.behind);
 }
 
+// --- Status bar: what changes as one works, each a way to it -----------------
+
+/** Saved, unsaved, saving, failed: at the status bar's right, as a click saves. */
+const saveStatus = el("div", { class: "save-status", attrs: { role: "status" } });
+// Unsaved or failed: a click saves, as Ctrl+S does.
+saveStatus.addEventListener("click", () => {
+	if (session.status === "unsaved" || session.status === "error") commands.save();
+});
+
+/** A chip of the status bar that does something when clicked. */
+function statusChip(
+	className: string,
+	label: string,
+	glyph: IconName,
+	run: () => void,
+): HTMLButtonElement {
+	const chip = el("button", {
+		class: `status-chip ${className}`,
+		attrs: { type: "button", title: label },
+		children: [icon(glyph), el("span", { class: "status-chip-text", text: label })],
+	});
+	chip.addEventListener("click", run);
+	chip.hidden = true;
+	return chip;
+}
+
+/** Confluence and Jira while connected: a click shows their pane. */
+const confluenceChip = statusChip("status-confluence", "Confluence", "confluence", () => {
+	if (!docks.shown().has("confluence")) updateSettings(revealPane(settings, "confluence"));
+});
+const jiraChip = statusChip("status-jira", "Jira", "target", () => {
+	if (!docks.shown().has("jira")) updateSettings(revealPane(settings, "jira"));
+});
+
+/** The selection's words, while there is one. */
+const selectionCount = el("span", { class: "status-selection" });
+selectionCount.hidden = true;
+function showSelectionCount(text: string): void {
+	const words = text.trim() === "" ? 0 : countWords(text, startup.language);
+	selectionCount.hidden = words === 0;
+	selectionCount.textContent = format(t.statusSelection, words);
+}
+
+/**
+ * A goal in words for the document, kept on this computer by its path (or
+ * its Confluence page); its progress is a ring. A click sets or removes it.
+ */
+const GOALS_KEY = "kalem.wordGoals";
+function readGoals(): Record<string, number> {
+	try {
+		const kept = JSON.parse(localStorage.getItem(GOALS_KEY) ?? "{}") as unknown;
+		return typeof kept === "object" && kept !== null ? (kept as Record<string, number>) : {};
+	} catch {
+		return {};
+	}
+}
+/** Goals of documents not saved yet, for as long as the window is open. */
+const unsavedGoals = new WeakMap<Session, number>();
+function goalKey(tab: Session): string | null {
+	if (tab.path !== null) return `path:${tab.path}`;
+	if (tab.remote !== null) return `confluence:${tab.remote.site}#${tab.remote.id}`;
+	return null;
+}
+function goalOf(tab: Session): number | null {
+	const key = goalKey(tab);
+	const goal = key === null ? unsavedGoals.get(tab) : readGoals()[key];
+	return typeof goal === "number" && goal > 0 ? goal : null;
+}
+function setGoal(tab: Session, goal: number | null): void {
+	const key = goalKey(tab);
+	if (key === null) {
+		if (goal === null) unsavedGoals.delete(tab);
+		else unsavedGoals.set(tab, goal);
+	} else {
+		const goals = readGoals();
+		if (goal === null) delete goals[key];
+		else goals[key] = goal;
+		try {
+			localStorage.setItem(GOALS_KEY, JSON.stringify(goals));
+		} catch {
+			// Storage may be unavailable: the goal lasts as long as the window.
+			unsavedGoals.set(tab, goal ?? 0);
+		}
+	}
+	showGoal();
+}
+
+const goalRing = el("span", { class: "status-goal-ring", attrs: { "aria-hidden": "true" } });
+const goalText = el("span", { class: "status-goal-text" });
+const goalButton = el("button", {
+	class: "status-chip status-goal",
+	attrs: { type: "button", "aria-haspopup": "dialog" },
+	children: [goalRing, goalText],
+});
+const goalInput = el("input", {
+	class: "status-goal-input",
+	attrs: { type: "number", min: "1", step: "50", "aria-label": t.goalLabel },
+});
+const goalSave = el("button", {
+	class: "status-goal-save",
+	text: t.goalSave,
+	attrs: { type: "button" },
+});
+const goalRemove = el("button", {
+	class: "status-goal-remove",
+	text: t.goalRemove,
+	attrs: { type: "button" },
+});
+// Not a <form>: the page's policy (form-action 'none') stops a form's submission.
+const goalForm = el("div", {
+	class: "status-popover status-goal-form",
+	attrs: { role: "dialog", "aria-label": t.goalLabel, hidden: "" },
+	children: [
+		el("label", { text: t.goalLabel, attrs: { for: "status-goal-input" } }),
+		goalInput,
+		goalSave,
+		goalRemove,
+	],
+});
+goalInput.id = "status-goal-input";
+document.body.append(goalForm);
+
+function showGoal(): void {
+	const tab = session as Session | undefined;
+	if (tab === undefined) return;
+	goalButton.hidden = tab.isText;
+	const goal = goalOf(tab);
+	const words = tab.wordCounts()?.words ?? 0;
+	goalButton.toggleAttribute("data-goal", goal !== null);
+	if (goal === null) {
+		goalRing.style.removeProperty("--goal");
+		goalText.textContent = t.goalSet;
+		goalButton.title = t.goalSet;
+		return;
+	}
+	const share = Math.min(1, words / goal);
+	goalRing.style.setProperty("--goal", `${Math.round(share * 100)}%`);
+	goalButton.toggleAttribute("data-reached", words >= goal);
+	goalText.textContent = `${words.toLocaleString(startup.language)} / ${goal.toLocaleString(startup.language)}`;
+	goalButton.title = format(t.goalTitle, words, goal, Math.round(share * 100));
+}
+let goalTimer: ReturnType<typeof setTimeout> | undefined;
+/** The counter counts a moment after a change: the ring follows it. */
+function showGoalSoon(): void {
+	clearTimeout(goalTimer);
+	goalTimer = setTimeout(showGoal, 400);
+}
+
+goalButton.addEventListener("click", () => {
+	if (!goalForm.hidden) {
+		goalForm.hidden = true;
+		return;
+	}
+	goalInput.value = String(goalOf(session) ?? "");
+	goalRemove.hidden = goalOf(session) === null;
+	goalForm.hidden = false;
+	const box = goalButton.getBoundingClientRect();
+	goalForm.style.left = `${Math.max(8, Math.min(box.left, window.innerWidth - goalForm.offsetWidth - 8))}px`;
+	goalForm.style.top = `${box.top - goalForm.offsetHeight - 6}px`;
+	goalInput.focus();
+	goalInput.select();
+});
+function saveGoal(): void {
+	const goal = Math.round(Number(goalInput.value));
+	setGoal(session, Number.isFinite(goal) && goal > 0 ? goal : null);
+	goalForm.hidden = true;
+}
+goalSave.addEventListener("click", saveGoal);
+goalInput.addEventListener("keydown", (event) => {
+	if (event.key === "Enter") {
+		event.preventDefault();
+		saveGoal();
+	}
+});
+goalRemove.addEventListener("click", () => {
+	setGoal(session, null);
+	goalForm.hidden = true;
+});
+goalForm.addEventListener("keydown", (event) => {
+	if (event.key === "Escape") goalForm.hidden = true;
+});
+document.addEventListener(
+	"mousedown",
+	(event) => {
+		const target = event.target as Node;
+		if (!goalForm.hidden && !goalForm.contains(target) && !goalButton.contains(target))
+			goalForm.hidden = true;
+	},
+	true,
+);
+
+/** The zoom's value opens the usual sizes. */
+// On the zoom's steps (ZOOM_STEP): another would be rounded to one.
+const ZOOM_PRESETS = [80, 90, 100, 110, 120, 150, 200] as const;
+const zoomMenu = el("div", {
+	class: "status-popover zoom-menu",
+	attrs: { role: "menu", hidden: "" },
+});
+document.body.append(zoomMenu);
+zoomValue.setAttribute("role", "button");
+zoomValue.setAttribute("tabindex", "0");
+zoomValue.setAttribute("aria-haspopup", "menu");
+zoomValue.title = t.zoom;
+function openZoomMenu(): void {
+	zoomMenu.replaceChildren(
+		...ZOOM_PRESETS.filter((zoom) => zoom >= MIN_ZOOM && zoom <= MAX_ZOOM).map((zoom) => {
+			const item = el("button", {
+				class: "zoom-menu-item",
+				text: `${zoom}%`,
+				attrs: {
+					type: "button",
+					role: "menuitemradio",
+					"aria-checked": String(zoom === settings.zoom),
+				},
+			});
+			item.addEventListener("click", () => {
+				zoomMenu.hidden = true;
+				setZoom(zoom);
+			});
+			return item;
+		}),
+	);
+	zoomMenu.hidden = false;
+	const box = zoomValue.getBoundingClientRect();
+	zoomMenu.style.left = `${Math.min(box.left, window.innerWidth - zoomMenu.offsetWidth - 8)}px`;
+	zoomMenu.style.top = `${box.top - zoomMenu.offsetHeight - 6}px`;
+	zoomMenu.querySelector<HTMLElement>('[aria-checked="true"]')?.focus();
+}
+zoomValue.addEventListener("click", () => {
+	if (zoomMenu.hidden) openZoomMenu();
+	else zoomMenu.hidden = true;
+});
+zoomValue.addEventListener("keydown", (event) => {
+	if (event.key === "Enter" || event.key === " ") {
+		event.preventDefault();
+		openZoomMenu();
+	}
+});
+document.addEventListener(
+	"mousedown",
+	(event) => {
+		const target = event.target as Node;
+		if (!zoomMenu.hidden && !zoomMenu.contains(target) && target !== zoomValue)
+			zoomMenu.hidden = true;
+	},
+	true,
+);
+document.addEventListener("keydown", (event) => {
+	if (event.key === "Escape") zoomMenu.hidden = true;
+});
+
 const statusBar = el("footer", {
 	class: "statusbar",
 	children: [
 		docks.stripes.bottom,
 		gitStatus,
+		confluenceChip,
+		jiraChip,
 		wordCountArea,
+		selectionCount,
+		goalButton,
 		el("span", { class: "status-spacer" }),
+		assistantChip,
+		saveStatus,
 		readOnlyBadge,
 		formatBadge,
 		el("div", { class: "zoom", children: [zoomSlider, zoomValue] }),
@@ -579,11 +1077,6 @@ const exitFocus = el("button", {
 	class: "focus-exit",
 	text: t.exitFocus,
 	attrs: { type: "button" },
-});
-const saveStatus = el("div", { class: "save-status", attrs: { role: "status" } });
-// Unsaved or failed: a click saves, as Ctrl+S does.
-saveStatus.addEventListener("click", () => {
-	if (session.status === "unsaved" || session.status === "error") commands.save();
 });
 // Publishing to Confluence, always at hand next to the save status while Confluence is connected.
 const publishButton = el("button", {
@@ -605,7 +1098,7 @@ changesButton.hidden = true;
 changesButton.addEventListener("click", () => commands["confluence-changes"]());
 const ribbonTrailing = el("div", {
 	class: "ribbon-trailing",
-	children: [publishButton, changesButton, saveStatus],
+	children: [publishButton, changesButton],
 });
 
 /** The publish button is there for a local document, once Confluence is connected. */
@@ -682,11 +1175,40 @@ const tabStrip = createTabStrip({
 	onDragOut: (id, x, y) => moveTab(id, { x, y }),
 });
 
+/**
+ * The window's title bar, when Kalem draws it (`tabsInTitleBar`): the
+ * documents' tabs, in the row the system's title bar took, which drags the
+ * window; the system's window buttons are over its right end (Windows,
+ * Linux) or its traffic lights at its left (macOS).
+ */
+const titleBar =
+	startup.titleBar === null
+		? null
+		: el("div", {
+				class: "title-bar",
+				attrs: { "data-kind": startup.titleBar },
+				children: [tabStrip.element],
+			});
+
+/** The system's window buttons take the title bar's colours, the theme's and the palette's. */
+let titleBarColors = "";
+function syncTitleBar(): void {
+	if (titleBar === null || startup.titleBar !== "overlay") return;
+	const style = getComputedStyle(titleBar);
+	const colors = `${style.backgroundColor}|${style.color}`;
+	if (colors === titleBarColors) return;
+	titleBarColors = colors;
+	bridge.titleBarColors(style.backgroundColor, style.color);
+}
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", syncTitleBar);
+
 const app = document.getElementById("app") ?? document.body.appendChild(el("div"));
 app.className = "app";
+app.toggleAttribute("data-title-bar", titleBar !== null);
+// The system's material behind the frame (`windowMaterial`): the shell lets it through.
+if (startup.material !== null) document.documentElement.dataset.material = startup.material;
 app.append(
-	ribbonHost,
-	tabStrip.element,
+	...(titleBar === null ? [ribbonHost, tabStrip.element] : [titleBar, ribbonHost]),
 	noticeArea,
 	el("div", {
 		class: "body",
@@ -869,6 +1391,18 @@ function createTab(id: string): Tab {
 		open: (path) => void bridge.openPath(path),
 		confluence: () => (accounts.confluence ? bridge.confluenceSearch("", null) : null),
 		openConfluence: (pageId) => void bridge.confluenceOpenPage(pageId),
+		templates: () => bridge.templates(),
+		newFromTemplate: (id) => void bridge.templateNew(id),
+		jira: () =>
+			accounts.jira
+				? bridge
+						.jiraSearch(
+							"assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC",
+							null,
+						)
+						.then((found) => found.issues)
+				: null,
+		openIssue: (key) => void jiraDialog.showIssue(key),
 	});
 	/** Once the document had something in it, the start page does not come back. */
 	let started = false;
@@ -880,6 +1414,23 @@ function createTab(id: string): Tab {
 	let specsChecked = false;
 	const page = el("div", { class: "page kalem-theme", children: [tabCanvas, start.element] });
 	const desk = el("main", { class: "desk", children: [page] });
+	desk.addEventListener(
+		"scroll",
+		() => {
+			if (tabs.get(session.id)?.desk !== desk) return;
+			documentMap.scrolled();
+			pathBar.scrolled(desk.scrollTop);
+		},
+		{ passive: true },
+	);
+	// My Notes' cards beside their lines follow the active page's scroll.
+	desk.addEventListener(
+		"scroll",
+		() => {
+			if (tabs.get(session.id)?.desk === desk) localNotes.align();
+		},
+		{ passive: true },
+	);
 	const outline = el("div", { class: "kalem-theme" });
 	const wordCount = el("div", { class: "kalem-theme" });
 	const views = [noticeHost, desk, outline, wordCount];
@@ -929,21 +1480,33 @@ function createTab(id: string): Tab {
 				renderState();
 				// Saved for the first time, or under another name: its notes go with it.
 				localNotes.refresh();
+				if (firstTabShown) refreshPathBar();
 			}
 			if (loaded) showStart();
 		},
 		onConfluenceMerge: () => void showConfluenceMerge(tabSession),
+		decorateBubble: (bubble) => selectionAssistant.decorate(bubble),
 		onEditorChange: () => {
 			review.changed();
 			scheduleRibbonUpdate();
-			if (session === tabSession) localNotes.refresh();
+			if (session === tabSession) {
+				localNotes.refresh();
+				foldEmptyOutlineSoon();
+				showGoalSoon();
+				documentMap.refresh();
+				suggestSoon();
+			}
 			lineNumbers.refresh();
 		},
 	});
 	const lineNumbers = createLineNumbers({
 		page,
 		canvas: tabCanvas,
-		enabled: () => settings.lineNumbers,
+		// The file's lines while its source is shown; on the page, not in focus mode.
+		enabled: () =>
+			tabSession.source?.isSource() === true
+				? settings.codeLineNumbers
+				: settings.lineNumbers && !app.hasAttribute("data-focus"),
 		available: () => !tabSession.isText,
 		snapshot: () => tabSession.lineSnapshot(),
 	});
@@ -1138,6 +1701,16 @@ function activateTab(id: string): void {
 
 	tabStrip.select(id);
 	bridge.tabActivated(id);
+	firstTabShown = true;
+	clearTimeout(foldTimer);
+	foldEmptyOutline();
+	fitSidePanes();
+	showSelectionCount("");
+	showGoalSoon();
+	documentMap.refresh();
+	refreshPathBar();
+	pathBar.scrolled(tab.desk.scrollTop);
+	assistant.documentChanged();
 	syncEdits();
 	renderState();
 	refreshFiles();
@@ -1152,6 +1725,12 @@ function openDocument({ tabId, payload, view }: TabDocument): void {
 	if (view !== undefined && view.scroll > 0) tab.pendingScroll = view.scroll;
 	tab.showStart();
 	activateTab(tabId);
+	// Into the active tab too (an empty one a document replaces): the headings
+	// pane is as the new document wants it at once, not after typing's pause,
+	// so the page does not move a moment after it is shown.
+	clearTimeout(foldTimer);
+	foldEmptyOutline();
+	fitSidePanes();
 	tab.session.focus();
 }
 
@@ -1217,6 +1796,64 @@ function cycleTab(step: 1 | -1): void {
 const pageSetup = document.head.appendChild(document.createElement("style"));
 /** The colour palette's variables, after the stylesheet so that they win. */
 const paletteStyle = document.head.appendChild(document.createElement("style"));
+/** The system's accent over the palette's (`accentSource`), after it. */
+const accentStyle = document.head.appendChild(document.createElement("style"));
+let systemAccent = startup.systemAccent;
+function applyAccent(): void {
+	accentStyle.textContent =
+		settings.accentSource === "system"
+			? systemAccentCss(systemAccent, settings.palette, settings.paletteCustom)
+			: "";
+}
+bridge.onSystemAccent((accent) => {
+	systemAccent = accent;
+	applyAccent();
+	syncTitleBar();
+});
+
+/**
+ * The headings pane with no heading to list gives its room to the page: its
+ * dock folds while the active document has none (a new one, a text file) and
+ * opens again with the first heading. Nothing is saved. Its button opens it
+ * for that tab all the same (`reveal` above).
+ */
+let outlineWanted: Session | null = null;
+function foldEmptyOutline(): void {
+	const active = session as Session | undefined;
+	const place = settings.panePlaces.outline;
+	const fold =
+		active !== undefined &&
+		place !== "hidden" &&
+		outlineWanted !== active &&
+		isPaneShown(settings, "outline", paneAvailable) &&
+		!hasHeadings(active);
+	const value = fold ? place : "";
+	if ((app.dataset.fold ?? "") !== value) {
+		if (value === "") delete app.dataset.fold;
+		else app.dataset.fold = value;
+	}
+}
+
+/** What the headings pane would list: a heading with words in it, a quote's or a list's too. */
+function hasHeadings(tab: Session): boolean {
+	return (
+		!tab.isText && outlineOf(tab.editor.getDocument()).some((heading) => heading.text.trim() !== "")
+	);
+}
+
+/**
+ * While typing, the pane comes and goes once the typing pauses: the page does
+ * not move under the first heading as it is being written.
+ */
+const FOLD_DELAY = 700;
+let foldTimer: ReturnType<typeof setTimeout> | undefined;
+function foldEmptyOutlineSoon(): void {
+	clearTimeout(foldTimer);
+	foldTimer = setTimeout(() => {
+		foldEmptyOutline();
+		fitSidePanes();
+	}, FOLD_DELAY);
+}
 
 /**
  * A window too narrow for every open side pane and a readable page: the
@@ -1227,7 +1864,12 @@ const paletteStyle = document.head.appendChild(document.createElement("style"));
 const SIDE_PANE_MIN = 150;
 const PAGE_MIN = 300;
 function fitSidePanes(): void {
-	const shown = (element: HTMLElement): boolean => !element.hidden && element.isConnected;
+	const folded = app.dataset.fold;
+	const shown = (element: HTMLElement): boolean =>
+		!element.hidden &&
+		element.isConnected &&
+		!(element === docks.elements.left && folded === "left") &&
+		!(element === docks.elements.right && folded === "right");
 	const left = docks.elements.left;
 	const right = docks.elements.right;
 	const stripes = 2 * 34;
@@ -1256,9 +1898,15 @@ function fitSidePanes(): void {
 }
 window.addEventListener("resize", fitSidePanes);
 
+/** The ribbon's simplified look; set once the ribbon is built, after the first settings. */
+let setRibbonSimple: ((simple: boolean) => void) | null = null;
+
 function applySettings(): void {
+	setRibbonSimple?.(settings.ribbonSimple);
 	pageSetup.textContent = pageRule(settings);
 	paletteStyle.textContent = paletteCss(settings.palette, settings.paletteCustom);
+	applyAccent();
+	document.documentElement.dataset.density = settings.density;
 	app.style.setProperty("--zoom", String(settings.zoom / 100));
 	app.toggleAttribute("data-full-width", settings.fullWidth);
 	for (const [name, value] of Object.entries(typographyVars(settings))) {
@@ -1266,9 +1914,10 @@ function applySettings(): void {
 		else app.style.setProperty(name, value);
 	}
 	app.toggleAttribute("data-doc-font", settings.documentFont !== "default");
+	app.toggleAttribute("data-typewriter", settings.typewriterScroll);
 	for (const tab of tabs.values()) {
 		tab.lineNumbers.relayout();
-		tab.session.textView?.setLineNumbers(settings.lineNumbers);
+		tab.session.textView?.setLineNumbers(settings.codeLineNumbers);
 	}
 	placeAssistant();
 	assistant.element.hidden = !settings.assistant;
@@ -1279,7 +1928,10 @@ function applySettings(): void {
 	zoomSlider.value = String(settings.zoom);
 	zoomValue.textContent = `${settings.zoom}%`;
 	localNotes.refresh();
+	foldEmptyOutline();
 	fitSidePanes();
+	syncTitleBar();
+	documentMap.refresh();
 }
 
 function updateSettings(patch: Partial<Settings>): void {
@@ -1310,10 +1962,95 @@ deskArea.addEventListener(
 
 function toggleFocusMode(): void {
 	app.toggleAttribute("data-focus");
+	for (const tab of tabs.values()) tab.lineNumbers.refresh();
 	scheduleRibbonUpdate();
+	// The page stays where it is: what is read does not move. Typing centres the line.
+	wakeFocusExit();
+	documentMap.refresh();
 }
 
 exitFocus.addEventListener("click", toggleFocusMode);
+
+/**
+ * Focus mode's way out fades once the mouse rests (2.5s) and comes back as
+ * soon as it moves, or the keyboard reaches it.
+ */
+const FOCUS_EXIT_IDLE = 2500;
+let focusExitTimer: ReturnType<typeof setTimeout> | undefined;
+function wakeFocusExit(): void {
+	clearTimeout(focusExitTimer);
+	delete app.dataset.focusIdle;
+	if (!app.hasAttribute("data-focus")) return;
+	focusExitTimer = setTimeout(() => {
+		app.dataset.focusIdle = "";
+	}, FOCUS_EXIT_IDLE);
+}
+document.addEventListener("mousemove", () => {
+	if (app.hasAttribute("data-focus")) wakeFocusExit();
+});
+
+/**
+ * Typewriter scrolling (focus mode, `typewriterScroll`): the line being
+ * written stays a little above the middle of the view, the page moving
+ * under it. Only when the keyboard moved the caret: a click puts it where
+ * the user looks already.
+ */
+let caretByKeyboard = false;
+document.addEventListener("keydown", () => {
+	caretByKeyboard = true;
+});
+document.addEventListener("selectionchange", () => {
+	if (!caretByKeyboard) return;
+	caretByKeyboard = false;
+	// After the editor's own scrolling into view, of the block the caret went to.
+	requestAnimationFrame(() => centerCaret());
+});
+/**
+ * The caret's line: a collapsed range's own box, or else a character's beside
+ * it (a caret just moved into a block has no box of its own), or else the
+ * first line of its block.
+ */
+function caretLine(range: Range): DOMRect | null {
+	const own = range.getBoundingClientRect();
+	if (own.height > 0) return own;
+	const character = (text: Text, offset: number): DOMRect | null => {
+		const probe = document.createRange();
+		if (offset >= text.length && offset === 0) return null;
+		const start = offset < text.length ? offset : offset - 1;
+		probe.setStart(text, start);
+		probe.setEnd(text, start + 1);
+		const box = probe.getBoundingClientRect();
+		return box.height > 0 ? box : null;
+	};
+	const node = range.startContainer;
+	if (node instanceof Text) return character(node, range.startOffset);
+	if (!(node instanceof Element)) return null;
+	const from = node.childNodes[range.startOffset] ?? node;
+	const walker = document.createTreeWalker(from, NodeFilter.SHOW_TEXT);
+	const text = from instanceof Text ? from : (walker.nextNode() as Text | null);
+	const found = text === null ? null : character(text, 0);
+	if (found !== null) return found;
+	const block = node.getBoundingClientRect();
+	const line = Number.parseFloat(getComputedStyle(node).lineHeight) || 20;
+	return new DOMRect(block.left, block.top, block.width, Math.min(line, block.height));
+}
+
+function centerCaret(): void {
+	if (!app.hasAttribute("data-focus") || !settings.typewriterScroll) return;
+	const tab = tabs.get(session.id);
+	const selection = document.getSelection();
+	if (tab === undefined || selection === null || selection.rangeCount === 0) return;
+	const anchor = selection.anchorNode;
+	if (anchor === null || !tab.canvas.contains(anchor)) return;
+	const range = selection.getRangeAt(0).cloneRange();
+	range.collapse(false);
+	const box = caretLine(range);
+	if (box === null) return;
+	const view = tab.desk.getBoundingClientRect();
+	const target = view.top + view.height * 0.42;
+	const delta = box.top + box.height / 2 - target;
+	if (Math.abs(delta) > box.height / 2) tab.desk.scrollTop += delta;
+}
 
 // --- Commands ---------------------------------------------------------------
 
@@ -1517,6 +2254,12 @@ const commands: Record<Command, () => void> = {
 		}),
 	"collapse-spaces": () => rewriteText(collapseSpaces),
 	assistant: () => toggleAssistant(),
+	"set-up-role": () => rolePicker.show(settings.role),
+	home: () => openHome(),
+	"assistant-prompt": () => {
+		if (session.isText || !canEdit()) return;
+		selectionAssistant.prompt();
+	},
 	"version-history": () => {
 		const tab = session;
 		void versionHistory.show({
@@ -1543,6 +2286,8 @@ for (const document of startup.documents) openDocument(document);
 // A restored window's active tab is not always its last.
 // (`activateTab` does nothing for the tab that is active already.)
 if (startup.active !== undefined && tabs.has(startup.active)) activateTab(startup.active);
+// The app's first start: whom to set it up for, once (skipped, nothing changes).
+if (startup.firstRun && settings.role === "") rolePicker.show("");
 
 // As the app closes, what is open is kept to come back next time (`session-store.ts`).
 bridge.onSessionRequest(() => {
@@ -1578,12 +2323,28 @@ const ribbon = createAppRibbon(ribbonHost, ribbonTrailing, {
 	edit,
 	editTable,
 });
+setRibbonSimple = ribbon.setSimple;
+// With Kalem's title bar, File and the quick access buttons are at its left, before the tabs.
+if (titleBar !== null) {
+	titleBar.prepend(ribbon.head);
+	ribbon.headMoved();
+}
+ribbon.setSimple(settings.ribbonSimple);
 
 // The editor reports no selection inside code blocks, so moving into or between
 // them would not refresh the contextual Code tab.
 document.addEventListener("selectionchange", scheduleRibbonUpdate);
 
 // Shift+F3 cycles the case, as in Word; the menu only shows the shortcut.
+// Ctrl+J opens the assistant's box under the caret, in the document; the menu only shows the shortcut.
+document.addEventListener("keydown", (event) => {
+	if (event.key !== "j" && event.key !== "J") return;
+	if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey) return;
+	if (!(document.activeElement instanceof Node) || !canvas.contains(document.activeElement)) return;
+	event.preventDefault();
+	commands["assistant-prompt"]();
+});
+
 document.addEventListener("keydown", (event) => {
 	if (event.key !== "F3" || !event.shiftKey || event.ctrlKey || event.altKey || event.metaKey)
 		return;
@@ -1607,7 +2368,10 @@ bridge.onSaveRequest((tabId) => {
 	const saving = tab === undefined ? Promise.resolve(false) : tab.session.save();
 	void saving.then((saved) => bridge.answerSave(tabId, saved));
 });
-bridge.onWorkspaceChange(() => void filesPane.refresh());
+bridge.onWorkspaceChange(() => {
+	void filesPane.refresh();
+	refreshPathBar(true);
+});
 bridge.onTabMoved((id) => discardTab(id));
 bridge.onTabMenu((id, action) => {
 	if (action === "move") moveTab(id);
@@ -1834,6 +2598,7 @@ document.addEventListener("selectionchange", () => {
 	if (text !== lastSelection) {
 		lastSelection = text;
 		assistant.refreshSelection();
+		showSelectionCount(text);
 	}
 });
 
@@ -1992,6 +2757,10 @@ async function applyAssistantActions(
 					excerpt(text),
 				),
 			);
+		}
+		// The text before the assistant's change: a point to go back to in the version history.
+		if (tab.path !== null && result.text !== before.replace(/\r\n?/g, "\n")) {
+			bridge.assistantCheckpoint(tab.id, before);
 		}
 		const reviewing = review ? [...tabs.values()].find((each) => each.session === tab) : undefined;
 		if (reviewing !== undefined && !tab.isText) {

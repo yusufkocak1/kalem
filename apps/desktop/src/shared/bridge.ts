@@ -82,8 +82,35 @@ export interface Settings extends Typography {
 	/** Document zoom in percent. */
 	readonly zoom: number;
 	readonly fullWidth: boolean;
-	/** Line numbers beside the page (the file's lines) and beside a text file. */
+	/**
+	 * Line numbers beside a document's page (the file's lines). Off at first:
+	 * a page is read as a page, and the Markdown file's lines mean little to
+	 * someone who does not write Markdown.
+	 */
 	readonly lineNumbers: boolean;
+	/** Line numbers beside a text or code file, and beside a document in source mode. */
+	readonly codeLineNumbers: boolean;
+	/** The simplified ribbon: one row of buttons, the groups' names left out (Ctrl+F1). */
+	readonly ribbonSimple: boolean;
+	/**
+	 * The documents' tabs in the window's title bar, which Kalem draws itself;
+	 * off, the system's title bar. A window takes it when it opens.
+	 */
+	readonly tabsInTitleBar: boolean;
+	/**
+	 * The window's frame and side panels show the system's material through
+	 * them (Mica on Windows 11, vibrancy on macOS); the page stays opaque. A
+	 * window takes it when it opens; elsewhere it does nothing.
+	 */
+	readonly windowMaterial: boolean;
+	/** How close together the app's controls are: rows, buttons, lists. */
+	readonly density: Density;
+	/** The accent: the palette's, or the system's (Windows, macOS), fitted to the theme. */
+	readonly accentSource: AccentSource;
+	/** In focus mode, the line being written is kept at the middle of the view, as on a typewriter. */
+	readonly typewriterScroll: boolean;
+	/** Whom the app was set up for (the first start's question); `""` until asked. */
+	readonly role: UserRole | "";
 	readonly navigation: boolean;
 	readonly autoSave: boolean;
 	readonly spellCheck: boolean;
@@ -118,6 +145,10 @@ export interface Settings extends Typography {
 	readonly restoreSession: boolean;
 	/** The user's own notes (balloons beside the text, kept on this computer) are shown. */
 	readonly localNotes: boolean;
+	/** The My Notes pane's cards beside the lines they are on, moving with the page. */
+	readonly notesAligned: boolean;
+	/** The document's map beside the scrollbar: headings, notes, the assistant's changes, what was found. */
+	readonly documentMap: boolean;
 	/** Jira issues the user starred, newest first. */
 	readonly jiraFavorites: readonly JiraFavorite[];
 	/** How the Jira issue popup lays out its fields: columns, and which fields in what order. */
@@ -183,7 +214,15 @@ export const DEFAULT_SETTINGS: Settings = {
 	language: null,
 	zoom: 100,
 	fullWidth: false,
-	lineNumbers: true,
+	lineNumbers: false,
+	codeLineNumbers: true,
+	ribbonSimple: false,
+	tabsInTitleBar: true,
+	windowMaterial: true,
+	density: "standard",
+	accentSource: "palette",
+	typewriterScroll: true,
+	role: "",
 	...DEFAULT_TYPOGRAPHY,
 	navigation: true,
 	autoSave: false,
@@ -205,6 +244,8 @@ export const DEFAULT_SETTINGS: Settings = {
 	confluenceReviewBeforeSave: true,
 	restoreSession: true,
 	localNotes: true,
+	notesAligned: true,
+	documentMap: true,
 	jiraFavorites: [],
 	jiraIssueLayout: DEFAULT_ISSUE_LAYOUT,
 	pinnedFiles: [],
@@ -521,7 +562,35 @@ export interface Startup {
 	readonly active?: string;
 	/** URL scheme that serves document-relative images. */
 	readonly documentScheme: string;
+	/**
+	 * How this window's title bar is drawn: by Kalem, with the system's window
+	 * buttons laid over its right end ("overlay": Windows, Linux) or its
+	 * traffic lights at its left ("inset": macOS); `null`, by the system.
+	 */
+	readonly titleBar: TitleBar;
+	/**
+	 * The system material behind the window's frame (`windowMaterial`): Mica on
+	 * Windows 11, vibrancy on macOS; `null` when the window has none.
+	 */
+	readonly material: WindowMaterial;
+	/** The system's accent colour (`#rrggbb`); `null` where it has none (Linux). */
+	readonly systemAccent: string | null;
+	/** The app's first start on this computer: the window offers to set it up for its user. */
+	readonly firstRun: boolean;
 }
+
+export type TitleBar = "overlay" | "inset" | null;
+export type WindowMaterial = "mica" | "vibrancy" | null;
+export const DENSITIES = ["compact", "standard", "comfortable"] as const;
+export type Density = (typeof DENSITIES)[number];
+export type AccentSource = "palette" | "system";
+
+/** Whom the app is set up for: the ribbon, the panes and the line numbers follow. */
+export type UserRole = "writer" | "analyst" | "developer";
+export const USER_ROLES: readonly UserRole[] = ["writer", "analyst", "developer"];
+
+/** The title bar Kalem draws, for the system's window buttons over it. */
+export const TITLE_BAR_HEIGHT = 38;
 
 /** What the renderer knows of a tab that is moving to another window. */
 export interface MovedTab {
@@ -627,6 +696,8 @@ export interface Version {
 	readonly time: number;
 	/** In bytes. */
 	readonly size: number;
+	/** `assistant`: the text before the assistant changed it; a save otherwise. */
+	readonly kind?: "assistant";
 }
 
 export interface SearchResult {
@@ -825,6 +896,9 @@ export const COMMANDS = [
 	"format-code",
 	"format-all-code",
 	"assistant",
+	"assistant-prompt",
+	"set-up-role",
+	"home",
 	"new-from-template",
 	"command-palette",
 	"network-log",
@@ -841,6 +915,14 @@ export interface PaletteCommand {
 	readonly accelerator: string;
 	/** For a check or radio item, whether it is on; `null` for the rest. */
 	readonly checked: boolean | null;
+	/**
+	 * What the item does, which gives it its icon: an app command (`save`), a
+	 * menu item's own name (`item:open`) or an Electron role (`role:copy`);
+	 * `null` when nothing names it.
+	 */
+	readonly action: string | null;
+	/** For a recent document, its path: the palette shows its name and folder. */
+	readonly path: string | null;
 }
 
 export type Command = (typeof COMMANDS)[number];
@@ -975,6 +1057,14 @@ export interface KalemBridge {
 	reloadDocument(tabId: string): Promise<OpenedFile | null>;
 	reportState(tabId: string, state: WindowState): void;
 	tabActivated(tabId: string): void;
+	/** The title bar's colours, for the system's window buttons drawn over it. */
+	titleBarColors(color: string, symbolColor: string): void;
+	/** The system's accent changed (`#rrggbb`, or `null` where there is none). */
+	onSystemAccent(handler: (accent: string | null) => void): () => void;
+	/** The assistant started or finished an answer: the taskbar shows it, and a notification ends it. */
+	assistantActivity(busy: boolean): void;
+	/** The tab's text before the assistant changes it, kept in its version history. */
+	assistantCheckpoint(tabId: string, text: string): void;
 	/** Asks the user what to do with an unsaved tab that is about to close. */
 	confirmCloseTab(tabId: string): Promise<CloseChoice>;
 	tabClosed(tabId: string): void;
@@ -1245,6 +1335,10 @@ export const CHANNEL = {
 	reloadDocument: "kalem:reload-document",
 	reportState: "kalem:report-state",
 	tabActivated: "kalem:tab-activated",
+	titleBarColors: "kalem:title-bar-colors",
+	systemAccent: "kalem:system-accent",
+	assistantActivity: "kalem:assistant-activity",
+	assistantCheckpoint: "kalem:assistant-checkpoint",
 	confirmCloseTab: "kalem:confirm-close-tab",
 	tabClosed: "kalem:tab-closed",
 	answerSave: "kalem:answer-save",

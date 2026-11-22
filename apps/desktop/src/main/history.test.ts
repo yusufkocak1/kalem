@@ -43,4 +43,25 @@ describe("VersionStore", () => {
 		expect(await versions.list(b)).toHaveLength(1);
 		await expect(versions.read(a, "../b")).rejects.toThrow("Invalid version id");
 	});
+
+	it("keeps the text from before the assistant's change, whatever is saved after", async () => {
+		const versions = await store();
+		const doc = join(tmpdir(), "analiz.md");
+		await versions.record(doc, "elle yazılan", 0);
+		await versions.checkpoint(doc, "asistan öncesi", MINUTE);
+		// A save soon after does not take its place, as a save would take a save's.
+		await versions.record(doc, "asistandan sonra", 2 * MINUTE);
+		await versions.record(doc, "biraz daha", 3 * MINUTE);
+
+		const list = await versions.list(doc);
+		expect(list.map((version) => [version.time, version.kind ?? "save"])).toEqual([
+			[3 * MINUTE, "save"],
+			[MINUTE, "assistant"],
+			[0, "save"],
+		]);
+		expect(await versions.read(doc, `${MINUTE}.assistant`)).toBe("asistan öncesi");
+		// Nothing changed since the last one: no new point.
+		await versions.checkpoint(doc, "biraz daha", 4 * MINUTE);
+		expect(await versions.list(doc)).toHaveLength(3);
+	});
 });

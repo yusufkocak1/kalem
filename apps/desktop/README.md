@@ -246,6 +246,18 @@ verir.
 - **Hızlı Aç** (`Ctrl+Shift+P`): açık klasörlerdeki dosyaları adla bulup
   açar; yazılan her sözcük yolda geçmeli, adı sözcükle başlayanlar öne
   gelir.
+- **Komut paleti: her şeyi bulan tek kutu** (`F1`, **Görünüm → Komut
+  Paleti…**; Hızlı Aç'ta `>` ile de). Yazılan şey her yerde aranır ve
+  sonuçlar türlerine göre gelir: **Komutlar** (menüdeki her komut, şeritteki
+  simgesi, menüdeki yeri ve kısayoluyla), **Dosyalar** (son kullanılan
+  belgeler ve açık klasörlerin dosyaları, adı ve klasörüyle), **Bu belgede**
+  (etkin belgenin başlıkları; seçmek imleci oraya götürür) ve en sonda
+  **Asistana sor: “…”**. İlk yazılan karakter aramayı daraltır: `>` yalnızca
+  komutlar, `#` yalnızca başlıklar, `?` doğrudan asistana sorar (asistan
+  hazır değilse soru kutusunda bekler); boş kutuda `Geri` tuşu daraltmayı
+  kaldırır. Boş kutuda **Son kullanılanlar** üstte durur: kutudan çalıştırılan
+  komutlar ne kadar sık ve yakın zamanda kullanıldıysa o kadar önde gelir
+  (bir haftada ağırlığı yarıya iner; bu bilgisayarda saklanır).
 - **Farklı Kaydet** belgeyi başka bir klasöre taşırsa bağlantı verdiği
   görsel ve dosyalar da yeni yerin `.assets` klasörüne kopyalanır ve
   bağlantılar güncellenir (yeni yerden zaten ulaşılabilen dosyalara
@@ -257,6 +269,49 @@ verir.
   arasında gezer. Her sekmenin kendi geri alma geçmişi, kayıt durumu ve
   kurtarma taslağı vardır. Zaten açık olan belge yeniden açılmaz, sekmesi
   öne gelir. Son sekme kapanınca pencere kapanır.
+- **Sekmeler başlık çubuğunda:** pencerenin başlık çubuğunu Kalem çizer;
+  belgelerin sekmeleri onun satırındadır, böylece ayrı bir sekme satırı
+  kalmaz. Sistemin pencere düğmeleri (küçült, büyüt, kapat) Windows ve
+  Linux'ta satırın sağ ucunda, macOS'ta trafik ışıkları solundadır;
+  renkleri tema ve paletle değişir. Satırın boş yeri pencereyi sürükler,
+  çift tıklamak büyütür. **Ayarlar → Görünüm → Sekmeler Başlık Çubuğunda**
+  kapatılırsa sistemin başlık çubuğu döner ve sekmeler şeridin altına iner;
+  değişiklik yeni açılan pencerelerde geçerlidir. **Dosya** düğmesi ile
+  Kaydet / Geri Al / Yinele de bu satırda, sekmelerin solundadır.
+- **Yol çubuğu:** sayfanın üstünde belgenin yeri yazar: çalışma klasörü ›
+  alt klasörler › dosya (Confluence sayfasında alan › sayfa). Bir klasöre
+  tıklamak içindekileri listeler; listede bir klasör onun içine girer, bir
+  dosya onu açar. Dosyanın adına tıklamak yanındaki dosyaları listeler.
+  Sayfa kaydırılınca çubuk çekilir; odak modunda ve yazdırırken görünmez.
+- **Yarı saydam pencere** (**Ayarlar → Görünüm**, açık): Windows 11'de
+  (22H2 ve sonrası) Mica, macOS'ta vibrancy pencerenin çerçevesinden,
+  sayfanın çevresinden ve yan panellerden hafifçe görünür; sayfa opak kalır.
+  Yüksek kontrastta kapalıdır; değişiklik yeni pencerelerde geçerlidir.
+  Linux'ta ve eski Windows'ta bir şey değiştirmez.
+- **Yoğunluk** (**Görünüm → Yoğunluk**: Kompakt / Standart / Rahat): şeridin
+  satırları ve düğmeleri, sekmeler, Başlıklar ve Dosyalar listeleri, not
+  kartları ve durum çubuğu sıklaşır ya da ferahlar. Başlık çubuğu sistemin
+  pencere düğmeleriyle aynı yükseklikte kalır.
+- **Vurgu rengi** (**Görünüm → Vurgu Rengi**: Paletin / Sistemin): sistemin
+  vurgu rengi (Windows ve macOS ayarlarındaki renk) paletin yerine geçer ve
+  değişince hemen izlenir. Okunması için açık temada koyulaştırılır, koyu
+  temada açılır: sayfa ve panellerle en az 4,5:1 kontrastta kalır. Linux'ta
+  sistemin vurgu rengi okunamadığından paletin rengi kalır.
+- **Ana sayfa** (`Ctrl+Shift+H`, **Görünüm → Ana Sayfa**): boş ve adsız bir
+  sekmenin başlangıç sayfasıdır; açık bir tane varsa ona geçilir, yoksa
+  yenisi açılır. En üstte **Kaldığınız yerden devam edin** (en son açılan
+  belge), altında başlamanın yolları, **Şablondan başlayın** (şablonlar tek
+  tıkla yeni belge olur), sabitlenen ve son belgeler, Confluence'ta son
+  değişen sayfalar ve Jira bağlıyken **Jira'da bana atananlar** (açık
+  kayıtlar). Yazmaya başlamak belgeyi eskisi gibi başlatır.
+- **İlk açılışta rol seçimi:** uygulama bu bilgisayarda ilk kez açıldığında
+  "Kalem'i kimin için ayarlayalım?" diye sorar. **Yazar** sade şerit,
+  satır numarasız sayfa ve solda başlıklar; **Analist** tam şerit, başlıklar,
+  açık asistan ve analiz şablonu; **Geliştirici** sade şerit, sayfada satır
+  numaraları, solda dosyalar, açık asistan ve kodlama ajanı spec şablonu
+  ayarlar. **Şimdilik atla** hiçbir şeyi değiştirmez. Seçim **Görünüm →
+  Kalem'i Kimin İçin Ayarlayalım…** ile yeniden yapılır; değişen her ayar
+  Ayarlar'dan tek tek de değiştirilebilir.
 - **Hızlı Not** (**Dosya → Hızlı Not**, `Ctrl+Shift+Alt+N`): açık
   klasörde, klasör yoksa `Belgeler\Kalem Notları` içinde
   `Not 2026-10-05 14.30.md` gibi tarihli bir not açar. Dosya ancak bir şey
@@ -297,6 +352,12 @@ verir.
   **Önceki / Sonraki Not** notlar arasında gezer. Gözden Geçir şeridindeki
   **Notlarım** paneli açıp kapatır; **Görünüm → Notlarımın sözcüklerini
   metinde boya** boyamayı kapatır.
+  - **Kenar notları:** panel sayfanın yanındayken (sol ya da sağ yuva) her
+    kart, notun bağlı olduğu sözcüklerin hizasında durur ve sayfa kaydıkça
+    onlarla birlikte kayar (Word ve Google Docs'un açıklamaları gibi); üst
+    üste binecek kartlar aşağı itilir, sözcükleri kaybolan notlar sonda
+    kalır. **Görünüm → Notlarım Satırlarının Hizasında** kapatılırsa kartlar
+    eskisi gibi alt alta bir liste olur.
   - Notlar **yalnızca bu bilgisayarda** saklanır
     (`%APPDATA%\kalem-desktop\local-notes.json`, belge yoluna ya da
     Confluence sayfasına göre). Markdown'a, Confluence'a, dışa aktarmaya ve
@@ -307,6 +368,17 @@ verir.
     kalır.
   - Kaydedilmemiş yeni bir belgedeki notlar, belge ilk kez kaydedilince
     onunla birlikte saklanır.
+- **Başlıklar paneli boşken yer kaplamaz:** etkin belgede listelenecek
+  başlık yoksa (yeni bir belge, bir metin dosyası) panelin yuvası katlanır,
+  sayfa ortada kalır; ilk başlık yazılınca, yazmaya ara verildiğinde geri
+  açılır. Ayar değişmez. Panelin kenardaki düğmesi onu o sekme için yine
+  açar.
+- **Belge haritası** (**Görünüm → Kaydırma Çubuğunun Yanında Belge
+  Haritası**, başta açık): görünüme sığmayan bir belgede kaydırma
+  çubuğunun yanında ince bir şerit; başlıklar gri, notlarım türlerinin
+  renginde, asistanın değişiklikleri yeşil, aramanın bulduğu yerler turuncu
+  çizgiyle işaretlenir. Şeride tıklamak belgenin o yerini görünümün ortasına
+  getirir; üzerine gelince görünen kısım gösterilir. Odak modunda gizlenir.
 - **Okunan yer korunur:** tam genişlik, yakınlaştırma, odak modu, panel
   açıp kapama ve pencere boyutu satırları yeniden kırar. Uygulama okunan
   bloğu (imlecin olduğu blok, imleç görünmüyorsa ekranın üçte birindeki
@@ -688,9 +760,13 @@ verir.
   yerleştirilir ya da gizlenir. Bir yuva aynı anda bir paneli gösterir ve
   başlığında, asistan paneli gibi, o panelin simgesi ve adı yazar. Panellerin
   sekmeleri pencerenin kenarındadır: sol ve sağ yuvanınkiler asistanın düğmesi
-  gibi **dikey** (solda kendi şeridi, sağda asistanın üstü), alt yuvanınkiler
-  durum çubuğunda **yatay**. Sekme paneli açar; o panel zaten açıksa yuvayı
-  kapatır.
+  gibi **simge** (solda kendi şeridi, sağda asistanın üstü); üzerine gelince
+  ya da klavyeyle odaklanınca adı yanında görünür. Açık panelin düğmesinin
+  kenar tarafında bir çizgi vardır. **Notlarım**'ın düğmesinde belgedeki not
+  sayısı, asistanınkinde belgede bekleyen değişikliklerin sayısı yazar;
+  asistan çalışırken düğmesinde bir nokta yanıp söner. Alt yuvanınkiler durum
+  çubuğunda **yatay** ve adlıdır. Sekme paneli açar; o panel zaten açıksa
+  yuvayı kapatır.
 - Bir panelin sekmesine ya da yuvanın başlığına sağ tıklamak (ya da yuvanın
   **⋯** düğmesi) onu **Sola / Sağa / Alta Taşı** ya da **Gizle** seçeneklerini
   verir. Sağ ve alt yuvalar da kenarlarından sürüklenerek boyutlandırılır
@@ -781,6 +857,29 @@ verir.
   yeniler.
 
 **Yapay Zekâ Asistanı**
+
+- **Metnin yanında asistan:** bir şey seçince çıkan balonda **✦ Asistan**
+  düğmesi var. Asistan panelinin seçim için sunduklarını (İyileştir, Kısalt,
+  Yazımı düzelt, Çevir, Açıkla) seçimin yanında açar ve **Kendi isteğini
+  yaz…** ile isteğin yazılır. `Ctrl+J` (**Görünüm → Burada Asistana Sor…**)
+  aynı kutuyu imlecin altında açar, seçim olsun olmasın: `Enter` gönderir,
+  `Esc` kutuyu kapatır ve imleci yerine koyar. Soru seçimle birlikte gider;
+  asistanın değişikliği belgede, kabul edilecek ya da geri alınacak öneri
+  olarak gelir (panel kapalıysa açılır). Asistan hazır değilse soru panelin
+  kutusunda bekler.
+- **Belgeye göre öneriler:** boş sohbetin önerileri açık belgeye bakar. Boş
+  belgede taslak ve başlık iskeleti önerir; Jira anahtarı geçen belgede o
+  kaydı özetlemeyi, analiz başlıkları olan belgede eksik bölümleri ve test
+  edilemeyen gereksinimleri bulmayı, tablolu belgede eksik ya da çelişen
+  satırları, kod bloğu olan belgede kodu adım adım açıklamayı önerir. Sekme
+  değişince ya da belge değişince öneriler yenilenir.
+- **Geri dönüş noktası:** asistan kayıtlı bir belgeyi değiştirmeden önce
+  belgenin o hâli **Sürüm Geçmişi**'ne **Asistan öncesi** etiketiyle yazılır;
+  sonraki kayıtlar bu noktanın yerine geçmez. Oradan tek tıkla geri
+  yüklenir.
+- **Arka planda iş:** asistan çalışırken görev çubuğundaki simgede belirsiz
+  ilerleme görünür; pencere öndeyken değilse iş bitince bir bildirim gelir
+  (tıklayınca pencere öne gelir).
 
 > **3.0'da yeni — analiz öncelikli ajan.** Asistan artık uygulamanın içinde
 > olduğunu biliyor ve Kalem'i kendi araçlarıyla, **izin isteyerek** kullanıyor:
@@ -1039,7 +1138,9 @@ verir.
   sohbet paneli açar (düğmeye yeniden basmak kapatır). Panelin sol kenarı
   sürüklenerek genişletilip daraltılır (odaktayken ok tuşları da çalışır,
   çift tıklamak varsayılan genişliğe döndürür); genişlik hatırlanır. Paneldeki ⚙ (**Bağlantı ayarları**) asistanın hangi
-  hizmeti kullanacağını seçer:
+  hizmeti kullanacağını seçer; hizmet listesinin altında kullanılanın sürümü
+  ya da modeli yazar ("Kullanılan: 2.1.330 (Claude Code)"). Panelin başlığı
+  bunu yalnızca hizmet aranırken ya da bulunamadığında gösterir:
 
   | Hizmet | Nasıl bağlanır |
   |---|---|
@@ -1393,6 +1494,19 @@ verir.
 **Düzenleme**
 
 - Şerit: Giriş / Ekle / Görünüm sekmeleri, stil galerisi, hızlı erişim.
+  - **Dar pencerede tek satır:** şerit hiçbir zaman ikinci satıra kırılmaz.
+    Önce düğmelerin yazıları düşer (ipucunda ve ekran okuyucuda kalır),
+    yetmezse gruplar birer birer tek bir düğmeye katlanır ("Paragraf ▾");
+    düğme grubun bütün düğmelerini altında açar, oradan çalıştırılan komut
+    onu kapatır (`Esc` de). Giriş'te önce Pano katlanır; iki simgelik
+    Düzenleme gibi katlanınca daralmayacak gruplar katlanmaz. Bundan da
+    dar bir pencerede satır yana kayar.
+  - **Sade şerit** (`Ctrl+F1`, **Görünüm → Sade Şerit** ya da şeridin sağ
+    altındaki ok): grup adları gizlenir, şerit tek satır kalır ve belgeye
+    daha çok yer açılır. Sekmeler başlık çubuğundayken şeridin sekme satırı
+    da kalkar: Giriş / Ekle / Gözden Geçir / Görünüm, satırın başındaki
+    **Giriş ▾** menüsünden seçilir. Böylece sayfanın üstünde başlık çubuğuyla
+    birlikte iki satır (yaklaşık 80 px) kalır. Seçim saklanır.
 - Tabloda **Tab** sonraki, **Shift+Tab** önceki hücreye geçer ve içeriğini
   seçer (yazınca değişir); son hücrede Tab yeni bir satır ekler.
 - İmleç tablodayken **Tablo** sekmesi: satır/sütun ekleme-silme, hizalama,
@@ -1457,6 +1571,51 @@ verir.
   pencerede yeni sekme olur.
 - Açık / koyu / sistem teması, yakınlaştırma, tam genişlik, odak modu,
   salt okunur kip, yazım denetimi.
+- **Durum çubuğu:** solda Git dalı (açık klasör bir depoysa), bağlıyken
+  **Confluence** ve **Jira** (tıklamak panelini açar), kelime/karakter
+  sayısı, bir şey seçiliyken **seçili kelime sayısı** ve **kelime hedefi**:
+  hedefe tıklayıp bu belge için bir sayı yazılır, ilerlemesi bir halka ve
+  "940 / 1500" olarak görünür; hedef bu bilgisayarda belgenin yoluna (ya da
+  Confluence sayfasına) göre saklanır, **Kaldır** siler. Sağda asistan bir
+  yanıt üzerinde çalışırken **Asistan çalışıyor…** (tıklamak paneli açar),
+  **kayıt durumu** (eskiden şeridin sağ üstündeydi; kaydedilmemişken
+  tıklamak kaydeder), kodlama ve yakınlık; yakınlık değerine tıklamak
+  %80–200 arası hazır değerleri açar.
+- **Odak modu** (`Ctrl+Shift+F`, **Görünüm → Odak Modu**): şerit, sekmeler,
+  paneller ve durum çubuğu gizlenir. İmlecin olduğu paragraf tam renkte
+  kalır, ötekiler soluklaşır (belgede imleç yokken, okurken, hiçbiri).
+  **Daktilo kaydırma** (**Görünüm → Odak Modunda Daktilo Kaydırma**, başta
+  açık): klavyeyle yazarken ya da ok tuşlarıyla gezerken imlecin satırı
+  görünümün ortasının biraz üstünde tutulur, sayfa altından akar; fareyle
+  tıklamak sayfayı oynatmaz, belgenin başındaki satırlar da yerinde kalır.
+  **Odak Modundan Çık** düğmesi fare 2,5 saniye durunca kaybolur, kıpırdayınca
+  ya da klavyeyle odaklanınca geri gelir.
+- **Satır numaraları:** belgenin sayfasında başta kapalıdır; sayfa bir
+  sayfa gibi okunur. **Görünüm → Belgelerde Satır Numaraları** (ya da
+  Görünüm şeridindeki düğme) açar: her bloğun yanında Markdown dosyasındaki
+  satırı yazar. Odak modunda gizlenir. Metin ve kod sekmelerinde ve Markdown
+  kaynağı kipinde numaralar başta açıktır, **Görünüm → Metin Dosyalarında ve
+  Kaynak Kipinde Satır Numaraları** ile ayrıca kapatılır. Şeritteki düğme
+  bulunduğunuz yerinkini (belge ya da metin/kaynak) açıp kapatır.
+- Paragraflar, liste maddeleri, alıntılar ve tablo hücreleri son satırda
+  tek bir kelime bırakmayacak biçimde satırlara bölünür; başlıkların
+  satırları eşit uzunlukta tutulur. Yalnızca görünüm değişir, Markdown
+  dosyasındaki satırlar değişmez.
+- İmlecin olduğu blok, sol kenar boşluğunda ince bir çizgiyle gösterilir;
+  çevresine kutu çizilmez, metin yerinden oynamaz. Yazdırırken ve PDF'te
+  çizgi çıkmaz.
+- **Yüksek kontrast:** Windows'un Kontrast temalarında (zorlanmış renkler)
+  basılı, seçili, açık ve geçerli olan her şey sistemin vurgu rengiyle bir
+  çizgi ya da kenarlık olarak gösterilir; yalnızca renk tonuyla ayrılan
+  durumlar kaybolmaz. Sayfanın, menülerin ve açılır kutuların kenarı vardır;
+  imlecin bloğu kenarda bir çizgidir; asistanın eklediği metnin altı çizilir,
+  çıkardığı soluk ve üstü çizili kalır. Anlam taşıyan renkler (renk
+  örnekleri, dosya türleri, hedef halkası) korunur. Sistemde **daha fazla
+  kontrast** istenmişse (macOS, Windows, GNOME) griler ve kenarlıklar
+  koyulaşır, odak halkası kalınlaşır.
+- Klavyeyle odaklanılan her düğme, kutu ve liste öğesi aynı odak halkasını
+  gösterir: seçilen paletin vurgu renginde, 2 px. Kendi halkası olmayan bir
+  denetim de tarayıcının varsayılanına (Linux'ta turuncu) düşmez.
 - Arayüz Türkçe ve İngilizce (sistem diline göre; **Görünüm → Dil**).
 
 ## Simge

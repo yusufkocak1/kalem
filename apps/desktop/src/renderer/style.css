@@ -25,6 +25,8 @@
 	--app-scrollbar: rgb(34 32 29 / 22%);
 	--app-scrollbar-hover: rgb(34 32 29 / 38%);
 	--app-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+	/* The one keyboard focus ring: every control draws it, in the palette's accent. */
+	--app-focus-ring: 2px solid var(--app-accent);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -83,6 +85,30 @@ body {
 
 button {
 	cursor: default;
+}
+
+/*
+ * A control with no focus style of its own still shows the app's ring, never
+ * the browser's own (orange on Linux, black on Windows). Zero specificity, so
+ * a control's own rule always wins.
+ */
+:where(
+	button,
+	a,
+	summary,
+	select,
+	[tabindex],
+	input[type="checkbox"],
+	input[type="radio"],
+	input[type="range"]
+):focus-visible {
+	outline: var(--app-focus-ring);
+	outline-offset: 2px;
+}
+
+:where(textarea, input:not([type="checkbox"], [type="radio"], [type="range"])):focus-visible {
+	outline: var(--app-focus-ring);
+	outline-offset: -1px;
 }
 
 .app {
@@ -153,6 +179,12 @@ button {
 	align-items: stretch;
 	height: 34px;
 	padding-right: 10px;
+}
+
+.ribbon-head {
+	display: flex;
+	flex: none;
+	align-items: stretch;
 }
 
 .ribbon-file {
@@ -258,7 +290,7 @@ button {
 
 .ribbon-publish:focus-visible,
 .ribbon-changes:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: 2px;
 }
 
@@ -297,6 +329,7 @@ button {
 }
 
 .ribbon-panels {
+	position: relative;
 	border-top: 1px solid var(--app-border);
 	background: var(--app-raised);
 }
@@ -304,10 +337,124 @@ button {
 .ribbon-panel {
 	display: flex;
 	min-height: 62px;
-	padding: 6px 2px 0;
-	/* Narrow windows: groups wrap onto a second row instead of being cut off. */
+	/* Room at the right for the simplified ribbon's button. */
+	padding: 6px 30px 0 2px;
+	/* One row always: a narrow window folds groups into buttons (`fit` in
+	   ribbon.ts); a window too narrow for that scrolls it sideways. */
+	flex-wrap: nowrap;
+	overflow-x: auto;
+	overflow-y: hidden;
+	scrollbar-width: thin;
+}
+
+/* A group folded into one button, which opens its buttons under it. */
+.ribbon-group-fold {
+	display: none;
+}
+
+.ribbon-group[data-folded] {
+	justify-content: center;
+	padding-bottom: 6px;
+}
+
+.ribbon-group[data-folded] > .ribbon-items,
+.ribbon-group[data-folded] > .ribbon-group-label {
+	display: none;
+}
+
+.ribbon-group[data-folded] > .ribbon-group-fold {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	height: 30px;
+	padding: 0 6px 0 9px;
+	border: 1px solid transparent;
+	border-radius: 6px;
+	background: none;
+	color: inherit;
+	font: inherit;
+	white-space: nowrap;
+}
+
+.ribbon-group-fold:hover {
+	background: var(--app-hover);
+}
+
+.ribbon-group-fold[aria-expanded="true"] {
+	border-color: var(--app-border);
+	background: var(--app-pressed);
+}
+
+.ribbon-group-fold > .icon {
+	width: 14px;
+	height: 14px;
+	color: var(--app-muted);
+	transform: rotate(90deg);
+}
+
+.ribbon-fold-popup {
+	position: fixed;
+	z-index: 55;
+	padding: 6px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	box-shadow: var(--app-shadow);
+}
+
+.ribbon-fold-popup > .ribbon-items {
 	flex-wrap: wrap;
-	row-gap: 4px;
+	max-width: min(520px, calc(100vw - 16px));
+}
+
+/* The simplified ribbon: one row of buttons, the groups' names left out. */
+.ribbon[data-simple] .ribbon-panel {
+	min-height: 0;
+	padding-top: 3px;
+	padding-bottom: 3px;
+}
+
+.ribbon[data-simple] .ribbon-group {
+	justify-content: center;
+}
+
+.ribbon[data-simple] .ribbon-group[data-folded] {
+	padding-bottom: 0;
+}
+
+.ribbon[data-simple] .ribbon-group-label {
+	display: none;
+}
+
+.ribbon-simplify {
+	position: absolute;
+	right: 6px;
+	bottom: 4px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 20px;
+	padding: 0;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: var(--app-muted);
+}
+
+.ribbon-simplify:hover {
+	background: var(--app-hover);
+	color: var(--app-text);
+}
+
+.ribbon-simplify > .icon {
+	width: 14px;
+	height: 14px;
+	transform: rotate(-90deg);
+}
+
+.ribbon[data-simple] .ribbon-simplify > .icon {
+	transform: rotate(90deg);
 }
 
 .ribbon-group {
@@ -381,7 +528,7 @@ button {
 .icon-button:focus-visible,
 .focus-exit:focus-visible,
 .table-picker-cell:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: 1px;
 }
 
@@ -591,12 +738,173 @@ button {
 }
 
 .ribbon-swatch[aria-pressed="true"] {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: 1px;
 }
 
 .ribbon-swatch:disabled {
 	opacity: 0.4;
+}
+
+/* --- Title bar: drawn by Kalem, with the documents' tabs (`tabsInTitleBar`) --- */
+
+.title-bar {
+	display: flex;
+	flex: none;
+	align-items: flex-end;
+	/* TITLE_BAR_HEIGHT in bridge.ts: the system's window buttons are as tall. */
+	height: 38px;
+	/* Clear of the window buttons the system draws over the right end. */
+	padding-left: env(titlebar-area-x, 0px);
+	padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));
+	border-bottom: 1px solid var(--app-border);
+	background: var(--app-desk);
+	color: var(--app-text);
+	user-select: none;
+	/* The empty part drags the window; double-clicking it maximizes it. */
+	app-region: drag;
+}
+
+/* macOS: the traffic lights are at the left. */
+.title-bar[data-kind="inset"] {
+	padding-left: 80px;
+}
+
+.title-bar > .tabstrip {
+	flex: 1;
+	min-width: 0;
+	height: 100%;
+	border-bottom: 0;
+	background: none;
+}
+
+.title-bar .doc-tab,
+.title-bar .doc-tab-new {
+	app-region: no-drag;
+}
+
+/* The active tab is of a piece with the ribbon under it. */
+.title-bar .doc-tab[aria-selected="true"] {
+	position: relative;
+	z-index: 1;
+	height: 31px;
+	margin-bottom: -1px;
+	background: var(--app-surface);
+}
+
+/* The File button and the quick access buttons, at the bar's left (ribbon.ts `head`). */
+.title-bar > .ribbon-head {
+	align-self: center;
+	height: 28px;
+	margin: 0 6px 0 8px;
+	app-region: no-drag;
+}
+
+.title-bar .ribbon-file {
+	padding: 0 16px;
+	border-radius: 6px;
+}
+
+.title-bar .ribbon-quick {
+	padding: 0 6px 0 8px;
+}
+
+/* A narrow window keeps the bar for the tabs: Save, Undo and Redo have their shortcuts. */
+@media (max-width: 900px) {
+	.title-bar .ribbon-quick {
+		display: none;
+	}
+}
+
+/* The simplified ribbon under the title bar: one row, its tabs a menu at its start. */
+.ribbon[data-one-row] .ribbon-top {
+	display: none;
+}
+
+.ribbon[data-one-row] .ribbon-panels {
+	display: flex;
+	align-items: center;
+	border-top: 0;
+}
+
+.ribbon[data-one-row] .ribbon-panel {
+	flex: 1;
+	min-width: 0;
+}
+
+.ribbon[data-one-row] .ribbon-trailing {
+	flex: none;
+	padding-right: 34px;
+}
+
+.ribbon-switch {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	gap: 4px;
+	height: 30px;
+	margin: 0 4px 0 8px;
+	padding: 0 8px 0 10px;
+	border: 0;
+	border-radius: 6px;
+	background: color-mix(in srgb, var(--app-accent) 11%, transparent);
+	color: var(--app-accent);
+	font: inherit;
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.ribbon-switch:hover {
+	background: var(--app-hover);
+}
+
+.ribbon-switch > .icon {
+	width: 14px;
+	height: 14px;
+	transform: rotate(90deg);
+}
+
+.ribbon-switch-menu {
+	position: fixed;
+	z-index: 56;
+	display: flex;
+	flex-direction: column;
+	min-width: 170px;
+	padding: 4px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	box-shadow: var(--app-shadow);
+}
+
+.ribbon-switch-menu[hidden] {
+	display: none;
+}
+
+.ribbon-switch-item {
+	padding: 7px 12px;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: var(--app-text);
+	font: inherit;
+	text-align: start;
+}
+
+.ribbon-switch-item:hover,
+.ribbon-switch-item:focus-visible {
+	background: var(--app-hover);
+}
+
+.ribbon-switch-item[aria-checked="true"] {
+	color: var(--app-accent);
+	font-weight: 600;
+}
+
+/* Focus mode keeps the bar (it drags the window, the window's buttons are on
+   it) without the tabs; the way out is below it. */
+.app[data-title-bar] .focus-exit {
+	top: 48px;
 }
 
 /* --- Document tabs ------------------------------------------------------- */
@@ -624,11 +932,17 @@ button {
 
 .doc-tab {
 	display: flex;
-	flex: none;
+	/* Many tabs share the row: they narrow, down to their icon and a few
+	   letters, before the row scrolls. */
+	flex: 0 1 220px;
 	align-items: center;
 	gap: 6px;
-	min-width: 96px;
+	min-width: 64px;
 	max-width: 220px;
+	/* A size container (the close button below), whose own width it would
+	   otherwise not have: as wide as it would like, till the row is full. */
+	container-type: inline-size;
+	contain-intrinsic-inline-size: 220px;
 	height: 28px;
 	padding: 0 4px 0 12px;
 	border: 1px solid transparent;
@@ -650,7 +964,7 @@ button {
 .doc-tab:focus-visible,
 .doc-tab-close:focus-visible,
 .doc-tab-new:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -2px;
 }
 
@@ -660,6 +974,18 @@ button {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+/* The shown tab narrows least: its name stays readable next to its close button. */
+.doc-tab[aria-selected="true"] {
+	min-width: 116px;
+}
+
+/* A narrowed tab keeps its name; its close button only while it is the shown one. */
+@container (max-width: 104px) {
+	.doc-tab:not([aria-selected="true"]) .doc-tab-close {
+		display: none;
+	}
 }
 
 /* Unsaved changes: a dot before the name, as in the window title. */
@@ -833,7 +1159,7 @@ button {
 }
 
 .assistant-rail-button:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -2px;
 }
 
@@ -1035,7 +1361,7 @@ button {
 }
 
 .assistant-path:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -1px;
 }
 
@@ -1790,7 +2116,7 @@ button {
 
 .assistant-field input:focus-visible,
 .assistant-field select:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -1px;
 }
 
@@ -1978,7 +2304,7 @@ button {
 }
 
 .assistant-fold-head:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -2px;
 }
 
@@ -2540,7 +2866,7 @@ button {
 }
 
 .assistant-history-search:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -1px;
 }
 
@@ -2629,7 +2955,7 @@ button {
 
 .files-search:focus,
 .confluence-pane-search:focus {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -1px;
 }
 
@@ -2735,7 +3061,7 @@ button {
 }
 
 .confluence-popup-input:focus {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -1px;
 }
 
@@ -3148,7 +3474,7 @@ button {
 
 .git-field input:focus,
 .git-field textarea:focus {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -1px;
 }
 
@@ -3421,7 +3747,7 @@ button.git-file-path {
 }
 
 .git-commit textarea:focus {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -1px;
 }
 
@@ -3665,7 +3991,7 @@ button.git-file-path {
 }
 
 .quick-open-input:focus {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -1px;
 }
 
@@ -3833,10 +4159,261 @@ button.git-file-path {
 }
 
 .desk-area {
+	position: relative;
 	display: flex;
 	flex: 1;
 	min-width: 0;
 	min-height: 0;
+}
+
+/* --- Where the document is, above its page (path-bar.ts) ---------------- */
+
+.path-bar {
+	position: absolute;
+	z-index: 3;
+	top: 4px;
+	left: 22px;
+	max-width: calc(100% - 80px);
+	transition: opacity 0.15s ease;
+}
+
+.path-bar[hidden],
+.app[data-focus] .path-bar {
+	display: none;
+}
+
+/* A narrow desk has little room above the page: the bar would sit on its edge. */
+@container (max-width: 520px) {
+	.path-bar {
+		display: none;
+	}
+}
+
+/* Only at the top of the page: scrolled, the text goes under where it was. */
+.path-bar[data-away] {
+	opacity: 0;
+	pointer-events: none;
+}
+
+.path-bar-list {
+	display: flex;
+	align-items: center;
+	min-width: 0;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	color: var(--app-muted);
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.path-bar-part {
+	display: flex;
+	align-items: center;
+	min-width: 0;
+}
+
+.path-bar-part + .path-bar-part::before {
+	content: "›";
+	padding: 0 2px;
+	opacity: 0.7;
+}
+
+.path-bar-button,
+.path-bar-label {
+	overflow: hidden;
+	padding: 1px 6px;
+	text-overflow: ellipsis;
+}
+
+.path-bar-button {
+	border: 0;
+	border-radius: 4px;
+	background: none;
+	color: inherit;
+	font: inherit;
+}
+
+.path-bar-button:hover,
+.path-bar-button[aria-expanded="true"] {
+	background: var(--app-hover);
+	color: var(--app-text);
+}
+
+.path-bar [aria-current="page"] {
+	color: var(--app-text);
+}
+
+.path-bar-menu {
+	position: fixed;
+	z-index: 56;
+	display: flex;
+	flex-direction: column;
+	width: 280px;
+	max-height: min(360px, 60vh);
+	overflow-y: auto;
+	padding: 4px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	box-shadow: var(--app-shadow);
+}
+
+.path-bar-menu[hidden] {
+	display: none;
+}
+
+.path-bar-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 10px;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: var(--app-text);
+	font: inherit;
+	font-size: 13px;
+	text-align: start;
+}
+
+.path-bar-item > span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.path-bar-item > .icon {
+	flex: none;
+	width: 15px;
+	height: 15px;
+	color: var(--app-muted);
+}
+
+.path-bar-item:hover,
+.path-bar-item:focus-visible {
+	background: var(--app-hover);
+}
+
+.path-bar-item[aria-current="page"] {
+	font-weight: 600;
+}
+
+.path-bar-empty {
+	margin: 0;
+	padding: 8px 10px;
+	color: var(--app-muted);
+	font-size: 13px;
+}
+
+/* --- The document map, beside the scrollbar (document-map.ts) ------------ */
+
+.doc-map {
+	position: absolute;
+	top: 6px;
+	right: 14px;
+	bottom: 6px;
+	z-index: 4;
+	width: 10px;
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.doc-map[hidden] {
+	display: none;
+}
+
+.doc-map:hover {
+	background: color-mix(in srgb, var(--app-text) 6%, transparent);
+}
+
+/* The part of the document in view, shown when the map is pointed at. */
+.doc-map-view {
+	position: absolute;
+	right: 0;
+	left: 0;
+	border-radius: 3px;
+	background: color-mix(in srgb, var(--app-accent) 14%, transparent);
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+
+.doc-map:hover .doc-map-view {
+	opacity: 1;
+}
+
+.doc-map-ticks {
+	position: absolute;
+	inset: 0;
+}
+
+.doc-map-tick {
+	position: absolute;
+	right: 1px;
+	width: 8px;
+	height: 2px;
+	border-radius: 1px;
+	background: var(--app-muted);
+	transform: translateY(-1px);
+}
+
+.doc-map-heading {
+	opacity: 0.55;
+}
+
+.doc-map-heading[data-detail="h1"] {
+	height: 3px;
+	opacity: 0.8;
+}
+
+.doc-map-heading[data-detail="h3"] {
+	width: 5px;
+}
+
+.doc-map-change {
+	width: 4px;
+	height: 6px;
+	right: 0;
+	background: var(--review-added-bar, #2da44e);
+}
+
+.doc-map-note {
+	width: 6px;
+	height: 4px;
+	right: auto;
+	left: 0;
+	background: var(--note-note, var(--app-accent));
+}
+
+.doc-map-note[data-detail="question"] {
+	background: var(--note-question, var(--app-accent));
+}
+
+.doc-map-note[data-detail="attention"] {
+	background: var(--note-attention, var(--app-warning));
+}
+
+.doc-map-note[data-detail="later"] {
+	background: var(--note-later, var(--app-muted));
+}
+
+.doc-map-found {
+	width: 10px;
+	height: 3px;
+	right: 0;
+	background: var(--app-warning);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.doc-map-view {
+		transition: none;
+	}
+}
+
+@media (forced-colors: active) {
+	.doc-map-tick {
+		forced-color-adjust: none;
+	}
 }
 
 /* The document, with the bottom dock under it. */
@@ -4050,11 +4627,33 @@ button.git-file-path {
 	box-shadow: none;
 }
 
-/* Quieter than the library default: on a page the caret already shows where you are. */
+/*
+ * Running text avoids a last line of one word, and evens out the lines before
+ * it (Chromium looks at a paragraph's last few lines only, so it stays cheap
+ * while typing). Headings are balanced already by the theme (viewer.css).
+ * The page, and the Text & Paragraph panel's preview of it.
+ */
+.kalem-doc :is(p, li, blockquote, td, th) {
+	text-wrap: pretty;
+}
+
+/*
+ * The block the caret is in: a thin mark in the margin at its left, not a box
+ * around it, which made a heading or an empty first line look like a form's
+ * field. Drawn as a border image on a border of no width, outside the block,
+ * so the text does not move by a pixel.
+ */
 .kalem-editor > [contenteditable="true"]:focus,
 .kalem-editor > [contenteditable="true"]:focus-visible {
-	outline: 1px solid color-mix(in srgb, var(--kalem-accent) 22%, transparent);
-	outline-offset: 4px;
+	outline: none;
+	border-style: solid;
+	border-width: 0;
+	border-image:
+		linear-gradient(
+			color-mix(in srgb, var(--kalem-accent) 55%, transparent),
+			color-mix(in srgb, var(--kalem-accent) 55%, transparent)
+		)
+		1 / 0 0 0 2px / 0 0 0 12px stretch;
 }
 
 /* The library pins this panel to the editor's top edge, which scrolls under the ribbon. */
@@ -4106,13 +4705,215 @@ button.git-file-path {
 
 .zoom-value {
 	min-width: 38px;
+	padding: 1px 4px;
+	border-radius: 4px;
 	text-align: right;
 	font-variant-numeric: tabular-nums;
+	cursor: default;
+}
+
+.zoom-value:hover {
+	background: var(--app-hover);
+	color: var(--app-text);
+}
+
+/* The status bar's chips: each does something when clicked. */
+.status-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	height: 20px;
+	padding: 0 6px;
+	border: 0;
+	border-radius: 4px;
+	background: none;
+	color: inherit;
+	font: inherit;
+	white-space: nowrap;
+}
+
+.status-chip:hover {
+	background: var(--app-hover);
+	color: var(--app-text);
+}
+
+.status-chip > .icon {
+	width: 13px;
+	height: 13px;
+}
+
+/* The connections only say they are there: their names are in the tooltip. */
+.status-confluence .status-chip-text,
+.status-jira .status-chip-text {
+	font-size: 11px;
+}
+
+.status-assistant {
+	color: var(--app-accent);
+}
+
+.status-assistant > .icon {
+	animation: status-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes status-pulse {
+	50% {
+		opacity: 0.35;
+	}
+}
+
+.status-selection {
+	color: var(--app-text);
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+}
+
+.status-goal {
+	font-variant-numeric: tabular-nums;
+}
+
+.status-goal:not([data-goal]) {
+	opacity: 0.7;
+}
+
+/* The goal's progress: a ring filled as far as the words have come. */
+.status-goal-ring {
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	background: conic-gradient(var(--app-accent) var(--goal, 0%), var(--app-border) 0);
+	mask: radial-gradient(circle, transparent 3px, #000 3.5px);
+}
+
+.status-goal[data-reached] .status-goal-ring {
+	background: var(--app-ok);
+}
+
+.status-popover {
+	position: fixed;
+	z-index: 60;
+	padding: 6px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: var(--app-shadow);
+	font-size: 12.5px;
+}
+
+.status-popover[hidden] {
+	display: none;
+}
+
+.status-goal-form {
+	display: grid;
+	grid-template-columns: 90px auto auto;
+	gap: 6px;
+	align-items: center;
+	padding: 8px;
+}
+
+.status-goal-form > label {
+	grid-column: 1 / -1;
+	color: var(--app-muted);
+}
+
+.status-goal-input {
+	padding: 4px 6px;
+	border: 1px solid var(--app-border);
+	border-radius: 5px;
+	background: var(--app-surface);
+	color: inherit;
+	font: inherit;
+}
+
+.status-goal-save,
+.status-goal-remove {
+	padding: 4px 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 5px;
+	background: var(--app-raised);
+	color: inherit;
+	font: inherit;
+}
+
+.status-goal-save {
+	border-color: var(--app-accent);
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+}
+
+.zoom-menu {
+	display: grid;
+	min-width: 80px;
+}
+
+.zoom-menu-item {
+	padding: 4px 10px;
+	border: 0;
+	border-radius: 5px;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: end;
+	font-variant-numeric: tabular-nums;
+}
+
+.zoom-menu-item:hover,
+.zoom-menu-item:focus-visible {
+	background: var(--app-hover);
+}
+
+.zoom-menu-item[aria-checked="true"] {
+	color: var(--app-accent);
+	font-weight: 600;
+}
+
+/* The save status, at the status bar's right since the tabs show unsaved ones too. */
+.statusbar .save-status {
+	margin-left: 0;
+}
+
+/* A narrow window (or panes' tabs in the bar): the bar gives up what can be
+   reached another way before it runs past the window's edge. */
+.statusbar {
+	container-type: inline-size;
+	min-width: 0;
+}
+
+.status-counts {
+	min-width: 0;
+	overflow: hidden;
+}
+
+@container (max-width: 900px) {
+	/* The zoom's value opens its sizes. */
+	.zoom-slider,
+	.status-confluence .status-chip-text,
+	.status-jira .status-chip-text,
+	.status-counts .kalem-wordcount-item:not(:first-child) {
+		display: none;
+	}
+}
+
+@container (max-width: 640px) {
+	.status-format,
+	.status-assistant .status-chip-text,
+	.status-goal[data-goal] .status-goal-text {
+		display: none;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.status-assistant > .icon {
+		animation: none;
+	}
 }
 
 /* --- Focus mode ---------------------------------------------------------- */
 
 .app[data-focus] .ribbon-host,
+.app[data-focus] .ribbon-head,
 .app[data-focus] .tabstrip,
 .app[data-focus] .navigation,
 .app[data-focus] .assistant,
@@ -4147,6 +4948,38 @@ button.git-file-path {
 	opacity: 1;
 }
 
+/* The mouse at rest: the way out fades (`wakeFocusExit` in main.ts); a key reaches it still. */
+.focus-exit {
+	transition: opacity 400ms ease;
+}
+
+.app[data-focus-idle] .focus-exit:not(:focus-visible) {
+	opacity: 0;
+	pointer-events: none;
+}
+
+/* What is being written stands out; the rest of the page is quieter. Only
+   while a block has the caret: reading, nothing is dimmed. */
+.app[data-focus] .kalem-editor > [contenteditable] {
+	transition: opacity 180ms ease;
+}
+
+.app[data-focus] .kalem-editor:has(> [contenteditable]:focus) > [contenteditable]:not(:focus) {
+	opacity: 0.32;
+}
+
+/* Typewriter scrolling: room under the last line, for it to come to the middle too. */
+.app[data-focus][data-typewriter] .page {
+	padding-bottom: 50vh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.focus-exit,
+	.app[data-focus] .kalem-editor > [contenteditable] {
+		transition: none;
+	}
+}
+
 /* --- Print and PDF export ------------------------------------------------ */
 
 @media print {
@@ -4163,6 +4996,8 @@ button.git-file-path {
 	}
 
 	.ribbon-host,
+	.ribbon-head,
+	.path-bar,
 	.tabstrip,
 	.notices,
 	.navigation,
@@ -4221,6 +5056,7 @@ button.git-file-path {
 
 	.kalem-editor > [contenteditable="true"]:focus {
 		outline: none;
+		border-image: none;
 	}
 
 	.kalem-editor {
@@ -4405,7 +5241,7 @@ button.git-file-path {
 
 .attachments-button:focus-visible,
 .attachments-filter:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -1px;
 }
 
@@ -4474,7 +5310,7 @@ button.git-file-path {
 }
 
 .attachment-card-button:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -1px;
 }
 
@@ -4663,7 +5499,7 @@ button.git-file-path {
 }
 
 .link-card-button:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: 1px;
 }
 
@@ -4773,7 +5609,7 @@ button.git-file-path {
 }
 
 .diagram-swatch[aria-pressed="true"] {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: 1px;
 }
 
@@ -5081,7 +5917,7 @@ button.git-file-path {
 }
 
 .versions-item:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -2px;
 }
 
@@ -5275,8 +6111,43 @@ button.git-file-path {
 
 .notes-list {
 	display: grid;
+	/* As wide as the pane, not as the widest card's head: a narrow pane
+	   wraps the cards' heads instead of scrolling sideways. */
+	grid-template-columns: minmax(0, 1fr);
 	gap: 8px;
 	align-content: start;
+}
+
+/* Beside their lines (`align` in local-notes.ts): each card at its words'
+   height, moved by the page's scroll; the pane does not scroll itself. */
+.notes-pane[data-aligned] {
+	overflow: hidden;
+}
+
+.notes-pane[data-aligned] .notes-list {
+	position: relative;
+	display: block;
+	flex: 1;
+	min-height: 0;
+	overflow: hidden;
+}
+
+.notes-pane[data-aligned] .note-balloon {
+	position: absolute;
+	right: 0;
+	left: 0;
+	transition: top 120ms var(--app-ease);
+}
+
+.notes-pane[data-aligned] .note-balloon:focus-within,
+.notes-pane[data-aligned] .note-balloon.active {
+	z-index: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.notes-pane[data-aligned] .note-balloon {
+		transition: none;
+	}
 }
 
 .notes-empty {
@@ -5327,6 +6198,7 @@ button.git-file-path {
 
 .note-head {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
 	gap: 6px;
 	min-height: 22px;
@@ -5570,7 +6442,7 @@ button.git-file-path {
 }
 
 .changes-body:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -2px;
 }
 
@@ -5803,7 +6675,7 @@ button.git-file-path {
 }
 
 .merge-option:has(input:focus-visible) {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: 2px;
 }
 
@@ -5940,7 +6812,7 @@ pre[data-preview="error"]::after {
 }
 
 .confluence-pane-space:focus {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -1px;
 }
 
@@ -6050,7 +6922,7 @@ pre[data-preview="error"]::after {
 }
 
 .confluence-row-main:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -2px;
 }
 
@@ -7522,6 +8394,14 @@ pre[data-confluence-kind="layout"]::before {
 	min-width: min(360px, 45vw);
 }
 
+/* Folded while the document has no heading for the headings pane in it
+   (`foldEmptyOutline` in main.ts); the pane's button opens it all the same. */
+.app[data-fold="left"] .tool-dock.dock-left,
+.app[data-fold="right"] .tool-dock.dock-right,
+.app[data-fold="bottom"] .tool-dock.dock-bottom {
+	display: none;
+}
+
 /* Squeezed out by a window too narrow for them (`fitSidePanes` in main.ts); their stripe buttons stay. */
 .app[data-squeeze~="left"] .tool-dock.dock-left,
 .app[data-squeeze~="right"] .tool-dock.dock-right {
@@ -7632,7 +8512,7 @@ pre[data-confluence-kind="layout"]::before {
 }
 
 .stripe-button:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -2px;
 }
 
@@ -7780,6 +8660,12 @@ pre[data-confluence-kind="layout"]::before {
 	cursor: pointer;
 }
 
+/* Inside the list, which scrolls and would clip a ring drawn outside the item. */
+.settings-nav-item:focus-visible {
+	outline: var(--app-focus-ring);
+	outline-offset: -2px;
+}
+
 .settings-nav-item:hover {
 	background: var(--app-hover, rgb(127 127 127 / 12%));
 }
@@ -7869,7 +8755,7 @@ pre[data-confluence-kind="layout"]::before {
 }
 
 .settings-fold:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: 2px;
 }
 
@@ -8150,7 +9036,7 @@ details.jira-section > .jira-list {
 }
 
 .jira-facets-button:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: 1px;
 }
 
@@ -8341,7 +9227,7 @@ details.jira-section > .jira-list {
 }
 
 .jira-type-chip:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: 1px;
 }
 
@@ -8827,7 +9713,7 @@ details.jira-section > .jira-list {
 }
 
 .jira-worklog-chip:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: 1px;
 }
 
@@ -9202,7 +10088,7 @@ textarea.jira-worklog-input {
 }
 
 .jira-status-button:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: 1px;
 }
 
@@ -9289,7 +10175,7 @@ textarea.jira-worklog-input {
 }
 
 .jira-dev-line:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -2px;
 }
 
@@ -9990,7 +10876,7 @@ textarea.jira-worklog-input {
 }
 
 .assistant-finding-row:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -2px;
 }
 
@@ -10467,7 +11353,7 @@ textarea.jira-worklog-input {
 }
 
 .publish-node-label:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -2px;
 }
 
@@ -10571,7 +11457,7 @@ textarea.jira-worklog-input {
 }
 
 .assistant-mode:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: 1px;
 }
 
@@ -10814,7 +11700,7 @@ textarea.jira-worklog-input {
 }
 
 .mode-tab:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: 1px;
 }
 
@@ -11222,7 +12108,7 @@ h3.mode-panel-name {
 }
 
 .mode-switch-input:focus-visible + .mode-switch-track {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: 2px;
 }
 
@@ -11749,6 +12635,9 @@ h3.mode-panel-name {
 /* --- Start page: ways to begin and recent documents, under an empty page ---- */
 
 .start-page {
+	/* In line with the document's text: the editor keeps the same room at its
+	   left for the block handles (`.kalem-ui` in @kalem-editor/themes). */
+	margin-inline-start: 2.75rem;
 	margin-top: 3em;
 	padding-top: 1.75em;
 	border-top: 1px solid var(--app-border);
@@ -11776,8 +12665,17 @@ h3.mode-panel-name {
 
 .start-actions {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+	/* Two to a row where there is room; one under the other on a narrow page
+	   (the side panels open), so their names are not broken. */
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
 	gap: 8px;
+	max-width: 40rem;
+}
+
+/* An odd number of ways to start (five; six with Jira): the first, a template,
+   takes the whole row, so no row is left with a hole. */
+.start-action:first-child:nth-last-child(odd) {
+	grid-column: 1 / -1;
 }
 
 .start-action {
@@ -11809,7 +12707,7 @@ h3.mode-panel-name {
 
 .start-action:focus-visible,
 .start-recent-item:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: 1px;
 }
 
@@ -11992,7 +12890,7 @@ dialog[open]::backdrop {
 }
 
 .files-empty-action:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: 1px;
 }
 
@@ -12056,9 +12954,42 @@ dialog[open]::backdrop {
 	outline: none;
 }
 
+.palette-prompt:empty {
+	display: none;
+}
+
 .palette-empty {
 	margin: 10px 4px 4px;
 	color: var(--app-muted);
+}
+
+/* The kinds of what was found, when the box searches everything. */
+.palette-section {
+	padding: 8px 10px 3px;
+	color: var(--app-muted);
+	font-size: 10.5px;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	list-style: none;
+}
+
+.palette-section:first-child {
+	padding-top: 2px;
+}
+
+.palette-ask .palette-icon {
+	color: var(--app-accent);
+}
+
+.palette-hints {
+	margin: 6px -6px -6px;
+	padding: 6px 12px;
+	border-top: 1px solid var(--app-border);
+	border-radius: 0 0 12px 12px;
+	background: var(--app-surface);
+	color: var(--app-muted);
+	font-size: 11.5px;
 }
 
 .palette-empty[hidden] {
@@ -12100,6 +13031,33 @@ dialog[open]::backdrop {
 .palette-check > svg.icon {
 	width: 14px;
 	height: 14px;
+}
+
+.palette-icon {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+}
+
+/* A command's icon is quiet; a document's keeps the colour of its kind (`.tone-*`). */
+.palette-icon:not(.files-icon) {
+	color: var(--app-muted);
+}
+
+.palette-icon > .icon {
+	width: 16px;
+	height: 16px;
+}
+
+.palette-icon > .icon-letter {
+	font-size: 13px;
+	line-height: 16px;
+}
+
+.palette-item[aria-selected="true"] .palette-icon:not(.files-icon) {
+	color: var(--app-accent);
 }
 
 .palette-name {
@@ -12153,7 +13111,7 @@ dialog[open]::backdrop {
 }
 
 .status-git:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -2px;
 }
 
@@ -12263,7 +13221,7 @@ dialog[open]::backdrop {
 }
 
 .start-pin:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -2px;
 }
 
@@ -12417,7 +13375,7 @@ dialog {
 }
 
 .palette-swatch:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: 2px;
 }
 
@@ -12607,7 +13565,7 @@ dialog {
 }
 
 .jira-icon-action:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: 1px;
 }
 
@@ -12680,7 +13638,7 @@ dialog {
 }
 
 .jira-tab:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -2px;
 }
 
@@ -12882,7 +13840,7 @@ dialog {
 }
 
 .jira-field-chip:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: 1px;
 }
 
@@ -13703,7 +14661,7 @@ dialog {
 }
 
 .network-resize:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -3px;
 }
 
@@ -14362,7 +15320,7 @@ dialog {
 }
 
 .edit-review-button:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -1px;
 }
 
@@ -14537,7 +15495,7 @@ dialog {
 .edit-summary-reject:focus-visible,
 .edit-summary-toggle:focus-visible,
 .edit-summary-item:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -2px;
 }
 
@@ -14662,7 +15620,7 @@ dialog {
 }
 
 .edit-summary-act:focus-visible {
-	outline: 2px solid var(--app-accent);
+	outline: var(--app-focus-ring);
 	outline-offset: -2px;
 }
 
@@ -14785,4 +15743,726 @@ dialog {
 	bottom: 18px;
 	margin-top: -52px;
 	font-family: system-ui, sans-serif;
+}
+
+/* --- The assistant where the text is: the bubble's button, its menu, Ctrl+J --- */
+
+.bubble-assistant-separator {
+	align-self: stretch;
+	width: 1px;
+	margin: 3px 2px;
+	background: var(--kalem-border);
+}
+
+.kalem-bubble-button.bubble-assistant {
+	gap: 5px;
+	padding: 0 8px 0 6px;
+	color: var(--app-accent);
+	font-weight: 600;
+}
+
+.bubble-assistant > .icon {
+	width: 15px;
+	height: 15px;
+}
+
+.bubble-assistant[aria-expanded="true"] {
+	background: color-mix(in srgb, var(--app-accent) 14%, transparent);
+}
+
+/* Over the bubble (900 in the theme). */
+.selection-ai-menu,
+.selection-ai-prompt {
+	position: fixed;
+	z-index: 950;
+	border: 1px solid var(--app-border);
+	border-radius: 10px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: var(--app-shadow);
+}
+
+.selection-ai-menu {
+	display: grid;
+	min-width: 220px;
+	padding: 4px;
+}
+
+.selection-ai-menu[hidden],
+.selection-ai-prompt[hidden] {
+	display: none;
+}
+
+.selection-ai-item {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	padding: 6px 8px;
+	border: 0;
+	border-radius: 6px;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: start;
+}
+
+.selection-ai-item:hover,
+.selection-ai-item:focus-visible {
+	background: var(--app-hover);
+}
+
+.selection-ai-item > .icon {
+	width: 16px;
+	height: 16px;
+	color: var(--app-muted);
+}
+
+.selection-ai-item > span {
+	flex: 1;
+}
+
+.selection-ai-item > kbd,
+.selection-ai-hint {
+	color: var(--app-muted);
+	font-family: inherit;
+	font-size: 11px;
+}
+
+.selection-ai-separator {
+	height: 1px;
+	margin: 4px 6px;
+	background: var(--app-border);
+}
+
+.selection-ai-prompt {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: min(520px, calc(100vw - 16px));
+	padding: 6px 10px;
+	border-color: color-mix(in srgb, var(--app-accent) 45%, var(--app-border));
+}
+
+.selection-ai-glyph {
+	display: inline-flex;
+	color: var(--app-accent);
+}
+
+.selection-ai-glyph > .icon {
+	width: 16px;
+	height: 16px;
+}
+
+.selection-ai-input {
+	flex: 1;
+	min-width: 0;
+	padding: 6px 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	font-size: 14px;
+	outline: none;
+}
+
+.selection-ai-hint {
+	flex: none;
+	white-space: nowrap;
+}
+
+/* --- High contrast ------------------------------------------------------------ */
+
+/*
+ * "More contrast" asked of the system (macOS, Windows, GNOME): the greys
+ * move toward the text and the borders and the focus ring are stronger.
+ * The palette's accent stays.
+ */
+@media (prefers-contrast: more) {
+	:root {
+		--app-muted: color-mix(in srgb, var(--app-text) 82%, var(--app-page));
+		--app-border: color-mix(in srgb, var(--app-text) 55%, var(--app-page));
+		--app-hover: color-mix(in srgb, var(--app-text) 14%, transparent);
+		--app-focus-ring: 3px solid var(--app-accent);
+	}
+}
+
+/*
+ * Windows' contrast themes (forced colours): the system paints with its own
+ * few colours, and a background or a shadow that was all that told a state
+ * apart is gone. Here a state is a border, an outline or the system's
+ * Highlight; colours that carry meaning (swatches, file kinds, the goal's
+ * ring, the assistant's changes) keep theirs.
+ */
+@media (forced-colors: active) {
+	:root {
+		--app-focus-ring: 2px solid Highlight;
+	}
+
+	/* What is chosen, pressed, open or current: an outline, not a tint. */
+	:is(
+		[aria-pressed="true"],
+		[aria-selected="true"],
+		[aria-current="true"],
+		[aria-checked="true"],
+		[aria-expanded="true"]
+	):not(input) {
+		outline: 1px solid Highlight;
+		outline-offset: -1px;
+	}
+
+	.ribbon-tab[aria-selected="true"],
+	.doc-tab[aria-selected="true"] {
+		outline: 0;
+		border-bottom: 2px solid Highlight;
+	}
+
+	/* The caret's block: its mark in the margin, drawn by the system. */
+	.kalem-editor > [contenteditable="true"]:focus {
+		border-image: none;
+		border-inline-start: 2px solid Highlight;
+		margin-inline-start: -2px;
+	}
+
+	/* The page had only its white and a shadow to stand out from the desk. */
+	.page {
+		border: 1px solid CanvasText;
+	}
+
+	/* Popovers and menus had only a shadow to stand out from the page. */
+	:is(
+		.selection-ai-menu,
+		.selection-ai-prompt,
+		.ribbon-fold-popup,
+		.status-popover,
+		.command-palette,
+		.link-card,
+		.table-picker,
+		.color-menu
+	) {
+		border: 1px solid CanvasText;
+	}
+
+	/* Colours that say something. */
+	:is(.ribbon-swatch, .palette-swatch, .color-menu, .files-icon, .status-goal-ring, .boot-nib) {
+		forced-color-adjust: none;
+	}
+
+	/* The assistant's change: added text underlined, what it took out struck, each with a bar. */
+	.page [data-ai-change] {
+		border-inline-start: 3px solid Highlight;
+		text-decoration: underline;
+	}
+
+	.page [data-ai-was]::before,
+	.page [data-ai-gone]::after {
+		border-inline-start: 3px solid GrayText;
+		color: GrayText;
+	}
+
+	/* Focus mode's quiet paragraphs: the system's dimmed text, not a lighter opacity. */
+	.app[data-focus] .kalem-editor:has(> [contenteditable]:focus) > [contenteditable]:not(:focus) {
+		opacity: 1;
+		color: GrayText;
+	}
+}
+
+/* --- Home: the start page's way back, and its templates ------------------- */
+
+.start-continue-box {
+	max-width: 40rem;
+	margin-bottom: 22px;
+}
+
+.start-continue {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	width: 100%;
+	padding: 14px 16px;
+	border: 1px solid color-mix(in srgb, var(--app-accent) 35%, var(--app-border));
+	border-radius: 12px;
+	background: color-mix(in srgb, var(--app-accent) 7%, var(--app-raised));
+	color: inherit;
+	font: inherit;
+	text-align: start;
+	cursor: pointer;
+	transition:
+		border-color 120ms ease,
+		box-shadow 120ms ease;
+}
+
+.start-continue:hover {
+	border-color: var(--app-accent);
+	box-shadow: 0 2px 10px rgb(0 0 0 / 6%);
+}
+
+.start-continue-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border-radius: 9px;
+	background: var(--app-raised);
+}
+
+.start-continue-icon > .icon {
+	width: 20px;
+	height: 20px;
+}
+
+.start-continue-label {
+	color: var(--app-accent);
+	font-size: 11.5px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+}
+
+.start-continue-name {
+	font-size: 15px;
+	font-weight: 600;
+}
+
+.start-continue-go {
+	margin-inline-start: auto;
+	color: var(--app-accent);
+}
+
+.start-templates-box {
+	max-width: 40rem;
+	margin-top: 22px;
+}
+
+.start-templates-box[hidden] {
+	display: none;
+}
+
+.start-templates {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.start-template {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px 6px 9px;
+	border: 1px solid var(--app-border);
+	border-radius: 999px;
+	background: var(--app-surface);
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+}
+
+.start-template:hover {
+	border-color: color-mix(in srgb, var(--app-accent) 45%, var(--app-border));
+	background: var(--app-raised);
+}
+
+.start-template > .icon {
+	width: 15px;
+	height: 15px;
+	color: var(--app-accent);
+}
+
+/* --- Who the app is set up for (first start) ------------------------------ */
+
+.role-picker {
+	width: min(720px, calc(100vw - 32px));
+	padding: 26px 28px 20px;
+	border: 1px solid var(--app-border);
+	border-radius: 14px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: var(--app-shadow);
+}
+
+.role-picker::backdrop {
+	background: rgb(0 0 0 / 25%);
+}
+
+.role-picker h2 {
+	margin: 0 0 6px;
+	font-size: 20px;
+}
+
+.role-lede {
+	margin: 0 0 18px;
+	color: var(--app-muted);
+}
+
+.role-list {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 10px;
+}
+
+@media (max-width: 640px) {
+	.role-list {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+.role-card {
+	display: grid;
+	gap: 6px;
+	align-content: start;
+	padding: 16px;
+	border: 1px solid var(--app-border);
+	border-radius: 12px;
+	background: var(--app-surface);
+	color: inherit;
+	font: inherit;
+	text-align: start;
+	cursor: pointer;
+}
+
+.role-card:hover,
+.role-card[aria-checked="true"] {
+	border-color: var(--app-accent);
+	background: color-mix(in srgb, var(--app-accent) 6%, var(--app-raised));
+}
+
+.role-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 36px;
+	height: 36px;
+	border-radius: 9px;
+	background: color-mix(in srgb, var(--app-accent) 12%, transparent);
+	color: var(--app-accent);
+}
+
+.role-name {
+	font-size: 15px;
+	font-weight: 600;
+}
+
+.role-what {
+	color: var(--app-muted);
+	font-size: 12.5px;
+	line-height: 1.45;
+}
+
+.role-footer {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin-top: 18px;
+}
+
+.role-hint {
+	flex: 1;
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.role-skip {
+	padding: 6px 14px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-raised);
+	color: inherit;
+	font: inherit;
+}
+
+/* The version history's points before the assistant's changes. */
+.versions-item.versions-assistant {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.versions-kind {
+	padding: 0 6px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--app-accent) 14%, transparent);
+	color: var(--app-accent);
+	font-size: 11px;
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+/* --- The system's material behind the frame (`windowMaterial`) ------------
+   Mica (Windows 11) or vibrancy (macOS) shows through the title bar, the
+   desk around the page and the side panels; the page itself stays opaque,
+   and so does everything when the user asked for more contrast. */
+@media not (prefers-contrast: more) {
+	:root[data-material] body {
+		background: transparent;
+	}
+
+	:root[data-material] .title-bar {
+		background: color-mix(in srgb, var(--app-desk) 55%, transparent);
+	}
+
+	:root[data-material] .desk-column {
+		background: color-mix(in srgb, var(--app-desk) 70%, transparent);
+	}
+
+	:root[data-material] :is(.navigation, .tool-dock, .dock-stripe, .statusbar) {
+		background: color-mix(in srgb, var(--app-surface) 78%, transparent);
+	}
+}
+
+@media (forced-colors: active) {
+	:root[data-material] body {
+		background: Canvas;
+	}
+}
+
+/* --- Density (`density`): how close together the controls are ------------
+   Standard is the stylesheet's own; Compact and Comfortable change the rows
+   and buttons of the ribbon, the tabs, the panels' lists and the status bar.
+   The title bar keeps its height: the system's window buttons are as tall. */
+:root[data-density="compact"] .files-list {
+	--files-row: 21px;
+}
+
+:root[data-density="comfortable"] .files-list {
+	--files-row: 30px;
+}
+
+:root[data-density="compact"] .ribbon-top {
+	height: 28px;
+}
+
+:root[data-density="comfortable"] .ribbon-top {
+	height: 40px;
+}
+
+:root[data-density="compact"] .ribbon-panel {
+	min-height: 54px;
+	padding-top: 3px;
+}
+
+:root[data-density="comfortable"] .ribbon-panel {
+	min-height: 72px;
+	padding-top: 9px;
+}
+
+:root[data-density="compact"] :is(.ribbon-button, .ribbon-style) {
+	min-width: 26px;
+	height: 26px;
+}
+
+:root[data-density="comfortable"] :is(.ribbon-button, .ribbon-style) {
+	min-width: 36px;
+	height: 36px;
+}
+
+:root[data-density="compact"] .ribbon[data-simple] .ribbon-panel,
+:root[data-density="comfortable"] .ribbon[data-simple] .ribbon-panel {
+	min-height: 0;
+}
+
+:root[data-density="compact"] .ribbon-switch {
+	height: 26px;
+}
+
+:root[data-density="comfortable"] .ribbon-switch {
+	height: 36px;
+}
+
+:root[data-density="compact"] .doc-tab {
+	height: 25px;
+}
+
+:root[data-density="comfortable"] .doc-tab {
+	height: 32px;
+}
+
+:root[data-density="compact"] .title-bar .doc-tab[aria-selected="true"] {
+	height: 28px;
+}
+
+:root[data-density="comfortable"] .title-bar .doc-tab[aria-selected="true"] {
+	height: 34px;
+}
+
+:root[data-density="compact"] .kalem-outline-item {
+	padding-block: 2px;
+}
+
+:root[data-density="comfortable"] .kalem-outline-item {
+	padding-block: 7px;
+}
+
+:root[data-density="compact"] .stripe-button {
+	padding-block: 6px;
+}
+
+:root[data-density="comfortable"] .stripe-button {
+	padding-block: 11px;
+}
+
+:root[data-density="compact"] .statusbar {
+	height: 22px;
+}
+
+:root[data-density="comfortable"] .statusbar {
+	height: 32px;
+	font-size: 13px;
+}
+
+:root[data-density="compact"] .note-balloon {
+	padding-block: 4px;
+}
+
+:root[data-density="comfortable"] .note-balloon {
+	padding-block: 11px 10px;
+}
+
+/* --- The edges' buttons: icons, their names beside them (tip.ts) ----------
+   The panes' buttons on the side edges and the assistant's are their icons;
+   the open pane's has a bar on the edge's side, a count sits on its corner
+   (the notes, the assistant's changes), and its name shows beside it when
+   pointed at. The names stay for screen readers. */
+.stripe-left .stripe-button,
+.stripe-right .stripe-button,
+.assistant-rail-button {
+	position: relative;
+	justify-content: center;
+	width: 30px;
+	height: 32px;
+	padding: 0;
+}
+
+.stripe-left .stripe-label,
+.stripe-right .stripe-label,
+.assistant-rail-label {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.stripe-left .stripe-button .icon,
+.stripe-right .stripe-button .icon,
+.assistant-rail-button .icon {
+	width: 18px;
+	height: 18px;
+}
+
+.stripe-left .stripe-button[aria-pressed="true"]::before,
+.stripe-right .stripe-button[aria-pressed="true"]::before,
+.assistant-rail-button[aria-expanded="true"]::before {
+	content: "";
+	position: absolute;
+	top: 7px;
+	bottom: 7px;
+	width: 2px;
+	border-radius: 2px;
+	background: var(--app-accent);
+}
+
+/* Against the edge, and no further: the window must not scroll sideways. */
+.stripe-left .stripe-button[aria-pressed="true"]::before {
+	left: -1px;
+}
+
+.stripe-right .stripe-button[aria-pressed="true"]::before,
+.assistant-rail-button[aria-expanded="true"]::before {
+	right: -1px;
+}
+
+.stripe-left .stripe-button:not([aria-pressed="true"]) .icon,
+.stripe-right .stripe-button:not([aria-pressed="true"]) .icon,
+.assistant-rail-button:not([aria-expanded="true"]) .icon {
+	color: var(--app-muted);
+}
+
+.stripe-left .stripe-button:hover .icon,
+.stripe-right .stripe-button:hover .icon,
+.assistant-rail-button:hover .icon {
+	color: var(--app-accent);
+}
+
+.stripe-badge {
+	position: absolute;
+	top: 1px;
+	right: -1px;
+	min-width: 15px;
+	height: 15px;
+	padding: 0 4px;
+	border: 1.5px solid var(--app-surface);
+	border-radius: 8px;
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+	font-size: 9.5px;
+	font-weight: 700;
+	line-height: 12px;
+	text-align: center;
+	box-sizing: border-box;
+}
+
+.stripe-badge[hidden] {
+	display: none;
+}
+
+.stripe-bottom .stripe-badge {
+	position: static;
+	margin-left: 2px;
+}
+
+/* The assistant at work: a dot on its button that breathes. */
+.assistant-rail-button[data-busy]::after {
+	content: "";
+	position: absolute;
+	right: 3px;
+	bottom: 4px;
+	width: 7px;
+	height: 7px;
+	border: 1.5px solid var(--app-surface);
+	border-radius: 50%;
+	background: var(--app-accent);
+	animation: rail-busy 1.4s ease-in-out infinite;
+}
+
+@keyframes rail-busy {
+	50% {
+		opacity: 0.35;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.assistant-rail-button[data-busy]::after {
+		animation: none;
+	}
+}
+
+.app-tip {
+	position: fixed;
+	z-index: 80;
+	padding: 4px 9px;
+	border-radius: 6px;
+	background: var(--app-text);
+	color: var(--app-page);
+	font-size: 12px;
+	font-weight: 500;
+	white-space: nowrap;
+	pointer-events: none;
+	box-shadow: var(--app-shadow-soft);
+}
+
+.app-tip[hidden] {
+	display: none;
+}
+
+@media (forced-colors: active) {
+	.app-tip {
+		border: 1px solid CanvasText;
+	}
+
+	.stripe-badge {
+		border-color: Canvas;
+		forced-color-adjust: none;
+		background: Highlight;
+		color: HighlightText;
+	}
 }

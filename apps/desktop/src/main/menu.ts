@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { MenuItemConstructorOptions, WebContents } from "electron";
 import { app, BrowserWindow, Menu, session, shell } from "electron";
 import type { Command, PaletteCommand, Settings, TabDocument } from "../shared/bridge.js";
-import { CHANNEL, PAGE_SIZES } from "../shared/bridge.js";
+import { CHANNEL, COMMANDS, PAGE_SIZES } from "../shared/bridge.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import { QUICK_NOTE_SHORTCUT } from "./tray.js";
@@ -43,10 +43,31 @@ function targetOf(ctx: MenuContext, window: Parameters<Click>[1]): AppWindow | u
 	return target === null ? undefined : ctx.windows.get(target.webContents);
 }
 
+/** The app command each `send` click sends, so the palette can name it (and give it an icon). */
+const SENT = new WeakMap<Click, Command>();
+
 function send(ctx: MenuContext, command: Command): Click {
-	return (_item, window) => {
+	const click: Click = (_item, window) => {
 		targetOf(ctx, window)?.window.webContents.send(CHANNEL.command, command);
 	};
+	SENT.set(click, command);
+	return click;
+}
+
+/**
+ * Gives every item that sends an app command the id `command:<name>`; an item
+ * with an id of its own keeps it. The palette reads them back.
+ */
+function nameCommands(items: MenuItemConstructorOptions[]): MenuItemConstructorOptions[] {
+	return items.map((item) => {
+		const command = item.click === undefined ? undefined : SENT.get(item.click as Click);
+		const submenu = Array.isArray(item.submenu) ? nameCommands(item.submenu) : item.submenu;
+		return {
+			...item,
+			...(item.id === undefined && command !== undefined ? { id: `command:${command}` } : {}),
+			...(submenu === undefined ? {} : { submenu }),
+		};
+	});
 }
 
 function withWindow(ctx: MenuContext, action: (doc: AppWindow) => void): Click {
@@ -78,16 +99,18 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 						(path): MenuItemConstructorOptions => ({
 							// `&` marks a mnemonic on Windows.
 							label: path.replace(/&/g, "&&"),
+							id: `recent:${path}`,
 							click: (_item, window) => void windows.openPath(path, targetOf(ctx, window)),
 						}),
 					),
 					{ type: "separator" },
-					{ label: t.clearRecent, click: () => ctx.clearRecentFiles() },
+					{ label: t.clearRecent, id: "item:clear-recent", click: () => ctx.clearRecentFiles() },
 				];
 
 	return [
 		{
 			label: t.new,
+			id: "item:new",
 			accelerator: "CmdOrCtrl+N",
 			click: (_item, window) => {
 				const win = targetOf(ctx, window);
@@ -96,9 +119,15 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 			},
 		},
 		{ label: t.newFromTemplate, click: send(ctx, "new-from-template") },
-		{ label: t.newWindow, accelerator: "CmdOrCtrl+Shift+N", click: () => void windows.open() },
+		{
+			label: t.newWindow,
+			id: "item:new-window",
+			accelerator: "CmdOrCtrl+Shift+N",
+			click: () => void windows.open(),
+		},
 		{
 			label: t.quickNote,
+			id: "item:quick-note",
 			accelerator: QUICK_NOTE_SHORTCUT,
 			// With the tray on, the shortcut is registered system-wide instead.
 			registerAccelerator: !ctx.settings.tray,
@@ -106,6 +135,7 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 		},
 		{
 			label: t.open,
+			id: "item:open",
 			accelerator: "CmdOrCtrl+O",
 			click: (_item, window) => void windows.showOpenDialog(targetOf(ctx, window)),
 		},
@@ -117,6 +147,7 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 		},
 		{
 			label: t.openFolder,
+			id: "item:open-folder",
 			click: (_item, window) => ctx.openFolder(targetOf(ctx, window)),
 		},
 		// Only while a folder is open: there is nothing to close otherwise.
@@ -132,6 +163,7 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 		{ label: t.versionHistory, click: send(ctx, "version-history") },
 		{
 			label: t.showInFolder,
+			id: "item:show-in-folder",
 			click: withWindow(ctx, (win) => {
 				const path = windows.activeTab(win)?.path ?? null;
 				if (path !== null) shell.showItemInFolder(path);
@@ -144,11 +176,13 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 			submenu: [
 				{
 					label: t.importFromWord,
+					id: "item:import-word",
 					accelerator: "CmdOrCtrl+Shift+O",
 					click: (_item, window) => void windows.showWordDialog(targetOf(ctx, window)),
 				},
 				{
 					label: t.importFromConfluence,
+					id: "item:import-confluence",
 					click: (_item, window) => void windows.showConfluenceDialog(targetOf(ctx, window)),
 				},
 			],
@@ -158,7 +192,11 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 			submenu: [
 				{ label: t.exportHtml, click: send(ctx, "export-html") },
 				{ label: t.exportDocx, click: send(ctx, "export-docx") },
-				{ label: t.exportPdf, click: withWindow(ctx, (win) => ctx.exportPdf(win)) },
+				{
+					label: t.exportPdf,
+					id: "item:export-pdf",
+					click: withWindow(ctx, (win) => ctx.exportPdf(win)),
+				},
 				{ type: "separator" },
 				{ label: t.exportConfluence, click: send(ctx, "export-confluence") },
 				{ label: t.exportConfluenceWiki, click: send(ctx, "export-confluence-wiki") },
@@ -178,6 +216,7 @@ export function fileMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[]
 		{ type: "separator" },
 		{
 			label: t.print,
+			id: "item:print",
 			accelerator: "CmdOrCtrl+P",
 			click: withWindow(ctx, (win) => ctx.print(win)),
 		},
@@ -276,6 +315,35 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 			type: "radio",
 			checked: settings.theme === theme,
 			click: () => ctx.changeSettings({ theme }),
+		}),
+	);
+
+	const densities = (
+		[
+			["compact", t.densityCompact],
+			["standard", t.densityStandard],
+			["comfortable", t.densityComfortable],
+		] as const
+	).map(
+		([density, label]): MenuItemConstructorOptions => ({
+			label,
+			type: "radio",
+			checked: settings.density === density,
+			click: () => ctx.changeSettings({ density }),
+		}),
+	);
+
+	const accents = (
+		[
+			["palette", t.accentPalette],
+			["system", t.accentSystem],
+		] as const
+	).map(
+		([accentSource, label]): MenuItemConstructorOptions => ({
+			label,
+			type: "radio",
+			checked: settings.accentSource === accentSource,
+			click: () => ctx.changeSettings({ accentSource }),
 		}),
 	);
 
@@ -406,6 +474,12 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 					click: send(ctx, "assistant"),
 				},
 				{
+					label: t.selectionAssistantMenu,
+					// The document takes the key itself, where the caret is.
+					...editorShortcut("CmdOrCtrl+J"),
+					click: send(ctx, "assistant-prompt"),
+				},
+				{
 					label: t.markdownSource,
 					...editorShortcut("CmdOrCtrl+Shift+M"),
 					click: send(ctx, "source"),
@@ -417,7 +491,25 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 					checked: settings.localNotes,
 					click: () => ctx.changeSettings({ localNotes: !settings.localNotes }),
 				},
+				{
+					label: t.documentMapSetting,
+					type: "checkbox",
+					checked: settings.documentMap,
+					click: () => ctx.changeSettings({ documentMap: !settings.documentMap }),
+				},
+				{
+					label: t.notesAligned,
+					type: "checkbox",
+					checked: settings.notesAligned,
+					click: () => ctx.changeSettings({ notesAligned: !settings.notesAligned }),
+				},
 				{ label: t.focusMode, accelerator: "CmdOrCtrl+Shift+F", click: send(ctx, "focus") },
+				{
+					label: t.typewriterScroll,
+					type: "checkbox",
+					checked: settings.typewriterScroll,
+					click: () => ctx.changeSettings({ typewriterScroll: !settings.typewriterScroll }),
+				},
 				{ type: "separator" },
 				{ label: t.zoomIn, accelerator: "CmdOrCtrl+=", click: send(ctx, "zoom-in") },
 				{ label: t.zoomOut, accelerator: "CmdOrCtrl+-", click: send(ctx, "zoom-out") },
@@ -429,14 +521,32 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 					click: () => ctx.changeSettings({ fullWidth: !settings.fullWidth }),
 				},
 				{ label: t.typographyOpen, click: send(ctx, "typography") },
+				{ label: t.homeMenu, accelerator: "CmdOrCtrl+Shift+H", click: send(ctx, "home") },
+				{ label: t.roleMenu, click: send(ctx, "set-up-role") },
+				{ type: "separator" },
 				{
-					label: t.lineNumbers,
+					label: t.ribbonSimple,
+					type: "checkbox",
+					accelerator: "CmdOrCtrl+F1",
+					checked: settings.ribbonSimple,
+					click: () => ctx.changeSettings({ ribbonSimple: !settings.ribbonSimple }),
+				},
+				{
+					label: t.lineNumbersDocuments,
 					type: "checkbox",
 					checked: settings.lineNumbers,
 					click: () => ctx.changeSettings({ lineNumbers: !settings.lineNumbers }),
 				},
+				{
+					label: t.lineNumbersCode,
+					type: "checkbox",
+					checked: settings.codeLineNumbers,
+					click: () => ctx.changeSettings({ codeLineNumbers: !settings.codeLineNumbers }),
+				},
 				{ type: "separator" },
 				{ label: t.theme, submenu: themes },
+				{ label: t.density, submenu: densities },
+				{ label: t.accentSource, submenu: accents },
 				{ label: t.language, submenu: languages },
 				{ type: "separator" },
 				{
@@ -506,7 +616,7 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 }
 
 export function installMenu(ctx: MenuContext): void {
-	Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate(ctx)));
+	Menu.setApplicationMenu(Menu.buildFromTemplate(nameCommands(menuTemplate(ctx))));
 }
 
 function caseMenuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
@@ -644,17 +754,31 @@ export function paletteCommands(): PaletteCommand[] {
 				return;
 			}
 			if (!item.enabled || label === "") return;
+			const own = item.id ?? "";
+			const recent = own.startsWith("recent:") ? own.slice("recent:".length) : null;
 			found.push({
 				id: [...ids, index].join("."),
-				label,
+				label: recent ?? label,
 				group: path.join(" › "),
 				accelerator: shownAccelerator(item.accelerator),
 				checked: item.type === "checkbox" || item.type === "radio" ? item.checked : null,
+				action: actionOf(own, item.role),
+				path: recent,
 			});
 		});
 	};
 	walk(menu.items, [], []);
 	return found;
+}
+
+/** What a menu item does, by the id `nameCommands` or its template gave it, or its role. */
+function actionOf(id: string, role: string | undefined): string | null {
+	if (id.startsWith("command:")) {
+		const name = id.slice("command:".length);
+		return (COMMANDS as readonly string[]).includes(name) ? name : null;
+	}
+	if (id.startsWith("item:")) return id;
+	return role === undefined || role === null ? null : `role:${role}`;
 }
 
 /** Runs the menu item a palette command names, as a click on it in `window` would. */

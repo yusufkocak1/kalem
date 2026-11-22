@@ -582,14 +582,15 @@ export function createNetworkPanel(options: NetworkPanelOptions): NetworkPanel {
 		resizer.setPointerCapture(event.pointerId);
 		const move = (moved: PointerEvent): void => setHeight(window.innerHeight - moved.clientY);
 		const end = (): void => {
-			resizer.removeEventListener("pointermove", move);
-			resizer.removeEventListener("pointerup", end);
-			resizer.removeEventListener("pointercancel", end);
+			window.removeEventListener("pointermove", move);
+			window.removeEventListener("pointerup", end);
+			window.removeEventListener("pointercancel", end);
 			keepHeight(panel.getBoundingClientRect().height);
 		};
-		resizer.addEventListener("pointermove", move);
-		resizer.addEventListener("pointerup", end);
-		resizer.addEventListener("pointercancel", end);
+		// On the window: the drag follows the pointer even when the capture is not given.
+		window.addEventListener("pointermove", move);
+		window.addEventListener("pointerup", end);
+		window.addEventListener("pointercancel", end);
 	});
 	resizer.addEventListener("keydown", (event) => {
 		if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;

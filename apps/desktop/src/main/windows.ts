@@ -13,9 +13,11 @@ import type {
 	SessionSnapshot,
 	Settings,
 	TabDocument,
+	TitleBar,
+	WindowMaterial,
 	WindowState,
 } from "../shared/bridge.js";
-import { CHANNEL } from "../shared/bridge.js";
+import { CHANNEL, TITLE_BAR_HEIGHT } from "../shared/bridge.js";
 import type { LegacyEncoding } from "../shared/encoding.js";
 import { DEFAULT_FORMAT, toTextFormat } from "../shared/encoding.js";
 import type { Lang, Strings } from "../shared/i18n.js";
@@ -32,6 +34,7 @@ import {
 } from "../shared/paths.js";
 import type { DraftStore } from "./drafts.js";
 import { FileError, modifiedTime, readDocument } from "./files.js";
+import { windowMaterial } from "./material.js";
 import type { PackageStore } from "./package.js";
 import { pathKey } from "./path-key.js";
 import type { SessionStore, SessionTabEntry, SessionWindow } from "./session-store.js";
@@ -78,6 +81,10 @@ export interface AppWindow {
 	sessionRequest: ((snapshot: unknown) => void) | null;
 	/** Closed with the app: its drafts are kept, to come back next time. */
 	keepDrafts: boolean;
+	/** How its title bar is drawn, fixed when it opened (`tabsInTitleBar`). */
+	readonly titleBar: TitleBar;
+	/** The system material behind its frame, fixed when it opened (`windowMaterial`). */
+	readonly material: WindowMaterial;
 }
 
 /** How a window is opened: where (a restored window's place) and which tab is active. */
@@ -159,6 +166,14 @@ export class WindowManager {
 		// A window opened after the app's last window closed (macOS, the tray) starts a new session.
 		if (!this.#quitting && this.#windows.size === 0) this.#session.clear();
 		const bounds = options.bounds ?? this.#initialBounds();
+		const titleBar: TitleBar = !this.#options.store.settings.tabsInTitleBar
+			? null
+			: process.platform === "darwin"
+				? "inset"
+				: "overlay";
+		const material = windowMaterial(this.#options.store.settings.windowMaterial);
+		// Under a material the page draws no background of its own where the frame is.
+		const background = material === null ? this.backgroundColor() : "#00000000";
 		const window = new BrowserWindow({
 			width: bounds.width,
 			height: bounds.height,
@@ -168,8 +183,25 @@ export class WindowManager {
 			show: false,
 			title: this.#options.strings().appName,
 			icon: join(__dirname, "icon.png"),
-			backgroundColor: this.backgroundColor(),
+			backgroundColor: background,
+			...(material === "mica" ? { backgroundMaterial: "mica" as const } : {}),
+			...(material === "vibrancy"
+				? { vibrancy: "sidebar" as const, visualEffectState: "followWindow" as const }
+				: {}),
 			autoHideMenuBar: true,
+			// The tabs take the title bar's row; the system's window buttons stay, over it.
+			...(titleBar === "inset"
+				? { titleBarStyle: "hiddenInset" as const, trafficLightPosition: { x: 14, y: 12 } }
+				: titleBar === "overlay"
+					? {
+							titleBarStyle: "hidden" as const,
+							titleBarOverlay: {
+								color: background,
+								symbolColor: nativeTheme.shouldUseDarkColors ? "#e8e6e1" : "#22201d",
+								height: TITLE_BAR_HEIGHT,
+							},
+						}
+					: {}),
 			webPreferences: {
 				preload: this.#options.preloadPath,
 				contextIsolation: true,
@@ -191,6 +223,8 @@ export class WindowManager {
 			saveRequests: new Map(),
 			sessionRequest: null,
 			keepDrafts: false,
+			titleBar,
+			material,
 		};
 		const initial = documents.length > 0 ? documents : [this.#emptyDocument()];
 		for (const document of initial) {

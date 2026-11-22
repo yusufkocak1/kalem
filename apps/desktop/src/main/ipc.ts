@@ -2,7 +2,7 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { IpcMainEvent, IpcMainInvokeEvent } from "electron";
-import { app, dialog, ipcMain, shell } from "electron";
+import { app, dialog, ipcMain, Notification, shell } from "electron";
 import type {
 	Attachment,
 	DraftRequest,
@@ -16,7 +16,7 @@ import type {
 	WindowState,
 	Workspace,
 } from "../shared/bridge.js";
-import { CHANNEL } from "../shared/bridge.js";
+import { CHANNEL, TITLE_BAR_HEIGHT } from "../shared/bridge.js";
 import { COMMIT_MESSAGE_PROMPT, cleanCommitMessage } from "../shared/commit-message.js";
 import { toTextFormat } from "../shared/encoding.js";
 import type { Lang, Strings } from "../shared/i18n.js";
@@ -34,6 +34,7 @@ import {
 	stripExtension,
 	TEXT_EXTENSIONS,
 } from "../shared/paths.js";
+import { systemAccent } from "./accent.js";
 import type { ChatStore } from "./assistant-chats.js";
 import type { AssistantService } from "./assistant-ipc.js";
 import { registerAssistantIpc } from "./assistant-ipc.js";
@@ -85,6 +86,8 @@ import { listWorkspace, searchWorkspace } from "./workspace.js";
 import { createEntry, isInside, renameEntry, WorkspaceFileError } from "./workspace-files.js";
 
 export interface IpcContext {
+	/** The app starts for the first time; asking it once answers for the first window only. */
+	firstRun(): boolean;
 	readonly windows: WindowManager;
 	readonly store: SettingsStore;
 	readonly drafts: DraftStore;
@@ -202,6 +205,10 @@ export function registerIpc(ctx: IpcContext): void {
 			documents: await windows.takePending(win),
 			...(win.activeTabId === null ? {} : { active: win.activeTabId }),
 			documentScheme: DOCUMENT_SCHEME,
+			titleBar: win.titleBar,
+			material: win.material,
+			systemAccent: systemAccent(),
+			firstRun: ctx.firstRun(),
 		};
 	});
 
@@ -375,6 +382,53 @@ export function registerIpc(ctx: IpcContext): void {
 
 	on(CHANNEL.tabActivated, (win, tabId) => {
 		if (typeof tabId === "string") windows.setActiveTab(win, tabId);
+	});
+
+	/**
+	 * The assistant at work: the taskbar's (or the Dock's) progress shows it
+	 * for the window, and when the answer is ready in a window not in front,
+	 * a notification says so; a click on it brings the window.
+	 */
+	const working = new WeakSet<object>();
+	on(CHANNEL.assistantActivity, (win, busy) => {
+		if (typeof busy !== "boolean" || busy === working.has(win)) return;
+		if (busy) {
+			working.add(win);
+			// Above 1: an indeterminate bar where the system has one (Windows).
+			win.window.setProgressBar(2);
+			return;
+		}
+		working.delete(win);
+		win.window.setProgressBar(-1);
+		if (win.window.isFocused() || !Notification.isSupported()) return;
+		const t = ctx.strings();
+		const notice = new Notification({
+			title: t.appName,
+			body: t.assistantDoneNotice,
+			silent: true,
+		});
+		notice.on("click", () => {
+			if (win.window.isDestroyed()) return;
+			if (win.window.isMinimized()) win.window.restore();
+			win.window.focus();
+		});
+		notice.show();
+	});
+
+	// The path is the window's own tab's, not one the renderer names.
+	on(CHANNEL.assistantCheckpoint, (win, tabId, text) => {
+		if (typeof tabId !== "string" || typeof text !== "string") return;
+		const path = win.tabs.get(tabId)?.path ?? null;
+		if (path !== null) void ctx.versions.checkpoint(path, text).catch(() => {});
+	});
+
+	on(CHANNEL.titleBarColors, (win, color, symbolColor) => {
+		if (win.titleBar !== "overlay" || typeof color !== "string" || typeof symbolColor !== "string")
+			return;
+		// Only colours the renderer computed: #rrggbb or rgb()/rgba().
+		const valid = (value: string): boolean => /^(#[0-9a-f]{6}|rgba?\([\d.,\s%]+\))$/i.test(value);
+		if (!valid(color) || !valid(symbolColor)) return;
+		win.window.setTitleBarOverlay({ color, symbolColor, height: TITLE_BAR_HEIGHT });
 	});
 
 	ipcMain.handle(CHANNEL.confirmCloseTab, (event, tabId: unknown) => {

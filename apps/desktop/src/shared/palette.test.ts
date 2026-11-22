@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+	contrast,
+	fitAccent,
 	hexColor,
 	PALETTE_IDS,
 	PALETTES,
 	paletteCss,
 	parsePaletteCustom,
+	systemAccentCss,
 	textOn,
 } from "./palette.js";
 
@@ -46,5 +49,27 @@ describe("colour palettes", () => {
 			expect(textOn(PALETTES[id].light.accent), id).toBe("#ffffff");
 			expect(textOn(PALETTES[id].dark.accent), id).toBe("#16151a");
 		}
+	});
+});
+
+describe("the system's accent", () => {
+	it("is darkened on a light theme and lightened on a dark one until it reads on the page", () => {
+		const { light, dark } = PALETTES.kalem;
+		// Windows' yellow is too light for a light page, and its navy too dark for a dark one.
+		const yellow = fitAccent("#ffb900", light, false);
+		expect(contrast(yellow, light.page)).toBeGreaterThanOrEqual(4.5);
+		expect(contrast(yellow, light.surface)).toBeGreaterThanOrEqual(4.5);
+		const navy = fitAccent("#002050", dark, true);
+		expect(contrast(navy, dark.page)).toBeGreaterThanOrEqual(4.5);
+		// One that reads already stays as it is.
+		expect(fitAccent("#0063b1", light, false)).toBe("#0063b1");
+	});
+
+	it("puts its variables over the palette's, for both themes, and nothing without one", () => {
+		const css = systemAccentCss("#0078d4", "kalem", PALETTES.kalem);
+		expect(css).toContain("--app-accent: #");
+		expect(css).toContain("--kalem-accent: #");
+		expect(css).toContain("prefers-color-scheme: dark");
+		expect(systemAccentCss(null, "kalem", PALETTES.kalem)).toBe("");
 	});
 });
