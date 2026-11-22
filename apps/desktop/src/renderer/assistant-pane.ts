@@ -1832,16 +1832,20 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			showWidth(width);
 		};
 		const up = (): void => {
-			resizer.removeEventListener("pointermove", move);
-			resizer.removeEventListener("pointerup", up);
-			resizer.removeEventListener("pointercancel", up);
+			window.removeEventListener("pointermove", move);
+			window.removeEventListener("pointerup", up);
+			window.removeEventListener("pointercancel", up);
 			element.classList.remove("resizing");
 			if (place === "bottom") host.setHeight(height);
 			else host.setWidth(width);
 		};
-		resizer.addEventListener("pointermove", move);
-		resizer.addEventListener("pointerup", up);
-		resizer.addEventListener("pointercancel", up);
+		// On the window, not the handle: the capture above keeps the events
+		// coming outside it, but when the system does not give it (it can
+		// miss a press made as the window settles) the drag still follows
+		// the pointer over the page and ends where it is let go.
+		window.addEventListener("pointermove", move);
+		window.addEventListener("pointerup", up);
+		window.addEventListener("pointercancel", up);
 	});
 	resizer.addEventListener("keydown", (event) => {
 		const place = host.place();

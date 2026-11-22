@@ -251,15 +251,16 @@ export function createDocks(options: DocksOptions): Docks {
 				showSize(dock, size);
 			};
 			const up = (): void => {
-				resizer.removeEventListener("pointermove", move);
-				resizer.removeEventListener("pointerup", up);
-				resizer.removeEventListener("pointercancel", up);
+				window.removeEventListener("pointermove", move);
+				window.removeEventListener("pointerup", up);
+				window.removeEventListener("pointercancel", up);
 				element.classList.remove("resizing");
 				options.update(dockPatch(dock, { size }));
 			};
-			resizer.addEventListener("pointermove", move);
-			resizer.addEventListener("pointerup", up);
-			resizer.addEventListener("pointercancel", up);
+			// On the window: the drag follows the pointer even when the capture is not given.
+			window.addEventListener("pointermove", move);
+			window.addEventListener("pointerup", up);
+			window.addEventListener("pointercancel", up);
 		});
 		resizer.addEventListener("keydown", (event) => {
 			const grow = { left: "ArrowRight", right: "ArrowLeft", bottom: "ArrowUp" }[dock];
