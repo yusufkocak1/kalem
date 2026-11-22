@@ -565,13 +565,15 @@ test("folds a narrow window's ribbon groups into buttons, and has a simplified r
 	await expect(panel.locator(".ribbon-group[data-folded]")).toHaveCount(0);
 
 	// The simplified ribbon: no group names, shorter; kept in the settings.
-	const height = await page.locator(".ribbon").evaluate((ribbon) => ribbon.offsetHeight);
+	const height = await page
+		.locator(".ribbon")
+		.evaluate((ribbon) => (ribbon as HTMLElement).offsetHeight);
 	await page.locator(".ribbon-simplify").click();
 	await expect(page.locator(".ribbon")).toHaveAttribute("data-simple", "");
 	await expect(panel.locator(".ribbon-group-label").first()).toBeHidden();
-	expect(await page.locator(".ribbon").evaluate((ribbon) => ribbon.offsetHeight)).toBeLessThan(
-		height,
-	);
+	expect(
+		await page.locator(".ribbon").evaluate((ribbon) => (ribbon as HTMLElement).offsetHeight),
+	).toBeLessThan(height);
 	await expect
 		.poll(async () => JSON.parse(await readFile(join(userData, "settings.json"), "utf8")).settings)
 		.toMatchObject({ ribbonSimple: true });
