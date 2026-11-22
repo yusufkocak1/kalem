@@ -11794,6 +11794,9 @@ h3.mode-panel-name {
 /* --- Start page: ways to begin and recent documents, under an empty page ---- */
 
 .start-page {
+	/* In line with the document's text: the editor keeps the same room at its
+	   left for the block handles (`.kalem-ui` in @kalem-editor/themes). */
+	margin-inline-start: 2.75rem;
 	margin-top: 3em;
 	padding-top: 1.75em;
 	border-top: 1px solid var(--app-border);
@@ -11821,8 +11824,15 @@ h3.mode-panel-name {
 
 .start-actions {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: 8px;
+	max-width: 40rem;
+}
+
+/* An odd number of ways to start (five; six with Jira): the first, a template,
+   takes the whole row, so no row is left with a hole. */
+.start-action:first-child:nth-last-child(odd) {
+	grid-column: 1 / -1;
 }
 
 .start-action {
