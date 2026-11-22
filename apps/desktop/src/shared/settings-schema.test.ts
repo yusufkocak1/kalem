@@ -130,6 +130,7 @@ describe("resetPatch", () => {
 			zoom: DEFAULT_SETTINGS.zoom,
 			fullWidth: DEFAULT_SETTINGS.fullWidth,
 			lineNumbers: DEFAULT_SETTINGS.lineNumbers,
+			ribbonSimple: DEFAULT_SETTINGS.ribbonSimple,
 			codeLineNumbers: DEFAULT_SETTINGS.codeLineNumbers,
 		});
 		const panels = resetPatch("panels");

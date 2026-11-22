@@ -1406,6 +1406,16 @@ verir.
 **Düzenleme**
 
 - Şerit: Giriş / Ekle / Görünüm sekmeleri, stil galerisi, hızlı erişim.
+  - **Dar pencerede tek satır:** şerit hiçbir zaman ikinci satıra kırılmaz.
+    Önce düğmelerin yazıları düşer (ipucunda ve ekran okuyucuda kalır),
+    yetmezse gruplar birer birer tek bir düğmeye katlanır ("Paragraf ▾");
+    düğme grubun bütün düğmelerini altında açar, oradan çalıştırılan komut
+    onu kapatır (`Esc` de). Giriş'te önce Pano katlanır; iki simgelik
+    Düzenleme gibi katlanınca daralmayacak gruplar katlanmaz. Bundan da
+    dar bir pencerede satır yana kayar.
+  - **Sade şerit** (`Ctrl+F1`, **Görünüm → Sade Şerit** ya da şeridin sağ
+    altındaki ok): grup adları gizlenir, şerit tek satır kalır ve belgeye
+    daha çok yer açılır. Seçim saklanır.
 - Tabloda **Tab** sonraki, **Shift+Tab** önceki hücreye geçer ve içeriğini
   seçer (yazınca değişir); son hücrede Tab yeni bir satır ekler.
 - İmleç tablodayken **Tablo** sekmesi: satır/sütun ekleme-silme, hizalama,

@@ -310,6 +310,23 @@ export const SETTINGS_SCHEMA: Schema = {
 		],
 		assistant: "write",
 	},
+	ribbonSimple: {
+		key: "ribbonSimple",
+		category: "appearance",
+		label: "ribbonSimple",
+		type: "boolean",
+		keywords: [
+			"şerit",
+			"ribbon",
+			"sade",
+			"simple",
+			"simplified",
+			"basit",
+			"araç çubuğu",
+			"toolbar",
+		],
+		assistant: "write",
+	},
 	codeLineNumbers: {
 		key: "codeLineNumbers",
 		category: "appearance",

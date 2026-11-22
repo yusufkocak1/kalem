@@ -469,6 +469,13 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 				},
 				{ label: t.typographyOpen, click: send(ctx, "typography") },
 				{
+					label: t.ribbonSimple,
+					type: "checkbox",
+					accelerator: "CmdOrCtrl+F1",
+					checked: settings.ribbonSimple,
+					click: () => ctx.changeSettings({ ribbonSimple: !settings.ribbonSimple }),
+				},
+				{
 					label: t.lineNumbersDocuments,
 					type: "checkbox",
 					checked: settings.lineNumbers,

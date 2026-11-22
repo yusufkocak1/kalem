@@ -338,6 +338,8 @@ export function createAppRibbon(
 			groups: [
 				{
 					label: t.groupClipboard,
+					// Folds second: Ctrl+V, X and C are what most use.
+					rank: -1,
 					items: [
 						{
 							id: "paste",
@@ -423,6 +425,8 @@ export function createAppRibbon(
 				},
 				{
 					label: t.groupEditing,
+					// Folds first: Ctrl+F and Ctrl+H reach it without the ribbon.
+					rank: -2,
 					items: [
 						{
 							id: "find",
@@ -812,5 +816,11 @@ export function createAppRibbon(
 		},
 		tabs: ribbonTabs,
 		trailing,
+		simplify: {
+			simpleLabel: t.ribbonSimple,
+			fullLabel: t.ribbonFull,
+			shortcut: `${MOD}+F1`,
+			toggle: () => ctx.updateSettings({ ribbonSimple: !ctx.settings().ribbonSimple }),
+		},
 	});
 }

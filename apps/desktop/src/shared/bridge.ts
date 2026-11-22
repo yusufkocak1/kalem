@@ -90,6 +90,8 @@ export interface Settings extends Typography {
 	readonly lineNumbers: boolean;
 	/** Line numbers beside a text or code file, and beside a document in source mode. */
 	readonly codeLineNumbers: boolean;
+	/** The simplified ribbon: one row of buttons, the groups' names left out (Ctrl+F1). */
+	readonly ribbonSimple: boolean;
 	readonly navigation: boolean;
 	readonly autoSave: boolean;
 	readonly spellCheck: boolean;
@@ -191,6 +193,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	fullWidth: false,
 	lineNumbers: false,
 	codeLineNumbers: true,
+	ribbonSimple: false,
 	...DEFAULT_TYPOGRAPHY,
 	navigation: true,
 	autoSave: false,

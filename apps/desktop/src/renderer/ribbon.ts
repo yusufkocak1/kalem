@@ -27,6 +27,12 @@ export type RibbonItem = RibbonButton | RibbonWidget | { readonly kind: "separat
 export interface RibbonGroup {
 	readonly label: string;
 	readonly items: readonly RibbonItem[];
+	/**
+	 * When the window is too narrow for the tab, groups fold one by one into a
+	 * button that opens them: the lowest rank first, and of equal ranks the one
+	 * furthest right. 0 when not given.
+	 */
+	readonly rank?: number;
 }
 
 export interface RibbonTab {
@@ -44,11 +50,20 @@ export interface RibbonOptions {
 	readonly tabs: readonly RibbonTab[];
 	/** Placed at the right end of the tab row. */
 	readonly trailing?: HTMLElement;
+	/** The button that switches between the full ribbon and the simplified one (one row, no group names). */
+	readonly simplify?: {
+		readonly simpleLabel: string;
+		readonly fullLabel: string;
+		readonly shortcut: string;
+		toggle(): void;
+	};
 }
 
 export interface Ribbon {
 	readonly element: HTMLElement;
 	update(): void;
+	/** The simplified ribbon: one row of buttons, no group names under them. */
+	setSimple(simple: boolean): void;
 	selectTab(id: string): void;
 	selectedTab(): string;
 }
@@ -56,6 +71,16 @@ export interface Ribbon {
 interface BuiltButton {
 	readonly element: HTMLButtonElement;
 	readonly button: RibbonButton;
+}
+
+/** A group of a tab, and the button it folds into. */
+interface BuiltGroup {
+	readonly element: HTMLElement;
+	readonly items: HTMLElement;
+	readonly label: HTMLElement;
+	readonly fold: HTMLButtonElement;
+	readonly rank: number;
+	readonly index: number;
 }
 
 // Ribbon controls must not take focus on mousedown, or the editor selection
@@ -116,7 +141,67 @@ export function createRibbon(container: HTMLElement, options: RibbonOptions): Ri
 
 	const tabList = el("div", { class: "ribbon-tabs", attrs: { role: "tablist" } });
 	const panels = el("div", { class: "ribbon-panels" });
-	const tabs = new Map<string, { tab: HTMLButtonElement; panel: HTMLElement }>();
+	const tabs = new Map<
+		string,
+		{ tab: HTMLButtonElement; panel: HTMLElement; groups: readonly BuiltGroup[] }
+	>();
+
+	// --- A folded group's buttons, opened under its button ------------------------
+	const foldPopup = el("div", { class: "ribbon-fold-popup", attrs: { role: "group", hidden: "" } });
+	document.body.append(foldPopup);
+	let opened: BuiltGroup | null = null;
+
+	function closeFold(): void {
+		if (opened === null) return;
+		const group = opened;
+		opened = null;
+		group.element.insertBefore(group.items, group.label);
+		group.fold.setAttribute("aria-expanded", "false");
+		foldPopup.hidden = true;
+		foldPopup.removeAttribute("aria-label");
+	}
+
+	function openFold(group: BuiltGroup): void {
+		closeFold();
+		opened = group;
+		foldPopup.setAttribute("aria-label", group.label.textContent ?? "");
+		foldPopup.replaceChildren(group.items);
+		foldPopup.hidden = false;
+		group.fold.setAttribute("aria-expanded", "true");
+		const box = group.fold.getBoundingClientRect();
+		const width = foldPopup.offsetWidth;
+		foldPopup.style.left = `${Math.max(4, Math.min(box.left, window.innerWidth - width - 4))}px`;
+		foldPopup.style.top = `${box.bottom + 4}px`;
+	}
+
+	// A command run from it closes it; a button that opens a picker of its own leaves it open.
+	foldPopup.addEventListener("click", (event) => {
+		const target = event.target instanceof Element ? event.target.closest("button") : null;
+		if (target === null || target.hasAttribute("aria-haspopup")) return;
+		if (target.closest(".table-picker, .color-menu") !== null) {
+			requestAnimationFrame(closeFold);
+			return;
+		}
+		if (target.matches(".ribbon-button, .ribbon-style, .ribbon-swatch"))
+			requestAnimationFrame(closeFold);
+	});
+	document.addEventListener(
+		"mousedown",
+		(event) => {
+			if (opened === null) return;
+			const target = event.target as Node;
+			if (foldPopup.contains(target) || opened.fold.contains(target)) return;
+			closeFold();
+		},
+		true,
+	);
+	document.addEventListener("keydown", (event) => {
+		if (event.key !== "Escape" || opened === null) return;
+		const fold = opened.fold;
+		closeFold();
+		fold.focus();
+	});
+	window.addEventListener("resize", closeFold);
 	let selected = options.tabs[0]?.id ?? "";
 
 	for (const definition of options.tabs) {
@@ -140,7 +225,8 @@ export function createRibbon(container: HTMLElement, options: RibbonOptions): Ri
 			attrs: { role: "tabpanel", id: `panel-${definition.id}`, "aria-labelledby": tab.id },
 		});
 
-		for (const group of definition.groups) {
+		const built: BuiltGroup[] = [];
+		for (const [index, group] of definition.groups.entries()) {
 			const items = el("div", { class: "ribbon-items" });
 			for (const item of group.items) {
 				if (item.kind === "separator") {
@@ -152,23 +238,34 @@ export function createRibbon(container: HTMLElement, options: RibbonOptions): Ri
 					items.append(addButton(item));
 				}
 			}
-			panel.append(
-				el("div", {
-					class: "ribbon-group",
-					attrs: { role: "group", "aria-label": group.label },
-					children: [
-						items,
-						el("div", {
-							class: "ribbon-group-label",
-							text: group.label,
-							attrs: { "aria-hidden": "true" },
-						}),
-					],
-				}),
-			);
+			const label = el("div", {
+				class: "ribbon-group-label",
+				text: group.label,
+				attrs: { "aria-hidden": "true" },
+			});
+			const fold = el("button", {
+				class: "ribbon-group-fold",
+				attrs: {
+					type: "button",
+					"aria-haspopup": "true",
+					"aria-expanded": "false",
+					title: group.label,
+				},
+				children: [el("span", { text: group.label }), icon("chevron")],
+			});
+			keepSelection(fold);
+			const element = el("div", {
+				class: "ribbon-group",
+				attrs: { role: "group", "aria-label": group.label },
+				children: [fold, items, label],
+			});
+			const entry: BuiltGroup = { element, items, label, fold, rank: group.rank ?? 0, index };
+			fold.addEventListener("click", () => (opened === entry ? closeFold() : openFold(entry)));
+			built.push(entry);
+			panel.append(element);
 		}
 
-		tabs.set(definition.id, { tab, panel });
+		tabs.set(definition.id, { tab, panel, groups: built });
 		tabList.append(tab);
 		panels.append(panel);
 	}
@@ -188,6 +285,7 @@ export function createRibbon(container: HTMLElement, options: RibbonOptions): Ri
 
 	function selectTab(id: string): void {
 		if (!tabs.has(id)) return;
+		closeFold();
 		selected = id;
 		for (const [tabId, { tab, panel }] of tabs) {
 			const active = tabId === id;
@@ -199,24 +297,58 @@ export function createRibbon(container: HTMLElement, options: RibbonOptions): Ri
 	}
 
 	/**
-	 * A narrow window: the shown tab's buttons drop their labels (kept for
-	 * screen readers and in the tooltip) before its groups wrap onto a
-	 * second row; they come back once there is room.
+	 * A narrow window: the shown tab never takes a second row. Its buttons
+	 * drop their labels first (kept for screen readers and in the tooltip);
+	 * then its groups fold, one by one, each into a button that opens it
+	 * (`rank`). They come back once there is room; a window too narrow for
+	 * even that scrolls the row sideways.
 	 */
 	function fit(): void {
-		const panel = tabs.get(selected)?.panel;
-		if (panel === undefined || !panel.isConnected) return;
-		const wraps = (): boolean => {
-			const tops = new Set<number>();
-			for (const group of panel.children) {
-				tops.add(Math.round((group as HTMLElement).offsetTop));
-			}
-			return tops.size > 1;
-		};
+		const shown = tabs.get(selected);
+		if (shown === undefined || !shown.panel.isConnected) return;
+		const { panel, groups } = shown;
+		closeFold();
+		const overflows = (): boolean => panel.scrollWidth > panel.clientWidth + 1;
 		delete panel.dataset.compact;
-		if (wraps()) panel.dataset.compact = "";
+		for (const group of groups) delete group.element.dataset.folded;
+		if (!overflows()) return;
+		panel.dataset.compact = "";
+		const order = [...groups].sort((a, b) => a.rank - b.rank || b.index - a.index);
+		for (const group of order) {
+			if (!overflows()) return;
+			// A group of two icons is narrower than its name: folding it would not help.
+			const before = group.element.offsetWidth;
+			group.element.dataset.folded = "";
+			if (group.element.offsetWidth >= before) delete group.element.dataset.folded;
+		}
 	}
 	new ResizeObserver(() => fit()).observe(panels);
+
+	const simplify =
+		options.simplify === undefined
+			? null
+			: el("button", {
+					class: "ribbon-simplify",
+					attrs: { type: "button", "data-command": "ribbon-simple" },
+					children: [icon("chevron")],
+				});
+	if (simplify !== null && options.simplify !== undefined) {
+		const toggle = options.simplify.toggle;
+		keepSelection(simplify);
+		simplify.addEventListener("click", () => toggle());
+		panels.append(simplify);
+	}
+
+	function setSimple(simple: boolean): void {
+		element.toggleAttribute("data-simple", simple);
+		if (simplify !== null && options.simplify !== undefined) {
+			const label = simple ? options.simplify.fullLabel : options.simplify.simpleLabel;
+			simplify.title = `${label} (${options.simplify.shortcut})`;
+			simplify.setAttribute("aria-label", label);
+			simplify.setAttribute("aria-pressed", String(simple));
+		}
+		fit();
+	}
 
 	function update(): void {
 		for (const definition of options.tabs) {
@@ -249,9 +381,10 @@ export function createRibbon(container: HTMLElement, options: RibbonOptions): Ri
 	container.append(element);
 
 	selectTab(selected);
+	setSimple(false);
 	update();
 
-	return { element, update, selectTab, selectedTab: () => selected };
+	return { element, update, setSimple, selectTab, selectedTab: () => selected };
 }
 
 // --- Style gallery ----------------------------------------------------------

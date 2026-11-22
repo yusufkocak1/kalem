@@ -530,6 +530,58 @@ for (const language of ["en", "tr"]) {
 	});
 }
 
+test("folds a narrow window's ribbon groups into buttons, and has a simplified ribbon", async () => {
+	const folder = await tempDir("ribbon-fold");
+	const path = join(folder, "belge.md");
+	await writeFile(path, "Bir paragraf.\n");
+	const { app, page, userData, errors } = await launch({ args: [path] });
+	await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(760, 700));
+	const panel = page.locator("#panel-home");
+	await expect(panel.locator(".ribbon-group[data-folded]").first()).toBeVisible();
+	const tops = await panel
+		.locator(".ribbon-group")
+		.evaluateAll((groups) => groups.map((group) => Math.round(group.getBoundingClientRect().top)));
+	expect(new Set(tops).size).toBe(1);
+
+	// A folded group opens under its button; a command run from it closes it.
+	const paragraph = panel.locator('.ribbon-group[aria-label="Paragraph"]');
+	await expect(paragraph).toHaveAttribute("data-folded", "");
+	await page.locator("#editor p").first().click();
+	await paragraph.locator(".ribbon-group-fold").click();
+	const popup = page.locator(".ribbon-fold-popup");
+	await expect(popup).toBeVisible();
+	await popup.locator('[data-command="bullet-list"]').click();
+	await expect(page.locator("#editor ul li")).toHaveText("Bir paragraf.");
+	await expect(popup).toBeHidden();
+	// Escape closes it too, and its buttons go back into the group.
+	await paragraph.locator(".ribbon-group-fold").click();
+	await expect(popup).toBeVisible();
+	await page.keyboard.press("Escape");
+	await expect(popup).toBeHidden();
+	await expect(paragraph.locator('[data-command="bullet-list"]')).toHaveCount(1);
+
+	// Wide again, nothing is folded.
+	await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setSize(1440, 900));
+	await expect(panel.locator(".ribbon-group[data-folded]")).toHaveCount(0);
+
+	// The simplified ribbon: no group names, shorter; kept in the settings.
+	const height = await page.locator(".ribbon").evaluate((ribbon) => ribbon.offsetHeight);
+	await page.locator(".ribbon-simplify").click();
+	await expect(page.locator(".ribbon")).toHaveAttribute("data-simple", "");
+	await expect(panel.locator(".ribbon-group-label").first()).toBeHidden();
+	expect(await page.locator(".ribbon").evaluate((ribbon) => ribbon.offsetHeight)).toBeLessThan(
+		height,
+	);
+	await expect
+		.poll(async () => JSON.parse(await readFile(join(userData, "settings.json"), "utf8")).settings)
+		.toMatchObject({ ribbonSimple: true });
+	await clickMenu(app, "View", "Simplified Ribbon");
+	await expect(page.locator(".ribbon")).not.toHaveAttribute("data-simple", "");
+	expect(errors).toEqual([]);
+	await stubMessageBox(app, 1);
+	await app.close();
+});
+
 test("removes the loading screen once the editor is ready", async () => {
 	const { app, page, errors } = await launch();
 	await expect(page.locator("#editor")).toBeVisible();

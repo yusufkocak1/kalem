@@ -1323,7 +1323,11 @@ function fitSidePanes(): void {
 }
 window.addEventListener("resize", fitSidePanes);
 
+/** The ribbon's simplified look; set once the ribbon is built, after the first settings. */
+let setRibbonSimple: ((simple: boolean) => void) | null = null;
+
 function applySettings(): void {
+	setRibbonSimple?.(settings.ribbonSimple);
 	pageSetup.textContent = pageRule(settings);
 	paletteStyle.textContent = paletteCss(settings.palette, settings.paletteCustom);
 	app.style.setProperty("--zoom", String(settings.zoom / 100));
@@ -1647,6 +1651,8 @@ const ribbon = createAppRibbon(ribbonHost, ribbonTrailing, {
 	edit,
 	editTable,
 });
+setRibbonSimple = ribbon.setSimple;
+ribbon.setSimple(settings.ribbonSimple);
 
 // The editor reports no selection inside code blocks, so moving into or between
 // them would not refresh the contextual Code tab.
