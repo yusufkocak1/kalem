@@ -1197,6 +1197,12 @@ function openDocument({ tabId, payload, view }: TabDocument): void {
 	if (view !== undefined && view.scroll > 0) tab.pendingScroll = view.scroll;
 	tab.showStart();
 	activateTab(tabId);
+	// Into the active tab too (an empty one a document replaces): the headings
+	// pane is as the new document wants it at once, not after typing's pause,
+	// so the page does not move a moment after it is shown.
+	clearTimeout(foldTimer);
+	foldEmptyOutline();
+	fitSidePanes();
 	tab.session.focus();
 }
 
