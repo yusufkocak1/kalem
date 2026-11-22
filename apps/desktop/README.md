@@ -1472,6 +1472,10 @@ verir.
   kaynağı kipinde numaralar başta açıktır, **Görünüm → Metin Dosyalarında ve
   Kaynak Kipinde Satır Numaraları** ile ayrıca kapatılır. Şeritteki düğme
   bulunduğunuz yerinkini (belge ya da metin/kaynak) açıp kapatır.
+- Paragraflar, liste maddeleri, alıntılar ve tablo hücreleri son satırda
+  tek bir kelime bırakmayacak biçimde satırlara bölünür; başlıkların
+  satırları eşit uzunlukta tutulur. Yalnızca görünüm değişir, Markdown
+  dosyasındaki satırlar değişmez.
 - İmlecin olduğu blok, sol kenar boşluğunda ince bir çizgiyle gösterilir;
   çevresine kutu çizilmez, metin yerinden oynamaz. Yazdırırken ve PDF'te
   çizgi çıkmaz.

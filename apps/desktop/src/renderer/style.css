@@ -4077,6 +4077,16 @@ button.git-file-path {
 }
 
 /*
+ * Running text avoids a last line of one word, and evens out the lines before
+ * it (Chromium looks at a paragraph's last few lines only, so it stays cheap
+ * while typing). Headings are balanced already by the theme (viewer.css).
+ * The page, and the Text & Paragraph panel's preview of it.
+ */
+.kalem-doc :is(p, li, blockquote, td, th) {
+	text-wrap: pretty;
+}
+
+/*
  * The block the caret is in: a thin mark in the margin at its left, not a box
  * around it, which made a heading or an empty first line look like a form's
  * field. Drawn as a border image on a border of no width, outside the block,
