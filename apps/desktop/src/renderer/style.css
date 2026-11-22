@@ -4076,11 +4076,23 @@ button.git-file-path {
 	box-shadow: none;
 }
 
-/* Quieter than the library default: on a page the caret already shows where you are. */
+/*
+ * The block the caret is in: a thin mark in the margin at its left, not a box
+ * around it, which made a heading or an empty first line look like a form's
+ * field. Drawn as a border image on a border of no width, outside the block,
+ * so the text does not move by a pixel.
+ */
 .kalem-editor > [contenteditable="true"]:focus,
 .kalem-editor > [contenteditable="true"]:focus-visible {
-	outline: 1px solid color-mix(in srgb, var(--kalem-accent) 22%, transparent);
-	outline-offset: 4px;
+	outline: none;
+	border-style: solid;
+	border-width: 0;
+	border-image:
+		linear-gradient(
+			color-mix(in srgb, var(--kalem-accent) 55%, transparent),
+			color-mix(in srgb, var(--kalem-accent) 55%, transparent)
+		)
+		1 / 0 0 0 2px / 0 0 0 12px stretch;
 }
 
 /* The library pins this panel to the editor's top edge, which scrolls under the ribbon. */
@@ -4247,6 +4259,7 @@ button.git-file-path {
 
 	.kalem-editor > [contenteditable="true"]:focus {
 		outline: none;
+		border-image: none;
 	}
 
 	.kalem-editor {

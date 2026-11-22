@@ -1464,6 +1464,9 @@ verir.
   kaynağı kipinde numaralar başta açıktır, **Görünüm → Metin Dosyalarında ve
   Kaynak Kipinde Satır Numaraları** ile ayrıca kapatılır. Şeritteki düğme
   bulunduğunuz yerinkini (belge ya da metin/kaynak) açıp kapatır.
+- İmlecin olduğu blok, sol kenar boşluğunda ince bir çizgiyle gösterilir;
+  çevresine kutu çizilmez, metin yerinden oynamaz. Yazdırırken ve PDF'te
+  çizgi çıkmaz.
 - Klavyeyle odaklanılan her düğme, kutu ve liste öğesi aynı odak halkasını
   gösterir: seçilen paletin vurgu renginde, 2 px. Kendi halkası olmayan bir
   denetim de tarayıcının varsayılanına (Linux'ta turuncu) düşmez.
