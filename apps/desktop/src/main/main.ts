@@ -19,6 +19,7 @@ import { format, pickLanguage, stringsFor } from "../shared/i18n.js";
 import { quickNoteName } from "../shared/notes.js";
 import { isPaneShown, revealPane } from "../shared/panes.js";
 import { isEditablePath, isPackagePath, isProgramPath, uncShare } from "../shared/paths.js";
+import { watchSystemAccent } from "./accent.js";
 import { ChatStore } from "./assistant-chats.js";
 import { AssistantStore } from "./assistant-store.js";
 import { confluenceClient } from "./confluence-ipc.js";
@@ -320,6 +321,11 @@ function start(): void {
 			});
 		}
 	}
+
+	// The system's accent, for the windows that take it (`accentSource`).
+	watchSystemAccent((accent) => {
+		for (const win of windows.all()) win.window.webContents.send(CHANNEL.systemAccent, accent);
+	});
 
 	const workspaceChanged = (): void => {
 		for (const win of windows.all()) win.window.webContents.send(CHANNEL.workspaceChange);

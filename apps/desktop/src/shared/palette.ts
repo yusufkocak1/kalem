@@ -312,3 +312,75 @@ function editorVariables(colors: PaletteColors, dark: boolean): string {
 	];
 	return lines.map(([name, value]) => `\t${name}: ${value};`).join("\n");
 }
+
+/** How far apart two colours are to the eye, as WCAG counts it: 1 to 21. */
+export function contrast(a: string, b: string): number {
+	const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
+	return (light + 0.05) / (dark + 0.05);
+}
+
+function mixHex(a: string, b: string, share: number): string {
+	const channel = (hex: string, offset: number): number =>
+		Number.parseInt(hex.slice(offset, offset + 2), 16);
+	const parts = [1, 3, 5].map((offset) =>
+		Math.round(channel(a, offset) * (1 - share) + channel(b, offset) * share)
+			.toString(16)
+			.padStart(2, "0"),
+	);
+	return `#${parts.join("")}`;
+}
+
+/**
+ * The system's accent made to read on a theme: darkened on a light one,
+ * lightened on a dark one, step by step, until it stands 4.5:1 from both the
+ * page and the panels (a link, a selected tab, a button's own colour).
+ */
+export function fitAccent(accent: string, colors: PaletteColors, dark: boolean): string {
+	const toward = dark ? "#ffffff" : "#000000";
+	let fitted = accent;
+	for (let step = 1; step <= 20; step++) {
+		if (Math.min(contrast(fitted, colors.page), contrast(fitted, colors.surface)) >= 4.5) break;
+		fitted = mixHex(accent, toward, step * 0.05);
+	}
+	return fitted;
+}
+
+/** The accent's own variables, for one theme. */
+function accentVariables(accent: string, colors: PaletteColors, dark: boolean): string {
+	const mix = (a: string, share: number, b: string): string =>
+		`color-mix(in srgb, ${a} ${share}%, ${b})`;
+	const lines: [string, string][] = [
+		["--app-accent", accent],
+		["--app-accent-text", textOn(accent)],
+		["--app-pressed", mix(accent, dark ? 18 : 13, "transparent")],
+		["--app-info-bg", mix(accent, dark ? 16 : 10, colors.surface)],
+	];
+	return lines.map(([name, value]) => `\t${name}: ${value};`).join("\n");
+}
+
+/**
+ * The CSS that puts the system's accent on the app over the palette, fitted
+ * to each theme (`accentSource`); empty without one. After the palette's CSS.
+ */
+export function systemAccentCss(
+	accent: string | null,
+	choice: PaletteChoice,
+	custom: PaletteTheme,
+): string {
+	if (accent === null) return "";
+	const { light, dark } = paletteColors(choice, custom);
+	const lightAccent = fitAccent(accent, light, false);
+	const darkAccent = fitAccent(accent, dark, true);
+	const editor = (value: string): string =>
+		`\t--kalem-accent: ${value};\n\t--kalem-accent-fg: ${textOn(value)};`;
+	return [
+		"@media screen {",
+		`:root {\n${accentVariables(lightAccent, light, false)}\n}`,
+		`${EDITOR_SURFACES} {\n${editor(lightAccent)}\n}`,
+		"}",
+		"@media screen and (prefers-color-scheme: dark) {",
+		`:root {\n${accentVariables(darkAccent, dark, true)}\n}`,
+		`${EDITOR_SURFACES} {\n${editor(darkAccent)}\n}`,
+		"}",
+	].join("\n");
+}

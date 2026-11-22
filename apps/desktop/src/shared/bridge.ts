@@ -103,6 +103,10 @@ export interface Settings extends Typography {
 	 * window takes it when it opens; elsewhere it does nothing.
 	 */
 	readonly windowMaterial: boolean;
+	/** How close together the app's controls are: rows, buttons, lists. */
+	readonly density: Density;
+	/** The accent: the palette's, or the system's (Windows, macOS), fitted to the theme. */
+	readonly accentSource: AccentSource;
 	/** In focus mode, the line being written is kept at the middle of the view, as on a typewriter. */
 	readonly typewriterScroll: boolean;
 	/** Whom the app was set up for (the first start's question); `""` until asked. */
@@ -215,6 +219,8 @@ export const DEFAULT_SETTINGS: Settings = {
 	ribbonSimple: false,
 	tabsInTitleBar: true,
 	windowMaterial: true,
+	density: "standard",
+	accentSource: "palette",
 	typewriterScroll: true,
 	role: "",
 	...DEFAULT_TYPOGRAPHY,
@@ -567,12 +573,17 @@ export interface Startup {
 	 * Windows 11, vibrancy on macOS; `null` when the window has none.
 	 */
 	readonly material: WindowMaterial;
+	/** The system's accent colour (`#rrggbb`); `null` where it has none (Linux). */
+	readonly systemAccent: string | null;
 	/** The app's first start on this computer: the window offers to set it up for its user. */
 	readonly firstRun: boolean;
 }
 
 export type TitleBar = "overlay" | "inset" | null;
 export type WindowMaterial = "mica" | "vibrancy" | null;
+export const DENSITIES = ["compact", "standard", "comfortable"] as const;
+export type Density = (typeof DENSITIES)[number];
+export type AccentSource = "palette" | "system";
 
 /** Whom the app is set up for: the ribbon, the panes and the line numbers follow. */
 export type UserRole = "writer" | "analyst" | "developer";
@@ -1048,6 +1059,8 @@ export interface KalemBridge {
 	tabActivated(tabId: string): void;
 	/** The title bar's colours, for the system's window buttons drawn over it. */
 	titleBarColors(color: string, symbolColor: string): void;
+	/** The system's accent changed (`#rrggbb`, or `null` where there is none). */
+	onSystemAccent(handler: (accent: string | null) => void): () => void;
 	/** The assistant started or finished an answer: the taskbar shows it, and a notification ends it. */
 	assistantActivity(busy: boolean): void;
 	/** The tab's text before the assistant changes it, kept in its version history. */
@@ -1323,6 +1336,7 @@ export const CHANNEL = {
 	reportState: "kalem:report-state",
 	tabActivated: "kalem:tab-activated",
 	titleBarColors: "kalem:title-bar-colors",
+	systemAccent: "kalem:system-accent",
 	assistantActivity: "kalem:assistant-activity",
 	assistantCheckpoint: "kalem:assistant-checkpoint",
 	confirmCloseTab: "kalem:confirm-close-tab",

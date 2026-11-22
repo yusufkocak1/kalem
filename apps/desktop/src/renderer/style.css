@@ -16183,3 +16183,104 @@ dialog {
 	}
 }
 
+/* --- Density (`density`): how close together the controls are ------------
+   Standard is the stylesheet's own; Compact and Comfortable change the rows
+   and buttons of the ribbon, the tabs, the panels' lists and the status bar.
+   The title bar keeps its height: the system's window buttons are as tall. */
+:root[data-density="compact"] .files-list {
+	--files-row: 21px;
+}
+
+:root[data-density="comfortable"] .files-list {
+	--files-row: 30px;
+}
+
+:root[data-density="compact"] .ribbon-top {
+	height: 28px;
+}
+
+:root[data-density="comfortable"] .ribbon-top {
+	height: 40px;
+}
+
+:root[data-density="compact"] .ribbon-panel {
+	min-height: 54px;
+	padding-top: 3px;
+}
+
+:root[data-density="comfortable"] .ribbon-panel {
+	min-height: 72px;
+	padding-top: 9px;
+}
+
+:root[data-density="compact"] :is(.ribbon-button, .ribbon-style) {
+	min-width: 26px;
+	height: 26px;
+}
+
+:root[data-density="comfortable"] :is(.ribbon-button, .ribbon-style) {
+	min-width: 36px;
+	height: 36px;
+}
+
+:root[data-density="compact"] .ribbon[data-simple] .ribbon-panel,
+:root[data-density="comfortable"] .ribbon[data-simple] .ribbon-panel {
+	min-height: 0;
+}
+
+:root[data-density="compact"] .ribbon-switch {
+	height: 26px;
+}
+
+:root[data-density="comfortable"] .ribbon-switch {
+	height: 36px;
+}
+
+:root[data-density="compact"] .doc-tab {
+	height: 25px;
+}
+
+:root[data-density="comfortable"] .doc-tab {
+	height: 32px;
+}
+
+:root[data-density="compact"] .title-bar .doc-tab[aria-selected="true"] {
+	height: 28px;
+}
+
+:root[data-density="comfortable"] .title-bar .doc-tab[aria-selected="true"] {
+	height: 34px;
+}
+
+:root[data-density="compact"] .kalem-outline-item {
+	padding-block: 2px;
+}
+
+:root[data-density="comfortable"] .kalem-outline-item {
+	padding-block: 7px;
+}
+
+:root[data-density="compact"] .stripe-button {
+	padding-block: 6px;
+}
+
+:root[data-density="comfortable"] .stripe-button {
+	padding-block: 11px;
+}
+
+:root[data-density="compact"] .statusbar {
+	height: 22px;
+}
+
+:root[data-density="comfortable"] .statusbar {
+	height: 32px;
+	font-size: 13px;
+}
+
+:root[data-density="compact"] .note-balloon {
+	padding-block: 4px;
+}
+
+:root[data-density="comfortable"] .note-balloon {
+	padding-block: 11px 10px;
+}

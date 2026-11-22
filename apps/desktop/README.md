@@ -288,6 +288,15 @@ verir.
   sayfanın çevresinden ve yan panellerden hafifçe görünür; sayfa opak kalır.
   Yüksek kontrastta kapalıdır; değişiklik yeni pencerelerde geçerlidir.
   Linux'ta ve eski Windows'ta bir şey değiştirmez.
+- **Yoğunluk** (**Görünüm → Yoğunluk**: Kompakt / Standart / Rahat): şeridin
+  satırları ve düğmeleri, sekmeler, Başlıklar ve Dosyalar listeleri, not
+  kartları ve durum çubuğu sıklaşır ya da ferahlar. Başlık çubuğu sistemin
+  pencere düğmeleriyle aynı yükseklikte kalır.
+- **Vurgu rengi** (**Görünüm → Vurgu Rengi**: Paletin / Sistemin): sistemin
+  vurgu rengi (Windows ve macOS ayarlarındaki renk) paletin yerine geçer ve
+  değişince hemen izlenir. Okunması için açık temada koyulaştırılır, koyu
+  temada açılır: sayfa ve panellerle en az 4,5:1 kontrastta kalır. Linux'ta
+  sistemin vurgu rengi okunamadığından paletin rengi kalır.
 - **Ana sayfa** (`Ctrl+Shift+H`, **Görünüm → Ana Sayfa**): boş ve adsız bir
   sekmenin başlangıç sayfasıdır; açık bir tane varsa ona geçilir, yoksa
   yenisi açılır. En üstte **Kaldığınız yerden devam edin** (en son açılan

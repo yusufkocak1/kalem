@@ -24,7 +24,7 @@ import { DIAGRAM_SUFFIX, serializeDiagram } from "../shared/diagram.js";
 import { keptProposals, placeProposals } from "../shared/edit-review.js";
 import { format, stringsFor } from "../shared/i18n.js";
 import { noteKey } from "../shared/local-notes.js";
-import { paletteCss } from "../shared/palette.js";
+import { paletteCss, systemAccentCss } from "../shared/palette.js";
 import type { ToolPane } from "../shared/panes.js";
 import { isPaneShown, revealPane, togglePane } from "../shared/panes.js";
 import {
@@ -1759,6 +1759,20 @@ function cycleTab(step: 1 | -1): void {
 const pageSetup = document.head.appendChild(document.createElement("style"));
 /** The colour palette's variables, after the stylesheet so that they win. */
 const paletteStyle = document.head.appendChild(document.createElement("style"));
+/** The system's accent over the palette's (`accentSource`), after it. */
+const accentStyle = document.head.appendChild(document.createElement("style"));
+let systemAccent = startup.systemAccent;
+function applyAccent(): void {
+	accentStyle.textContent =
+		settings.accentSource === "system"
+			? systemAccentCss(systemAccent, settings.palette, settings.paletteCustom)
+			: "";
+}
+bridge.onSystemAccent((accent) => {
+	systemAccent = accent;
+	applyAccent();
+	syncTitleBar();
+});
 
 /**
  * The headings pane with no heading to list gives its room to the page: its
@@ -1854,6 +1868,8 @@ function applySettings(): void {
 	setRibbonSimple?.(settings.ribbonSimple);
 	pageSetup.textContent = pageRule(settings);
 	paletteStyle.textContent = paletteCss(settings.palette, settings.paletteCustom);
+	applyAccent();
+	document.documentElement.dataset.density = settings.density;
 	app.style.setProperty("--zoom", String(settings.zoom / 100));
 	app.toggleAttribute("data-full-width", settings.fullWidth);
 	for (const [name, value] of Object.entries(typographyVars(settings))) {

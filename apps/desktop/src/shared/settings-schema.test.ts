@@ -134,6 +134,8 @@ describe("resetPatch", () => {
 			documentMap: DEFAULT_SETTINGS.documentMap,
 			tabsInTitleBar: DEFAULT_SETTINGS.tabsInTitleBar,
 			windowMaterial: DEFAULT_SETTINGS.windowMaterial,
+			density: DEFAULT_SETTINGS.density,
+			accentSource: DEFAULT_SETTINGS.accentSource,
 			ribbonSimple: DEFAULT_SETTINGS.ribbonSimple,
 			codeLineNumbers: DEFAULT_SETTINGS.codeLineNumbers,
 		});

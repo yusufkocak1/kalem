@@ -34,6 +34,7 @@ import {
 	stripExtension,
 	TEXT_EXTENSIONS,
 } from "../shared/paths.js";
+import { systemAccent } from "./accent.js";
 import type { ChatStore } from "./assistant-chats.js";
 import type { AssistantService } from "./assistant-ipc.js";
 import { registerAssistantIpc } from "./assistant-ipc.js";
@@ -206,6 +207,7 @@ export function registerIpc(ctx: IpcContext): void {
 			documentScheme: DOCUMENT_SCHEME,
 			titleBar: win.titleBar,
 			material: win.material,
+			systemAccent: systemAccent(),
 			firstRun: ctx.firstRun(),
 		};
 	});

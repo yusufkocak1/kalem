@@ -318,6 +318,35 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 		}),
 	);
 
+	const densities = (
+		[
+			["compact", t.densityCompact],
+			["standard", t.densityStandard],
+			["comfortable", t.densityComfortable],
+		] as const
+	).map(
+		([density, label]): MenuItemConstructorOptions => ({
+			label,
+			type: "radio",
+			checked: settings.density === density,
+			click: () => ctx.changeSettings({ density }),
+		}),
+	);
+
+	const accents = (
+		[
+			["palette", t.accentPalette],
+			["system", t.accentSystem],
+		] as const
+	).map(
+		([accentSource, label]): MenuItemConstructorOptions => ({
+			label,
+			type: "radio",
+			checked: settings.accentSource === accentSource,
+			click: () => ctx.changeSettings({ accentSource }),
+		}),
+	);
+
 	const languages = (
 		[
 			[null, t.languageSystem],
@@ -516,6 +545,8 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 				},
 				{ type: "separator" },
 				{ label: t.theme, submenu: themes },
+				{ label: t.density, submenu: densities },
+				{ label: t.accentSource, submenu: accents },
 				{ label: t.language, submenu: languages },
 				{ type: "separator" },
 				{

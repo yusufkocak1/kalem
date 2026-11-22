@@ -113,6 +113,7 @@ const bridge: KalemBridge = {
 	assistantCheckpoint: (tabId, text) => ipcRenderer.send(CHANNEL.assistantCheckpoint, tabId, text),
 	titleBarColors: (color, symbolColor) =>
 		ipcRenderer.send(CHANNEL.titleBarColors, color, symbolColor),
+	onSystemAccent: (handler) => listen<[string | null]>(CHANNEL.systemAccent, handler),
 	confirmCloseTab: (tabId) => ipcRenderer.invoke(CHANNEL.confirmCloseTab, tabId),
 	tabClosed: (tabId) => ipcRenderer.send(CHANNEL.tabClosed, tabId),
 	answerSave: (tabId, saved) => ipcRenderer.send(CHANNEL.answerSave, tabId, saved),
