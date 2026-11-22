@@ -313,6 +313,11 @@ verir.
     kalır.
   - Kaydedilmemiş yeni bir belgedeki notlar, belge ilk kez kaydedilince
     onunla birlikte saklanır.
+- **Başlıklar paneli boşken yer kaplamaz:** etkin belgede listelenecek
+  başlık yoksa (yeni bir belge, bir metin dosyası) panelin yuvası katlanır,
+  sayfa ortada kalır; ilk başlık yazılınca, yazmaya ara verildiğinde geri
+  açılır. Ayar değişmez. Panelin kenardaki düğmesi onu o sekme için yine
+  açar.
 - **Okunan yer korunur:** tam genişlik, yakınlaştırma, odak modu, panel
   açıp kapama ve pencere boyutu satırları yeniden kırar. Uygulama okunan
   bloğu (imlecin olduğu blok, imleç görünmüyorsa ekranın üçte birindeki

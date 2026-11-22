@@ -7571,6 +7571,14 @@ pre[data-confluence-kind="layout"]::before {
 	min-width: min(360px, 45vw);
 }
 
+/* Folded while the document has no heading for the headings pane in it
+   (`foldEmptyOutline` in main.ts); the pane's button opens it all the same. */
+.app[data-fold="left"] .tool-dock.dock-left,
+.app[data-fold="right"] .tool-dock.dock-right,
+.app[data-fold="bottom"] .tool-dock.dock-bottom {
+	display: none;
+}
+
 /* Squeezed out by a window too narrow for them (`fitSidePanes` in main.ts); their stripe buttons stay. */
 .app[data-squeeze~="left"] .tool-dock.dock-left,
 .app[data-squeeze~="right"] .tool-dock.dock-right {

@@ -36,6 +36,12 @@ export interface DocksOptions {
 	available(pane: ToolPane): boolean;
 	/** Opens the settings at the panels. */
 	openLayout(): void;
+	/**
+	 * A pane whose dock is folded for now (the headings pane of a document
+	 * without headings): a click on its button opens it rather than closing
+	 * it, and nothing is saved. True when it did.
+	 */
+	reveal?(pane: ToolPane): boolean;
 }
 
 export interface Docks {
@@ -288,9 +294,10 @@ export function createDocks(options: DocksOptions): Docks {
 			},
 			children: [icon(pane.icon), el("span", { class: "stripe-label", text: pane.label })],
 		});
-		button.addEventListener("click", () =>
-			options.update(togglePane(options.settings(), pane.id, options.available)),
-		);
+		button.addEventListener("click", () => {
+			if (options.reveal?.(pane.id) === true) return;
+			options.update(togglePane(options.settings(), pane.id, options.available));
+		});
 		menuOn(button, pane.id);
 		return button;
 	}

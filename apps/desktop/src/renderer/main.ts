@@ -2,6 +2,7 @@ import type { Root } from "@kalem-editor/core";
 import type { BlockType, MarkType } from "@kalem-editor/core/commands";
 import type { Caret, EditResult } from "@kalem-editor/editor";
 import { holderIn, indentItem, outdentItem, selectRange, toggleList } from "@kalem-editor/editor";
+import { outlineOf } from "@kalem-editor/plugin-outline";
 import type { DocumentAction } from "../shared/actions.js";
 import { applyActions } from "../shared/actions.js";
 import type {
@@ -24,7 +25,7 @@ import { format, stringsFor } from "../shared/i18n.js";
 import { noteKey } from "../shared/local-notes.js";
 import { paletteCss } from "../shared/palette.js";
 import type { ToolPane } from "../shared/panes.js";
-import { revealPane, togglePane } from "../shared/panes.js";
+import { isPaneShown, revealPane, togglePane } from "../shared/panes.js";
 import {
 	extension,
 	isEditablePath,
@@ -435,6 +436,13 @@ const docks = createDocks({
 	update: (patch) => updateSettings(patch),
 	available: paneAvailable,
 	openLayout: () => void settingsDialog.show("panels"),
+	reveal: (pane) => {
+		if (pane !== "outline" || app.dataset.fold === undefined) return false;
+		outlineWanted = session;
+		foldEmptyOutline();
+		fitSidePanes();
+		return true;
+	},
 });
 const deskColumn = el("div", { class: "desk-column", children: [deskArea, docks.elements.bottom] });
 
@@ -936,7 +944,10 @@ function createTab(id: string): Tab {
 		onEditorChange: () => {
 			review.changed();
 			scheduleRibbonUpdate();
-			if (session === tabSession) localNotes.refresh();
+			if (session === tabSession) {
+				localNotes.refresh();
+				foldEmptyOutlineSoon();
+			}
 			lineNumbers.refresh();
 		},
 	});
@@ -1142,6 +1153,9 @@ function activateTab(id: string): void {
 
 	tabStrip.select(id);
 	bridge.tabActivated(id);
+	clearTimeout(foldTimer);
+	foldEmptyOutline();
+	fitSidePanes();
 	syncEdits();
 	renderState();
 	refreshFiles();
@@ -1223,6 +1237,50 @@ const pageSetup = document.head.appendChild(document.createElement("style"));
 const paletteStyle = document.head.appendChild(document.createElement("style"));
 
 /**
+ * The headings pane with no heading to list gives its room to the page: its
+ * dock folds while the active document has none (a new one, a text file) and
+ * opens again with the first heading. Nothing is saved. Its button opens it
+ * for that tab all the same (`reveal` above).
+ */
+let outlineWanted: Session | null = null;
+function foldEmptyOutline(): void {
+	const active = session as Session | undefined;
+	const place = settings.panePlaces.outline;
+	const fold =
+		active !== undefined &&
+		place !== "hidden" &&
+		outlineWanted !== active &&
+		isPaneShown(settings, "outline", paneAvailable) &&
+		!hasHeadings(active);
+	const value = fold ? place : "";
+	if ((app.dataset.fold ?? "") !== value) {
+		if (value === "") delete app.dataset.fold;
+		else app.dataset.fold = value;
+	}
+}
+
+/** What the headings pane would list: a heading with words in it, a quote's or a list's too. */
+function hasHeadings(tab: Session): boolean {
+	return (
+		!tab.isText && outlineOf(tab.editor.getDocument()).some((heading) => heading.text.trim() !== "")
+	);
+}
+
+/**
+ * While typing, the pane comes and goes once the typing pauses: the page does
+ * not move under the first heading as it is being written.
+ */
+const FOLD_DELAY = 700;
+let foldTimer: ReturnType<typeof setTimeout> | undefined;
+function foldEmptyOutlineSoon(): void {
+	clearTimeout(foldTimer);
+	foldTimer = setTimeout(() => {
+		foldEmptyOutline();
+		fitSidePanes();
+	}, FOLD_DELAY);
+}
+
+/**
  * A window too narrow for every open side pane and a readable page: the
  * left dock gives way first, then the right one, for as long as the window
  * is that narrow. Nothing is saved; widened, they are back. (The assistant
@@ -1231,7 +1289,12 @@ const paletteStyle = document.head.appendChild(document.createElement("style"));
 const SIDE_PANE_MIN = 150;
 const PAGE_MIN = 300;
 function fitSidePanes(): void {
-	const shown = (element: HTMLElement): boolean => !element.hidden && element.isConnected;
+	const folded = app.dataset.fold;
+	const shown = (element: HTMLElement): boolean =>
+		!element.hidden &&
+		element.isConnected &&
+		!(element === docks.elements.left && folded === "left") &&
+		!(element === docks.elements.right && folded === "right");
 	const left = docks.elements.left;
 	const right = docks.elements.right;
 	const stripes = 2 * 34;
@@ -1283,6 +1346,7 @@ function applySettings(): void {
 	zoomSlider.value = String(settings.zoom);
 	zoomValue.textContent = `${settings.zoom}%`;
 	localNotes.refresh();
+	foldEmptyOutline();
 	fitSidePanes();
 }
 
