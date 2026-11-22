@@ -1,5 +1,6 @@
 import type { ConfluencePageSummary } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
+import type { JiraIssueRef } from "../shared/jira.js";
 import { el } from "./dom.js";
 import { fileType } from "./file-types.js";
 import type { IconName } from "./icons.js";
@@ -26,6 +27,12 @@ export interface StartPageOptions {
 	/** Confluence's recently changed pages; `null` while it is not connected. */
 	confluence(): Promise<readonly ConfluencePageSummary[]> | null;
 	openConfluence(pageId: string): void;
+	/** The templates, a new document from one of them. */
+	templates?(): Promise<readonly { readonly id: string; readonly name: string }[]>;
+	newFromTemplate?(id: string): void;
+	/** Jira's open issues assigned to the user; `null` while it is not connected. */
+	jira?(): Promise<readonly JiraIssueRef[]> | null;
+	openIssue?(key: string): void;
 }
 
 export interface StartPage {
@@ -36,6 +43,8 @@ export interface StartPage {
 
 const MAX_RECENT = 6;
 const MAX_CONFLUENCE = 5;
+const MAX_TEMPLATES = 4;
+const MAX_JIRA = 5;
 
 /**
  * The file's name and the end of the folder it is in (its last two folders,
@@ -82,16 +91,29 @@ export function createStartPage(options: StartPageOptions): StartPage {
 	const pinned = section(t.startPinned);
 	const recent = section(t.startRecent);
 	const confluence = section(t.startConfluenceRecent);
+	const jira = section(t.startJiraMine);
 	pinned.box.classList.add("start-pinned");
 	confluence.box.classList.add("start-confluence");
+	jira.box.classList.add("start-jira");
 	const lists = el("div", {
 		class: "start-lists",
-		children: [pinned.box, recent.box, confluence.box],
+		children: [pinned.box, recent.box, confluence.box, jira.box],
 	});
+	const title = el("p", { class: "start-title", text: t.startTitle });
+	/** The document opened last: the way back to it, first. */
+	const resume = el("div", { class: "start-continue-box" });
+	resume.hidden = true;
+	/** A new document from a template, a click away. */
+	const templateList = el("div", { class: "start-templates" });
+	const templates = el("div", {
+		class: "start-templates-box",
+		children: [el("h3", { class: "start-heading", text: t.startTemplates }), templateList],
+	});
+	templates.hidden = true;
 	const element = el("section", {
 		class: "start-page",
 		attrs: { "aria-label": t.startLabel },
-		children: [el("p", { class: "start-title", text: t.startTitle }), actions, lists],
+		children: [resume, title, actions, templates, lists],
 	});
 	element.hidden = true;
 	// The page's buttons must not take the caret out of the document on a click.
@@ -169,6 +191,96 @@ export function createStartPage(options: StartPageOptions): StartPage {
 		return el("li", { children: [open] });
 	}
 
+	function drawResume(path: string | null): void {
+		resume.hidden = path === null;
+		// With the way back above it, the line under it is about what is new.
+		title.textContent = path === null ? t.startTitle : t.startTitleNew;
+		if (path === null) {
+			resume.replaceChildren();
+			return;
+		}
+		const { name, folder } = splitPath(path);
+		const type = fileType(path);
+		const button = el("button", {
+			class: "start-continue",
+			attrs: { type: "button", title: path },
+			children: [
+				el("span", {
+					class: `start-continue-icon files-icon tone-${type.tone}`,
+					children: [icon(type.icon)],
+				}),
+				el("span", {
+					class: "start-action-text",
+					children: [
+						el("span", { class: "start-continue-label", text: t.startContinue }),
+						el("span", { class: "start-continue-name", text: name }),
+						el("span", { class: "start-action-hint", text: folder }),
+					],
+				}),
+				el("span", {
+					class: "start-continue-go",
+					attrs: { "aria-hidden": "true" },
+					children: [icon("chevron")],
+				}),
+			],
+		});
+		button.addEventListener("click", () => options.open(path));
+		resume.replaceChildren(button);
+	}
+
+	async function drawTemplates(): Promise<void> {
+		if (options.templates === undefined || options.newFromTemplate === undefined) return;
+		const make = options.newFromTemplate;
+		let found: readonly { readonly id: string; readonly name: string }[];
+		try {
+			found = await options.templates();
+		} catch {
+			found = [];
+		}
+		templateList.replaceChildren(
+			...found.slice(0, MAX_TEMPLATES).map((template) => {
+				const button = el("button", {
+					class: "start-template",
+					attrs: { type: "button", "data-template": template.id },
+					children: [icon("new"), el("span", { text: template.name })],
+				});
+				button.addEventListener("click", () => make(template.id));
+				return button;
+			}),
+		);
+		templates.hidden = found.length === 0;
+	}
+
+	function issueItem(issue: JiraIssueRef): HTMLElement {
+		const open = el("button", {
+			class: "start-recent-item",
+			attrs: { type: "button", title: `${issue.key} · ${issue.summary}` },
+			children: [
+				el("span", { class: "files-icon tone-code", children: [icon("target")] }),
+				el("span", { class: "start-recent-name", text: issue.summary }),
+				el("span", { class: "start-recent-folder", text: `${issue.key} · ${issue.status}` }),
+			],
+		});
+		open.addEventListener("click", () => options.openIssue?.(issue.key));
+		return el("li", { children: [open] });
+	}
+
+	async function drawJira(): Promise<void> {
+		const asking = options.jira?.() ?? null;
+		if (asking === null) {
+			jira.box.hidden = true;
+			return;
+		}
+		let found: readonly JiraIssueRef[];
+		try {
+			found = await asking;
+		} catch {
+			found = [];
+		}
+		jira.list.replaceChildren(...found.slice(0, MAX_JIRA).map(issueItem));
+		jira.box.hidden = found.length === 0;
+	}
+
 	let asked = 0;
 	async function drawLists(): Promise<void> {
 		const mine = ++asked;
@@ -182,6 +294,8 @@ export function createStartPage(options: StartPageOptions): StartPage {
 			paths = [];
 		}
 		if (mine !== asked) return;
+		// The last one is the way back, above everything (and in the list too, to pin).
+		drawResume(paths[0] ?? null);
 		const shown = unpinnedRecent(paths, pins);
 		recent.list.replaceChildren(...shown.map((path) => fileItem(path, false)));
 		recent.box.hidden = shown.length === 0;
@@ -210,6 +324,8 @@ export function createStartPage(options: StartPageOptions): StartPage {
 			if (!visible) return;
 			drawActions();
 			void drawLists();
+			void drawTemplates();
+			void drawJira();
 		},
 	};
 }

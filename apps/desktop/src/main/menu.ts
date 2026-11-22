@@ -480,6 +480,9 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 					click: () => ctx.changeSettings({ fullWidth: !settings.fullWidth }),
 				},
 				{ label: t.typographyOpen, click: send(ctx, "typography") },
+				{ label: t.homeMenu, accelerator: "CmdOrCtrl+Shift+H", click: send(ctx, "home") },
+				{ label: t.roleMenu, click: send(ctx, "set-up-role") },
+				{ type: "separator" },
 				{
 					label: t.ribbonSimple,
 					type: "checkbox",

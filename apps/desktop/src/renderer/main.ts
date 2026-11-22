@@ -34,6 +34,7 @@ import {
 	isWordPath,
 	TEXT_EXTENSIONS,
 } from "../shared/paths.js";
+import { rolePreset } from "../shared/roles.js";
 import { withColumnWidth } from "../shared/table-style.js";
 import { changeCase, collapseSpaces, nextCase } from "../shared/text-case.js";
 import { typographyVars } from "../shared/typography.js";
@@ -77,6 +78,7 @@ import { Previews } from "./previews.js";
 import { documentImages } from "./prompt-images.js";
 import { createQuickOpen, workspaceItems } from "./quick-open.js";
 import { createAppRibbon } from "./ribbon-layout.js";
+import { createRolePicker } from "./role-picker.js";
 import { createSelectionAssistant } from "./selection-assistant.js";
 import type { ConfluenceMergePlan } from "./session.js";
 import { ipcErrorMessage, Session } from "./session.js";
@@ -222,6 +224,33 @@ const quickOpen = createQuickOpen({
 	open: (path) => void bridge.openPath(path),
 	commands: (query) => void commandPalette.show(query, "commands"),
 });
+/** Who the app is set up for: asked at its first start, and from the View menu. */
+const rolePicker = createRolePicker({
+	t,
+	pick: (role) => updateSettings(rolePreset(role, settings)),
+});
+
+/**
+ * Home is an empty, untitled tab: its start page is it. One open already is
+ * brought forward; else a new one is opened.
+ */
+function openHome(): void {
+	for (const [id, tab] of tabs) {
+		const doc = tab.session;
+		const empty =
+			!doc.isText &&
+			doc.path === null &&
+			doc.remote === null &&
+			!doc.dirty &&
+			doc.styledMarkdown().trim() === "";
+		if (empty) {
+			activateTab(id);
+			return;
+		}
+	}
+	bridge.newTab();
+}
+
 /** The assistant where the text is: in the selection's bubble, and under the caret (Ctrl+J). */
 const selectionAssistant = createSelectionAssistant({
 	t,
@@ -1188,6 +1217,18 @@ function createTab(id: string): Tab {
 		open: (path) => void bridge.openPath(path),
 		confluence: () => (accounts.confluence ? bridge.confluenceSearch("", null) : null),
 		openConfluence: (pageId) => void bridge.confluenceOpenPage(pageId),
+		templates: () => bridge.templates(),
+		newFromTemplate: (id) => void bridge.templateNew(id),
+		jira: () =>
+			accounts.jira
+				? bridge
+						.jiraSearch(
+							"assignee = currentUser() AND resolution = Unresolved ORDER BY updated DESC",
+							null,
+						)
+						.then((found) => found.issues)
+				: null,
+		openIssue: (key) => void jiraDialog.showIssue(key),
 	});
 	/** Once the document had something in it, the start page does not come back. */
 	let started = false;
@@ -1996,6 +2037,8 @@ const commands: Record<Command, () => void> = {
 		}),
 	"collapse-spaces": () => rewriteText(collapseSpaces),
 	assistant: () => toggleAssistant(),
+	"set-up-role": () => rolePicker.show(settings.role),
+	home: () => openHome(),
 	"assistant-prompt": () => {
 		if (session.isText || !canEdit()) return;
 		selectionAssistant.prompt();
@@ -2026,6 +2069,8 @@ for (const document of startup.documents) openDocument(document);
 // A restored window's active tab is not always its last.
 // (`activateTab` does nothing for the tab that is active already.)
 if (startup.active !== undefined && tabs.has(startup.active)) activateTab(startup.active);
+// The app's first start: whom to set it up for, once (skipped, nothing changes).
+if (startup.firstRun && settings.role === "") rolePicker.show("");
 
 // As the app closes, what is open is kept to come back next time (`session-store.ts`).
 bridge.onSessionRequest(() => {

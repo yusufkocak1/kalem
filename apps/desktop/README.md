@@ -277,6 +277,21 @@ verir.
   çift tıklamak büyütür. **Ayarlar → Görünüm → Sekmeler Başlık Çubuğunda**
   kapatılırsa sistemin başlık çubuğu döner ve sekmeler şeridin altına iner;
   değişiklik yeni açılan pencerelerde geçerlidir.
+- **Ana sayfa** (`Ctrl+Shift+H`, **Görünüm → Ana Sayfa**): boş ve adsız bir
+  sekmenin başlangıç sayfasıdır; açık bir tane varsa ona geçilir, yoksa
+  yenisi açılır. En üstte **Kaldığınız yerden devam edin** (en son açılan
+  belge), altında başlamanın yolları, **Şablondan başlayın** (şablonlar tek
+  tıkla yeni belge olur), sabitlenen ve son belgeler, Confluence'ta son
+  değişen sayfalar ve Jira bağlıyken **Jira'da bana atananlar** (açık
+  kayıtlar). Yazmaya başlamak belgeyi eskisi gibi başlatır.
+- **İlk açılışta rol seçimi:** uygulama bu bilgisayarda ilk kez açıldığında
+  "Kalem'i kimin için ayarlayalım?" diye sorar. **Yazar** sade şerit,
+  satır numarasız sayfa ve solda başlıklar; **Analist** tam şerit, başlıklar,
+  açık asistan ve analiz şablonu; **Geliştirici** sade şerit, sayfada satır
+  numaraları, solda dosyalar, açık asistan ve kodlama ajanı spec şablonu
+  ayarlar. **Şimdilik atla** hiçbir şeyi değiştirmez. Seçim **Görünüm →
+  Kalem'i Kimin İçin Ayarlayalım…** ile yeniden yapılır; değişen her ayar
+  Ayarlar'dan tek tek de değiştirilebilir.
 - **Hızlı Not** (**Dosya → Hızlı Not**, `Ctrl+Shift+Alt+N`): açık
   klasörde, klasör yoksa `Belgeler\Kalem Notları` içinde
   `Not 2026-10-05 14.30.md` gibi tarihli bir not açar. Dosya ancak bir şey

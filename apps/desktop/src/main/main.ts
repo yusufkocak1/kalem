@@ -88,6 +88,9 @@ function documentArguments(argv: readonly string[], cwd: string): string[] {
 		});
 }
 
+/** Set while the app starts for the first time on this computer, until its first window asks. */
+let firstRun = false;
+
 function start(): void {
 	const store = new SettingsStore(join(app.getPath("userData"), "settings.json"));
 	const drafts = new DraftStore(join(app.getPath("userData"), "drafts"));
@@ -612,6 +615,12 @@ function start(): void {
 		applyPermissions();
 		installUserTasks();
 		registerIpc({
+			// The app's first start on this computer: the first window offers to set it up.
+			firstRun: () => {
+				const was = firstRun;
+				firstRun = false;
+				return was;
+			},
 			windows,
 			store,
 			drafts,
@@ -658,7 +667,10 @@ function start(): void {
 		if (BrowserWindow.getAllWindows().length === 0) {
 			windows.open(store.state.welcomed ? [] : [welcomeDocument()]);
 		}
-		if (!store.state.welcomed) store.update({ welcomed: true });
+		if (!store.state.welcomed) {
+			firstRun = true;
+			store.update({ welcomed: true });
+		}
 		// Not in the way of startup.
 		setTimeout(() => updater.checkInBackground(), 10_000);
 	});

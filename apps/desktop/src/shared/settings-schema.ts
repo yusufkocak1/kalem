@@ -310,6 +310,17 @@ export const SETTINGS_SCHEMA: Schema = {
 		],
 		assistant: "write",
 	},
+	// Set by the first start's question (or View → Set Kalem Up For…), which applies its presets.
+	role: {
+		key: "role",
+		category: "appearance",
+		label: null,
+		type: "enum",
+		values: ["", "writer", "analyst", "developer"],
+		valueLabels: ["roleNone", "roleWriter", "roleAnalyst", "roleDeveloper"],
+		keywords: ["rol", "role"],
+		assistant: "read",
+	},
 	typewriterScroll: {
 		key: "typewriterScroll",
 		category: "appearance",

@@ -85,6 +85,8 @@ import { listWorkspace, searchWorkspace } from "./workspace.js";
 import { createEntry, isInside, renameEntry, WorkspaceFileError } from "./workspace-files.js";
 
 export interface IpcContext {
+	/** The app starts for the first time; asking it once answers for the first window only. */
+	firstRun(): boolean;
 	readonly windows: WindowManager;
 	readonly store: SettingsStore;
 	readonly drafts: DraftStore;
@@ -203,6 +205,7 @@ export function registerIpc(ctx: IpcContext): void {
 			...(win.activeTabId === null ? {} : { active: win.activeTabId }),
 			documentScheme: DOCUMENT_SCHEME,
 			titleBar: win.titleBar,
+			firstRun: ctx.firstRun(),
 		};
 	});
 

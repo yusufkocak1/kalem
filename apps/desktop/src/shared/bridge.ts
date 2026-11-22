@@ -99,6 +99,8 @@ export interface Settings extends Typography {
 	readonly tabsInTitleBar: boolean;
 	/** In focus mode, the line being written is kept at the middle of the view, as on a typewriter. */
 	readonly typewriterScroll: boolean;
+	/** Whom the app was set up for (the first start's question); `""` until asked. */
+	readonly role: UserRole | "";
 	readonly navigation: boolean;
 	readonly autoSave: boolean;
 	readonly spellCheck: boolean;
@@ -203,6 +205,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	ribbonSimple: false,
 	tabsInTitleBar: true,
 	typewriterScroll: true,
+	role: "",
 	...DEFAULT_TYPOGRAPHY,
 	navigation: true,
 	autoSave: false,
@@ -546,9 +549,15 @@ export interface Startup {
 	 * traffic lights at its left ("inset": macOS); `null`, by the system.
 	 */
 	readonly titleBar: TitleBar;
+	/** The app's first start on this computer: the window offers to set it up for its user. */
+	readonly firstRun: boolean;
 }
 
 export type TitleBar = "overlay" | "inset" | null;
+
+/** Whom the app is set up for: the ribbon, the panes and the line numbers follow. */
+export type UserRole = "writer" | "analyst" | "developer";
+export const USER_ROLES: readonly UserRole[] = ["writer", "analyst", "developer"];
 
 /** The title bar Kalem draws, for the system's window buttons over it. */
 export const TITLE_BAR_HEIGHT = 38;
@@ -856,6 +865,8 @@ export const COMMANDS = [
 	"format-all-code",
 	"assistant",
 	"assistant-prompt",
+	"set-up-role",
+	"home",
 	"new-from-template",
 	"command-palette",
 	"network-log",
