@@ -73,7 +73,7 @@ import { createNetworkPanel } from "./network-panel.js";
 import { createNotices } from "./notices.js";
 import { Previews } from "./previews.js";
 import { documentImages } from "./prompt-images.js";
-import { createQuickOpen } from "./quick-open.js";
+import { createQuickOpen, workspaceItems } from "./quick-open.js";
 import { createAppRibbon } from "./ribbon-layout.js";
 import type { ConfluenceMergePlan } from "./session.js";
 import { ipcErrorMessage, Session } from "./session.js";
@@ -217,7 +217,7 @@ const quickOpen = createQuickOpen({
 	lang: startup.language,
 	workspace: () => bridge.getWorkspace(),
 	open: (path) => void bridge.openPath(path),
-	commands: (query) => void commandPalette.show(query),
+	commands: (query) => void commandPalette.show(query, "commands"),
 });
 /** The menu's commands by name (F1, or `>` in Quick Open). */
 const commandPalette = createCommandPalette({
@@ -225,6 +225,15 @@ const commandPalette = createCommandPalette({
 	lang: startup.language,
 	commands: () => bridge.paletteCommands(),
 	run: (id) => bridge.runPaletteCommand(id),
+	files: async () => workspaceItems(await bridge.getWorkspace()),
+	openFile: (path) => void bridge.openPath(path),
+	headings: () =>
+		session.headings().map((heading) => ({ text: heading.text, level: heading.level })),
+	goToHeading: (index) => session.goToHeading(index),
+	ask: (question) => {
+		if (!settings.assistant) updateSettings({ assistant: true });
+		assistant.ask(question);
+	},
 });
 
 /** Where the caret last was in each tab's document, and the text last selected in it. */

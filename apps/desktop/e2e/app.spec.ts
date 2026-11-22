@@ -2168,6 +2168,60 @@ test("runs a menu command by name from the command palette, and from > in Quick 
 	await app.close();
 });
 
+test("one box finds commands, the folder's files and the document's headings, and asks the assistant", async () => {
+	const folder = await tempDir("everything");
+	const doc = join(folder, "analiz.md");
+	await writeFile(doc, "# Amaç\n\nMetin.\n\n## Kabul Ölçütleri\n\nSon.\n");
+	await writeFile(join(folder, "kabul-testleri.md"), "# Testler\n");
+	const { app, page, errors } = await launch({
+		args: [doc],
+		env: { KALEM_CLAUDE: join(folder, "nothing-here") },
+	});
+	await expect(page.locator("#editor h1")).toHaveText("Amaç");
+	const palette = page.locator(".command-palette");
+	const input = palette.locator(".palette-input");
+	const items = palette.locator(".palette-item");
+
+	// Everything at once, by kind: the folder's file and the heading both match.
+	await clickMenu(app, "View", "Command Palette…");
+	await input.fill("kabul");
+	await expect(palette.locator(".palette-section")).toContainText(["Files", "In this document"]);
+	await expect(palette.locator(".palette-file .palette-name")).toHaveText("kabul-testleri.md");
+	await expect(palette.locator(".palette-heading .palette-name")).toHaveText("Kabul Ölçütleri");
+	await expect(items.last()).toHaveText(/Ask the assistant: “kabul”/);
+
+	// # for the headings only: Enter puts the caret there.
+	await input.fill("#ölçüt");
+	await expect(palette.locator(".palette-prompt")).toHaveText("#");
+	await expect(input).toHaveValue("ölçüt");
+	await expect(items).toHaveCount(1);
+	await input.press("Enter");
+	await expect(palette).toBeHidden();
+	await expect
+		.poll(() => page.evaluate(() => document.activeElement?.closest("h2")?.textContent ?? ""))
+		.toBe("Kabul Ölçütleri");
+
+	// A command run from the box comes first next time, with nothing typed.
+	await clickMenu(app, "View", "Command Palette…");
+	await input.fill(">full width");
+	await input.press("Enter");
+	await clickMenu(app, "View", "Command Palette…");
+	await expect(palette.locator(".palette-section").first()).toHaveText("Used lately");
+	await expect(items.first().locator(".palette-name")).toHaveText("Full Width");
+	await page.keyboard.press("Escape");
+
+	// ? asks the assistant: without a service yet, the question waits in its box.
+	await clickMenu(app, "View", "Command Palette…");
+	await input.fill("?bu belgeyi özetle");
+	await expect(palette.locator(".palette-prompt")).toHaveText("?");
+	await input.press("Enter");
+	await expect(page.locator(".assistant")).toBeVisible();
+	await expect(page.locator(".assistant-input")).toHaveValue("bu belgeyi özetle");
+	expect(errors).toEqual([]);
+	await stubMessageBox(app, 1);
+	await app.close();
+});
+
 test("saves from the save status when the document has unsaved changes", async () => {
 	const folder = await tempDir("save-status");
 	const path = join(folder, "not.md");

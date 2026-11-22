@@ -246,12 +246,18 @@ verir.
 - **Hızlı Aç** (`Ctrl+Shift+P`): açık klasörlerdeki dosyaları adla bulup
   açar; yazılan her sözcük yolda geçmeli, adı sözcükle başlayanlar öne
   gelir.
-- **Komut paleti** (`F1`, **Görünüm → Komut Paleti…**; Hızlı Aç'ta `>` ile
-  de): menüdeki her komut adıyla aranır ve `Enter` ile çalışır. Her komutun
-  yanında şeritteki simgesi, menüdeki yeri ve kısayolu görünür; son
-  kullanılan belgeler tam yolla değil, dosya adı ve son iki klasörüyle
-  (türünün renkli simgesiyle) listelenir, yolun herhangi bir parçasıyla
-  bulunur.
+- **Komut paleti: her şeyi bulan tek kutu** (`F1`, **Görünüm → Komut
+  Paleti…**; Hızlı Aç'ta `>` ile de). Yazılan şey her yerde aranır ve
+  sonuçlar türlerine göre gelir: **Komutlar** (menüdeki her komut, şeritteki
+  simgesi, menüdeki yeri ve kısayoluyla), **Dosyalar** (son kullanılan
+  belgeler ve açık klasörlerin dosyaları, adı ve klasörüyle), **Bu belgede**
+  (etkin belgenin başlıkları; seçmek imleci oraya götürür) ve en sonda
+  **Asistana sor: “…”**. İlk yazılan karakter aramayı daraltır: `>` yalnızca
+  komutlar, `#` yalnızca başlıklar, `?` doğrudan asistana sorar (asistan
+  hazır değilse soru kutusunda bekler); boş kutuda `Geri` tuşu daraltmayı
+  kaldırır. Boş kutuda **Son kullanılanlar** üstte durur: kutudan çalıştırılan
+  komutlar ne kadar sık ve yakın zamanda kullanıldıysa o kadar önde gelir
+  (bir haftada ağırlığı yarıya iner; bu bilgisayarda saklanır).
 - **Farklı Kaydet** belgeyi başka bir klasöre taşırsa bağlantı verdiği
   görsel ve dosyalar da yeni yerin `.assets` klasörüne kopyalanır ve
   bağlantılar güncellenir (yeni yerden zaten ulaşılabilen dosyalara

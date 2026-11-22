@@ -12296,9 +12296,42 @@ dialog[open]::backdrop {
 	outline: none;
 }
 
+.palette-prompt:empty {
+	display: none;
+}
+
 .palette-empty {
 	margin: 10px 4px 4px;
 	color: var(--app-muted);
+}
+
+/* The kinds of what was found, when the box searches everything. */
+.palette-section {
+	padding: 8px 10px 3px;
+	color: var(--app-muted);
+	font-size: 10.5px;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	list-style: none;
+}
+
+.palette-section:first-child {
+	padding-top: 2px;
+}
+
+.palette-ask .palette-icon {
+	color: var(--app-accent);
+}
+
+.palette-hints {
+	margin: 6px -6px -6px;
+	padding: 6px 12px;
+	border-top: 1px solid var(--app-border);
+	border-radius: 0 0 12px 12px;
+	background: var(--app-surface);
+	color: var(--app-muted);
+	font-size: 11.5px;
 }
 
 .palette-empty[hidden] {

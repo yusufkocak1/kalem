@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PaletteCommand } from "../shared/bridge.js";
-import { paletteIcon, rankCommands } from "./command-palette.js";
+import { frecency, paletteIcon, parseQuery, rankCommands, usageKey } from "./command-palette.js";
 
 const command = (label: string, group: string): PaletteCommand => ({
 	id: label,
@@ -66,5 +66,35 @@ describe("command palette", () => {
 		expect(iconOf(null, "/a/b/notlar.md")).toEqual({ name: "file", tone: "markdown" });
 		expect(iconOf("heading-9-nothing")).toBeNull();
 		expect(iconOf(null)).toBeNull();
+	});
+
+	it("reads what is searched from the first character", () => {
+		expect(parseQuery("kaydet")).toEqual({ scope: "all", text: "kaydet" });
+		expect(parseQuery("> kaydet")).toEqual({ scope: "commands", text: "kaydet" });
+		expect(parseQuery("#kapsam")).toEqual({ scope: "headings", text: "kapsam" });
+		expect(parseQuery("? bu belgeyi özetle")).toEqual({ scope: "ask", text: "bu belgeyi özetle" });
+		// Only first: a # inside is searched for.
+		expect(parseQuery("C# notları")).toEqual({ scope: "all", text: "C# notları" });
+	});
+
+	it("puts the commands used more and lately first, among those that match as well", () => {
+		const used = (c: PaletteCommand): number => (c.label === "Farklı Kaydet…" ? 3 : 0);
+		expect(rankCommands(commands, "kaydet", "tr", used).map((c) => c.label)).toEqual([
+			"Kaydet",
+			"Farklı Kaydet…",
+		]);
+		// With nothing typed, the one used comes first.
+		expect(rankCommands(commands, "", "tr", used)[0]?.label).toBe("Farklı Kaydet…");
+	});
+
+	it("halves a use's weight a week on, and knows a command by what it does", () => {
+		const now = Date.UTC(2026, 10, 22);
+		const week = 7 * 24 * 60 * 60 * 1000;
+		expect(frecency(undefined, now)).toBe(0);
+		expect(frecency({ count: 4, last: now }, now)).toBe(4);
+		expect(frecency({ count: 4, last: now - week }, now)).toBeCloseTo(2);
+		expect(usageKey({ ...command("Kaydet", "Dosya"), action: "save" })).toBe("action:save");
+		expect(usageKey({ ...command("a.md", "Dosya"), path: "/x/a.md" })).toBe("path:/x/a.md");
+		expect(usageKey(command("Kaydet", "Dosya"))).toBe("menu:Dosya › Kaydet");
 	});
 });

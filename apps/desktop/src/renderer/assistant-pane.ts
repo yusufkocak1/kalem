@@ -179,6 +179,8 @@ export interface AssistantPane {
 	documentEdits(edits: DocumentEdits | null): void;
 	/** A file's changes being reviewed in its tab were decided in part, or the review ended. */
 	editsChanged(): void;
+	/** A question from elsewhere (the command box): sent when the service is ready, else left in the box. */
+	ask(question: string): void;
 }
 
 interface Message {
@@ -4289,6 +4291,12 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		},
 		editsChanged() {
 			refreshEditSummary();
+		},
+		ask(question) {
+			if (view !== "chat") void setView("chat");
+			input.value = question;
+			if (status?.ready === true && active.reply === null) void send();
+			else input.focus();
 		},
 	};
 }

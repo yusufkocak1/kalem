@@ -15,6 +15,7 @@ import {
 	insertImage,
 	replaceImageUrl,
 } from "@kalem-editor/plugin-image-upload";
+import type { OutlineItem, OutlinePlugin } from "@kalem-editor/plugin-outline";
 import { outlinePlugin } from "@kalem-editor/plugin-outline";
 import type { SourceModePlugin } from "@kalem-editor/plugin-source-mode";
 import { sourceModePlugin } from "@kalem-editor/plugin-source-mode";
@@ -122,6 +123,7 @@ export class Session {
 	#find: FindReplacePlugin | null = null;
 	#source: SourceModePlugin | null = null;
 	#images: ImageUploadPlugin | null = null;
+	#outline: OutlinePlugin | null = null;
 	/** The `@` mention box and the Jira issue box of the `/` menu. */
 	#picker: AtomPicker | null = null;
 	/** The `/` menu items of the picker already in this editor's menu. */
@@ -169,6 +171,16 @@ export class Session {
 	constructor(options: SessionOptions) {
 		this.#o = options;
 		this.#name = options.t.untitled;
+	}
+
+	/** The document's headings, as the headings pane lists them; none for a text file. */
+	headings(): readonly OutlineItem[] {
+		return this.isText ? [] : (this.#outline?.items() ?? []);
+	}
+
+	/** Moves the caret to a heading of `headings()` and brings it into view. */
+	goToHeading(index: number): void {
+		this.#outline?.goTo(index);
 	}
 
 	/** Whether this tab shows a text file as plain text rather than a Markdown document. */
@@ -621,10 +633,11 @@ export class Session {
 			},
 		});
 
+		this.#outline = outlinePlugin({ container: outline });
 		const plugins = [
 			codeHighlightPlugin(),
 			find,
-			outlinePlugin({ container: outline }),
+			this.#outline,
 			wordCountPlugin({ container: wordCount }),
 			source,
 			images,
