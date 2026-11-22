@@ -310,6 +310,14 @@ export const SETTINGS_SCHEMA: Schema = {
 		],
 		assistant: "write",
 	},
+	typewriterScroll: {
+		key: "typewriterScroll",
+		category: "appearance",
+		label: "typewriterScroll",
+		type: "boolean",
+		keywords: ["daktilo", "typewriter", "odak", "focus", "ortala", "center", "kaydırma", "scroll"],
+		assistant: "write",
+	},
 	tabsInTitleBar: {
 		key: "tabsInTitleBar",
 		category: "appearance",

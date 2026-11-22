@@ -1390,6 +1390,7 @@ function applySettings(): void {
 		else app.style.setProperty(name, value);
 	}
 	app.toggleAttribute("data-doc-font", settings.documentFont !== "default");
+	app.toggleAttribute("data-typewriter", settings.typewriterScroll);
 	for (const tab of tabs.values()) {
 		tab.lineNumbers.relayout();
 		tab.session.textView?.setLineNumbers(settings.codeLineNumbers);
@@ -1438,9 +1439,92 @@ function toggleFocusMode(): void {
 	app.toggleAttribute("data-focus");
 	for (const tab of tabs.values()) tab.lineNumbers.refresh();
 	scheduleRibbonUpdate();
+	// The page stays where it is: what is read does not move. Typing centres the line.
+	wakeFocusExit();
 }
 
 exitFocus.addEventListener("click", toggleFocusMode);
+
+/**
+ * Focus mode's way out fades once the mouse rests (2.5s) and comes back as
+ * soon as it moves, or the keyboard reaches it.
+ */
+const FOCUS_EXIT_IDLE = 2500;
+let focusExitTimer: ReturnType<typeof setTimeout> | undefined;
+function wakeFocusExit(): void {
+	clearTimeout(focusExitTimer);
+	delete app.dataset.focusIdle;
+	if (!app.hasAttribute("data-focus")) return;
+	focusExitTimer = setTimeout(() => {
+		app.dataset.focusIdle = "";
+	}, FOCUS_EXIT_IDLE);
+}
+document.addEventListener("mousemove", () => {
+	if (app.hasAttribute("data-focus")) wakeFocusExit();
+});
+
+/**
+ * Typewriter scrolling (focus mode, `typewriterScroll`): the line being
+ * written stays a little above the middle of the view, the page moving
+ * under it. Only when the keyboard moved the caret: a click puts it where
+ * the user looks already.
+ */
+let caretByKeyboard = false;
+document.addEventListener("keydown", () => {
+	caretByKeyboard = true;
+});
+document.addEventListener("selectionchange", () => {
+	if (!caretByKeyboard) return;
+	caretByKeyboard = false;
+	// After the editor's own scrolling into view, of the block the caret went to.
+	requestAnimationFrame(() => centerCaret());
+});
+/**
+ * The caret's line: a collapsed range's own box, or else a character's beside
+ * it (a caret just moved into a block has no box of its own), or else the
+ * first line of its block.
+ */
+function caretLine(range: Range): DOMRect | null {
+	const own = range.getBoundingClientRect();
+	if (own.height > 0) return own;
+	const character = (text: Text, offset: number): DOMRect | null => {
+		const probe = document.createRange();
+		if (offset >= text.length && offset === 0) return null;
+		const start = offset < text.length ? offset : offset - 1;
+		probe.setStart(text, start);
+		probe.setEnd(text, start + 1);
+		const box = probe.getBoundingClientRect();
+		return box.height > 0 ? box : null;
+	};
+	const node = range.startContainer;
+	if (node instanceof Text) return character(node, range.startOffset);
+	if (!(node instanceof Element)) return null;
+	const from = node.childNodes[range.startOffset] ?? node;
+	const walker = document.createTreeWalker(from, NodeFilter.SHOW_TEXT);
+	const text = from instanceof Text ? from : (walker.nextNode() as Text | null);
+	const found = text === null ? null : character(text, 0);
+	if (found !== null) return found;
+	const block = node.getBoundingClientRect();
+	const line = Number.parseFloat(getComputedStyle(node).lineHeight) || 20;
+	return new DOMRect(block.left, block.top, block.width, Math.min(line, block.height));
+}
+
+function centerCaret(): void {
+	if (!app.hasAttribute("data-focus") || !settings.typewriterScroll) return;
+	const tab = tabs.get(session.id);
+	const selection = document.getSelection();
+	if (tab === undefined || selection === null || selection.rangeCount === 0) return;
+	const anchor = selection.anchorNode;
+	if (anchor === null || !tab.canvas.contains(anchor)) return;
+	const range = selection.getRangeAt(0).cloneRange();
+	range.collapse(false);
+	const box = caretLine(range);
+	if (box === null) return;
+	const view = tab.desk.getBoundingClientRect();
+	const target = view.top + view.height * 0.42;
+	const delta = box.top + box.height / 2 - target;
+	if (Math.abs(delta) > box.height / 2) tab.desk.scrollTop += delta;
+}
 
 // --- Commands ---------------------------------------------------------------
 

@@ -4362,6 +4362,38 @@ button.git-file-path {
 	opacity: 1;
 }
 
+/* The mouse at rest: the way out fades (`wakeFocusExit` in main.ts); a key reaches it still. */
+.focus-exit {
+	transition: opacity 400ms ease;
+}
+
+.app[data-focus-idle] .focus-exit:not(:focus-visible) {
+	opacity: 0;
+	pointer-events: none;
+}
+
+/* What is being written stands out; the rest of the page is quieter. Only
+   while a block has the caret: reading, nothing is dimmed. */
+.app[data-focus] .kalem-editor > [contenteditable] {
+	transition: opacity 180ms ease;
+}
+
+.app[data-focus] .kalem-editor:has(> [contenteditable]:focus) > [contenteditable]:not(:focus) {
+	opacity: 0.32;
+}
+
+/* Typewriter scrolling: room under the last line, for it to come to the middle too. */
+.app[data-focus][data-typewriter] .page {
+	padding-bottom: 50vh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.focus-exit,
+	.app[data-focus] .kalem-editor > [contenteditable] {
+		transition: none;
+	}
+}
+
 /* --- Print and PDF export ------------------------------------------------ */
 
 @media print {

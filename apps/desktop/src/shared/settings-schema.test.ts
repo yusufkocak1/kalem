@@ -130,6 +130,7 @@ describe("resetPatch", () => {
 			zoom: DEFAULT_SETTINGS.zoom,
 			fullWidth: DEFAULT_SETTINGS.fullWidth,
 			lineNumbers: DEFAULT_SETTINGS.lineNumbers,
+			typewriterScroll: DEFAULT_SETTINGS.typewriterScroll,
 			tabsInTitleBar: DEFAULT_SETTINGS.tabsInTitleBar,
 			ribbonSimple: DEFAULT_SETTINGS.ribbonSimple,
 			codeLineNumbers: DEFAULT_SETTINGS.codeLineNumbers,

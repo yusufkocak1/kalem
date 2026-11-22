@@ -1504,6 +1504,15 @@ verir.
   pencerede yeni sekme olur.
 - Açık / koyu / sistem teması, yakınlaştırma, tam genişlik, odak modu,
   salt okunur kip, yazım denetimi.
+- **Odak modu** (`Ctrl+Shift+F`, **Görünüm → Odak Modu**): şerit, sekmeler,
+  paneller ve durum çubuğu gizlenir. İmlecin olduğu paragraf tam renkte
+  kalır, ötekiler soluklaşır (belgede imleç yokken, okurken, hiçbiri).
+  **Daktilo kaydırma** (**Görünüm → Odak Modunda Daktilo Kaydırma**, başta
+  açık): klavyeyle yazarken ya da ok tuşlarıyla gezerken imlecin satırı
+  görünümün ortasının biraz üstünde tutulur, sayfa altından akar; fareyle
+  tıklamak sayfayı oynatmaz, belgenin başındaki satırlar da yerinde kalır.
+  **Odak Modundan Çık** düğmesi fare 2,5 saniye durunca kaybolur, kıpırdayınca
+  ya da klavyeyle odaklanınca geri gelir.
 - **Satır numaraları:** belgenin sayfasında başta kapalıdır; sayfa bir
   sayfa gibi okunur. **Görünüm → Belgelerde Satır Numaraları** (ya da
   Görünüm şeridindeki düğme) açar: her bloğun yanında Markdown dosyasındaki

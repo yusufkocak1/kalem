@@ -463,6 +463,12 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 					click: () => ctx.changeSettings({ localNotes: !settings.localNotes }),
 				},
 				{ label: t.focusMode, accelerator: "CmdOrCtrl+Shift+F", click: send(ctx, "focus") },
+				{
+					label: t.typewriterScroll,
+					type: "checkbox",
+					checked: settings.typewriterScroll,
+					click: () => ctx.changeSettings({ typewriterScroll: !settings.typewriterScroll }),
+				},
 				{ type: "separator" },
 				{ label: t.zoomIn, accelerator: "CmdOrCtrl+=", click: send(ctx, "zoom-in") },
 				{ label: t.zoomOut, accelerator: "CmdOrCtrl+-", click: send(ctx, "zoom-out") },

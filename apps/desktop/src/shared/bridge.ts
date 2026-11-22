@@ -97,6 +97,8 @@ export interface Settings extends Typography {
 	 * off, the system's title bar. A window takes it when it opens.
 	 */
 	readonly tabsInTitleBar: boolean;
+	/** In focus mode, the line being written is kept at the middle of the view, as on a typewriter. */
+	readonly typewriterScroll: boolean;
 	readonly navigation: boolean;
 	readonly autoSave: boolean;
 	readonly spellCheck: boolean;
@@ -200,6 +202,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	codeLineNumbers: true,
 	ribbonSimple: false,
 	tabsInTitleBar: true,
+	typewriterScroll: true,
 	...DEFAULT_TYPOGRAPHY,
 	navigation: true,
 	autoSave: false,
