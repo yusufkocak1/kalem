@@ -1,12 +1,14 @@
 name: Masaüstü yayını
 
-# Kalem Masaüstü'nün Windows sürümü.
+# Kalem Masaüstü'nün Windows ve macOS sürümleri.
 #
 # `desktop-v<sürüm>` etiketi push edilince Windows'ta kurulum paketi ve
-# taşınabilir exe derleniyor, aynı adlı bir GitHub release'i açılıp dört
-# dosya ona ekleniyor: iki exe, `latest.yml` ve kurulum paketinin
-# `.blockmap`'i. Kurulu uygulamalar güncellemeyi bu release'ten alıyor
-# (apps/desktop/src/main/updater.ts).
+# taşınabilir exe, macOS'ta Apple Silicon (arm64) ve Intel (x64) için birer
+# dmg derleniyor, aynı adlı bir GitHub release'i açılıp dosyalar ona
+# ekleniyor: iki exe, `latest.yml`, kurulum paketinin `.blockmap`'i ve iki
+# dmg. Kurulu Windows uygulamaları güncellemeyi bu release'ten alıyor
+# (apps/desktop/src/main/updater.ts); macOS sürümü imzasız olduğundan
+# kendini güncelleyemiyor, yeni sürümde indirme sayfasını açıyor.
 #
 # Etiket, `apps/desktop/package.json`'daki sürümle aynı olmalı; değilse iş
 # hiçbir şey yayımlamadan duruyor.
@@ -33,26 +35,16 @@ permissions:
   contents: write
 
 jobs:
-  windows:
-    name: Windows paketi ve release
-    runs-on: windows-latest
-    defaults:
-      run:
-        shell: bash
+  surum:
+    name: Etiket ve sürüm denetimi
+    runs-on: ubuntu-latest
+    outputs:
+      surum: ${{ steps.surum.outputs.surum }}
     steps:
       - uses: actions/checkout@v4
         with:
-          # Sürüm notu bir önceki masaüstü etiketinden bu yana yazılıyor.
           fetch-depth: 0
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-
-      - name: Etiket ve sürüm denetimi
-        id: surum
+      - id: surum
         run: |
           SURUM=$(node -p "require('./apps/desktop/package.json').version")
           if [ "$GITHUB_REF_TYPE" = tag ]; then
@@ -72,6 +64,22 @@ jobs:
           fi
           echo "surum=$SURUM" >> "$GITHUB_OUTPUT"
 
+  windows:
+    name: Windows paketi
+    needs: surum
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
       # Masaüstü uygulaması paketlerin derlenmiş çıktısını kullanıyor.
       - name: Paketleri derle
         run: pnpm build
@@ -79,29 +87,98 @@ jobs:
       - name: Windows paketi
         working-directory: apps/desktop
         # electron-builder CI'da etiketi görünce kendisi yayımlamaya
-        # çalışıyor; release'i aşağıdaki adım açıyor.
+        # çalışıyor; release'i son iş açıyor.
         run: pnpm package --win --publish never
 
-      - name: GitHub release
-        env:
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          if-no-files-found: error
+          path: |
+            apps/desktop/release/Kalem-Setup-${{ needs.surum.outputs.surum }}.exe
+            apps/desktop/release/Kalem-Setup-${{ needs.surum.outputs.surum }}.exe.blockmap
+            apps/desktop/release/Kalem-${{ needs.surum.outputs.surum }}.exe
+            apps/desktop/release/latest.yml
+
+  macos:
+    name: macOS paketi
+    needs: surum
+    runs-on: macos-latest
+    env:
+      # Developer ID yok: anahtar zincirinde sertifika aramasın, ad-hoc
+      # imzalasın (electron-builder.yml → mac.identity).
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Paketleri derle
+        run: pnpm build
+
+      - name: macOS paketi (arm64 + x64)
+        working-directory: apps/desktop
+        run: pnpm package --mac --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          if-no-files-found: error
+          path: |
+            apps/desktop/release/Kalem-${{ needs.surum.outputs.surum }}-arm64.dmg
+            apps/desktop/release/Kalem-${{ needs.surum.outputs.surum }}-x64.dmg
+
+  release:
+    name: GitHub release
+    needs: [surum, windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Sürüm notu bir önceki masaüstü etiketinden bu yana yazılıyor.
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          path: dosyalar
+          merge-multiple: true
+      - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SURUM: ${{ steps.surum.outputs.surum }}
+          SURUM: ${{ needs.surum.outputs.surum }}
         run: |
           ETIKET="desktop-v$SURUM"
           if gh release view "$ETIKET" > /dev/null 2>&1; then
             echo "::error::$ETIKET release'i zaten var; dosyaları elle değiştirin ya da önce silin."
             exit 1
           fi
-          DIZIN=apps/desktop/release
+          D=dosyalar
           ONCEKI=$(git tag --list 'desktop-v*' --sort=-v:refname | grep -vx "$ETIKET" | head -n 1)
+          NOT=$(mktemp)
+          cat > "$NOT" <<'METIN'
+          ### macOS
+
+          Apple Silicon (M1 ve sonrası) için `-arm64.dmg`, Intel Mac için `-x64.dmg`.
+          Uygulama henüz Apple tarafından onaylanmadığı (notarize edilmediği) için ilk
+          açılışta macOS onu engeller. Kalem'i Uygulamalar klasörüne sürükleyin, bir kez
+          açmayı deneyin, sonra **Sistem Ayarları → Gizlilik ve Güvenlik → Yine de Aç**'ı
+          kullanın (macOS 14 ve öncesinde sağ tıklayıp **Aç** demek de yeter). Yalnızca
+          ilk açılışta gerekir. Bu sürüm kendini güncelleyemez; yeni sürüm çıkınca indirme
+          sayfasını açar.
+          METIN
           # Etiket yoksa (main'den elle çalıştırma) yayımlanınca bu commit'te açılıyor.
           gh release create "$ETIKET" \
             --draft \
             --target "$GITHUB_SHA" \
             --title "Kalem Masaüstü $SURUM" \
+            --notes-file "$NOT" \
             --generate-notes ${ONCEKI:+--notes-start-tag "$ONCEKI"} \
-            "$DIZIN/Kalem-Setup-$SURUM.exe" \
-            "$DIZIN/Kalem-Setup-$SURUM.exe.blockmap" \
-            "$DIZIN/Kalem-$SURUM.exe" \
-            "$DIZIN/latest.yml"
+            "$D/Kalem-Setup-$SURUM.exe" \
+            "$D/Kalem-Setup-$SURUM.exe.blockmap" \
+            "$D/Kalem-$SURUM.exe" \
+            "$D/latest.yml" \
+            "$D/Kalem-$SURUM-arm64.dmg" \
+            "$D/Kalem-$SURUM-x64.dmg"
           gh release edit "$ETIKET" --draft=false

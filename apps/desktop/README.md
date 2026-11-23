@@ -24,9 +24,17 @@ Birim testleri depo kökünden: `pnpm test`.
 
 ## İndirme
 
-Hazır Windows sürümleri [GitHub Releases](https://github.com/yusufkocak1/kalem/releases)
-sayfasında: kurulum paketi (`Kalem-Setup-<sürüm>.exe`) ve taşınabilir exe
-(`Kalem-<sürüm>.exe`). Exe'ler depoda tutulmuyor.
+Hazır sürümler [GitHub Releases](https://github.com/yusufkocak1/kalem/releases)
+sayfasında. Windows: kurulum paketi (`Kalem-Setup-<sürüm>.exe`) ve
+taşınabilir exe (`Kalem-<sürüm>.exe`). macOS: Apple Silicon için
+`Kalem-<sürüm>-arm64.dmg`, Intel için `Kalem-<sürüm>-x64.dmg`. Paketler depoda
+tutulmuyor.
+
+macOS sürümü Developer ID ile imzalı ve notarize edilmiş değil (ad-hoc
+imzalı). İlk açılışta macOS engeller: bir kez açmayı deneyip **Sistem
+Ayarları → Gizlilik ve Güvenlik → Yine de Aç** deyin (macOS 14 ve öncesinde
+sağ tıklayıp **Aç** da yeter). Bu yüzden macOS sürümü kendini güncelleyemez;
+yeni sürümde indirme sayfasını açar.
 
 Yeni sürüm: `package.json`'daki `version` artırılıp `main`'e alınır, sonra
 aynı sürümün etiketi push edilir:
@@ -35,9 +43,10 @@ aynı sürümün etiketi push edilir:
 git tag desktop-v<sürüm> && git push origin desktop-v<sürüm>
 ```
 
-**Masaüstü yayını** iş akışı (`.github/workflows/masaustu.yml`) Windows'ta
-`package`'ı çalıştırır, `desktop-v<sürüm>` release'ini açar ve dört dosyayı
-ona ekler: iki exe, `latest.yml` ve `Kalem-Setup-<sürüm>.exe.blockmap`.
+**Masaüstü yayını** iş akışı (`.github/workflows/masaustu.yml`) `package`'ı
+Windows'ta ve macOS'ta çalıştırır, `desktop-v<sürüm>` release'ini açar ve
+altı dosyayı ona ekler: iki exe, `latest.yml`,
+`Kalem-Setup-<sürüm>.exe.blockmap` ve iki dmg (arm64, x64).
 Etiket `package.json`'daki sürümle uyuşmazsa hiçbir şey yayımlanmaz.
 Etiketi push etmek yerine iş akışı GitHub'dan da başlatılabilir (Actions →
 **Masaüstü yayını** → Run workflow → `main`); etiketi o zaman kendisi açar.
