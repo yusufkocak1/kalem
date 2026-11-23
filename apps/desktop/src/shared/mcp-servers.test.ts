@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { parseCustomModes } from "./custom-modes.js";
+import { MCP_PRESETS } from "./mcp-presets.js";
 import {
+	claudeServers,
 	liftModeServers,
 	mcpInstructions,
 	newMcpServer,
@@ -147,5 +149,43 @@ describe("the assistant's MCP servers", () => {
 		expect(withProject(files, null)).toEqual(files);
 		expect(projectFolder(undefined, "", "/work", "/doc")).toBe("/work");
 		expect(projectFolder(null, undefined)).toBeNull();
+	});
+
+	it("are kept running between questions only when the user says so, and only a program", () => {
+		const [plain, kept, address] = parseMcpServers([
+			I18N,
+			{ ...I18N, name: "kept", keepAlive: true },
+			{ name: "web", transport: "http", url: "https://mcp.example.com/mcp", keepAlive: true },
+		]);
+		expect(plain?.keepAlive).toBe(false);
+		expect(kept?.keepAlive).toBe(true);
+		expect(address?.keepAlive).toBe(false);
+		expect(newMcpServer([]).keepAlive).toBe(false);
+		// The CLIs' configurations do not say it: the app keeps them running.
+		expect(claudeServers(parseMcpServers([{ ...I18N, keepAlive: true }]))).toEqual({
+			"i18n-db": { type: "stdio", command: "npx", args: I18N.args, env: {} },
+		});
+	});
+
+	it("Playwright as added before is shown and kept running; changed by the user, it is left alone", () => {
+		const before = {
+			name: "playwright",
+			transport: "stdio",
+			command: "npx",
+			args: ["-y", "@playwright/mcp@latest", "--headless"],
+			preset: "playwright",
+		};
+		const [upgraded, chosen, own] = parseMcpServers([
+			before,
+			{ ...before, name: "chosen", keepAlive: false },
+			{ ...before, name: "own", args: [...before.args, "--isolated"] },
+		]);
+		expect(upgraded).toMatchObject({ args: ["-y", "@playwright/mcp@latest"], keepAlive: true });
+		expect(chosen).toMatchObject({ args: before.args, keepAlive: false });
+		expect(own).toMatchObject({ args: [...before.args, "--isolated"], keepAlive: false });
+		// The ready-made server adds it so too.
+		const preset = MCP_PRESETS.find((each) => each.id === "playwright");
+		expect(preset?.server.args).not.toContain("--headless");
+		expect(preset?.server.keepAlive).toBe(true);
 	});
 });

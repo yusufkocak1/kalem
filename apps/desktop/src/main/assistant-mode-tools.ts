@@ -175,6 +175,7 @@ function withChanges(base: McpServer, given: Record<string, unknown>): McpServer
 		...(tools === undefined ? {} : { tools }),
 		...(typeof given.purpose === "string" ? { purpose: given.purpose } : {}),
 		...(typeof given.enabled === "boolean" ? { enabled: given.enabled } : {}),
+		...(typeof given.keepAlive === "boolean" ? { keepAlive: given.keepAlive } : {}),
 	};
 }
 
@@ -200,6 +201,11 @@ const SERVER_FIELDS = {
 			description: "What it is for and when to use it; the model is told in the modes that use it.",
 		},
 		enabled: { type: "boolean" },
+		keepAlive: {
+			type: "boolean",
+			description:
+				"stdio: Kalem starts it once and keeps it running between questions (a browser stays open, with its sign-in).",
+		},
 	},
 } as const;
 
@@ -374,6 +380,7 @@ const MODE_TOOLS: readonly KalemTool[] = [
 								purpose: "",
 								preset: "",
 								enabled: true,
+								keepAlive: false,
 							}
 						: presetServer(preset, servers);
 				const wantedName = typeof given.name === "string" ? serverName(given.name) : base.name;

@@ -349,7 +349,7 @@ Kullanım: *"Dün 14:00 civarında ödeme servisinde hata var mı?"*
 | **Git** | uvx | `<repository folder>`: deponun klasörü. Yalnızca okuma araçları açık. | "Bu dosya son hangi commit'te değişti, neden?" |
 | **Filesystem** | npx | `<folder>`: okunacak klasör (birden fazla klasör için her satıra bir klasör). | "Ortak klasördeki API sözleşmesine göre yaz." |
 | **Context7** | npx | — | "Spring Boot 3'te bunu nasıl yaparım?" (güncel dokümana bakar) |
-| **Playwright** | npx | — (ilk çalışmada tarayıcı indirebilir) | "Giriş sayfasını aç, hata mesajı görünüyor mu?" |
+| **Playwright** | npx | — (ilk çalışmada tarayıcı indirebilir). Tarayıcı görünür açılır ve **Sorular arasında açık kalsın** işaretli gelir: bir sayfa giriş isterse o pencerede giriş yapın, asistan sonraki soruda aynı oturumla sürer. Görünmesin isterseniz Argümanlar'a `--headless` ekleyin. | "Giriş sayfasını aç, hata mesajı görünüyor mu?" |
 | **Sentry** | npx | `SENTRY_ACCESS_TOKEN`; kendi sunucunuz varsa `SENTRY_HOST` | "Son 24 saatteki en sık hata ne?" |
 | **Fetch** | uvx | — | "Şu adresteki sürüm notlarını özetle." |
 | **Memory** | npx | `MEMORY_FILE_PATH`: hafızanın tutulacağı dosya | "Bundan sonra servis adlarını hep kebab-case yazacağız, hatırla." |

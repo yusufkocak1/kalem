@@ -1253,6 +1253,9 @@ const en = {
 	mcpCommand: "Command",
 	mcpArgs: "Arguments (one a line)",
 	mcpEnv: "Environment (KEY=value, one a line)",
+	mcpKeepAlive: "Keep it running between questions",
+	mcpKeepAliveHint:
+		"Kalem starts it once and keeps it running while the app is open, instead of each answer starting and stopping it: what it holds (a browser window and its sign-in, say) is still there at the next question. Changed, turned off or removed, it stops.",
 	mcpUrl: "Address",
 	mcpHeaders: "Headers (Name: value, one a line)",
 	mcpTools: "Tools it may use",
@@ -1301,7 +1304,7 @@ const en = {
 	mcpPresetContext7:
 		"Up-to-date documentation of libraries (React, Spring, .NET…), so code follows their current API.",
 	mcpPresetPlaywright:
-		"A browser the assistant drives: opens your app's pages to check a change or reproduce a bug.",
+		"A browser the assistant drives, in a window you see and kept open between questions: opens your app's pages to check a change or reproduce a bug.",
 	mcpPresetSentry:
 		"Production errors and stack traces from Sentry. Needs an access token; SENTRY_HOST for your own server.",
 	mcpPresetFortify:
@@ -1334,7 +1337,7 @@ const en = {
 	mcpGuideContext7:
 		"Up-to-date documentation of libraries and frameworks (React, Spring, .NET…), so code follows their current API instead of what the model remembers.\nPress Add; nothing to fill in. For higher limits, add --api-key and your key as two more lines in Arguments.\nTry it: “How do I do this in Spring Boot 3?”",
 	mcpGuidePlaywright:
-		"A browser the assistant drives: it opens your application's pages to check a change or reproduce a bug.\nPress Add. The first run may download a browser.\nTo watch it work, remove --headless from Arguments.\nTry it: “Open the login page; does the error message show?”",
+		"A browser the assistant drives, in a window you see: it opens your application's pages to check a change or reproduce a bug.\nPress Add. The first run may download a browser.\nIt is kept running between questions: when a page asks you to sign in, sign in in that window and tell the assistant; it goes on in the same session at the next question.\nTo run it unseen, add --headless to Arguments.\nTry it: “Open the login page; does the error message show?”",
 	mcpGuideSentry:
 		"Your application's errors in production, with their stack traces.\nIn Sentry: User settings → Auth Tokens → create a token with org:read, project:read and event:read.\nPress Add, and in Environment replace <token> with it. For your own Sentry server, set SENTRY_HOST to its address.\nTry it: “What was the most frequent error in the last 24 hours?”",
 	mcpGuideFortify:
@@ -3238,6 +3241,9 @@ const tr: Strings = {
 	mcpCommand: "Komut",
 	mcpArgs: "Argümanlar (her satıra bir tane)",
 	mcpEnv: "Ortam değişkenleri (ANAHTAR=değer, her satıra bir tane)",
+	mcpKeepAlive: "Sorular arasında açık kalsın",
+	mcpKeepAliveHint:
+		"Her yanıt onu başlatıp kapatmak yerine Kalem bir kez başlatır ve uygulama açık kaldıkça çalışır tutar: tuttuğu şey (bir tarayıcı penceresi ve oturumu gibi) sonraki soruda da yerindedir. Değiştirilince, kapatılınca ya da silinince durur.",
 	mcpUrl: "Adres",
 	mcpHeaders: "Başlıklar (Ad: değer, her satıra bir tane)",
 	mcpTools: "Kullanabileceği araçlar",
@@ -3286,7 +3292,7 @@ const tr: Strings = {
 	mcpPresetContext7:
 		"Kütüphanelerin (React, Spring, .NET…) güncel dokümantasyonu; kod güncel API'ye göre yazılır.",
 	mcpPresetPlaywright:
-		"Asistanın kullandığı bir tarayıcı: bir değişikliği görmek ya da hatayı tekrar etmek için uygulamanızın sayfalarını açar.",
+		"Asistanın kullandığı, görünen ve sorular arasında açık kalan bir tarayıcı: bir değişikliği görmek ya da hatayı tekrar etmek için uygulamanızın sayfalarını açar.",
 	mcpPresetSentry:
 		"Sentry'deki canlı ortam hataları ve stack trace'ler. Erişim token'ı gerekir; kendi sunucunuz için SENTRY_HOST.",
 	mcpPresetFortify:
@@ -3319,7 +3325,7 @@ const tr: Strings = {
 	mcpGuideContext7:
 		"Kütüphanelerin ve framework'lerin (React, Spring, .NET…) güncel dokümantasyonu; kod, modelin hatırladığına değil güncel API'ye göre yazılır.\nEkle'ye basın; doldurulacak bir şey yok. Daha yüksek limit için Argümanlar'a iki satır ekleyin: --api-key ve anahtarınız.\nDeneyin: “Spring Boot 3'te bunu nasıl yaparım?”",
 	mcpGuidePlaywright:
-		"Asistanın kullandığı bir tarayıcı: bir değişikliği görmek ya da bir hatayı tekrarlamak için uygulamanızın sayfalarını açar.\nEkle'ye basın. İlk çalışmada bir tarayıcı indirebilir.\nÇalışırken izlemek için Argümanlar'dan --headless'ı silin.\nDeneyin: “Giriş sayfasını aç; hata mesajı görünüyor mu?”",
+		"Asistanın kullandığı, sizin de gördüğünüz bir pencerede açılan tarayıcı: bir değişikliği görmek ya da bir hatayı tekrarlamak için uygulamanızın sayfalarını açar.\nEkle'ye basın. İlk çalışmada bir tarayıcı indirebilir.\nSorular arasında açık kalır: bir sayfa giriş isterse o pencerede giriş yapın ve asistana söyleyin; sonraki soruda aynı oturumla devam eder.\nGörünmeden çalışsın isterseniz Argümanlar'a --headless ekleyin.\nDeneyin: “Giriş sayfasını aç; hata mesajı görünüyor mu?”",
 	mcpGuideSentry:
 		"Uygulamanızın canlı ortamdaki hataları ve stack trace'leri.\nSentry'de: User settings → Auth Tokens → org:read, project:read ve event:read izinli bir token oluşturun.\nEkle'ye basın; Ortam değişkenleri'ndeki <token>'ı onunla değiştirin. Kendi Sentry sunucunuz varsa SENTRY_HOST'a adresini yazın.\nDeneyin: “Son 24 saatte en sık görülen hata ne?”",
 	mcpGuideFortify:

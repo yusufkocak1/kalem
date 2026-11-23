@@ -69,6 +69,8 @@ import { findRepoRoot, isTrustedRepo } from "./git-trust.js";
 import type { VersionStore } from "./history.js";
 import { connectJira, jiraConnection, registerJiraIpc } from "./jira-ipc.js";
 import { LocalNotesStore } from "./local-notes-store.js";
+import { KeptServers } from "./mcp-kept.js";
+import { programEnvironment } from "./mcp-probe.js";
 import { paletteCommands, runPaletteCommand } from "./menu.js";
 import { registerNetworkIpc } from "./network-ipc.js";
 import { networkLog } from "./network-log.js";
@@ -151,6 +153,12 @@ function toImageFile(raw: unknown): ImageFile {
  * so every handler checks its sender and its arguments.
  */
 export function registerIpc(ctx: IpcContext): void {
+	/** The assistant's MCP servers kept running between questions. */
+	const keptServers = new KeptServers({
+		folder: join(app.getPath("userData"), "assistant-tools"),
+		node: process.execPath,
+		env: programEnvironment,
+	});
 	const { windows } = ctx;
 	/** Set at the end, once the assistant's requests are registered. */
 	let assistant: AssistantService;
@@ -1009,6 +1017,10 @@ export function registerIpc(ctx: IpcContext): void {
 		// Trust is given only through the confirmation the main process shows.
 		const { language, gitTrustedFolders: _trust, ...rest } = patch as Partial<Settings>;
 		if (Object.keys(rest).length > 0) ctx.changeSettings(rest);
+		// A server no longer kept running (changed, turned off, removed) stops now.
+		if (Object.hasOwn(rest, "assistantMcpServers")) {
+			keptServers.retain(ctx.store.settings.assistantMcpServers);
+		}
 		if (
 			Object.hasOwn(patch, "language") &&
 			(language === null || language === "tr" || language === "en") &&
@@ -1141,6 +1153,7 @@ export function registerIpc(ctx: IpcContext): void {
 			folder: join(app.getPath("userData"), "assistant-tools"),
 			node: process.execPath,
 		}),
+		kept: keptServers,
 		changeSettings: ctx.changeSettings,
 		changeLanguage: ctx.changeLanguage,
 		language: ctx.language,

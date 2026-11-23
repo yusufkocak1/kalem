@@ -32,10 +32,15 @@ export async function fakeClaude(
 	answer: string | readonly (readonly [string, string])[] = REPLY,
 	/**
 	 * Tools to call before answering, as Claude Code does: through the MCP
-	 * server its `--mcp-config` names. What they return is written down
-	 * with the call, and the calls show in the stream as tool uses.
+	 * server its `--mcp-config` names (the first, or the one named). What
+	 * they return is written down with the call, and the calls show in the
+	 * stream as tool uses.
 	 */
-	tools: readonly { readonly name: string; readonly input: Record<string, unknown> }[] = [],
+	tools: readonly {
+		readonly name: string;
+		readonly input: Record<string, unknown>;
+		readonly server?: string;
+	}[] = [],
 	options: {
 		/** A run whose arguments hold this fails the first time, as a rate limit would. */
 		readonly failOnce?: string;
@@ -109,12 +114,26 @@ const textOf = (line) => {
 	return typeof content === "string" ? content : (content.find((block) => block.type === "text")?.text ?? "");
 };
 const tools = ${JSON.stringify(tools)};
-/** Calls the tools through the configured MCP server; their texts. */
+/** Calls the tools through the configured MCP servers; their texts. */
 async function callTools() {
 	const at = args.indexOf("--mcp-config");
 	if (tools.length === 0 || at === -1) return [];
 	const config = JSON.parse(fs.readFileSync(args[at + 1], "utf8"));
-	const [name, server] = Object.entries(config.mcpServers)[0];
+	const connections = new Map();
+	const results = [];
+	for (const tool of tools) {
+		const [name, server] = tool.server ? [tool.server, config.mcpServers[tool.server]] : Object.entries(config.mcpServers)[0];
+		if (!connections.has(name)) connections.set(name, await connect(server));
+		const { ask } = connections.get(name);
+		const allowed = args.includes("mcp__" + name + "__" + tool.name) || args.includes("mcp__" + name);
+		const answer = await ask("tools/call", { name: tool.name, arguments: tool.input });
+		results.push({ tool: "mcp__" + name + "__" + tool.name, allowed, text: answer.result ? answer.result.content[0].text : "error: " + answer.error.message });
+	}
+	for (const { end } of connections.values()) end();
+	return results;
+}
+/** Starts a server as Claude Code does, greets it, and asks it things. */
+async function connect(server) {
 	const child = require("node:child_process").spawn(server.command, server.args, {
 		env: { ...process.env, ...server.env },
 		stdio: ["pipe", "pipe", "inherit"],
@@ -140,14 +159,7 @@ async function callTools() {
 			child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\\n");
 		});
 	await ask("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "fake" } });
-	const results = [];
-	for (const tool of tools) {
-		const allowed = args.includes("mcp__" + name + "__" + tool.name);
-		const answer = await ask("tools/call", { name: tool.name, arguments: tool.input });
-		results.push({ tool: "mcp__" + name + "__" + tool.name, allowed, text: answer.result.content[0].text });
-	}
-	child.stdin.end();
-	return results;
+	return { ask, end: () => child.stdin.end() };
 }
 /** Answers one message; \`input\` is its JSON line, when it came as one. */
 async function turn(prompt, input) {

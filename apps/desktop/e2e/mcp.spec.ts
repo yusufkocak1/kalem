@@ -9,7 +9,7 @@ import { shot } from "./shots.js";
 
 /** The settings the app keeps, as written: the parts these tests read. */
 interface Stored {
-	readonly assistantMcpServers?: readonly { readonly name: string }[];
+	readonly assistantMcpServers?: readonly { readonly name: string; readonly keepAlive?: boolean }[];
 	readonly assistantModes?: Record<string, { readonly mcp?: readonly string[] } | undefined>;
 	readonly assistantCustomModes?: readonly { readonly mcp?: readonly string[] }[];
 }
@@ -355,6 +355,86 @@ test("the assistant adds a server and uses it in a mode only once the user sees 
 	expect(listed).toContain("- serena");
 	expect(listed).toContain("used in: review, prompt, code");
 	expect(listed).not.toContain("git+https://github.com/oraios/serena");
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+/** A stdio MCP server that holds a count, as a browser holds a sign-in: `open` counts up. */
+const COUNTER = `
+let opened = 0;
+let rest = "";
+const send = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + "\\n");
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => {
+	rest += chunk;
+	let at;
+	while ((at = rest.indexOf("\\n")) !== -1) {
+		const message = JSON.parse(rest.slice(0, at));
+		rest = rest.slice(at + 1);
+		if (message.method === "initialize") {
+			send({ id: message.id, result: { protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "counter", version: "1" } } });
+		} else if (message.method === "tools/call") {
+			opened++;
+			send({ id: message.id, result: { content: [{ type: "text", text: "open:" + opened + ":" + process.pid }] } });
+		}
+	}
+});
+process.stdin.on("end", () => process.exit(0));
+`;
+
+test("a server kept running between questions still holds what it held at the next one", async () => {
+	const folder = await tempDir("mcp-kept");
+	const script = join(folder, "counter.cjs");
+	await writeFile(script, COUNTER);
+	const claude = await fakeClaude(folder, "Tamam.", [{ name: "open", input: {}, server: "sayac" }]);
+	const counter = {
+		name: "sayac",
+		transport: "stdio",
+		command: process.execPath,
+		args: [script],
+		purpose: "A count.",
+	};
+	const userData = await profile({
+		assistant: true,
+		assistantMcpServers: [{ ...counter, keepAlive: true }],
+		assistantModes: { ask: { mcp: ["sayac"] } },
+	});
+	const { app, page, errors } = await launch({ userData, env: { KALEM_CLAUDE: claude.path } });
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toHaveText("9.9.9 (Claude Code)");
+	const opened = async (n: number): Promise<string> => {
+		await expect.poll(async () => (await questions(claude)).length).toBe(n);
+		return (await questions(claude))[n - 1]?.tools?.[0]?.text ?? "";
+	};
+
+	// Two questions, two CLIs: the same server, its count still there.
+	await ask(page, "ask", "Bir", "Tamam.");
+	const first = await opened(1);
+	expect(first).toMatch(/^open:1:\d+$/);
+	await ask(page, "ask", "İki", "Tamam.");
+	expect(await opened(2)).toBe(`open:2:${first.split(":")[2]}`);
+	// The CLI was given Kalem's stand-in for it, not the program itself.
+	const config = (await questions(claude))[1]?.mcp?.mcpServers.sayac ?? {};
+	expect(config.args).toEqual([expect.stringMatching(/kalem-kept\.cjs$/)]);
+	expect(JSON.stringify(config)).not.toContain(script);
+
+	// Set to run per question in Settings: each CLI starts it anew.
+	const settings = await openSettings(app, page, "assistant");
+	const keep = settings.locator('.mcp-card[data-server="sayac"] input[data-setting="keepAlive"]');
+	await expect(keep).toBeChecked();
+	await expect(settings.locator('.mcp-card[data-server="sayac"]')).toContainText(
+		"Keep it running between questions",
+	);
+	await keep.uncheck();
+	await expect
+		.poll(async () => (await stored(userData)).assistantMcpServers)
+		.toEqual([expect.objectContaining({ name: "sayac", keepAlive: false })]);
+	await settings.getByRole("button", { name: "Done" }).click();
+	await ask(page, "ask", "Üç", "Tamam.");
+	const third = await opened(3);
+	expect(third).toMatch(/^open:1:\d+$/);
+	expect(third.split(":")[2]).not.toBe(first.split(":")[2]);
+	expect((await questions(claude))[2]?.mcp?.mcpServers.sayac?.args).toEqual([script]);
 	expect(errors).toEqual([]);
 	await app.close();
 });

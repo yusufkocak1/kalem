@@ -36,7 +36,7 @@ const stdio = (
 	command: string,
 	args: readonly string[],
 	purpose: string,
-	more: { env?: Record<string, string>; tools?: readonly string[] } = {},
+	more: { env?: Record<string, string>; tools?: readonly string[]; keepAlive?: boolean } = {},
 ): Omit<McpServer, "enabled" | "preset"> => ({
 	name,
 	transport: "stdio",
@@ -47,6 +47,7 @@ const stdio = (
 	headers: {},
 	tools: more.tools ?? [],
 	purpose,
+	keepAlive: more.keepAlive ?? false,
 });
 
 const http = (
@@ -64,6 +65,7 @@ const http = (
 	headers: more.headers ?? {},
 	tools: more.tools ?? [],
 	purpose,
+	keepAlive: false,
 });
 
 export const MCP_PRESETS: readonly McpPreset[] = [
@@ -178,8 +180,10 @@ export const MCP_PRESETS: readonly McpPreset[] = [
 		server: stdio(
 			"playwright",
 			"npx",
-			["-y", "@playwright/mcp@latest", "--headless"],
-			"A browser: open the application's pages to check how a change looks and behaves, and to reproduce a bug the user describes.",
+			["-y", "@playwright/mcp@latest"],
+			"A browser the user sees: open the application's pages to check how a change looks and behaves, and to reproduce a bug the user describes. It stays open between questions: when a page asks to sign in, ask the user to sign in in that window and to tell you when they have, then go on in the same browser.",
+			// Shown, and kept running: a sign-in done there carries over to the next question.
+			{ keepAlive: true },
 		),
 	},
 	{

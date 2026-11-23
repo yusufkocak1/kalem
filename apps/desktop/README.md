@@ -999,6 +999,25 @@ verir.
 >     kullanıcıya kalır. Bir MCP sunucusu bu bilgisayarda program
 >     çalıştırabildiği için asistan bu ayarı (`assistantMcpServers`)
 >     göremez.
+>   - **Sorular arasında açık kalsın:** bu bilgisayarda çalışan (stdio) bir
+>     sunucu normalde bir yanıt kadar yaşar: her soruda Claude Code / Copilot
+>     onu başlatır, yanıt bitince kapatır. Kartta bu kutu işaretliyse Kalem
+>     sunucuyu bir kez başlatır ve uygulama açık kaldıkça çalışır tutar;
+>     tuttuğu şey (ör. bir tarayıcı penceresi ve oturumu) sonraki soruda da
+>     yerindedir. CLI'ye her soruda sunucunun kendisi değil, ona Kalem
+>     üzerinden bağlanan küçük bir stdio aracısı verilir (yalnızca
+>     127.0.0.1, bu çalıştırmaya özel token, proxy'den geçmez). Sunucu bir
+>     kez selamlanır; her CLI o selamı alır, istek numaraları karışmaz;
+>     CLI çekilince beklediği istekler iptal edilir. Sunucu değiştirilince
+>     yeniden başlar; kutu kaldırılınca, sunucu kapatılınca ya da silinince
+>     ve uygulama kapanınca durur. **Playwright** hazır sunucusu artık
+>     tarayıcıyı görünür açar (`--headless` yok) ve açık kalır: bir sayfa
+>     giriş isterse o pencerede giriş yapılır, asistan sonraki soruda aynı
+>     oturumla sürer. Önceki sürümün hazır ayarıyla (değiştirilmeden)
+>     eklenmiş Playwright bir kez bu yeni hâle getirilir; argümanları
+>     değiştirilmiş olan olduğu gibi kalır. Asistanın MCP sunucuları API
+>     hizmetlerinde (Anthropic, OpenAI uyumlu) bağlanmaz; yalnızca Claude
+>     Code ve Copilot ile kullanılır.
 >   - **Serena, hazır gelen sunucu:** asistan Serena ile gelir (kodu IDE
 >     gibi okuyan, sembol sembol düzenleyen MCP sunucusu; `uvx` gerekir) ve
 >     baştan Kod, Analizi İncele ve Prompt Hazırla modlarında açıktır.

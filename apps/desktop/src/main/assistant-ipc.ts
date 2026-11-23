@@ -82,6 +82,7 @@ import { PermissionGate } from "./assistant-permissions.js";
 import { Steering } from "./assistant-steering.js";
 import type { Connections, DocumentSnapshot, ToolContext, ToolResult } from "./assistant-tools.js";
 import { allTools, approver, RendererCalls, runTool, toolsFor } from "./assistant-tools.js";
+import type { KeptServers } from "./mcp-kept.js";
 import { ModelCatalog } from "./model-catalog.js";
 import { networkLog } from "./network-log.js";
 import { ReviewRun, ReviewRuns } from "./review-run.js";
@@ -134,6 +135,8 @@ export interface AssistantIpcContext {
 	readonly connections: Connections;
 	/** Kalem's tools for a CLI, as an MCP server. */
 	readonly tools: AssistantToolServer;
+	/** The assistant's MCP servers kept running between questions. */
+	readonly kept: KeptServers;
 	/** Changes settings as the menus do: every window follows. */
 	changeSettings(patch: Partial<Settings>): void;
 	changeLanguage(language: Lang | null): void;
@@ -297,6 +300,8 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		}
 		return search;
 	};
+	// The servers kept running stop with the app.
+	app.on("will-quit", () => ctx.kept.stopAll());
 	/** Running questions by window and chat; each can be stopped. */
 	const running = new Map<string, () => void>();
 	/** What the user adds to each running question, by window and chat. */
@@ -724,22 +729,26 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		// The user's code folder for `${project}` (Serena's): a folder added to the question,
 		// else one open in the Files pane, else the active document's.
 		const activeTab = typeof request.tabId === "string" ? win.tabs.get(request.tabId) : undefined;
-		const servers = withProject(
-			modeServers(reach, modeSettings, customModes, ctx.store.settings.assistantMcpServers),
-			projectFolder(
-				// The Files pane's folders go with every question: one added besides them was picked for it.
-				collected.roots.find(
-					(root) =>
-						!ctx.store.state.workspaces.some(
-							(open) =>
-								sameKey(resolve(open), process.platform) ===
-								sameKey(resolve(root), process.platform),
-						),
+		// Those kept running are started once, and the CLI is given a stand-in that reaches them.
+		ctx.kept.retain(ctx.store.settings.assistantMcpServers);
+		const servers = await ctx.kept.bridge(
+			withProject(
+				modeServers(reach, modeSettings, customModes, ctx.store.settings.assistantMcpServers),
+				projectFolder(
+					// The Files pane's folders go with every question: one added besides them was picked for it.
+					collected.roots.find(
+						(root) =>
+							!ctx.store.state.workspaces.some(
+								(open) =>
+									sameKey(resolve(open), process.platform) ===
+									sameKey(resolve(root), process.platform),
+							),
+					),
+					ctx.store.state.workspaces[0],
+					activeTab !== undefined && activeTab.path !== null && activeTab.remote === null
+						? dirname(activeTab.path)
+						: null,
 				),
-				ctx.store.state.workspaces[0],
-				activeTab !== undefined && activeTab.path !== null && activeTab.remote === null
-					? dirname(activeTab.path)
-					: null,
 			),
 		);
 		// The document template picked for this question, whatever the mode: the model works by it.
