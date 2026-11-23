@@ -64,10 +64,24 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
 
+# No Apple Developer ID yet: the app is signed ad hoc ("-"), which Apple
+# Silicon requires to run at all, and is not notarized, so Gatekeeper asks
+# once (right-click → Open, or System Settings → Privacy & Security → Open
+# Anyway). Hardened runtime is for notarization; with an ad-hoc signature it
+# would only make library validation refuse Electron's own frameworks.
 mac:
   category: public.app-category.productivity
+  identity: "-"
+  hardenedRuntime: false
   target:
-    - dmg
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+
+dmg:
+  # One per architecture: Kalem-<version>-arm64.dmg, Kalem-<version>-x64.dmg.
+  artifactName: ${productName}-${version}-${arch}.${ext}
 
 linux:
   category: Office
