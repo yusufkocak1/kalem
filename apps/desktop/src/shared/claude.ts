@@ -13,6 +13,7 @@ import { boxOf, GROUP_PADDING, GROUP_TOP, layoutDiagram } from "./diagram-edit.j
 import type { Finding } from "./findings.js";
 import type { Strings } from "./i18n.js";
 import { claudeInitModel } from "./models.js";
+import type { Steered } from "./steering.js";
 import { TABLE_COLORS } from "./table-style.js";
 
 /** The code fence language of a Kalem diagram in a reply. */
@@ -477,6 +478,8 @@ export type ClaudeEvent =
 			readonly output: number;
 			readonly cached: number;
 	  }
+	/** What the user added while it answered, now taken in by it (by the ids the window gave them). */
+	| { readonly kind: "steered"; readonly messages: readonly Steered[] }
 	| { readonly kind: "done" }
 	| { readonly kind: "error"; readonly message: string };
 

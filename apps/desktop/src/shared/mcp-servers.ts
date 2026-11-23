@@ -27,6 +27,12 @@ export interface McpServer {
 	/** The ready-made server it was added from (its guide is shown with it); empty for none. */
 	readonly preset: string;
 	readonly enabled: boolean;
+	/**
+	 * stdio: Kalem starts it once and keeps it running while the app is open,
+	 * instead of each question's CLI starting and stopping it; what it holds
+	 * (a browser and its sign-in) carries over to the next question.
+	 */
+	readonly keepAlive: boolean;
 }
 
 /**
@@ -71,10 +77,29 @@ export const serverName = (name: string): string =>
 		.replace(/^-+|-+$/g, "")
 		.slice(0, 40);
 
+/**
+ * Playwright as its ready-made server added it before it could be kept
+ * running: a browser nobody saw (`--headless`), gone when the answer
+ * ended, so a page that wants the user to sign in could not be used. As
+ * it was added, unchanged, it is now added: shown, and kept running.
+ */
+const PLAYWRIGHT_BEFORE = ["-y", "@playwright/mcp@latest", "--headless"];
+
+function upgraded(server: Record<string, unknown>): Record<string, unknown> {
+	if (
+		server.preset !== "playwright" ||
+		server.keepAlive !== undefined ||
+		JSON.stringify(server.args) !== JSON.stringify(PLAYWRIGHT_BEFORE)
+	) {
+		return server;
+	}
+	return { ...server, args: PLAYWRIGHT_BEFORE.slice(0, 2), keepAlive: true };
+}
+
 /** A server as the settings file holds it, validated; `null` when it cannot be used. */
 export function parseMcpServer(raw: unknown): McpServer | null {
 	if (typeof raw !== "object" || raw === null) return null;
-	const server = raw as Record<string, unknown>;
+	const server = upgraded(raw as Record<string, unknown>);
 	const name = serverName(text(server.name, 60));
 	if (name === "" || name.toLocaleLowerCase("en") === RESERVED_SERVER) return null;
 	const transport = server.transport === "http" ? "http" : "stdio";
@@ -94,6 +119,7 @@ export function parseMcpServer(raw: unknown): McpServer | null {
 		purpose: text(server.purpose, 2000),
 		preset: /^[a-z0-9-]{1,40}$/.test(text(server.preset, 40)) ? text(server.preset, 40) : "",
 		enabled: server.enabled !== false,
+		keepAlive: transport === "stdio" && server.keepAlive === true,
 	};
 }
 
@@ -127,6 +153,7 @@ export function newMcpServer(taken: readonly McpServer[]): McpServer {
 		purpose: "",
 		preset: "",
 		enabled: true,
+		keepAlive: false,
 	};
 }
 

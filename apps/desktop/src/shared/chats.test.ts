@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { StoredMessage } from "./chats.js";
 import { chatSummary, chatTitle, historyOf, parseChat } from "./chats.js";
+import { steeringNote } from "./steering.js";
 
 const message = (
 	role: "user" | "assistant",
@@ -91,5 +92,32 @@ describe("chats", () => {
 		const kept = historyOf(long);
 		expect(kept).toHaveLength(40);
 		expect(kept[0]).toEqual({ role: "user", content: "q10" });
+	});
+
+	it("keep what the user added while a reply ran, with the reply", () => {
+		const chat = parseChat({
+			id: "c-3",
+			provider: "anthropic",
+			messages: [
+				{ role: "user", text: "Özetle", steered: [{ at: 0, text: "yok sayılır" }] },
+				{
+					role: "assistant",
+					text: "Özet: …",
+					steered: [
+						{ at: 6, text: "Kısa tut" },
+						{ at: -1, text: "yeri yanlış" },
+						{ at: 2, text: "   " },
+						"bozuk",
+					],
+				},
+			],
+		});
+		expect(chat?.messages[0]).not.toHaveProperty("steered");
+		expect(chat?.messages[1]?.steered).toEqual([{ at: 6, text: "Kısa tut" }]);
+		// An API picking the chat up is told it, as it was when it answered.
+		expect(historyOf(chat?.messages ?? [])).toEqual([
+			{ role: "user", content: `Özetle\n\n${steeringNote(["Kısa tut"])}` },
+			{ role: "assistant", content: "Özet: …" },
+		]);
 	});
 });

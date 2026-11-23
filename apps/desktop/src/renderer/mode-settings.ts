@@ -1,4 +1,4 @@
-import type { Settings } from "../shared/bridge.js";
+import type { ModeExportResult, ModeImportResult, Settings } from "../shared/bridge.js";
 import { newCustomMode } from "../shared/custom-modes.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
@@ -41,6 +41,12 @@ export interface ModeEditorOptions {
 	update(patch: Partial<Settings>): void;
 	/** Kalem's tools, for choosing a mode's of the user's. */
 	toolCatalog(): Promise<readonly ToolInfo[]>;
+	/** Writes a mode to a file the user picks, to give to someone else. */
+	exportMode(
+		which: { readonly custom: string } | { readonly kalem: Mode },
+	): Promise<ModeExportResult | null>;
+	/** Reads a mode someone gave from a file the user picks, and adds it once they say so. */
+	importMode(): Promise<ModeImportResult | null>;
 }
 
 /** An icon with a class of its own. */
@@ -74,11 +80,82 @@ export function createModeEditor(options: ModeEditorOptions): {
 		attrs: { role: "tablist", "aria-label": t.settingsCatModes },
 	});
 	const panel = el("section", { class: "mode-panel", attrs: { role: "tabpanel" } });
+	/** What came of an export or an import. */
+	const shareStatus = el("p", {
+		class: "mode-share-status",
+		attrs: { role: "status", hidden: "" },
+	});
 	const element = el("div", {
 		class: "settings-block mode-editor",
 		attrs: { "data-block": "modes" },
-		children: [el("p", { class: "confluence-hint", text: t.modesHint }), tabs, panel],
+		children: [el("p", { class: "confluence-hint", text: t.modesHint }), tabs, shareStatus, panel],
 	});
+
+	function say(text: string): void {
+		shareStatus.textContent = text;
+		shareStatus.hidden = text === "";
+	}
+
+	/** Writes the mode shown to a file, and says where and what was left out. */
+	async function exportMode(
+		which: { readonly custom: string } | { readonly kalem: Mode },
+	): Promise<void> {
+		say("");
+		try {
+			const done = await options.exportMode(which);
+			if (done === null) return;
+			say(
+				[
+					format(t.modeExported, done.path),
+					...(done.fillIn.length === 0
+						? []
+						: [format(t.modeExportedSecrets, done.fillIn.join(", "))]),
+				].join(" "),
+			);
+		} catch (error) {
+			say(error instanceof Error ? error.message : String(error));
+		}
+	}
+
+	/** Brings in a mode from a file, and shows it. */
+	async function importMode(): Promise<void> {
+		say("");
+		let done: ModeImportResult | null;
+		try {
+			done = await options.importMode();
+		} catch (error) {
+			say(error instanceof Error ? error.message : String(error));
+			return;
+		}
+		if (done === null) return;
+		const imported = done;
+		// The settings it changed may still be on their way to this window.
+		const has = (): boolean =>
+			imported.custom === undefined ||
+			options.settings().assistantCustomModes.some((each) => each.id === imported.custom);
+		for (let wait = 0; !has() && wait < 20; wait++) {
+			await new Promise((resolve) => setTimeout(resolve, 50));
+		}
+		editing = null;
+		if (imported.custom !== undefined) customId = imported.custom;
+		else if (imported.kalem !== undefined) {
+			customId = null;
+			selected = imported.kalem;
+			mode = resolveMode(selected, options.settings().assistantModes);
+		}
+		draw();
+		say(
+			[
+				format(t.modeImported, imported.name),
+				...(imported.added.length === 0
+					? []
+					: [format(t.modeImportedServers, imported.added.join(", "))]),
+				...(imported.fillIn.length === 0
+					? []
+					: [format(t.modeImportFillIn, imported.fillIn.join(", "))]),
+			].join(" "),
+		);
+	}
 
 	const stepTitle = (step: ResolvedStep): string =>
 		step.title ?? (step.titleKey === null ? step.id : t[step.titleKey]);
@@ -151,6 +228,15 @@ export function createModeEditor(options: ModeEditorOptions): {
 			draw();
 			panel.querySelector<HTMLInputElement>(".mode-field input")?.select();
 		});
+		const load = el("button", {
+			class: "mode-tab mode-tab-import",
+			attrs: { type: "button", title: t.modeImportTitle },
+			children: [
+				mark("open", "mode-tab-icon"),
+				el("span", { class: "mode-tab-label", text: t.modeImport }),
+			],
+		});
+		load.addEventListener("click", () => void importMode());
 		tabs.replaceChildren(
 			...MODES.map((each) => {
 				const resolved =
@@ -183,6 +269,7 @@ export function createModeEditor(options: ModeEditorOptions): {
 			}),
 			...customTabs,
 			add,
+			load,
 		);
 	}
 
@@ -197,6 +284,7 @@ export function createModeEditor(options: ModeEditorOptions): {
 				mode: own,
 				catalog,
 				mcpServers: () => options.settings().assistantMcpServers,
+				share: () => void exportMode({ custom: id }),
 				save(next) {
 					const all = options.settings().assistantCustomModes;
 					if (next === null) {
@@ -465,6 +553,12 @@ export function createModeEditor(options: ModeEditorOptions): {
 			save();
 			draw();
 		});
+		const share = el("button", {
+			class: "jira-button mode-export",
+			text: t.modeExport,
+			attrs: { type: "button", title: t.modeExportTitle },
+		});
+		share.addEventListener("click", () => void exportMode({ kalem: selected }));
 
 		const keywords = el("input", {
 			class: "publish-input",
@@ -558,6 +652,7 @@ export function createModeEditor(options: ModeEditorOptions): {
 							el("p", { class: "mode-panel-hint", text: t[MODE_HINTS[selected]] }),
 						],
 					}),
+					share,
 					reset,
 				],
 			}),

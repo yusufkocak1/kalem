@@ -120,13 +120,106 @@ function showCheck(t: Strings, input: FieldInput): boolean {
 	return checked.ok;
 }
 
+/**
+ * A card that waits for the user to do something themselves: what to do,
+ * a button for each way it went, and a box for their own words. Answered,
+ * it says what they chose.
+ */
+function waitCard(
+	t: Strings,
+	request: ApprovalRequest,
+	choices: readonly string[],
+	state: ApprovalState,
+	answer: (answer: ApprovalAnswer) => void,
+	chosen: string | undefined,
+): HTMLElement {
+	const children: HTMLElement[] = [
+		el("div", { class: "assistant-wait-label", text: t.waitLabel }),
+		el("div", { class: "assistant-approval-title", text: request.title }),
+	];
+	if (request.lines.length > 0) {
+		children.push(
+			el("ol", {
+				class: "assistant-wait-steps",
+				children: request.lines.map((line) => el("li", { text: line })),
+			}),
+		);
+	}
+	if (request.reason !== undefined && request.reason !== "") {
+		children.push(
+			el("p", { class: "assistant-approval-reason", text: format(t.approvalWhy, request.reason) }),
+		);
+	}
+	if (state !== "waiting") {
+		children.push(
+			el("p", {
+				class: `assistant-approval-state approval-${state}`,
+				text:
+					state === "denied" || chosen === undefined
+						? t.waitNotAnswered
+						: choices.includes(chosen)
+							? format(t.waitChosen, chosen)
+							: format(t.waitWrote, chosen),
+			}),
+		);
+	} else {
+		children.push(
+			el("div", {
+				class: "assistant-approval-actions assistant-wait-choices",
+				children: choices.map((label, index) => {
+					const button = el("button", {
+						// The first is the way on; skip and stop, the last two, are quieter.
+						class: index === 0 ? "assistant-primary" : "assistant-action",
+						text: label,
+						attrs: { type: "button", "data-choice": String(index) },
+					});
+					button.addEventListener("click", () =>
+						answer({ approved: true, scope: "once", choice: index }),
+					);
+					return button;
+				}),
+			}),
+		);
+		const own = el("input", {
+			class: "publish-input assistant-wait-own",
+			attrs: {
+				type: "text",
+				placeholder: t.waitOwnPlaceholder,
+				"aria-label": t.waitOwnPlaceholder,
+			},
+		});
+		const send = el("button", {
+			class: "assistant-action",
+			text: t.waitSend,
+			attrs: { type: "submit" },
+		});
+		const form = el("form", { class: "assistant-wait-form", children: [own, send] });
+		form.addEventListener("submit", (event) => {
+			event.preventDefault();
+			const text = own.value.trim();
+			if (text !== "") answer({ approved: true, scope: "once", text });
+		});
+		children.push(form);
+	}
+	return el("div", {
+		class: "assistant-approval assistant-wait",
+		attrs: { role: "group", "aria-label": request.title, "data-wait": state },
+		children,
+	});
+}
+
 /** A card that asks the user before a tool changes something; `answer` sends what they chose. */
 export function approvalCard(
 	t: Strings,
 	request: ApprovalRequest,
 	state: ApprovalState,
 	answer: (answer: ApprovalAnswer) => void,
+	/** A card that waits for the user: the choice they made, or what they wrote. */
+	chosen?: string,
 ): HTMLElement {
+	if (request.choices !== undefined) {
+		return waitCard(t, request, request.choices, state, answer, chosen);
+	}
 	const id = ++cardCount;
 	const children: HTMLElement[] = [
 		el("div", { class: "assistant-approval-title", text: request.title }),

@@ -168,6 +168,7 @@ describe("the assistant's app tools", () => {
 					purpose: "The team's GitHub.",
 					preset: "github",
 					enabled: true,
+					keepAlive: false,
 				},
 			],
 			assistantModes: { code: { mcp: ["github"] } },

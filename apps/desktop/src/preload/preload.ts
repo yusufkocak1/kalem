@@ -110,6 +110,7 @@ const bridge: KalemBridge = {
 	reportState: (tabId, state) => ipcRenderer.send(CHANNEL.reportState, tabId, state),
 	tabActivated: (tabId) => ipcRenderer.send(CHANNEL.tabActivated, tabId),
 	assistantActivity: (busy) => ipcRenderer.send(CHANNEL.assistantActivity, busy),
+	assistantAttention: (text) => ipcRenderer.send(CHANNEL.assistantAttention, text),
 	assistantCheckpoint: (tabId, text) => ipcRenderer.send(CHANNEL.assistantCheckpoint, tabId, text),
 	titleBarColors: (color, symbolColor) =>
 		ipcRenderer.send(CHANNEL.titleBarColors, color, symbolColor),
@@ -186,6 +187,8 @@ const bridge: KalemBridge = {
 	assistantConfigure: (update) => ipcRenderer.invoke(CHANNEL.assistantConfigure, update),
 	assistantSetModel: (model) => ipcRenderer.invoke(CHANNEL.assistantSetModel, model),
 	assistantToolCatalog: () => ipcRenderer.invoke(CHANNEL.assistantToolCatalog),
+	assistantModeExport: (which) => ipcRenderer.invoke(CHANNEL.assistantModeExport, which),
+	assistantModeImport: () => ipcRenderer.invoke(CHANNEL.assistantModeImport),
 	assistantModels: (request) => ipcRenderer.invoke(CHANNEL.assistantModels, request),
 	assistantLocate: () => ipcRenderer.invoke(CHANNEL.assistantLocate),
 	assistantUsePath: (path) => ipcRenderer.invoke(CHANNEL.assistantUsePath, path),
@@ -198,6 +201,9 @@ const bridge: KalemBridge = {
 	assistantDeleteChat: (id) => ipcRenderer.invoke(CHANNEL.assistantDeleteChat, id),
 	assistantAsk: (request) => ipcRenderer.invoke(CHANNEL.assistantAsk, request),
 	assistantStop: (chatId) => ipcRenderer.invoke(CHANNEL.assistantStop, chatId),
+	assistantSteer: (chatId, id, text) =>
+		ipcRenderer.invoke(CHANNEL.assistantSteer, chatId, id, text),
+	assistantUnsteer: (chatId, id) => ipcRenderer.invoke(CHANNEL.assistantUnsteer, chatId, id),
 	assistantRetryCheck: (review, index) =>
 		ipcRenderer.invoke(CHANNEL.assistantRetryCheck, review, index),
 	assistantPickSources: (kind) => ipcRenderer.invoke(CHANNEL.assistantPickSources, kind),

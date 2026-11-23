@@ -144,6 +144,20 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 	const addPreset = (preset: McpPreset): void =>
 		options.change([...options.servers(), presetServer(preset, options.servers())], true);
 
+	/** Whether Kalem keeps a program running between questions, with what that is for. */
+	function keepAliveField(on: boolean, change: (on: boolean) => void): HTMLElement {
+		const box = el("input", { attrs: { type: "checkbox", "data-setting": "keepAlive" } });
+		box.checked = on;
+		box.addEventListener("change", () => change(box.checked));
+		return el("div", {
+			class: "mode-field mcp-keep",
+			children: [
+				el("label", { class: "settings-check", children: [box, t.mcpKeepAlive] }),
+				el("p", { class: "mode-section-hint", text: t.mcpKeepAliveHint }),
+			],
+		});
+	}
+
 	function serverCard(server: McpServer, index: number): HTMLElement {
 		// Each change builds on the servers as they are now: fields typed one after another keep each other.
 		const set = (next: Partial<McpServer>, redraw = false): void =>
@@ -200,6 +214,7 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 						{ placeholder: "API_KEY=…" },
 						true,
 					),
+					keepAliveField(server.keepAlive, (keepAlive) => set({ keepAlive })),
 				];
 		const name = el("input", {
 			class: "publish-input mcp-name",

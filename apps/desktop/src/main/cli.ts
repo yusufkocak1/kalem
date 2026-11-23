@@ -537,10 +537,17 @@ export function textOutput(): OutputReader {
 	};
 }
 
+/** Standard input left open after the question, for more lines while the CLI answers. */
+export interface CliInput {
+	/** The CLI has the question: `write` sends it another line, `end` closes its input. */
+	opened(write: (line: string) => void, end: () => void): void;
+}
+
 /**
  * Runs one question, with the question on standard input; resolves once
  * the CLI has exited, whatever happened. A CLI whose output does not say
- * when it ends has answered when it exits without an error.
+ * when it ends has answered when it exits without an error. With `input`
+ * its input stays open until `end` is called (or it exits).
  */
 export function runCli(
 	launch: CliLaunch,
@@ -553,6 +560,7 @@ export function runCli(
 	started: (child: ChildProcess) => void,
 	/** More environment variables for this run. */
 	extraEnv: Readonly<Record<string, string>> = {},
+	input?: CliInput,
 ): Promise<void> {
 	return new Promise((resolve) => {
 		let child: ChildProcess;
@@ -576,6 +584,8 @@ export function runCli(
 
 		let failed = false;
 		let stderr = "";
+		/** Whether more can be written to its input. */
+		let open = input !== undefined;
 		const pass = (events: readonly ClaudeEvent[]): void => {
 			for (const event of events) {
 				if (event.kind === "error") failed = true;
@@ -593,6 +603,7 @@ export function runCli(
 			send({ kind: "error", message: errorMessage(error) });
 		});
 		child.on("close", (code, signal) => {
+			open = false;
 			sender.removeListener("destroyed", stop);
 			pass(output.end());
 			if (!output.finished && !failed) {
@@ -606,6 +617,20 @@ export function runCli(
 			resolve();
 		});
 		child.stdin?.on("error", () => {});
-		child.stdin?.end(prompt, "utf8");
+		if (input === undefined) {
+			child.stdin?.end(prompt, "utf8");
+			return;
+		}
+		child.stdin?.write(prompt, "utf8");
+		input.opened(
+			(line) => {
+				if (open) child.stdin?.write(line, "utf8");
+			},
+			() => {
+				if (!open) return;
+				open = false;
+				child.stdin?.end();
+			},
+		);
 	});
 }

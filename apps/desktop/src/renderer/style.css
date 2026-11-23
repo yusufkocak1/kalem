@@ -1741,6 +1741,38 @@ button {
 	object-fit: cover;
 }
 
+/* The active document offered, not in the chat: faded, its edge dashed, a + to add it with a click. */
+.assistant-chip-offered {
+	gap: 3px;
+	padding: 0 5px 0 7px;
+	border: 1px dashed color-mix(in srgb, var(--app-muted) 60%, transparent);
+	background: none;
+	color: var(--app-muted);
+	font: inherit;
+	opacity: 0.8;
+	cursor: pointer;
+}
+
+.assistant-chip-offered:hover,
+.assistant-chip-offered:focus-visible {
+	border-color: var(--app-accent);
+	color: var(--app-text);
+	opacity: 1;
+}
+
+.assistant-chip-file {
+	flex: none;
+	width: 13px;
+	height: 13px;
+}
+
+.assistant-chip-plus {
+	flex: none;
+	width: 12px;
+	height: 12px;
+	color: var(--app-accent);
+}
+
 /* An open folder of the Files pane: the chat's workspace on its own. */
 .assistant-source-workspace {
 	gap: 4px;
@@ -1845,6 +1877,58 @@ button {
 
 .assistant-send.busy {
 	background: var(--app-error);
+}
+
+/* What was written while the reply runs, until the answer takes it in: above the box, each taken back with ×. */
+.assistant-queue {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	font-size: 12px;
+}
+
+.assistant-queue-title {
+	color: var(--app-muted);
+	font-size: 11px;
+}
+
+.assistant-queued {
+	display: flex;
+	align-items: flex-start;
+	gap: 4px;
+	padding: 4px 4px 4px 10px;
+	border: 1px dashed color-mix(in srgb, var(--app-accent) 45%, var(--app-border));
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--app-accent) 7%, var(--app-raised));
+}
+
+.assistant-queued-text {
+	flex: 1;
+	min-width: 0;
+	max-height: 4.5em;
+	overflow: hidden;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+/* What the user added while the reply ran, in the reply where the answer went on with it. */
+.assistant-steered {
+	align-self: flex-end;
+	max-width: 88%;
+	padding: 6px 10px;
+	border-radius: 12px 12px 4px;
+	background: color-mix(in srgb, var(--app-accent) 13%, var(--app-raised));
+	font-size: 12px;
+}
+
+.assistant-steered-label {
+	color: var(--app-muted);
+	font-size: 11px;
+}
+
+.assistant-steered-text {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
 }
 
 /* Dragging the navigation pane's right edge sets its width. */
@@ -10351,6 +10435,36 @@ textarea.jira-worklog-input {
 	gap: 8px;
 }
 
+/* The answer waits for the user to do something: what to do, how it went, or their own words. */
+.assistant-wait {
+	border-width: 2px;
+	background: color-mix(in srgb, var(--app-accent) 6%, var(--app-surface));
+}
+
+.assistant-wait-label {
+	color: var(--app-accent);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+}
+
+.assistant-wait-steps {
+	margin: 0;
+	padding-inline-start: 20px;
+	line-height: 1.5;
+}
+
+.assistant-wait-form {
+	display: flex;
+	gap: 6px;
+}
+
+.assistant-wait-own {
+	flex: 1;
+	min-width: 0;
+}
+
 .assistant-approval-scope {
 	margin-inline-start: auto;
 	padding: 3px 6px;
@@ -11676,6 +11790,16 @@ textarea.jira-worklog-input {
 	gap: 6px;
 }
 
+/* What came of exporting or importing a mode: where it was saved, what to fill in. */
+.mode-share-status {
+	margin: 0;
+	padding: 6px 10px;
+	border-radius: 6px;
+	background: color-mix(in srgb, var(--app-accent) 10%, transparent);
+	font-size: 12px;
+	overflow-wrap: anywhere;
+}
+
 .mode-tab {
 	display: grid;
 	grid-template-columns: auto 1fr;
@@ -12149,14 +12273,16 @@ h3.mode-panel-name {
 
 /* --- The user's own modes in Settings ------------------------------------------------- */
 
-.mode-tab-new {
+.mode-tab-new,
+.mode-tab-import {
 	align-content: center;
 	border-style: dashed;
 	background: none;
 	color: var(--app-accent);
 }
 
-.mode-tab-new .mode-tab-label {
+.mode-tab-new .mode-tab-label,
+.mode-tab-import .mode-tab-label {
 	color: var(--app-accent);
 }
 

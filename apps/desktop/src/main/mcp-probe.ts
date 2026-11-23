@@ -212,7 +212,7 @@ async function httpTools(server: McpServer): Promise<McpToolInfo[]> {
 }
 
 /** The app's environment, with where npx and uvx usually are on a Mac (an app started from the Dock lacks them). */
-function programEnvironment(): NodeJS.ProcessEnv {
+export function programEnvironment(): NodeJS.ProcessEnv {
 	if (process.platform === "win32") return process.env;
 	const path = ["/opt/homebrew/bin", "/usr/local/bin", process.env.PATH ?? ""]
 		.filter((part) => part !== "")

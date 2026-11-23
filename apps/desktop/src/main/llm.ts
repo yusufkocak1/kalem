@@ -17,6 +17,7 @@ import {
 	modelIds,
 	SseReader,
 } from "../shared/providers.js";
+import { steeringNote } from "../shared/steering.js";
 import { networkLog } from "./network-log.js";
 
 /** Electron's fetch, its requests in the debug mode's network log. */
@@ -61,6 +62,11 @@ export interface AskOptions {
 	readonly tools?: AskTools;
 	/** What a round of the answer cost, in tokens. */
 	usage?(usage: { input: number; output: number; cached: number }): void;
+	/**
+	 * What the user added while it answered, taken in with the results of a
+	 * round of tools: the next round goes on with it in mind.
+	 */
+	steer?(): readonly string[];
 }
 
 export interface AskTools {
@@ -200,9 +206,14 @@ async function askAnthropic(options: AskOptions): Promise<void> {
 					content: await tools.run(call.name, call.input),
 				})),
 			);
+			// What the user added meanwhile comes after the results, in the same turn.
+			const added = steeringNote(options.steer?.() ?? []);
 			messages.push(
 				{ role: "assistant", content: message.content as Anthropic.ContentBlockParam[] },
-				{ role: "user", content: results },
+				{
+					role: "user",
+					content: added === "" ? results : [...results, { type: "text", text: added }],
+				},
 			);
 			out.round();
 		}
@@ -281,6 +292,9 @@ async function askChatCompletions(options: AskOptions): Promise<void> {
 			}),
 		);
 		turn.push(...results);
+		// What the user added meanwhile follows the results.
+		const added = steeringNote(options.steer?.() ?? []);
+		if (added !== "") turn.push({ role: "user", content: added });
 		out.round();
 	}
 }

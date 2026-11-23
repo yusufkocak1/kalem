@@ -27,7 +27,7 @@ import type { WorklogContext, WorklogEntry } from "./jira-worklog.js";
 import type { LocalNote } from "./local-notes.js";
 import { defaultServers } from "./mcp-presets.js";
 import type { McpServer, McpToolList } from "./mcp-servers.js";
-import type { ModeSettings } from "./mode-config.js";
+import type { Mode, ModeSettings } from "./mode-config.js";
 import type { ModelOption } from "./models.js";
 import type { NetworkEntry, NetworkEvent, NetworkLogState } from "./network.js";
 import type { PaletteChoice, PaletteTheme } from "./palette.js";
@@ -165,8 +165,11 @@ export interface Settings extends Typography {
 	readonly gitTrustedFolders: readonly string[];
 	/** The Claude assistant's panel, at the right of the document. */
 	readonly assistant: boolean;
-	/** Share the active document with Claude along with each question. */
-	readonly assistantDocument: boolean;
+	/**
+	 * Add the active document to each chat on its own. Off, it is offered: its
+	 * chip shows faded, and a click adds it.
+	 */
+	readonly assistantDocumentAuto: boolean;
 	/** The Claude Code CLI the user picked; empty to look for it. */
 	readonly claudePath: string;
 	/** The GitHub Copilot CLI the user picked; empty to look for it. */
@@ -202,6 +205,23 @@ export interface Settings extends Typography {
 }
 
 export type AssistantPlace = "right" | "left" | "bottom";
+
+/** An assistant mode written to a file: where, and what was left out to be filled in by whoever imports it. */
+export interface ModeExportResult {
+	readonly path: string;
+	readonly fillIn: readonly string[];
+}
+
+/** A mode imported from a file: its name, where it went, the servers it added and what they need filled in. */
+export interface ModeImportResult {
+	readonly name: string;
+	/** The user's mode it became. */
+	readonly custom?: string;
+	/** Kalem's mode it reshaped. */
+	readonly kalem?: Mode;
+	readonly added: readonly string[];
+	readonly fillIn: readonly string[];
+}
 
 export type CopilotTools = "auto" | "mcp" | "block";
 
@@ -254,7 +274,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	gitAutoFetch: true,
 	gitTrustedFolders: [],
 	assistant: false,
-	assistantDocument: true,
+	assistantDocumentAuto: false,
 	claudePath: "",
 	copilotPath: "",
 	assistantWidth: 380,
@@ -1063,6 +1083,8 @@ export interface KalemBridge {
 	onSystemAccent(handler: (accent: string | null) => void): () => void;
 	/** The assistant started or finished an answer: the taskbar shows it, and a notification ends it. */
 	assistantActivity(busy: boolean): void;
+	/** The assistant waits for the user: a window not in front says so (a notification, the taskbar). */
+	assistantAttention(text: string): void;
 	/** The tab's text before the assistant changes it, kept in its version history. */
 	assistantCheckpoint(tabId: string, text: string): void;
 	/** Asks the user what to do with an unsaved tab that is about to close. */
@@ -1162,6 +1184,12 @@ export interface KalemBridge {
 	assistantConfigure(update: AssistantUpdate): Promise<AssistantStatus>;
 	/** The models a service offers; without `key`, the kept one is used. */
 	/** Kalem's tools the assistant can be given, for choosing a mode's tools. */
+	/** Writes an assistant mode (one of the user's, or one of Kalem's as shaped) to a file the user picks. */
+	assistantModeExport(
+		which: { readonly custom: string } | { readonly kalem: Mode },
+	): Promise<ModeExportResult | null>;
+	/** Reads a mode from a file the user picks and, once they say so, adds it. */
+	assistantModeImport(): Promise<ModeImportResult | null>;
 	assistantToolCatalog(): Promise<
 		readonly {
 			readonly name: string;
@@ -1199,6 +1227,14 @@ export interface KalemBridge {
 	/** Asks the assistant; resolves when the reply has ended. */
 	assistantAsk(request: AssistantRequest): Promise<void>;
 	assistantStop(chatId: string): Promise<void>;
+	/**
+	 * Adds a message to the answer running in a chat, without stopping it: the
+	 * answer takes it in when it can (a `steered` event says when). `false`
+	 * when no answer is running there to take it.
+	 */
+	assistantSteer(chatId: string, id: string, text: string): Promise<boolean>;
+	/** Takes back an added message the answer has not taken in yet; whether there was one. */
+	assistantUnsteer(chatId: string, id: string): Promise<boolean>;
 	/** Runs a check of a review run side by side again, one that failed. */
 	assistantRetryCheck(review: string, index: number): Promise<void>;
 	/** Asks for files or a folder to add to a chat; empty when cancelled. */
@@ -1338,6 +1374,7 @@ export const CHANNEL = {
 	titleBarColors: "kalem:title-bar-colors",
 	systemAccent: "kalem:system-accent",
 	assistantActivity: "kalem:assistant-activity",
+	assistantAttention: "kalem:assistant-attention",
 	assistantCheckpoint: "kalem:assistant-checkpoint",
 	confirmCloseTab: "kalem:confirm-close-tab",
 	tabClosed: "kalem:tab-closed",
@@ -1392,6 +1429,8 @@ export const CHANNEL = {
 	assistantSetModel: "kalem:assistant-set-model",
 	assistantModels: "kalem:assistant-models",
 	assistantToolCatalog: "kalem:assistant-tool-catalog",
+	assistantModeExport: "kalem:assistant-mode-export",
+	assistantModeImport: "kalem:assistant-mode-import",
 	assistantLocate: "kalem:assistant-locate",
 	assistantUsePath: "kalem:assistant-use-path",
 	assistantSearch: "kalem:assistant-search",
@@ -1403,6 +1442,8 @@ export const CHANNEL = {
 	assistantDeleteChat: "kalem:assistant-delete-chat",
 	assistantAsk: "kalem:assistant-ask",
 	assistantStop: "kalem:assistant-stop",
+	assistantSteer: "kalem:assistant-steer",
+	assistantUnsteer: "kalem:assistant-unsteer",
 	assistantRetryCheck: "kalem:assistant-retry-check",
 	assistantPickSources: "kalem:assistant-pick-sources",
 	assistantApplyEdit: "kalem:assistant-apply-edit",

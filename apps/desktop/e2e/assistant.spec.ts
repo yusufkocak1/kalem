@@ -7,7 +7,7 @@ import { expect, test } from "@playwright/test";
 import { parseDiagram } from "../src/shared/diagram.js";
 import type { Call } from "./fake-claude.js";
 import { fakeClaude, REPLY } from "./fake-claude.js";
-import { clickMenu, launch, tempDir } from "./launch.js";
+import { clickMenu, launch, showPane, tempDir } from "./launch.js";
 import { shot } from "./shots.js";
 
 test("asks the local Claude about the document and inserts its reply with the diagram", async () => {
@@ -81,11 +81,11 @@ test("asks the local Claude about the document and inserts its reply with the di
 		'<diagram src="notlar.assets/Onay-ak%C4%B1%C5%9F%C4%B1.diagram.png">',
 	);
 
-	// Without sharing, only the question goes: the document's chip is taken off.
+	// Without sharing, only the question goes: the document's chip is taken off, and offered instead.
 	const docChip = pane.locator(".assistant-source-document");
 	await expect(docChip).toHaveText("notlar.md");
 	await docChip.getByRole("button", { name: "Do not share notlar.md" }).click();
-	await expect(docChip).toHaveCount(0);
+	await expect(pane.getByRole("button", { name: "Add notlar.md to the chat" })).toBeVisible();
 	await input.fill("Teşekkürler");
 	await input.press("Enter");
 	await expect(pane.locator(".assistant-assistant")).toHaveCount(3);
@@ -93,6 +93,120 @@ test("asks the local Claude about the document and inserts its reply with the di
 
 	expect(errors).toEqual([]);
 	await app.close();
+});
+
+test("the open document is offered faded, and a click adds it to the chat", async () => {
+	const folder = await tempDir("assistant-offer");
+	const notes = join(folder, "notlar.md");
+	const plan = join(folder, "plan.md");
+	await writeFile(notes, "# Notlar\n\nGiriş\n");
+	await writeFile(plan, "# Plan\n\nAdımlar\n");
+	const claude = await fakeClaude(folder, "Tamam.");
+	const { app, page, errors } = await launch({
+		args: [notes],
+		settings: { assistant: true, assistantDocumentAuto: false },
+		env: { KALEM_CLAUDE: claude.path },
+	});
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toBeHidden();
+	const offered = (name: string) => pane.getByRole("button", { name: `Add ${name} to the chat` });
+	const shared = pane.locator(".assistant-source-document:not(.assistant-chip-offered)");
+
+	// Not in the chat yet: the question goes alone.
+	await expect(offered("notlar.md")).toBeVisible();
+	await expect(offered("notlar.md")).toHaveClass(/assistant-chip-offered/);
+	await expect(shared).toHaveCount(0);
+	const input = pane.locator(".assistant-input");
+	await input.fill("Merhaba");
+	await input.press("Enter");
+	await expect(pane.locator(".assistant-assistant")).toHaveCount(1);
+	await expect.poll(async () => (await claude.calls())[0]?.prompt).toBe("Merhaba");
+	await expect(pane.locator(".assistant-user .assistant-notes")).toHaveCount(0);
+
+	// A click adds it: it goes with the next question, and stays in the chat.
+	await offered("notlar.md").click();
+	await expect(shared).toHaveText("notlar.md");
+	await expect(offered("notlar.md")).toHaveCount(0);
+	await input.fill("Özetle");
+	await input.press("Enter");
+	await expect
+		.poll(async () => (await claude.calls())[1]?.prompt)
+		.toContain('<document name="notlar.md">');
+	await expect(shared).toHaveText("notlar.md");
+
+	// Another document is offered on its own; back on the first, it is still in the chat.
+	await showPane(page, "files");
+	await page.locator(".files-item", { hasText: "plan.md" }).click();
+	await expect(page.locator(".doc-tab")).toHaveCount(2);
+	await expect(offered("plan.md")).toBeVisible();
+	await expect(shared).toHaveCount(0);
+	await page.locator(".doc-tab", { hasText: "notlar" }).click();
+	await expect(shared).toHaveText("notlar.md");
+
+	// A new chat starts with it offered; a suggestion about the document adds it.
+	await pane.getByRole("button", { name: "New chat" }).first().click();
+	await expect(offered("notlar.md")).toBeVisible();
+	await pane.locator(".assistant-suggestion").first().click();
+	await expect(shared).toHaveText("notlar.md");
+	await expect.poll(async () => (await claude.calls()).length).toBe(3);
+	expect((await claude.calls())[2]?.prompt).toContain('<document name="notlar.md">');
+
+	// The setting adds it to every chat on its own.
+	await clickMenu(app, "File", "Settings…");
+	const dialog = page.locator(".settings-dialog");
+	await dialog.locator('[data-category="assistant"]').click();
+	await dialog.getByLabel("Add the active document to each chat on its own").check();
+	await dialog.getByRole("button", { name: "Done" }).click();
+	await page.locator(".doc-tab", { hasText: "plan" }).click();
+	await expect(shared).toHaveText("plan.md");
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("a message written while Claude Code answers goes to it at once, and the answer takes it in", async () => {
+	const folder = await tempDir("assistant-steer");
+	const claude = await fakeClaude(folder, "Akış hazır.", [], { delay: 2000 });
+	const env = { KALEM_CLAUDE: claude.path };
+	const { app, page, userData, errors } = await launch({ settings: { assistant: true }, env });
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toBeHidden();
+	const input = pane.locator(".assistant-input");
+	await input.fill("Onay sürecini çiz");
+	await input.press("Enter");
+	await expect(pane.getByRole("button", { name: "Stop" })).toBeVisible();
+	await input.fill("Tabloyu da ekle");
+	await input.press("Enter");
+	await expect(input).toHaveValue("");
+
+	// Claude Code took it in while it worked: the reply goes on with it, and shows where.
+	const reply = pane.locator(".assistant-assistant").last();
+	await expect(reply.locator(".assistant-markdown")).toContainText("Ek: Tabloyu da ekle");
+	await expect(reply.locator(".assistant-steered-label")).toHaveText("You added while it worked");
+	await expect(reply.locator(".assistant-steered-text")).toHaveText("Tabloyu da ekle");
+	// Added before it wrote anything: it shows before the reply's text.
+	await expect(reply.locator(".assistant-steered + .assistant-markdown")).toContainText(
+		"Akış hazır.",
+	);
+	await expect(pane.locator(".assistant-queue")).toBeHidden();
+	await expect(pane.getByRole("button", { name: "Stop" })).toBeHidden();
+	// One run: the question as a JSON line, its input open until the answer, what was added after it.
+	const calls = await claude.calls();
+	expect(calls).toHaveLength(1);
+	expect(calls[0]?.args.slice(0, 3)).toEqual(["-p", "--input-format", "stream-json"]);
+	expect(calls[0]?.prompt.endsWith("Onay sürecini çiz")).toBe(true);
+	expect(calls[0]?.added).toEqual(["Tabloyu da ekle"]);
+	await expect(pane.locator(".assistant-user")).toHaveCount(1);
+
+	expect(errors).toEqual([]);
+	await app.close();
+
+	// Kept with the chat: after a restart the reply still shows it.
+	const again = await launch({ userData, env });
+	await expect(again.page.locator(".assistant .assistant-steered-text")).toHaveText(
+		"Tabloyu da ekle",
+	);
+	expect(again.errors).toEqual([]);
+	await again.app.close();
 });
 
 test("a screenshot pasted into the question goes with it as a picture, and a copied file joins the chat", async () => {
@@ -145,7 +259,7 @@ test("a screenshot pasted into the question goes with it as a picture, and a cop
 	// Sent once: the next question starts without it.
 	await expect(pane.locator(".assistant-picture")).toHaveCount(0);
 	const [call] = await claude.calls();
-	const [question, ...rest] = JSON.parse(call?.prompt ?? "{}").message.content;
+	const [question, ...rest] = JSON.parse(call?.input ?? "{}").message.content;
 	expect(question.text).toContain("<pictures>");
 	expect(question.text).toContain("pasted-2");
 	expect(question.text.endsWith("Bu ekranda hata ne?")).toBe(true);
@@ -185,7 +299,7 @@ test("sends the document's pictures to Claude instead of their base64", async ()
 
 	const [call] = await claude.calls();
 	expect(call?.args.slice(0, 3)).toEqual(["-p", "--input-format", "stream-json"]);
-	const message = JSON.parse(call?.prompt ?? "{}").message;
+	const message = JSON.parse(call?.input ?? "{}").message;
 	const [question, ...rest] = message.content;
 	expect(question.text).toContain("![akış](image-1)");
 	expect(question.text).toContain("![ekran](ekran.png)");

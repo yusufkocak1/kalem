@@ -777,7 +777,7 @@ verir.
   ayarlar tek pencerede, solda kategoriler — **Görünüm** (tema, dil,
   yakınlık, tam genişlik), **Düzenleyici** (otomatik kaydetme, yazım
   denetimi), **Paneller** (panellerin yeri, yuvaların açıklığı ve
-  boyutları), **Asistan** (hizmet ve model, panel, belgeyi paylaşma),
+  boyutları), **Asistan** (hizmet ve model, panel, belgeyi kendiliğinden ekleme),
   **Bağlantılar** (Confluence ve Jira: bağlan / bağlantıyı kes), **Sayfa
   Düzeni** (kâğıt, yönlendirme, kenar boşlukları, sayfa numarası) ve
   **Sistem** (güncelleme denetimi, bildirim alanı, Git'i otomatik getirme).
@@ -999,6 +999,25 @@ verir.
 >     kullanıcıya kalır. Bir MCP sunucusu bu bilgisayarda program
 >     çalıştırabildiği için asistan bu ayarı (`assistantMcpServers`)
 >     göremez.
+>   - **Sorular arasında açık kalsın:** bu bilgisayarda çalışan (stdio) bir
+>     sunucu normalde bir yanıt kadar yaşar: her soruda Claude Code / Copilot
+>     onu başlatır, yanıt bitince kapatır. Kartta bu kutu işaretliyse Kalem
+>     sunucuyu bir kez başlatır ve uygulama açık kaldıkça çalışır tutar;
+>     tuttuğu şey (ör. bir tarayıcı penceresi ve oturumu) sonraki soruda da
+>     yerindedir. CLI'ye her soruda sunucunun kendisi değil, ona Kalem
+>     üzerinden bağlanan küçük bir stdio aracısı verilir (yalnızca
+>     127.0.0.1, bu çalıştırmaya özel token, proxy'den geçmez). Sunucu bir
+>     kez selamlanır; her CLI o selamı alır, istek numaraları karışmaz;
+>     CLI çekilince beklediği istekler iptal edilir. Sunucu değiştirilince
+>     yeniden başlar; kutu kaldırılınca, sunucu kapatılınca ya da silinince
+>     ve uygulama kapanınca durur. **Playwright** hazır sunucusu artık
+>     tarayıcıyı görünür açar (`--headless` yok) ve açık kalır: bir sayfa
+>     giriş isterse o pencerede giriş yapılır, asistan sonraki soruda aynı
+>     oturumla sürer. Önceki sürümün hazır ayarıyla (değiştirilmeden)
+>     eklenmiş Playwright bir kez bu yeni hâle getirilir; argümanları
+>     değiştirilmiş olan olduğu gibi kalır. Asistanın MCP sunucuları API
+>     hizmetlerinde (Anthropic, OpenAI uyumlu) bağlanmaz; yalnızca Claude
+>     Code ve Copilot ile kullanılır.
 >   - **Serena, hazır gelen sunucu:** asistan Serena ile gelir (kodu IDE
 >     gibi okuyan, sembol sembol düzenleyen MCP sunucusu; `uvx` gerekir) ve
 >     baştan Kod, Analizi İncele ve Prompt Hazırla modlarında açıktır.
@@ -1022,6 +1041,29 @@ verir.
 >     içinde duran sunucular ilk açılışta asistana taşınır (aynı sunucu
 >     bir kez, aynı adlı farklı sunucular `ad-2` olarak) ve her mod, açık
 >     olanları kullanmaya devam eder.
+>   - **Modu paylaşmak (dışa / içe aktarma):** her modun başlığındaki
+>     **Dışa aktar…** modu bir JSON dosyasına (`<ad>.kalem-mode.json`)
+>     yazar: kendi modunuzun tamamı (adı, simgesi, talimatı, adımları,
+>     araçları, anahtar kelimeleri, ayrıntı ve dil) ya da Kalem'in bir
+>     modunun sizin ayarladığınız hâli (yalnızca varsayılandan farklı
+>     olanlar), ve modun kullandığı MCP sunucularının tanımları. Sır gibi
+>     görünen değerler dosyaya konmaz, yerlerine doldurulacak bir işaret
+>     yazılır: adı token, secret, password, key, auth gibi olan ortam
+>     değişkenleri ve başlıklar (`<GITHUB_TOKEN>`, `<Authorization>`),
+>     `--token=…` / `--api-key …` argümanları ve adresteki `?api_key=…`.
+>     Kaydettikten sonra neyin dışarıda bırakıldığı söylenir. Mod
+>     sekmelerinin yanındaki **İçe aktar…** bir mod dosyasını açar ve önce
+>     sorar: modun ne olduğu (kendi başına bir mod ya da Kalem'in bir
+>     modunun yerine geçen ayarlar), getirdiği sunucular ve **her birinin
+>     çalıştıracağı komut ya da bağlanacağı adres**, sizde aynı adla olan
+>     sunucuların sizinkiyle kullanılacağı, doldurulacak yerler ve "sunucuları
+>     yalnızca güvendiğiniz birinden içe aktarın" uyarısı. **Sunucularıyla
+>     içe aktar**, **Yalnızca modu içe aktar** ya da **Vazgeç**. Aynı adlı
+>     bir modunuz varsa "modumun yerine geçsin" kutusu çıkar; işaretlenmezse
+>     mod `Ad (2)` olarak eklenir. İçe aktarılan mod açık gelir ve
+>     Ayarlar'da seçili olur; eklenen sunucular ve doldurulacak yerler
+>     altta yazar. JSON olmayan, Kalem modu olmayan ya da daha yeni bir
+>     Kalem'le yapılmış dosya bunu söyler ve bir şey değiştirmez.
 >   - **Asistana söyleyerek bağlamak:** "DBHub'ı ekle ve Kod modunda
 >     kullan, config dosyası şurada" gibi bir istekte asistan
 >     `mode_mcp_list` ile sunucuları, hangi modların kullandığını ve hazır
@@ -1458,12 +1500,58 @@ verir.
 - Copilot'a sistem talimatı verilemediği için Kalem tanıtımı sohbetin ilk
   sorusuyla gider; araçlardan komut çalıştırma ve dosya yazma kapalıdır
   (`--deny-tool shell`, `--deny-tool write`).
-- **Belgeyi paylaş** açıkken her soruyla birlikte belgenin Markdown'ı,
-  belgedeki Kalem diyagramlarının verisi ve belgede seçili metin gider
+- **Açık belge önerilir:** etkin belge, giriş kutusunun üstünde **silik,
+  kesikli kenarlı bir çip** (`ad.md +`) olarak gelir; henüz sohbette
+  değildir, soruyla gitmez. Çipe bir tık belgeyi sohbete ekler (dolu çip
+  olur), `×` geri çıkarır ve çip yine silik kalır. Seçim sohbet ve belge
+  başınadır: başka bir sekmeye geçilince o belge de silik gelir, ilk belgeye
+  dönülünce sohbette olduğu görülür; **Yeni sohbet** yine silik başlar.
+  **+ › Belgeyi paylaş**, `/share` ve `@ belge` de ekler. Belgeyle ilgili
+  girişler belgeyi kendiliğinden ekler: boş sohbetin belgeye göre önerileri
+  ve seçimin yanındaki **✦ Asistan** / `Ctrl+J`. Belgenin her sohbete
+  kendiliğinden eklenmesi istenirse **Ayarlar → Asistan → Etkin belgeyi her
+  sohbete kendiliğinden ekle** açılır (önceki sürümlerin davranışı; bu ayar
+  yeni olduğu için eski "her soruyla paylaş" değeri taşınmaz).
+- Belge sohbetteyken her soruyla birlikte belgenin Markdown'ı, belgedeki
+  Kalem diyagramlarının verisi gider. Belgede seçili metin her zaman gider
   (seçim, giriş kutusunun üstündeki etiketten çıkarılabilir). Belge önceki
   sorudan beri değişmediyse yeniden gönderilmez. Sohbet sürer (Claude Code'da `--resume`, API'lerde geçmiş yeniden gönderilir);
   **Yeni sohbet** baştan başlar. Yanıt geldikçe görünür; **Durdur** ya da
   `Esc` keser.
+- **Sizden bir şey beklerken durur, bitmez:** asistan işin bir yerinde
+  sizin yapmanız gereken bir şeye geldiğinde (sunucuyu yeniden başlatmak,
+  IntelliJ'de sınıfları güncellemek, bir tarayıcı penceresinde giriş
+  yapmak) yanıtı "yapınca 'devam' yazın" diye bitirmez: `wait_for_user`
+  aracıyla sohbette bir **Sizi bekliyor** kartı açar ve yanıt (Claude
+  Code'da CLI'nin kendisi de) orada bekler. Kartta ne yapılacağı adım adım
+  ve nedeni yazar; düğmeler **Yaptım, devam et** (ya da asistanın önerdiği
+  en fazla üç seçenek, ör. "Tomcat'i yeniden başlattım"), **Atla** (o
+  adımsız devam eder, sonunda neyin eksik kaldığını söyler) ve **Burada
+  bitir** (yapılanı ve kalanı özetleyip durur); altında kendi cevabınızı
+  yazacağınız bir kutu vardır. Kart beklerken ana kutuya yazıp `Enter`'a
+  basmak da kartı yanıtlar ("yaptım", "olmadı, şu hatayı verdi"…). Seçtiğiniz
+  ya da yazdığınız kartta kalır, yanıt aynı oturumda kaldığı yerden sürer.
+  Bu kart hiçbir onay ayarıyla kendiliğinden geçilmez. Pencere öndeyken
+  değilse bir bildirim gelir ve görev çubuğundaki simge yanıp söner.
+  Bekleme en fazla iki saat sürer; **Durdur** her zaman keser.
+- **Çalışırken araya girme:** asistan çalışırken kutu yazmaya açık kalır;
+  yazılıp `Enter`'a basılan mesaj işi durdurmaz, çalışan yanıta eklenir.
+  Kutunun üstünde **Sırada** olarak görünür; `×` ile (ya da boş kutuda `↑`
+  ile) geri alınıp düzeltilebilir. Yanıt mesajı uygun ilk anda ele alır ve
+  yanıtın içinde, ele aldığı yerde **Çalışırken eklediğiniz** kartı çıkar:
+  - **Claude Code:** soru JSON satırı olarak gider ve CLI'nin girdisi yanıt
+    bitene kadar açık kalır (`--input-format stream-json`); eklenen mesaj
+    hemen oraya yazılır, Claude Code onu bir sonraki adımında ele alır.
+    `/` ile başlayan Claude Code komutları eskisi gibi düz metin gider.
+  - **API'ler** (Anthropic, OpenAI uyumlu): mesaj, araç turunun sonuçlarıyla
+    birlikte modele gider; model kalan işi onu bilerek sürdürür. Sohbet
+    geçmişinde de sorunun yanında saklanır.
+  - **Copilot:** soruyu bir kerede okuduğu için mesaj bir sonraki araç
+    turunda gider.
+  - Yanıt mesajı ele alamadan biterse (ör. araç çağırmadan yanıtlayan bir
+    model ya da Copilot), mesaj kendiliğinden sıradaki soru olarak gönderilir
+    (**Önceki yanıt sürerken yazıldı** notuyla). Yanıt durdurulursa ya da
+    hata verirse gönderilmez, kutuya geri döner.
 - Modele, hangi hizmet olursa olsun, sistem talimatıyla Kalem tanıtılır
   (`src/shared/claude.ts`):
   - Kalem'in gösterdiği Markdown: GFM tabloları, görev listeleri, dipnotlar,

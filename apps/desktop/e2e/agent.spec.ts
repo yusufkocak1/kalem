@@ -12,12 +12,14 @@ import { shot } from "./shots.js";
  * A stand-in for the GitHub Copilot CLI that answers by what the question
  * holds (the first answer whose needle is in it, else the last). With
  * `mcp`, its help offers `--additional-mcp-config`, and a run given one
- * fails as a Copilot that cannot start the server would.
+ * fails as a Copilot that cannot start the server would. `delay` is how long
+ * it works before it answers, in ms.
  */
 async function fakeCopilot(
 	folder: string,
 	answers: readonly (readonly [string, string])[],
 	mcp = false,
+	delay = 0,
 ): Promise<{ path: string; calls: () => Promise<Call[]> }> {
 	const log = join(folder, "copilot-calls.jsonl");
 	const script = join(folder, "fake-copilot.cjs");
@@ -44,7 +46,7 @@ process.stdin.on("end", () => {
 	}
 	const answers = ${JSON.stringify(answers)};
 	const reply = (answers.find(([needle]) => prompt.includes(needle)) ?? answers[answers.length - 1])[1];
-	process.stdout.write(reply);
+	setTimeout(() => process.stdout.write(reply), ${delay});
 });
 `,
 	);
@@ -553,6 +555,92 @@ test("a Copilot that cannot start Kalem's MCP server is asked again with blocks"
 	await expect(pane.locator(".assistant-assistant")).toHaveCount(2);
 	await expect.poll(async () => (await copilot.calls()).length).toBe(3);
 	expect((await copilot.calls())[2]?.args).not.toContain("--additional-mcp-config");
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("what is written while Copilot answers waits, can be taken back, and is asked once the answer ends", async () => {
+	const folder = await tempDir("agent-copilot-queue");
+	const copilot = await fakeCopilot(
+		folder,
+		[
+			["Tabloyu da ekle", "Tablo eklendi."],
+			["", "Akış hazır."],
+		],
+		false,
+		2500,
+	);
+	const { app, page, errors } = await launch({
+		settings: { assistant: true },
+		env: { KALEM_COPILOT: copilot.path, KALEM_CLAUDE: join(folder, "none") },
+	});
+	const pane = page.locator(".assistant");
+	await pane.getByRole("button", { name: "Connection settings" }).click();
+	await pane.locator(".assistant-settings").getByLabel("Service").selectOption("copilot");
+	await pane.locator(".assistant-settings").getByRole("button", { name: "Save" }).click();
+	const input = pane.locator(".assistant-input");
+	await input.fill("Akışı çiz");
+	await input.press("Enter");
+
+	// While it answers the box still takes a message: it is added, not a stop.
+	const stop = pane.getByRole("button", { name: "Stop" });
+	await expect(stop).toBeVisible();
+	await expect(input).toHaveAttribute("placeholder", /Add to the answer while it works/);
+	const add = pane.getByRole("button", { name: "Add to the running answer" });
+	await expect(add).toBeDisabled();
+	await input.fill("Kısa tut");
+	await expect(add).toBeEnabled();
+	await input.press("Enter");
+	await input.fill("Tabloyu da ekle");
+	await input.press("Enter");
+	const queue = pane.locator(".assistant-queue");
+	await expect(queue.locator(".assistant-queue-title")).toHaveText(
+		"Waiting: taken in when the answer can",
+	);
+	await expect(queue.locator(".assistant-queued-text")).toHaveText(["Kısa tut", "Tabloyu da ekle"]);
+	// The last one comes back to be changed, and one is taken back with its ×.
+	await expect(input).toHaveValue("");
+	await input.press("ArrowUp");
+	await expect(input).toHaveValue("Tabloyu da ekle");
+	await expect(queue.locator(".assistant-queued-text")).toHaveText(["Kısa tut"]);
+	await input.press("Enter");
+	await queue
+		.locator(".assistant-queued", { hasText: "Kısa tut" })
+		.getByRole("button", { name: "Take back" })
+		.click();
+	await expect(input).toHaveValue("Kısa tut");
+	await input.fill("");
+	await expect(queue.locator(".assistant-queued-text")).toHaveText(["Tabloyu da ekle"]);
+
+	// Copilot reads its question at once: what was added is asked when the answer ends.
+	const replies = pane.locator(".assistant-assistant");
+	await expect(replies.first().locator(".assistant-markdown")).toHaveText("Akış hazır.");
+	await expect(replies).toHaveCount(2);
+	await expect(replies.last().locator(".assistant-markdown")).toHaveText("Tablo eklendi.");
+	await expect(queue).toBeHidden();
+	await expect(stop).toBeHidden();
+	const asked = pane.locator(".assistant-user").last();
+	await expect(asked).toContainText("Tabloyu da ekle");
+	await expect(asked.locator(".assistant-notes")).toContainText(
+		"Written while the previous answer ran",
+	);
+	const calls = await copilot.calls();
+	expect(calls).toHaveLength(2);
+	expect(calls[1]?.prompt).toContain("Tabloyu da ekle");
+	expect(calls[1]?.prompt).not.toContain("Kısa tut");
+
+	// A stopped answer asks nothing more: what was added comes back to the box.
+	await input.fill("Bir daha çiz");
+	await input.press("Enter");
+	await expect(stop).toBeVisible();
+	await input.fill("Renkli olsun");
+	await input.press("Enter");
+	await expect(queue.locator(".assistant-queued-text")).toHaveText(["Renkli olsun"]);
+	await stop.click();
+	await expect(stop).toBeHidden();
+	await expect(input).toHaveValue("Renkli olsun");
+	await expect(queue).toBeHidden();
+	await expect.poll(async () => (await copilot.calls()).length).toBe(3);
 	expect(errors).toEqual([]);
 	await app.close();
 });
@@ -1451,7 +1539,7 @@ test("the assistant's panel moves left or under the document, and '@' adds a sec
 	const claude = await fakeClaude(folder, "Tamam.");
 	const { app, page, errors } = await launch({
 		args: [doc],
-		settings: { assistant: true, assistantDocument: false },
+		settings: { assistant: true, assistantDocumentAuto: false },
 		env: { KALEM_CLAUDE: claude.path },
 	});
 	const pane = page.locator(".assistant");
@@ -1711,5 +1799,278 @@ test("the empty chat suggests for this document, a change leaves a point before 
 	await expect(versions.locator(".versions-preview")).toContainText("İptal hızlı yapılmalı.");
 	expect(errors).toEqual([]);
 	await stubMessageBox(app, 1);
+	await app.close();
+});
+
+test("a mode is exported to a file without its secrets, and imported on another computer with its servers", async () => {
+	const folder = await tempDir("agent-mode-share");
+	const ownFile = join(folder, "test-analisti.kalem-mode.json");
+	const reviewFile = join(folder, "incele.kalem-mode.json");
+	const analyst = {
+		id: "custom-1",
+		name: "Test Analisti",
+		icon: "target",
+		description: "Gereksinimlerden test senaryosu yazar",
+		prompt: "You are a test analyst.",
+		steps: [
+			{
+				id: "step-1",
+				on: true,
+				title: "Senaryolar",
+				instruction: "Write a test case for each rule.",
+				custom: true,
+			},
+		],
+		tools: ["document_read"],
+		mcp: ["dosyalar"],
+		keywords: ["senaryo"],
+		detail: "normal",
+		language: "tr",
+		enabled: true,
+		parallel: false,
+	};
+	const files = {
+		name: "dosyalar",
+		transport: "stdio",
+		command: "npx",
+		args: ["-y", "mcp-files", "/tmp"],
+		env: { TOKEN: "abc-secret", ROOT: "/tmp" },
+		purpose: "Shared specs.",
+	};
+	/** Answers the next save or open dialog with this file. */
+	const pick = (app: import("@playwright/test").ElectronApplication, path: string) =>
+		app.evaluate(({ dialog }, filePath) => {
+			dialog.showSaveDialog = (async () => ({ canceled: false, filePath })) as never;
+			dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [filePath] })) as never;
+		}, path);
+	/** Answers the next question with a button (and the box ticked or not); the questions asked so far. */
+	const answer = async (
+		app: import("@playwright/test").ElectronApplication,
+		response: number,
+		checked = false,
+	) => {
+		await app.evaluate(
+			({ dialog }, [index, tick]) => {
+				const holder = globalThis as { asked?: unknown[] };
+				holder.asked ??= [];
+				const asked = holder.asked;
+				dialog.showMessageBox = (async (...args: unknown[]) => {
+					asked.push(args.at(-1));
+					return { response: index, checkboxChecked: tick };
+				}) as typeof dialog.showMessageBox;
+			},
+			[response, checked] as const,
+		);
+		return () =>
+			app.evaluate(
+				() =>
+					((globalThis as { asked?: unknown[] }).asked ?? []) as {
+						message: string;
+						detail: string;
+						buttons: string[];
+						checkboxLabel?: string;
+					}[],
+			);
+	};
+
+	// On one computer: their own mode, and Kalem's review as they shaped it, each to a file.
+	const mine = await launch({
+		settings: {
+			assistantCustomModes: [analyst],
+			assistantMcpServers: [files],
+			assistantModes: { review: { detail: "detailed", extra: "Tarihlere de bak." } },
+		},
+	});
+	await clickMenu(mine.app, "File", "Settings…");
+	let settings = mine.page.locator(".settings-dialog");
+	await settings.locator('[data-category="modes"]').click();
+	await settings.locator('.mode-tab-custom[data-mode="custom-1"]').click();
+	await pick(mine.app, ownFile);
+	await settings.locator(".custom-mode").getByRole("button", { name: "Export…" }).click();
+	const status = settings.locator(".mode-share-status");
+	await expect(status).toContainText(`Saved to ${ownFile}.`);
+	await expect(status).toContainText("for whoever imports it to fill in: dosyalar: <TOKEN>");
+	const written = await readFile(ownFile, "utf8");
+	expect(written).not.toContain("abc-secret");
+	expect(JSON.parse(written)).toMatchObject({
+		kind: "kalem-assistant-mode",
+		version: 1,
+		custom: { name: "Test Analisti", prompt: "You are a test analyst.", mcp: ["dosyalar"] },
+		servers: [{ name: "dosyalar", env: { TOKEN: "<TOKEN>", ROOT: "/tmp" } }],
+	});
+	await settings.locator('.mode-tab[data-mode="review"]').click();
+	await pick(mine.app, reviewFile);
+	await settings.locator(".mode-panel").getByRole("button", { name: "Export…" }).click();
+	await expect(status).toContainText(`Saved to ${reviewFile}.`);
+	expect(JSON.parse(await readFile(reviewFile, "utf8")).kalem).toEqual({
+		mode: "review",
+		settings: { detail: "detailed", extra: "Tarihlere de bak." },
+	});
+	expect(mine.errors).toEqual([]);
+	await mine.app.close();
+
+	// On a colleague's: the mode comes in with its server, once they see what it runs.
+	const theirs = await launch({});
+	await clickMenu(theirs.app, "File", "Settings…");
+	settings = theirs.page.locator(".settings-dialog");
+	await settings.locator('[data-category="modes"]').click();
+	await pick(theirs.app, ownFile);
+	let asked = await answer(theirs.app, 0);
+	await settings.getByRole("button", { name: "Import…" }).click();
+	await expect(settings.locator('.mode-tab-custom[data-mode="custom-1"]')).toContainText(
+		"Test Analisti",
+	);
+	const [question] = await asked();
+	expect(question?.message).toBe("Import the mode “Test Analisti”?");
+	expect(question?.detail).toContain("A mode of its own");
+	expect(question?.detail).toContain("• dosyalar — npx -y mcp-files /tmp");
+	expect(question?.detail).toContain("import servers only from someone you trust");
+	expect(question?.detail).toContain("dosyalar: <TOKEN>");
+	expect(question?.buttons).toEqual(["Import with its servers", "Import the mode only", "Cancel"]);
+	expect(question?.checkboxLabel).toBeUndefined();
+	const shown = settings.locator(".custom-mode");
+	await expect(shown.getByRole("textbox", { name: "Instructions" })).toHaveValue(
+		"You are a test analyst.",
+	);
+	await expect(settings.locator(".mode-share-status")).toContainText(
+		"“Test Analisti” imported. Servers added: dosyalar. To fill in (Settings → Assistant → MCP servers): dosyalar: <TOKEN>.",
+	);
+	const stored = async () =>
+		JSON.parse(await readFile(join(theirs.userData, "settings.json"), "utf8")).settings;
+	await expect
+		.poll(async () =>
+			(await stored()).assistantMcpServers.map((each: { name: string }) => each.name),
+		)
+		.toContain("dosyalar");
+	expect(
+		(await stored()).assistantMcpServers.find((each: { name: string }) => each.name === "dosyalar")
+			.env,
+	).toEqual({ TOKEN: "<TOKEN>", ROOT: "/tmp" });
+
+	// Again: named apart; with the box ticked, in place of the one of its name.
+	await pick(theirs.app, ownFile);
+	asked = await answer(theirs.app, 0);
+	await settings.getByRole("button", { name: "Import…" }).click();
+	await expect(settings.locator(".mode-tab-custom")).toHaveCount(2);
+	await expect(settings.locator(".mode-tab-custom").last()).toContainText("Test Analisti (2)");
+	const [, again] = await asked();
+	// The server is theirs now: it is used, not added again.
+	expect(again?.detail).toContain("• dosyalar — you have one of this name: yours is used");
+	expect(again?.buttons).toEqual(["Import", "Cancel"]);
+	expect(again?.checkboxLabel).toBe("Take the place of my mode “Test Analisti”");
+	await pick(theirs.app, ownFile);
+	await answer(theirs.app, 0, true);
+	await settings.getByRole("button", { name: "Import…" }).click();
+	await expect(settings.locator(".mode-share-status")).toContainText("“Test Analisti” imported.");
+	await expect(settings.locator(".mode-tab-custom")).toHaveCount(2);
+
+	// Kalem's review as the colleague shaped it takes the place of how theirs is set up.
+	await pick(theirs.app, reviewFile);
+	asked = await answer(theirs.app, 0);
+	await settings.getByRole("button", { name: "Import…" }).click();
+	await expect(settings.locator('.mode-tab[data-mode="review"]')).toHaveAttribute(
+		"aria-selected",
+		"true",
+	);
+	await expect(settings.getByRole("textbox", { name: "More instructions" })).toHaveValue(
+		"Tarihlere de bak.",
+	);
+	expect((await asked()).at(-1)?.detail).toContain(
+		"Kalem's Review analysis mode as someone shaped it",
+	);
+	await expect
+		.poll(async () => (await stored()).assistantModes.review)
+		.toEqual({
+			detail: "detailed",
+			extra: "Tarihlere de bak.",
+		});
+
+	// A file that is not a mode says so, and changes nothing.
+	const junk = join(folder, "not-a-mode.json");
+	await writeFile(junk, '{"hello": 1}');
+	await pick(theirs.app, junk);
+	asked = await answer(theirs.app, 0);
+	await settings.getByRole("button", { name: "Import…" }).click();
+	await expect
+		.poll(async () => (await asked()).at(-1)?.message)
+		.toBe("not-a-mode.json could not be imported.");
+	expect((await asked()).at(-1)?.detail).toBe("It is not a Kalem mode file.");
+	expect(theirs.errors).toEqual([]);
+	await theirs.app.close();
+});
+
+test("the answer waits while the user does something, and goes on with what they chose", async () => {
+	const folder = await tempDir("agent-wait");
+	const claude = await fakeClaude(folder, "Tamam, hata senaryosunu çalıştırıyorum.", [
+		{
+			name: "wait_for_user",
+			input: {
+				title: "IntelliJ'de sınıfları güncelleyin",
+				steps: ["Run/Debug → Update 'Tomcat'", "Hot swap classes"],
+				reason: "Sunucu yeni kodu henüz yüklemedi",
+			},
+		},
+	]);
+	const { app, page, errors } = await launch({
+		settings: { assistant: true },
+		env: { KALEM_CLAUDE: claude.path },
+	});
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toBeHidden();
+	const input = pane.locator(".assistant-input");
+	await input.fill("Mock'u dene");
+	await input.press("Enter");
+
+	// The CLI waits on the tool: the card says what to do, and the answer does not end.
+	const card = pane.locator(".assistant-wait");
+	await expect(card.locator(".assistant-wait-label")).toHaveText("Waiting for you");
+	await expect(card.locator(".assistant-approval-title")).toHaveText(
+		"IntelliJ'de sınıfları güncelleyin",
+	);
+	await expect(card.locator(".assistant-wait-steps li")).toHaveText([
+		"Run/Debug → Update 'Tomcat'",
+		"Hot swap classes",
+	]);
+	await expect(card.locator(".assistant-wait-choices button")).toHaveText([
+		"Done, go on",
+		"Skip",
+		"Stop here",
+	]);
+	await expect(pane.getByRole("button", { name: "Stop", exact: true })).toBeVisible();
+	await expect(input).toHaveAttribute("placeholder", /The assistant is waiting for you/);
+	expect(await claude.calls()).toHaveLength(0);
+
+	// Written in the box, it answers the card.
+	await input.fill("Hot swap olmadı, Tomcat'i yeniden başlattım");
+	await input.press("Enter");
+	await expect(card.locator(".assistant-approval-state")).toHaveText(
+		"You wrote: “Hot swap olmadı, Tomcat'i yeniden başlattım”",
+	);
+	const reply = pane.locator(".assistant-assistant").last();
+	await expect(reply.locator(".assistant-markdown")).toHaveText(
+		"Tamam, hata senaryosunu çalıştırıyorum.",
+	);
+	await expect(pane.getByRole("button", { name: "Stop", exact: true })).toBeHidden();
+	const [first] = await claude.calls();
+	expect(first?.tools?.[0]?.tool).toBe("mcp__kalem__wait_for_user");
+	expect(first?.tools?.[0]?.text).toContain(
+		"The user answered in their own words: “Hot swap olmadı, Tomcat'i yeniden başlattım”.",
+	);
+	// The model is told to wait this way, not to end asking for "continue".
+	const system = first?.args[first.args.indexOf("--append-system-prompt") + 1] ?? "";
+	expect(system).toContain("call wait_for_user with what to do");
+
+	// The next time, a button: skipped.
+	await input.fill("Bir daha dene");
+	await input.press("Enter");
+	const next = pane.locator(".assistant-wait").last();
+	await expect(next.locator(".assistant-wait-choices button")).toHaveCount(3);
+	await next.getByRole("button", { name: "Skip" }).click();
+	await expect(next.locator(".assistant-approval-state")).toHaveText("You chose: Skip");
+	await expect
+		.poll(async () => (await claude.calls())[1]?.tools?.[0]?.text)
+		.toContain("The user skipped it");
+	await expect(pane.locator(".assistant-assistant")).toHaveCount(2);
+	expect(errors).toEqual([]);
 	await app.close();
 });

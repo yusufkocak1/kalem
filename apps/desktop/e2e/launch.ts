@@ -43,6 +43,8 @@ export async function launch(options: LaunchOptions = {}): Promise<Launched> {
 					confluenceReviewBeforeSave: false,
 					// Closing asks about unsaved tabs, as before sessions were kept; a test turns them on.
 					restoreSession: false,
+					// The document goes with each question, as before it was offered faded; a test turns that off.
+					assistantDocumentAuto: true,
 					...options.settings,
 				},
 				welcomed: options.welcomed ?? true,

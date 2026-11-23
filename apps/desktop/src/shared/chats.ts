@@ -5,6 +5,13 @@
  */
 import type { ChatMessage, ProviderId } from "./providers.js";
 import { isProvider } from "./providers.js";
+import { MAX_STEER_TEXT, withSteering } from "./steering.js";
+
+/** A message the user added while a reply ran, and where in the reply's text it was taken in. */
+export interface SteeredText {
+	readonly at: number;
+	readonly text: string;
+}
 
 export interface StoredMessage {
 	readonly role: "user" | "assistant";
@@ -15,6 +22,8 @@ export interface StoredMessage {
 	readonly notes: readonly string[];
 	/** The model that answered; empty when the service chose. */
 	readonly model?: string;
+	/** A reply's: what the user added while it ran. */
+	readonly steered?: readonly SteeredText[];
 }
 
 export interface StoredChat {
@@ -44,6 +53,7 @@ export const MAX_CHATS = 100;
 export const MAX_CHAT_SOURCES = 20;
 const MAX_MESSAGES = 400;
 const MAX_TEXT = 200_000;
+const MAX_STEERED = 20;
 
 /** A chat's name: the start of its first question. */
 export function chatTitle(question: string): string {
@@ -57,6 +67,17 @@ const str = (value: unknown, max: number): string =>
 const time = (value: unknown): number =>
 	typeof value === "number" && Number.isFinite(value) && value > 0 ? value : Date.now();
 
+/** What a reply was added while it ran, as far as it makes sense. */
+function steeredTexts(raw: unknown): SteeredText[] {
+	return (Array.isArray(raw) ? raw : []).slice(0, MAX_STEERED).flatMap((item): SteeredText[] => {
+		if (typeof item !== "object" || item === null) return [];
+		const { at, text } = item as Record<string, unknown>;
+		if (typeof at !== "number" || !Number.isInteger(at) || at < 0) return [];
+		const said = str(text, MAX_STEER_TEXT);
+		return said.trim() === "" ? [] : [{ at, text: said }];
+	});
+}
+
 /** A chat read from disk or sent by a window; `null` when it is not one. */
 export function parseChat(raw: unknown): StoredChat | null {
 	if (typeof raw !== "object" || raw === null) return null;
@@ -69,6 +90,7 @@ export function parseChat(raw: unknown): StoredChat | null {
 			if (typeof item !== "object" || item === null) return [];
 			const message = item as Record<string, unknown>;
 			if (message.role !== "user" && message.role !== "assistant") return [];
+			const steered = message.role === "assistant" ? steeredTexts(message.steered) : [];
 			return [
 				{
 					role: message.role,
@@ -81,6 +103,7 @@ export function parseChat(raw: unknown): StoredChat | null {
 					...(typeof message.model === "string" && message.model !== ""
 						? { model: message.model.slice(0, 200) }
 						: {}),
+					...(steered.length === 0 ? {} : { steered }),
 				},
 			];
 		});
@@ -123,7 +146,8 @@ export function chatSummary(chat: StoredChat): ChatSummary {
 /**
  * What an API is sent again to continue a chat it has not seen in this
  * run: answered questions with their replies, taking turns, without the
- * documents that went with them.
+ * documents that went with them; what the user added while a reply ran
+ * goes with its question, as the model was told it.
  */
 export function historyOf(messages: readonly StoredMessage[], max = 40): ChatMessage[] {
 	const history: ChatMessage[] = [];
@@ -133,7 +157,13 @@ export function historyOf(messages: readonly StoredMessage[], max = 40): ChatMes
 		if (question.role !== "user" || reply.role !== "assistant") continue;
 		if (reply.text.trim() === "" || question.text.trim() === "") continue;
 		history.push(
-			{ role: "user", content: question.text },
+			{
+				role: "user",
+				content: withSteering(
+					question.text,
+					(reply.steered ?? []).map((steered) => steered.text),
+				),
+			},
 			{ role: "assistant", content: reply.text },
 		);
 		i++;
