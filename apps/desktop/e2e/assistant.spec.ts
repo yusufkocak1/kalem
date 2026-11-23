@@ -95,7 +95,7 @@ test("asks the local Claude about the document and inserts its reply with the di
 	await app.close();
 });
 
-test("the open document is offered faded, and a click adds it to the chat", async () => {
+test("the open document is offered faded, a click adds it, and it stays in the chat when another is opened", async () => {
 	const folder = await tempDir("assistant-offer");
 	const notes = join(folder, "notlar.md");
 	const plan = join(folder, "plan.md");
@@ -134,22 +134,46 @@ test("the open document is offered faded, and a click adds it to the chat", asyn
 		.toContain('<document name="notlar.md">');
 	await expect(shared).toHaveText("notlar.md");
 
-	// Another document is offered on its own; back on the first, it is still in the chat.
+	// Another document opened: the first stays in the chat, the new one is offered beside it.
 	await showPane(page, "files");
 	await page.locator(".files-item", { hasText: "plan.md" }).click();
 	await expect(page.locator(".doc-tab")).toHaveCount(2);
+	await expect(shared).toHaveText(["notlar.md"]);
 	await expect(offered("plan.md")).toBeVisible();
-	await expect(shared).toHaveCount(0);
+	// The first goes on going with the questions, once until it changes; the new one, once added.
+	await input.fill("Devam");
+	await input.press("Enter");
+	await expect
+		.poll(async () => (await claude.calls())[2]?.prompt)
+		.toContain('<other-document-unchanged name="notlar.md">');
+	expect((await claude.calls())[2]?.prompt).not.toContain("# Plan");
+	await offered("plan.md").click();
+	await expect(shared).toHaveText(["notlar.md", "plan.md"]);
+	await input.fill("İkisini karşılaştır");
+	await input.press("Enter");
+	await expect.poll(async () => (await claude.calls()).length).toBe(4);
+	const both = (await claude.calls())[3]?.prompt ?? "";
+	expect(both).toContain('<document name="plan.md">\n# Plan\n\nAdımlar\n</document>');
+	expect(both).toContain('<other-document-unchanged name="notlar.md">');
+	const user = pane.locator(".assistant-user").last();
+	await expect(user.locator(".assistant-notes")).toHaveText("with “plan.md” · with “notlar.md”");
+	// Back on the first: both still in the chat; one taken out of another tab stays out.
 	await page.locator(".doc-tab", { hasText: "notlar" }).click();
-	await expect(shared).toHaveText("notlar.md");
+	await expect(shared).toHaveText(["notlar.md", "plan.md"]);
+	await shared
+		.filter({ hasText: "plan.md" })
+		.getByRole("button", { name: "Do not share plan.md" })
+		.click();
+	await expect(shared).toHaveText(["notlar.md"]);
+	await expect(offered("plan.md")).toHaveCount(0);
 
 	// A new chat starts with it offered; a suggestion about the document adds it.
 	await pane.getByRole("button", { name: "New chat" }).first().click();
 	await expect(offered("notlar.md")).toBeVisible();
 	await pane.locator(".assistant-suggestion").first().click();
 	await expect(shared).toHaveText("notlar.md");
-	await expect.poll(async () => (await claude.calls()).length).toBe(3);
-	expect((await claude.calls())[2]?.prompt).toContain('<document name="notlar.md">');
+	await expect.poll(async () => (await claude.calls()).length).toBe(5);
+	expect((await claude.calls())[4]?.prompt).toContain('<document name="notlar.md">');
 
 	// The setting adds it to every chat on its own.
 	await clickMenu(app, "File", "Settings…");
@@ -158,7 +182,7 @@ test("the open document is offered faded, and a click adds it to the chat", asyn
 	await dialog.getByLabel("Add the active document to each chat on its own").check();
 	await dialog.getByRole("button", { name: "Done" }).click();
 	await page.locator(".doc-tab", { hasText: "plan" }).click();
-	await expect(shared).toHaveText("plan.md");
+	await expect(shared).toHaveText(["notlar.md", "plan.md"]);
 	expect(errors).toEqual([]);
 	await app.close();
 });

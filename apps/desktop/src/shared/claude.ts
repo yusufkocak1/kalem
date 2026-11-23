@@ -133,6 +133,16 @@ export interface PromptContext {
 	readonly diagrams?: readonly ContextDiagram[];
 	/** The document's pictures that go with the question, in order. */
 	readonly images?: readonly { readonly src: string; readonly label: string }[];
+	/**
+	 * Documents the user added to the chat that are open in other tabs:
+	 * read from here (Kalem's document tools work on the active one only).
+	 * One sent earlier in the chat and not changed since says only that.
+	 */
+	readonly others?: readonly {
+		readonly name: string;
+		readonly text: string;
+		readonly unchanged?: boolean;
+	}[];
 }
 
 /** A picture of the document, sent with the question for the model to look at. */
@@ -239,6 +249,14 @@ export function composePrompt(context: PromptContext): string {
 		);
 	} else if (context.documentUnchanged === true) {
 		parts.push("<document-unchanged>The document is as I shared it above.</document-unchanged>");
+	}
+	for (const other of context.others ?? []) {
+		const name = attribute(other.name);
+		parts.push(
+			other.unchanged === true
+				? `<other-document-unchanged name="${name}">As I shared it above.</other-document-unchanged>`
+				: `<other-document name="${name}">\nOpen in another tab: read it here; Kalem's document tools work on the active document only.\n${clip(other.text.replace(/\n+$/, ""), MAX_DOCUMENT)}\n</other-document>`,
+		);
 	}
 	for (const { src, diagram } of context.diagrams ?? []) {
 		parts.push(`<diagram src="${attribute(src)}">\n${diagramForPrompt(diagram)}\n</diagram>`);

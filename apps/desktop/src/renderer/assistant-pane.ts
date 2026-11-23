@@ -103,6 +103,8 @@ export interface AssistantHost {
 	autoDocument(): boolean;
 	/** The active document's tab; empty when none is open. */
 	documentId(): string;
+	/** A document open in a tab: its name as its chip shows it, and its text; `null` once it is closed. */
+	documentOf(id: string): { readonly name: string; text(): string } | null;
 	/**
 	 * Opens a file's proposed changes in its tab, to review them there a line at a time;
 	 * `settle` is told whether any was kept once all are decided. Resolves `false` when it
@@ -213,6 +215,8 @@ interface Message {
 	editAt?: Record<string, number>;
 	/** What it asked the user before changing something, in this run. */
 	approvals?: ApprovalRequest[];
+	/** Where in the reply's text each question came (by its id): what follows shows after it. */
+	approvalAt?: Record<string, number>;
 	/** Its plan for the answer. */
 	plan?: readonly PlanStep[];
 	/** What it changed, each with its undo. */
@@ -272,8 +276,8 @@ interface Chat {
 	sources: string[];
 	/** Folders open in the Files pane that this chat leaves out. */
 	skipped: string[];
-	/** The document text the service was last given in this chat, in this run. */
-	sharedText: string | null;
+	/** Each document's text (by tab) the service was last given in this chat, in this run. */
+	readonly sent: Map<string, string>;
 	/** The reply coming in, and what ends the wait for it. */
 	reply: Message | null;
 	ended: (() => void) | null;
@@ -354,7 +358,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			messages: [],
 			sources: [],
 			skipped: [],
-			sharedText: null,
+			sent: new Map(),
 			reply: null,
 			ended: null,
 			queued: [],
@@ -830,15 +834,27 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	let documentShown = "";
 	/** A document is open: the app tells the panel so first through `refreshSelection`. */
 	let documentOpen = false;
-	/** Whether the active document goes with this chat's questions: as the user chose here, else as the setting says. */
-	function documentShared(chat: Chat): boolean {
-		const id = host.documentId();
-		return id !== "" && (chat.documents.get(id) ?? host.autoDocument());
+	/**
+	 * The documents in the chat, by tab, in the order they came: those the
+	 * user added (or that went with a question), whichever tab is active,
+	 * and the active one when the setting adds it on its own. A closed
+	 * tab's is gone.
+	 */
+	function chatDocuments(chat: Chat): string[] {
+		const ids = [...chat.documents].filter(([, on]) => on).map(([id]) => id);
+		const activeId = host.documentId();
+		if (activeId !== "" && !chat.documents.has(activeId) && host.autoDocument()) ids.push(activeId);
+		return ids.filter((id) => host.documentOf(id) !== null);
 	}
 
-	/** Adds the active document to the chat, or takes it out: its chip says which. */
-	function shareDocument(chat: Chat, share: boolean): void {
+	/** Whether the active document goes with this chat's questions. */
+	function documentShared(chat: Chat): boolean {
 		const id = host.documentId();
+		return id !== "" && chatDocuments(chat).includes(id);
+	}
+
+	/** Adds a document to the chat, or takes it out: the active one, unless another is named. */
+	function shareDocument(chat: Chat, share: boolean, id = host.documentId()): void {
 		if (id === "") return;
 		chat.documents.set(id, share);
 		if (chat !== active) return;
@@ -848,30 +864,47 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	}
 
 	/**
-	 * The active document's chip. In the chat, it has a ✕ to take it out; else
-	 * it is offered, faded with a +, and a click adds it.
+	 * The documents' chips: each one in the chat with a ✕ to take it out,
+	 * then the active one, when it is not in the chat, offered faded with a
+	 * +, which a click adds. Opening another document leaves those in the
+	 * chat where they are.
 	 */
-	function documentChip(): HTMLElement[] {
-		const name = documentOpen ? host.documentName() : "";
-		if (name === "") return [];
-		if (!documentShared(active)) {
-			const file = icon("file");
-			file.classList.add("assistant-chip-file");
-			const plus = icon("plus");
-			plus.classList.add("assistant-chip-plus");
-			const add = el("button", {
-				class: "assistant-chip assistant-source assistant-source-document assistant-chip-offered",
-				attrs: {
-					type: "button",
-					title: format(t.assistantAddDocument, name),
-					"aria-label": format(t.assistantAddDocument, name),
-					"data-document": "",
-				},
-				children: [file, el("span", { class: "assistant-chip-text", text: name }), plus],
-			});
-			add.addEventListener("click", () => shareDocument(active, true));
-			return [add];
+	function documentChips(): HTMLElement[] {
+		if (!documentOpen) return [];
+		const activeId = host.documentId();
+		const ids = chatDocuments(active);
+		const chips = ids.map((id) =>
+			documentChip(host.documentOf(id)?.name ?? "", id, id === activeId),
+		);
+		const name = host.documentName();
+		if (activeId !== "" && name !== "" && !ids.includes(activeId)) {
+			chips.push(offeredChip(name));
 		}
+		return chips;
+	}
+
+	/** The active document, not in the chat: faded, with a + that adds it. */
+	function offeredChip(name: string): HTMLElement {
+		const file = icon("file");
+		file.classList.add("assistant-chip-file");
+		const plus = icon("plus");
+		plus.classList.add("assistant-chip-plus");
+		const add = el("button", {
+			class: "assistant-chip assistant-source assistant-source-document assistant-chip-offered",
+			attrs: {
+				type: "button",
+				title: format(t.assistantAddDocument, name),
+				"aria-label": format(t.assistantAddDocument, name),
+				"data-document": "",
+			},
+			children: [file, el("span", { class: "assistant-chip-text", text: name }), plus],
+		});
+		add.addEventListener("click", () => shareDocument(active, true));
+		return add;
+	}
+
+	/** A document in the chat, the active one or one open in another tab, with a ✕ that takes it out. */
+	function documentChip(name: string, id: string, isActive: boolean): HTMLElement {
 		const remove = el("button", {
 			class: "assistant-chip-close",
 			attrs: {
@@ -881,20 +914,26 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			},
 			children: [icon("close")],
 		});
-		remove.addEventListener("click", () => shareDocument(active, false));
-		return [
-			el("span", {
-				class: "assistant-chip assistant-source assistant-source-document",
-				attrs: { title: t.assistantShareDocument, "data-document": "" },
-				children: [icon("file"), el("span", { class: "assistant-chip-text", text: name }), remove],
-			}),
-		];
+		remove.addEventListener("click", () => shareDocument(active, false, id));
+		return el("span", {
+			class: "assistant-chip assistant-source assistant-source-document",
+			attrs: {
+				title: isActive ? t.assistantShareDocument : format(t.assistantOtherDocument, name),
+				"data-document": "",
+				...(isActive ? { "data-active": "" } : {}),
+			},
+			children: [icon("file"), el("span", { class: "assistant-chip-text", text: name }), remove],
+		});
 	}
 
-	/** The document chip as drawn: its tab, name, and whether it is in the chat. */
+	/** The document chips as drawn: the active tab, and each document in the chat by tab and name. */
 	const documentState = (): string =>
-		documentOpen && host.documentName() !== ""
-			? `${host.documentId()}\u0000${host.documentName()}\u0000${documentShared(active)}`
+		documentOpen
+			? [
+					host.documentId(),
+					host.documentName(),
+					...chatDocuments(active).map((id) => `${id}:${host.documentOf(id)?.name ?? ""}`),
+				].join("\u0000")
 			: "";
 
 	/** Draws the chips again when the document chip changed (another tab, added or taken out). */
@@ -904,7 +943,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 	function renderSources(): void {
 		const open = openFolders(active);
-		const doc = documentChip();
+		const doc = documentChips();
 		documentShown = documentState();
 		sourceList.hidden =
 			doc.length === 0 && active.sources.length === 0 && open.length === 0 && pasted.length === 0;
@@ -2488,7 +2527,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			})),
 			sources: [...(stored.sources ?? [])],
 			skipped: [...(stored.skipped ?? [])],
-			sharedText: null,
+			sent: new Map(),
 			reply: null,
 			ended: null,
 			queued: [],
@@ -2738,6 +2777,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				if (card.at !== piece.cut) continue;
 				if (card.kind === "edit") nodes.push(editCard(card.edit));
 				else if (card.kind === "steered") nodes.push(steeredCard(card.text));
+				else if (card.kind === "approval") nodes.push(questionCard(card.request, message));
 				else nodes.push(commandCard(card.run, message));
 			}
 		}
@@ -2785,28 +2825,6 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				for (const change of [...undoable].reverse()) await undoChange(message, change);
 			});
 			nodes.push(el("div", { class: "assistant-change assistant-undo-all", children: [all] }));
-		}
-		for (const request of message.approvals ?? []) {
-			const state = approvalStates.get(request.id) ?? "waiting";
-			// A card that waited for the user when the reply ended was not answered.
-			const unanswered = request.choices !== undefined && message.done && state === "waiting";
-			nodes.push(
-				approvalCard(
-					t,
-					request,
-					unanswered ? "denied" : state,
-					(answer) => {
-						if (request.choices !== undefined) {
-							answerWait(request, answer);
-							return;
-						}
-						approvalStates.set(request.id, answer.approved ? "allowed" : "denied");
-						void bridge.assistantApprove(request.id, answer);
-						renderReply(message);
-					},
-					approvalChosen.get(request.id),
-				),
-			);
 		}
 		const waitsForUser = (message.approvals ?? []).some(
 			(request) =>
@@ -3104,12 +3122,14 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		| { kind: "run"; run: CommandRun }
 		| { kind: "edit"; edit: ProposedEdit }
 		| { kind: "steered"; text: string }
+		| { kind: "approval"; request: ApprovalRequest }
 	))[] {
 		const end = message.text.length;
 		const cards: ({ at: number } & (
 			| { kind: "run"; run: CommandRun }
 			| { kind: "edit"; edit: ProposedEdit }
 			| { kind: "steered"; text: string }
+			| { kind: "approval"; request: ApprovalRequest }
 		))[] = [];
 		for (const run of message.runs ?? [])
 			cards.push({ at: Math.min(run.at, end), kind: "run", run });
@@ -3125,11 +3145,38 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			const paragraph = between ? at : message.text.indexOf("\n\n", at);
 			cards.push({ at: paragraph === -1 ? end : paragraph, kind: "steered", text: steered.text });
 		}
+		// A question shows where it was asked: what the reply says after it comes under it.
+		for (const request of message.approvals ?? []) {
+			const at = Math.min(message.approvalAt?.[request.id] ?? end, end);
+			cards.push({ at, kind: "approval", request });
+		}
 		// In the order they came, at the same place too.
 		return cards
 			.map((card, order) => ({ card, order }))
 			.sort((a, b) => a.card.at - b.card.at || a.order - b.order)
 			.map(({ card }) => card);
+	}
+
+	/** A question to the user: to allow a change, a form, or what they are waited for to do. */
+	function questionCard(request: ApprovalRequest, message: Message): HTMLElement {
+		const state = approvalStates.get(request.id) ?? "waiting";
+		// A card that waited for the user when the reply ended was not answered.
+		const unanswered = request.choices !== undefined && message.done && state === "waiting";
+		return approvalCard(
+			t,
+			request,
+			unanswered ? "denied" : state,
+			(answer) => {
+				if (request.choices !== undefined) {
+					answerWait(request, answer);
+					return;
+				}
+				approvalStates.set(request.id, answer.approved ? "allowed" : "denied");
+				void bridge.assistantApprove(request.id, answer);
+				renderReply(message);
+			},
+			approvalChosen.get(request.id),
+		);
 	}
 
 	/** What the user added while the reply ran, where the answer went on with it. */
@@ -4139,6 +4186,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			return;
 		}
 		reply.approvals = [...(reply.approvals ?? []), request];
+		reply.approvalAt = { ...reply.approvalAt, [request.id]: reply.text.length };
 		const waits = request.choices !== undefined;
 		// Waiting for the user to do something: the window says so even when it is not in front.
 		if (waits) bridge.assistantAttention(format(t.waitNotice, request.title));
@@ -4275,7 +4323,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			chat.provider = provider;
 			chat.sessionId = null;
 			chat.folder = null;
-			chat.sharedText = null;
+			chat.sent.clear();
 		}
 		const reply: Message = {
 			role: "assistant",
@@ -4343,14 +4391,33 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			}
 			const selection = droppedSelection === null ? host.selection() : "";
 			const sharing = chat.documents.get(context.tabId) ?? host.autoDocument();
-			const unchanged = sharing && chat.sessionId !== null && chat.sharedText === context.text;
+			const unchanged =
+				sharing && chat.sessionId !== null && chat.sent.get(context.tabId) === context.text;
 			if (sharing) notes.push(format(t.assistantSharedDocument, context.name));
+			// The documents added from other tabs go too: each once, until it changes.
+			const others = chatDocuments(chat)
+				.filter((id) => id !== context.tabId)
+				.flatMap((id) => {
+					const doc = host.documentOf(id);
+					if (doc === null) return [];
+					const text = doc.text();
+					const same = chat.sessionId !== null && chat.sent.get(id) === text;
+					return [{ id, name: doc.name, text, unchanged: same }];
+				});
+			for (const other of others) notes.push(format(t.assistantSharedDocument, other.name));
+			const otherDocuments =
+				others.length === 0
+					? {}
+					: { others: others.map(({ name, text, unchanged }) => ({ name, text, unchanged })) };
 			if (selection.trim() !== "") notes.push(t.assistantSharedSelection);
 			const sources = chatSources(chat);
 			if (mode === "auto") {
 				const detected = detectMode(
 					question,
-					{ hasDocument: sharing, hasWorkspace: sources.length > 0 || chat.folder !== null },
+					{
+						hasDocument: sharing || others.length > 0,
+						hasWorkspace: sources.length > 0 || chat.folder !== null,
+					},
 					host.modes(),
 					host.customModes(),
 				);
@@ -4382,16 +4449,22 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					diagrams: context.diagrams,
 					images,
 					selection,
+					...otherDocuments,
 				});
-				notes[0] = format(
-					t.assistantSharedDocument,
-					format(t.assistantDocumentOutline, context.name),
-				);
+				// The document's own note says it went as its outline (the sections' note, if any, stays).
+				const noted = notes.indexOf(format(t.assistantSharedDocument, context.name));
+				if (noted !== -1) {
+					notes[noted] = format(
+						t.assistantSharedDocument,
+						format(t.assistantDocumentOutline, context.name),
+					);
+				}
 				prompt = composePrompt({
 					question: withSections,
 					outline: { name: context.name, text: outlineText(context.text) },
 					diagrams: context.diagrams,
 					selection,
+					...otherDocuments,
 				});
 				images = [];
 			} else
@@ -4406,8 +4479,14 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 						: {}),
 					documentUnchanged: unchanged,
 					selection,
+					...otherDocuments,
 				});
-			if (sharing) chat.sharedText = context.text;
+			// What went with a question stays in the chat, whichever tab is opened next.
+			if (sharing) {
+				chat.sent.set(context.tabId, context.text);
+				chat.documents.set(context.tabId, true);
+			}
+			for (const other of others) chat.sent.set(other.id, other.text);
 			// A review, or a mode's steps, asked for now (not a question about an earlier answer)
 			// may run by workers: the review's checks, or the steps marked parallel at once.
 			const workspace = sources.length > 0 || chat.folder !== null;
@@ -4435,6 +4514,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 									document: { name: context.name, text: context.text },
 									diagrams: context.diagrams,
 									selection,
+									...otherDocuments,
 								})
 							: prompt));
 			}

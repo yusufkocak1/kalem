@@ -1503,9 +1503,15 @@ verir.
 - **Açık belge önerilir:** etkin belge, giriş kutusunun üstünde **silik,
   kesikli kenarlı bir çip** (`ad.md +`) olarak gelir; henüz sohbette
   değildir, soruyla gitmez. Çipe bir tık belgeyi sohbete ekler (dolu çip
-  olur), `×` geri çıkarır ve çip yine silik kalır. Seçim sohbet ve belge
-  başınadır: başka bir sekmeye geçilince o belge de silik gelir, ilk belgeye
-  dönülünce sohbette olduğu görülür; **Yeni sohbet** yine silik başlar.
+  olur), `×` geri çıkarır ve çip yine silik kalır. Sohbete eklenen belge,
+  başka bir belge açılınca da sohbette kalır: dolu çipi yerinde durur ve
+  sorularla gitmeye devam eder; yeni açılan belge yanında silik `+` çipiyle
+  eklenebilir olarak gelir. Böylece birden çok belge aynı sohbette olabilir.
+  Etkin olmayan belgeler modele `<other-document>` olarak gider ve modele
+  Kalem'in belge araçlarının yalnızca etkin belgede çalıştığı söylenir. Bir
+  belge aynı sohbette değişmeden yeniden gönderilmez (her belge için ayrı
+  bakılır). Bir soruyla giden belge sohbette kalır; sekmesi kapanan belge
+  sohbetten düşer. **Yeni sohbet** yine silik başlar.
   **+ › Belgeyi paylaş**, `/share` ve `@ belge` de ekler. Belgeyle ilgili
   girişler belgeyi kendiliğinden ekler: boş sohbetin belgeye göre önerileri
   ve seçimin yanındaki **✦ Asistan** / `Ctrl+J`. Belgenin her sohbete

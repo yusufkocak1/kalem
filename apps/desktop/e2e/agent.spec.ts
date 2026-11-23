@@ -2050,6 +2050,10 @@ test("the answer waits while the user does something, and goes on with what they
 	await expect(reply.locator(".assistant-markdown")).toHaveText(
 		"Tamam, hata senaryosunu çalıştırıyorum.",
 	);
+	// What the answer says after the card comes under it, where the user is looking.
+	await expect(reply.locator(".assistant-wait + .assistant-markdown")).toHaveText(
+		"Tamam, hata senaryosunu çalıştırıyorum.",
+	);
 	await expect(pane.getByRole("button", { name: "Stop", exact: true })).toBeHidden();
 	const [first] = await claude.calls();
 	expect(first?.tools?.[0]?.tool).toBe("mcp__kalem__wait_for_user");
