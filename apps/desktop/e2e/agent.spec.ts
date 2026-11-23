@@ -1801,3 +1801,200 @@ test("the empty chat suggests for this document, a change leaves a point before 
 	await stubMessageBox(app, 1);
 	await app.close();
 });
+
+test("a mode is exported to a file without its secrets, and imported on another computer with its servers", async () => {
+	const folder = await tempDir("agent-mode-share");
+	const ownFile = join(folder, "test-analisti.kalem-mode.json");
+	const reviewFile = join(folder, "incele.kalem-mode.json");
+	const analyst = {
+		id: "custom-1",
+		name: "Test Analisti",
+		icon: "target",
+		description: "Gereksinimlerden test senaryosu yazar",
+		prompt: "You are a test analyst.",
+		steps: [
+			{
+				id: "step-1",
+				on: true,
+				title: "Senaryolar",
+				instruction: "Write a test case for each rule.",
+				custom: true,
+			},
+		],
+		tools: ["document_read"],
+		mcp: ["dosyalar"],
+		keywords: ["senaryo"],
+		detail: "normal",
+		language: "tr",
+		enabled: true,
+		parallel: false,
+	};
+	const files = {
+		name: "dosyalar",
+		transport: "stdio",
+		command: "npx",
+		args: ["-y", "mcp-files", "/tmp"],
+		env: { TOKEN: "abc-secret", ROOT: "/tmp" },
+		purpose: "Shared specs.",
+	};
+	/** Answers the next save or open dialog with this file. */
+	const pick = (app: import("@playwright/test").ElectronApplication, path: string) =>
+		app.evaluate(({ dialog }, filePath) => {
+			dialog.showSaveDialog = (async () => ({ canceled: false, filePath })) as never;
+			dialog.showOpenDialog = (async () => ({ canceled: false, filePaths: [filePath] })) as never;
+		}, path);
+	/** Answers the next question with a button (and the box ticked or not); the questions asked so far. */
+	const answer = async (
+		app: import("@playwright/test").ElectronApplication,
+		response: number,
+		checked = false,
+	) => {
+		await app.evaluate(
+			({ dialog }, [index, tick]) => {
+				const holder = globalThis as { asked?: unknown[] };
+				holder.asked ??= [];
+				const asked = holder.asked;
+				dialog.showMessageBox = (async (...args: unknown[]) => {
+					asked.push(args.at(-1));
+					return { response: index, checkboxChecked: tick };
+				}) as typeof dialog.showMessageBox;
+			},
+			[response, checked] as const,
+		);
+		return () =>
+			app.evaluate(
+				() =>
+					((globalThis as { asked?: unknown[] }).asked ?? []) as {
+						message: string;
+						detail: string;
+						buttons: string[];
+						checkboxLabel?: string;
+					}[],
+			);
+	};
+
+	// On one computer: their own mode, and Kalem's review as they shaped it, each to a file.
+	const mine = await launch({
+		settings: {
+			assistantCustomModes: [analyst],
+			assistantMcpServers: [files],
+			assistantModes: { review: { detail: "detailed", extra: "Tarihlere de bak." } },
+		},
+	});
+	await clickMenu(mine.app, "File", "Settings…");
+	let settings = mine.page.locator(".settings-dialog");
+	await settings.locator('[data-category="modes"]').click();
+	await settings.locator('.mode-tab-custom[data-mode="custom-1"]').click();
+	await pick(mine.app, ownFile);
+	await settings.locator(".custom-mode").getByRole("button", { name: "Export…" }).click();
+	const status = settings.locator(".mode-share-status");
+	await expect(status).toContainText(`Saved to ${ownFile}.`);
+	await expect(status).toContainText("for whoever imports it to fill in: dosyalar: <TOKEN>");
+	const written = await readFile(ownFile, "utf8");
+	expect(written).not.toContain("abc-secret");
+	expect(JSON.parse(written)).toMatchObject({
+		kind: "kalem-assistant-mode",
+		version: 1,
+		custom: { name: "Test Analisti", prompt: "You are a test analyst.", mcp: ["dosyalar"] },
+		servers: [{ name: "dosyalar", env: { TOKEN: "<TOKEN>", ROOT: "/tmp" } }],
+	});
+	await settings.locator('.mode-tab[data-mode="review"]').click();
+	await pick(mine.app, reviewFile);
+	await settings.locator(".mode-panel").getByRole("button", { name: "Export…" }).click();
+	await expect(status).toContainText(`Saved to ${reviewFile}.`);
+	expect(JSON.parse(await readFile(reviewFile, "utf8")).kalem).toEqual({
+		mode: "review",
+		settings: { detail: "detailed", extra: "Tarihlere de bak." },
+	});
+	expect(mine.errors).toEqual([]);
+	await mine.app.close();
+
+	// On a colleague's: the mode comes in with its server, once they see what it runs.
+	const theirs = await launch({});
+	await clickMenu(theirs.app, "File", "Settings…");
+	settings = theirs.page.locator(".settings-dialog");
+	await settings.locator('[data-category="modes"]').click();
+	await pick(theirs.app, ownFile);
+	let asked = await answer(theirs.app, 0);
+	await settings.getByRole("button", { name: "Import…" }).click();
+	await expect(settings.locator('.mode-tab-custom[data-mode="custom-1"]')).toContainText(
+		"Test Analisti",
+	);
+	const [question] = await asked();
+	expect(question?.message).toBe("Import the mode “Test Analisti”?");
+	expect(question?.detail).toContain("A mode of its own");
+	expect(question?.detail).toContain("• dosyalar — npx -y mcp-files /tmp");
+	expect(question?.detail).toContain("import servers only from someone you trust");
+	expect(question?.detail).toContain("dosyalar: <TOKEN>");
+	expect(question?.buttons).toEqual(["Import with its servers", "Import the mode only", "Cancel"]);
+	expect(question?.checkboxLabel).toBeUndefined();
+	const shown = settings.locator(".custom-mode");
+	await expect(shown.getByRole("textbox", { name: "Instructions" })).toHaveValue(
+		"You are a test analyst.",
+	);
+	await expect(settings.locator(".mode-share-status")).toContainText(
+		"“Test Analisti” imported. Servers added: dosyalar. To fill in (Settings → Assistant → MCP servers): dosyalar: <TOKEN>.",
+	);
+	const stored = async () =>
+		JSON.parse(await readFile(join(theirs.userData, "settings.json"), "utf8")).settings;
+	await expect
+		.poll(async () =>
+			(await stored()).assistantMcpServers.map((each: { name: string }) => each.name),
+		)
+		.toContain("dosyalar");
+	expect(
+		(await stored()).assistantMcpServers.find((each: { name: string }) => each.name === "dosyalar")
+			.env,
+	).toEqual({ TOKEN: "<TOKEN>", ROOT: "/tmp" });
+
+	// Again: named apart; with the box ticked, in place of the one of its name.
+	await pick(theirs.app, ownFile);
+	asked = await answer(theirs.app, 0);
+	await settings.getByRole("button", { name: "Import…" }).click();
+	await expect(settings.locator(".mode-tab-custom")).toHaveCount(2);
+	await expect(settings.locator(".mode-tab-custom").last()).toContainText("Test Analisti (2)");
+	const [, again] = await asked();
+	// The server is theirs now: it is used, not added again.
+	expect(again?.detail).toContain("• dosyalar — you have one of this name: yours is used");
+	expect(again?.buttons).toEqual(["Import", "Cancel"]);
+	expect(again?.checkboxLabel).toBe("Take the place of my mode “Test Analisti”");
+	await pick(theirs.app, ownFile);
+	await answer(theirs.app, 0, true);
+	await settings.getByRole("button", { name: "Import…" }).click();
+	await expect(settings.locator(".mode-share-status")).toContainText("“Test Analisti” imported.");
+	await expect(settings.locator(".mode-tab-custom")).toHaveCount(2);
+
+	// Kalem's review as the colleague shaped it takes the place of how theirs is set up.
+	await pick(theirs.app, reviewFile);
+	asked = await answer(theirs.app, 0);
+	await settings.getByRole("button", { name: "Import…" }).click();
+	await expect(settings.locator('.mode-tab[data-mode="review"]')).toHaveAttribute(
+		"aria-selected",
+		"true",
+	);
+	await expect(settings.getByRole("textbox", { name: "More instructions" })).toHaveValue(
+		"Tarihlere de bak.",
+	);
+	expect((await asked()).at(-1)?.detail).toContain(
+		"Kalem's Review analysis mode as someone shaped it",
+	);
+	await expect
+		.poll(async () => (await stored()).assistantModes.review)
+		.toEqual({
+			detail: "detailed",
+			extra: "Tarihlere de bak.",
+		});
+
+	// A file that is not a mode says so, and changes nothing.
+	const junk = join(folder, "not-a-mode.json");
+	await writeFile(junk, '{"hello": 1}');
+	await pick(theirs.app, junk);
+	asked = await answer(theirs.app, 0);
+	await settings.getByRole("button", { name: "Import…" }).click();
+	await expect
+		.poll(async () => (await asked()).at(-1)?.message)
+		.toBe("not-a-mode.json could not be imported.");
+	expect((await asked()).at(-1)?.detail).toBe("It is not a Kalem mode file.");
+	expect(theirs.errors).toEqual([]);
+	await theirs.app.close();
+});

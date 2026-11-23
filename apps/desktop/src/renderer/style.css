@@ -11760,6 +11760,16 @@ textarea.jira-worklog-input {
 	gap: 6px;
 }
 
+/* What came of exporting or importing a mode: where it was saved, what to fill in. */
+.mode-share-status {
+	margin: 0;
+	padding: 6px 10px;
+	border-radius: 6px;
+	background: color-mix(in srgb, var(--app-accent) 10%, transparent);
+	font-size: 12px;
+	overflow-wrap: anywhere;
+}
+
 .mode-tab {
 	display: grid;
 	grid-template-columns: auto 1fr;
@@ -12233,14 +12243,16 @@ h3.mode-panel-name {
 
 /* --- The user's own modes in Settings ------------------------------------------------- */
 
-.mode-tab-new {
+.mode-tab-new,
+.mode-tab-import {
 	align-content: center;
 	border-style: dashed;
 	background: none;
 	color: var(--app-accent);
 }
 
-.mode-tab-new .mode-tab-label {
+.mode-tab-new .mode-tab-label,
+.mode-tab-import .mode-tab-label {
 	color: var(--app-accent);
 }
 

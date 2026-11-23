@@ -27,7 +27,7 @@ import type { WorklogContext, WorklogEntry } from "./jira-worklog.js";
 import type { LocalNote } from "./local-notes.js";
 import { defaultServers } from "./mcp-presets.js";
 import type { McpServer, McpToolList } from "./mcp-servers.js";
-import type { ModeSettings } from "./mode-config.js";
+import type { Mode, ModeSettings } from "./mode-config.js";
 import type { ModelOption } from "./models.js";
 import type { NetworkEntry, NetworkEvent, NetworkLogState } from "./network.js";
 import type { PaletteChoice, PaletteTheme } from "./palette.js";
@@ -205,6 +205,23 @@ export interface Settings extends Typography {
 }
 
 export type AssistantPlace = "right" | "left" | "bottom";
+
+/** An assistant mode written to a file: where, and what was left out to be filled in by whoever imports it. */
+export interface ModeExportResult {
+	readonly path: string;
+	readonly fillIn: readonly string[];
+}
+
+/** A mode imported from a file: its name, where it went, the servers it added and what they need filled in. */
+export interface ModeImportResult {
+	readonly name: string;
+	/** The user's mode it became. */
+	readonly custom?: string;
+	/** Kalem's mode it reshaped. */
+	readonly kalem?: Mode;
+	readonly added: readonly string[];
+	readonly fillIn: readonly string[];
+}
 
 export type CopilotTools = "auto" | "mcp" | "block";
 
@@ -1165,6 +1182,12 @@ export interface KalemBridge {
 	assistantConfigure(update: AssistantUpdate): Promise<AssistantStatus>;
 	/** The models a service offers; without `key`, the kept one is used. */
 	/** Kalem's tools the assistant can be given, for choosing a mode's tools. */
+	/** Writes an assistant mode (one of the user's, or one of Kalem's as shaped) to a file the user picks. */
+	assistantModeExport(
+		which: { readonly custom: string } | { readonly kalem: Mode },
+	): Promise<ModeExportResult | null>;
+	/** Reads a mode from a file the user picks and, once they say so, adds it. */
+	assistantModeImport(): Promise<ModeImportResult | null>;
 	assistantToolCatalog(): Promise<
 		readonly {
 			readonly name: string;
@@ -1403,6 +1426,8 @@ export const CHANNEL = {
 	assistantSetModel: "kalem:assistant-set-model",
 	assistantModels: "kalem:assistant-models",
 	assistantToolCatalog: "kalem:assistant-tool-catalog",
+	assistantModeExport: "kalem:assistant-mode-export",
+	assistantModeImport: "kalem:assistant-mode-import",
 	assistantLocate: "kalem:assistant-locate",
 	assistantUsePath: "kalem:assistant-use-path",
 	assistantSearch: "kalem:assistant-search",

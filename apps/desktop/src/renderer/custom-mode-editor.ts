@@ -25,6 +25,8 @@ export interface CustomModeEditorOptions {
 	mcpServers(): readonly McpServer[];
 	/** Keeps the mode; `null` removes it. */
 	save(mode: CustomMode | null): void;
+	/** Writes the mode to a file, to give to someone else. */
+	share?(): void;
 }
 
 function mark(name: IconName, className: string): Element {
@@ -359,6 +361,13 @@ export function createCustomModeEditor(options: CustomModeEditorOptions): HTMLEl
 			attrs: { type: "button" },
 		});
 		remove.addEventListener("click", () => options.save(null));
+		const share = el("button", {
+			class: "jira-button mode-export",
+			text: t.modeExport,
+			attrs: { type: "button", title: t.modeExportTitle },
+		});
+		share.addEventListener("click", () => options.share?.());
+		share.hidden = options.share === undefined;
 		const language = el("select", {
 			class: "publish-input",
 			attrs: { "aria-label": t.modeLanguage },
@@ -388,6 +397,7 @@ export function createCustomModeEditor(options: CustomModeEditorOptions): HTMLEl
 							el("p", { class: "mode-panel-hint", text: mode.description || t.modeCustomHint }),
 						],
 					}),
+					share,
 					remove,
 				],
 			}),

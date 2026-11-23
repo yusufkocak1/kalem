@@ -1041,6 +1041,29 @@ verir.
 >     içinde duran sunucular ilk açılışta asistana taşınır (aynı sunucu
 >     bir kez, aynı adlı farklı sunucular `ad-2` olarak) ve her mod, açık
 >     olanları kullanmaya devam eder.
+>   - **Modu paylaşmak (dışa / içe aktarma):** her modun başlığındaki
+>     **Dışa aktar…** modu bir JSON dosyasına (`<ad>.kalem-mode.json`)
+>     yazar: kendi modunuzun tamamı (adı, simgesi, talimatı, adımları,
+>     araçları, anahtar kelimeleri, ayrıntı ve dil) ya da Kalem'in bir
+>     modunun sizin ayarladığınız hâli (yalnızca varsayılandan farklı
+>     olanlar), ve modun kullandığı MCP sunucularının tanımları. Sır gibi
+>     görünen değerler dosyaya konmaz, yerlerine doldurulacak bir işaret
+>     yazılır: adı token, secret, password, key, auth gibi olan ortam
+>     değişkenleri ve başlıklar (`<GITHUB_TOKEN>`, `<Authorization>`),
+>     `--token=…` / `--api-key …` argümanları ve adresteki `?api_key=…`.
+>     Kaydettikten sonra neyin dışarıda bırakıldığı söylenir. Mod
+>     sekmelerinin yanındaki **İçe aktar…** bir mod dosyasını açar ve önce
+>     sorar: modun ne olduğu (kendi başına bir mod ya da Kalem'in bir
+>     modunun yerine geçen ayarlar), getirdiği sunucular ve **her birinin
+>     çalıştıracağı komut ya da bağlanacağı adres**, sizde aynı adla olan
+>     sunucuların sizinkiyle kullanılacağı, doldurulacak yerler ve "sunucuları
+>     yalnızca güvendiğiniz birinden içe aktarın" uyarısı. **Sunucularıyla
+>     içe aktar**, **Yalnızca modu içe aktar** ya da **Vazgeç**. Aynı adlı
+>     bir modunuz varsa "modumun yerine geçsin" kutusu çıkar; işaretlenmezse
+>     mod `Ad (2)` olarak eklenir. İçe aktarılan mod açık gelir ve
+>     Ayarlar'da seçili olur; eklenen sunucular ve doldurulacak yerler
+>     altta yazar. JSON olmayan, Kalem modu olmayan ya da daha yeni bir
+>     Kalem'le yapılmış dosya bunu söyler ve bir şey değiştirmez.
 >   - **Asistana söyleyerek bağlamak:** "DBHub'ı ekle ve Kod modunda
 >     kullan, config dosyası şurada" gibi bir istekte asistan
 >     `mode_mcp_list` ile sunucuları, hangi modların kullandığını ve hazır

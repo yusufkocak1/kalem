@@ -72,6 +72,7 @@ import { LocalNotesStore } from "./local-notes-store.js";
 import { KeptServers } from "./mcp-kept.js";
 import { programEnvironment } from "./mcp-probe.js";
 import { paletteCommands, runPaletteCommand } from "./menu.js";
+import { registerModeShareIpc } from "./mode-share-ipc.js";
 import { registerNetworkIpc } from "./network-ipc.js";
 import { networkLog } from "./network-log.js";
 import type { PackageStore } from "./package.js";
@@ -1097,6 +1098,12 @@ export function registerIpc(ctx: IpcContext): void {
 		language: ctx.language,
 	});
 	registerTemplateIpc({ templates, windows, strings: ctx.strings, senderOf });
+	registerModeShareIpc({
+		store: ctx.store,
+		strings: ctx.strings,
+		senderOf,
+		changeSettings: ctx.changeSettings,
+	});
 	registerNetworkIpc({ log: networkLog, senderOf, setDebugMode: ctx.setDebugMode });
 
 	// The user's own notes on documents: in the app's data folder, never in a document.
