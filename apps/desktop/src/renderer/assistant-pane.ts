@@ -215,6 +215,8 @@ interface Message {
 	editAt?: Record<string, number>;
 	/** What it asked the user before changing something, in this run. */
 	approvals?: ApprovalRequest[];
+	/** Where in the reply's text each question came (by its id): what follows shows after it. */
+	approvalAt?: Record<string, number>;
 	/** Its plan for the answer. */
 	plan?: readonly PlanStep[];
 	/** What it changed, each with its undo. */
@@ -2775,6 +2777,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				if (card.at !== piece.cut) continue;
 				if (card.kind === "edit") nodes.push(editCard(card.edit));
 				else if (card.kind === "steered") nodes.push(steeredCard(card.text));
+				else if (card.kind === "approval") nodes.push(questionCard(card.request, message));
 				else nodes.push(commandCard(card.run, message));
 			}
 		}
@@ -2822,28 +2825,6 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				for (const change of [...undoable].reverse()) await undoChange(message, change);
 			});
 			nodes.push(el("div", { class: "assistant-change assistant-undo-all", children: [all] }));
-		}
-		for (const request of message.approvals ?? []) {
-			const state = approvalStates.get(request.id) ?? "waiting";
-			// A card that waited for the user when the reply ended was not answered.
-			const unanswered = request.choices !== undefined && message.done && state === "waiting";
-			nodes.push(
-				approvalCard(
-					t,
-					request,
-					unanswered ? "denied" : state,
-					(answer) => {
-						if (request.choices !== undefined) {
-							answerWait(request, answer);
-							return;
-						}
-						approvalStates.set(request.id, answer.approved ? "allowed" : "denied");
-						void bridge.assistantApprove(request.id, answer);
-						renderReply(message);
-					},
-					approvalChosen.get(request.id),
-				),
-			);
 		}
 		const waitsForUser = (message.approvals ?? []).some(
 			(request) =>
@@ -3141,12 +3122,14 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		| { kind: "run"; run: CommandRun }
 		| { kind: "edit"; edit: ProposedEdit }
 		| { kind: "steered"; text: string }
+		| { kind: "approval"; request: ApprovalRequest }
 	))[] {
 		const end = message.text.length;
 		const cards: ({ at: number } & (
 			| { kind: "run"; run: CommandRun }
 			| { kind: "edit"; edit: ProposedEdit }
 			| { kind: "steered"; text: string }
+			| { kind: "approval"; request: ApprovalRequest }
 		))[] = [];
 		for (const run of message.runs ?? [])
 			cards.push({ at: Math.min(run.at, end), kind: "run", run });
@@ -3162,11 +3145,38 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			const paragraph = between ? at : message.text.indexOf("\n\n", at);
 			cards.push({ at: paragraph === -1 ? end : paragraph, kind: "steered", text: steered.text });
 		}
+		// A question shows where it was asked: what the reply says after it comes under it.
+		for (const request of message.approvals ?? []) {
+			const at = Math.min(message.approvalAt?.[request.id] ?? end, end);
+			cards.push({ at, kind: "approval", request });
+		}
 		// In the order they came, at the same place too.
 		return cards
 			.map((card, order) => ({ card, order }))
 			.sort((a, b) => a.card.at - b.card.at || a.order - b.order)
 			.map(({ card }) => card);
+	}
+
+	/** A question to the user: to allow a change, a form, or what they are waited for to do. */
+	function questionCard(request: ApprovalRequest, message: Message): HTMLElement {
+		const state = approvalStates.get(request.id) ?? "waiting";
+		// A card that waited for the user when the reply ended was not answered.
+		const unanswered = request.choices !== undefined && message.done && state === "waiting";
+		return approvalCard(
+			t,
+			request,
+			unanswered ? "denied" : state,
+			(answer) => {
+				if (request.choices !== undefined) {
+					answerWait(request, answer);
+					return;
+				}
+				approvalStates.set(request.id, answer.approved ? "allowed" : "denied");
+				void bridge.assistantApprove(request.id, answer);
+				renderReply(message);
+			},
+			approvalChosen.get(request.id),
+		);
 	}
 
 	/** What the user added while the reply ran, where the answer went on with it. */
@@ -4176,6 +4186,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			return;
 		}
 		reply.approvals = [...(reply.approvals ?? []), request];
+		reply.approvalAt = { ...reply.approvalAt, [request.id]: reply.text.length };
 		const waits = request.choices !== undefined;
 		// Waiting for the user to do something: the window says so even when it is not in front.
 		if (waits) bridge.assistantAttention(format(t.waitNotice, request.title));
