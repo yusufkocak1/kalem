@@ -582,12 +582,20 @@ export const SETTINGS_SCHEMA: Schema = {
 		keywords: ["asistan", "assistant", "yapay zeka", "ai", "claude", "copilot", "panel"],
 		assistant: "write",
 	},
-	assistantDocument: {
-		key: "assistantDocument",
+	// Was `assistantDocument` (on): the document now is offered, and the old value is not kept.
+	assistantDocumentAuto: {
+		key: "assistantDocumentAuto",
 		category: "assistant",
 		label: "settingsAssistantDocument",
 		type: "boolean",
-		keywords: ["belgeyi paylaş", "share document", "bağlam", "context"],
+		keywords: [
+			"belgeyi paylaş",
+			"share document",
+			"belgeyi ekle",
+			"add document",
+			"bağlam",
+			"context",
+		],
 		assistant: "write",
 	},
 	assistantEditReview: {

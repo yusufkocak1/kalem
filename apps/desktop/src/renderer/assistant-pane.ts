@@ -99,8 +99,10 @@ export interface AssistantHost {
 	readonly lang: Lang;
 	readonly bridge: KalemBridge;
 	readonly previews: Previews;
-	shareDocument(): boolean;
-	setShareDocument(share: boolean): void;
+	/** Whether the active document is added to a chat on its own; else it is offered, faded. */
+	autoDocument(): boolean;
+	/** The active document's tab; empty when none is open. */
+	documentId(): string;
 	/**
 	 * Opens a file's proposed changes in its tab, to review them there a line at a time;
 	 * `settle` is told whether any was kept once all are decided. Resolves `false` when it
@@ -187,7 +189,8 @@ export interface AssistantPane {
 	/** The active document changed, or another is active: the empty chat's suggestions follow it. */
 	documentChanged(): void;
 	/** A question from elsewhere (the command box): sent when the service is ready, else left in the box. */
-	ask(question: string): void;
+	/** Asks a question; `document` adds the active document to the chat first (a question about it). */
+	ask(question: string, options?: { readonly document?: boolean }): void;
 }
 
 interface Message {
@@ -276,6 +279,8 @@ interface Chat {
 	ended: (() => void) | null;
 	/** What the user wrote while the reply ran that it has not taken in yet. */
 	queued: Queued[];
+	/** The documents (by tab) the user added to this chat or took out of it; the others are as the setting says. */
+	readonly documents: Map<string, boolean>;
 }
 
 const INSTALL: Readonly<Record<"claude-code" | "copilot", { command: string; url: string }>> = {
@@ -353,6 +358,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			reply: null,
 			ended: null,
 			queued: [],
+			documents: new Map(),
 		};
 	}
 
@@ -645,8 +651,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 							label: `@ ${t.mentionDocument}`,
 							run: () => {
 								take();
-								host.setShareDocument(true);
-								render();
+								shareDocument(active, true);
 							},
 						},
 					]
@@ -697,14 +702,13 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					}),
 				),
 			menuItem(t.assistantUseTemplate, "file", () => void showTemplateMenu()),
-			// The document left out of the chat comes back from here.
-			...(host.shareDocument()
+			// The document left out of the chat comes in from here too.
+			...(!documentOpen || host.documentName() === "" || documentShared(active)
 				? []
 				: [
-						menuItem(format(t.assistantShareDocumentNamed, host.documentName()), "file", () => {
-							host.setShareDocument(true);
-							renderSources();
-						}),
+						menuItem(format(t.assistantShareDocumentNamed, host.documentName()), "file", () =>
+							shareDocument(active, true),
+						),
 					]),
 		);
 		addMenu.hidden = false;
@@ -826,10 +830,48 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	let documentShown = "";
 	/** A document is open: the app tells the panel so first through `refreshSelection`. */
 	let documentOpen = false;
+	/** Whether the active document goes with this chat's questions: as the user chose here, else as the setting says. */
+	function documentShared(chat: Chat): boolean {
+		const id = host.documentId();
+		return id !== "" && (chat.documents.get(id) ?? host.autoDocument());
+	}
+
+	/** Adds the active document to the chat, or takes it out: its chip says which. */
+	function shareDocument(chat: Chat, share: boolean): void {
+		const id = host.documentId();
+		if (id === "") return;
+		chat.documents.set(id, share);
+		if (chat !== active) return;
+		renderSources();
+		render();
+		input.focus();
+	}
+
+	/**
+	 * The active document's chip. In the chat, it has a ✕ to take it out; else
+	 * it is offered, faded with a +, and a click adds it.
+	 */
 	function documentChip(): HTMLElement[] {
-		if (!documentOpen || !host.shareDocument()) return [];
-		const name = host.documentName();
+		const name = documentOpen ? host.documentName() : "";
 		if (name === "") return [];
+		if (!documentShared(active)) {
+			const file = icon("file");
+			file.classList.add("assistant-chip-file");
+			const plus = icon("plus");
+			plus.classList.add("assistant-chip-plus");
+			const add = el("button", {
+				class: "assistant-chip assistant-source assistant-source-document assistant-chip-offered",
+				attrs: {
+					type: "button",
+					title: format(t.assistantAddDocument, name),
+					"aria-label": format(t.assistantAddDocument, name),
+					"data-document": "",
+				},
+				children: [file, el("span", { class: "assistant-chip-text", text: name }), plus],
+			});
+			add.addEventListener("click", () => shareDocument(active, true));
+			return [add];
+		}
 		const remove = el("button", {
 			class: "assistant-chip-close",
 			attrs: {
@@ -839,11 +881,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			},
 			children: [icon("close")],
 		});
-		remove.addEventListener("click", () => {
-			host.setShareDocument(false);
-			renderSources();
-			input.focus();
-		});
+		remove.addEventListener("click", () => shareDocument(active, false));
 		return [
 			el("span", {
 				class: "assistant-chip assistant-source assistant-source-document",
@@ -853,16 +891,21 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		];
 	}
 
-	/** Draws the chips again when the shared document changed (another tab, sharing turned off). */
+	/** The document chip as drawn: its tab, name, and whether it is in the chat. */
+	const documentState = (): string =>
+		documentOpen && host.documentName() !== ""
+			? `${host.documentId()}\u0000${host.documentName()}\u0000${documentShared(active)}`
+			: "";
+
+	/** Draws the chips again when the document chip changed (another tab, added or taken out). */
 	function refreshDocumentChip(): void {
-		const now = documentOpen && host.shareDocument() ? host.documentName() : "";
-		if (now !== documentShown) renderSources();
+		if (documentState() !== documentShown) renderSources();
 	}
 
 	function renderSources(): void {
 		const open = openFolders(active);
 		const doc = documentChip();
-		documentShown = doc.length === 0 ? "" : host.documentName();
+		documentShown = documentState();
 		sourceList.hidden =
 			doc.length === 0 && active.sources.length === 0 && open.length === 0 && pasted.length === 0;
 		sourceList.replaceChildren(
@@ -1504,9 +1547,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			name: "share",
 			label: t.slashShare,
 			run() {
-				host.setShareDocument(!host.shareDocument());
-				renderSources();
-				render();
+				shareDocument(active, !documentShared(active));
 			},
 		},
 		{ name: "stop", label: t.assistantStop, run: () => stopReply(active) },
@@ -1919,6 +1960,9 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 					children: [icon(name), el("span", { text })],
 				});
 				suggestion.addEventListener("click", () => {
+					// Offered for this document: it goes with the question.
+					if (host.documentId() !== "") active.documents.set(host.documentId(), true);
+					renderSources();
 					input.value = text;
 					void send();
 				});
@@ -2443,6 +2487,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			reply: null,
 			ended: null,
 			queued: [],
+			documents: new Map(),
 		};
 	}
 
@@ -4241,7 +4286,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				renderSources();
 			}
 			const selection = droppedSelection === null ? host.selection() : "";
-			const sharing = host.shareDocument();
+			const sharing = chat.documents.get(context.tabId) ?? host.autoDocument();
 			const unchanged = sharing && chat.sessionId !== null && chat.sharedText === context.text;
 			if (sharing) notes.push(format(t.assistantSharedDocument, context.name));
 			if (selection.trim() !== "") notes.push(t.assistantSharedSelection);
@@ -4474,8 +4519,12 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		documentChanged() {
 			if (active.messages.length === 0) renderEmpty();
 		},
-		ask(question) {
+		ask(question, options) {
 			if (view !== "chat") void setView("chat");
+			if (options?.document === true && host.documentId() !== "") {
+				active.documents.set(host.documentId(), true);
+				renderSources();
+			}
 			input.value = question;
 			if (status?.ready === true && active.reply === null) void send();
 			else input.focus();

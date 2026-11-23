@@ -165,8 +165,11 @@ export interface Settings extends Typography {
 	readonly gitTrustedFolders: readonly string[];
 	/** The Claude assistant's panel, at the right of the document. */
 	readonly assistant: boolean;
-	/** Share the active document with Claude along with each question. */
-	readonly assistantDocument: boolean;
+	/**
+	 * Add the active document to each chat on its own. Off, it is offered: its
+	 * chip shows faded, and a click adds it.
+	 */
+	readonly assistantDocumentAuto: boolean;
 	/** The Claude Code CLI the user picked; empty to look for it. */
 	readonly claudePath: string;
 	/** The GitHub Copilot CLI the user picked; empty to look for it. */
@@ -254,7 +257,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	gitAutoFetch: true,
 	gitTrustedFolders: [],
 	assistant: false,
-	assistantDocument: true,
+	assistantDocumentAuto: false,
 	claudePath: "",
 	copilotPath: "",
 	assistantWidth: 380,

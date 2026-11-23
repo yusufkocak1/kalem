@@ -1539,7 +1539,7 @@ test("the assistant's panel moves left or under the document, and '@' adds a sec
 	const claude = await fakeClaude(folder, "Tamam.");
 	const { app, page, errors } = await launch({
 		args: [doc],
-		settings: { assistant: true, assistantDocument: false },
+		settings: { assistant: true, assistantDocumentAuto: false },
 		env: { KALEM_CLAUDE: claude.path },
 	});
 	const pane = page.locator(".assistant");

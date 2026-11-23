@@ -393,7 +393,8 @@ const selectionAssistant = createSelectionAssistant({
 	t,
 	ask: (prompt) => {
 		if (!settings.assistant) updateSettings({ assistant: true });
-		assistant.ask(prompt);
+		// Asked about the document's text: the document goes with it.
+		assistant.ask(prompt, { document: true });
 	},
 });
 
@@ -532,8 +533,8 @@ const assistant = createAssistantPane({
 	lang: startup.language,
 	bridge,
 	previews,
-	shareDocument: () => settings.assistantDocument,
-	setShareDocument: (share) => updateSettings({ assistantDocument: share }),
+	autoDocument: () => settings.assistantDocumentAuto,
+	documentId: () => (session as Session | undefined)?.id ?? "",
 	// Empty until the first tab is open.
 	documentName: () =>
 		(session as Session | undefined) === undefined

@@ -1741,6 +1741,38 @@ button {
 	object-fit: cover;
 }
 
+/* The active document offered, not in the chat: faded, its edge dashed, a + to add it with a click. */
+.assistant-chip-offered {
+	gap: 3px;
+	padding: 0 5px 0 7px;
+	border: 1px dashed color-mix(in srgb, var(--app-muted) 60%, transparent);
+	background: none;
+	color: var(--app-muted);
+	font: inherit;
+	opacity: 0.8;
+	cursor: pointer;
+}
+
+.assistant-chip-offered:hover,
+.assistant-chip-offered:focus-visible {
+	border-color: var(--app-accent);
+	color: var(--app-text);
+	opacity: 1;
+}
+
+.assistant-chip-file {
+	flex: none;
+	width: 13px;
+	height: 13px;
+}
+
+.assistant-chip-plus {
+	flex: none;
+	width: 12px;
+	height: 12px;
+	color: var(--app-accent);
+}
+
 /* An open folder of the Files pane: the chat's workspace on its own. */
 .assistant-source-workspace {
 	gap: 4px;

@@ -777,7 +777,7 @@ verir.
   ayarlar tek pencerede, solda kategoriler — **Görünüm** (tema, dil,
   yakınlık, tam genişlik), **Düzenleyici** (otomatik kaydetme, yazım
   denetimi), **Paneller** (panellerin yeri, yuvaların açıklığı ve
-  boyutları), **Asistan** (hizmet ve model, panel, belgeyi paylaşma),
+  boyutları), **Asistan** (hizmet ve model, panel, belgeyi kendiliğinden ekleme),
   **Bağlantılar** (Confluence ve Jira: bağlan / bağlantıyı kes), **Sayfa
   Düzeni** (kâğıt, yönlendirme, kenar boşlukları, sayfa numarası) ve
   **Sistem** (güncelleme denetimi, bildirim alanı, Git'i otomatik getirme).
@@ -1458,8 +1458,20 @@ verir.
 - Copilot'a sistem talimatı verilemediği için Kalem tanıtımı sohbetin ilk
   sorusuyla gider; araçlardan komut çalıştırma ve dosya yazma kapalıdır
   (`--deny-tool shell`, `--deny-tool write`).
-- **Belgeyi paylaş** açıkken her soruyla birlikte belgenin Markdown'ı,
-  belgedeki Kalem diyagramlarının verisi ve belgede seçili metin gider
+- **Açık belge önerilir:** etkin belge, giriş kutusunun üstünde **silik,
+  kesikli kenarlı bir çip** (`ad.md +`) olarak gelir; henüz sohbette
+  değildir, soruyla gitmez. Çipe bir tık belgeyi sohbete ekler (dolu çip
+  olur), `×` geri çıkarır ve çip yine silik kalır. Seçim sohbet ve belge
+  başınadır: başka bir sekmeye geçilince o belge de silik gelir, ilk belgeye
+  dönülünce sohbette olduğu görülür; **Yeni sohbet** yine silik başlar.
+  **+ › Belgeyi paylaş**, `/share` ve `@ belge` de ekler. Belgeyle ilgili
+  girişler belgeyi kendiliğinden ekler: boş sohbetin belgeye göre önerileri
+  ve seçimin yanındaki **✦ Asistan** / `Ctrl+J`. Belgenin her sohbete
+  kendiliğinden eklenmesi istenirse **Ayarlar → Asistan → Etkin belgeyi her
+  sohbete kendiliğinden ekle** açılır (önceki sürümlerin davranışı; bu ayar
+  yeni olduğu için eski "her soruyla paylaş" değeri taşınmaz).
+- Belge sohbetteyken her soruyla birlikte belgenin Markdown'ı, belgedeki
+  Kalem diyagramlarının verisi gider. Belgede seçili metin her zaman gider
   (seçim, giriş kutusunun üstündeki etiketten çıkarılabilir). Belge önceki
   sorudan beri değişmediyse yeniden gönderilmez. Sohbet sürer (Claude Code'da `--resume`, API'lerde geçmiş yeniden gönderilir);
   **Yeni sohbet** baştan başlar. Yanıt geldikçe görünür; **Durdur** ya da
