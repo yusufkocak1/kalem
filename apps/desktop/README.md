@@ -1518,6 +1518,22 @@ verir.
   sorudan beri değişmediyse yeniden gönderilmez. Sohbet sürer (Claude Code'da `--resume`, API'lerde geçmiş yeniden gönderilir);
   **Yeni sohbet** baştan başlar. Yanıt geldikçe görünür; **Durdur** ya da
   `Esc` keser.
+- **Sizden bir şey beklerken durur, bitmez:** asistan işin bir yerinde
+  sizin yapmanız gereken bir şeye geldiğinde (sunucuyu yeniden başlatmak,
+  IntelliJ'de sınıfları güncellemek, bir tarayıcı penceresinde giriş
+  yapmak) yanıtı "yapınca 'devam' yazın" diye bitirmez: `wait_for_user`
+  aracıyla sohbette bir **Sizi bekliyor** kartı açar ve yanıt (Claude
+  Code'da CLI'nin kendisi de) orada bekler. Kartta ne yapılacağı adım adım
+  ve nedeni yazar; düğmeler **Yaptım, devam et** (ya da asistanın önerdiği
+  en fazla üç seçenek, ör. "Tomcat'i yeniden başlattım"), **Atla** (o
+  adımsız devam eder, sonunda neyin eksik kaldığını söyler) ve **Burada
+  bitir** (yapılanı ve kalanı özetleyip durur); altında kendi cevabınızı
+  yazacağınız bir kutu vardır. Kart beklerken ana kutuya yazıp `Enter`'a
+  basmak da kartı yanıtlar ("yaptım", "olmadı, şu hatayı verdi"…). Seçtiğiniz
+  ya da yazdığınız kartta kalır, yanıt aynı oturumda kaldığı yerden sürer.
+  Bu kart hiçbir onay ayarıyla kendiliğinden geçilmez. Pencere öndeyken
+  değilse bir bildirim gelir ve görev çubuğundaki simge yanıp söner.
+  Bekleme en fazla iki saat sürer; **Durdur** her zaman keser.
 - **Çalışırken araya girme:** asistan çalışırken kutu yazmaya açık kalır;
   yazılıp `Enter`'a basılan mesaj işi durdurmaz, çalışan yanıta eklenir.
   Kutunun üstünde **Sırada** olarak görünür; `×` ile (ya da boş kutuda `↑`

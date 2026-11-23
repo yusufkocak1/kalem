@@ -1998,3 +1998,79 @@ test("a mode is exported to a file without its secrets, and imported on another 
 	expect(theirs.errors).toEqual([]);
 	await theirs.app.close();
 });
+
+test("the answer waits while the user does something, and goes on with what they chose", async () => {
+	const folder = await tempDir("agent-wait");
+	const claude = await fakeClaude(folder, "Tamam, hata senaryosunu çalıştırıyorum.", [
+		{
+			name: "wait_for_user",
+			input: {
+				title: "IntelliJ'de sınıfları güncelleyin",
+				steps: ["Run/Debug → Update 'Tomcat'", "Hot swap classes"],
+				reason: "Sunucu yeni kodu henüz yüklemedi",
+			},
+		},
+	]);
+	const { app, page, errors } = await launch({
+		settings: { assistant: true },
+		env: { KALEM_CLAUDE: claude.path },
+	});
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toBeHidden();
+	const input = pane.locator(".assistant-input");
+	await input.fill("Mock'u dene");
+	await input.press("Enter");
+
+	// The CLI waits on the tool: the card says what to do, and the answer does not end.
+	const card = pane.locator(".assistant-wait");
+	await expect(card.locator(".assistant-wait-label")).toHaveText("Waiting for you");
+	await expect(card.locator(".assistant-approval-title")).toHaveText(
+		"IntelliJ'de sınıfları güncelleyin",
+	);
+	await expect(card.locator(".assistant-wait-steps li")).toHaveText([
+		"Run/Debug → Update 'Tomcat'",
+		"Hot swap classes",
+	]);
+	await expect(card.locator(".assistant-wait-choices button")).toHaveText([
+		"Done, go on",
+		"Skip",
+		"Stop here",
+	]);
+	await expect(pane.getByRole("button", { name: "Stop", exact: true })).toBeVisible();
+	await expect(input).toHaveAttribute("placeholder", /The assistant is waiting for you/);
+	expect(await claude.calls()).toHaveLength(0);
+
+	// Written in the box, it answers the card.
+	await input.fill("Hot swap olmadı, Tomcat'i yeniden başlattım");
+	await input.press("Enter");
+	await expect(card.locator(".assistant-approval-state")).toHaveText(
+		"You wrote: “Hot swap olmadı, Tomcat'i yeniden başlattım”",
+	);
+	const reply = pane.locator(".assistant-assistant").last();
+	await expect(reply.locator(".assistant-markdown")).toHaveText(
+		"Tamam, hata senaryosunu çalıştırıyorum.",
+	);
+	await expect(pane.getByRole("button", { name: "Stop", exact: true })).toBeHidden();
+	const [first] = await claude.calls();
+	expect(first?.tools?.[0]?.tool).toBe("mcp__kalem__wait_for_user");
+	expect(first?.tools?.[0]?.text).toContain(
+		"The user answered in their own words: “Hot swap olmadı, Tomcat'i yeniden başlattım”.",
+	);
+	// The model is told to wait this way, not to end asking for "continue".
+	const system = first?.args[first.args.indexOf("--append-system-prompt") + 1] ?? "";
+	expect(system).toContain("call wait_for_user with what to do");
+
+	// The next time, a button: skipped.
+	await input.fill("Bir daha dene");
+	await input.press("Enter");
+	const next = pane.locator(".assistant-wait").last();
+	await expect(next.locator(".assistant-wait-choices button")).toHaveCount(3);
+	await next.getByRole("button", { name: "Skip" }).click();
+	await expect(next.locator(".assistant-approval-state")).toHaveText("You chose: Skip");
+	await expect
+		.poll(async () => (await claude.calls())[1]?.tools?.[0]?.text)
+		.toContain("The user skipped it");
+	await expect(pane.locator(".assistant-assistant")).toHaveCount(2);
+	expect(errors).toEqual([]);
+	await app.close();
+});

@@ -105,6 +105,11 @@ export interface ApprovalRequest {
 	 * without asking skips it.
 	 */
 	readonly mustAsk?: boolean;
+	/**
+	 * The answer waits for the user to do something themselves (`lines` say
+	 * what): a button for each way it went, and a box for their own words.
+	 */
+	readonly choices?: readonly string[];
 }
 
 export interface ApprovalAnswer {
@@ -114,6 +119,10 @@ export interface ApprovalAnswer {
 	readonly selected?: readonly number[];
 	/** What the user typed into the form's fields; never shown to the model as it is. */
 	readonly values?: FormValues;
+	/** A card with choices: the one the user picked, by index. */
+	readonly choice?: number;
+	/** A card with choices: what the user wrote instead of picking one. */
+	readonly text?: string;
 }
 
 export const DENIED: ApprovalAnswer = { approved: false, scope: "once" };
@@ -130,11 +139,18 @@ export function parseApprovalAnswer(raw: unknown): ApprovalAnswer {
 		? raw.selected.filter((n): n is number => Number.isInteger(n) && n >= 0).slice(0, 500)
 		: undefined;
 	const values = parseFormValues(raw.values);
+	const choice =
+		typeof raw.choice === "number" && Number.isInteger(raw.choice) && raw.choice >= 0
+			? Math.min(raw.choice, 20)
+			: undefined;
+	const text = typeof raw.text === "string" ? raw.text.trim().slice(0, 4000) : "";
 	return {
 		approved: true,
 		scope,
 		...(selected === undefined ? {} : { selected }),
 		...(values === undefined ? {} : { values }),
+		...(choice === undefined ? {} : { choice }),
+		...(text === "" ? {} : { text }),
 	};
 }
 

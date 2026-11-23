@@ -1083,6 +1083,8 @@ export interface KalemBridge {
 	onSystemAccent(handler: (accent: string | null) => void): () => void;
 	/** The assistant started or finished an answer: the taskbar shows it, and a notification ends it. */
 	assistantActivity(busy: boolean): void;
+	/** The assistant waits for the user: a window not in front says so (a notification, the taskbar). */
+	assistantAttention(text: string): void;
 	/** The tab's text before the assistant changes it, kept in its version history. */
 	assistantCheckpoint(tabId: string, text: string): void;
 	/** Asks the user what to do with an unsaved tab that is about to close. */
@@ -1372,6 +1374,7 @@ export const CHANNEL = {
 	titleBarColors: "kalem:title-bar-colors",
 	systemAccent: "kalem:system-accent",
 	assistantActivity: "kalem:assistant-activity",
+	assistantAttention: "kalem:assistant-attention",
 	assistantCheckpoint: "kalem:assistant-checkpoint",
 	confirmCloseTab: "kalem:confirm-close-tab",
 	tabClosed: "kalem:tab-closed",

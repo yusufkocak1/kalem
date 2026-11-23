@@ -10435,6 +10435,36 @@ textarea.jira-worklog-input {
 	gap: 8px;
 }
 
+/* The answer waits for the user to do something: what to do, how it went, or their own words. */
+.assistant-wait {
+	border-width: 2px;
+	background: color-mix(in srgb, var(--app-accent) 6%, var(--app-surface));
+}
+
+.assistant-wait-label {
+	color: var(--app-accent);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+}
+
+.assistant-wait-steps {
+	margin: 0;
+	padding-inline-start: 20px;
+	line-height: 1.5;
+}
+
+.assistant-wait-form {
+	display: flex;
+	gap: 6px;
+}
+
+.assistant-wait-own {
+	flex: 1;
+	min-width: 0;
+}
+
 .assistant-approval-scope {
 	margin-inline-start: auto;
 	padding: 3px 6px;

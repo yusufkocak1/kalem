@@ -110,6 +110,7 @@ const bridge: KalemBridge = {
 	reportState: (tabId, state) => ipcRenderer.send(CHANNEL.reportState, tabId, state),
 	tabActivated: (tabId) => ipcRenderer.send(CHANNEL.tabActivated, tabId),
 	assistantActivity: (busy) => ipcRenderer.send(CHANNEL.assistantActivity, busy),
+	assistantAttention: (text) => ipcRenderer.send(CHANNEL.assistantAttention, text),
 	assistantCheckpoint: (tabId, text) => ipcRenderer.send(CHANNEL.assistantCheckpoint, tabId, text),
 	titleBarColors: (color, symbolColor) =>
 		ipcRenderer.send(CHANNEL.titleBarColors, color, symbolColor),

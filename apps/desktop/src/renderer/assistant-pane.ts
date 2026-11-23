@@ -57,7 +57,7 @@ import type { SlashEntry } from "../shared/slash.js";
 import { findSlash, matchSlash, slashQuery } from "../shared/slash.js";
 import { runsByWorkers } from "../shared/step-stages.js";
 import type { TemplateInfo } from "../shared/templates.js";
-import type { ApprovalMode, ApprovalRequest } from "../shared/tool-protocol.js";
+import type { ApprovalAnswer, ApprovalMode, ApprovalRequest } from "../shared/tool-protocol.js";
 import { APPROVAL_MODES, withoutToolCalls } from "../shared/tool-protocol.js";
 import type { ApprovalState, ChecksView, MadeChange, Usage } from "./assistant-agent.js";
 import {
@@ -2227,10 +2227,15 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		stopButton.hidden = !busy;
 		// While a reply runs what is typed goes to it: with nothing typed there is nothing to add.
 		sendButton.disabled = status?.ready !== true || (busy && input.value.trim() === "");
-		const label = busy ? t.assistantSendWhileBusy : t.assistantSend;
+		const waits = waitingCard(active) !== undefined;
+		const label = waits ? t.waitAnswer : busy ? t.assistantSendWhileBusy : t.assistantSend;
 		sendButton.title = label;
 		sendButton.setAttribute("aria-label", label);
-		const placeholder = busy ? t.assistantPlaceholderBusy : t.assistantPlaceholder;
+		const placeholder = waits
+			? t.waitPlaceholder
+			: busy
+				? t.assistantPlaceholderBusy
+				: t.assistantPlaceholder;
 		if (input.placeholder !== placeholder) input.placeholder = placeholder;
 	}
 
@@ -2782,15 +2787,33 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			nodes.push(el("div", { class: "assistant-change assistant-undo-all", children: [all] }));
 		}
 		for (const request of message.approvals ?? []) {
+			const state = approvalStates.get(request.id) ?? "waiting";
+			// A card that waited for the user when the reply ended was not answered.
+			const unanswered = request.choices !== undefined && message.done && state === "waiting";
 			nodes.push(
-				approvalCard(t, request, approvalStates.get(request.id) ?? "waiting", (answer) => {
-					approvalStates.set(request.id, answer.approved ? "allowed" : "denied");
-					void bridge.assistantApprove(request.id, answer);
-					renderReply(message);
-				}),
+				approvalCard(
+					t,
+					request,
+					unanswered ? "denied" : state,
+					(answer) => {
+						if (request.choices !== undefined) {
+							answerWait(request, answer);
+							return;
+						}
+						approvalStates.set(request.id, answer.approved ? "allowed" : "denied");
+						void bridge.assistantApprove(request.id, answer);
+						renderReply(message);
+					},
+					approvalChosen.get(request.id),
+				),
 			);
 		}
-		if (!message.done && message.error === null) {
+		const waitsForUser = (message.approvals ?? []).some(
+			(request) =>
+				request.choices !== undefined &&
+				(approvalStates.get(request.id) ?? "waiting") === "waiting",
+		);
+		if (!message.done && message.error === null && !waitsForUser) {
 			const lastStep = message.lastStep ?? message.steps?.at(-1);
 			if (pending !== null) nodes.push(waiting(pending, message));
 			else if (message.text === "" || (lastStep !== undefined && message.text.endsWith("\n\n")))
@@ -4085,6 +4108,28 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 	/** What became of each question the user was asked. */
 	const approvalStates = new Map<string, ApprovalState>();
+	/** What the user chose on a card that waited for them, or what they wrote. */
+	const approvalChosen = new Map<string, string>();
+
+	/** The card the chat's reply waits on the user with, while it waits. */
+	function waitingCard(chat: Chat): ApprovalRequest | undefined {
+		return (chat.reply?.approvals ?? []).find(
+			(request) =>
+				request.choices !== undefined &&
+				(approvalStates.get(request.id) ?? "waiting") === "waiting",
+		);
+	}
+
+	/** Answers a card that waits for the user: a choice, or their own words; the answer goes on. */
+	function answerWait(request: ApprovalRequest, answer: ApprovalAnswer): void {
+		approvalStates.set(request.id, "allowed");
+		approvalChosen.set(request.id, answer.text ?? request.choices?.[answer.choice ?? 0] ?? "");
+		void bridge.assistantApprove(request.id, answer);
+		const chat = chats.get(request.chatId);
+		if (chat?.reply != null && chat === active) renderReply(chat.reply);
+		drawSendButton();
+		input.focus();
+	}
 
 	bridge.onAssistantApproval((request) => {
 		const chat = chats.get(request.chatId);
@@ -4094,6 +4139,9 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			return;
 		}
 		reply.approvals = [...(reply.approvals ?? []), request];
+		const waits = request.choices !== undefined;
+		// Waiting for the user to do something: the window says so even when it is not in front.
+		if (waits) bridge.assistantAttention(format(t.waitNotice, request.title));
 		if (chat === active) {
 			// The question waits for the user: it is brought into view.
 			renderReply(reply);
@@ -4102,7 +4150,9 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				?.element.querySelector(".assistant-approval:last-of-type")
 				?.scrollIntoView({ block: "nearest" });
 			log.scrollTop = log.scrollHeight;
-			if (!element.hidden) input.blur();
+			// A card that waits for the user is answered from the box too: it keeps the caret.
+			if (!element.hidden && !waits) input.blur();
+			drawSendButton();
 		}
 		if (chat !== active || element.hidden) showNotice(t.approvalWaiting);
 	});
@@ -4209,6 +4259,12 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		if (question === "" || status?.ready !== true) return;
 		if (chat.reply !== null) {
 			if (queued === undefined) input.value = "";
+			// The reply waits for the user: what they write answers it.
+			const waiting = queued === undefined ? waitingCard(chat) : undefined;
+			if (waiting !== undefined) {
+				answerWait(waiting, { approved: true, scope: "once", text: question });
+				return;
+			}
 			addToReply(chat, question);
 			return;
 		}

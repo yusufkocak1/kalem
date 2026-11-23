@@ -424,6 +424,23 @@ export function registerIpc(ctx: IpcContext): void {
 		notice.show();
 	});
 
+	// The assistant waits for the user to do something: a window not in front says so.
+	on(CHANNEL.assistantAttention, (win, text) => {
+		if (typeof text !== "string" || win.window.isFocused()) return;
+		win.window.flashFrame(true);
+		win.window.once("focus", () => {
+			if (!win.window.isDestroyed()) win.window.flashFrame(false);
+		});
+		if (!Notification.isSupported()) return;
+		const notice = new Notification({ title: ctx.strings().appName, body: text.slice(0, 200) });
+		notice.on("click", () => {
+			if (win.window.isDestroyed()) return;
+			if (win.window.isMinimized()) win.window.restore();
+			win.window.focus();
+		});
+		notice.show();
+	});
+
 	// The path is the window's own tab's, not one the renderer names.
 	on(CHANNEL.assistantCheckpoint, (win, tabId, text) => {
 		if (typeof tabId !== "string" || typeof text !== "string") return;

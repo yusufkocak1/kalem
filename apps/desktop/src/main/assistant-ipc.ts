@@ -89,6 +89,7 @@ import { ReviewRun, ReviewRuns } from "./review-run.js";
 import { StepRun } from "./step-run.js";
 import "./assistant-app-tools.js";
 import "./assistant-form-tools.js";
+import "./assistant-wait-tools.js";
 import "./assistant-analysis-tools.js";
 import "./assistant-spec-tools.js";
 import "./assistant-external-tools.js";
@@ -145,8 +146,11 @@ export interface AssistantIpcContext {
 	readonly templates: TemplateStore;
 }
 
-/** How long an answer may wait for the user to allow a change, in ms. */
-const APPROVAL_WAIT = 30 * 60 * 1000;
+/**
+ * How long an answer may wait for the user, in ms: to allow a change, or to
+ * do something themselves (`wait_for_user`: restarting a server may take a while).
+ */
+const APPROVAL_WAIT = 2 * 60 * 60 * 1000;
 
 /** The active document as the window sent it; `null` when it is not shared. */
 function sentDocument(raw: unknown): DocumentSnapshot | null {
