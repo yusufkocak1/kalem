@@ -95,6 +95,52 @@ test("asks the local Claude about the document and inserts its reply with the di
 	await app.close();
 });
 
+test("a message written while Claude Code answers goes to it at once, and the answer takes it in", async () => {
+	const folder = await tempDir("assistant-steer");
+	const claude = await fakeClaude(folder, "Akış hazır.", [], { delay: 2000 });
+	const env = { KALEM_CLAUDE: claude.path };
+	const { app, page, userData, errors } = await launch({ settings: { assistant: true }, env });
+	const pane = page.locator(".assistant");
+	await expect(pane.locator(".assistant-subtitle")).toBeHidden();
+	const input = pane.locator(".assistant-input");
+	await input.fill("Onay sürecini çiz");
+	await input.press("Enter");
+	await expect(pane.getByRole("button", { name: "Stop" })).toBeVisible();
+	await input.fill("Tabloyu da ekle");
+	await input.press("Enter");
+	await expect(input).toHaveValue("");
+
+	// Claude Code took it in while it worked: the reply goes on with it, and shows where.
+	const reply = pane.locator(".assistant-assistant").last();
+	await expect(reply.locator(".assistant-markdown")).toContainText("Ek: Tabloyu da ekle");
+	await expect(reply.locator(".assistant-steered-label")).toHaveText("You added while it worked");
+	await expect(reply.locator(".assistant-steered-text")).toHaveText("Tabloyu da ekle");
+	// Added before it wrote anything: it shows before the reply's text.
+	await expect(reply.locator(".assistant-steered + .assistant-markdown")).toContainText(
+		"Akış hazır.",
+	);
+	await expect(pane.locator(".assistant-queue")).toBeHidden();
+	await expect(pane.getByRole("button", { name: "Stop" })).toBeHidden();
+	// One run: the question as a JSON line, its input open until the answer, what was added after it.
+	const calls = await claude.calls();
+	expect(calls).toHaveLength(1);
+	expect(calls[0]?.args.slice(0, 3)).toEqual(["-p", "--input-format", "stream-json"]);
+	expect(calls[0]?.prompt.endsWith("Onay sürecini çiz")).toBe(true);
+	expect(calls[0]?.added).toEqual(["Tabloyu da ekle"]);
+	await expect(pane.locator(".assistant-user")).toHaveCount(1);
+
+	expect(errors).toEqual([]);
+	await app.close();
+
+	// Kept with the chat: after a restart the reply still shows it.
+	const again = await launch({ userData, env });
+	await expect(again.page.locator(".assistant .assistant-steered-text")).toHaveText(
+		"Tabloyu da ekle",
+	);
+	expect(again.errors).toEqual([]);
+	await again.app.close();
+});
+
 test("a screenshot pasted into the question goes with it as a picture, and a copied file joins the chat", async () => {
 	const folder = await tempDir("assistant-paste");
 	const doc = join(folder, "analiz.md");
@@ -145,7 +191,7 @@ test("a screenshot pasted into the question goes with it as a picture, and a cop
 	// Sent once: the next question starts without it.
 	await expect(pane.locator(".assistant-picture")).toHaveCount(0);
 	const [call] = await claude.calls();
-	const [question, ...rest] = JSON.parse(call?.prompt ?? "{}").message.content;
+	const [question, ...rest] = JSON.parse(call?.input ?? "{}").message.content;
 	expect(question.text).toContain("<pictures>");
 	expect(question.text).toContain("pasted-2");
 	expect(question.text.endsWith("Bu ekranda hata ne?")).toBe(true);
@@ -185,7 +231,7 @@ test("sends the document's pictures to Claude instead of their base64", async ()
 
 	const [call] = await claude.calls();
 	expect(call?.args.slice(0, 3)).toEqual(["-p", "--input-format", "stream-json"]);
-	const message = JSON.parse(call?.prompt ?? "{}").message;
+	const message = JSON.parse(call?.input ?? "{}").message;
 	const [question, ...rest] = message.content;
 	expect(question.text).toContain("![akış](image-1)");
 	expect(question.text).toContain("![ekran](ekran.png)");

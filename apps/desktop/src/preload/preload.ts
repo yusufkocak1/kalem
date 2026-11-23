@@ -198,6 +198,9 @@ const bridge: KalemBridge = {
 	assistantDeleteChat: (id) => ipcRenderer.invoke(CHANNEL.assistantDeleteChat, id),
 	assistantAsk: (request) => ipcRenderer.invoke(CHANNEL.assistantAsk, request),
 	assistantStop: (chatId) => ipcRenderer.invoke(CHANNEL.assistantStop, chatId),
+	assistantSteer: (chatId, id, text) =>
+		ipcRenderer.invoke(CHANNEL.assistantSteer, chatId, id, text),
+	assistantUnsteer: (chatId, id) => ipcRenderer.invoke(CHANNEL.assistantUnsteer, chatId, id),
 	assistantRetryCheck: (review, index) =>
 		ipcRenderer.invoke(CHANNEL.assistantRetryCheck, review, index),
 	assistantPickSources: (kind) => ipcRenderer.invoke(CHANNEL.assistantPickSources, kind),

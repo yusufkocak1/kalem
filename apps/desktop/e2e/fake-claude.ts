@@ -68,17 +68,46 @@ if (args.includes("--help")) {
 let prompt = "";
 process.stdin.setEncoding("utf8");
 const accountModels = ${JSON.stringify(options.accountModels ?? null)};
+// With --input-format stream-json Claude Code reads a JSON line per message as it comes, without
+// waiting for its input to end, and answers it; a message that comes while it works is taken in.
+const streaming = args.includes("--input-format") && args[args.indexOf("--input-format") + 1] === "stream-json";
+const waiting = [];
+let rest = "";
+let inputEnded = false;
+let wake = () => {};
 process.stdin.on("data", (chunk) => {
 	prompt += chunk;
 	// Kalem asks for the account's models with an initialize control request.
 	const request = prompt.split("\\n").find((line) => line.includes('"control_request"'));
-	if (accountModels === null || request === undefined) return;
-	const id = JSON.parse(request).request_id;
-	setTimeout(() => {
-		process.stdout.write(JSON.stringify({ type: "control_response", response: { subtype: "success", request_id: id, response: { models: accountModels, commands: [] } } }) + "\\n");
-		process.exit(0);
-	}, ${JSON.stringify(options.accountDelay ?? 0)});
+	if (accountModels !== null && request !== undefined) {
+		const id = JSON.parse(request).request_id;
+		setTimeout(() => {
+			process.stdout.write(JSON.stringify({ type: "control_response", response: { subtype: "success", request_id: id, response: { models: accountModels, commands: [] } } }) + "\\n");
+			process.exit(0);
+		}, ${JSON.stringify(options.accountDelay ?? 0)});
+	}
+	rest += chunk;
+	const lines = rest.split("\\n");
+	rest = lines.pop();
+	for (const line of lines) {
+		try {
+			if (JSON.parse(line).type === "user") waiting.push(line + "\\n");
+		} catch {}
+	}
+	wake();
 });
+process.stdin.on("end", () => {
+	inputEnded = true;
+	wake();
+});
+const until = async (ready) => {
+	while (!ready()) await new Promise((resolve) => (wake = resolve));
+};
+/** A message's text, as a JSON line: its first text block. */
+const textOf = (line) => {
+	const content = JSON.parse(line).message.content;
+	return typeof content === "string" ? content : (content.find((block) => block.type === "text")?.text ?? "");
+};
 const tools = ${JSON.stringify(tools)};
 /** Calls the tools through the configured MCP server; their texts. */
 async function callTools() {
@@ -120,7 +149,8 @@ async function callTools() {
 	child.stdin.end();
 	return results;
 }
-process.stdin.on("end", async () => {
+/** Answers one message; \`input\` is its JSON line, when it came as one. */
+async function turn(prompt, input) {
 	const options = ${JSON.stringify(options)};
 	if (options.delay) await new Promise((resolve) => setTimeout(resolve, options.delay));
 	const failMark = ${JSON.stringify(join(folder, "failed-once"))};
@@ -133,12 +163,15 @@ process.stdin.on("end", async () => {
 	const used = await callTools();
 	const mcpAt = args.indexOf("--mcp-config");
 	const mcp = mcpAt === -1 ? null : JSON.parse(fs.readFileSync(args[mcpAt + 1], "utf8"));
-	fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args, prompt, cwd: process.cwd(), tools: used, mcp }) + "\\n");
+	// What came while it worked is taken in by this turn, as Claude Code takes in a message sent meanwhile.
+	const added = streaming ? waiting.splice(0).map(textOf) : [];
+	fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({ args, prompt, ...(input === undefined ? {} : { input }), cwd: process.cwd(), tools: used, mcp, ...(added.length === 0 ? {} : { added }) }) + "\\n");
 	const answers = ${JSON.stringify(answer)};
 	const reply =
-		typeof answers === "string"
+		(typeof answers === "string"
 			? answers
-			: (answers.find(([needle]) => prompt.includes(needle)) ?? answers[answers.length - 1])[1];
+			: (answers.find(([needle]) => prompt.includes(needle)) ?? answers[answers.length - 1])[1]) +
+		added.map((text) => "\\n\\nEk: " + text).join("");
 	const out = (line) => process.stdout.write(JSON.stringify(line) + "\\n");
 	// As Claude Code does, the first line names the model that answers: an alias's, or the default's.
 	const alias = args.includes("--model") ? args[args.indexOf("--model") + 1] : "";
@@ -154,7 +187,22 @@ process.stdin.on("end", async () => {
 	}
 	out({ type: "assistant", message: { content: [{ type: "text", text: reply }] }, session_id: "sess-1" });
 	out({ type: "result", subtype: "success", is_error: false, result: reply, session_id: "sess-1" });
-});
+}
+(async () => {
+	if (!streaming) {
+		await until(() => inputEnded);
+		return turn(prompt);
+	}
+	await until(() => waiting.length > 0 || inputEnded);
+	// No message, only a control request: answered as before, when its input ends.
+	if (waiting.length === 0) return turn(prompt);
+	// One turn a message; it exits once its input has ended and nothing is left.
+	while (waiting.length > 0) {
+		const line = waiting.shift();
+		await turn(textOf(line), line);
+		await until(() => waiting.length > 0 || inputEnded);
+	}
+})();
 `,
 	);
 	let path = script;
@@ -191,4 +239,8 @@ export interface Call {
 	readonly mcp?: { readonly mcpServers: Record<string, Record<string, unknown>> } | null;
 	/** It failed on purpose (`failOnce`). */
 	readonly failed?: boolean;
+	/** The message as the JSON line it came in, with `--input-format stream-json`. */
+	readonly input?: string;
+	/** What the user added while it worked, taken in by this turn. */
+	readonly added?: readonly string[];
 }

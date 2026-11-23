@@ -1464,6 +1464,24 @@ verir.
   sorudan beri değişmediyse yeniden gönderilmez. Sohbet sürer (Claude Code'da `--resume`, API'lerde geçmiş yeniden gönderilir);
   **Yeni sohbet** baştan başlar. Yanıt geldikçe görünür; **Durdur** ya da
   `Esc` keser.
+- **Çalışırken araya girme:** asistan çalışırken kutu yazmaya açık kalır;
+  yazılıp `Enter`'a basılan mesaj işi durdurmaz, çalışan yanıta eklenir.
+  Kutunun üstünde **Sırada** olarak görünür; `×` ile (ya da boş kutuda `↑`
+  ile) geri alınıp düzeltilebilir. Yanıt mesajı uygun ilk anda ele alır ve
+  yanıtın içinde, ele aldığı yerde **Çalışırken eklediğiniz** kartı çıkar:
+  - **Claude Code:** soru JSON satırı olarak gider ve CLI'nin girdisi yanıt
+    bitene kadar açık kalır (`--input-format stream-json`); eklenen mesaj
+    hemen oraya yazılır, Claude Code onu bir sonraki adımında ele alır.
+    `/` ile başlayan Claude Code komutları eskisi gibi düz metin gider.
+  - **API'ler** (Anthropic, OpenAI uyumlu): mesaj, araç turunun sonuçlarıyla
+    birlikte modele gider; model kalan işi onu bilerek sürdürür. Sohbet
+    geçmişinde de sorunun yanında saklanır.
+  - **Copilot:** soruyu bir kerede okuduğu için mesaj bir sonraki araç
+    turunda gider.
+  - Yanıt mesajı ele alamadan biterse (ör. araç çağırmadan yanıtlayan bir
+    model ya da Copilot), mesaj kendiliğinden sıradaki soru olarak gönderilir
+    (**Önceki yanıt sürerken yazıldı** notuyla). Yanıt durdurulursa ya da
+    hata verirse gönderilmez, kutuya geri döner.
 - Modele, hangi hizmet olursa olsun, sistem talimatıyla Kalem tanıtılır
   (`src/shared/claude.ts`):
   - Kalem'in gösterdiği Markdown: GFM tabloları, görev listeleri, dipnotlar,

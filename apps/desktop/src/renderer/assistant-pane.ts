@@ -11,7 +11,7 @@ import type {
 	Settings,
 } from "../shared/bridge.js";
 import { clampAssistantWidth, DEFAULT_SETTINGS, MIN_ASSISTANT_WIDTH } from "../shared/bridge.js";
-import type { ChatSummary, StoredChat, StoredMessage } from "../shared/chats.js";
+import type { ChatSummary, SteeredText, StoredChat, StoredMessage } from "../shared/chats.js";
 import { chatTitle, historyOf } from "../shared/chats.js";
 import type {
 	CheckProgress,
@@ -225,6 +225,14 @@ interface Message {
 	rulesRan?: boolean;
 	/** The card is of a mode's steps run by workers, not of a review's checks. */
 	stepsRan?: boolean;
+	/** What the user added while it ran, where in its text the answer took it in. */
+	steered?: SteeredText[];
+}
+
+/** A message written while a reply ran, waiting for the answer to take it in. */
+interface Queued {
+	readonly id: string;
+	readonly text: string;
 }
 
 /** A command the model ran in a terminal: its line, why, and what it printed once it ended. */
@@ -266,6 +274,8 @@ interface Chat {
 	/** The reply coming in, and what ends the wait for it. */
 	reply: Message | null;
 	ended: (() => void) | null;
+	/** What the user wrote while the reply ran that it has not taken in yet. */
+	queued: Queued[];
 }
 
 const INSTALL: Readonly<Record<"claude-code" | "copilot", { command: string; url: string }>> = {
@@ -311,6 +321,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	/** The chats opened in this run, by id. */
 	const chats = new Map<string, Chat>();
 	let active: Chat = blankChat();
+	/** Chats whose reply the user stopped: what they added to it is not asked on its own. */
+	const stopped = new WeakSet<Chat>();
 	/** The changes waiting above the question box: the document's, and the files' still to apply. */
 	const editSummary = createEditSummary(t);
 	let documentEdits: DocumentEdits | null = null;
@@ -340,6 +352,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			sharedText: null,
 			reply: null,
 			ended: null,
+			queued: [],
 		};
 	}
 
@@ -949,6 +962,17 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		attrs: { type: "button", title: t.assistantSend, "aria-label": t.assistantSend },
 		children: [icon("send")],
 	});
+	// While a reply runs the box still takes a message, added to the answer: stopping is a button of its own.
+	const stopButton = el("button", {
+		class: "assistant-send assistant-stop busy",
+		attrs: { type: "button", title: t.assistantStop, "aria-label": t.assistantStop, hidden: "" },
+		children: [icon("stop")],
+	});
+	/** What was written while the reply runs, until the answer takes it in. */
+	const queueList = el("div", {
+		class: "assistant-queue",
+		attrs: { hidden: "", role: "list", "aria-label": t.assistantQueued },
+	});
 	const modelSelect = el("select", {
 		class: "assistant-model",
 		attrs: { "aria-label": t.assistantModel, title: t.assistantModel },
@@ -1272,6 +1296,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			templateList,
 			mentionList,
 			mentionMenu,
+			queueList,
 			el("div", {
 				class: "assistant-box",
 				children: [
@@ -1282,6 +1307,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 							addButton,
 							el("span", { class: "assistant-toolbar-space" }),
 							modePicker,
+							stopButton,
 							sendButton,
 						],
 					}),
@@ -1392,6 +1418,13 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			}
 		}
 		if (event.key === "ArrowUp" && input.value === "" && !event.isComposing) {
+			// While the reply runs, the last message added to it comes back to be changed.
+			const queued = active.queued.at(-1);
+			if (queued !== undefined) {
+				event.preventDefault();
+				unqueue(active, queued);
+				return;
+			}
 			// The last question comes back, to ask it again or change it.
 			const last = [...active.messages].reverse().find((message) => message.role === "user");
 			if (last !== undefined) {
@@ -1405,13 +1438,15 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			if (!runTyped()) void send();
 		} else if (event.key === "Escape" && active.reply !== null) {
 			event.preventDefault();
-			void bridge.assistantStop(active.id);
+			stopReply(active);
 		}
 	});
+	// While a reply runs, what is typed is added to it: the button says so.
+	input.addEventListener("input", () => drawSendButton());
 	sendButton.addEventListener("click", () => {
-		if (active.reply !== null) void bridge.assistantStop(active.id);
-		else if (!runTyped()) void send();
+		if (!runTyped()) void send();
 	});
+	stopButton.addEventListener("click", () => stopReply(active));
 
 	// --- Commands ------------------------------------------------------------------
 
@@ -1474,7 +1509,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				render();
 			},
 		},
-		{ name: "stop", label: t.assistantStop, run: () => void bridge.assistantStop(active.id) },
+		{ name: "stop", label: t.assistantStop, run: () => stopReply(active) },
 		{
 			name: "help",
 			label: t.slashHelp,
@@ -2142,6 +2177,75 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		);
 	}
 
+	/** The send button, and the stop button beside it while a reply runs. */
+	function drawSendButton(): void {
+		const busy = active.reply !== null;
+		stopButton.hidden = !busy;
+		// While a reply runs what is typed goes to it: with nothing typed there is nothing to add.
+		sendButton.disabled = status?.ready !== true || (busy && input.value.trim() === "");
+		const label = busy ? t.assistantSendWhileBusy : t.assistantSend;
+		sendButton.title = label;
+		sendButton.setAttribute("aria-label", label);
+		const placeholder = busy ? t.assistantPlaceholderBusy : t.assistantPlaceholder;
+		if (input.placeholder !== placeholder) input.placeholder = placeholder;
+	}
+
+	/** What was written while the reply runs, each with a way to take it back. */
+	function renderQueue(): void {
+		queueList.hidden = active.queued.length === 0;
+		queueList.replaceChildren(
+			...(active.queued.length === 0
+				? []
+				: [el("div", { class: "assistant-queue-title", text: t.assistantQueued })]),
+			...active.queued.map((item) => {
+				const chat = active;
+				const back = el("button", {
+					class: "assistant-chip-close",
+					attrs: { type: "button", title: t.assistantUnqueue, "aria-label": t.assistantUnqueue },
+					children: [icon("close")],
+				});
+				back.addEventListener("click", () => unqueue(chat, item));
+				return el("div", {
+					class: "assistant-queued",
+					attrs: { role: "listitem" },
+					children: [el("span", { class: "assistant-queued-text", text: item.text }), back],
+				});
+			}),
+		);
+	}
+
+	/** A message written while the reply runs: added to it, without stopping it. */
+	function addToReply(chat: Chat, text: string): void {
+		const item: Queued = { id: crypto.randomUUID(), text };
+		chat.queued.push(item);
+		// The answer takes it in when it can; else it is asked once the answer has ended.
+		void bridge.assistantSteer(chat.id, item.id, text).catch(() => false);
+		if (chat === active) {
+			renderQueue();
+			drawSendButton();
+		}
+	}
+
+	/** Takes back a message not taken in yet: it comes back to the box, if the box is empty. */
+	function unqueue(chat: Chat, item: Queued): void {
+		const at = chat.queued.indexOf(item);
+		if (at === -1) return;
+		chat.queued.splice(at, 1);
+		void bridge.assistantUnsteer(chat.id, item.id).catch(() => false);
+		if (chat !== active) return;
+		if (input.value.trim() === "") input.value = item.text;
+		renderQueue();
+		drawSendButton();
+		input.focus();
+	}
+
+	/** Stops the reply; what was added to it and not taken in comes back to the box. */
+	function stopReply(chat: Chat): void {
+		if (chat.reply === null) return;
+		stopped.add(chat);
+		void bridge.assistantStop(chat.id);
+	}
+
 	function render(): void {
 		refreshEditSummary();
 		const ready = status?.ready === true;
@@ -2165,7 +2269,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		for (const item of quick.querySelectorAll("button")) item.disabled = !ready || busy;
 		log.classList.toggle("busy", busy);
 		updateJump();
-		sendButton.disabled = !ready && !busy;
+		drawSendButton();
 		refreshDocumentChip();
 		drawModeButton();
 		// The service's version is the settings' business (Settings → Assistant): the
@@ -2175,10 +2279,6 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		subtitle.hidden = ready;
 		settingsButton.setAttribute("aria-pressed", String(view === "settings"));
 		historyButton.setAttribute("aria-pressed", String(view === "history"));
-		sendButton.replaceChildren(icon(busy ? "stop" : "send"));
-		sendButton.title = busy ? t.assistantStop : t.assistantSend;
-		sendButton.setAttribute("aria-label", sendButton.title);
-		sendButton.classList.toggle("busy", busy);
 		newChat.disabled = active.messages.length === 0;
 		modelSelect.hidden = !ready;
 		modelRow.hidden = !ready;
@@ -2335,12 +2435,14 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				done: true,
 				notes: message.notes,
 				...(message.model === undefined ? {} : { model: message.model }),
+				...(message.steered === undefined ? {} : { steered: [...message.steered] }),
 			})),
 			sources: [...(stored.sources ?? [])],
 			skipped: [...(stored.skipped ?? [])],
 			sharedText: null,
 			reply: null,
 			ended: null,
+			queued: [],
 		};
 	}
 
@@ -2368,7 +2470,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			return;
 		}
 		const chat = chats.get(summary.id);
-		if (chat?.reply != null) void bridge.assistantStop(chat.id);
+		if (chat !== undefined) stopReply(chat);
 		chats.delete(summary.id);
 		await bridge.assistantDeleteChat(summary.id);
 		if (active.id === summary.id) {
@@ -2381,13 +2483,16 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 
 	function save(chat: Chat): void {
 		if (chat.messages.length === 0) return;
-		const messages: StoredMessage[] = chat.messages.map(({ role, text, error, notes, model }) => ({
-			role,
-			text,
-			error,
-			notes,
-			...(model === undefined || model === "" ? {} : { model }),
-		}));
+		const messages: StoredMessage[] = chat.messages.map(
+			({ role, text, error, notes, model, steered }) => ({
+				role,
+				text,
+				error,
+				notes,
+				...(model === undefined || model === "" ? {} : { model }),
+				...(steered === undefined || steered.length === 0 ? {} : { steered }),
+			}),
+		);
 		const stored: StoredChat = {
 			id: chat.id,
 			title: chat.title,
@@ -2411,6 +2516,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		log.replaceChildren();
 		for (const message of active.messages) appendMessage(message);
 		log.scrollTop = log.scrollHeight;
+		renderQueue();
 		renderSources();
 		renderTemplate();
 		render();
@@ -2581,6 +2687,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			for (const card of placed) {
 				if (card.at !== piece.cut) continue;
 				if (card.kind === "edit") nodes.push(editCard(card.edit));
+				else if (card.kind === "steered") nodes.push(steeredCard(card.text));
 				else nodes.push(commandCard(card.run, message));
 			}
 		}
@@ -2928,22 +3035,44 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 	): ({ at: number } & (
 		| { kind: "run"; run: CommandRun }
 		| { kind: "edit"; edit: ProposedEdit }
+		| { kind: "steered"; text: string }
 	))[] {
 		const end = message.text.length;
 		const cards: ({ at: number } & (
 			| { kind: "run"; run: CommandRun }
 			| { kind: "edit"; edit: ProposedEdit }
+			| { kind: "steered"; text: string }
 		))[] = [];
 		for (const run of message.runs ?? [])
 			cards.push({ at: Math.min(run.at, end), kind: "run", run });
 		for (const edit of message.edits ?? []) {
 			cards.push({ at: Math.min(message.editAt?.[edit.id] ?? end, end), kind: "edit", edit });
 		}
+		// What the user added shows where the answer took it in, or, taken in half-way through
+		// a paragraph (Claude Code reads it as it comes), after that paragraph.
+		for (const steered of message.steered ?? []) {
+			const at = Math.min(steered.at, end);
+			const between =
+				at === 0 || message.text[at - 1] === "\n" || message.text.startsWith("\n", at);
+			const paragraph = between ? at : message.text.indexOf("\n\n", at);
+			cards.push({ at: paragraph === -1 ? end : paragraph, kind: "steered", text: steered.text });
+		}
 		// In the order they came, at the same place too.
 		return cards
 			.map((card, order) => ({ card, order }))
 			.sort((a, b) => a.card.at - b.card.at || a.order - b.order)
 			.map(({ card }) => card);
+	}
+
+	/** What the user added while the reply ran, where the answer went on with it. */
+	function steeredCard(text: string): HTMLElement {
+		return el("div", {
+			class: "assistant-steered",
+			children: [
+				el("div", { class: "assistant-steered-label", text: t.assistantSteered }),
+				el("div", { class: "assistant-steered-text", text }),
+			],
+		});
 	}
 
 	/** A command the reply ran in a terminal: its line and why; what it printed opens from it. */
@@ -3569,6 +3698,20 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			case "findings":
 				onFindings(chat.id, reply, event.findings);
 				return;
+			case "steered": {
+				// Taken in: it leaves the waiting list and shows in the reply, where the answer went on with it.
+				const ids = new Set(event.messages.map((message) => message.id));
+				chat.queued = chat.queued.filter((item) => !ids.has(item.id));
+				reply.steered = [
+					...(reply.steered ?? []),
+					...event.messages.map((message) => ({ at: reply.text.length, text: message.text })),
+				];
+				if (chat === active) {
+					renderQueue();
+					scheduleRender(reply);
+				}
+				return;
+			}
 			case "done":
 				chat.ended?.();
 				return;
@@ -4010,10 +4153,21 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		}
 	}
 
-	async function send(): Promise<void> {
-		const chat = active;
-		const question = input.value.trim();
-		if (question === "" || chat.reply !== null || status?.ready !== true) return;
+	/**
+	 * Asks the question in the box; while the chat's reply runs, adds it to the
+	 * reply instead, which goes on. `queued` is what was added to an earlier
+	 * reply that it never took in: asked on its own, without what the box holds.
+	 */
+	async function send(queued?: { readonly chat: Chat; readonly text: string }): Promise<void> {
+		const chat = queued?.chat ?? active;
+		const question = (queued?.text ?? input.value).trim();
+		if (question === "" || status?.ready !== true) return;
+		if (chat.reply !== null) {
+			if (queued === undefined) input.value = "";
+			addToReply(chat, question);
+			return;
+		}
+		stopped.delete(chat);
 		const provider = status.provider;
 		// A chat picked up with another service goes on there as a new conversation.
 		if (chat.provider !== provider) {
@@ -4031,7 +4185,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			model: status.model,
 		};
 		chat.reply = reply;
-		input.value = "";
+		if (queued === undefined) input.value = "";
 		render();
 
 		const notes: string[] = [];
@@ -4042,7 +4196,10 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		/** The document template the question is asked by, whatever the mode. */
 		const usedTemplate = pickedTemplate;
 		/** The pictures pasted for this question: they go with it, and are not kept for the next. */
-		const usedPictures = pasted.map(({ label, mediaType, data }) => ({ label, mediaType, data }));
+		const usedPictures =
+			queued === undefined
+				? pasted.map(({ label, mediaType, data }) => ({ label, mediaType, data }))
+				: [];
 		let prompt: string;
 		// The sections added with "@" go with the question, whether or not the document is shared.
 		let withSections = question;
@@ -4056,7 +4213,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		try {
 			const context = await host.context();
 			tabId = context.tabId;
-			if (mentions.length > 0) {
+			if (queued === undefined && mentions.length > 0) {
 				const lines = context.text.split("\n");
 				const sections = mentions.flatMap((heading) => {
 					const found = findHeading(context.text, heading);
@@ -4182,7 +4339,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			}
 		} catch (error) {
 			chat.reply = null;
-			input.value = question;
+			if (queued === undefined || input.value.trim() === "") input.value = question;
 			render();
 			showNotice(format(t.assistantActionFailed, host.errorText(error)));
 			return;
@@ -4191,6 +4348,7 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 		// What an API is sent again when this run has not seen the chat (picked up from disk).
 		const earlier = isCli(PROVIDER_INFO[provider]) ? [] : historyOf(chat.messages);
 		if (usedTemplate !== null) notes.push(format(t.assistantTemplateUsed, usedTemplate.name));
+		if (queued !== undefined) notes.push(t.assistantQueuedAsked);
 		const asked: Message = { role: "user", text: question, error: null, done: true, notes };
 		chat.messages.push(asked, reply);
 		if (chat.title === "") chat.title = chatTitle(question);
@@ -4253,6 +4411,19 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 			input.focus();
 		}
 		if (view === "history") void renderHistory();
+		// What was added to the reply too late for it to take in is asked now, on its own.
+		// A reply the user stopped, or one that failed in sight, leaves it in the box instead.
+		const left = chat.queued.splice(0);
+		if (left.length === 0) return;
+		const text = left.map((item) => item.text).join("\n\n");
+		if (stopped.has(chat) || (reply.error !== null && chat === active)) {
+			input.value = [text, input.value.trim()].filter((part) => part !== "").join("\n\n");
+			if (chat === active) renderQueue();
+			drawSendButton();
+			return;
+		}
+		if (chat === active) renderQueue();
+		await send({ chat, text });
 	}
 
 	/** The most recent chat comes back when the panel first shows. */

@@ -64,6 +64,7 @@ import {
 	SUGGESTED_MODELS,
 } from "../shared/providers.js";
 import { reviewPlan, summaryQuestion } from "../shared/review-plan.js";
+import { MAX_STEER_TEXT, withSteering } from "../shared/steering.js";
 import {
 	FINAL_COMBINE_NOTE,
 	FINAL_REST_NOTE,
@@ -78,6 +79,7 @@ import { JiraLookups } from "./assistant-jira.js";
 import type { AssistantToolServer, McpRun } from "./assistant-mcp.js";
 import { MCP_SERVER, mcpToolName } from "./assistant-mcp.js";
 import { PermissionGate } from "./assistant-permissions.js";
+import { Steering } from "./assistant-steering.js";
 import type { Connections, DocumentSnapshot, ToolContext, ToolResult } from "./assistant-tools.js";
 import { allTools, approver, RendererCalls, runTool, toolsFor } from "./assistant-tools.js";
 import { ModelCatalog } from "./model-catalog.js";
@@ -96,7 +98,7 @@ import "./assistant-confluence-tools.js";
 import { blockResults, parseApprovalAnswer, toolCalls } from "../shared/tool-protocol.js";
 import { collectSources, MAX_SOURCES, SOURCE_BUDGET } from "./assistant-sources.js";
 import type { AssistantStore } from "./assistant-store.js";
-import type { CliProgram } from "./cli.js";
+import type { CliInput, CliProgram } from "./cli.js";
 import { claudeOutput, LocalCli, runCli, SearchLog, textOutput } from "./cli.js";
 import { CliCatalog } from "./cli-catalog.js";
 import { cliCommands } from "./cli-commands.js";
@@ -297,6 +299,8 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 	};
 	/** Running questions by window and chat; each can be stopped. */
 	const running = new Map<string, () => void>();
+	/** What the user adds to each running question, by window and chat. */
+	const steerings = new Map<string, Steering>();
 	/** The latest reviews run side by side: a check that failed can be run again. */
 	const reviews = new ReviewRuns();
 	/** The folder each CLI conversation ran in. */
@@ -621,7 +625,12 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		if (typeof id === "string") await ctx.chats.delete(id);
 	});
 
-	ipcMain.handle(CHANNEL.assistantAsk, async (event, raw: unknown) => {
+	/** One question, answered to its end; what the user adds while it runs comes through `steering`. */
+	const answer = async (
+		event: IpcMainInvokeEvent,
+		raw: unknown,
+		steering: Steering,
+	): Promise<void> => {
 		const win = ctx.senderOf(event);
 		const request = record(raw);
 		const { chatId, prompt } = request;
@@ -651,6 +660,12 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		const { provider, connection, key } = await ctx.assistant.active();
 		const forward = (assistantEvent: ClaudeEvent): void => {
 			if (!sender.isDestroyed()) sender.send(CHANNEL.assistantEvent, chatId, assistantEvent);
+		};
+		/** What the user added that the answer takes in now; the window is told it was. */
+		const takeSteering = (): string[] => {
+			const taken = steering.take();
+			if (taken.length > 0) forward({ kind: "steered", messages: taken });
+			return taken.map((message) => message.text);
 		};
 
 		const program = programOf(provider);
@@ -1121,10 +1136,16 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				}
 			}
 			let args: string[];
+			// Claude Code's input stays open while it answers: what the user adds goes to it as it
+			// comes, as a message of its own, and the CLI takes it in at its next step. The question
+			// then goes as a JSON line; a command of Claude Code's ("/compact") goes as typed.
+			const streamInput = program === "claude" && !prompt.trimStart().startsWith("/");
+			// Copilot reads its question at once: what the user added before it started goes with it.
+			if (program === "copilot") asked = withSteering(asked, takeSteering());
 			let question = asked;
 			if (program === "claude") {
-				// Pictures need the question as a JSON line; without them it stays plain text.
-				const jsonInput = images.length > 0;
+				// Pictures need the question as a JSON line too.
+				const jsonInput = streamInput || images.length > 0;
 				args = argsFor(sessionId, jsonInput);
 				if (jsonInput) question = claudeInputLine(asked, images);
 			} else {
@@ -1141,6 +1162,30 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 				stopped = true;
 				gate.cancel(sender, chatId);
 			});
+			/** Claude Code's open input, while it can still take a message in this turn. */
+			let writeInput: ((line: string) => void) | null = null;
+			let endInput: (() => void) | null = null;
+			const passOn = (): void => {
+				const write = writeInput;
+				if (write === null) return;
+				for (const text of takeSteering()) write(claudeInputLine(text, []));
+			};
+			/** The turn has ended: what comes later is asked once the answer is done. */
+			const closeInput = (): void => {
+				writeInput = null;
+				endInput?.();
+				endInput = null;
+			};
+			const input: CliInput | undefined = streamInput
+				? {
+						opened: (write, end) => {
+							writeInput = write;
+							endInput = end;
+							passOn();
+						},
+					}
+				: undefined;
+			if (streamInput) steering.listen(passOn);
 			try {
 				for (let round = 0; ; round++) {
 					let said = "";
@@ -1161,10 +1206,12 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 							// The answer is done only when no look-ups are left.
 							if (cliEvent.kind === "done") {
 								ended = "done";
+								closeInput();
 								return;
 							}
 							if (cliEvent.kind === "error") {
 								ended = "error";
+								closeInput();
 								if (trying) {
 									held = cliEvent;
 									return;
@@ -1181,7 +1228,9 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 							});
 						},
 						env,
+						input,
 					);
+					closeInput();
 					if (trying && ended === "error" && said === "" && !stopped) {
 						noMcp.add(launch.path);
 						await mcpRun?.close();
@@ -1274,9 +1323,14 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 							? `${results}\n\nThis was the last look-up: answer now with what you found.`
 							: results;
 					send({ kind: "text", text: "\n\n" });
-					args = argsFor(conversation);
+					// What the user added meanwhile goes with the results (Claude Code reads it from its input).
+					if (streamInput) question = claudeInputLine(question, []);
+					else question = withSteering(question, takeSteering());
+					args = argsFor(conversation, streamInput);
 				}
 			} finally {
+				steering.listen(null);
+				closeInput();
 				await mcpRun?.close();
 				running.delete(runKey);
 			}
@@ -1295,10 +1349,20 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		forward({ kind: "session", id });
 		// An API sees the sources again only while a kept message still carries them.
 		const seen = files.text !== "" && before.some(({ content }) => content.startsWith(files.text));
+		// What the user added before the answer started goes with the question.
+		const early = takeSteering();
 		const messages: ChatMessage[] = [
 			...before,
-			{ role: "user", content: withSources(files.text, seen ? files.text : undefined, prompt) },
+			{
+				role: "user",
+				content: withSteering(
+					withSources(files.text, seen ? files.text : undefined, prompt),
+					early,
+				),
+			},
 		];
+		/** What the user added while it answered, taken in after a round of tools. */
+		const steered: string[] = [];
 		const controller = new AbortController();
 		running.set(runKey, () => {
 			controller.abort();
@@ -1328,6 +1392,11 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 					forward({ kind: "text", text: chunk });
 				},
 				usage: (cost) => forward({ kind: "usage", ...cost }),
+				steer: () => {
+					const taken = takeSteering();
+					steered.push(...taken);
+					return taken;
+				},
 				...(definitions.length === 0 || !withTools
 					? {}
 					: {
@@ -1363,7 +1432,10 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 						: await collectSources(sources, { budget: SOURCE_BUDGET.api, listOnly: false });
 				messages[messages.length - 1] = {
 					role: "user",
-					content: withSources(inlined.text, seen ? inlined.text : undefined, fullPrompt),
+					content: withSteering(
+						withSources(inlined.text, seen ? inlined.text : undefined, fullPrompt),
+						early,
+					),
 				};
 				await ask(
 					messages,
@@ -1386,7 +1458,9 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		}
 		// What was said stays, a stopped reply as far as it got; a question without
 		// an answer is left out, so the messages keep taking turns.
-		const asked = messages.at(-1) as ChatMessage;
+		// What the user added while it answered stays with the question, so the next one knows of it.
+		const last = messages.at(-1) as ChatMessage;
+		const asked = { ...last, content: withSteering(last.content, steered) };
 		const remembered = rememberReads(reads);
 		const answered: ChatMessage[] =
 			reply === ""
@@ -1397,6 +1471,37 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 						{ role: "assistant", content: reply },
 					];
 		histories.set(id, answered.slice(-MAX_HISTORY));
+	};
+
+	ipcMain.handle(CHANNEL.assistantAsk, async (event, raw: unknown) => {
+		// Taken before the question starts, so a message added at once finds it.
+		const runKey = `${event.sender.id}:${String(record(raw).chatId)}`;
+		const steering = new Steering();
+		steerings.get(runKey)?.close();
+		steerings.set(runKey, steering);
+		try {
+			await answer(event, raw, steering);
+		} finally {
+			steering.close();
+			if (steerings.get(runKey) === steering) steerings.delete(runKey);
+		}
+	});
+
+	// A message added to the answer running in a chat, and one taken back before it was taken in.
+	ipcMain.handle(
+		CHANNEL.assistantSteer,
+		(event, chatId: unknown, id: unknown, text: unknown): boolean => {
+			if (typeof chatId !== "string" || typeof id !== "string" || typeof text !== "string") {
+				return false;
+			}
+			const said = text.trim().slice(0, MAX_STEER_TEXT);
+			if (said === "" || !/^[\w-]{1,100}$/.test(id)) return false;
+			return steerings.get(`${event.sender.id}:${chatId}`)?.add({ id, text: said }) ?? false;
+		},
+	);
+	ipcMain.handle(CHANNEL.assistantUnsteer, (event, chatId: unknown, id: unknown): boolean => {
+		if (typeof chatId !== "string" || typeof id !== "string") return false;
+		return steerings.get(`${event.sender.id}:${chatId}`)?.withdraw(id) ?? false;
 	});
 
 	// A check of a review run side by side that failed, run again on its own.

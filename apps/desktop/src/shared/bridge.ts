@@ -1199,6 +1199,14 @@ export interface KalemBridge {
 	/** Asks the assistant; resolves when the reply has ended. */
 	assistantAsk(request: AssistantRequest): Promise<void>;
 	assistantStop(chatId: string): Promise<void>;
+	/**
+	 * Adds a message to the answer running in a chat, without stopping it: the
+	 * answer takes it in when it can (a `steered` event says when). `false`
+	 * when no answer is running there to take it.
+	 */
+	assistantSteer(chatId: string, id: string, text: string): Promise<boolean>;
+	/** Takes back an added message the answer has not taken in yet; whether there was one. */
+	assistantUnsteer(chatId: string, id: string): Promise<boolean>;
 	/** Runs a check of a review run side by side again, one that failed. */
 	assistantRetryCheck(review: string, index: number): Promise<void>;
 	/** Asks for files or a folder to add to a chat; empty when cancelled. */
@@ -1403,6 +1411,8 @@ export const CHANNEL = {
 	assistantDeleteChat: "kalem:assistant-delete-chat",
 	assistantAsk: "kalem:assistant-ask",
 	assistantStop: "kalem:assistant-stop",
+	assistantSteer: "kalem:assistant-steer",
+	assistantUnsteer: "kalem:assistant-unsteer",
 	assistantRetryCheck: "kalem:assistant-retry-check",
 	assistantPickSources: "kalem:assistant-pick-sources",
 	assistantApplyEdit: "kalem:assistant-apply-edit",

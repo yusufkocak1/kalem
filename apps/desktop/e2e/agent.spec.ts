@@ -12,12 +12,14 @@ import { shot } from "./shots.js";
  * A stand-in for the GitHub Copilot CLI that answers by what the question
  * holds (the first answer whose needle is in it, else the last). With
  * `mcp`, its help offers `--additional-mcp-config`, and a run given one
- * fails as a Copilot that cannot start the server would.
+ * fails as a Copilot that cannot start the server would. `delay` is how long
+ * it works before it answers, in ms.
  */
 async function fakeCopilot(
 	folder: string,
 	answers: readonly (readonly [string, string])[],
 	mcp = false,
+	delay = 0,
 ): Promise<{ path: string; calls: () => Promise<Call[]> }> {
 	const log = join(folder, "copilot-calls.jsonl");
 	const script = join(folder, "fake-copilot.cjs");
@@ -44,7 +46,7 @@ process.stdin.on("end", () => {
 	}
 	const answers = ${JSON.stringify(answers)};
 	const reply = (answers.find(([needle]) => prompt.includes(needle)) ?? answers[answers.length - 1])[1];
-	process.stdout.write(reply);
+	setTimeout(() => process.stdout.write(reply), ${delay});
 });
 `,
 	);
@@ -553,6 +555,92 @@ test("a Copilot that cannot start Kalem's MCP server is asked again with blocks"
 	await expect(pane.locator(".assistant-assistant")).toHaveCount(2);
 	await expect.poll(async () => (await copilot.calls()).length).toBe(3);
 	expect((await copilot.calls())[2]?.args).not.toContain("--additional-mcp-config");
+	expect(errors).toEqual([]);
+	await app.close();
+});
+
+test("what is written while Copilot answers waits, can be taken back, and is asked once the answer ends", async () => {
+	const folder = await tempDir("agent-copilot-queue");
+	const copilot = await fakeCopilot(
+		folder,
+		[
+			["Tabloyu da ekle", "Tablo eklendi."],
+			["", "Akış hazır."],
+		],
+		false,
+		2500,
+	);
+	const { app, page, errors } = await launch({
+		settings: { assistant: true },
+		env: { KALEM_COPILOT: copilot.path, KALEM_CLAUDE: join(folder, "none") },
+	});
+	const pane = page.locator(".assistant");
+	await pane.getByRole("button", { name: "Connection settings" }).click();
+	await pane.locator(".assistant-settings").getByLabel("Service").selectOption("copilot");
+	await pane.locator(".assistant-settings").getByRole("button", { name: "Save" }).click();
+	const input = pane.locator(".assistant-input");
+	await input.fill("Akışı çiz");
+	await input.press("Enter");
+
+	// While it answers the box still takes a message: it is added, not a stop.
+	const stop = pane.getByRole("button", { name: "Stop" });
+	await expect(stop).toBeVisible();
+	await expect(input).toHaveAttribute("placeholder", /Add to the answer while it works/);
+	const add = pane.getByRole("button", { name: "Add to the running answer" });
+	await expect(add).toBeDisabled();
+	await input.fill("Kısa tut");
+	await expect(add).toBeEnabled();
+	await input.press("Enter");
+	await input.fill("Tabloyu da ekle");
+	await input.press("Enter");
+	const queue = pane.locator(".assistant-queue");
+	await expect(queue.locator(".assistant-queue-title")).toHaveText(
+		"Waiting: taken in when the answer can",
+	);
+	await expect(queue.locator(".assistant-queued-text")).toHaveText(["Kısa tut", "Tabloyu da ekle"]);
+	// The last one comes back to be changed, and one is taken back with its ×.
+	await expect(input).toHaveValue("");
+	await input.press("ArrowUp");
+	await expect(input).toHaveValue("Tabloyu da ekle");
+	await expect(queue.locator(".assistant-queued-text")).toHaveText(["Kısa tut"]);
+	await input.press("Enter");
+	await queue
+		.locator(".assistant-queued", { hasText: "Kısa tut" })
+		.getByRole("button", { name: "Take back" })
+		.click();
+	await expect(input).toHaveValue("Kısa tut");
+	await input.fill("");
+	await expect(queue.locator(".assistant-queued-text")).toHaveText(["Tabloyu da ekle"]);
+
+	// Copilot reads its question at once: what was added is asked when the answer ends.
+	const replies = pane.locator(".assistant-assistant");
+	await expect(replies.first().locator(".assistant-markdown")).toHaveText("Akış hazır.");
+	await expect(replies).toHaveCount(2);
+	await expect(replies.last().locator(".assistant-markdown")).toHaveText("Tablo eklendi.");
+	await expect(queue).toBeHidden();
+	await expect(stop).toBeHidden();
+	const asked = pane.locator(".assistant-user").last();
+	await expect(asked).toContainText("Tabloyu da ekle");
+	await expect(asked.locator(".assistant-notes")).toContainText(
+		"Written while the previous answer ran",
+	);
+	const calls = await copilot.calls();
+	expect(calls).toHaveLength(2);
+	expect(calls[1]?.prompt).toContain("Tabloyu da ekle");
+	expect(calls[1]?.prompt).not.toContain("Kısa tut");
+
+	// A stopped answer asks nothing more: what was added comes back to the box.
+	await input.fill("Bir daha çiz");
+	await input.press("Enter");
+	await expect(stop).toBeVisible();
+	await input.fill("Renkli olsun");
+	await input.press("Enter");
+	await expect(queue.locator(".assistant-queued-text")).toHaveText(["Renkli olsun"]);
+	await stop.click();
+	await expect(stop).toBeHidden();
+	await expect(input).toHaveValue("Renkli olsun");
+	await expect(queue).toBeHidden();
+	await expect.poll(async () => (await copilot.calls()).length).toBe(3);
 	expect(errors).toEqual([]);
 	await app.close();
 });
