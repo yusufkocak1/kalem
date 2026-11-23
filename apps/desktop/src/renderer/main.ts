@@ -535,6 +535,15 @@ const assistant = createAssistantPane({
 	previews,
 	autoDocument: () => settings.assistantDocumentAuto,
 	documentId: () => (session as Session | undefined)?.id ?? "",
+	documentOf: (id) => {
+		const tab = tabs.get(id);
+		if (tab === undefined) return null;
+		const doc = tab.session;
+		return {
+			name: doc.path?.split(/[\\/]/).pop() ?? doc.name,
+			text: () => doc.styledMarkdown(),
+		};
+	},
 	// Empty until the first tab is open.
 	documentName: () =>
 		(session as Session | undefined) === undefined

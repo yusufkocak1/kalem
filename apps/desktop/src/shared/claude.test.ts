@@ -262,6 +262,29 @@ describe("the question", () => {
 		expect(prompt.endsWith("Devam")).toBe(true);
 	});
 
+	it("brings the documents added from other tabs, each once until it changes", () => {
+		const prompt = composePrompt({
+			question: "İkisini karşılaştır",
+			document: { name: "analiz.md", text: "# Analiz\n" },
+			others: [
+				{ name: "plan.md", text: "# Plan\n\nAdımlar\n\n" },
+				{ name: "notlar.md", text: "# Notlar", unchanged: true },
+			],
+		});
+		expect(prompt).toContain('<document name="analiz.md">\n# Analiz\n</document>');
+		expect(prompt).toContain(
+			'<other-document name="plan.md">\nOpen in another tab: read it here; Kalem\'s document tools work on the active document only.\n# Plan\n\nAdımlar\n</other-document>',
+		);
+		expect(prompt).toContain(
+			'<other-document-unchanged name="notlar.md">As I shared it above.</other-document-unchanged>',
+		);
+		expect(prompt).not.toContain("# Notlar");
+		// Without the active one too.
+		const alone = composePrompt({ question: "Özetle", others: [{ name: "plan.md", text: "x" }] });
+		expect(alone.startsWith('<other-document name="plan.md">')).toBe(true);
+		expect(alone.endsWith("Özetle")).toBe(true);
+	});
+
 	it("is only the question without context", () => {
 		expect(composePrompt({ question: "Merhaba", selection: "  " })).toBe("Merhaba");
 	});
