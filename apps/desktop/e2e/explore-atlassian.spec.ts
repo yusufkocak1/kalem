@@ -14,6 +14,7 @@ import { fakeConfluence, TOKEN } from "./fake-confluence.js";
 import { CONFLUENCE_TOKEN, fakeJira, fakeJiraConfluence, JIRA_TOKEN } from "./fake-jira.js";
 import {
 	clickMenu,
+	closeSettings,
 	launch,
 	recordMessageBoxes,
 	showPane,
@@ -271,7 +272,7 @@ for (const theme of ["light", "dark"] as const) {
 			await settings.locator('[data-category="panels"]').click();
 			if (place === "right") await explorer.scene("settings, panels");
 			await settings.locator('select[data-pane="jira"]').selectOption(place);
-			await settings.getByRole("button", { name: "Done" }).click();
+			await closeSettings(page);
 			await expect(page.locator(`.dock-${place} .jira-pane`)).toBeVisible();
 			await explorer.scene(`jira pane, ${place} dock`);
 		}
@@ -486,7 +487,7 @@ for (const theme of ["light", "dark"] as const) {
 		const settings = page.locator(".settings-dialog");
 		await settings.locator('[data-category="panels"]').click();
 		await settings.locator('select[data-pane="confluence"]').selectOption("right");
-		await settings.getByRole("button", { name: "Done" }).click();
+		await closeSettings(page);
 		await expect(page.locator(".dock-right .confluence-pane")).toBeVisible();
 		await explorer.scene("pane, right dock");
 		await clickMenu(app, "File", "Settings…");

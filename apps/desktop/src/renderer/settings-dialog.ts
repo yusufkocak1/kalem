@@ -1,4 +1,5 @@
 import type { AssistantStatus, KalemBridge, Settings } from "../shared/bridge.js";
+import { DEFAULT_SETTINGS } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import { modesUsingServers, renameServerRefs } from "../shared/modes.js";
@@ -12,16 +13,24 @@ import { PALETTE_IDS, PALETTE_TOKENS, PALETTES, paletteColors } from "../shared/
 import type { PanePlace, ToolPane } from "../shared/panes.js";
 import { movePane, placesFor, TOOL_PANES } from "../shared/panes.js";
 import { PROVIDERS, providerLabel } from "../shared/providers.js";
-import type { SettingCategory, SettingDef } from "../shared/settings-schema.js";
+import type { SettingPage } from "../shared/settings-pages.js";
 import {
-	CATEGORY_LABELS,
+	changedKeys,
+	pageLabel,
+	pageOf,
+	pageResetPatch,
+	pageResettable,
+	pageTitle,
+	SETTING_GROUPS,
+	SETTING_PAGES,
+} from "../shared/settings-pages.js";
+import type { SettingDef } from "../shared/settings-schema.js";
+import {
 	foldSearch,
 	matchesQuery,
 	matchesStems,
 	parseSetting,
 	permissionLabel,
-	resetPatch,
-	SETTING_CATEGORIES,
 	SETTING_DEFS,
 	searchText,
 	settingDef,
@@ -31,9 +40,11 @@ import type { TemplateInfo } from "../shared/templates.js";
 import { BUILTIN_ID } from "../shared/templates.js";
 import { createAssistantSettings } from "./assistant-settings.js";
 import { el } from "./dom.js";
+import { icon } from "./icons.js";
 import { createMcpSection } from "./mcp-editor.js";
 import { createModeEditor } from "./mode-settings.js";
 import { installFolds } from "./settings-fold.js";
+import { installHints } from "./settings-hints.js";
 import { sourceLabel } from "./template-picker.js";
 import { createToolSettings } from "./tool-settings.js";
 import { createTypographyPanel } from "./typography-panel.js";
@@ -61,13 +72,22 @@ export interface SettingsDialogOptions {
 	readonly version: string;
 	/** The version was clicked seven times in a row: the hidden debug mode. */
 	unlockDebug(): void;
+	/**
+	 * Where Settings is shown as a page of its own (a tab beside the
+	 * documents) instead of a window over them; none for the window.
+	 */
+	readonly host?: HTMLElement;
+	/** Settings was closed: by itself (a template opened, a login asked for) or by `close`. */
+	closed?(): void;
 }
 
 export interface SettingsDialog {
-	/** Opens it on a category; the last one shown, or the first, when none is given. */
-	show(category?: SettingCategory): Promise<void>;
+	/** Opens it on a page; the last one shown, or the first, when none is given. */
+	show(page?: SettingPage): Promise<void>;
 	/** Re-reads the connections and the values while it is open. */
 	refresh(): Promise<void>;
+	/** Closes it, as its own Done does. */
+	close(): void;
 }
 
 let fieldCount = 0;
@@ -85,12 +105,25 @@ const TAP_GAP = 800;
  */
 export function createSettingsDialog(options: SettingsDialogOptions): SettingsDialog {
 	const { t, bridge } = options;
-	let current: SettingCategory = SETTING_CATEGORIES[0];
+	let current: SettingPage = SETTING_PAGES[0] as SettingPage;
 	let connected = { confluence: false, jira: false };
 
 	const search = el("input", {
 		class: "settings-search",
 		attrs: { type: "search", placeholder: t.settingsSearch, "aria-label": t.settingsSearch },
+	});
+	// Only what is not as it was installed: across every page, like a search.
+	const changedOnly = el("button", {
+		class: "jira-button settings-changed-only",
+		text: t.settingsChangedOnly,
+		attrs: { type: "button", "aria-pressed": "false", title: t.settingsChangedOnlyHint },
+	});
+	changedOnly.addEventListener("click", () => {
+		changedOnly.setAttribute(
+			"aria-pressed",
+			String(changedOnly.getAttribute("aria-pressed") !== "true"),
+		);
+		filter();
 	});
 	const nav = el("nav", {
 		class: "settings-nav",
@@ -125,7 +158,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		children: [
 			el("div", {
 				class: "settings-head",
-				children: [el("h2", { text: t.settingsTitle }), search],
+				children: [el("h2", { text: t.settingsTitle }), search, changedOnly],
 			}),
 			el("div", {
 				class: "settings-layout",
@@ -134,62 +167,94 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 			el("div", { class: "confluence-actions settings-actions", children: [version, done] }),
 		],
 	});
-	document.body.append(dialog);
+	const docked = options.host !== undefined;
+	dialog.toggleAttribute("data-docked", docked);
+	(options.host ?? document.body).append(dialog);
+	dialog.addEventListener("close", () => options.closed?.());
 	// Long parts fold under their headings; a search shows them whole.
 	installFolds(body);
+	// Long notes are a line until opened.
+	installHints(body, t);
 	done.addEventListener("click", () => dialog.close());
+	// Escape closes a window by itself; a tab of its own closes the same way.
+	dialog.addEventListener("keydown", (event) => {
+		if (!docked || event.key !== "Escape" || event.defaultPrevented) return;
+		event.preventDefault();
+		dialog.close();
+	});
+	// Outside the window closes it; a page of its own has no outside.
 	dialog.addEventListener("click", (event) => {
-		if (event.target === dialog) dialog.close();
+		if (!docked && event.target === dialog) dialog.close();
 	});
 
 	// --- Categories ------------------------------------------------------------
 
-	const navButtons = new Map<SettingCategory, HTMLButtonElement>();
-	const sections = new Map<SettingCategory, HTMLElement>();
-	const contents = new Map<SettingCategory, HTMLElement>();
-	for (const category of SETTING_CATEGORIES) {
-		const label = t[CATEGORY_LABELS[category]];
-		const button = el("button", {
-			class: "settings-nav-item",
-			text: label,
-			attrs: { type: "button", "data-category": category },
+	// Every change made here goes through `update`: the marks of what is changed follow it.
+	const update = (patch: Partial<Settings>): void => {
+		options.update(patch);
+		markChanged();
+	};
+
+	const navButtons = new Map<SettingPage, HTMLButtonElement>();
+	const sections = new Map<SettingPage, HTMLElement>();
+	const contents = new Map<SettingPage, HTMLElement>();
+	for (const group of SETTING_GROUPS) {
+		const list = el("div", {
+			class: "settings-nav-group",
+			attrs: { role: "group", ...(group.label === null ? {} : { "aria-label": t[group.label] }) },
+			children:
+				group.label === null
+					? []
+					: [el("span", { class: "settings-nav-heading", text: t[group.label] })],
 		});
-		button.addEventListener("click", () => {
-			search.value = "";
-			select(category);
-		});
-		navButtons.set(category, button);
-		nav.append(button);
-		const content = el("div", { class: "settings-items" });
-		const reset = el("button", {
-			class: "jira-button settings-reset",
-			text: t.settingsReset,
-			attrs: { type: "button" },
-		});
-		reset.addEventListener("click", () => {
-			options.update(resetPatch(category));
-			renderValues();
-		});
-		const hasReset = category !== "connections";
-		const section = el("section", {
-			class: "settings-section",
-			attrs: { "data-section": category, "aria-label": label },
-			children: [
-				el("div", {
-					class: "settings-section-head",
-					children: [el("h3", { text: label }), ...(hasReset ? [reset] : [])],
-				}),
-				content,
-			],
-		});
-		sections.set(category, section);
-		contents.set(category, content);
-		body.append(section);
+		nav.append(list);
+		for (const page of group.pages) {
+			const label = pageLabel(t, page);
+			const button = el("button", {
+				class: "settings-nav-item",
+				text: label,
+				attrs: { type: "button", "data-category": page },
+			});
+			button.addEventListener("click", () => {
+				search.value = "";
+				changedOnly.setAttribute("aria-pressed", "false");
+				select(page);
+			});
+			navButtons.set(page, button);
+			list.append(button);
+			const content = el("div", { class: "settings-items" });
+			const reset = el("button", {
+				class: "jira-button settings-reset",
+				text: t.settingsReset,
+				attrs: { type: "button" },
+			});
+			reset.addEventListener("click", () => {
+				update(pageResetPatch(page));
+				renderValues();
+			});
+			const hasReset = pageResettable(page).length > 0;
+			const title = pageTitle(t, page);
+			const section = el("section", {
+				class: "settings-section",
+				attrs: { "data-section": page, "aria-label": title },
+				children: [
+					el("div", {
+						class: "settings-section-head",
+						children: [el("h3", { text: title }), ...(hasReset ? [reset] : [])],
+					}),
+					content,
+				],
+			});
+			sections.set(page, section);
+			contents.set(page, content);
+			body.append(section);
+		}
 	}
 
-	function select(category: SettingCategory): void {
-		current = category;
+	function select(page: SettingPage): void {
+		current = page;
 		filter();
+		body.parentElement?.scrollTo({ top: 0 });
 	}
 
 	// --- Rows from the schema --------------------------------------------------
@@ -197,11 +262,73 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 	/** Puts a row's control back to the setting's value. */
 	const refreshers: (() => void)[] = [];
 
-	function item(category: SettingCategory, words: string, child: HTMLElement): HTMLElement {
+	/** The settings each item shows, to mark it when one is not as it was installed. */
+	const itemKeys = new Map<HTMLElement, readonly (keyof Settings)[]>();
+
+	function item(
+		page: SettingPage,
+		words: string,
+		child: HTMLElement,
+		keys: readonly (keyof Settings)[] = [],
+	): HTMLElement {
 		child.classList.add("settings-item");
 		child.dataset.search = foldSearch(words);
-		contents.get(category)?.append(child);
+		if (keys.length > 0) itemKeys.set(child, keys);
+		contents.get(page)?.append(child);
 		return child;
+	}
+
+	/** Marks the items whose settings differ from their defaults. */
+	function markChanged(): void {
+		const settings = options.settings();
+		for (const [child, keys] of itemKeys) {
+			const changed = changedKeys(settings, keys).length > 0;
+			if (child.hasAttribute("data-changed") !== changed) {
+				child.toggleAttribute("data-changed", changed);
+			}
+		}
+	}
+
+	/**
+	 * A row of the schema with what it needs at its end: a mark when it is
+	 * changed, and a button that puts it back.
+	 */
+	function settingRow(def: SettingDef, words: string, control: HTMLElement): HTMLElement {
+		// The setting's name describes the button, so the setting alone is found by its name.
+		const named = `settings-name-${++fieldCount}`;
+		const back = el("button", {
+			class: "settings-row-reset",
+			attrs: {
+				type: "button",
+				"aria-label": t.settingsResetOne,
+				"aria-describedby": named,
+				title: t.settingsResetOne,
+			},
+			children: [icon("undo")],
+		});
+		const name = control.matches("label") ? control : control.querySelector("label");
+		if (name !== null) name.id = named;
+		back.addEventListener("click", () => {
+			update({ [def.key]: DEFAULT_SETTINGS[def.key] } as Partial<Settings>);
+			renderValues();
+		});
+		return item(
+			pageOf(def.key),
+			words,
+			el("div", {
+				class: "settings-row",
+				attrs: { "data-key": def.key },
+				children: [
+					el("span", {
+						class: "settings-changed-mark",
+						attrs: { title: t.settingsModified, "aria-hidden": "true" },
+					}),
+					control,
+					back,
+				],
+			}),
+			[def.key],
+		);
 	}
 
 	function row(def: SettingDef): HTMLElement | null {
@@ -210,7 +337,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		const id = `settings-field-${++fieldCount}`;
 		const words = searchText(t, def);
 		const change = (value: unknown): void => {
-			options.update({ [def.key]: parseSetting(def.key, value) } as Partial<Settings>);
+			update({ [def.key]: parseSetting(def.key, value) } as Partial<Settings>);
 		};
 		switch (def.type) {
 			case "boolean": {
@@ -219,8 +346,8 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 				refreshers.push(() => {
 					box.checked = options.settings()[def.key] === true;
 				});
-				return item(
-					def.category,
+				return settingRow(
+					def,
 					words,
 					el("label", { class: "settings-check", children: [box, label] }),
 				);
@@ -237,7 +364,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 				refreshers.push(() => {
 					control.value = String(values.indexOf(options.settings()[def.key]));
 				});
-				return item(def.category, words, field(id, label, control));
+				return settingRow(def, words, field(id, label, control));
 			}
 			case "number": {
 				const control = el("input", {
@@ -262,7 +389,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 				refreshers.push(() => {
 					control.value = String(options.settings()[def.key]);
 				});
-				return item(def.category, words, field(id, label, control));
+				return settingRow(def, words, field(id, label, control));
 			}
 			default:
 				return null;
@@ -309,7 +436,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		attrs: { type: "button" },
 	});
 	resetPalette.addEventListener("click", () => {
-		options.update({ palette: "kalem" });
+		update({ palette: "kalem" });
 		renderValues();
 	});
 	item(
@@ -333,6 +460,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 				resetPalette,
 			],
 		}),
+		["palette", "paletteCustom"],
 	);
 
 	/** A palette's card: its page, panels and accent as a small picture of the app, both themes. */
@@ -375,7 +503,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 			],
 		});
 		button.addEventListener("click", () => {
-			options.update({ palette: choice });
+			update({ palette: choice });
 			renderValues();
 		});
 		return button;
@@ -405,7 +533,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 				input.addEventListener("change", () => {
 					const now = options.settings();
 					const base = paletteColors(now.palette, now.paletteCustom);
-					options.update({
+					update({
 						palette: "custom",
 						paletteCustom: { ...base, [side]: { ...base[side], [token]: input.value } },
 					});
@@ -454,6 +582,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 				panes,
 			],
 		}),
+		["panePlaces"],
 	);
 
 	function renderPanes(): void {
@@ -469,7 +598,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 				});
 				control.value = settings.panePlaces[pane];
 				control.addEventListener("change", () => {
-					options.update(movePane(options.settings(), pane, control.value as PanePlace));
+					update(movePane(options.settings(), pane, control.value as PanePlace));
 					renderValues();
 				});
 				const needs = (pane === "confluence" || pane === "jira") && !connected[pane];
@@ -518,7 +647,8 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		].join(" "),
 		el("div", {
 			class: "settings-block",
-			children: [el("h4", { text: t.settingsAssistantConnection }), assistantForm.element],
+			// The page's own heading names it: the form needs none of its own.
+			children: [assistantForm.element],
 		}),
 	);
 
@@ -532,13 +662,14 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 	});
 	forgetSession.addEventListener("click", () => void bridge.assistantForgetPermissions());
 	item(
-		"assistant",
+		"assistantTools",
 		[t.settingsPermissions, ...settingDef("assistantPermissions").keywords].join(" "),
 		el("div", {
 			class: "settings-block",
 			attrs: { "data-block": "permissions" },
 			children: [el("h4", { text: t.settingsPermissions }), permissions, forgetSession],
 		}),
+		["assistantPermissions"],
 	);
 
 	function renderPermissions(): void {
@@ -557,7 +688,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 					attrs: { type: "button", "data-permission": permission },
 				});
 				remove.addEventListener("click", () => {
-					options.update({
+					update({
 						assistantPermissions: options
 							.settings()
 							.assistantPermissions.filter((kept) => kept !== permission),
@@ -577,15 +708,16 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 	const toolSettings = createToolSettings({
 		t,
 		settings: options.settings,
-		update: options.update,
+		update,
 		catalog: () => bridge.assistantToolCatalog(),
 	});
 	item(
-		"assistant",
+		"assistantTools",
 		[t.toolSettingsTitle, t.toolSettingsHint, ...settingDef("assistantToolPolicies").keywords].join(
 			" ",
 		),
 		toolSettings.element,
+		["assistantToolPolicies"],
 	);
 	refreshers.push(() => toolSettings.refresh());
 
@@ -598,12 +730,12 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 				t,
 				servers: () => options.settings().assistantMcpServers,
 				change(servers, redraw) {
-					options.update({ assistantMcpServers: servers });
+					update({ assistantMcpServers: servers });
 					if (redraw) drawMcp();
 				},
 				renamed(from, to) {
 					const settings = options.settings();
-					options.update(
+					update(
 						renameServerRefs(settings.assistantModes, settings.assistantCustomModes, from, to),
 					);
 					modeEditor.refresh();
@@ -621,9 +753,10 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 	}
 	drawMcp();
 	item(
-		"assistant",
+		"mcp",
 		[t.mcpTitle, t.mcpHint, ...settingDef("assistantMcpServers").keywords].join(" "),
 		mcpBlock,
+		["assistantMcpServers"],
 	);
 	refreshers.push(() => {
 		// Text being typed is not redrawn under the cursor.
@@ -642,7 +775,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 	const modeEditor = createModeEditor({
 		t,
 		settings: options.settings,
-		update: options.update,
+		update,
 		toolCatalog: () => bridge.assistantToolCatalog(),
 		exportMode: (which) => bridge.assistantModeExport(which),
 		importMode: () => bridge.assistantModeImport(),
@@ -651,6 +784,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		"modes",
 		[t.settingsCatModes, t.modesHint, ...settingDef("assistantModes").keywords].join(" "),
 		modeEditor.element,
+		["assistantModes", "assistantCustomModes"],
 	);
 	refreshers.push(() => modeEditor.refresh());
 
@@ -712,6 +846,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 				templateError,
 			],
 		}),
+		["defaultTemplate"],
 	);
 
 	const templateFailed = (error: unknown): void => {
@@ -754,7 +889,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 				});
 				radio.checked = isDefault;
 				radio.addEventListener("change", () => {
-					options.update({ defaultTemplate: template.id === BUILTIN_ID ? "" : template.id });
+					update({ defaultTemplate: template.id === BUILTIN_ID ? "" : template.id });
 				});
 				const actions: HTMLElement[] = [
 					templateAction(t.templateNewDoc, async () => {
@@ -782,7 +917,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 							if (!window.confirm(format(t.templateDeleteConfirm, template.name))) return;
 							await bridge.templateDelete(template.id);
 							if (template.id === options.settings().defaultTemplate)
-								options.update({ defaultTemplate: "" });
+								update({ defaultTemplate: "" });
 						}),
 					);
 				}
@@ -928,7 +1063,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 	const typography = createTypographyPanel({
 		t,
 		settings: options.settings,
-		update: options.update,
+		update,
 	});
 	item(
 		"typography",
@@ -939,6 +1074,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 			),
 		].join(" "),
 		typography.element,
+		SETTING_DEFS.filter((def) => def.category === "typography").map((def) => def.key),
 	);
 
 	// The schema's rows, in each category after its own parts.
@@ -946,38 +1082,51 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 
 	// --- Search ------------------------------------------------------------------
 
-	/** Shows the chosen category, or, while searching, every item the search finds. */
+	/**
+	 * Shows the chosen page, or, while searching or showing only what is
+	 * changed, every item that is looked for, page by page.
+	 */
 	function filter(): void {
 		const query = search.value.trim();
-		const searching = query !== "";
+		const onlyChanged = changedOnly.getAttribute("aria-pressed") === "true";
+		const searching = query !== "" || onlyChanged;
 		dialog.toggleAttribute("data-searching", searching);
-		const items = SETTING_CATEGORIES.flatMap((category) => [
-			...(contents.get(category)?.children ?? []),
+		markChanged();
+		const items = SETTING_PAGES.flatMap((page) => [
+			...(contents.get(page)?.children ?? []),
 		]) as HTMLElement[];
 		// Words with a Turkish ending ("yakınlaştırma") only when nothing matches as typed.
 		const matches = items.some((item) => matchesQuery(item.dataset.search ?? "", query))
 			? matchesQuery
 			: matchesStems;
 		let found = 0;
-		for (const category of SETTING_CATEGORIES) {
+		for (const page of SETTING_PAGES) {
 			let shown = 0;
-			for (const child of contents.get(category)?.children ?? []) {
+			for (const child of contents.get(page)?.children ?? []) {
 				const item = child as HTMLElement;
-				const match = !searching || matches(item.dataset.search ?? "", query);
+				const match =
+					(query === "" || matches(item.dataset.search ?? "", query)) &&
+					(!onlyChanged || item.hasAttribute("data-changed"));
 				item.hidden = !match;
 				if (match) shown++;
 			}
 			found += shown;
-			const section = sections.get(category) as HTMLElement;
-			section.hidden = searching ? shown === 0 : category !== current;
-			const button = navButtons.get(category) as HTMLButtonElement;
-			button.classList.toggle("settings-nav-current", !searching && category === current);
+			const section = sections.get(page) as HTMLElement;
+			section.hidden = searching ? shown === 0 : page !== current;
+			const button = navButtons.get(page) as HTMLButtonElement;
+			button.classList.toggle("settings-nav-current", !searching && page === current);
 			button.classList.toggle("settings-nav-dim", searching && shown === 0);
-			if (!searching && category === current) button.setAttribute("aria-current", "true");
+			if (!searching && page === current) button.setAttribute("aria-current", "true");
 			else button.removeAttribute("aria-current");
 		}
 		empty.hidden = !searching || found > 0;
-		empty.textContent = searching ? format(t.settingsNoResults, query) : "";
+		empty.textContent = !searching
+			? ""
+			: onlyChanged
+				? query === ""
+					? t.settingsNoChanges
+					: format(t.settingsNoChangedResults, query)
+				: format(t.settingsNoResults, query);
 	}
 	search.addEventListener("input", filter);
 	search.addEventListener("keydown", (event) => {
@@ -989,6 +1138,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 	});
 
 	function renderValues(): void {
+		markChanged();
 		for (const refresh of refreshers) refresh();
 		typography.refresh();
 		renderPalette();
@@ -1003,14 +1153,16 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 	}
 
 	return {
-		async show(category) {
-			if (category !== undefined) {
-				current = category;
+		async show(page) {
+			if (page !== undefined) {
+				current = page;
 				search.value = "";
+				changedOnly.setAttribute("aria-pressed", "false");
 			}
 			await refresh();
 			if (!dialog.open) {
-				dialog.showModal();
+				if (docked) dialog.show();
+				else dialog.showModal();
 				void assistantForm.show().then(() => {
 					// The form takes the focus to its first field: the search keeps it.
 					search.focus();
@@ -1019,6 +1171,9 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		},
 		async refresh() {
 			if (dialog.open) await refresh();
+		},
+		close() {
+			if (dialog.open) dialog.close();
 		},
 	};
 }

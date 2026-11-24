@@ -43,6 +43,38 @@ const reachKey = (server: McpServer): string =>
 			: [server.transport, server.command, server.args, server.env],
 	);
 
+/**
+ * The server whose settings are shown beside the list, by name, while the
+ * app runs: a redraw keeps it. The first one when it is not there.
+ */
+let chosen: string | null = null;
+
+/** What a server runs, in a few words: the program and what it is given first. */
+export function reachSummary(server: McpServer): string {
+	if (server.transport === "http") {
+		try {
+			return new URL(server.url).host;
+		} catch {
+			return server.url;
+		}
+	}
+	const short = (path: string): string => {
+		const parts = path.split(/[\\/]/).filter(Boolean);
+		// A script inside a package reads best as the package's name.
+		const at = parts.lastIndexOf("node_modules");
+		if (at >= 0 && at + 1 < parts.length) {
+			const scope = parts[at + 1] ?? "";
+			return scope.startsWith("@") && at + 2 < parts.length ? `${scope}/${parts[at + 2]}` : scope;
+		}
+		return parts.at(-1) ?? path;
+	};
+	const first = server.args.find((arg) => !arg.startsWith("-"));
+	return [server.command, first]
+		.filter((part): part is string => part !== undefined && part !== "")
+		.map(short)
+		.join(" ");
+}
+
 /** Where each command was found, while Settings is open: a redraw does not look again. */
 const found = new Map<string, Promise<string | null>>();
 
@@ -141,8 +173,12 @@ function pills<T extends string>(
  */
 export function createMcpSection(options: McpSectionOptions): HTMLElement {
 	const { t } = options;
-	const addPreset = (preset: McpPreset): void =>
-		options.change([...options.servers(), presetServer(preset, options.servers())], true);
+	/** A server just added shows its settings, to be filled in. */
+	const addServer = (server: McpServer): void => {
+		chosen = server.name;
+		options.change([...options.servers(), server], true);
+	};
+	const addPreset = (preset: McpPreset): void => addServer(presetServer(preset, options.servers()));
 
 	/** Whether Kalem keeps a program running between questions, with what that is for. */
 	function keepAliveField(on: boolean, change: (on: boolean) => void): HTMLElement {
@@ -160,11 +196,14 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 
 	function serverCard(server: McpServer, index: number): HTMLElement {
 		// Each change builds on the servers as they are now: fields typed one after another keep each other.
-		const set = (next: Partial<McpServer>, redraw = false): void =>
+		const set = (next: Partial<McpServer>, redraw = false): void => {
 			options.change(
 				options.servers().map((each, i) => (i === index ? { ...each, ...next } : each)),
 				redraw,
 			);
+			// The list beside it says what the server runs: it follows what is typed.
+			if (!redraw) drawList();
+		};
 		const http = server.transport === "http";
 		let check = commandCheck(server.command);
 		// The command typed is looked for once it is left.
@@ -229,6 +268,7 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 				return;
 			}
 			const from = options.servers()[index]?.name;
+			chosen = value;
 			set({ name: value }, true);
 			if (from !== undefined && from !== value) options.renamed(from, value);
 		});
@@ -239,6 +279,9 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 		});
 		remove.addEventListener("click", () => {
 			const gone = options.servers()[index]?.name;
+			// The one after it is shown, or the one before when it was the last.
+			const rest = options.servers().filter((_, i) => i !== index);
+			chosen = (rest[index] ?? rest[index - 1])?.name ?? null;
 			options.change(
 				options.servers().filter((_, i) => i !== index),
 				true,
@@ -248,20 +291,18 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 		const used = options.usedIn(server.name);
 		return el("div", {
 			class: "mcp-card",
-			attrs: { "data-server": server.name, ...(server.enabled ? {} : { "data-off": "" }) },
+			attrs: {
+				role: "tabpanel",
+				id: "mcp-detail",
+				"data-server": server.name,
+				...(server.enabled ? {} : { "data-off": "" }),
+			},
 			children: [
 				el("div", {
 					class: "mcp-card-head",
 					children: [
 						switchOf(server.enabled, server.name, (enabled) => set({ enabled }, true)),
 						name,
-						pills(
-							t.mcpTransport,
-							["stdio", "http"] as const,
-							server.transport,
-							(value) => (value === "stdio" ? t.mcpStdio : t.mcpHttp),
-							(transport) => set({ transport }, true),
-						),
 						remove,
 					],
 				}),
@@ -269,6 +310,13 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 					class: "mode-section-hint mcp-used-in",
 					text: used.length === 0 ? t.mcpUsedNowhere : format(t.mcpUsedIn, used.join(", ")),
 				}),
+				pills(
+					t.mcpTransport,
+					["stdio", "http"] as const,
+					server.transport,
+					(value) => (value === "stdio" ? t.mcpStdio : t.mcpHttp),
+					(transport) => set({ transport }, true),
+				),
 				...(http ? [] : [check]),
 				...fields,
 				toolsField(index, set),
@@ -282,6 +330,49 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 				...cardGuide(server),
 			],
 		});
+	}
+
+	/** A server in the list: its name, what it runs, its tools and how many modes use it. */
+	function pick(server: McpServer, index: number, selected: boolean): HTMLElement {
+		const used = options.usedIn(server.name);
+		const button = el("button", {
+			class: "mcp-pick",
+			attrs: {
+				type: "button",
+				role: "tab",
+				"aria-selected": String(selected),
+				"aria-controls": "mcp-detail",
+				tabindex: selected ? "0" : "-1",
+				"data-server": server.name,
+				...(server.enabled ? {} : { "data-off": "" }),
+				title: used.length === 0 ? t.mcpUsedNowhere : format(t.mcpUsedIn, used.join(", ")),
+			},
+			children: [
+				el("span", {
+					class: "mcp-pick-name",
+					children: [
+						el("span", { class: "mcp-pick-dot", attrs: { "aria-hidden": "true" } }),
+						el("code", { text: server.name }),
+						el("span", {
+							class: "mcp-card-kind",
+							text: server.transport === "http" ? "HTTP" : "stdio",
+						}),
+					],
+				}),
+				el("code", { class: "mcp-pick-reach", text: reachSummary(server) || "—" }),
+				el("span", {
+					class: "mcp-pick-meta",
+					text: [
+						server.tools.length === 0
+							? t.mcpSummaryAllTools
+							: format(t.mcpSummaryTools, String(server.tools.length)),
+						used.length === 0 ? t.mcpSummaryUnused : format(t.mcpSummaryModes, String(used.length)),
+					].join(" · "),
+				}),
+			],
+		});
+		button.addEventListener("click", () => show(index));
+		return button;
 	}
 
 	/**
@@ -529,16 +620,69 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 		attrs: { type: "button" },
 		children: [mark("plus", "mode-icon"), t.mcpAdd],
 	});
-	add.addEventListener("click", () =>
-		options.change([...options.servers(), newMcpServer(options.servers())], true),
+	add.addEventListener("click", () => addServer(newMcpServer(options.servers())));
+
+	// The servers at the left, the chosen one's settings at the right.
+	const list = el("div", {
+		class: "mcp-list",
+		attrs: { role: "tablist", "aria-orientation": "vertical", "aria-label": t.mcpTitle },
+	});
+	const detail = el("div", { class: "mcp-detail" });
+	let current = Math.max(
+		0,
+		options.servers().findIndex((server) => server.name === chosen),
 	);
+	chosen = options.servers()[current]?.name ?? null;
+
+	function drawList(): void {
+		const focused = list.contains(document.activeElement);
+		list.replaceChildren(
+			...options.servers().map((server, index) => pick(server, index, index === current)),
+		);
+		if (focused) list.querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
+	}
+
+	function show(index: number): void {
+		const server = options.servers()[index];
+		if (server === undefined) return;
+		current = index;
+		chosen = server.name;
+		drawList();
+		detail.replaceChildren(serverCard(server, index));
+	}
+
+	// Up and down go through the list, as in a list of tabs.
+	list.addEventListener("keydown", (event) => {
+		const count = options.servers().length;
+		const step =
+			event.key === "ArrowDown"
+				? 1
+				: event.key === "ArrowUp"
+					? -1
+					: event.key === "Home"
+						? -count
+						: event.key === "End"
+							? count
+							: 0;
+		if (step === 0 || count === 0) return;
+		event.preventDefault();
+		show(Math.min(count - 1, Math.max(0, current + step)));
+		list.querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
+	});
+
+	const servers = options.servers();
+	drawList();
+	const first = servers[current];
+	if (first !== undefined) detail.replaceChildren(serverCard(first, current));
 	return el("div", {
 		class: "mode-section mode-mcp",
 		children: [
-			el("h4", { text: t.mcpTitle }),
 			el("p", { class: "mode-section-hint", text: t.mcpHint }),
-			el("div", { class: "mcp-list", children: options.servers().map(serverCard) }),
-			add,
+			el("div", {
+				class: "mcp-master",
+				attrs: servers.length === 0 ? { "data-empty": "" } : {},
+				children: [el("div", { class: "mcp-side", children: [list, add] }), detail],
+			}),
 			presets(),
 		],
 	});

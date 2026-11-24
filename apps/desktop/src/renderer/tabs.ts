@@ -1,5 +1,6 @@
 import { el } from "./dom.js";
 import { fileType } from "./file-types.js";
+import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
 
 export interface TabStripOptions {
@@ -29,6 +30,19 @@ export interface TabStrip {
 	select(id: string): void;
 	/** Tab ids in display order. */
 	order(): string[];
+	/**
+	 * A tab that is not a document (Settings): after the documents', with its
+	 * own icon, never saved with the session. `null` hides it.
+	 */
+	page(page: PageTab | null): void;
+}
+
+export interface PageTab {
+	readonly id: string;
+	readonly title: string;
+	readonly icon: IconName;
+	onSelect(): void;
+	onClose(): void;
 }
 
 /** The row of open documents. Tabs are identified by `data-document`. */
@@ -53,6 +67,8 @@ export function createTabStrip(options: TabStripOptions): TabStrip {
 		children: [icon("plus")],
 	});
 	newTab.addEventListener("click", () => options.onNew());
+	/** The tab that is not a document, while it is open. */
+	let pageTab: { id: string; tab: HTMLElement } | null = null;
 
 	// Arrow keys move between tabs; the list is a single Tab stop.
 	list.addEventListener("keydown", (event) => {
@@ -129,7 +145,9 @@ export function createTabStrip(options: TabStripOptions): TabStrip {
 			});
 
 			tabs.set(id, { tab, title, mark, kind: "" });
-			list.append(tab);
+			// The documents first; Settings stays after them.
+			if (pageTab === null) list.append(tab);
+			else pageTab.tab.before(tab);
 		},
 
 		remove(id) {
@@ -153,7 +171,9 @@ export function createTabStrip(options: TabStripOptions): TabStrip {
 		},
 
 		select(id) {
-			for (const [tabId, { tab }] of tabs) {
+			const all = [...[...tabs].map(([tabId, { tab }]) => [tabId, tab] as const)];
+			if (pageTab !== null) all.push([pageTab.id, pageTab.tab]);
+			for (const [tabId, tab] of all) {
 				const active = tabId === id;
 				tab.setAttribute("aria-selected", String(active));
 				tab.tabIndex = active ? 0 : -1;
@@ -162,5 +182,45 @@ export function createTabStrip(options: TabStripOptions): TabStrip {
 		},
 
 		order: () => [...tabs.keys()],
+
+		page(page) {
+			pageTab?.tab.remove();
+			pageTab = null;
+			if (page === null) return;
+			const close = el("button", {
+				class: "doc-tab-close",
+				attrs: { type: "button", "aria-label": options.closeLabel, title: options.closeLabel },
+				children: [icon("close")],
+			});
+			close.addEventListener("click", (event) => {
+				event.stopPropagation();
+				page.onClose();
+			});
+			const tab = el("div", {
+				class: "doc-tab doc-tab-page",
+				attrs: { role: "tab", "data-page": page.id, "aria-selected": "false", tabindex: "-1" },
+				children: [
+					el("span", {
+						class: "doc-tab-icon",
+						attrs: { "aria-hidden": "true" },
+						children: [icon(page.icon)],
+					}),
+					el("span", { class: "doc-tab-title", text: page.title }),
+					close,
+				],
+			});
+			tab.title = page.title;
+			tab.addEventListener("click", () => page.onSelect());
+			tab.addEventListener("keydown", (event) => {
+				if (event.target !== tab || (event.key !== "Enter" && event.key !== " ")) return;
+				event.preventDefault();
+				page.onSelect();
+			});
+			tab.addEventListener("auxclick", (event) => {
+				if (event.button === 1) page.onClose();
+			});
+			list.append(tab);
+			pageTab = { id: page.id, tab };
+		},
 	};
 }

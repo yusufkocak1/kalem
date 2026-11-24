@@ -7,7 +7,7 @@ import { expect, test } from "@playwright/test";
 import { parseDiagram } from "../src/shared/diagram.js";
 import type { Call } from "./fake-claude.js";
 import { fakeClaude, REPLY } from "./fake-claude.js";
-import { clickMenu, launch, showPane, tempDir } from "./launch.js";
+import { clickMenu, closeSettings, launch, showPane, tempDir } from "./launch.js";
 import { shot } from "./shots.js";
 
 test("asks the local Claude about the document and inserts its reply with the diagram", async () => {
@@ -180,7 +180,7 @@ test("the open document is offered faded, a click adds it, and it stays in the c
 	const dialog = page.locator(".settings-dialog");
 	await dialog.locator('[data-category="assistant"]').click();
 	await dialog.getByLabel("Add the active document to each chat on its own").check();
-	await dialog.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 	await page.locator(".doc-tab", { hasText: "plan" }).click();
 	await expect(shared).toHaveText(["notlar.md", "plan.md"]);
 	expect(errors).toEqual([]);

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import type { Call } from "./fake-claude.js";
 import { fakeClaude } from "./fake-claude.js";
-import { clickMenu, launch, stubMessageBox, tempDir } from "./launch.js";
+import { clickMenu, closeSettings, launch, stubMessageBox, tempDir } from "./launch.js";
 import { shot } from "./shots.js";
 
 /**
@@ -132,7 +132,7 @@ test("Claude Code changes a setting through Kalem's tools once the user allows i
 	// The always-allowed kinds are listed in the settings, and can be taken back.
 	await clickMenu(app, "File", "Settings…");
 	const dialog = page.locator(".settings-dialog");
-	await dialog.locator('[data-category="assistant"]').click();
+	await dialog.locator('[data-category="assistantTools"]').click();
 	const allowed = dialog.locator('[data-block="permissions"]');
 	await expect(allowed).toContainText("Settings: Appearance");
 	await allowed.getByRole("button", { name: "Remove" }).click();
@@ -915,7 +915,7 @@ test("modes: shaped in Settings (a step off, one of the user's own), and picked 
 	);
 	await expect(settings.locator(".mode-preview-text")).not.toContainText("analysis_lint");
 	await expect(settings.locator('.mode-tab[data-mode="review"]')).toContainText("9 steps");
-	await settings.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 	await expect
 		.poll(async () => {
 			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
@@ -953,7 +953,7 @@ test("modes: shaped in Settings (a step off, one of the user's own), and picked 
 	await pane.getByRole("menuitem", { name: "Customize modes…" }).click();
 	await settings.locator('.mode-tab[data-mode="review"]').click();
 	await settings.getByLabel(/Run steps in parallel/).uncheck();
-	await settings.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 	await pane.getByRole("button", { name: "New chat" }).first().click();
 	await pane.locator(".assistant-input").fill("Bu analizi geliştirme öncesi incele");
 	await pane.locator(".assistant-input").press("Enter");
@@ -993,7 +993,7 @@ test("modes: shaped in Settings (a step off, one of the user's own), and picked 
 	// Settings' long lists fold: a group of tools opens from its heading, and a search opens all.
 	await picker.click();
 	await pane.getByRole("menuitem", { name: "Customize modes…" }).click();
-	await settings.locator('.settings-nav-item[data-category="assistant"]').click();
+	await settings.locator('.settings-nav-item[data-category="assistantTools"]').click();
 	const group = settings.locator('.tool-settings-group[data-group="document"]');
 	const heading = group.locator("h5");
 	await expect(heading).toHaveAttribute("aria-expanded", "false");
@@ -1011,7 +1011,7 @@ test("modes: shaped in Settings (a step off, one of the user's own), and picked 
 	await tools.click();
 	await expect(settings.locator(".tool-settings-filter")).toBeVisible();
 	await page.screenshot({ path: process.env.KALEM_SHOT ?? join(folder, "settings.png") });
-	await settings.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 	expect(errors).toEqual([]);
 	await app.close();
 });
@@ -1033,11 +1033,12 @@ test("a mode of the user's own: its instructions, its tools and the MCP server i
 	const settings = page.locator(".settings-dialog");
 
 	// An MCP server of the assistant's: a program on this computer.
-	await settings.locator('[data-category="assistant"]').click();
+	await settings.locator('[data-category="mcp"]').click();
 	const servers = settings.locator('[data-block="mcp"]');
 	await servers.getByRole("button", { name: "Add an MCP server" }).click();
-	// Next to Serena, which the assistant starts with.
-	await expect(servers.locator(".mcp-card")).toHaveCount(2);
+	// Next to Serena, which the assistant starts with; the one added is shown.
+	await expect(servers.locator(".mcp-pick")).toHaveCount(2);
+	await expect(servers.locator(".mcp-pick").last()).toHaveAttribute("aria-selected", "true");
 	const server = servers.locator(".mcp-card").last();
 	await server.getByRole("textbox", { name: "Server name" }).fill("dosyalar");
 	await server.getByRole("textbox", { name: "Server name" }).press("Tab");
@@ -1074,7 +1075,7 @@ test("a mode of the user's own: its instructions, its tools and the MCP server i
 	// The assistant's server, used in this mode.
 	await editor.getByRole("switch", { name: "dosyalar" }).check();
 	await expect(settings.locator(".mode-tab-custom")).toContainText("Test Analisti");
-	await settings.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 	await expect
 		.poll(async () => {
 			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
@@ -1133,7 +1134,7 @@ test("one of Kalem's modes uses the assistant's MCP servers too, and the model i
 	const settings = page.locator(".settings-dialog");
 
 	// The assistant's servers: a database server, one tool of it, and what it is for.
-	await settings.locator('[data-category="assistant"]').click();
+	await settings.locator('[data-category="mcp"]').click();
 	const servers = settings.locator('[data-block="mcp"]');
 	await servers.getByRole("button", { name: "Add an MCP server" }).click();
 	const server = servers.locator(".mcp-card").last();
@@ -1169,7 +1170,7 @@ test("one of Kalem's modes uses the assistant's MCP servers too, and the model i
 	await settings.locator('.mcp-preset[data-preset="dbhub"] .mcp-preset-help').click();
 	await expect(settings.locator(".mcp-guide-panel")).toHaveCount(0);
 	await settings.locator('.mcp-preset[data-preset="context7"] .mcp-preset-add').click();
-	await expect(settings.locator(".mcp-card")).toHaveCount(3);
+	await expect(settings.locator(".mcp-pick")).toHaveCount(3);
 	await expect(
 		settings
 			.locator('.mcp-card[data-server="context7"]')
@@ -1180,7 +1181,10 @@ test("one of Kalem's modes uses the assistant's MCP servers too, and the model i
 	await kept.locator("summary").click();
 	await expect(kept).toContainText("Up-to-date documentation");
 	// The Code mode uses both, next to Serena, on there from the start; the Ask mode none.
-	await expect(settings.getByRole("switch", { name: "serena" })).toBeChecked();
+	await expect(settings.locator('.mcp-pick[data-server="serena"]')).not.toHaveAttribute(
+		"data-off",
+		"",
+	);
 	await settings.locator('[data-category="modes"]').click();
 	await settings.locator('.mode-tab[data-mode="code"]').click();
 	await settings.getByRole("switch", { name: "i18n-db" }).check();
@@ -1194,7 +1198,7 @@ test("one of Kalem's modes uses the assistant's MCP servers too, and the model i
 	);
 	await settings.locator(".mode-preview").scrollIntoViewIfNeeded();
 	await shot(page, "09-code-mode-preview");
-	await settings.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 	await expect
 		.poll(async () => {
 			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
@@ -1204,14 +1208,15 @@ test("one of Kalem's modes uses the assistant's MCP servers too, and the model i
 			];
 		})
 		.toEqual([["add_i18n_key"], ["serena", "i18n-db", "context7"]]);
-	// The servers' cards say which modes use them.
+	// Each server's settings say which modes use it.
 	await pane.locator(".assistant-mode").click();
 	await pane.getByRole("menuitem", { name: "Customize modes…" }).click();
-	await settings.locator('[data-category="assistant"]').click();
+	await settings.locator('[data-category="mcp"]').click();
+	await settings.locator('.mcp-pick[data-server="i18n-db"]').click();
 	await expect(settings.locator('.mcp-card[data-server="i18n-db"] .mcp-used-in')).toHaveText(
 		"Used in: Code",
 	);
-	await settings.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 
 	await pane.locator(".assistant-mode").click();
 	await pane.locator('.assistant-mode-item[data-mode="code"]').click();
@@ -1264,7 +1269,7 @@ test("a server whose command is not on this computer says what it is and how to 
 	});
 	await clickMenu(app, "File", "Settings…");
 	const settings = page.locator(".settings-dialog");
-	await settings.locator('[data-category="assistant"]').click();
+	await settings.locator('[data-category="mcp"]').click();
 	// Serena, which the assistant starts with, needs uvx: what uv is and how it is installed.
 	const missing = settings.locator('.mcp-card[data-server="serena"] .mcp-missing');
 	await expect(missing).toBeVisible();
@@ -1338,7 +1343,7 @@ test("templates: the team's and the user's own, a default, and new documents fro
 
 	// The team's is the default from now on.
 	await block.locator(".settings-template").first().locator('input[type="radio"]').check();
-	await dialog.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 
 	await clickMenu(app, "File", "New from Document Template…");
 	const picker = page.locator(".template-picker");
@@ -1556,7 +1561,7 @@ test("the assistant's panel moves left or under the document, and '@' adds a sec
 	const paneBox = await pane.boundingBox();
 	const deskBox = await page.locator(".desk-column").boundingBox();
 	expect((paneBox?.x ?? 0) + (paneBox?.width ?? 0)).toBeLessThanOrEqual((deskBox?.x ?? 0) + 1);
-	await dialog.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 
 	// "@" lists the document's sections; the picked one goes with the question, the document is not shared.
 	const input = pane.locator(".assistant-input");
@@ -1606,7 +1611,7 @@ test("an MCP server of the assistant's lists its tools, and each is turned on or
 	await pane.locator(".assistant-mode").click();
 	await pane.getByRole("menuitem", { name: "Customize modes…" }).click();
 	const settings = page.locator(".settings-dialog");
-	await settings.locator('[data-category="assistant"]').click();
+	await settings.locator('[data-category="mcp"]').click();
 	await settings.getByRole("button", { name: "Add an MCP server" }).click();
 	const card = settings.locator(".mcp-card").last();
 	// Node itself runs the script: the app's executable would be Electron's.
@@ -1630,7 +1635,7 @@ test("an MCP server of the assistant's lists its tools, and each is turned on or
 	await expect(card.getByRole("switch", { name: "add_i18n_key" })).toBeChecked();
 	await expect(card.locator(".mcp-tools-status")).toContainText("At least one tool stays on");
 
-	await settings.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 	await expect
 		.poll(async () => {
 			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
