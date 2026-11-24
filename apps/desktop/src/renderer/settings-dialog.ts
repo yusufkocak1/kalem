@@ -21,6 +21,7 @@ import {
 	pageResetPatch,
 	pageResettable,
 	pageTitle,
+	permissionLabel,
 	SETTING_GROUPS,
 	SETTING_PAGES,
 } from "../shared/settings-pages.js";
@@ -30,7 +31,6 @@ import {
 	matchesQuery,
 	matchesStems,
 	parseSetting,
-	permissionLabel,
 	SETTING_DEFS,
 	searchText,
 	settingDef,

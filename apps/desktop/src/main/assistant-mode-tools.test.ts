@@ -139,7 +139,7 @@ describe("the assistant setting up its MCP servers and the modes that use them",
 	});
 
 	it("asks every time, even when the tool is set to run without asking or the kind was allowed always", async () => {
-		const { ctx, asked } = chat(allow, { policy: "auto", always: ["settings:mcp"] });
+		const { ctx, asked } = chat(allow, { policy: "auto", always: ["settings/mcp"] });
 		await runTool("mode_mcp_change", { action: "add", mode: "ask", preset: "context7" }, ctx);
 		await runTool("mode_mcp_change", { action: "use", mode: "code", name: "context7" }, ctx);
 		expect(asked).toHaveLength(2);

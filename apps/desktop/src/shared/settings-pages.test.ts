@@ -3,14 +3,22 @@ import { DEFAULT_SETTINGS } from "./bridge.js";
 import { stringsFor } from "./i18n.js";
 import {
 	changedKeys,
+	migratePermissions,
 	pageOf,
 	pageResetPatch,
 	pageResettable,
 	pageTitle,
+	permissionLabel,
 	SETTING_PAGES,
 	sameValue,
 } from "./settings-pages.js";
-import { resettable, SETTING_CATEGORIES, SETTING_DEFS, settingDef } from "./settings-schema.js";
+import {
+	parsePermissions,
+	resettable,
+	SETTING_CATEGORIES,
+	SETTING_DEFS,
+	settingDef,
+} from "./settings-schema.js";
 
 describe("settings pages", () => {
 	it("lists each page once, and every page shows something", () => {
@@ -84,5 +92,58 @@ describe("changed settings", () => {
 			panePlaces: { ...DEFAULT_SETTINGS.panePlaces },
 		} as typeof DEFAULT_SETTINGS;
 		expect(changedKeys(settings, ["palette", "panePlaces"])).toEqual(["palette"]);
+	});
+});
+
+describe("what the assistant is allowed, a page at a time", () => {
+	it("allows a page the old categories covered whole, and nothing more", () => {
+		// Appearance and the editor were allowed always: Theme & Colours, Window & Ribbon,
+		// Document View and Editing hold only their settings.
+		const pages = migratePermissions(["settings:appearance", "settings:editor", "document"]);
+		expect(pages).toEqual(
+			expect.arrayContaining([
+				"document",
+				"settings/appearance",
+				"settings/window",
+				"settings/documentView",
+				"settings/editor",
+			]),
+		);
+		// General has the language (appearance) and the session (system): not both were allowed.
+		expect(pages).not.toContain("settings/general");
+		// Confluence & Jira has the review before saving (editor) and the connections: asked again.
+		expect(pages).not.toContain("settings/connections");
+	});
+
+	it("allows a page brought together from two categories when both were allowed", () => {
+		expect(migratePermissions(["settings:appearance", "settings:system"])).toContain(
+			"settings/general",
+		);
+	});
+
+	it("keeps the modes' and the MCP servers' own permissions, and what is already a page's", () => {
+		expect(migratePermissions(["settings:mcp", "settings:modes", "settings/git"])).toEqual(
+			expect.arrayContaining(["settings/mcp", "settings/modes", "settings/git"]),
+		);
+		expect(migratePermissions(["settings/panels", "commands"])).toEqual([
+			"settings/panels",
+			"commands",
+		]);
+	});
+
+	it("keeps a page permission when the settings are read again", () => {
+		expect(parsePermissions(["settings/documentView", "settings/appearance", "x y"])).toEqual([
+			"settings/documentView",
+			"settings/appearance",
+		]);
+	});
+
+	it("names a page permission by the page, as the window does", () => {
+		const t = stringsFor("tr");
+		expect(permissionLabel(t, "settings/documentView")).toBe("Ayarlar: Doküman › Belge Görünümü");
+		expect(permissionLabel(t, "settings/mcp")).toBe(
+			`Ayarlar: ${t.settingsCatAssistant} › ${t.mcpTitle}`,
+		);
+		expect(permissionLabel(t, "document")).toBe(t.permissionDocument);
 	});
 });

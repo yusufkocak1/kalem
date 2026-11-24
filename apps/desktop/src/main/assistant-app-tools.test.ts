@@ -93,7 +93,7 @@ describe("the assistant's app tools", () => {
 		expect(asked[0]).toMatchObject({
 			chatId: "chat-1",
 			risk: "ui",
-			permission: "settings:appearance",
+			permission: "settings/appearance",
 			lines: ["Theme: System → Dark"],
 			reason: "koyu tema istendi",
 			scopes: ["once", "session", "always"],
@@ -186,19 +186,31 @@ describe("the assistant's app tools", () => {
 
 	it("does not ask again what was allowed for the session or always", async () => {
 		const { ctx, asked, always } = context((request) =>
-			request.permission === "settings:appearance"
+			request.permission === "settings/appearance"
 				? { approved: true, scope: "session" }
 				: { approved: true, scope: "always" },
 		);
 		await runTool("settings_set", { changes: [{ key: "theme", value: "dark" }] }, ctx);
-		await runTool("settings_set", { changes: [{ key: "fullWidth", value: true }] }, ctx);
+		await runTool("settings_set", { changes: [{ key: "palette", value: "rose" }] }, ctx);
 		await runTool("settings_set", { changes: [{ key: "autoSave", value: true }] }, ctx);
 		await runTool("settings_set", { changes: [{ key: "spellCheck", value: false }] }, ctx);
+		// A page at a time, as the window shows them: the theme's allows the palette, not the editing.
 		expect(asked.map((request) => request.permission)).toEqual([
-			"settings:appearance",
-			"settings:editor",
+			"settings/appearance",
+			"settings/editor",
 		]);
-		expect(always()).toEqual(["settings:editor"]);
+		expect(always()).toEqual(["settings/editor"]);
+	});
+
+	it("asks again for a setting on another page than the one allowed", async () => {
+		const { ctx, asked } = context(() => ({ approved: true, scope: "session" }));
+		await runTool("settings_set", { changes: [{ key: "theme", value: "dark" }] }, ctx);
+		// Full Width is on Document View, not on Theme & Colours: allowing the theme did not allow it.
+		await runTool("settings_set", { changes: [{ key: "fullWidth", value: true }] }, ctx);
+		expect(asked.map((request) => request.permission)).toEqual([
+			"settings/appearance",
+			"settings/documentView",
+		]);
 	});
 
 	it("moves the Jira panel to the bottom dock", async () => {
@@ -206,7 +218,7 @@ describe("the assistant's app tools", () => {
 		const moved = await runTool("pane_move", { pane: "jira", place: "bottom" }, ctx);
 		expect(moved.text).toBe("Moved: Jira: Left → Bottom. It shows once connected.");
 		expect(asked[0]).toMatchObject({
-			permission: "settings:panels",
+			permission: "settings/panels",
 			lines: ["Jira: Left → Bottom"],
 		});
 		expect(settings().panePlaces.jira).toBe("bottom");

@@ -1,6 +1,7 @@
 import type { Settings } from "./bridge.js";
 import { DEFAULT_SETTINGS } from "./bridge.js";
 import type { Strings } from "./i18n.js";
+import { format } from "./i18n.js";
 import type { SettingCategory } from "./settings-schema.js";
 import { resettable, SETTING_DEFS } from "./settings-schema.js";
 
@@ -169,3 +170,61 @@ export const changedKeys = (
 	settings: Settings,
 	keys: readonly (keyof Settings)[],
 ): (keyof Settings)[] => keys.filter((key) => !sameValue(settings[key], DEFAULT_SETTINGS[key]));
+
+/**
+ * What the user allows the assistant to change, a page at a time: the
+ * settings as they are found in the window, so "always allow" on a change of
+ * the theme covers Theme & Colours and not, as a category would, the
+ * language too.
+ */
+export const pagePermission = (page: SettingPage): string => `settings/${page}`;
+
+const isPage = (value: string): value is SettingPage =>
+	SETTING_PAGES.includes(value as SettingPage);
+
+/** The page a page permission names; `null` for another permission. */
+export function permissionPage(permission: string): SettingPage | null {
+	if (!permission.startsWith("settings/")) return null;
+	const page = permission.slice("settings/".length);
+	return isPage(page) ? page : null;
+}
+
+/**
+ * Permissions kept by an earlier version, a category at a time
+ * (`settings:appearance`), as page permissions. A page is allowed when the
+ * old permissions covered every setting the assistant may change on it, so
+ * nothing is allowed that was not before: a page that brings two categories
+ * together (General: the language and the session) is asked about again
+ * unless both were allowed. Permissions that already name a page, and the
+ * others (the document, the commands), are kept as they are.
+ */
+export function migratePermissions(permissions: readonly string[]): string[] {
+	const old = new Set<string>();
+	const kept: string[] = [];
+	for (const permission of permissions) {
+		const name = permission.startsWith("settings:") ? permission.slice("settings:".length) : null;
+		if (name === null || name.startsWith("sensitive:")) kept.push(permission);
+		else old.add(name);
+	}
+	if (old.size === 0) return [...permissions];
+	const pages = SETTING_PAGES.filter((page) => {
+		// The modes' and the MCP servers' own tools asked by their page's name.
+		if (old.has(page) && (page === "mcp" || page === "modes")) return true;
+		const changeable = SETTING_DEFS.filter(
+			(def) => pageOf(def.key) === page && def.assistant !== "hidden",
+		);
+		return changeable.length > 0 && changeable.every((def) => old.has(def.category));
+	});
+	return [...new Set([...kept, ...pages.map(pagePermission)])];
+}
+
+/** A kind of change the assistant may be allowed, as the user reads it. */
+export function permissionLabel(t: Strings, permission: string): string {
+	const page = permissionPage(permission);
+	if (page !== null) return format(t.permissionSettings, pageTitle(t, page));
+	if (permission === "view") return t.permissionView;
+	if (permission === "commands") return t.permissionCommands;
+	if (permission === "document") return t.permissionDocument;
+	if (permission === "prompts") return t.permissionPrompts;
+	return permission;
+}

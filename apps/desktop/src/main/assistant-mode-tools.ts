@@ -29,6 +29,7 @@ import {
 	renameServerRefs,
 	USE_MODE,
 } from "../shared/modes.js";
+import { pagePermission } from "../shared/settings-pages.js";
 import type { KalemTool, ToolContext } from "./assistant-tools.js";
 import { registerTools } from "./assistant-tools.js";
 import { findProgram } from "./mcp-probe.js";
@@ -459,7 +460,7 @@ const MODE_TOOLS: readonly KalemTool[] = [
 			const answer = await ctx.approve({
 				tool: "mode_mcp_change",
 				risk: "ui",
-				permission: "settings:mcp",
+				permission: pagePermission("mcp"),
 				title,
 				lines,
 				// It runs programs on this computer: asked every time, whatever was allowed before.

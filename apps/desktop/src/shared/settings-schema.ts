@@ -21,7 +21,6 @@ import {
 import { parseCustomModes } from "./custom-modes.js";
 import { groupName } from "./favorites.js";
 import type { Strings } from "./i18n.js";
-import { format } from "./i18n.js";
 import { parseIssueLayout } from "./jira-layout.js";
 import { liftModeServers, parseMcpServers } from "./mcp-servers.js";
 import { DEFAULT_MODE_SERVERS, isMode, parseModeSettings } from "./mode-config.js";
@@ -185,7 +184,8 @@ export function parsePermissions(value: unknown): string[] {
 	return [
 		...new Set(
 			value.filter(
-				(item): item is string => typeof item === "string" && /^[a-z][a-z:-]{0,63}$/.test(item),
+				// `document`, `settings:sensitive:…`, a page of Settings (`settings/documentView`).
+				(item): item is string => typeof item === "string" && /^[a-z][a-zA-Z:/-]{0,63}$/.test(item),
 			),
 		),
 	].slice(0, 100);
@@ -1019,19 +1019,6 @@ export const CATEGORY_LABELS: Readonly<Record<SettingCategory, StringKey>> = {
 	templates: "settingsCatTemplates",
 	system: "settingsCatSystem",
 };
-
-/** A kind of change the assistant may be allowed, as the user reads it. */
-export function permissionLabel(t: Strings, permission: string): string {
-	const category = permission.startsWith("settings:") ? permission.slice(9) : null;
-	if (category !== null && Object.hasOwn(CATEGORY_LABELS, category)) {
-		return format(t.permissionSettings, t[CATEGORY_LABELS[category as SettingCategory]]);
-	}
-	if (permission === "view") return t.permissionView;
-	if (permission === "commands") return t.permissionCommands;
-	if (permission === "document") return t.permissionDocument;
-	if (permission === "prompts") return t.permissionPrompts;
-	return permission;
-}
 
 /** Every setting's description, in the order of the type. */
 export const SETTING_DEFS: readonly SettingDef[] = Object.values(SETTINGS_SCHEMA) as SettingDef[];

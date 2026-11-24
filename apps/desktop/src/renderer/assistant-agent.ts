@@ -6,6 +6,7 @@
 import type { CheckProgress, PlanStep } from "../shared/claude.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
+import { permissionLabel, permissionPage } from "../shared/settings-pages.js";
 import type { FormField, FormValue } from "../shared/tool-form.js";
 import { checkField, checkForm } from "../shared/tool-form.js";
 import type { ApprovalAnswer, ApprovalRequest, ApprovalScope } from "../shared/tool-protocol.js";
@@ -345,10 +346,15 @@ export function approvalCard(
 			});
 		}
 	} else if (state === "waiting") {
+		// "Always" says what it covers when that is a page of Settings: the page, not one setting.
+		const covers =
+			permissionPage(request.permission) === null
+				? ""
+				: ` (${permissionLabel(t, request.permission)})`;
 		const scopeLabels: Readonly<Record<ApprovalScope, string>> = {
 			once: t.approvalScopeOnce,
-			session: t.approvalScopeSession,
-			always: t.approvalScopeAlways,
+			session: `${t.approvalScopeSession}${covers}`,
+			always: `${t.approvalScopeAlways}${covers}`,
 		};
 		const scope = el("select", {
 			class: "assistant-approval-scope",
