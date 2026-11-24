@@ -81,27 +81,32 @@ test("servers kept in modes by an earlier version move to the assistant, and eac
 		],
 	});
 	const { app, page, errors } = await launch({ userData, args: [doc] });
-	const settings = await openSettings(app, page, "assistant");
+	const settings = await openSettings(app, page, "mcp");
 	const block = settings.locator('[data-block="mcp"]');
 	// Serena, which the assistant starts with, and each server once; a different one of a taken name is files-2.
-	await expect(block.locator(".mcp-card")).toHaveCount(4);
+	await expect(block.locator(".mcp-pick")).toHaveCount(4);
 	expect(
 		await block
-			.locator(".mcp-card .mcp-name")
-			.evaluateAll((inputs) => inputs.map((input) => (input as HTMLInputElement).value)),
+			.locator(".mcp-pick")
+			.evaluateAll((picks) => picks.map((pick) => (pick as HTMLElement).dataset.server)),
 	).toEqual(["serena", "i18n-db", "files", "files-2"]);
-	await expect(block.locator('.mcp-card[data-server="i18n-db"] .mcp-used-in')).toHaveText(
-		"Used in: Code",
-	);
+	// The list says how many modes use each; the chosen one's settings say which.
+	await expect(block.locator('.mcp-pick[data-server="i18n-db"]')).toContainText("1 modes");
+	const usedIn = async (server: string): Promise<void> => {
+		await block.locator(`.mcp-pick[data-server="${server}"]`).click();
+	};
+	await usedIn("files-2");
 	await expect(block.locator('.mcp-card[data-server="files-2"] .mcp-used-in')).toHaveText(
 		"Used in: Test Analisti",
 	);
+	await usedIn("serena");
 	await expect(block.locator('.mcp-card[data-server="serena"] .mcp-used-in')).toHaveText(
 		"Used in: Review analysis, Prepare prompt, Code",
 	);
-	await block
-		.locator('.mcp-card[data-server="i18n-db"] .mcp-card-head')
-		.evaluate((head) => head.scrollIntoView({ block: "start" }));
+	await usedIn("i18n-db");
+	await expect(block.locator('.mcp-card[data-server="i18n-db"] .mcp-used-in')).toHaveText(
+		"Used in: Code",
+	);
 	await shot(page, "01-migrated-servers");
 
 	await settings.locator('[data-category="modes"]').click();
@@ -161,7 +166,7 @@ test("a server renamed in the assistant is renamed in its modes, and removed fro
 		assistantModes: { code: { mcp: ["db"] }, ask: { mcp: ["db"] } },
 	});
 	const { app, page, errors } = await launch({ userData, args: [doc] });
-	const settings = await openSettings(app, page, "assistant");
+	const settings = await openSettings(app, page, "mcp");
 	const card = settings.locator('.mcp-card[data-server="db"]');
 	await expect(card.locator(".mcp-used-in")).toHaveText("Used in: Ask, Code");
 	await card.getByRole("textbox", { name: "Server name" }).fill("database");
@@ -184,7 +189,7 @@ test("a server renamed in the assistant is renamed in its modes, and removed fro
 	await settings.locator('[data-category="modes"]').click();
 	await settings.locator('.mode-tab[data-mode="code"]').click();
 	await expect(settings.getByRole("switch", { name: "database" })).toBeChecked();
-	await settings.locator('[data-category="assistant"]').click();
+	await settings.locator('[data-category="mcp"]').click();
 	await renamed.getByRole("button", { name: "Remove the server" }).click();
 	await expect(settings.locator('.mcp-card[data-server="database"]')).toHaveCount(0);
 	await expect
@@ -419,7 +424,7 @@ test("a server kept running between questions still holds what it held at the ne
 	expect(JSON.stringify(config)).not.toContain(script);
 
 	// Set to run per question in Settings: each CLI starts it anew.
-	const settings = await openSettings(app, page, "assistant");
+	const settings = await openSettings(app, page, "mcp");
 	const keep = settings.locator('.mcp-card[data-server="sayac"] input[data-setting="keepAlive"]');
 	await expect(keep).toBeChecked();
 	await expect(settings.locator('.mcp-card[data-server="sayac"]')).toContainText(

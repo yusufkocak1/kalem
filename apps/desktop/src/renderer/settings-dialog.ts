@@ -275,15 +275,20 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 	 * changed, and a button that puts it back.
 	 */
 	function settingRow(def: SettingDef, words: string, control: HTMLElement): HTMLElement {
+		// The setting's name describes the button, so the setting alone is found by its name.
+		const named = `settings-name-${++fieldCount}`;
 		const back = el("button", {
 			class: "settings-row-reset",
 			attrs: {
 				type: "button",
-				"aria-label": `${t.settingsResetOne}: ${def.label === null ? def.key : t[def.label]}`,
+				"aria-label": t.settingsResetOne,
+				"aria-describedby": named,
 				title: t.settingsResetOne,
 			},
 			children: [icon("undo")],
 		});
+		const name = control.matches("label") ? control : control.querySelector("label");
+		if (name !== null) name.id = named;
 		back.addEventListener("click", () => {
 			update({ [def.key]: DEFAULT_SETTINGS[def.key] } as Partial<Settings>);
 			renderValues();
