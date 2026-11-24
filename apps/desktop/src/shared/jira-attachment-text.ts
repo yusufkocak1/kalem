@@ -189,9 +189,10 @@ export const MAX_ATTACHMENT_TEXT = 60_000;
 /** A part of an attachment's text for the model, with how to read the rest. */
 export function attachmentTextPart(
 	key: string,
-	entry: AttachmentEntry,
+	entry: Pick<AttachmentEntry, "filename" | "mimeType">,
 	text: string,
 	from: number,
+	tool = "jira_get_attachment",
 ): string {
 	const start = Math.min(Math.max(0, Math.floor(from)), text.length);
 	const part = text.slice(start, start + MAX_ATTACHMENT_TEXT);
@@ -202,8 +203,6 @@ export function attachmentTextPart(
 			? `${text.length} characters`
 			: `characters ${start}–${end} of ${text.length}`;
 	const more =
-		end < text.length
-			? `\n\n[More follows: call jira_get_attachment again with "from": ${end}.]`
-			: "";
+		end < text.length ? `\n\n[More follows: call ${tool} again with "from": ${end}.]` : "";
 	return `${head}, ${range}:\n\n${part === "" ? "(empty)" : part}${more}`;
 }

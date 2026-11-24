@@ -83,6 +83,14 @@ interface ImportState {
 	readonly source: string;
 	/** Inline atoms become kept links (see `atomKind`) instead of plain text. */
 	readonly atoms: boolean;
+	/** Read for the assistant: what is not text (macros, people) is described, not dropped. */
+	readonly reading?: ReadingOptions;
+}
+
+/** How a page is read for the assistant. */
+export interface ReadingOptions {
+	/** People's names by account id, user key or user name. */
+	readonly users?: ReadonlyMap<string, string>;
 }
 
 /** FNV-1a of the text: the same key for the same XML on every import. */
@@ -181,10 +189,123 @@ function macro(node: MarkupElement, state: ImportState): HtmlNode[] {
 	}
 
 	if (name === "status") return [text(params.get("title") ?? "")];
+	if (state.reading !== undefined) {
+		const described = describedMacro(name, node, params);
+		if (described !== null) return [text(described)];
+	}
 	if (name === "jira") return [text(params.get("key") ?? "")];
 	if (body !== undefined) return [element("div", convertAll(body.children, state))];
 	if (plain !== undefined) return [element("pre", [text(textOf(plain))])];
+	// Read for the assistant, a macro it cannot see is still named where it stands.
+	if (state.reading !== undefined && !SILENT_MACROS.has(name)) return [text(`⟦Macro: ${name}⟧`)];
 	return [];
+}
+
+/** Macros that show nothing of the page's own: left out when it is read. */
+const SILENT_MACROS = new Set(["toc", "anchor", "section", "column", "space-attachments-hint"]);
+
+/** Every element called `name` under the node, depth first. */
+function descendants(node: MarkupElement, name: string): MarkupElement[] {
+	const found: MarkupElement[] = [];
+	for (const child of childElements(node)) {
+		if (child.name === name) found.push(child);
+		found.push(...descendants(child, name));
+	}
+	return found;
+}
+
+/** A page a macro names (`ri:page`), as text. */
+function pageNamed(node: MarkupElement): string {
+	const page = descendants(node, "ri:page")[0];
+	if (page === undefined) return "";
+	const title = page.attrs.get("ri:content-title") ?? "";
+	const space = page.attrs.get("ri:space-key") ?? "";
+	return title === "" ? "" : `"${title}"${space === "" ? "" : ` (space ${space})`}`;
+}
+
+/** A file a macro names (`ri:attachment`, or its name parameter). */
+function fileNamed(node: MarkupElement, params: ReadonlyMap<string, string>): string {
+	return (
+		descendants(node, "ri:attachment")[0]?.attrs.get("ri:filename") ??
+		params.get("name") ??
+		params.get("diagramName") ??
+		""
+	);
+}
+
+const LISTING_MACROS: Readonly<Record<string, string>> = {
+	children: "the page's child pages (confluence_child_pages lists them)",
+	pagetree: "a tree of pages (confluence_child_pages lists them)",
+	"pagetree-search": "a search box for the page tree",
+	contentbylabel: "pages with labels",
+	"content-by-label": "pages with labels",
+	"recently-updated": "recently changed pages",
+	"blog-posts": "blog posts",
+	"content-report-table": "a table of pages",
+	"page-index": "an index of the space's pages",
+	"tasks-report-macro": "a report of tasks",
+	"task-report": "a report of tasks",
+	"jira-chart": "a chart of Jira issues",
+	jirachart: "a chart of Jira issues",
+	"details-summary": "a summary of page properties",
+	detailssummary: "a summary of page properties",
+	livesearch: "a search box",
+	"create-from-template": "a button that creates a page",
+	attachments: "the page's attachments (confluence_get_attachment lists them)",
+	"profile-picture": "a person's picture",
+	"user-profile": "a person's profile",
+	contributors: "the page's contributors",
+	"contributors-summary": "the page's contributors",
+	"popular-labels": "popular labels",
+	"related-labels": "related labels",
+	"spaces-list": "a list of spaces",
+};
+
+/** What a macro the assistant cannot see is, as a line of text; `null` to convert it as usual. */
+function describedMacro(
+	name: string,
+	node: MarkupElement,
+	params: ReadonlyMap<string, string>,
+): string | null {
+	if (name === "jira") {
+		const key = params.get("key") ?? "";
+		if (key !== "") return key;
+		const jql = params.get("jqlQuery") ?? params.get("jql") ?? "";
+		if (jql !== "")
+			return `⟦Jira issues: a table of the issues of JQL "${jql}" — read them with jira_search⟧`;
+		return "⟦Jira issues⟧";
+	}
+	if (name === "include" || name === "excerpt-include") {
+		const page = pageNamed(node);
+		return `⟦${name === "include" ? "The page" : "An excerpt of the page"} ${page === "" ? "(unnamed)" : page} is shown here — find it with confluence_search (mode title) and read it⟧`;
+	}
+	if (name === "drawio" || name === "drawio-sketch" || name === "inc-drawio" || name === "gliffy") {
+		const diagram = fileNamed(node, params);
+		const kind = name === "gliffy" ? "Gliffy" : "draw.io";
+		return diagram === ""
+			? `⟦${kind} diagram⟧`
+			: `⟦${kind} diagram "${diagram}" — see its picture with confluence_get_attachment, name "${diagram}.png"⟧`;
+	}
+	if (
+		/^view-?(file|pdf|doc|xls|ppt)$|^viewpdf$|^viewdoc$|^viewxls$|^viewppt$|^multimedia$/.test(name)
+	) {
+		const file = fileNamed(node, params);
+		return file === ""
+			? "[An attached file]"
+			: `⟦The attached file "${file}" is shown here — read it with confluence_get_attachment⟧`;
+	}
+	const listing = LISTING_MACROS[name];
+	if (listing !== undefined) {
+		const labels = params.get("labels") ?? params.get("label") ?? "";
+		const cql = params.get("cql") ?? "";
+		const narrowed = [
+			labels === "" ? "" : `labels ${labels}`,
+			cql === "" ? "" : `CQL "${cql}"`,
+			params.get("spaces") ?? params.get("spaceKey") ?? "",
+		].filter((part) => part !== "");
+		return `⟦A list Confluence makes when the page is shown: ${listing}${narrowed.length === 0 ? "" : ` (${narrowed.join(", ")})`}; it is not in the page's text⟧`;
+	}
+	return null;
 }
 
 function task(node: MarkupElement, state: ImportState): HtmlNode {
@@ -234,8 +355,12 @@ function link(node: MarkupElement, state: ImportState): HtmlNode[] {
 				? [text(textOf(plainBody))]
 				: [];
 	if (body.length === 0) {
+		const named =
+			user === undefined || state.reading === undefined
+				? undefined
+				: personName(user, state.reading);
 		const fallback = user
-			? `@${user.attrs.get("ri:username") ?? user.attrs.get("ri:userkey") ?? ""}`
+			? `@${named ?? user.attrs.get("ri:username") ?? user.attrs.get("ri:userkey") ?? user.attrs.get("ri:account-id") ?? ""}`
 			: (page?.attrs.get("ri:content-title") ?? file ?? url ?? anchor ?? "");
 		body = [text(fallback)];
 	}
@@ -248,6 +373,42 @@ function link(node: MarkupElement, state: ImportState): HtmlNode[] {
 				? `#${anchor}`
 				: null);
 	return href === null ? [element("span", body)] : [element("a", body, { href })];
+}
+
+/** A mentioned person's name, when the reading knows it. */
+function personName(user: MarkupElement, reading: ReadingOptions): string | undefined {
+	for (const attribute of ["ri:account-id", "ri:userkey", "ri:username"]) {
+		const id = user.attrs.get(attribute);
+		const name = id === undefined ? undefined : reading.users?.get(id);
+		if (name !== undefined && name !== "") return name;
+	}
+	return undefined;
+}
+
+/** The people a page mentions (`ri:user`), each once, to look their names up. */
+export function storageUsers(
+	source: string,
+): { accountId?: string; key?: string; username?: string }[] {
+	const found = new Map<string, { accountId?: string; key?: string; username?: string }>();
+	for (const match of source.matchAll(/<ri:user\b([^>]*)\/?>/g)) {
+		const attrs = match[1] ?? "";
+		const value = (name: string): string | undefined =>
+			new RegExp(`${name}="([^"]+)"`).exec(attrs)?.[1];
+		const accountId = value("ri:account-id");
+		const key = value("ri:userkey");
+		const username = value("ri:username");
+		const id = accountId ?? key ?? username;
+		if (id === undefined || found.has(id)) continue;
+		found.set(
+			id,
+			accountId !== undefined
+				? { accountId }
+				: key !== undefined
+					? { key }
+					: { username: username as string },
+		);
+	}
+	return [...found.values()];
 }
 
 /** The cell's paragraphs and list items become lines of the Markdown cell (`<br>`). */
@@ -344,8 +505,16 @@ function codeBlocks(doc: Root): Code[] {
  * With `atoms`, inline atoms become kept links (`ATOM_PREFIX`); `markdownToStorage`
  * writes their XML back when it is given them.
  */
-export function storageToMarkdown(source: string, options: { atoms?: boolean } = {}): string {
-	const state: ImportState = { languages: [], source, atoms: options.atoms === true };
+export function storageToMarkdown(
+	source: string,
+	options: { atoms?: boolean; reading?: ReadingOptions } = {},
+): string {
+	const state: ImportState = {
+		languages: [],
+		source,
+		atoms: options.atoms === true,
+		...(options.reading === undefined ? {} : { reading: options.reading }),
+	};
 	const root = parseMarkup(source);
 	const body = childElements(root, "html")[0]?.children.find(
 		(child): child is MarkupElement => child.kind === "element" && child.name === "body",

@@ -5,10 +5,10 @@
  * go back to it as the next question. They only read.
  */
 import { DEFAULT_SEARCH } from "../shared/confluence-search.js";
-import { storageToMarkdown } from "../shared/confluence-storage.js";
+import { storageToMarkdown, storageUsers } from "../shared/confluence-storage.js";
 import type { ConfluenceRequest } from "../shared/confluence-tool.js";
 import { pageText, requestOf, searchResultText } from "../shared/confluence-tool.js";
-import type { ConfluenceClient } from "./confluence-client.js";
+import type { ConfluenceClient, ConfluencePageInfo } from "./confluence-client.js";
 import type { ToolDefinition, ToolStep } from "./workspace-tools.js";
 
 export const CONFLUENCE_TOOLS: readonly ToolDefinition[] = [
@@ -33,7 +33,7 @@ export const CONFLUENCE_TOOLS: readonly ToolDefinition[] = [
 	{
 		name: "confluence_read_page",
 		description:
-			"Reads a Confluence page's text as Markdown, by the page id a search gave. A long page comes in parts; read on with `offset`.",
+			"Reads a Confluence page's or blog post's text as Markdown, by the id a search gave, with where it sits (the pages above it), who created and last changed it, and its labels. What Confluence fills in when the page is shown (Jira issue tables, included pages, diagrams, attached files, page lists) is marked ⟦like this⟧. A long page comes in parts; read on with `offset`.",
 		parameters: {
 			type: "object",
 			properties: {
@@ -48,13 +48,56 @@ export const CONFLUENCE_TOOLS: readonly ToolDefinition[] = [
 export const isConfluenceTool = (name: string): boolean =>
 	CONFLUENCE_TOOLS.some((tool) => tool.name === name);
 
+/** The most people a page's mentions are named by: each is a request. */
+const MAX_NAMED_PEOPLE = 40;
+
+/** A page's text for the model: its macros described, the people it mentions by name. */
+export async function readingMarkdown(client: ConfluenceClient, storage: string): Promise<string> {
+	const users = new Map<string, string>();
+	await Promise.all(
+		storageUsers(storage)
+			.slice(0, MAX_NAMED_PEOPLE)
+			.map(async (ref) => {
+				const found = await client.user(ref).catch(() => null);
+				const id = ref.accountId ?? ref.key ?? ref.username;
+				if (found !== null && found.name !== "" && id !== undefined) users.set(id, found.name);
+			}),
+	);
+	return storageToMarkdown(storage, { reading: { users } });
+}
+
+/** Where a page sits, who wrote it and its labels, a line each. */
+export function aboutText(info: ConfluencePageInfo | null, labels: readonly string[]): string {
+	const lines: string[] = [];
+	if (info !== null) {
+		if (info.type === "blogpost") lines.push("A blog post.");
+		if (info.ancestors.length > 0) {
+			lines.push(
+				`Under: ${info.ancestors.map((page) => `${page.title || "?"} (id ${page.id})`).join(" › ")}`,
+			);
+		}
+		const created = [info.createdBy, info.created?.slice(0, 10) ?? ""].filter(
+			(part) => part !== "",
+		);
+		if (created.length > 0) lines.push(`Created: ${created.join(", ")}`);
+		const changed = [
+			`version ${info.version}`,
+			info.modifiedBy,
+			info.modified?.slice(0, 10) ?? "",
+		].filter((part) => part !== "");
+		lines.push(`Last changed: ${changed.join(", ")} (confluence_page_history shows the changes)`);
+	}
+	if (labels.length > 0) lines.push(`Labels: ${labels.join(", ")}`);
+	return lines.join("\n");
+}
+
 /** The look-ups for one answer, on one site. */
 export class ConfluenceLookups {
 	readonly #client: ConfluenceClient;
 	/** Pages read for this answer, so reading one again costs nothing. */
 	readonly #pages = new Map<
 		string,
-		{ title: string; spaceKey: string; url: string; text: string }
+		{ title: string; spaceKey: string; url: string; text: string; about: string }
 	>();
 
 	constructor(client: ConfluenceClient) {
@@ -81,11 +124,22 @@ export class ConfluenceLookups {
 			let page = this.#pages.get(request.id);
 			if (page === undefined) {
 				const content = await this.#client.page(request.id);
+				const [text, info, labels] = await Promise.all([
+					readingMarkdown(this.#client, content.storage),
+					// What is around the page is a help: a page is read without it.
+					Promise.resolve()
+						.then(() => this.#client.pageInfo(request.id))
+						.catch(() => null),
+					Promise.resolve()
+						.then(() => this.#client.labels(request.id))
+						.catch(() => [] as string[]),
+				]);
 				page = {
 					title: content.page.title,
 					spaceKey: content.page.spaceKey,
 					url: content.page.webUrl,
-					text: storageToMarkdown(content.storage),
+					text,
+					about: aboutText(info, labels),
 				};
 				this.#pages.set(request.id, page);
 			}

@@ -39,7 +39,7 @@ export async function parentLine(
 	return format(ctx.t.approvalConfluenceParent, title === "" ? parent : `“${title}”`);
 }
 
-function pageIdOf(input: Record<string, unknown>, key = "page_id"): string | null {
+export function pageIdOf(input: Record<string, unknown>, key = "page_id"): string | null {
 	const given = text(input, key);
 	if (/^\d+$/.test(given)) return given;
 	const match = /[?&]pageId=(\d+)|\/pages\/(\d+)/.exec(given);
@@ -172,6 +172,11 @@ const TOOLS: readonly KalemTool[] = [
 				properties: {
 					cql: { type: "string", description: "The CQL query." },
 					limit: { type: "integer", description: "How many results, at most 50 (default 25)." },
+					next: {
+						type: "string",
+						description:
+							"The next page of results: the `next` the earlier results gave, with the same cql.",
+					},
 				},
 				required: ["cql"],
 			},
@@ -183,10 +188,16 @@ const TOOLS: readonly KalemTool[] = [
 			if (cql === "") return "Give a CQL query.";
 			ctx.readExternal = true;
 			const limit = typeof input.limit === "number" ? input.limit : 25;
-			const results = await clientOf(ctx).searchCql(cql, limit);
+			const given = text(input, "next");
+			const found = await clientOf(ctx).searchCqlPage(cql, limit, given === "" ? null : given);
+			const results = found.results;
 			ctx.step({ tool: "confluence_cql", detail: cql });
 			if (results.length === 0) return `CQL \`${cql}\`: nothing found.`;
-			return `CQL \`${cql}\`: ${results.length} results.\n${results
+			const more =
+				found.next === null
+					? ""
+					: `\n\nMore results follow: call confluence_cql again with the same cql and "next": "${found.next}".`;
+			return `CQL \`${cql}\`: ${results.length} results${given === "" ? "" : " (a further page)"}.\n${results
 				.map(
 					(result) =>
 						`- ${result.title} (${[
@@ -201,7 +212,7 @@ const TOOLS: readonly KalemTool[] = [
 								", ",
 							)}) ${result.url}${result.excerpt === "" ? "" : `\n  ${result.excerpt.slice(0, 300)}`}`,
 				)
-				.join("\n")}`;
+				.join("\n")}${more}`;
 		},
 	},
 	{

@@ -5,16 +5,13 @@
  * issues linked, an assignee changed. A write is shown to the user in full
  * and asked every time.
  */
-import mammoth from "mammoth";
 import { format } from "../shared/i18n.js";
 import { issueKey } from "../shared/jira.js";
 import {
 	attachmentEntriesOf,
-	attachmentKind,
 	attachmentListText,
 	attachmentTextPart,
 	findAttachment,
-	looksLikeText,
 	sizeText,
 } from "../shared/jira-attachment-text.js";
 import { attachmentsOf, jiraImageOf } from "../shared/jira-fields.js";
@@ -31,6 +28,7 @@ import {
 } from "../shared/jira-write.js";
 import type { KalemTool, ToolContext } from "./assistant-tools.js";
 import { registerTools } from "./assistant-tools.js";
+import { attachmentContent, downloadBytes, MAX_ATTACHMENT_BYTES } from "./attachment-reading.js";
 import type { JiraClient } from "./jira-client.js";
 import { JiraError } from "./jira-client.js";
 import { promptImageOf } from "./tool-images.js";
@@ -109,9 +107,6 @@ export function resolveFields(
 export const FIELDS_HELP =
 	'"fields": {"Field name or id": value}. A choice by its name; a user by user name (Server) or account id (Cloud); a list as an array; text in a description or multi-line field is Markdown; null empties a field. Jira\'s own shape ({"id":"10001"}) goes as it is.';
 
-/** The largest attachment the assistant downloads to read. */
-export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
-
 /** An attachment's bytes, or why they could not be had. */
 async function attachmentBytes(
 	jira: JiraClient,
@@ -119,16 +114,7 @@ async function attachmentBytes(
 	filename: string,
 	ask: () => Promise<Response> = () => jira.attachment(id, filename),
 ): Promise<Uint8Array | string> {
-	const response = await ask();
-	if (!response.ok) return `Jira answered HTTP ${response.status} for ${filename}.`;
-	const length = Number(response.headers.get("content-length") ?? "");
-	if (Number.isFinite(length) && length > MAX_ATTACHMENT_BYTES) {
-		return `${filename} is ${sizeText(length)}: too large to read here.`;
-	}
-	const bytes = new Uint8Array(await response.arrayBuffer());
-	return bytes.length > MAX_ATTACHMENT_BYTES
-		? `${filename} is ${sizeText(bytes.length)}: too large to read here.`
-		: bytes;
+	return downloadBytes(await ask(), filename, sizeText);
 }
 
 const TOOLS: readonly KalemTool[] = [
@@ -203,35 +189,19 @@ const TOOLS: readonly KalemTool[] = [
 			const entry = findAttachment(entries, named);
 			if (typeof entry === "string") return entry;
 			ctx.step({ tool: "jira_get_attachment", detail: `${key} ${entry.filename}` });
-			const kind = attachmentKind(entry.filename, entry.mimeType);
 			const about = `${entry.filename} (${[entry.mimeType, sizeText(entry.size)].filter((part) => part !== "").join(", ")})`;
 			if (entry.size !== null && entry.size > MAX_ATTACHMENT_BYTES) {
 				return `${about} is too large to read here.`;
 			}
 			const bytes = await attachmentBytes(jira, entry.id, entry.filename);
 			if (typeof bytes === "string") return bytes;
-			if (kind === "image") {
-				const image = promptImageOf(bytes, entry.filename);
-				if (typeof image === "string") return image;
-				return { text: `Attachment ${about} of ${key}:`, images: [image] };
-			}
-			let content: string;
-			if (kind === "word") {
-				try {
-					const result = await mammoth.extractRawText({
-						buffer: Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength),
-					});
-					content = result.value.replace(/\n{3,}/g, "\n\n").trim();
-				} catch {
-					return `${about} could not be read as a Word document (an old .doc, or damaged).`;
-				}
-			} else if (kind === "text" || looksLikeText(bytes)) {
-				content = new TextDecoder("utf-8").decode(bytes).replace(/^\uFEFF/, "");
-			} else {
-				return `${about} is a binary file (PDF, spreadsheet, archive…): its content cannot be read as text here.`;
+			const content = await attachmentContent(bytes, entry.filename, entry.mimeType, about);
+			if (content.kind === "none") return content.why;
+			if (content.kind === "image") {
+				return { text: `Attachment ${about} of ${key}:`, images: [content.image] };
 			}
 			const from = typeof input.from === "number" && Number.isFinite(input.from) ? input.from : 0;
-			return attachmentTextPart(key, entry, content, from);
+			return attachmentTextPart(key, entry, content.text, from);
 		},
 	},
 	{

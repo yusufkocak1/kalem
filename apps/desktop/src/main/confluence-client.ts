@@ -141,6 +141,32 @@ const asJson = (value: unknown): Json =>
 const asString = (value: unknown): string => (typeof value === "string" ? value : "");
 const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
+/** Where a page sits and who wrote it. */
+export interface ConfluencePageInfo {
+	/** "page" or "blogpost". */
+	readonly type: string;
+	/** The pages above it, top first. */
+	readonly ancestors: readonly { readonly id: string; readonly title: string }[];
+	readonly version: number;
+	/** ISO, or `null` */
+	readonly modified: string | null;
+	readonly modifiedBy: string;
+	readonly created: string | null;
+	readonly createdBy: string;
+}
+
+/** One version of a page. */
+export interface ConfluenceVersion {
+	readonly number: number;
+	/** ISO, or `null` */
+	readonly when: string | null;
+	/** Who saved it, by name (an account id where the name cannot be read). */
+	readonly by: string;
+	/** The note given with the change. */
+	readonly message: string;
+	readonly minor: boolean;
+}
+
 /** One result of a CQL search. */
 export interface ConfluenceCqlResult {
 	readonly id: string;
@@ -652,10 +678,159 @@ export class ConfluenceClient {
 		});
 	}
 
+	/** Whether a Cloud id is a page or a blog post, as v2 names them; learned on the first 404. */
+	readonly #v2Kinds = new Map<string, "pages" | "blogposts">();
+
+	/** A v2 request about a page or a blog post (Cloud): `/api/v2/{pages|blogposts}/{id}{rest}`. */
+	async #v2(id: string, rest: string): Promise<Json> {
+		const known = this.#v2Kinds.get(id);
+		if (known !== undefined) return this.#json(`/api/v2/${known}/${id}${rest}`);
+		try {
+			const body = await this.#json(`/api/v2/pages/${id}${rest}`);
+			this.#v2Kinds.set(id, "pages");
+			return body;
+		} catch (error) {
+			if (!(error instanceof ConfluenceError) || error.status !== 404) throw error;
+			const body = await this.#json(`/api/v2/blogposts/${id}${rest}`);
+			this.#v2Kinds.set(id, "blogposts");
+			return body;
+		}
+	}
+
+	/** Where a page sits and who wrote it: its ancestors, version, last change and creation. */
+	async pageInfo(id: string): Promise<ConfluencePageInfo> {
+		if (!/^\d+$/.test(id)) throw new Error("Invalid page id");
+		if (!this.cloud) {
+			const body = await this.#json(`/rest/api/content/${id}?expand=ancestors,version,history`);
+			const version = asJson(body.version);
+			const history = asJson(body.history);
+			return {
+				type: asString(body.type) || "page",
+				ancestors: asArray(body.ancestors).flatMap((item) => {
+					const ancestor = asJson(item);
+					const ancestorId = asString(ancestor.id);
+					return ancestorId === "" ? [] : [{ id: ancestorId, title: asString(ancestor.title) }];
+				}),
+				version: Number(version.number) || 1,
+				modified: asString(version.when) || null,
+				modifiedBy: asString(asJson(version.by).displayName),
+				created: asString(history.createdDate) || null,
+				createdBy: asString(asJson(history.createdBy).displayName),
+			};
+		}
+		const body = await this.#v2(id, "");
+		const type = this.#v2Kinds.get(id) === "blogposts" ? "blogpost" : "page";
+		const version = asJson(body.version);
+		let ancestors: { id: string; title: string }[] = [];
+		if (type === "page") {
+			const found = await this.#json(`/api/v2/pages/${id}/ancestors?limit=250`).catch(() => ({}));
+			const ids = asArray(asJson(found).results)
+				.map((item) => asString(asJson(item).id))
+				.filter((ancestor) => /^\d+$/.test(ancestor));
+			if (ids.length > 0) {
+				const titled = await this.#json(
+					`/api/v2/pages?${ids.map((one) => `id=${one}`).join("&")}&limit=250`,
+				).catch(() => ({}));
+				const titles = new Map(
+					asArray(asJson(titled).results).map((item) => [
+						asString(asJson(item).id),
+						asString(asJson(item).title),
+					]),
+				);
+				ancestors = ids.map((ancestor) => ({ id: ancestor, title: titles.get(ancestor) ?? "" }));
+			}
+		}
+		const nameOf = async (accountId: string): Promise<string> =>
+			accountId === "" ? "" : ((await this.user({ accountId }).catch(() => null))?.name ?? "");
+		const [modifiedBy, createdBy] = await Promise.all([
+			nameOf(asString(version.authorId)),
+			nameOf(asString(body.authorId)),
+		]);
+		return {
+			type,
+			ancestors,
+			version: Number(version.number) || 1,
+			modified: asString(version.createdAt) || null,
+			modifiedBy,
+			created: asString(body.createdAt) || null,
+			createdBy,
+		};
+	}
+
+	/** A page's versions, the newest first: number, when, who, the note given. */
+	async versions(id: string, limit = 50): Promise<ConfluenceVersion[]> {
+		if (!/^\d+$/.test(id)) throw new Error("Invalid page id");
+		const wanted = Math.min(Math.max(1, Math.floor(limit)), 200);
+		if (this.cloud) {
+			const versions: ConfluenceVersion[] = [];
+			let next: string | null = null;
+			let body = await this.#v2(id, `/versions?limit=${Math.min(wanted, 50)}`);
+			for (let round = 0; round < 10; round++) {
+				for (const item of asArray(body.results)) {
+					const version = asJson(item);
+					versions.push({
+						number: Number(version.number) || 0,
+						when: asString(version.createdAt) || null,
+						by: asString(version.authorId),
+						message: asString(version.message),
+						minor: version.minorEdit === true,
+					});
+				}
+				const link = asString(asJson(body._links).next);
+				next = link === "" ? null : this.#relative(link);
+				if (next === null || versions.length >= wanted) break;
+				body = await this.#json(next);
+			}
+			// v2 names authors by account id: their names are asked once each.
+			const names = new Map<string, string>();
+			for (const accountId of new Set(versions.map((version) => version.by))) {
+				if (accountId === "") continue;
+				names.set(accountId, (await this.user({ accountId }).catch(() => null))?.name ?? accountId);
+			}
+			return versions
+				.map((version) => ({ ...version, by: names.get(version.by) ?? version.by }))
+				.sort((a, b) => b.number - a.number)
+				.slice(0, wanted);
+		}
+		let body: Json;
+		try {
+			body = await this.#json(`/rest/experimental/content/${id}/version?limit=${wanted}`);
+		} catch (error) {
+			if (!(error instanceof ConfluenceError) || error.status !== 404) throw error;
+			body = await this.#json(`/rest/api/content/${id}/version?limit=${wanted}`);
+		}
+		return asArray(body.results)
+			.map((item) => {
+				const version = asJson(item);
+				return {
+					number: Number(version.number) || 0,
+					when: asString(version.when) || null,
+					by: asString(asJson(version.by).displayName),
+					message: asString(version.message),
+					minor: version.minorEdit === true,
+				};
+			})
+			.sort((a, b) => b.number - a.number);
+	}
+
+	/** An earlier version of a page, in storage format. */
+	async pageVersion(id: string, version: number): Promise<string> {
+		if (!/^\d+$/.test(id)) throw new Error("Invalid page id");
+		if (!Number.isInteger(version) || version < 1) throw new Error("Invalid version");
+		if (this.cloud) {
+			const body = await this.#v2(id, `?version=${version}&body-format=storage`);
+			return asString(asJson(asJson(body.body).storage).value);
+		}
+		const body = await this.#json(
+			`/rest/api/content/${id}?status=historical&version=${version}&expand=body.storage`,
+		);
+		return asString(asJson(asJson(body.body).storage).value);
+	}
+
 	async page(id: string): Promise<ConfluencePageContent> {
 		if (!/^\d+$/.test(id)) throw new Error("Invalid page id");
 		if (this.cloud) {
-			const body = await this.#json(`/api/v2/pages/${id}?body-format=storage`);
+			const body = await this.#v2(id, "?body-format=storage");
 			const spaceId = asString(body.spaceId);
 			const space = spaceId === "" ? {} : await this.#json(`/api/v2/spaces/${spaceId}`);
 			return {
@@ -804,8 +979,31 @@ export class ConfluenceClient {
 
 	/** A CQL search as it is written: pages, blog posts, comments, attachments. */
 	async searchCql(cql: string, limit = 25): Promise<ConfluenceCqlResult[]> {
+		return (await this.searchCqlPage(cql, limit, null)).results;
+	}
+
+	/**
+	 * A page of a CQL search; `next` (as an earlier page gave it) goes on
+	 * where that one ended, and is `null` on the last page.
+	 */
+	async searchCqlPage(
+		cql: string,
+		limit: number,
+		next: string | null,
+	): Promise<{ results: ConfluenceCqlResult[]; next: string | null }> {
 		const query = new URLSearchParams({ cql, limit: String(Math.min(Math.max(limit, 1), 50)) });
-		const body = await this.#json(`/rest/api/search?${query.toString()}`);
+		let path = `/rest/api/search?${query.toString()}`;
+		if (next !== null) {
+			const relative = this.#relative(next);
+			if (!/^\/rest\/api\/search\?/.test(relative)) throw new Error("Invalid search cursor");
+			path = relative;
+		}
+		const body = await this.#json(path);
+		const link = asString(asJson(body._links).next);
+		return { results: this.#cqlResults(body), next: link === "" ? null : link };
+	}
+
+	#cqlResults(body: Json): ConfluenceCqlResult[] {
 		return asArray(body.results).flatMap((item): ConfluenceCqlResult[] => {
 			const result = asJson(item);
 			const content = asJson(result.content);
@@ -909,7 +1107,11 @@ export class ConfluenceClient {
 			? `/api/v2/pages/${pageId}/attachments?limit=250`
 			: `/rest/api/content/${pageId}/child/attachment?limit=200&expand=version`;
 		for (let round = 0; next !== null && round < 10; round++) {
-			const body: Json = await this.#json(next);
+			// A blog post's attachments are asked of blogposts (Cloud).
+			const body: Json =
+				this.cloud && round === 0
+					? await this.#v2(pageId, "/attachments?limit=250")
+					: await this.#json(next);
 			for (const item of asArray(body.results)) {
 				const file = asJson(item);
 				const id = asString(file.id);
@@ -967,7 +1169,7 @@ export class ConfluenceClient {
 		const query = `filename=${encodeURIComponent(name)}`;
 		let download = "";
 		if (this.cloud) {
-			const body = await this.#json(`/api/v2/pages/${pageId}/attachments?${query}`);
+			const body = await this.#v2(pageId, `/attachments?${query}`);
 			download = asString(asJson(asArray(body.results)[0]).downloadLink);
 		} else {
 			const body = await this.#json(`/rest/api/content/${pageId}/child/attachment?${query}`);
