@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import { CONFLUENCE_TOKEN, fakeJira, fakeJiraConfluence, JIRA_TOKEN } from "./fake-jira.js";
-import { clickMenu, launch, showPane } from "./launch.js";
+import { clickMenu, closeSettings, launch, showPane } from "./launch.js";
 
 const cleanup: (() => Promise<void>)[] = [];
 
@@ -503,7 +503,7 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await settings.locator('[data-category="panels"]').click();
 	await settings.locator('select[data-pane="jira"]').selectOption("right");
 	await settings.locator('select[data-pane="outline"]').selectOption("bottom");
-	await settings.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 	await expect(page.locator(".dock-right .jira-pane")).toBeVisible();
 	await expect(page.locator(".dock-bottom .navigation-content")).toBeVisible();
 	await expect(page.locator('.stripe-right .stripe-button[data-pane="jira"]')).toHaveAttribute(

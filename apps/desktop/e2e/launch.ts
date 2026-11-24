@@ -154,3 +154,10 @@ export async function showPane(page: Page, pane: string): Promise<void> {
 	if ((await tab.getAttribute("aria-pressed")) !== "true") await tab.click();
 	await expect(tab).toHaveAttribute("aria-pressed", "true");
 }
+
+/** Settings is a tab beside the documents: closing its tab is what Done was. */
+export async function closeSettings(page: Page): Promise<void> {
+	const tab = page.locator('.doc-tab[data-page="settings"]');
+	await tab.locator(".doc-tab-close").click();
+	await expect(tab).toHaveCount(0);
+}

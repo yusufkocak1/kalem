@@ -8668,6 +8668,139 @@ pre[data-confluence-kind="layout"]::before {
 
 /* --- Settings ------------------------------------------------------------------ */
 
+/* Settings as a tab: its page takes the documents' place, the panes stay. */
+.desk-area[data-settings] > :not(.settings-host) {
+	display: none !important;
+}
+
+.settings-host {
+	display: flex;
+	flex: 1;
+	justify-content: center;
+	min-width: 0;
+	min-height: 0;
+	padding: 12px 12px 0;
+	overflow: hidden;
+	/* The page follows the room the tab has, not the window's: the panes beside take theirs. */
+	container-type: inline-size;
+}
+
+.settings-host[hidden] {
+	display: none;
+}
+
+/* The same page as the window, filling the tab; its text in a column as wide as reads well. */
+.settings-dialog[data-docked] {
+	position: static;
+	min-width: 0;
+	width: 100%;
+	max-width: 1180px;
+	height: 100%;
+	margin: 0;
+	padding: 20px 24px 12px;
+	border: 1px solid var(--app-border);
+	border-bottom: 0;
+	border-radius: 12px 12px 0 0;
+	box-shadow: none;
+}
+
+.settings-dialog[data-docked] .settings-layout {
+	grid-template-columns: 200px minmax(0, 1fr);
+	gap: 24px;
+}
+
+.settings-dialog[data-docked] .settings-head {
+	flex-wrap: wrap;
+	row-gap: 8px;
+}
+
+.settings-dialog[data-docked] .settings-search {
+	min-width: 0;
+}
+
+/* A narrow tab: the pages in a row above, as in a narrow window. */
+@container (max-width: 720px) {
+	.settings-dialog[data-docked] .settings-layout {
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-rows: auto minmax(0, 1fr);
+		gap: 12px;
+	}
+
+	.settings-dialog[data-docked] .settings-nav {
+		flex-direction: row;
+		flex-wrap: wrap;
+		gap: 2px 8px;
+		padding: 0 0 8px;
+		border-inline-end: 0;
+		border-bottom: 1px solid var(--app-border);
+	}
+
+	.settings-dialog[data-docked] .settings-nav-group {
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: center;
+	}
+
+	.settings-dialog[data-docked] .settings-nav-group:not(:has(.settings-nav-heading)) {
+		padding-top: 0;
+		border-top: 0;
+	}
+
+	.settings-dialog[data-docked] .settings-nav-item {
+		padding: 4px 8px;
+		font-size: 13px;
+	}
+
+	/* The groups' names would take a row each: the pages alone, in one wrapping row. */
+	.settings-dialog[data-docked] .settings-nav-heading {
+		display: none;
+	}
+
+	.settings-dialog[data-docked] .settings-search {
+		flex-basis: 100%;
+		max-width: none;
+		order: 1;
+	}
+}
+
+/* Very narrow (the panes beside take the room): a label above its control, not beside it. */
+@container (max-width: 440px) {
+	.settings-dialog[data-docked] .settings-grid,
+	.settings-dialog[data-docked] .settings-connection {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 4px 16px;
+	}
+
+	.settings-dialog[data-docked] .settings-grid select,
+	.settings-dialog[data-docked] .settings-grid input[type="number"] {
+		justify-self: start;
+		max-width: 100%;
+	}
+
+	.settings-dialog[data-docked] .settings-section-head {
+		flex-wrap: wrap;
+	}
+}
+
+@container (max-width: 520px) {
+	.settings-dialog[data-docked] {
+		padding: 14px 12px 10px;
+	}
+}
+
+/* In a tab there is nothing to be done with: the tab closes it. */
+.settings-dialog[data-docked] .settings-actions .confluence-primary {
+	display: none;
+}
+
+.settings-dialog[data-docked] .settings-actions {
+	justify-content: flex-start;
+}
+
+.doc-tab-page .doc-tab-icon {
+	color: var(--app-accent);
+}
+
 .settings-dialog {
 	width: min(960px, calc(100vw - 32px));
 	height: min(680px, 86vh);
@@ -8893,6 +9026,7 @@ pre[data-confluence-kind="layout"]::before {
 
 .settings-body {
 	display: grid;
+	grid-template-columns: minmax(0, 1fr);
 	gap: 22px;
 }
 
@@ -8916,6 +9050,8 @@ pre[data-confluence-kind="layout"]::before {
 
 .settings-items {
 	display: grid;
+	/* As narrow as the room: a long part wraps or scrolls inside itself, not the page sideways. */
+	grid-template-columns: minmax(0, 1fr);
 	gap: 12px;
 }
 
@@ -11903,6 +12039,7 @@ textarea.jira-worklog-input {
 
 .mode-editor {
 	display: grid;
+	grid-template-columns: minmax(0, 1fr);
 	gap: 14px;
 }
 
@@ -12010,6 +12147,7 @@ textarea.jira-worklog-input {
 
 .mode-panel {
 	display: grid;
+	grid-template-columns: minmax(0, 1fr);
 	gap: 16px;
 	padding: 16px;
 	border: 1px solid var(--app-border);
@@ -12019,6 +12157,7 @@ textarea.jira-worklog-input {
 
 .mode-panel-head {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: flex-start;
 	gap: 12px;
 }
@@ -12064,6 +12203,7 @@ h3.mode-panel-name {
 
 .mode-section {
 	display: grid;
+	grid-template-columns: minmax(0, 1fr);
 	gap: 8px;
 }
 
@@ -12084,6 +12224,7 @@ h3.mode-panel-name {
 
 .mode-steps {
 	display: grid;
+	grid-template-columns: minmax(0, 1fr);
 	gap: 6px;
 	margin: 0;
 	padding: 0;
@@ -12092,6 +12233,7 @@ h3.mode-panel-name {
 
 .mode-step {
 	display: grid;
+	grid-template-columns: minmax(0, 1fr);
 	gap: 8px;
 	padding: 6px 8px;
 	border: 1px solid var(--app-border);
@@ -12102,6 +12244,8 @@ h3.mode-panel-name {
 
 .mode-step-head {
 	display: flex;
+	/* Very narrow (a narrow Settings tab), its buttons go under it rather than out of it. */
+	flex-wrap: wrap;
 	align-items: center;
 	gap: 8px;
 }
@@ -12282,7 +12426,7 @@ h3.mode-panel-name {
 
 .mode-options {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
 	gap: 12px;
 }
 
@@ -12833,7 +12977,7 @@ h3.mode-panel-name {
 
 .mcp-preset-list {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
 	gap: 8px;
 }
 
@@ -13854,7 +13998,7 @@ dialog {
 
 .palette-own {
 	display: grid;
-	grid-template-columns: max-content 64px 64px;
+	grid-template-columns: minmax(0, max-content) minmax(40px, 64px) minmax(40px, 64px);
 	align-items: center;
 	gap: 6px 14px;
 	margin-bottom: 12px;
@@ -13872,7 +14016,8 @@ dialog {
 }
 
 .palette-color {
-	width: 64px;
+	width: 100%;
+	max-width: 64px;
 	height: 28px;
 	padding: 2px;
 	border: 1px solid var(--app-border);
@@ -15464,6 +15609,17 @@ dialog {
 	grid-column: 2;
 }
 
+/* Too narrow for a label beside its control (a narrow Settings tab): the label above it. */
+@container (max-width: 360px) {
+	.typography-row {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.typography-row > :nth-child(n + 3) {
+		grid-column: 1;
+	}
+}
+
 .typography-label {
 	font-size: 13px;
 }
@@ -15501,6 +15657,7 @@ dialog {
 
 .typography-select {
 	flex: 1;
+	min-width: 0;
 	padding: 4px 6px;
 	border: 1px solid var(--app-border);
 	border-radius: 5px;

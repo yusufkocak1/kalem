@@ -35,6 +35,7 @@ import {
 	TEXT_EXTENSIONS,
 } from "../shared/paths.js";
 import { rolePreset } from "../shared/roles.js";
+import type { SettingPage } from "../shared/settings-pages.js";
 import { withColumnWidth } from "../shared/table-style.js";
 import { changeCase, collapseSpaces, nextCase } from "../shared/text-case.js";
 import { typographyVars } from "../shared/typography.js";
@@ -583,7 +584,7 @@ const assistant = createAssistantPane({
 	errorText: ipcErrorMessage,
 	modes: () => settings.assistantModes,
 	customModes: () => settings.assistantCustomModes,
-	openModeSettings: () => void settingsDialog.show("modes"),
+	openModeSettings: () => openSettings("modes"),
 	approvalMode: () => settings.assistantApprovals,
 	setApprovalMode: (mode) => updateSettings({ assistantApprovals: mode }),
 });
@@ -674,7 +675,7 @@ const docks = createDocks({
 	settings: () => settings,
 	update: (patch) => updateSettings(patch),
 	available: paneAvailable,
-	openLayout: () => void settingsDialog.show("panels"),
+	openLayout: () => openSettings("panels"),
 	reveal: (pane) => {
 		if (pane !== "outline" || app.dataset.fold === undefined) return false;
 		outlineWanted = session;
@@ -697,7 +698,58 @@ function placeAssistant(): void {
 	assistant.element.dataset.place = place;
 }
 assistantRail.prepend(docks.stripes.right);
+
+/**
+ * Settings is a tab beside the documents: its page takes the documents'
+ * place while it is chosen, and the panes stay where they are. A document's
+ * tab brings that document back; Settings' own tab, or the menu, Settings.
+ */
+const settingsHost = el("div", { class: "settings-host", attrs: { hidden: "" } });
+deskArea.append(settingsHost);
+/** Whether Settings' tab is open, and whether it is the one shown. */
+let settingsOpen = false;
+let settingsShown = false;
+
+function showSettingsTab(): void {
+	if (!settingsOpen) {
+		settingsOpen = true;
+		tabStrip.page({
+			id: "settings",
+			title: t.settingsTitle,
+			icon: "settings",
+			onSelect: showSettingsTab,
+			onClose: () => settingsDialog.close(),
+		});
+	}
+	settingsShown = true;
+	deskArea.toggleAttribute("data-settings", true);
+	settingsHost.hidden = false;
+	tabStrip.select("settings");
+}
+
+/** The active document comes back in Settings' place; its tab stays open. */
+function leaveSettingsTab(): void {
+	if (!settingsShown) return;
+	settingsShown = false;
+	deskArea.removeAttribute("data-settings");
+	settingsHost.hidden = true;
+	tabStrip.select(session.id);
+}
+
+function openSettings(page?: SettingPage): void {
+	showSettingsTab();
+	void settingsDialog.show(page);
+}
+
 const settingsDialog = createSettingsDialog({
+	host: settingsHost,
+	closed: () => {
+		if (!settingsOpen) return;
+		leaveSettingsTab();
+		settingsOpen = false;
+		tabStrip.page(null);
+		session.focus();
+	},
 	t,
 	bridge,
 	settings: () => settings,
@@ -1683,7 +1735,10 @@ function keepReadingPlace(desk: HTMLElement, page: HTMLElement, canvas: HTMLElem
 
 function activateTab(id: string): void {
 	const tab = tabs.get(id);
-	if (tab === undefined || tab.session === session) return;
+	if (tab === undefined) return;
+	// A document's tab chosen over Settings' brings the documents back.
+	leaveSettingsTab();
+	if (tab.session === session) return;
 
 	for (const other of tabs.values()) {
 		if (other === tab) continue;
@@ -2244,8 +2299,8 @@ const commands: Record<Command, () => void> = {
 		refreshShown(before);
 	},
 	"jira-open": () => void jiraDialog.showSearch(),
-	settings: () => void settingsDialog.show(),
-	typography: () => void settingsDialog.show("typography"),
+	settings: () => openSettings(),
+	typography: () => openSettings("typography"),
 	"network-log": () => {
 		if (debugMode) networkPanel.toggle();
 	},

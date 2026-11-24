@@ -2,7 +2,7 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
-import { clickMenu, launch, tempDir } from "./launch.js";
+import { clickMenu, closeSettings, launch, tempDir } from "./launch.js";
 
 const paragraph = (page: Page) => page.locator("#editor > p").first();
 const lineHeight = (page: Page): Promise<number> =>
@@ -43,7 +43,7 @@ test("Text & Paragraph in Settings sets the spacing as it is changed", async () 
 		// The section's reset puts every value back.
 		await section.getByRole("button", { name: "Reset to Defaults" }).click();
 		await expect.poll(async () => (await lineHeight(page)) / size).toBeCloseTo(1.65, 1);
-		await page.locator(".settings-dialog").getByRole("button", { name: "Done" }).click();
+		await closeSettings(page);
 
 		// File is tidied: the Atlassian items are under one submenu.
 		const top = await app.evaluate(({ Menu }) =>

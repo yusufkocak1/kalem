@@ -4,7 +4,7 @@ import type { ElectronApplication, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 import type { Call } from "./fake-claude.js";
 import { fakeClaude } from "./fake-claude.js";
-import { clickMenu, launch, tempDir } from "./launch.js";
+import { clickMenu, closeSettings, launch, tempDir } from "./launch.js";
 import { shot } from "./shots.js";
 
 /** The settings the app keeps, as written: the parts these tests read. */
@@ -136,7 +136,7 @@ test("servers kept in modes by an earlier version move to the assistant, and eac
 		.locator(".custom-mode .mode-mcp")
 		.evaluate((section) => section.scrollIntoView({ block: "center" }));
 	await shot(page, "03-custom-mode-choice");
-	await settings.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 
 	// Kept in the new shape: servers in the assistant, names in the modes.
 	await expect
@@ -222,7 +222,7 @@ test("Serena turned off in a mode stays off after a restart, and the CLI is not 
 	let settings = await openSettings(first.app, first.page, "modes");
 	await settings.locator('.mode-tab[data-mode="code"]').click();
 	await settings.getByRole("switch", { name: "serena" }).uncheck();
-	await settings.getByRole("button", { name: "Done" }).click();
+	await closeSettings(first.page);
 	await expect.poll(async () => (await stored(userData)).assistantModes?.code).toEqual({ mcp: [] });
 	await first.app.close();
 
@@ -237,7 +237,7 @@ test("Serena turned off in a mode stays off after a restart, and the CLI is not 
 	await expect(settings.getByRole("switch", { name: "serena" })).not.toBeChecked();
 	await settings.locator('.mode-tab[data-mode="review"]').click();
 	await expect(settings.getByRole("switch", { name: "serena" })).toBeChecked();
-	await settings.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 
 	await ask(page, "code", "Giriş ekranına hata mesajı ekle", "Tamam.");
 	await ask(page, "prompt", "Bunun için bir prompt hazırla", "Tamam.");
@@ -434,7 +434,7 @@ test("a server kept running between questions still holds what it held at the ne
 	await expect
 		.poll(async () => (await stored(userData)).assistantMcpServers)
 		.toEqual([expect.objectContaining({ name: "sayac", keepAlive: false })]);
-	await settings.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 	await ask(page, "ask", "Üç", "Tamam.");
 	const third = await opened(3);
 	expect(third).toMatch(/^open:1:\d+$/);

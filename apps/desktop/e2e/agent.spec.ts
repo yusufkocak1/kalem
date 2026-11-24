@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { expect, test } from "@playwright/test";
 import type { Call } from "./fake-claude.js";
 import { fakeClaude } from "./fake-claude.js";
-import { clickMenu, launch, stubMessageBox, tempDir } from "./launch.js";
+import { clickMenu, closeSettings, launch, stubMessageBox, tempDir } from "./launch.js";
 import { shot } from "./shots.js";
 
 /**
@@ -915,7 +915,7 @@ test("modes: shaped in Settings (a step off, one of the user's own), and picked 
 	);
 	await expect(settings.locator(".mode-preview-text")).not.toContainText("analysis_lint");
 	await expect(settings.locator('.mode-tab[data-mode="review"]')).toContainText("9 steps");
-	await settings.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 	await expect
 		.poll(async () => {
 			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
@@ -953,7 +953,7 @@ test("modes: shaped in Settings (a step off, one of the user's own), and picked 
 	await pane.getByRole("menuitem", { name: "Customize modes…" }).click();
 	await settings.locator('.mode-tab[data-mode="review"]').click();
 	await settings.getByLabel(/Run steps in parallel/).uncheck();
-	await settings.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 	await pane.getByRole("button", { name: "New chat" }).first().click();
 	await pane.locator(".assistant-input").fill("Bu analizi geliştirme öncesi incele");
 	await pane.locator(".assistant-input").press("Enter");
@@ -1011,7 +1011,7 @@ test("modes: shaped in Settings (a step off, one of the user's own), and picked 
 	await tools.click();
 	await expect(settings.locator(".tool-settings-filter")).toBeVisible();
 	await page.screenshot({ path: process.env.KALEM_SHOT ?? join(folder, "settings.png") });
-	await settings.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 	expect(errors).toEqual([]);
 	await app.close();
 });
@@ -1075,7 +1075,7 @@ test("a mode of the user's own: its instructions, its tools and the MCP server i
 	// The assistant's server, used in this mode.
 	await editor.getByRole("switch", { name: "dosyalar" }).check();
 	await expect(settings.locator(".mode-tab-custom")).toContainText("Test Analisti");
-	await settings.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 	await expect
 		.poll(async () => {
 			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
@@ -1198,7 +1198,7 @@ test("one of Kalem's modes uses the assistant's MCP servers too, and the model i
 	);
 	await settings.locator(".mode-preview").scrollIntoViewIfNeeded();
 	await shot(page, "09-code-mode-preview");
-	await settings.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 	await expect
 		.poll(async () => {
 			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
@@ -1216,7 +1216,7 @@ test("one of Kalem's modes uses the assistant's MCP servers too, and the model i
 	await expect(settings.locator('.mcp-card[data-server="i18n-db"] .mcp-used-in')).toHaveText(
 		"Used in: Code",
 	);
-	await settings.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 
 	await pane.locator(".assistant-mode").click();
 	await pane.locator('.assistant-mode-item[data-mode="code"]').click();
@@ -1343,7 +1343,7 @@ test("templates: the team's and the user's own, a default, and new documents fro
 
 	// The team's is the default from now on.
 	await block.locator(".settings-template").first().locator('input[type="radio"]').check();
-	await dialog.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 
 	await clickMenu(app, "File", "New from Document Template…");
 	const picker = page.locator(".template-picker");
@@ -1561,7 +1561,7 @@ test("the assistant's panel moves left or under the document, and '@' adds a sec
 	const paneBox = await pane.boundingBox();
 	const deskBox = await page.locator(".desk-column").boundingBox();
 	expect((paneBox?.x ?? 0) + (paneBox?.width ?? 0)).toBeLessThanOrEqual((deskBox?.x ?? 0) + 1);
-	await dialog.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 
 	// "@" lists the document's sections; the picked one goes with the question, the document is not shared.
 	const input = pane.locator(".assistant-input");
@@ -1635,7 +1635,7 @@ test("an MCP server of the assistant's lists its tools, and each is turned on or
 	await expect(card.getByRole("switch", { name: "add_i18n_key" })).toBeChecked();
 	await expect(card.locator(".mcp-tools-status")).toContainText("At least one tool stays on");
 
-	await settings.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 	await expect
 		.poll(async () => {
 			const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));

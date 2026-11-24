@@ -10,6 +10,7 @@ import { DEFAULT_SETTINGS } from "../src/shared/bridge.js";
 import type { Launched } from "./launch.js";
 import {
 	clickMenu,
+	closeSettings,
 	lastSaveDialog,
 	launch,
 	showPane,
@@ -834,7 +835,7 @@ test("keeps every setting in File → Settings, by category and by search", asyn
 	await dialog.locator('[data-section="page"] .settings-reset').click();
 	await expect(dialog.locator('select[data-setting="pageSize"]')).toHaveValue("0");
 
-	await dialog.getByRole("button", { name: "Done" }).click();
+	await closeSettings(page);
 	await app.close();
 	const stored = JSON.parse(await readFile(join(userData, "settings.json"), "utf8"));
 	expect(stored.settings).toMatchObject({ theme: "dark", spellCheck: false, pageSize: "A4" });

@@ -72,6 +72,13 @@ export interface SettingsDialogOptions {
 	readonly version: string;
 	/** The version was clicked seven times in a row: the hidden debug mode. */
 	unlockDebug(): void;
+	/**
+	 * Where Settings is shown as a page of its own (a tab beside the
+	 * documents) instead of a window over them; none for the window.
+	 */
+	readonly host?: HTMLElement;
+	/** Settings was closed: by itself (a template opened, a login asked for) or by `close`. */
+	closed?(): void;
 }
 
 export interface SettingsDialog {
@@ -79,6 +86,8 @@ export interface SettingsDialog {
 	show(page?: SettingPage): Promise<void>;
 	/** Re-reads the connections and the values while it is open. */
 	refresh(): Promise<void>;
+	/** Closes it, as its own Done does. */
+	close(): void;
 }
 
 let fieldCount = 0;
@@ -158,14 +167,24 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 			el("div", { class: "confluence-actions settings-actions", children: [version, done] }),
 		],
 	});
-	document.body.append(dialog);
+	const docked = options.host !== undefined;
+	dialog.toggleAttribute("data-docked", docked);
+	(options.host ?? document.body).append(dialog);
+	dialog.addEventListener("close", () => options.closed?.());
 	// Long parts fold under their headings; a search shows them whole.
 	installFolds(body);
 	// Long notes are a line until opened.
 	installHints(body, t);
 	done.addEventListener("click", () => dialog.close());
+	// Escape closes a window by itself; a tab of its own closes the same way.
+	dialog.addEventListener("keydown", (event) => {
+		if (!docked || event.key !== "Escape" || event.defaultPrevented) return;
+		event.preventDefault();
+		dialog.close();
+	});
+	// Outside the window closes it; a page of its own has no outside.
 	dialog.addEventListener("click", (event) => {
-		if (event.target === dialog) dialog.close();
+		if (!docked && event.target === dialog) dialog.close();
 	});
 
 	// --- Categories ------------------------------------------------------------
@@ -1142,7 +1161,8 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 			}
 			await refresh();
 			if (!dialog.open) {
-				dialog.showModal();
+				if (docked) dialog.show();
+				else dialog.showModal();
 				void assistantForm.show().then(() => {
 					// The form takes the focus to its first field: the search keeps it.
 					search.focus();
@@ -1151,6 +1171,9 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		},
 		async refresh() {
 			if (dialog.open) await refresh();
+		},
+		close() {
+			if (dialog.open) dialog.close();
 		},
 	};
 }
