@@ -10,14 +10,27 @@ import {
 	SETTING_PAGES,
 	sameValue,
 } from "./settings-pages.js";
-import { resettable, SETTING_CATEGORIES, SETTING_DEFS } from "./settings-schema.js";
+import { resettable, SETTING_CATEGORIES, SETTING_DEFS, settingDef } from "./settings-schema.js";
 
 describe("settings pages", () => {
-	it("lists every category of the schema once, and the assistant's own pages", () => {
-		for (const category of SETTING_CATEGORIES) expect(SETTING_PAGES).toContain(category);
-		expect(SETTING_PAGES).toContain("mcp");
-		expect(SETTING_PAGES).toContain("assistantTools");
+	it("lists each page once, and every page shows something", () => {
 		expect(new Set(SETTING_PAGES).size).toBe(SETTING_PAGES.length);
+		const shown = new Set(SETTING_DEFS.map((def) => pageOf(def.key)));
+		for (const page of SETTING_PAGES) expect(shown.has(page)).toBe(true);
+	});
+
+	it("puts a setting where a person looks for it, not only by its category", () => {
+		expect(pageOf("language")).toBe("general");
+		expect(pageOf("restoreSession")).toBe("general");
+		expect(pageOf("theme")).toBe("appearance");
+		expect(pageOf("ribbonSimple")).toBe("window");
+		expect(pageOf("zoom")).toBe("documentView");
+		expect(pageOf("autoSave")).toBe("editor");
+		expect(pageOf("defaultTemplate")).toBe("page");
+		expect(pageOf("confluenceReviewBeforeSave")).toBe("connections");
+		expect(pageOf("gitAutoFetch")).toBe("git");
+		// The assistant's permissions still name the category: what was always allowed is kept.
+		expect(settingDef("language").category).toBe("appearance");
 	});
 
 	it("puts every setting on a page that is listed", () => {
@@ -47,10 +60,11 @@ describe("settings pages", () => {
 		expect(patch.copilotTools).toEqual(DEFAULT_SETTINGS.copilotTools);
 	});
 
-	it("names the assistant's pages as the assistant's", () => {
+	it("names a page with its group, one on its own by itself", () => {
 		const t = stringsFor("tr");
 		expect(pageTitle(t, "mcp")).toBe(`${t.settingsCatAssistant} › ${t.mcpTitle}`);
-		expect(pageTitle(t, "appearance")).toBe(t.settingsCatAppearance);
+		expect(pageTitle(t, "appearance")).toBe("Arayüz › Tema ve Renkler");
+		expect(pageTitle(t, "general")).toBe("Genel");
 	});
 });
 

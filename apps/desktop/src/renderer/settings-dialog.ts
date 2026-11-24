@@ -848,8 +848,8 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		text: t.templateImport,
 		attrs: { type: "button" },
 	});
-	item(
-		"templates",
+	const templatesBlock = item(
+		"page",
 		[
 			t.settingsCatTemplates,
 			t.templatesHint,
@@ -861,6 +861,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 			class: "settings-block",
 			attrs: { "data-block": "templates" },
 			children: [
+				el("h4", { text: t.settingsCatTemplates }),
 				el("p", { class: "confluence-hint", text: t.templatesHint }),
 				templateList,
 				el("div", { class: "jira-actions", children: [keepOpen, importButton] }),
@@ -1102,6 +1103,13 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 
 	// The schema's rows, in each category after its own parts.
 	for (const def of SETTING_DEFS) if (def.category !== "typography") row(def);
+	// The templates after the page's own settings: the size and margins first, as the page's name says.
+	contents.get("page")?.append(templatesBlock);
+	// What coding agents' spec files follow goes with the templates they come from.
+	const specRow = contents
+		.get("page")
+		?.querySelector<HTMLElement>(':scope > [data-key="specProfile"]');
+	if (specRow) templatesBlock.after(specRow);
 
 	// --- Search ------------------------------------------------------------------
 

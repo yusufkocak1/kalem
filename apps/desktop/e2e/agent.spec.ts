@@ -1317,7 +1317,7 @@ test("templates: the team's and the user's own, a default, and new documents fro
 
 	await clickMenu(app, "File", "Settings…");
 	const dialog = page.locator(".settings-dialog");
-	await dialog.locator('[data-category="templates"]').click();
+	await dialog.locator('[data-category="page"]').click();
 	const block = dialog.locator('[data-block="templates"]');
 	await expect(block.locator(".settings-template")).toHaveCount(3);
 	await expect(block.locator(".settings-template").first()).toContainText("Kurum Analiz Şablonu");
