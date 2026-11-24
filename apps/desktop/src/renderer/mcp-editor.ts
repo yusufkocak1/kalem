@@ -43,6 +43,38 @@ const reachKey = (server: McpServer): string =>
 			: [server.transport, server.command, server.args, server.env],
 	);
 
+/**
+ * The servers whose settings are shown, by name, while the app runs: a card
+ * is folded to its head unless it was opened, or was just added.
+ */
+const opened = new Set<string>();
+
+/** What a server runs, in a few words: the program and what it is given first. */
+export function reachSummary(server: McpServer): string {
+	if (server.transport === "http") {
+		try {
+			return new URL(server.url).host;
+		} catch {
+			return server.url;
+		}
+	}
+	const short = (path: string): string => {
+		const parts = path.split(/[\\/]/).filter(Boolean);
+		// A script inside a package reads best as the package's name.
+		const at = parts.lastIndexOf("node_modules");
+		if (at >= 0 && at + 1 < parts.length) {
+			const scope = parts[at + 1] ?? "";
+			return scope.startsWith("@") && at + 2 < parts.length ? `${scope}/${parts[at + 2]}` : scope;
+		}
+		return parts.at(-1) ?? path;
+	};
+	const first = server.args.find((arg) => !arg.startsWith("-"));
+	return [server.command, first]
+		.filter((part): part is string => part !== undefined && part !== "")
+		.map(short)
+		.join(" ");
+}
+
 /** Where each command was found, while Settings is open: a redraw does not look again. */
 const found = new Map<string, Promise<string | null>>();
 
@@ -141,8 +173,12 @@ function pills<T extends string>(
  */
 export function createMcpSection(options: McpSectionOptions): HTMLElement {
 	const { t } = options;
-	const addPreset = (preset: McpPreset): void =>
-		options.change([...options.servers(), presetServer(preset, options.servers())], true);
+	/** A server just added shows its settings, to be filled in. */
+	const addServer = (server: McpServer): void => {
+		opened.add(server.name);
+		options.change([...options.servers(), server], true);
+	};
+	const addPreset = (preset: McpPreset): void => addServer(presetServer(preset, options.servers()));
 
 	/** Whether Kalem keeps a program running between questions, with what that is for. */
 	function keepAliveField(on: boolean, change: (on: boolean) => void): HTMLElement {
@@ -229,6 +265,7 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 				return;
 			}
 			const from = options.servers()[index]?.name;
+			if (from !== undefined && opened.delete(from)) opened.add(value);
 			set({ name: value }, true);
 			if (from !== undefined && from !== value) options.renamed(from, value);
 		});
@@ -246,29 +283,22 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 			if (gone !== undefined) options.renamed(gone, null);
 		});
 		const used = options.usedIn(server.name);
-		return el("div", {
-			class: "mcp-card",
-			attrs: { "data-server": server.name, ...(server.enabled ? {} : { "data-off": "" }) },
+		const open = opened.has(server.name);
+		const body = el("div", {
+			class: "mcp-card-body",
+			attrs: { id: `mcp-card-body-${index}` },
 			children: [
-				el("div", {
-					class: "mcp-card-head",
-					children: [
-						switchOf(server.enabled, server.name, (enabled) => set({ enabled }, true)),
-						name,
-						pills(
-							t.mcpTransport,
-							["stdio", "http"] as const,
-							server.transport,
-							(value) => (value === "stdio" ? t.mcpStdio : t.mcpHttp),
-							(transport) => set({ transport }, true),
-						),
-						remove,
-					],
-				}),
 				el("p", {
 					class: "mode-section-hint mcp-used-in",
 					text: used.length === 0 ? t.mcpUsedNowhere : format(t.mcpUsedIn, used.join(", ")),
 				}),
+				pills(
+					t.mcpTransport,
+					["stdio", "http"] as const,
+					server.transport,
+					(value) => (value === "stdio" ? t.mcpStdio : t.mcpHttp),
+					(transport) => set({ transport }, true),
+				),
 				...(http ? [] : [check]),
 				...fields,
 				toolsField(index, set),
@@ -282,6 +312,79 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 				...cardGuide(server),
 			],
 		});
+		body.hidden = !open;
+		const toggle = el("button", {
+			class: "mode-icon-button mcp-card-toggle",
+			attrs: {
+				type: "button",
+				"aria-expanded": String(open),
+				"aria-controls": body.id,
+				"aria-label": open ? t.mcpCollapse : t.mcpExpand,
+				title: open ? t.mcpCollapse : t.mcpExpand,
+			},
+			children: [mark("chevron", "mode-icon")],
+		});
+		const card = el("div", {
+			class: "mcp-card",
+			attrs: {
+				"data-server": server.name,
+				...(server.enabled ? {} : { "data-off": "" }),
+				...(open ? { "data-open": "" } : {}),
+			},
+		});
+		// Folding does not redraw: what is typed in the card stays as it is.
+		const fold = (): void => {
+			const now = body.hidden === true;
+			body.hidden = !now;
+			card.toggleAttribute("data-open", now);
+			toggle.setAttribute("aria-expanded", String(now));
+			const label = now ? t.mcpCollapse : t.mcpExpand;
+			toggle.setAttribute("aria-label", label);
+			toggle.setAttribute("title", label);
+			const current = options.servers()[index]?.name ?? server.name;
+			if (now) opened.add(current);
+			else opened.delete(current);
+		};
+		toggle.addEventListener("click", fold);
+		const toolCount =
+			server.tools.length === 0
+				? t.mcpSummaryAllTools
+				: format(t.mcpSummaryTools, String(server.tools.length));
+		const summary = el("span", {
+			class: "mcp-card-summary",
+			children: [
+				el("span", { class: "mcp-card-kind", text: http ? "HTTP" : "stdio" }),
+				el("code", { class: "mcp-card-reach", text: reachSummary(server) }),
+				el("span", {
+					text: [
+						toolCount,
+						used.length === 0 ? t.mcpSummaryUnused : format(t.mcpSummaryModes, String(used.length)),
+					].join(" · "),
+				}),
+			],
+			attrs: { title: used.length === 0 ? t.mcpUsedNowhere : format(t.mcpUsedIn, used.join(", ")) },
+		});
+		const head = el("div", {
+			class: "mcp-card-head",
+			children: [
+				toggle,
+				switchOf(server.enabled, server.name, (enabled) => set({ enabled }, true)),
+				name,
+				summary,
+				remove,
+			],
+		});
+		// The head's empty parts and its summary fold the card too.
+		head.addEventListener("click", (event) => {
+			if (
+				event.target instanceof Element &&
+				event.target.closest("input, button, label, .mode-switch")
+			)
+				return;
+			fold();
+		});
+		card.replaceChildren(head, body);
+		return card;
 	}
 
 	/**
@@ -529,9 +632,7 @@ export function createMcpSection(options: McpSectionOptions): HTMLElement {
 		attrs: { type: "button" },
 		children: [mark("plus", "mode-icon"), t.mcpAdd],
 	});
-	add.addEventListener("click", () =>
-		options.change([...options.servers(), newMcpServer(options.servers())], true),
-	);
+	add.addEventListener("click", () => addServer(newMcpServer(options.servers())));
 	return el("div", {
 		class: "mode-section mode-mcp",
 		children: [

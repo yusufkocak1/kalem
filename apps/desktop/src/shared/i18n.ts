@@ -1333,6 +1333,12 @@ const en = {
 	mcpToolsNoProject:
 		"It works on the folder of each question (${project}): open a folder in the Files pane to list its tools.",
 	mcpRemove: "Remove the server",
+	mcpExpand: "Show the server's settings",
+	mcpCollapse: "Hide the server's settings",
+	mcpSummaryAllTools: "all tools",
+	mcpSummaryTools: "{0} tools",
+	mcpSummaryUnused: "no mode uses it",
+	mcpSummaryModes: "{0} modes",
 	mcpPresets: "Ready-made servers",
 	mcpPresetsHint:
 		"Added filled in as they are commonly run, with what each is for. Fill in the words in angle brackets (<GITHUB_TOKEN>, <folder>). npx needs Node.js, uvx needs uv.",
@@ -3364,6 +3370,12 @@ const tr: Strings = {
 	mcpToolsNoProject:
 		"Her sorunun klasöründe çalışır (${project}): araçlarını listelemek için Dosyalar panelinde bir klasör açın.",
 	mcpRemove: "Sunucuyu kaldır",
+	mcpExpand: "Sunucunun ayarlarını göster",
+	mcpCollapse: "Sunucunun ayarlarını gizle",
+	mcpSummaryAllTools: "tüm araçlar",
+	mcpSummaryTools: "{0} araç",
+	mcpSummaryUnused: "hiçbir mod kullanmıyor",
+	mcpSummaryModes: "{0} mod",
 	mcpPresets: "Hazır sunucular",
 	mcpPresetsHint:
 		"Yaygın kullanıldıkları gibi doldurulmuş ve ne için oldukları yazılmış olarak eklenir. Köşeli parantezdeki yerleri (<GITHUB_TOKEN>, <folder>) doldurun. npx için Node.js, uvx için uv gerekir.",
