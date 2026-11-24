@@ -62,3 +62,26 @@ test("the accent can be the system's, made dark enough to read on the light them
 	expect(errors).toEqual([]);
 	await app.close();
 });
+
+test("a palette chosen in the Settings tab colours the whole app, and stays when the style sheet comes in again", async () => {
+	const { app, page, errors } = await launch();
+	const accent = () =>
+		page.evaluate(() =>
+			getComputedStyle(document.documentElement).getPropertyValue("--app-accent").trim(),
+		);
+	await expect.poll(accent).toBe("#0f4e4a");
+	await clickMenu(app, "File", "Settings…");
+	await page.locator('.settings-dialog [data-palette="rose"]').click();
+	await expect.poll(accent).toBe("#a8325e");
+	// A style sheet that comes after the palette's, as the development server puts one in again.
+	await page.evaluate(() => {
+		const linked = [...document.styleSheets].find((sheet) => sheet.href?.endsWith(".css"));
+		const again = document.createElement("style");
+		again.textContent = [...(linked?.cssRules ?? [])].map((rule) => rule.cssText).join("\n");
+		document.head.append(again);
+	});
+	await page.waitForTimeout(300);
+	await expect.poll(accent).toBe("#a8325e");
+	expect(errors).toEqual([]);
+	await app.close();
+});
