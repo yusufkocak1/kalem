@@ -8669,8 +8669,8 @@ pre[data-confluence-kind="layout"]::before {
 /* --- Settings ------------------------------------------------------------------ */
 
 .settings-dialog {
-	width: min(860px, calc(100vw - 32px));
-	height: min(620px, 84vh);
+	width: min(960px, calc(100vw - 32px));
+	height: min(680px, 86vh);
 	margin: 6vh auto auto;
 	padding: 16px 18px;
 	border: 1px solid var(--app-border);
@@ -8726,10 +8726,131 @@ pre[data-confluence-kind="layout"]::before {
 .settings-nav {
 	display: flex;
 	flex-direction: column;
-	gap: 2px;
+	gap: 12px;
 	padding-inline-end: 12px;
 	border-inline-end: 1px solid var(--app-border);
 	overflow-y: auto;
+}
+
+/* The pages in groups: a small heading, the pages under it. */
+.settings-nav-group {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.settings-nav-group:not(:has(.settings-nav-heading)) {
+	padding-top: 10px;
+	border-top: 1px solid var(--app-border);
+}
+
+.settings-nav-heading {
+	padding: 0 10px 2px;
+	color: var(--app-muted);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+/* Only the changed settings: pressed while it is on. */
+.settings-changed-only {
+	flex: none;
+	white-space: nowrap;
+}
+
+.settings-changed-only[aria-pressed="true"] {
+	border-color: var(--app-accent);
+	background: color-mix(in srgb, var(--app-accent) 14%, transparent);
+	color: var(--app-text);
+}
+
+/* A row of the schema: a mark when it is not as installed, the setting, and a button that puts it back. */
+.settings-row {
+	display: grid;
+	grid-template-columns: 4px minmax(0, 1fr) 26px;
+	align-items: center;
+	gap: 8px;
+	margin-inline-start: -12px;
+}
+
+.settings-changed-mark {
+	align-self: stretch;
+	border-radius: 2px;
+}
+
+.settings-item[data-changed] > .settings-changed-mark {
+	background: var(--app-accent);
+}
+
+.settings-row-reset {
+	display: grid;
+	place-items: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border: 0;
+	border-radius: 6px;
+	background: none;
+	color: var(--app-muted);
+	cursor: pointer;
+	visibility: hidden;
+}
+
+.settings-row-reset svg {
+	width: 15px;
+	height: 15px;
+}
+
+.settings-item[data-changed] > .settings-row-reset {
+	visibility: visible;
+}
+
+.settings-row-reset:hover {
+	background: var(--app-hover, rgb(127 127 127 / 12%));
+	color: var(--app-text);
+}
+
+.settings-row-reset:focus-visible {
+	outline: var(--app-focus-ring);
+	outline-offset: -2px;
+}
+
+/* A part (the palette, the modes, the MCP servers) that is changed: a dot after its heading. */
+.settings-item[data-changed] > h4::after {
+	content: "";
+	width: 6px;
+	height: 6px;
+	margin-inline-start: 4px;
+	border-radius: 50%;
+	background: var(--app-accent);
+}
+
+/* A long note is a line until it is opened; a search shows it whole. */
+.settings-hint {
+	cursor: pointer;
+	border-radius: 4px;
+}
+
+.settings-hint[aria-expanded="false"] {
+	display: -webkit-box;
+	overflow: hidden;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 1;
+}
+
+.settings-dialog[data-searching] .settings-hint[aria-expanded="false"] {
+	display: block;
+	-webkit-line-clamp: unset;
+}
+
+.settings-hint:hover {
+	color: var(--app-text);
+}
+
+.settings-hint:focus-visible {
+	outline: var(--app-focus-ring);
+	outline-offset: 2px;
 }
 
 .settings-nav-item {
@@ -8766,7 +8887,8 @@ pre[data-confluence-kind="layout"]::before {
 .settings-main {
 	min-height: 0;
 	overflow-y: auto;
-	padding-inline-end: 4px;
+	/* Room at the left for the mark of a changed setting. */
+	padding-inline: 12px 4px;
 }
 
 .settings-body {
@@ -11784,6 +11906,35 @@ textarea.jira-worklog-input {
 	gap: 14px;
 }
 
+/* In Settings, the modes at the left and the chosen one at the right, as the MCP servers. */
+.settings-dialog .settings-items:has(> .mode-editor) {
+	container-type: inline-size;
+}
+
+@container (min-width: 600px) {
+	.mode-editor {
+		grid-template-columns: minmax(160px, 190px) minmax(0, 1fr);
+		align-items: start;
+	}
+
+	.mode-editor > :not(.mode-tabs) {
+		grid-column: 2;
+	}
+
+	.mode-editor > .confluence-hint {
+		grid-column: 1 / -1;
+	}
+
+	.mode-editor > .mode-tabs {
+		align-self: start;
+		grid-column: 1;
+		grid-row: 2 / span 3;
+		grid-template-columns: 1fr;
+		position: sticky;
+		top: 0;
+	}
+}
+
 .mode-tabs {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -12432,71 +12583,137 @@ h3.mode-panel-name {
 	margin-left: auto;
 }
 
-/* Folded, a server is its head alone: what it runs, its tools and modes in a line. */
-.mcp-card:not([data-open]) {
-	padding-block: 8px;
+/* The servers at the left, the chosen one's settings at the right; one under
+   the other where the window is narrow. */
+.mcp-master {
+	display: grid;
+	grid-template-columns: minmax(170px, 210px) minmax(0, 1fr);
+	align-items: start;
+	gap: 12px;
 }
 
-.mcp-card-head {
-	flex-wrap: nowrap;
+.settings-dialog .mode-mcp {
+	container-type: inline-size;
+}
+
+.mcp-master[data-empty] {
+	grid-template-columns: 1fr;
+}
+
+.mcp-side {
+	display: grid;
+	gap: 8px;
+	position: sticky;
+	top: 0;
+}
+
+.mcp-list {
+	display: grid;
+	gap: 4px;
+}
+
+.mcp-pick {
+	display: grid;
+	gap: 2px;
+	min-width: 0;
+	padding: 7px 9px;
+	border: 1px solid transparent;
+	border-radius: 8px;
+	background: none;
+	color: var(--app-text);
+	font: inherit;
+	text-align: start;
 	cursor: pointer;
 }
 
-.mcp-card-head .mcp-card-toggle {
-	margin-left: 0;
-	flex: none;
+.mcp-pick:hover {
+	background: var(--app-hover, rgb(127 127 127 / 12%));
 }
 
-.mcp-card-toggle .mode-icon {
-	transition: transform 0.12s;
+.mcp-pick:focus-visible {
+	outline: var(--app-focus-ring);
+	outline-offset: -2px;
 }
 
-.mcp-card[data-open] .mcp-card-toggle .mode-icon {
-	transform: rotate(90deg);
+.mcp-pick[aria-selected="true"] {
+	border-color: var(--app-accent);
+	background: var(--app-surface);
 }
 
-.mcp-card-summary {
-	flex: 1 1 0;
-	min-width: 0;
+.mcp-pick-name {
 	display: flex;
-	align-items: baseline;
-	gap: 8px;
-	overflow: hidden;
-	white-space: nowrap;
-	color: var(--app-muted);
-	font-size: 12px;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	font-size: 13px;
+	font-weight: 600;
 }
 
-.mcp-card-summary > * {
-	flex: none;
-}
-
-.mcp-card-reach {
-	flex: 0 1 auto;
+.mcp-pick-name code {
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mcp-pick-name .mcp-card-kind {
+	margin-inline-start: auto;
+	font-weight: 400;
+}
+
+/* On or off at a glance: the switch itself is in the settings beside. */
+.mcp-pick-dot {
+	flex: none;
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: var(--app-accent);
+}
+
+.mcp-pick[data-off] .mcp-pick-dot {
+	background: none;
+	box-shadow: inset 0 0 0 1.5px var(--app-muted);
+}
+
+.mcp-pick[data-off] .mcp-pick-name code {
+	color: var(--app-muted);
+}
+
+.mcp-pick-reach,
+.mcp-pick-meta {
+	min-width: 0;
+	overflow: hidden;
+	color: var(--app-muted);
+	font-size: 11px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .mcp-card-kind {
-	padding: 1px 6px;
+	flex: none;
+	padding: 0 6px;
 	border: 1px solid var(--app-border);
 	border-radius: 999px;
-	font-size: 11px;
+	color: var(--app-muted);
+	font-size: 10px;
+	line-height: 16px;
 }
 
-.mcp-card-body {
-	display: grid;
-	gap: 10px;
+.mcp-detail {
+	min-width: 0;
 }
 
-.mcp-card-body[hidden] {
+.mcp-detail:empty {
 	display: none;
 }
 
-@media (prefers-reduced-motion: reduce) {
-	.mcp-card-toggle .mode-icon {
-		transition: none;
+@container (max-width: 520px) {
+	.mcp-master {
+		grid-template-columns: 1fr;
+	}
+
+	.mcp-side {
+		position: static;
 	}
 }
 

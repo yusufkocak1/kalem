@@ -38,19 +38,20 @@ görür ve size ne kurmanız gerektiğini söyler.
 
 ### 2.1 Sunucuyu asistana ekleyin
 
-1. **Dosya → Ayarlar → Asistan** sayfasını açın ve **MCP sunucuları**
-   bölümüne kadar aşağı kaydırın.
+1. **Dosya → Ayarlar → Asistan → MCP sunucuları** sayfasını açın. Solda
+   sunucuların listesi, sağda seçtiğiniz sunucunun ayarları durur.
 2. İki yolunuz var:
    - **Hazır sunucular**'ı açıp bir karta tıklayın. Sunucu, yaygın
      kullanıldığı ayarlarla ve "ne için" metniyle dolu olarak eklenir.
      Size kalan, köşeli parantezli yerleri (`<GITHUB_TOKEN>`, `<path>`,
      `<folder>`, `<graylog-host>` …) kendi değerlerinizle değiştirmek.
-   - Ya da **MCP sunucusu ekle** ile boş bir kart açıp her şeyi kendiniz
+   - Ya da **MCP sunucusu ekle** ile boş bir sunucu açıp her şeyi kendiniz
      doldurun.
-3. Kartın solundaki anahtarla sunucuyu **tüm asistan için** kapatıp
+3. Sunucunun ayarlarındaki anahtarla sunucuyu **tüm asistan için** kapatıp
    açabilirsiniz; kapalı sunucu hiçbir modda modele verilmez.
-4. Her kartta sunucuyu **hangi modların kullandığı** yazar ("Kullanıldığı
-   modlar: Kod, Sor"). Yeni eklenen bir sunucuyu henüz hiçbir mod
+4. Her sunucunun ayarlarında onu **hangi modların kullandığı** yazar
+   ("Kullanıldığı modlar: Kod, Sor"); listede de kaç modun kullandığı,
+   ne çalıştırdığı ve kaç aracının açık olduğu görünür. Yeni eklenen bir sunucuyu henüz hiçbir mod
    kullanmaz.
 5. Ayarlar her değişiklikte hemen kaydedilir. Bir sunucunun adını
    değiştirirseniz onu kullanan modlar yeni adla kullanmaya devam eder;
@@ -58,7 +59,7 @@ görür ve size ne kurmanız gerektiğini söyler.
 
 ### 2.2 Modda kullanılacak sunucuları seçin
 
-1. **Dosya → Ayarlar → Asistan Modları** sayfasını açın. Asistan panelindeki
+1. **Dosya → Ayarlar → Asistan → Modlar** sayfasını açın. Asistan panelindeki
    mod seçicinin en altındaki **Modları özelleştir…** de aynı yere gider.
 2. Modun sekmesine tıklayın, örneğin **Kod** (ya da kendi modunuzu).
 3. **Bu modun kullandığı MCP sunucuları** bölümünde, asistanın her sunucusu
@@ -151,7 +152,7 @@ Asistan **Serena** ile gelir. Serena kodunuzu bir IDE gibi okur: semboller,
 tanımlar, kullanıldığı yerler, dosya özetleri ve sembol sembol düzenleme
 (bir dil sunucusuyla: Java, C#, TypeScript, Python, Go…). Baştan **Kod**,
 **Analizi İncele** ve **Prompt Hazırla** modlarında açıktır; diğer modlarda
-kapalıdır. **Asistan Modları** sayfasında her modda açıp kapatabilirsiniz.
+kapalıdır. **Asistan → Modlar** sayfasında her modda açıp kapatabilirsiniz.
 `uv` gerekir (`uvx`); ilk başlangıçta Serena indirildiği için ilk soru
 daha uzun sürer.
 
@@ -274,7 +275,7 @@ Notlar:
    onu kullanamaz.
 4. **Ne için** metnini kendi kurallarınıza göre düzenleyin (anahtar
    adlandırması, değerlerin anlamı…).
-5. **Ayarlar → Asistan Modları → Kod** sekmesinde, **Bu modun kullandığı
+5. **Ayarlar → Asistan → Modlar → Kod** sekmesinde, **Bu modun kullandığı
    MCP sunucuları** bölümünde `db` anahtarını açın. Parametre sorularını
    Sor modunda da istiyorsanız aynı anahtarı **Sor** sekmesinde de açın.
 
