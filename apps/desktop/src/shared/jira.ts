@@ -5,6 +5,7 @@
  * words become. Pure: the main process asks the server.
  */
 import { wikiToMarkdown } from "./confluence-wiki.js";
+import { timeTrackingLine } from "./jira-assistant-text.js";
 import type { JiraMention } from "./jira-comments.js";
 import { mentionsOf } from "./jira-comments.js";
 import type {
@@ -554,6 +555,8 @@ export function issueText(issue: JiraIssue): string {
 		"",
 		...facts.filter(([, value]) => value !== "").map(([name, value]) => `${name}: ${value}`),
 	];
+	const time = issue.time === undefined ? "" : timeTrackingLine(issue.time);
+	if (time !== "") lines.push(`Time tracking: ${time}`);
 	const others = (issue.allFields ?? []).filter((entry) => !entry.empty && entry.value !== "");
 	if (issue.sprint !== null && issue.sprint !== undefined)
 		lines.push(`Sprint: ${issue.sprint.name}`);
@@ -588,11 +591,31 @@ export function issueText(issue: JiraIssue): string {
 			),
 		);
 	}
+	const attachments = issue.attachments ?? [];
+	if (attachments.length > 0) {
+		lines.push(
+			"",
+			`Attachments (${attachments.length}; read one with jira_get_attachment):`,
+			...attachments.map(
+				(file) => `- ${file.filename}${file.mimeType === "" ? "" : ` (${file.mimeType})`}`,
+			),
+		);
+	}
+	const changes = issue.statusChanges ?? [];
+	if (changes.length > 0) {
+		lines.push(
+			"",
+			"Status changes (jira_get_history shows every change):",
+			...changes
+				.slice(-20)
+				.map((change) => `- ${change.at.slice(0, 10)}: ${change.from || "—"} → ${change.to}`),
+		);
+	}
 	if (issue.comments.length > 0) {
 		const skipped = issue.commentTotal - issue.comments.length;
 		lines.push(
 			"",
-			`Comments (${issue.commentTotal}${skipped > 0 ? `, the latest ${issue.comments.length}` : ""}):`,
+			`Comments (${issue.commentTotal}${skipped > 0 ? `, the latest ${issue.comments.length}; jira_get_comments reads the others` : ""}):`,
 			...issue.comments.map(
 				(entry) =>
 					`- ${entry.author}${entry.created === null ? "" : `, ${entry.created.slice(0, 10)}`}: ${entry.body.replace(/\n+/g, " ")}`,
@@ -608,7 +631,7 @@ export function searchText(found: JiraSearchResults, site: string, shown = 25): 
 		found.total === null
 			? `${found.issues.length}${found.next === null ? "" : "+"} issues`
 			: `${found.total} issues`;
-	const head = `Jira search \`${found.jql}\`: ${count}${found.issues.length < (found.total ?? 0) || found.next !== null ? `, the first ${Math.min(shown, found.issues.length)} below` : ""}.`;
+	const head = `Jira search \`${found.jql}\`: ${count}${found.issues.length < (found.total ?? 0) || found.next !== null ? `, ${Math.min(shown, found.issues.length)} of them below` : ""}.`;
 	if (found.issues.length === 0) {
 		return `${head}\nNothing found. Try other words, or a wider JQL (fewer conditions, another project).`;
 	}
@@ -621,7 +644,11 @@ export function searchText(found: JiraSearchResults, site: string, shown = 25): 
 		].filter((part) => part !== "");
 		return `- ${row.key} ${row.summary} (${facts.join(", ")}) ${issueUrl(site, row.key)}`;
 	});
-	return `${head}\n${lines.join("\n")}`;
+	const more =
+		found.next === null
+			? ""
+			: `\n\nMore issues follow: call jira_search again with the same query and "next": "${found.next}".`;
+	return `${head}\n${lines.join("\n")}${more}`;
 }
 
 /**

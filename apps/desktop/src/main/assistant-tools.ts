@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import type { WebContents } from "electron";
 import type { Settings } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
-import type { ClaudeEvent } from "../shared/claude.js";
+import type { ClaudeEvent, PromptImage } from "../shared/claude.js";
 import { clipStepOutput } from "../shared/claude.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
@@ -121,7 +121,14 @@ export interface KalemTool {
 	readonly risk: ToolRisk;
 	/** Whether it can be offered: a connection, a workspace or the document it needs. */
 	available(ctx: ToolContext): boolean;
-	run(input: Record<string, unknown>, ctx: ToolContext): Promise<string>;
+	/** What it found: text, or text with pictures for the model to see. */
+	run(input: Record<string, unknown>, ctx: ToolContext): Promise<string | ToolOutput>;
+}
+
+/** A tool's answer with pictures (a Jira attachment's image…). */
+export interface ToolOutput {
+	readonly text: string;
+	readonly images: readonly PromptImage[];
 }
 
 const record = (raw: unknown): Record<string, unknown> =>
@@ -257,6 +264,24 @@ const inputLine = (input: Record<string, unknown>): string => {
 export interface ToolResult {
 	readonly text: string;
 	readonly isError: boolean;
+	/** Pictures for the model to see with the text; where they cannot go, the text says so. */
+	readonly images?: readonly PromptImage[];
+}
+
+/** A result as text alone, where pictures cannot be sent (a CLI's tool blocks). */
+export function blockText(result: ToolResult): string {
+	const count = result.images?.length ?? 0;
+	return count === 0
+		? result.text
+		: `${result.text}\n\n[${count} picture(s) came with this, but they cannot be shown to you this way. Tell the user to look at them in Jira.]`;
+}
+
+/** A tool's answer as a result. */
+function resultOf(output: string | ToolOutput): ToolResult {
+	if (typeof output === "string") return { text: output, isError: false };
+	return output.images.length === 0
+		? { text: output.text, isError: false }
+		: { text: output.text, isError: false, images: output.images };
 }
 
 /** Runs one call; what it says goes back to the model, a mistake included. */
@@ -289,7 +314,7 @@ export async function runTool(name: string, input: unknown, ctx: ToolContext): P
 				};
 			}
 		}
-		return { text: await tool.run(given, ctx), isError: false };
+		return resultOf(await tool.run(given, ctx));
 	} catch (error) {
 		return {
 			text: `Error: ${error instanceof Error ? error.message : String(error)}`,

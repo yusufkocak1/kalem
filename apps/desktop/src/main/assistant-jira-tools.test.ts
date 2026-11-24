@@ -7,6 +7,7 @@ vi.mock("electron", () => ({ ipcMain: { handle: () => {} } }));
 const { runTool, toolsFor } = await import("./assistant-tools.js");
 await import("./assistant-external-tools.js");
 await import("./assistant-jira-tools.js");
+await import("./assistant-jira-insight-tools.js");
 await import("./assistant-confluence-tools.js");
 const { JiraError } = await import("./jira-client.js");
 type ToolContext = import("./assistant-tools.js").ToolContext;
@@ -361,5 +362,211 @@ describe("jira_transition", () => {
 		await runTool("jira_transition", { key: "QR-1", status: "Test" }, ctx);
 		expect(asked[0]?.lines).toEqual(["QR-1: → Test (Start Test)"]);
 		expect(jira.moved).toEqual([]);
+	});
+});
+
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+
+describe("jira_get_attachment", () => {
+	const RAW_ISSUE = {
+		key: "QR-1",
+		fields: {
+			summary: "x",
+			attachment: [
+				{ id: "7", filename: "notes.md", mimeType: "text/markdown", size: 12 },
+				{ id: "8", filename: "shot.png", mimeType: "image/png", size: 99 },
+				{ id: "10", filename: "notes2.txt", mimeType: "text/plain", size: 9 },
+				{ id: "9", filename: "spec.pdf", mimeType: "application/pdf", size: 99 },
+			],
+		},
+	};
+	function attachmentJira() {
+		const downloaded: string[] = [];
+		const client = {
+			site: "https://jira.example.com",
+			cloud: false,
+			rawIssue: async () => RAW_ISSUE,
+			async attachment(id: string, name: string) {
+				downloaded.push(`${id}/${name}`);
+				if (id === "9") return new Response(new Uint8Array([37, 80, 68, 70, 0, 1]));
+				if (id === "8") return new Response(PNG);
+				return new Response("# Notlar\nçalışıyor");
+			},
+		};
+		return { client, downloaded };
+	}
+
+	it("lists the attachments without a name", async () => {
+		const { ctx } = context(attachmentJira().client, []);
+		const result = await runTool("jira_get_attachment", { key: "QR-1" }, ctx);
+		expect(result.text).toContain("Attachments of QR-1 (4)");
+		expect(result.text).toContain("notes.md");
+	});
+
+	it("reads a text attachment", async () => {
+		const jira = attachmentJira();
+		const { ctx } = context(jira.client, []);
+		const result = await runTool("jira_get_attachment", { key: "QR-1", name: "notes.md" }, ctx);
+		expect(result.isError).toBe(false);
+		expect(result.text).toContain("# Notlar\nçalışıyor");
+		expect(jira.downloaded).toEqual(["7/notes.md"]);
+	});
+
+	it("shows a picture to the model", async () => {
+		const jira = attachmentJira();
+		const { ctx } = context(jira.client, []);
+		const result = await runTool("jira_get_attachment", { key: "QR-1", name: "8" }, ctx);
+		expect(result.text).toContain("shot.png");
+		expect(result.images).toEqual([
+			{ label: "shot.png", mediaType: "image/png", data: Buffer.from(PNG).toString("base64") },
+		]);
+	});
+
+	it("shows a picture of the issue's text by its address", async () => {
+		const jira = attachmentJira();
+		const { ctx } = context(jira.client, []);
+		const result = await runTool(
+			"jira_get_attachment",
+			{ key: "QR-1", image: "https://jira.example.com/secure/attachment/8/shot.png" },
+			ctx,
+		);
+		expect(result.images?.[0]?.mediaType).toBe("image/png");
+		expect(jira.downloaded).toEqual(["8/shot.png"]);
+	});
+
+	it("says binary files cannot be read", async () => {
+		const jira = attachmentJira();
+		const { ctx } = context(jira.client, []);
+		expect(
+			(await runTool("jira_get_attachment", { key: "QR-1", name: "spec.pdf" }, ctx)).text,
+		).toContain("binary file");
+		expect(jira.downloaded).toEqual(["9/spec.pdf"]);
+	});
+});
+
+describe("the further Jira look-ups", () => {
+	const ATTRIBUTE = {
+		id: 1,
+		key: "_Servis_",
+		name: "Servis",
+		type: "STATIC_LIST",
+		kind: "list",
+		required: true,
+		options: [{ value: "web", name: "Web" }],
+	};
+	function insightJira() {
+		const logged: unknown[] = [];
+		const moved: unknown[] = [];
+		const client = {
+			site: "https://jira.example.com",
+			cloud: false,
+			changelog: async () => [
+				{
+					created: "2026-01-02T10:00:00.000+0300",
+					author: { displayName: "Ayşe" },
+					items: [{ field: "status", fromString: "To Do", toString: "Done" }],
+				},
+			],
+			comments: async (_key: string, start: number) => ({
+				comments: [
+					{
+						author: "Ali",
+						authorId: "a",
+						created: null,
+						body: "eski yorum",
+						html: null,
+						mentions: [],
+					},
+				],
+				total: 30,
+				start,
+			}),
+			worklogContext: async () => ({ tempo: true, attributes: [ATTRIBUTE] }),
+			async logWork(key: string, entry: unknown) {
+				logged.push({ key, entry });
+			},
+			issueId: async () => "1001",
+			development: async () => ({
+				branches: { count: 0, updated: null },
+				commits: { count: 0, updated: null },
+				pullRequests: { count: 1, updated: null, state: "OPEN" },
+				builds: { count: 0, updated: null },
+				sources: ["stash"],
+			}),
+			developmentDetail: async () => [
+				{
+					title: "Giriş düzeltmesi",
+					detail: "",
+					repository: "web",
+					author: "Ali",
+					when: null,
+					state: "OPEN",
+					url: "",
+				},
+			],
+			boards: async () => [{ id: "5", name: "QR board" }],
+			boardSprints: async () => [
+				{
+					id: "11",
+					name: "Sprint 11",
+					state: "active",
+					boardId: "5",
+					startDate: "",
+					endDate: "",
+					goal: "",
+				},
+			],
+			async moveToSprint(key: string, sprint: string | null) {
+				moved.push({ key, sprint });
+			},
+		};
+		return { client, logged, moved };
+	}
+
+	it("reads the history, the comments and the development", async () => {
+		const { ctx } = context(insightJira().client, []);
+		expect((await runTool("jira_get_history", { key: "QR-1" }, ctx)).text).toContain(
+			"Ayşe: status: To Do → Done",
+		);
+		const comments = (await runTool("jira_get_comments", { key: "QR-1", start: 21 }, ctx)).text;
+		expect(comments).toContain("Comments 21–21 of 30");
+		expect(comments).toContain('"start": 22');
+		expect((await runTool("jira_get_development", { key: "QR-1" }, ctx)).text).toContain(
+			"- Giriş düzeltmesi (web, Ali, OPEN)",
+		);
+		expect((await runTool("jira_list_sprints", { project: "qr" }, ctx)).text).toContain(
+			"Sprints of the board QR board (id 5)",
+		);
+	});
+
+	it("asks for Tempo's required attributes before logging work", async () => {
+		const jira = insightJira();
+		const { ctx, asked } = context(jira.client, [YES]);
+		const missing = await runTool("jira_log_work", { key: "QR-1", time: "2h" }, ctx);
+		expect(missing.text).toContain("Required: Servis.");
+		expect(missing.text).toContain("choices: Web");
+		expect(asked).toHaveLength(0);
+		const done = await runTool(
+			"jira_log_work",
+			{ key: "QR-1", time: "1h 30m", date: "2026-01-05", attributes: { Servis: "web" } },
+			ctx,
+		);
+		expect(done.text).toContain("Logged 1h 30m on QR-1 for 2026-01-05 (through Tempo)");
+		expect(asked[0]?.lines).toContain("Servis: Web");
+		expect(jira.logged[0]).toMatchObject({
+			key: "QR-1",
+			entry: { date: "2026-01-05", seconds: 5400, attributes: { _Servis_: "web" } },
+		});
+	});
+
+	it("moves an issue to a sprint only when the user allows it", async () => {
+		const jira = insightJira();
+		const { ctx } = context(jira.client, [{ approved: false, scope: "once" }, YES]);
+		expect(
+			(await runTool("jira_move_to_sprint", { key: "QR-1", sprint: "11" }, ctx)).text,
+		).toContain("did not allow");
+		expect(jira.moved).toEqual([]);
+		await runTool("jira_move_to_sprint", { key: "QR-1", sprint: "sprint 11" }, ctx);
+		expect(jira.moved).toEqual([{ key: "QR-1", sprint: "11" }]);
 	});
 });

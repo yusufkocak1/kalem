@@ -316,6 +316,11 @@ describe("Jira fields kept as HTML", () => {
 describe("Jira requests of a CLI", () => {
 	it("reads issue, JQL and word requests", () => {
 		expect(jiraRequestOf({ issue: "dev-7" })).toEqual({ kind: "issue", key: "DEV-7" });
+		expect(jiraRequestOf({ jql: "project = A", next: "25" })).toEqual({
+			kind: "search",
+			jql: "project = A",
+			next: "25",
+		});
 		expect(jiraRequestOf({ key: "https://jira.example.com/browse/DEV-7" }, "issue")).toEqual({
 			kind: "issue",
 			key: "DEV-7",

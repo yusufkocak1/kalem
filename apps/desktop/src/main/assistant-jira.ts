@@ -27,12 +27,17 @@ export const JIRA_TOOLS: readonly ToolDefinition[] = [
 	{
 		name: "jira_search",
 		description:
-			"Searches Jira. Give `jql` (e.g. `project = ABC AND status != Done ORDER BY updated DESC`, `assignee = currentUser() AND resolution = Unresolved`, `sprint in openSprints()`), or `query`: words to find in issues' text. Returns each issue's key, summary, type, status, assignee and address.",
+			"Searches Jira. Give `jql` (e.g. `project = ABC AND status != Done ORDER BY updated DESC`, `assignee = currentUser() AND resolution = Unresolved`, `sprint in openSprints()`), or `query`: words to find in issues' text. Returns each issue's key, summary, type, status, assignee and address, 25 a page; when there are more, the results say how to ask for the next page.",
 		parameters: {
 			type: "object",
 			properties: {
 				jql: { type: "string", description: "A JQL query." },
 				query: { type: "string", description: "Words to find, when there is no JQL." },
+				next: {
+					type: "string",
+					description:
+						"The next page of a search: the `next` the earlier results gave, with the same jql or query.",
+				},
 			},
 			required: [],
 		},
@@ -60,7 +65,10 @@ export class JiraLookups {
 		try {
 			if (request.kind === "search") {
 				step({ tool: "jira_search", detail: request.jql });
-				return searchText(await this.#client.search(request.jql), this.#client.site);
+				return searchText(
+					await this.#client.search(request.jql, request.next ?? null),
+					this.#client.site,
+				);
 			}
 			let issue = this.#issues.get(request.key);
 			if (issue === undefined) {
