@@ -71,7 +71,9 @@ async function handle(message) {
 		}
 		case "tools/call": {
 			const answer = await post("/call", { name: params?.name, arguments: params?.arguments ?? {} });
-			return send({ id, result: { content: [{ type: "text", text: String(answer.text ?? "") }], isError: answer.isError === true } });
+			const images = Array.isArray(answer.images) ? answer.images : [];
+			const pictures = images.filter((image) => image && typeof image.data === "string" && typeof image.mediaType === "string").map((image) => ({ type: "image", data: image.data, mimeType: image.mediaType }));
+			return send({ id, result: { content: [{ type: "text", text: String(answer.text ?? "") }, ...pictures], isError: answer.isError === true } });
 		}
 		default:
 			return send({ id, error: { code: -32601, message: "Unknown method " + method } });

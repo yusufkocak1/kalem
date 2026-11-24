@@ -17,6 +17,7 @@ import {
 	looksLikeText,
 	sizeText,
 } from "../shared/jira-attachment-text.js";
+import { attachmentsOf, jiraImageOf } from "../shared/jira-fields.js";
 import type { FieldMeta } from "../shared/jira-write.js";
 import {
 	clonePlan,
@@ -32,6 +33,7 @@ import type { KalemTool, ToolContext } from "./assistant-tools.js";
 import { registerTools } from "./assistant-tools.js";
 import type { JiraClient } from "./jira-client.js";
 import { JiraError } from "./jira-client.js";
+import { promptImageOf } from "./tool-images.js";
 
 const REFUSED = "The user did not allow it: nothing was sent. Do not try again unless they ask.";
 
@@ -115,8 +117,9 @@ async function attachmentBytes(
 	jira: JiraClient,
 	id: string,
 	filename: string,
+	ask: () => Promise<Response> = () => jira.attachment(id, filename),
 ): Promise<Uint8Array | string> {
-	const response = await jira.attachment(id, filename);
+	const response = await ask();
 	if (!response.ok) return `Jira answered HTTP ${response.status} for ${filename}.`;
 	const length = Number(response.headers.get("content-length") ?? "");
 	if (Number.isFinite(length) && length > MAX_ATTACHMENT_BYTES) {
@@ -133,7 +136,7 @@ const TOOLS: readonly KalemTool[] = [
 		definition: {
 			name: "jira_get_attachment",
 			description:
-				"Reads a Jira issue's attachments. With only `key` it lists them (name, type, size, who added it, when, id). With `name` (or id) it reads that file's content: text files (txt, md, csv, json, xml, yaml, log, sql, code…) and Word documents (.docx) as text; long ones in parts, continued with `from`. Images, PDFs and other binary files cannot be read as text: it says so.",
+				"Reads a Jira issue's attachments. With only `key` it lists them (name, type, size, who added it, when, id). With `name` (or id) it reads that file: text files (txt, md, csv, json, xml, yaml, log, sql, code…) and Word documents (.docx) as text, long ones in parts continued with `from`; pictures (png, jpg, gif, webp…) are shown to you, so you can see screenshots and diagrams. With `image`, it shows a picture of the issue's description or comments by its address. PDFs and other binary files cannot be read: it says so.",
 			parameters: {
 				type: "object",
 				properties: {
@@ -147,6 +150,11 @@ const TOOLS: readonly KalemTool[] = [
 						type: "number",
 						description: "The character to start reading at, for a long file's next part.",
 					},
+					image: {
+						type: "string",
+						description:
+							"A picture's address as the issue's description or a comment has it (![](…)); instead of name.",
+					},
 				},
 				required: ["key"],
 			},
@@ -158,7 +166,34 @@ const TOOLS: readonly KalemTool[] = [
 			if (key === null) return "Give an issue key, e.g. ABC-123.";
 			ctx.readExternal = true;
 			const jira = jiraOf(ctx);
-			const entries = attachmentEntriesOf(await jira.rawIssue(key));
+			const raw = await jira.rawIssue(key);
+			const entries = attachmentEntriesOf(raw);
+			const address = text(input, "image");
+			if (address !== "") {
+				const picture = jiraImageOf(
+					address,
+					jira.site,
+					attachmentsOf(record(raw.fields).attachment),
+				);
+				ctx.step({ tool: "jira_get_attachment", detail: `${key} ${picture.name}` });
+				let why = `${address} is not a picture of this Jira: it cannot be loaded here.`;
+				for (const source of picture.sources) {
+					if (source.kind === "url") continue;
+					const bytes = await attachmentBytes(jira, "", picture.name, () =>
+						source.kind === "attachment"
+							? jira.attachment(source.file.id, source.file.filename)
+							: jira.editorImage(source.query),
+					).catch((error: unknown) => (error instanceof Error ? error.message : String(error)));
+					if (typeof bytes === "string") {
+						why = bytes;
+						continue;
+					}
+					const image = promptImageOf(bytes, picture.name);
+					if (typeof image === "string") return image;
+					return { text: `The picture ${picture.name} of ${key}:`, images: [image] };
+				}
+				return why;
+			}
 			const named = text(input, "name") || text(input, "id");
 			if (named === "") {
 				ctx.step({ tool: "jira_get_attachment", detail: key });
@@ -170,14 +205,16 @@ const TOOLS: readonly KalemTool[] = [
 			ctx.step({ tool: "jira_get_attachment", detail: `${key} ${entry.filename}` });
 			const kind = attachmentKind(entry.filename, entry.mimeType);
 			const about = `${entry.filename} (${[entry.mimeType, sizeText(entry.size)].filter((part) => part !== "").join(", ")})`;
-			if (kind === "image") {
-				return `${about} is an image: its content cannot be read as text here. Tell the user what it is called, and ask them to describe it if it matters.`;
-			}
 			if (entry.size !== null && entry.size > MAX_ATTACHMENT_BYTES) {
 				return `${about} is too large to read here.`;
 			}
 			const bytes = await attachmentBytes(jira, entry.id, entry.filename);
 			if (typeof bytes === "string") return bytes;
+			if (kind === "image") {
+				const image = promptImageOf(bytes, entry.filename);
+				if (typeof image === "string") return image;
+				return { text: `Attachment ${about} of ${key}:`, images: [image] };
+			}
 			let content: string;
 			if (kind === "word") {
 				try {

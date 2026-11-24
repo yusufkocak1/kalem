@@ -81,7 +81,14 @@ import { MCP_SERVER, mcpToolName } from "./assistant-mcp.js";
 import { PermissionGate } from "./assistant-permissions.js";
 import { Steering } from "./assistant-steering.js";
 import type { Connections, DocumentSnapshot, ToolContext, ToolResult } from "./assistant-tools.js";
-import { allTools, approver, RendererCalls, runTool, toolsFor } from "./assistant-tools.js";
+import {
+	allTools,
+	approver,
+	blockText,
+	RendererCalls,
+	runTool,
+	toolsFor,
+} from "./assistant-tools.js";
 import type { KeptServers } from "./mcp-kept.js";
 import { ModelCatalog } from "./model-catalog.js";
 import { networkLog } from "./network-log.js";
@@ -94,6 +101,7 @@ import "./assistant-analysis-tools.js";
 import "./assistant-spec-tools.js";
 import "./assistant-external-tools.js";
 import "./assistant-jira-tools.js";
+import "./assistant-jira-insight-tools.js";
 import "./assistant-mode-tools.js";
 import "./assistant-mode-edit-tools.js";
 import "./assistant-confluence-tools.js";
@@ -1320,7 +1328,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 							if (stopped) break;
 							results.push({
 								tool: blockCall.tool,
-								text: (await call(blockCall.tool, blockCall.input)).text,
+								text: blockText(await call(blockCall.tool, blockCall.input)),
 							});
 						}
 						found.push(blockResults(results));
@@ -1419,7 +1427,9 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 									looked = true;
 									const result = await call(name, input);
 									if (name === "read_file") reads.push(result.text);
-									return result.text;
+									return result.images === undefined
+										? result.text
+										: { text: result.text, images: result.images };
 								},
 							},
 						}),

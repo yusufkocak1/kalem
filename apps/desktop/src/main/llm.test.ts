@@ -161,3 +161,61 @@ describe("what the user adds while an API answers", () => {
 		expect(messages.at(-1)?.role).toBe("tool");
 	});
 });
+
+describe("pictures a tool returns", () => {
+	const picture = { label: "shot.png", mediaType: "image/png" as const, data: "iVBOR" };
+	const looking = {
+		definitions: [{ name: "look", description: "Bakar", parameters: { type: "object" } }],
+		run: async () => ({ text: "Resim:", images: [picture] }),
+	};
+
+	it("go to Anthropic inside the tool's result", async () => {
+		state.anthropicSent.length = 0;
+		state.anthropicAnswers = [
+			{
+				content: [{ type: "tool_use", id: "t1", name: "look", input: {} }],
+				stop_reason: "tool_use",
+				usage,
+			},
+			{ content: [{ type: "text", text: "Gördüm." }], stop_reason: "end_turn", usage },
+		];
+		await askApi({
+			provider: PROVIDER_INFO.anthropic,
+			connection: { baseUrl: "http://anthropic.test", model: "claude-test" },
+			key: "k",
+			system: "sistem",
+			messages: [{ role: "user", content: "Bak" }],
+			signal: new AbortController().signal,
+			text: () => {},
+			tools: looking,
+		});
+		const messages = state.anthropicSent[1]?.messages as { content: unknown }[];
+		const turn = messages.at(-1)?.content as { content: unknown }[];
+		expect(turn[0]?.content).toEqual([
+			{ type: "text", text: "Resim:" },
+			{ type: "image", source: { type: "base64", media_type: "image/png", data: "iVBOR" } },
+		]);
+	});
+
+	it("follow the tool's message to an OpenAI-compatible service", async () => {
+		state.sent.length = 0;
+		state.answers = [
+			`${chunk({ tool_calls: [{ index: 0, id: "c1", function: { name: "look", arguments: "{}" } }] })}data: [DONE]\n\n`,
+			`${chunk({ content: "Gördüm." })}data: [DONE]\n\n`,
+		];
+		await askApi({
+			provider: PROVIDER_INFO.openai,
+			connection: { baseUrl: "http://openai.test/v1", model: "gpt-test" },
+			key: "k",
+			system: "sistem",
+			messages: [{ role: "user", content: "Bak" }],
+			signal: new AbortController().signal,
+			text: () => {},
+			tools: looking,
+		});
+		const messages = state.sent[1]?.body.messages as { role: string; content: unknown }[];
+		expect(messages.at(-2)).toMatchObject({ role: "tool", content: "Resim:" });
+		expect(messages.at(-1)?.role).toBe("user");
+		expect(JSON.stringify(messages.at(-1)?.content)).toContain("data:image/png;base64,iVBOR");
+	});
+});

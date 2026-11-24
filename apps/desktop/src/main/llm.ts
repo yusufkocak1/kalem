@@ -69,10 +69,20 @@ export interface AskOptions {
 	steer?(): readonly string[];
 }
 
+/** What a tool call returns to the model: text, or text with pictures. */
+export type ToolReply =
+	| string
+	| { readonly text: string; readonly images?: readonly PromptImage[] };
+
+const replyText = (reply: ToolReply): string => (typeof reply === "string" ? reply : reply.text);
+
+const replyImages = (reply: ToolReply): readonly PromptImage[] =>
+	typeof reply === "string" ? [] : (reply.images ?? []);
+
 export interface AskTools {
 	readonly definitions: readonly ChatTool[];
 	/** Runs one call; what it returns goes back to the model. */
-	run(name: string, input: unknown): Promise<string>;
+	run(name: string, input: unknown): Promise<ToolReply>;
 }
 
 /** Calls of tools one answer may make; the last round must answer with what it has. */
@@ -200,11 +210,28 @@ async function askAnthropic(options: AskOptions): Promise<void> {
 			if (tools === undefined || message.stop_reason !== "tool_use" || calls.length === 0) return;
 			// Calls the model made together run together; their results keep its order.
 			const results: Anthropic.ToolResultBlockParam[] = await Promise.all(
-				calls.map(async (call) => ({
-					type: "tool_result" as const,
-					tool_use_id: call.id,
-					content: await tools.run(call.name, call.input),
-				})),
+				calls.map(async (call) => {
+					const reply = await tools.run(call.name, call.input);
+					const images = replyImages(reply);
+					return {
+						type: "tool_result" as const,
+						tool_use_id: call.id,
+						content:
+							images.length === 0
+								? replyText(reply)
+								: [
+										{ type: "text" as const, text: replyText(reply) },
+										...images.map((image) => ({
+											type: "image" as const,
+											source: {
+												type: "base64" as const,
+												media_type: image.mediaType,
+												data: image.data,
+											},
+										})),
+									],
+					};
+				}),
 			);
 			// What the user added meanwhile comes after the results, in the same turn.
 			const added = steeringNote(options.steer?.() ?? []);
@@ -288,10 +315,28 @@ async function askChatCompletions(options: AskOptions): Promise<void> {
 				} catch {
 					// Arguments that are not JSON: the tool says what it misses.
 				}
-				return { role: "tool", tool_call_id: call.id, content: await tools.run(call.name, input) };
+				const reply = await tools.run(call.name, input);
+				return {
+					message: { role: "tool", tool_call_id: call.id, content: replyText(reply) },
+					images: replyImages(reply),
+				};
 			}),
 		);
-		turn.push(...results);
+		turn.push(...results.map((result) => result.message));
+		// A tool's message holds only text: its pictures follow in a message of their own.
+		const images = results.flatMap((result) => result.images);
+		if (images.length > 0) {
+			turn.push({
+				role: "user",
+				content: [
+					{ type: "text", text: "The pictures the tool calls above returned:" },
+					...images.flatMap(({ label, mediaType, data }) => [
+						{ type: "text", text: `[${label}]` },
+						{ type: "image_url", image_url: { url: `data:${mediaType};base64,${data}` } },
+					]),
+				],
+			});
+		}
 		// What the user added meanwhile follows the results.
 		const added = steeringNote(options.steer?.() ?? []);
 		if (added !== "") turn.push({ role: "user", content: added });

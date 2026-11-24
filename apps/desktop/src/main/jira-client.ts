@@ -9,6 +9,7 @@ import {
 	ROW_FIELDS,
 	remoteLinksOf,
 } from "../shared/jira.js";
+import type { BoardSprint } from "../shared/jira-assistant-text.js";
 import type {
 	DevelopmentItem,
 	DevelopmentKind,
@@ -606,6 +607,114 @@ export class JiraClient {
 		return this.#json(
 			`/rest/api/2/issue/${this.#valid(key)}?fields=*all&expand=names,schema,editmeta`,
 		);
+	}
+
+	/** The issue's change history, oldest first: Jira's raw `histories`, at most `limit` of them. */
+	async changelog(key: string, limit = 1000): Promise<unknown[]> {
+		const valid = this.#valid(key);
+		if (!this.cloud) {
+			const body = await this.#json(`/rest/api/2/issue/${valid}?fields=created&expand=changelog`);
+			return asArray(asJson(body.changelog).histories).slice(-limit);
+		}
+		// Cloud gives the history a page at a time.
+		const histories: unknown[] = [];
+		for (let start = 0; histories.length < limit; ) {
+			const body = await this.#json(
+				`/rest/api/2/issue/${valid}/changelog?startAt=${start}&maxResults=100`,
+			);
+			const page = asArray(body.values);
+			histories.push(...page);
+			start += page.length;
+			if (page.length === 0 || body.isLast === true) break;
+			if (typeof body.total === "number" && start >= body.total) break;
+		}
+		return histories.slice(0, limit);
+	}
+
+	/** A page of the issue's comments, oldest first, from `start`. */
+	async comments(
+		key: string,
+		start: number,
+		max: number,
+	): Promise<{ comments: JiraComment[]; total: number; start: number }> {
+		const valid = this.#valid(key);
+		const params = new URLSearchParams({
+			startAt: String(Math.max(0, Math.floor(start))),
+			maxResults: String(Math.min(Math.max(1, Math.floor(max)), 100)),
+			orderBy: "created",
+			expand: "renderedBody",
+		});
+		const body = await this.#json(`/rest/api/2/issue/${valid}/comment?${params.toString()}`);
+		const raw = asArray(body.comments);
+		return {
+			comments: raw.map((item) => commentOf(item, asJson(item).renderedBody)),
+			total: typeof body.total === "number" ? body.total : raw.length,
+			start: typeof body.startAt === "number" ? body.startAt : start,
+		};
+	}
+
+	/** The issue's work logs (Jira's raw `worklogs`) and its time tracking. */
+	async worklogs(key: string): Promise<{ worklogs: unknown[]; timetracking: Json }> {
+		const valid = this.#valid(key);
+		const [logs, issue] = await Promise.all([
+			this.#json(`/rest/api/2/issue/${valid}/worklog`),
+			this.#json(`/rest/api/2/issue/${valid}?fields=timetracking`),
+		]);
+		return {
+			worklogs: asArray(logs.worklogs),
+			timetracking: asJson(asJson(issue.fields).timetracking),
+		};
+	}
+
+	/** The issue's id, which its development information is asked by. */
+	async issueId(key: string): Promise<string> {
+		const body = await this.#json(`/rest/api/2/issue/${this.#valid(key)}?fields=summary`);
+		const id = String(body.id ?? "");
+		if (!/^\d+$/.test(id)) throw new Error("Jira did not return the issue");
+		return id;
+	}
+
+	/** The scrum boards of a project: id and name. */
+	async boards(project: string): Promise<{ id: string; name: string }[]> {
+		if (!/^[A-Z][A-Z0-9_]*$/i.test(project)) throw new Error("Invalid project key");
+		const body = await this.#json(
+			`/rest/agile/1.0/board?projectKeyOrId=${encodeURIComponent(project)}&type=scrum&maxResults=50`,
+		);
+		return asArray(body.values).flatMap((item) => {
+			const board = asJson(item);
+			const id = String(board.id ?? "");
+			return /^\d+$/.test(id) ? [{ id, name: asString(board.name) }] : [];
+		});
+	}
+
+	/** A board's sprints in the given states (active, future, closed), the latest last. */
+	async boardSprints(boardId: string, states: readonly string[]): Promise<BoardSprint[]> {
+		if (!/^\d+$/.test(boardId)) throw new Error("Invalid board id");
+		const wanted = states.filter((state) => /^(active|future|closed)$/.test(state));
+		const sprints: BoardSprint[] = [];
+		for (let start = 0; sprints.length < 500; ) {
+			const raw = await this.#json(
+				`/rest/agile/1.0/board/${boardId}/sprint?state=${(wanted.length === 0 ? ["active", "future"] : wanted).join(",")}&startAt=${start}&maxResults=50`,
+			);
+			const page = asArray(raw.values);
+			for (const item of page) {
+				const sprint = asJson(item);
+				const id = String(sprint.id ?? "");
+				if (id === "") continue;
+				sprints.push({
+					id,
+					name: asString(sprint.name),
+					state: asString(sprint.state),
+					boardId,
+					startDate: asString(sprint.startDate),
+					endDate: asString(sprint.endDate),
+					goal: asString(sprint.goal),
+				});
+			}
+			start += page.length;
+			if (page.length === 0 || raw.isLast === true) break;
+		}
+		return sprints;
 	}
 
 	/** The projects the user can see: key and name. */
