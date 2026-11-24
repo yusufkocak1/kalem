@@ -2878,6 +2878,8 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				return format(t.assistantStepJiraIssue, detail);
 			case "jira_search":
 				return format(t.assistantStepJiraSearch, detail);
+			case "jira_get_attachment":
+				return format(t.assistantStepJiraAttachment, detail);
 			case "kalem_help":
 				return format(t.assistantStepHelp, detail);
 			case "settings_find":

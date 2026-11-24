@@ -65,7 +65,7 @@ The user is not connected to Jira. If they ask about a Jira issue (a key like AB
 	}
 	const how =
 		way === "mcp"
-			? "Look issues up with Kalem's tools `mcp__kalem__jira_get_issue` (one issue by its key: fields, description, sub-tasks, links, comments) and `mcp__kalem__jira_search` (JQL, or words to find). They use the app's own connection. Do not use WebFetch, curl, Bash or any other tool for Jira: it is behind the user's sign-in, and only these tools reach it."
+			? "Look issues up with Kalem's tools `mcp__kalem__jira_get_issue` (one issue by its key: fields, description, sub-tasks, links, comments) and `mcp__kalem__jira_search` (JQL, or words to find); `mcp__kalem__jira_get_attachment` lists an issue's attachments and reads one. They use the app's own connection. Do not use WebFetch, curl, Bash or any other tool for Jira: it is behind the user's sign-in, and only these tools reach it."
 			: way === "block"
 				? `To look something up, reply with ONLY a \`${JIRA_FENCE}\` code block holding a JSON array of requests, and nothing else:
 
@@ -84,5 +84,5 @@ The user is connected to Jira at ${site}. Confluence pages and documents name Ji
 
 ${how}
 
-Answer from what you read, and link each issue you mention as [ABC-123](${site}/browse/ABC-123). jira_get_fields shows every field of an issue, custom ones included. To change Jira, use Kalem's tools (the user is asked each time): jira_create_issues, jira_clone_issue (a copy with all of its fields, as Jira's Clone), jira_update_issue, jira_add_comment, jira_transition, jira_link_issues, jira_assign; jira_create_fields lists what a create needs. Do not tell the user to do in Jira what these tools do.`;
+Answer from what you read, and link each issue you mention as [ABC-123](${site}/browse/ABC-123). jira_get_fields shows every field of an issue, custom ones included. jira_get_attachment lists an issue's attachments and reads one (text files and Word documents); read them yourself when the question needs them, instead of saying you cannot. To change Jira, use Kalem's tools (the user is asked each time): jira_create_issues, jira_clone_issue (a copy with all of its fields, as Jira's Clone), jira_update_issue, jira_add_comment, jira_transition, jira_link_issues, jira_assign; jira_create_fields lists what a create needs. Do not tell the user to do in Jira what these tools do.`;
 }

@@ -5,8 +5,18 @@
  * issues linked, an assignee changed. A write is shown to the user in full
  * and asked every time.
  */
+import mammoth from "mammoth";
 import { format } from "../shared/i18n.js";
 import { issueKey } from "../shared/jira.js";
+import {
+	attachmentEntriesOf,
+	attachmentKind,
+	attachmentListText,
+	attachmentTextPart,
+	findAttachment,
+	looksLikeText,
+	sizeText,
+} from "../shared/jira-attachment-text.js";
 import type { FieldMeta } from "../shared/jira-write.js";
 import {
 	clonePlan,
@@ -97,7 +107,96 @@ export function resolveFields(
 export const FIELDS_HELP =
 	'"fields": {"Field name or id": value}. A choice by its name; a user by user name (Server) or account id (Cloud); a list as an array; text in a description or multi-line field is Markdown; null empties a field. Jira\'s own shape ({"id":"10001"}) goes as it is.';
 
+/** The largest attachment the assistant downloads to read. */
+export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
+
+/** An attachment's bytes, or why they could not be had. */
+async function attachmentBytes(
+	jira: JiraClient,
+	id: string,
+	filename: string,
+): Promise<Uint8Array | string> {
+	const response = await jira.attachment(id, filename);
+	if (!response.ok) return `Jira answered HTTP ${response.status} for ${filename}.`;
+	const length = Number(response.headers.get("content-length") ?? "");
+	if (Number.isFinite(length) && length > MAX_ATTACHMENT_BYTES) {
+		return `${filename} is ${sizeText(length)}: too large to read here.`;
+	}
+	const bytes = new Uint8Array(await response.arrayBuffer());
+	return bytes.length > MAX_ATTACHMENT_BYTES
+		? `${filename} is ${sizeText(bytes.length)}: too large to read here.`
+		: bytes;
+}
+
 const TOOLS: readonly KalemTool[] = [
+	{
+		definition: {
+			name: "jira_get_attachment",
+			description:
+				"Reads a Jira issue's attachments. With only `key` it lists them (name, type, size, who added it, when, id). With `name` (or id) it reads that file's content: text files (txt, md, csv, json, xml, yaml, log, sql, code…) and Word documents (.docx) as text; long ones in parts, continued with `from`. Images, PDFs and other binary files cannot be read as text: it says so.",
+			parameters: {
+				type: "object",
+				properties: {
+					key: { type: "string", description: "The issue key, e.g. ABC-123." },
+					name: {
+						type: "string",
+						description:
+							"The attachment's file name (or part of it) or its id; leave out to list them.",
+					},
+					from: {
+						type: "number",
+						description: "The character to start reading at, for a long file's next part.",
+					},
+				},
+				required: ["key"],
+			},
+		},
+		risk: "read",
+		available: connected,
+		async run(input, ctx) {
+			const key = keyOf(input);
+			if (key === null) return "Give an issue key, e.g. ABC-123.";
+			ctx.readExternal = true;
+			const jira = jiraOf(ctx);
+			const entries = attachmentEntriesOf(await jira.rawIssue(key));
+			const named = text(input, "name") || text(input, "id");
+			if (named === "") {
+				ctx.step({ tool: "jira_get_attachment", detail: key });
+				return attachmentListText(key, entries);
+			}
+			if (entries.length === 0) return `${key} has no attachments.`;
+			const entry = findAttachment(entries, named);
+			if (typeof entry === "string") return entry;
+			ctx.step({ tool: "jira_get_attachment", detail: `${key} ${entry.filename}` });
+			const kind = attachmentKind(entry.filename, entry.mimeType);
+			const about = `${entry.filename} (${[entry.mimeType, sizeText(entry.size)].filter((part) => part !== "").join(", ")})`;
+			if (kind === "image") {
+				return `${about} is an image: its content cannot be read as text here. Tell the user what it is called, and ask them to describe it if it matters.`;
+			}
+			if (entry.size !== null && entry.size > MAX_ATTACHMENT_BYTES) {
+				return `${about} is too large to read here.`;
+			}
+			const bytes = await attachmentBytes(jira, entry.id, entry.filename);
+			if (typeof bytes === "string") return bytes;
+			let content: string;
+			if (kind === "word") {
+				try {
+					const result = await mammoth.extractRawText({
+						buffer: Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength),
+					});
+					content = result.value.replace(/\n{3,}/g, "\n\n").trim();
+				} catch {
+					return `${about} could not be read as a Word document (an old .doc, or damaged).`;
+				}
+			} else if (kind === "text" || looksLikeText(bytes)) {
+				content = new TextDecoder("utf-8").decode(bytes).replace(/^\uFEFF/, "");
+			} else {
+				return `${about} is a binary file (PDF, spreadsheet, archive…): its content cannot be read as text here.`;
+			}
+			const from = typeof input.from === "number" && Number.isFinite(input.from) ? input.from : 0;
+			return attachmentTextPart(key, entry, content, from);
+		},
+	},
 	{
 		definition: {
 			name: "jira_get_fields",

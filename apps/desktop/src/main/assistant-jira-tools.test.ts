@@ -363,3 +363,60 @@ describe("jira_transition", () => {
 		expect(jira.moved).toEqual([]);
 	});
 });
+
+describe("jira_get_attachment", () => {
+	const RAW_ISSUE = {
+		key: "QR-1",
+		fields: {
+			summary: "x",
+			attachment: [
+				{ id: "7", filename: "notes.md", mimeType: "text/markdown", size: 12 },
+				{ id: "8", filename: "shot.png", mimeType: "image/png", size: 99 },
+				{ id: "9", filename: "spec.pdf", mimeType: "application/pdf", size: 99 },
+			],
+		},
+	};
+	function attachmentJira() {
+		const downloaded: string[] = [];
+		const client = {
+			site: "https://jira.example.com",
+			cloud: false,
+			rawIssue: async () => RAW_ISSUE,
+			async attachment(id: string, name: string) {
+				downloaded.push(`${id}/${name}`);
+				return id === "9"
+					? new Response(new Uint8Array([37, 80, 68, 70, 0, 1]))
+					: new Response("# Notlar\nçalışıyor");
+			},
+		};
+		return { client, downloaded };
+	}
+
+	it("lists the attachments without a name", async () => {
+		const { ctx } = context(attachmentJira().client, []);
+		const result = await runTool("jira_get_attachment", { key: "QR-1" }, ctx);
+		expect(result.text).toContain("Attachments of QR-1 (3)");
+		expect(result.text).toContain("notes.md");
+	});
+
+	it("reads a text attachment", async () => {
+		const jira = attachmentJira();
+		const { ctx } = context(jira.client, []);
+		const result = await runTool("jira_get_attachment", { key: "QR-1", name: "notes" }, ctx);
+		expect(result.isError).toBe(false);
+		expect(result.text).toContain("# Notlar\nçalışıyor");
+		expect(jira.downloaded).toEqual(["7/notes.md"]);
+	});
+
+	it("says images and binary files cannot be read", async () => {
+		const jira = attachmentJira();
+		const { ctx } = context(jira.client, []);
+		expect((await runTool("jira_get_attachment", { key: "QR-1", name: "8" }, ctx)).text).toContain(
+			"is an image",
+		);
+		expect(
+			(await runTool("jira_get_attachment", { key: "QR-1", name: "spec.pdf" }, ctx)).text,
+		).toContain("binary file");
+		expect(jira.downloaded).toEqual(["9/spec.pdf"]);
+	});
+});

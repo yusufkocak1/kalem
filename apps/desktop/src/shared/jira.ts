@@ -588,6 +588,16 @@ export function issueText(issue: JiraIssue): string {
 			),
 		);
 	}
+	const attachments = issue.attachments ?? [];
+	if (attachments.length > 0) {
+		lines.push(
+			"",
+			`Attachments (${attachments.length}; read one with jira_get_attachment):`,
+			...attachments.map(
+				(file) => `- ${file.filename}${file.mimeType === "" ? "" : ` (${file.mimeType})`}`,
+			),
+		);
+	}
 	if (issue.comments.length > 0) {
 		const skipped = issue.commentTotal - issue.comments.length;
 		lines.push(
