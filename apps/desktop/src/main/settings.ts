@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Settings } from "../shared/bridge.js";
+import { migratePermissions } from "../shared/settings-pages.js";
 import { parseSettings } from "../shared/settings-schema.js";
 
 export const MAX_RECENT_FILES = 12;
@@ -67,8 +68,13 @@ export function parseStoredState(raw: unknown): StoredState {
 		? root.recentFiles.filter((p): p is string => typeof p === "string" && p !== "")
 		: [];
 
+	const settings = parseSettings(root.settings);
 	return {
-		settings: parseSettings(root.settings),
+		// An earlier version allowed the assistant's changes a category at a time; now a page at a time.
+		settings: {
+			...settings,
+			assistantPermissions: migratePermissions(settings.assistantPermissions),
+		},
 		recentFiles: [...new Set(recentFiles)].slice(0, MAX_RECENT_FILES),
 		window: parseBounds(root.window),
 		welcomed: asBoolean(root.welcomed, false),

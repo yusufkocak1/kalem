@@ -6,7 +6,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import { SETTING_CATEGORIES } from "../src/shared/settings-schema.js";
+import { SETTING_PAGES } from "../src/shared/settings-pages.js";
 import { createExplorer } from "./audit.js";
 import { fakeClaude } from "./fake-claude.js";
 import { clickMenu, launch, showPane, stubOpenDialog, tempDir } from "./launch.js";
@@ -156,7 +156,7 @@ for (const theme of ["light", "dark"] as const) {
 		await clickMenu(app, "File", "Settings…");
 		const settings = page.locator(".settings-dialog");
 		await expect(settings).toBeVisible();
-		for (const category of SETTING_CATEGORIES) {
+		for (const category of SETTING_PAGES) {
 			await settings.locator(`.settings-nav-item[data-category="${category}"]`).click();
 			await ex.scene(`settings ${category}`);
 		}

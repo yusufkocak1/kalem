@@ -97,6 +97,10 @@ test("Claude Code changes a setting through Kalem's tools once the user allows i
 	await expect(card).toContainText("Change settings");
 	await expect(card).toContainText("Theme: Light → Dark");
 	await expect(card).toContainText("Why: koyu tema");
+	// "Always" says what it covers: the page the setting is on.
+	await expect(card.locator('.assistant-approval-scope option[value="always"]')).toHaveText(
+		"Always allow (Settings: Interface › Theme & Colours)",
+	);
 	await card.locator(".assistant-approval-scope").selectOption("always");
 	await card.getByRole("button", { name: "Allow" }).click();
 	await expect.poll(() => isDark(page)).toBe(true);
@@ -124,7 +128,7 @@ test("Claude Code changes a setting through Kalem's tools once the user allows i
 	// What was allowed always is kept; the change can be undone from the reply.
 	await expect
 		.poll(async () => JSON.parse(await readFile(join(userData, "settings.json"), "utf8")).settings)
-		.toMatchObject({ theme: "dark", assistantPermissions: ["settings:appearance"] });
+		.toMatchObject({ theme: "dark", assistantPermissions: ["settings/appearance"] });
 	await reply.locator(".assistant-change").getByRole("button", { name: "Undo" }).click();
 	await expect.poll(() => isDark(page)).toBe(false);
 	await expect(reply.locator(".assistant-change")).toContainText("Undone");
@@ -134,7 +138,8 @@ test("Claude Code changes a setting through Kalem's tools once the user allows i
 	const dialog = page.locator(".settings-dialog");
 	await dialog.locator('[data-category="assistantTools"]').click();
 	const allowed = dialog.locator('[data-block="permissions"]');
-	await expect(allowed).toContainText("Settings: Appearance");
+	// A page of Settings, named as the window names it.
+	await expect(allowed).toContainText("Settings: Interface › Theme & Colours");
 	await allowed.getByRole("button", { name: "Remove" }).click();
 	await expect(allowed).toContainText("Nothing is allowed always");
 	expect(errors).toEqual([]);
@@ -1317,7 +1322,7 @@ test("templates: the team's and the user's own, a default, and new documents fro
 
 	await clickMenu(app, "File", "Settings…");
 	const dialog = page.locator(".settings-dialog");
-	await dialog.locator('[data-category="templates"]').click();
+	await dialog.locator('[data-category="page"]').click();
 	const block = dialog.locator('[data-block="templates"]');
 	await expect(block.locator(".settings-template")).toHaveCount(3);
 	await expect(block.locator(".settings-template").first()).toContainText("Kurum Analiz Şablonu");
@@ -1552,7 +1557,7 @@ test("the assistant's panel moves left or under the document, and '@' adds a sec
 
 	await clickMenu(app, "File", "Settings…");
 	const dialog = page.locator(".settings-dialog");
-	await dialog.locator('[data-category="assistant"]').click();
+	await dialog.locator('[data-category="panels"]').click();
 	await dialog.locator('select[data-setting="assistantPlace"]').selectOption({ label: "Bottom" });
 	await expect(page.locator(".desk-column > .assistant")).toBeVisible();
 	await expect(pane).toHaveAttribute("data-place", "bottom");

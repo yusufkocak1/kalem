@@ -71,6 +71,7 @@ test("a palette chosen in the Settings tab colours the whole app, and stays when
 		);
 	await expect.poll(accent).toBe("#0f4e4a");
 	await clickMenu(app, "File", "Settings…");
+	await page.locator('.settings-dialog [data-category="appearance"]').click();
 	await page.locator('.settings-dialog [data-palette="rose"]').click();
 	await expect.poll(accent).toBe("#a8325e");
 	// A style sheet that comes after the palette's, as the development server puts one in again.

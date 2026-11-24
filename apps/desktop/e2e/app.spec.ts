@@ -798,8 +798,9 @@ test("keeps every setting in File → Settings, by category and by search", asyn
 	const dialog = page.locator(".settings-dialog");
 	await expect(dialog).toBeVisible();
 	await expect(dialog.locator(".settings-search")).toBeFocused();
-	// One category at a time: Appearance first.
-	await expect(dialog.locator('[data-section="appearance"]')).toBeVisible();
+	// One page at a time: General first.
+	await expect(dialog.locator('[data-section="general"]')).toBeVisible();
+	await expect(dialog.locator('[data-section="appearance"]')).toBeHidden();
 	await expect(dialog.locator('[data-section="page"]')).toBeHidden();
 
 	await dialog.locator('[data-category="page"]').click();
@@ -2249,6 +2250,7 @@ test("picks a colour palette in the settings, or the user's own colours", async 
 		);
 	expect(await accent()).toBe("#0f4e4a");
 	await clickMenu(app, "File", "Settings…");
+	await page.locator('.settings-dialog [data-category="appearance"]').click();
 	const block = page.locator('.settings-dialog [data-block="palette"]');
 	await expect(block.locator(".palette-swatch")).toHaveCount(11);
 	await block.locator('[data-palette="forest"]').click();

@@ -52,3 +52,48 @@ test("the panes' buttons on the edges are icons, named beside them when pointed 
 	await stubMessageBox(app, 1);
 	await app.close();
 });
+
+test("the assistant takes a side as the panes do: its button on that edge, one panel open there at a time", async () => {
+	const folder = await tempDir("assistant-side");
+	const doc = join(folder, "notlar.md");
+	await writeFile(doc, "# Notlar\n\nKullanıcı siparişi iptal edebilir.\n");
+	const { app, page, errors } = await launch({
+		args: [doc],
+		env: { KALEM_CLAUDE: join(folder, "nothing-here") },
+	});
+	const assistant = page.locator(".assistant");
+	const notes = page.locator(".dock-right");
+	const assistantButton = page.locator(".assistant-rail-button");
+	const notesButton = page.locator('.stripe-button[data-pane="notes"]');
+
+	// On the right, after the right dock's panes.
+	await expect(page.locator(".stripe-right .assistant-rail-button")).toBeVisible();
+
+	// My Notes and the assistant share the right side: one opens, the other closes.
+	await notesButton.click();
+	await expect(notes).toBeVisible();
+	await assistantButton.click();
+	await expect(assistant).toBeVisible();
+	await expect(notes).toBeHidden();
+	await expect(notesButton).toHaveAttribute("aria-pressed", "false");
+	await notesButton.click();
+	await expect(notes).toBeVisible();
+	await expect(assistant).toBeHidden();
+	await expect(assistantButton).toHaveAttribute("aria-expanded", "false");
+
+	// Moved to the left from its button's menu: its button goes with it, the right edge keeps My Notes'.
+	await assistantButton.click({ button: "right" });
+	await page.locator(".dock-menu").getByRole("menuitem", { name: "Move to Left" }).click();
+	await expect(page.locator(".stripe-left .assistant-rail-button")).toBeVisible();
+	await expect(page.locator(".stripe-right .assistant-rail-button")).toHaveCount(0);
+	// Opened there, it takes the left side's place: the headings pane closes.
+	await page.locator(".stripe-left .assistant-rail-button").click();
+	await expect(assistant).toBeVisible();
+	await expect(assistant).toHaveAttribute("data-place", "left");
+	await expect(page.locator(".dock-left")).toBeHidden();
+	await expect(notes).toBeVisible();
+
+	expect(errors).toEqual([]);
+	await stubMessageBox(app, 1);
+	await app.close();
+});

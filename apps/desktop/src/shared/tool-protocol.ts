@@ -75,7 +75,7 @@ export interface ApprovalRequest {
 	readonly chatId: string;
 	readonly tool: string;
 	readonly risk: Exclude<ToolRisk, "read">;
-	/** The kind of change, as the permissions keep it (`settings:appearance`, `document`, `jira`). */
+	/** The kind of change, as the permissions keep it (`settings/appearance`, a page of Settings; `document`, `jira`). */
 	readonly permission: string;
 	readonly title: string;
 	/** What changes, a line each (`Theme: System → Dark`). */

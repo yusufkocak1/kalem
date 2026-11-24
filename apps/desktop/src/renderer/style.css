@@ -1121,6 +1121,11 @@ button {
 
 /* --- Assistant rail: the assistant's button at the right edge ------------- */
 
+/* With no button on the right edge (the assistant on another side, no pane there), no empty strip. */
+.assistant-rail:not(:has(> .dock-stripe:not([hidden]))) {
+	display: none;
+}
+
 .assistant-rail {
 	display: flex;
 	flex: none;
@@ -8859,7 +8864,7 @@ pre[data-confluence-kind="layout"]::before {
 .settings-nav {
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
+	gap: 8px;
 	padding-inline-end: 12px;
 	border-inline-end: 1px solid var(--app-border);
 	overflow-y: auto;
@@ -8872,7 +8877,7 @@ pre[data-confluence-kind="layout"]::before {
 	gap: 2px;
 }
 
-.settings-nav-group:not(:has(.settings-nav-heading)) {
+.settings-nav-group:not(:first-child):not(:has(.settings-nav-heading)) {
 	padding-top: 10px;
 	border-top: 1px solid var(--app-border);
 }
@@ -8987,7 +8992,7 @@ pre[data-confluence-kind="layout"]::before {
 }
 
 .settings-nav-item {
-	padding: 6px 10px;
+	padding: 5px 10px;
 	border: 0;
 	border-radius: 6px;
 	background: none;

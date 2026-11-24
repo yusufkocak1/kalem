@@ -30,6 +30,7 @@ import {
 	storeMode,
 } from "../shared/mode-config.js";
 import { MODE_LABELS } from "../shared/modes.js";
+import { pagePermission } from "../shared/settings-pages.js";
 import { applySettings } from "./assistant-app-tools.js";
 import type { KalemTool, ToolContext } from "./assistant-tools.js";
 import { allTools, registerTools } from "./assistant-tools.js";
@@ -147,7 +148,7 @@ async function change(
 	const answer = await ctx.approve({
 		tool,
 		risk: "ui",
-		permission: "settings:modes",
+		permission: pagePermission("modes"),
 		title,
 		lines: [...lines],
 		...(options.mustAsk === true ? { mustAsk: true } : {}),

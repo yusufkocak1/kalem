@@ -1,4 +1,4 @@
-import type { AssistantStatus, KalemBridge, Settings } from "../shared/bridge.js";
+import type { AssistantPlace, AssistantStatus, KalemBridge, Settings } from "../shared/bridge.js";
 import { DEFAULT_SETTINGS } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
@@ -21,6 +21,7 @@ import {
 	pageResetPatch,
 	pageResettable,
 	pageTitle,
+	permissionLabel,
 	SETTING_GROUPS,
 	SETTING_PAGES,
 } from "../shared/settings-pages.js";
@@ -30,7 +31,6 @@ import {
 	matchesQuery,
 	matchesStems,
 	parseSetting,
-	permissionLabel,
 	SETTING_DEFS,
 	searchText,
 	settingDef,
@@ -333,6 +333,8 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 
 	function row(def: SettingDef): HTMLElement | null {
 		if (def.label === null) return null;
+		// Where the assistant's panel is: a line of the panels' places, as the others'.
+		if (def.key === "assistantPlace") return null;
 		const label = t[def.label];
 		const id = `settings-field-${++fieldCount}`;
 		const words = searchText(t, def);
@@ -573,6 +575,9 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 			...TOOL_PANES.map((pane) => options.paneLabel(pane)),
 			...Object.values(placeLabel),
 			...settingDef("panePlaces").keywords,
+			t.assistantPane,
+			t.settingsAssistantPlace,
+			...settingDef("assistantPlace").keywords,
 		].join(" "),
 		el("div", {
 			class: "settings-block",
@@ -582,7 +587,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 				panes,
 			],
 		}),
-		["panePlaces"],
+		["panePlaces", "assistantPlace"],
 	);
 
 	function renderPanes(): void {
@@ -620,7 +625,25 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 					control,
 				];
 			}),
+			...assistantPlaceRow(settings),
 		);
+	}
+
+	/** The assistant's panel among the others: left, right or under the document; it is closed, not hidden. */
+	function assistantPlaceRow(settings: Settings): HTMLElement[] {
+		const id = `settings-pane-${++fieldCount}`;
+		const control = el("select", {
+			attrs: { id, "data-pane": "assistant", "data-setting": "assistantPlace" },
+			children: (["left", "right", "bottom"] as const).map((place) =>
+				el("option", { text: placeLabel[place], attrs: { value: place } }),
+			),
+		});
+		control.value = settings.assistantPlace;
+		control.addEventListener("change", () => {
+			update({ assistantPlace: control.value as AssistantPlace });
+			renderValues();
+		});
+		return [el("label", { attrs: { for: id }, text: t.assistantPane }), control];
 	}
 
 	// --- Assistant: the service and its model --------------------------------------
@@ -825,8 +848,8 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		text: t.templateImport,
 		attrs: { type: "button" },
 	});
-	item(
-		"templates",
+	const templatesBlock = item(
+		"page",
 		[
 			t.settingsCatTemplates,
 			t.templatesHint,
@@ -838,6 +861,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 			class: "settings-block",
 			attrs: { "data-block": "templates" },
 			children: [
+				el("h4", { text: t.settingsCatTemplates }),
 				el("p", { class: "confluence-hint", text: t.templatesHint }),
 				templateList,
 				el("div", { class: "jira-actions", children: [keepOpen, importButton] }),
@@ -1079,6 +1103,13 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 
 	// The schema's rows, in each category after its own parts.
 	for (const def of SETTING_DEFS) if (def.category !== "typography") row(def);
+	// The templates after the page's own settings: the size and margins first, as the page's name says.
+	contents.get("page")?.append(templatesBlock);
+	// What coding agents' spec files follow goes with the templates they come from.
+	const specRow = contents
+		.get("page")
+		?.querySelector<HTMLElement>(':scope > [data-key="specProfile"]');
+	if (specRow) templatesBlock.after(specRow);
 
 	// --- Search ------------------------------------------------------------------
 
