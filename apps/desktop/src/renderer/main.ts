@@ -1971,6 +1971,9 @@ function applySettings(): void {
 	pageSetup.textContent = pageRule(settings);
 	paletteStyle.textContent = paletteCss(settings.palette, settings.paletteCustom);
 	applyAccent();
+	// Last in the head, the palette and then the system's accent: a sheet put in after them does not undo them.
+	if (document.head.lastElementChild !== accentStyle)
+		document.head.append(paletteStyle, accentStyle);
 	document.documentElement.dataset.density = settings.density;
 	app.style.setProperty("--zoom", String(settings.zoom / 100));
 	app.toggleAttribute("data-full-width", settings.fullWidth);

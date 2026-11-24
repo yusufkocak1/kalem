@@ -25,6 +25,12 @@ describe("colour palettes", () => {
 		expect(css).toContain("--app-accent: #7fb4f0;");
 	});
 
+	it("outweighs the style sheet's own root, whatever order the sheets come in", () => {
+		const css = paletteCss("ocean", PALETTES.kalem);
+		expect(css).toContain(":root:root {");
+		expect(css).not.toMatch(/(^|[^:\w]):root \{/m);
+	});
+
 	it("uses the user's own colours for a custom palette", () => {
 		const custom = parsePaletteCustom({ light: { accent: "#AA0000" }, dark: { page: "#101010" } });
 		expect(custom.light.accent).toBe("#aa0000");

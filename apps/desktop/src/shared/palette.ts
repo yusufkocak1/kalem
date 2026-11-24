@@ -283,15 +283,23 @@ export function paletteCss(choice: PaletteChoice, custom: PaletteTheme): string 
 	// On the screen only: printing keeps the paper's own colours.
 	return [
 		"@media screen {",
-		`:root {\n${variables(light, false)}\n}`,
+		`${ROOT} {\n${variables(light, false)}\n}`,
 		`${EDITOR_SURFACES} {\n${editorVariables(light, false)}\n}`,
 		"}",
 		"@media screen and (prefers-color-scheme: dark) {",
-		`:root {\n${variables(dark, true)}\n}`,
+		`${ROOT} {\n${variables(dark, true)}\n}`,
 		`${EDITOR_SURFACES} {\n${editorVariables(dark, true)}\n}`,
 		"}",
 	].join("\n");
 }
+
+/**
+ * The document's root, as the palette names it: weightier than the style
+ * sheet's own `:root`, so the palette wins whatever order the sheets come in
+ * (a sheet put in again after it, as the development server does, would
+ * otherwise put Kalem's colours back around a page that keeps the palette's).
+ */
+const ROOT = ":root:root";
 
 /** The editor's own surfaces, whose colours its theme sets with no specificity (`:where`). */
 const EDITOR_SURFACES =
@@ -375,11 +383,11 @@ export function systemAccentCss(
 		`\t--kalem-accent: ${value};\n\t--kalem-accent-fg: ${textOn(value)};`;
 	return [
 		"@media screen {",
-		`:root {\n${accentVariables(lightAccent, light, false)}\n}`,
+		`${ROOT} {\n${accentVariables(lightAccent, light, false)}\n}`,
 		`${EDITOR_SURFACES} {\n${editor(lightAccent)}\n}`,
 		"}",
 		"@media screen and (prefers-color-scheme: dark) {",
-		`:root {\n${accentVariables(darkAccent, dark, true)}\n}`,
+		`${ROOT} {\n${accentVariables(darkAccent, dark, true)}\n}`,
 		`${EDITOR_SURFACES} {\n${editor(darkAccent)}\n}`,
 		"}",
 	].join("\n");
