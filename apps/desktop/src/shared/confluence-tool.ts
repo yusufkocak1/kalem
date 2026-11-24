@@ -139,6 +139,8 @@ export function pageText(
 		readonly title: string;
 		readonly spaceKey: string;
 		readonly url: string;
+		/** Where it sits, who wrote it, its labels: lines shown with its first part. */
+		readonly about?: string;
 	},
 	markdown: string,
 	offset: number,
@@ -152,7 +154,9 @@ export function pageText(
 			: "";
 	const range =
 		offset === 0 && end >= text.length ? "" : ` (characters ${offset}-${end} of ${text.length})`;
-	return `Page "${page.title}" (page id ${page.id}, space ${page.spaceKey})${range}\n${page.url}\n\n${part === "" ? "[No text past this point.]" : part}${more}`;
+	const about =
+		offset === 0 && page.about !== undefined && page.about !== "" ? `${page.about}\n` : "";
+	return `Page "${page.title}" (page id ${page.id}, space ${page.spaceKey})${range}\n${page.url}\n${about}\n${part === "" ? "[No text past this point.]" : part}${more}`;
 }
 
 /** What the model is told about Confluence; `site` is `null` when the app is not connected to one. */
@@ -191,5 +195,11 @@ ${how}
 How to search well:
 - Search inside pages with 2-4 distinctive words, not the whole question. Confluence matches whole words: also try a shorter stem (Turkish suffixes: "onaylanması" → "onay"), synonyms, an abbreviation or the English term, and an exact "phrase" when you know one. Search titles when the user names a page.
 - Look at several results before choosing; then read the 1-4 most promising pages. Do not answer from the excerpts alone when the answer needs the page.
-- Answer from what you read: say what the pages say, and cite each page you used as a Markdown link, [Title](address). When pages disagree, or the answer is not there, say so and say what you searched for.`;
+- Answer from what you read: say what the pages say, and cite each page you used as a Markdown link, [Title](address). When pages disagree, or the answer is not there, say so and say what you searched for.
+
+A page read says where it sits, who created and last changed it and its labels. What Confluence fills in when the page is shown is marked ⟦like this⟧ where it stands: a Jira issue table (read its JQL with jira_search), a page included from another (find and read it), a draw.io or Gliffy diagram, an attached file, a list of pages. Follow them when the question needs them.${
+		way === "block"
+			? ""
+			: " Further tools: confluence_get_attachment lists a page's attachments and reads one (text files and Word documents as text; pictures, diagrams and screenshots are shown to you); confluence_page_history lists a page's versions and shows what a version changed; confluence_find_user finds a person by name; confluence_cql pages through results with `next`."
+	}`;
 }

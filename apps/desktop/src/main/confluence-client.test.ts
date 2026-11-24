@@ -1003,3 +1003,96 @@ describe("ConfluenceStore", () => {
 		expect(await new ConfluenceStore(file, box).get()).toBeNull();
 	});
 });
+
+describe("what the assistant reads of a page", () => {
+	const cloudLogin = { site: "acme.atlassian.net", username: "a@b.c", token: "tok" };
+
+	it("reads a Cloud blog post where the pages endpoint does not know it", async () => {
+		const { fetch, calls } = fakeFetch([
+			["/api/v2/pages/77", { message: "Not found" }, 404],
+			["/api/v2/blogposts/77/attachments", { results: [{ id: "att1", title: "a.png" }] }],
+			[
+				"/api/v2/blogposts/77",
+				{
+					title: "Duyuru",
+					spaceId: "",
+					version: { number: 3 },
+					body: { storage: { value: "<p>x</p>" } },
+				},
+			],
+		]);
+		const client = new ConfluenceClient(cloudLogin, fetch);
+		const page = await client.page("77");
+		expect(page.page.title).toBe("Duyuru");
+		expect(page.storage).toBe("<p>x</p>");
+		expect((await client.attachments("77")).map((file) => file.name)).toEqual(["a.png"]);
+		// Once known, the blog post is not asked of the pages endpoint again.
+		expect(calls.filter((call) => call.url.includes("/api/v2/pages/77"))).toHaveLength(1);
+	});
+
+	it("reads a Server page's ancestors, versions and an old version", async () => {
+		const { fetch, calls } = fakeFetch([
+			[
+				"/rest/api/content/5?expand=ancestors",
+				{
+					type: "page",
+					ancestors: [{ id: "1", title: "Ana Sayfa" }],
+					version: { number: 4, when: "2026-02-01T10:00:00.000Z", by: { displayName: "Ali" } },
+					history: { createdDate: "2026-01-01T10:00:00.000Z", createdBy: { displayName: "Ayşe" } },
+				},
+			],
+			[
+				"/rest/experimental/content/5/version",
+				{
+					results: [
+						{ number: 3, when: "2026-01-20", by: { displayName: "Ali" }, message: "düzeltme" },
+					],
+				},
+			],
+			["status=historical&version=3", { body: { storage: { value: "<p>eski</p>" } } }],
+		]);
+		const client = new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "", token: "pat" },
+			fetch,
+		);
+		expect(await client.pageInfo("5")).toEqual({
+			type: "page",
+			ancestors: [{ id: "1", title: "Ana Sayfa" }],
+			version: 4,
+			modified: "2026-02-01T10:00:00.000Z",
+			modifiedBy: "Ali",
+			created: "2026-01-01T10:00:00.000Z",
+			createdBy: "Ayşe",
+		});
+		expect(await client.versions("5")).toEqual([
+			{ number: 3, when: "2026-01-20", by: "Ali", message: "düzeltme", minor: false },
+		]);
+		expect(await client.pageVersion("5", 3)).toBe("<p>eski</p>");
+		expect(calls.at(-1)?.url).toContain("/rest/api/content/5?status=historical&version=3");
+	});
+
+	it("pages through a CQL search", async () => {
+		const { fetch } = fakeFetch([
+			["cursor=abc", { results: [{ content: { id: "2", title: "İkinci" } }], _links: {} }],
+			[
+				"/rest/api/search?",
+				{
+					results: [{ content: { id: "1", title: "Birinci" } }],
+					_links: { next: "/rest/api/search?cql=type%3Dpage&cursor=abc" },
+				},
+			],
+		]);
+		const client = new ConfluenceClient(
+			{ site: "https://wiki.example.com", username: "", token: "pat" },
+			fetch,
+		);
+		const first = await client.searchCqlPage("type=page", 1, null);
+		expect(first.results.map((result) => result.title)).toEqual(["Birinci"]);
+		expect(first.next).toBe("/rest/api/search?cql=type%3Dpage&cursor=abc");
+		const second = await client.searchCqlPage("type=page", 1, first.next);
+		expect(second).toMatchObject({ next: null, results: [{ title: "İkinci" }] });
+		await expect(client.searchCqlPage("type=page", 1, "/rest/api/content/1")).rejects.toThrow(
+			"Invalid search cursor",
+		);
+	});
+});

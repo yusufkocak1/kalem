@@ -119,6 +119,27 @@ function context(
 
 const YES: ApprovalAnswer = { approved: true, scope: "once" };
 
+const CQL_RESULTS = [
+	{
+		id: "42",
+		type: "",
+		title: "Sprint Planı",
+		space: "Geliştirme",
+		url: "https://wiki.example.com/pages/42",
+		excerpt: "",
+		modified: "2026-10-01T09:00:00.000Z",
+	},
+	{
+		id: "",
+		type: "page",
+		title: "Taslak",
+		space: "",
+		url: "https://wiki.example.com/x",
+		excerpt: "",
+		modified: null,
+	},
+];
+
 describe("jira_clone_issue", () => {
 	it("copies the issue's fields, custom ones included, and links the copy", async () => {
 		const jira = fakeJira();
@@ -261,26 +282,7 @@ describe("Confluence tools", () => {
 	/** Keşif testi: a result without a type read "Sprint Planı (, id 42, …)". */
 	it("lists CQL results without empty parts", async () => {
 		const confluence = {
-			searchCql: async () => [
-				{
-					id: "42",
-					type: "",
-					title: "Sprint Planı",
-					space: "Geliştirme",
-					url: "https://wiki.example.com/pages/42",
-					excerpt: "",
-					modified: "2026-10-01T09:00:00.000Z",
-				},
-				{
-					id: "",
-					type: "page",
-					title: "Taslak",
-					space: "",
-					url: "https://wiki.example.com/x",
-					excerpt: "",
-					modified: null,
-				},
-			],
+			searchCqlPage: async () => ({ results: CQL_RESULTS, next: "/rest/api/search?cql=x&start=2" }),
 		};
 		const { ctx } = context(null, [], confluence);
 		const result = await runTool("confluence_cql", { cql: "type = page" }, ctx);
@@ -288,6 +290,7 @@ describe("Confluence tools", () => {
 			"- Sprint Planı (id 42, Geliştirme, 2026-10-01) https://wiki.example.com/pages/42",
 		);
 		expect(result.text).toContain("- Taslak (page) https://wiki.example.com/x");
+		expect(result.text).toContain('"next": "/rest/api/search?cql=x&start=2"');
 	});
 
 	it("are offered only while connected", () => {

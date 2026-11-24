@@ -2874,6 +2874,12 @@ export function createAssistantPane(host: AssistantHost): AssistantPane {
 				return format(t.assistantStepConfluenceTitles, detail);
 			case "confluence_read_page":
 				return format(t.assistantStepConfluenceRead, detail);
+			case "confluence_get_attachment":
+				return format(t.assistantStepConfluenceAttachment, detail);
+			case "confluence_page_history":
+				return format(t.assistantStepConfluenceHistory, detail);
+			case "confluence_find_user":
+				return format(t.assistantStepConfluenceUser, detail);
 			case "jira_get_issue":
 				return format(t.assistantStepJiraIssue, detail);
 			case "jira_search":

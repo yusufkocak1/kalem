@@ -105,6 +105,7 @@ import "./assistant-jira-insight-tools.js";
 import "./assistant-mode-tools.js";
 import "./assistant-mode-edit-tools.js";
 import "./assistant-confluence-tools.js";
+import "./assistant-confluence-more-tools.js";
 import { blockResults, parseApprovalAnswer, toolCalls } from "../shared/tool-protocol.js";
 import { collectSources, MAX_SOURCES, SOURCE_BUDGET } from "./assistant-sources.js";
 import type { AssistantStore } from "./assistant-store.js";
