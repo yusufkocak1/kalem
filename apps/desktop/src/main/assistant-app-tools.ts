@@ -26,7 +26,14 @@ import {
 } from "../shared/document-outline.js";
 import { format } from "../shared/i18n.js";
 import type { PanePlace, ToolPane } from "../shared/panes.js";
-import { movePane, PANE_PLACES, placesFor, revealPane, TOOL_PANES } from "../shared/panes.js";
+import {
+	movePane,
+	oneOnEachSide,
+	PANE_PLACES,
+	placesFor,
+	revealPane,
+	TOOL_PANES,
+} from "../shared/panes.js";
 import type { SettingDef } from "../shared/settings-schema.js";
 import {
 	findSettings,
@@ -166,7 +173,9 @@ function intended(
 }
 
 /** Applies settings the user allowed; language goes through its own flow (a restart). */
-export function applySettings(ctx: ToolContext, patch: Partial<Settings>, label: string): void {
+export function applySettings(ctx: ToolContext, change: Partial<Settings>, label: string): void {
+	// With what it closes on the same side (one panel open on each), so Undo opens that again too.
+	const patch = oneOnEachSide(ctx.settings(), change);
 	const before: Record<string, unknown> = {};
 	for (const key of Object.keys(patch) as (keyof Settings)[]) before[key] = ctx.settings()[key];
 	const { language, ...rest } = patch;

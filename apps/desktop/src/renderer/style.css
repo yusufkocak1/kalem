@@ -1121,6 +1121,11 @@ button {
 
 /* --- Assistant rail: the assistant's button at the right edge ------------- */
 
+/* With no button on the right edge (the assistant on another side, no pane there), no empty strip. */
+.assistant-rail:not(:has(> .dock-stripe:not([hidden]))) {
+	display: none;
+}
+
 .assistant-rail {
 	display: flex;
 	flex: none;

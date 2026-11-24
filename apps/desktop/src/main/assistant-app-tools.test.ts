@@ -224,6 +224,19 @@ describe("the assistant's app tools", () => {
 		).toContain("left, right or bottom");
 	});
 
+	it("shows a panel on its own side, closing its own panel there, and its Undo opens that again", async () => {
+		const { ctx, events, settings } = context(() => allow);
+		ctx.changeSettings({ assistant: true, assistantPlace: "right", rightDock: false });
+		const shown = await runTool("pane_show", { pane: "notes" }, ctx);
+		expect(shown.text).toBe("Shown: notes.");
+		// One panel open on each side: My Notes on the right, the assistant's panel closed.
+		expect(settings()).toMatchObject({ rightDock: true, rightPane: "notes", assistant: false });
+		expect(events.at(-1)).toMatchObject({
+			kind: "changed",
+			undo: { rightDock: false, assistant: true },
+		});
+	});
+
 	it("changes the language through the app's own flow", async () => {
 		const { ctx, languages } = context(() => allow);
 		const set = await runTool("settings_set", { changes: [{ key: "language", value: "tr" }] }, ctx);

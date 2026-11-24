@@ -32,6 +32,11 @@ export const SETTING_PAGES: readonly SettingPage[] = SETTING_GROUPS.flatMap((gro
 
 /** Settings of the assistant's category that are shown on a page of their own. */
 const MOVED: Partial<Record<keyof Settings, SettingPage>> = {
+	// The assistant's panel takes a side as the other panels do: it is set up with them.
+	assistant: "panels",
+	assistantPlace: "panels",
+	assistantWidth: "panels",
+	assistantHeight: "panels",
 	assistantMcpServers: "mcp",
 	assistantPermissions: "assistantTools",
 	assistantToolPolicies: "assistantTools",

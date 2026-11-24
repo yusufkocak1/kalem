@@ -17,7 +17,7 @@ import { CHANNEL } from "../shared/bridge.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format, pickLanguage, stringsFor } from "../shared/i18n.js";
 import { quickNoteName } from "../shared/notes.js";
-import { isPaneShown, revealPane } from "../shared/panes.js";
+import { isPaneShown, oneOnEachSide, revealPane } from "../shared/panes.js";
 import { isEditablePath, isPackagePath, isProgramPath, uncShare } from "../shared/paths.js";
 import { watchSystemAccent } from "./accent.js";
 import { ChatStore } from "./assistant-chats.js";
@@ -236,7 +236,8 @@ function start(): void {
 	}
 
 	function changeSettings(patch: Partial<Settings>): void {
-		store.updateSettings(patch);
+		// One panel on each side: the assistant's opening closes the dock there, and the other way round.
+		store.updateSettings(oneOnEachSide(store.settings, patch));
 		tray.apply(store.settings.tray);
 		nativeTheme.themeSource = store.settings.theme;
 		applySpellCheck();

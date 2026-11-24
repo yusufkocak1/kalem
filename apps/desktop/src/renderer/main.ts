@@ -26,7 +26,7 @@ import { format, stringsFor } from "../shared/i18n.js";
 import { noteKey } from "../shared/local-notes.js";
 import { paletteCss, systemAccentCss } from "../shared/palette.js";
 import type { ToolPane } from "../shared/panes.js";
-import { isPaneShown, revealPane, togglePane } from "../shared/panes.js";
+import { isPaneShown, oneOnEachSide, revealPane, togglePane } from "../shared/panes.js";
 import {
 	extension,
 	isEditablePath,
@@ -589,9 +589,9 @@ const assistant = createAssistantPane({
 	setApprovalMode: (mode) => updateSettings({ assistantApprovals: mode }),
 });
 
-// Always at the right edge, so the assistant is never hard to find.
+// On the edge of the side the assistant is on, after that side's panes' buttons, as one of them.
 const assistantToggle = el("button", {
-	class: "assistant-rail-button",
+	class: "stripe-button assistant-rail-button",
 	attrs: {
 		type: "button",
 		title: `${t.assistantPane} (${startup.platform === "darwin" ? "Cmd" : "Ctrl"}+Shift+L)`,
@@ -600,7 +600,7 @@ const assistantToggle = el("button", {
 	},
 	children: [
 		icon("assistant"),
-		el("span", { class: "assistant-rail-label", text: t.assistantTitle }),
+		el("span", { class: "stripe-label assistant-rail-label", text: t.assistantTitle }),
 	],
 });
 assistantToggle.addEventListener("click", () => {
@@ -613,7 +613,7 @@ assistantToggle.addEventListener("click", () => {
 		assistant.focus();
 	}
 });
-const assistantRail = el("div", { class: "assistant-rail", children: [assistantToggle] });
+const assistantRail = el("div", { class: "assistant-rail" });
 const assistantShortcut = `${startup.platform === "darwin" ? "Cmd" : "Ctrl"}+Shift+L`;
 attachTip(
 	assistantToggle,
@@ -684,6 +684,12 @@ const docks = createDocks({
 		return true;
 	},
 	badge: (pane) => (pane === "notes" ? localNotes.count() : null),
+	// The assistant takes a side as a pane does: its button there, and one panel open on that side.
+	side: {
+		button: assistantToggle,
+		place: () => settings.assistantPlace,
+		move: (place) => updateSettings({ assistantPlace: place }),
+	},
 });
 refreshBadges = () => docks.refreshBadges();
 const deskColumn = el("div", { class: "desk-column", children: [deskArea, docks.elements.bottom] });
@@ -2002,8 +2008,10 @@ function applySettings(): void {
 	documentMap.refresh();
 }
 
-function updateSettings(patch: Partial<Settings>): void {
+function updateSettings(change: Partial<Settings>): void {
 	const before = docks.shown();
+	// One panel on each side: the assistant's opening closes the dock there, and the other way round.
+	const patch = oneOnEachSide(settings, change);
 	settings = { ...settings, ...patch };
 	applySettings();
 	refreshShown(before);
@@ -2348,6 +2356,14 @@ const commands: Record<Command, () => void> = {
 	},
 };
 
+// The assistant and a pane open on one side (kept so by an earlier version): the assistant stays.
+if (settings.assistant) {
+	const keep = oneOnEachSide({ ...settings, assistant: false }, { assistant: true });
+	if (Object.keys(keep).length > 1) {
+		settings = { ...settings, ...keep };
+		bridge.updateSettings(keep);
+	}
+}
 // The ribbon reads editor state as soon as it is built, so the documents come first.
 applySettings();
 for (const document of startup.documents) openDocument(document);

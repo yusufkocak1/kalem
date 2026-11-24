@@ -28,7 +28,10 @@ describe("settings pages", () => {
 		expect(pageOf("assistantMcpServers")).toBe("mcp");
 		expect(pageOf("assistantApprovals")).toBe("assistantTools");
 		expect(pageOf("copilotTools")).toBe("assistantTools");
-		expect(pageOf("assistantPlace")).toBe("assistant");
+		expect(pageOf("assistantDocumentAuto")).toBe("assistant");
+		// The assistant's panel is set up with the other panels.
+		expect(pageOf("assistantPlace")).toBe("panels");
+		expect(pageOf("assistant")).toBe("panels");
 	});
 
 	it("resets each setting a category reset would, on exactly one page", () => {

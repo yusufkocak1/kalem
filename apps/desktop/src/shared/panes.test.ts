@@ -6,6 +6,7 @@ import {
 	dockState,
 	isPaneShown,
 	movePane,
+	oneOnEachSide,
 	panesIn,
 	parsePanePlaces,
 	placesFor,
@@ -99,5 +100,57 @@ describe("panes in docks", () => {
 		expect(parsePanePlaces(null).outline).toBe("left");
 		expect(clampDockSize(5000, 240)).toBe(900);
 		expect(clampDockSize("x", 240)).toBe(240);
+	});
+});
+
+describe("one panel open on each side, the assistant's too", () => {
+	// The notes are in the right dock by default, as the assistant is.
+	const notesOpen: Settings = { ...DEFAULT_SETTINGS, rightDock: true, rightPane: "notes" };
+	const assistantOpen: Settings = { ...DEFAULT_SETTINGS, assistant: true, rightDock: false };
+
+	it("closes the dock when the assistant opens on its side", () => {
+		expect(oneOnEachSide(notesOpen, { assistant: true })).toEqual({
+			assistant: true,
+			rightDock: false,
+		});
+	});
+
+	it("closes the assistant when a pane opens on its side", () => {
+		const patch = togglePane(assistantOpen, "notes", all);
+		expect(oneOnEachSide(assistantOpen, patch)).toEqual({ ...patch, assistant: false });
+	});
+
+	it("closes the assistant when a pane is moved to its side and shown there", () => {
+		const patch = movePane(assistantOpen, "outline", "right");
+		expect(oneOnEachSide(assistantOpen, patch)).toMatchObject({ assistant: false });
+	});
+
+	it("closes the dock the assistant is moved onto, open", () => {
+		const both: Settings = { ...assistantOpen, navigation: true, sidePane: "outline" };
+		expect(oneOnEachSide(both, { assistantPlace: "left" })).toEqual({
+			assistantPlace: "left",
+			navigation: false,
+		});
+	});
+
+	it("leaves the other sides alone", () => {
+		const left: Settings = { ...assistantOpen, navigation: true };
+		expect(oneOnEachSide(left, { assistant: true })).toEqual({ assistant: true });
+		expect(oneOnEachSide(assistantOpen, revealPane(assistantOpen, "outline"))).not.toHaveProperty(
+			"assistant",
+		);
+	});
+
+	it("changes nothing for a change that opens, closes or moves no panel", () => {
+		const both: Settings = { ...notesOpen, assistant: true };
+		expect(oneOnEachSide(both, { zoom: 120 })).toEqual({ zoom: 120 });
+	});
+
+	it("does not count a dock with nothing in it", () => {
+		const empty: Settings = {
+			...notesOpen,
+			panePlaces: { ...notesOpen.panePlaces, notes: "hidden" },
+		};
+		expect(oneOnEachSide(empty, { assistant: true })).toEqual({ assistant: true });
 	});
 });

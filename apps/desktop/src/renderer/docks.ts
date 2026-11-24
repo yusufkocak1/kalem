@@ -45,6 +45,20 @@ export interface DocksOptions {
 	reveal?(pane: ToolPane): boolean;
 	/** A count on a pane's button (the notes in the document); `null` for none. */
 	badge?(pane: ToolPane): number | null;
+	/**
+	 * A panel that is not a dock's pane but takes a side as one does (the
+	 * assistant's): its button is on that side's edge, after the panes', and
+	 * its menu moves it as theirs do.
+	 */
+	readonly side?: SidePanel;
+}
+
+export interface SidePanel {
+	readonly button: HTMLElement;
+	/** The side it is on now. */
+	place(): Dock;
+	/** Moves it to another side. */
+	move(place: Dock): void;
 }
 
 export interface Docks {
@@ -92,6 +106,29 @@ export function createDocks(options: DocksOptions): Docks {
 	};
 	function showMenu(pane: ToolPane, x: number, y: number): void {
 		const place = options.settings().panePlaces[pane];
+		openMenu(
+			placesFor(pane)
+				.filter((target) => target !== place)
+				.map((target) => [
+					placeLabel[target],
+					() => options.update(movePane(options.settings(), pane, target)),
+				]),
+			x,
+			y,
+		);
+	}
+	/** The side panel's menu: the other sides it goes to. */
+	function showSideMenu(side: SidePanel, x: number, y: number): void {
+		openMenu(
+			DOCKS.filter((target) => target !== side.place()).map((target) => [
+				placeLabel[target],
+				() => side.move(target),
+			]),
+			x,
+			y,
+		);
+	}
+	function openMenu(moves: readonly (readonly [string, () => void])[], x: number, y: number): void {
 		const item = (label: string, run: () => void): HTMLButtonElement => {
 			const button = el("button", {
 				class: "dock-menu-item",
@@ -105,13 +142,7 @@ export function createDocks(options: DocksOptions): Docks {
 			return button;
 		};
 		menu.replaceChildren(
-			...placesFor(pane)
-				.filter((target) => target !== place)
-				.map((target) =>
-					item(placeLabel[target], () =>
-						options.update(movePane(options.settings(), pane, target)),
-					),
-				),
+			...moves.map(([label, run]) => item(label, run)),
 			el("hr", { class: "dock-menu-separator" }),
 			item(t.panelLayout, () => options.openLayout()),
 		);
@@ -127,6 +158,13 @@ export function createDocks(options: DocksOptions): Docks {
 	document.addEventListener("keydown", (event) => {
 		if (event.key === "Escape" && !menu.hidden) closeMenu();
 	});
+	if (options.side !== undefined) {
+		const side = options.side;
+		side.button.addEventListener("contextmenu", (event) => {
+			event.preventDefault();
+			showSideMenu(side, event.clientX, event.clientY);
+		});
+	}
 	const menuOn = (target: HTMLElement, pane: ToolPane): void => {
 		target.addEventListener("contextmenu", (event) => {
 			event.preventDefault();
@@ -353,12 +391,15 @@ export function createDocks(options: DocksOptions): Docks {
 				if (pane.element.parentElement !== view.body) view.body.append(pane.element);
 				pane.element.hidden = id !== active;
 			}
+			// The side panel's button after the panes', on the side it is on.
+			const side = options.side?.place() === dock ? options.side.button : null;
 			view.stripe.replaceChildren(
 				...panes.map((id) =>
 					stripeButton(entries.get(id) as DockPane, open && id === active, dock),
 				),
+				...(side === null ? [] : [side]),
 			);
-			view.stripe.hidden = panes.length === 0;
+			view.stripe.hidden = panes.length === 0 && side === null;
 		}
 		// What is not in a dock (hidden, or not set up) is not shown anywhere.
 		for (const id of TOOL_PANES) {

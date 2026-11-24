@@ -1,4 +1,4 @@
-import type { AssistantStatus, KalemBridge, Settings } from "../shared/bridge.js";
+import type { AssistantPlace, AssistantStatus, KalemBridge, Settings } from "../shared/bridge.js";
 import { DEFAULT_SETTINGS } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
@@ -333,6 +333,8 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 
 	function row(def: SettingDef): HTMLElement | null {
 		if (def.label === null) return null;
+		// Where the assistant's panel is: a line of the panels' places, as the others'.
+		if (def.key === "assistantPlace") return null;
 		const label = t[def.label];
 		const id = `settings-field-${++fieldCount}`;
 		const words = searchText(t, def);
@@ -573,6 +575,9 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 			...TOOL_PANES.map((pane) => options.paneLabel(pane)),
 			...Object.values(placeLabel),
 			...settingDef("panePlaces").keywords,
+			t.assistantPane,
+			t.settingsAssistantPlace,
+			...settingDef("assistantPlace").keywords,
 		].join(" "),
 		el("div", {
 			class: "settings-block",
@@ -582,7 +587,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 				panes,
 			],
 		}),
-		["panePlaces"],
+		["panePlaces", "assistantPlace"],
 	);
 
 	function renderPanes(): void {
@@ -620,7 +625,25 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 					control,
 				];
 			}),
+			...assistantPlaceRow(settings),
 		);
+	}
+
+	/** The assistant's panel among the others: left, right or under the document; it is closed, not hidden. */
+	function assistantPlaceRow(settings: Settings): HTMLElement[] {
+		const id = `settings-pane-${++fieldCount}`;
+		const control = el("select", {
+			attrs: { id, "data-pane": "assistant", "data-setting": "assistantPlace" },
+			children: (["left", "right", "bottom"] as const).map((place) =>
+				el("option", { text: placeLabel[place], attrs: { value: place } }),
+			),
+		});
+		control.value = settings.assistantPlace;
+		control.addEventListener("change", () => {
+			update({ assistantPlace: control.value as AssistantPlace });
+			renderValues();
+		});
+		return [el("label", { attrs: { for: id }, text: t.assistantPane }), control];
 	}
 
 	// --- Assistant: the service and its model --------------------------------------

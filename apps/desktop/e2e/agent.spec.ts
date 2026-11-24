@@ -1552,7 +1552,7 @@ test("the assistant's panel moves left or under the document, and '@' adds a sec
 
 	await clickMenu(app, "File", "Settings…");
 	const dialog = page.locator(".settings-dialog");
-	await dialog.locator('[data-category="assistant"]').click();
+	await dialog.locator('[data-category="panels"]').click();
 	await dialog.locator('select[data-setting="assistantPlace"]').selectOption({ label: "Bottom" });
 	await expect(page.locator(".desk-column > .assistant")).toBeVisible();
 	await expect(pane).toHaveAttribute("data-place", "bottom");

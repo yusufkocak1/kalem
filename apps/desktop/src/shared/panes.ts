@@ -163,3 +163,45 @@ export function clampDockSize(value: unknown, fallback: number): number {
 	if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
 	return Math.round(Math.min(MAX_DOCK_SIZE, Math.max(MIN_DOCK_SIZE, value)));
 }
+
+/** The settings that open, close or move a panel. */
+const SIDE_KEYS: readonly (keyof Settings)[] = [
+	"assistant",
+	"assistantPlace",
+	"panePlaces",
+	"navigation",
+	"sidePane",
+	"rightDock",
+	"rightPane",
+	"bottomDock",
+	"bottomPane",
+];
+
+/** The side the assistant's panel is on: a dock's, which shows one panel at a time. */
+export const assistantDock = (settings: Settings): Dock => settings.assistantPlace;
+
+/** Whether a dock is open with a pane in it (one not set up is counted: it is the dock's own). */
+const dockShowsPane = (settings: Settings, dock: Dock): boolean =>
+	dockState(settings, dock).open && panesIn(settings, dock, () => true).length > 0;
+
+/**
+ * One panel open on each side, the assistant's as a dock's: a change that
+ * opens the assistant where a dock is open closes the dock, and one that
+ * opens a dock (or moves a pane into it) where the assistant is open closes
+ * the assistant. The patch, with what it closes.
+ */
+export function oneOnEachSide(before: Settings, patch: Partial<Settings>): Partial<Settings> {
+	// A change elsewhere (the zoom, a colour) leaves the panels as they are.
+	if (!SIDE_KEYS.some((key) => key in patch)) return patch;
+	const next = { ...before, ...patch };
+	if (!next.assistant) return patch;
+	const side = assistantDock(next);
+	if (!dockShowsPane(next, side)) return patch;
+	// The assistant just came to this side: opened, or moved here open.
+	const assistantCame =
+		(patch.assistant === true && !before.assistant) ||
+		(patch.assistantPlace !== undefined && patch.assistantPlace !== before.assistantPlace);
+	return assistantCame
+		? { ...patch, ...dockPatch(side, { open: false }) }
+		: { ...patch, assistant: false };
+}
