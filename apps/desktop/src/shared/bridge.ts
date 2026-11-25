@@ -210,6 +210,23 @@ export interface Settings extends Typography {
 	readonly assistantHeight: number;
 }
 
+export interface CopilotAccount {
+	readonly login: string;
+}
+
+export interface CopilotDeviceCode {
+	readonly userCode: string;
+	readonly verificationUri: string;
+	/** Seconds the code is valid for. */
+	readonly expiresIn: number;
+}
+
+export type CopilotLoginFailure = "denied" | "expired" | "cancelled" | "noCopilot" | "failed";
+
+export type CopilotLoginResult =
+	| { readonly account: CopilotAccount }
+	| { readonly error: CopilotLoginFailure; readonly detail?: string };
+
 export interface ProxyAccount {
 	readonly username: string;
 	readonly hasPassword: boolean;
@@ -1315,6 +1332,14 @@ export interface KalemBridge {
 	onAssistantToolCall(handler: (call: AssistantToolCall) => void): () => void;
 	onAssistantEvent(handler: (chatId: string, event: ClaudeEvent) => void): () => void;
 
+	/** The GitHub account Kalem signed in to for Copilot with a device code; `null` when none. */
+	copilotAccount(): Promise<CopilotAccount | null>;
+	/** Asks GitHub for a device code to type on github.com. */
+	copilotLoginBegin(): Promise<CopilotDeviceCode>;
+	/** Waits until the code is approved (or refused, or runs out). */
+	copilotLoginWait(): Promise<CopilotLoginResult>;
+	copilotLoginCancel(): Promise<void>;
+	copilotLogout(): Promise<void>;
 	/** The proxy's login: its user name, and whether a password is kept. */
 	proxyAccount(): Promise<ProxyAccount | null>;
 	/** Keeps the proxy's login (the password encrypted); an empty user name forgets it. */
@@ -1504,6 +1529,11 @@ export const CHANNEL = {
 	mcpListTools: "kalem:mcp-list-tools",
 	mcpFindCommand: "kalem:mcp-find-command",
 	setDebugMode: "kalem:set-debug-mode",
+	copilotAccount: "kalem:copilot-account",
+	copilotLoginBegin: "kalem:copilot-login-begin",
+	copilotLoginWait: "kalem:copilot-login-wait",
+	copilotLoginCancel: "kalem:copilot-login-cancel",
+	copilotLogout: "kalem:copilot-logout",
 	proxyAccount: "kalem:proxy-account",
 	proxySetLogin: "kalem:proxy-set-login",
 	proxyTest: "kalem:proxy-test",

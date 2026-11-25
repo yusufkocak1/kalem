@@ -2025,6 +2025,20 @@ const en = {
 	copilotCliNote:
 		"Uses the GitHub Copilot CLI installed on this computer, with your Copilot subscription and its own sign-in; no key is needed here.",
 	copilotModelPlaceholder: "Copilot's default model (or a model name)",
+	copilotDeviceTitle: "GitHub sign-in with a device code (optional)",
+	copilotDeviceNone:
+		"Not signed in here: the Copilot CLI uses its own sign-in. You can also sign in here with a code instead of /login.",
+	copilotDeviceSignedIn: "Signed in to GitHub as {0}: the Copilot CLI uses this account.",
+	copilotDeviceSignIn: "Sign in with a device code",
+	copilotDeviceSignOut: "Sign out",
+	copilotDeviceSteps:
+		"1. Copy the code and open the GitHub page. 2. Enter the code and approve it with the account that has a Copilot license. 3. This screen notices by itself.",
+	copilotDeviceCopyOpen: "Copy code and open GitHub",
+	copilotDeviceWaiting: "Waiting for GitHub's approval…",
+	copilotDeviceDenied: "The sign-in was declined on GitHub.",
+	copilotDeviceExpired: "The code ran out before it was approved. Try again.",
+	copilotDeviceNoCopilot: "This GitHub account has no Copilot license.",
+	copilotDeviceFailed: "GitHub could not be reached for the sign-in.",
 	assistantChats: "Chats",
 	assistantNoChats: "No chats yet. Questions you ask are kept here.",
 	assistantUntitledChat: "New chat",
@@ -4116,6 +4130,20 @@ const tr: Strings = {
 	copilotCliNote:
 		"Bu bilgisayarda kurulu GitHub Copilot CLI'ı Copilot aboneliğinizle ve kendi oturumuyla kullanır; burada anahtar gerekmez.",
 	copilotModelPlaceholder: "Copilot'ın varsayılan modeli (ya da bir model adı)",
+	copilotDeviceTitle: "Cihaz koduyla GitHub girişi (isteğe bağlı)",
+	copilotDeviceNone:
+		"Burada giriş yapılmadı: Copilot CLI kendi girişini kullanır. /login yerine buradan kodla da giriş yapabilirsiniz.",
+	copilotDeviceSignedIn: "GitHub'a {0} olarak girildi: Copilot CLI bu hesabı kullanır.",
+	copilotDeviceSignIn: "Cihaz koduyla giriş yap",
+	copilotDeviceSignOut: "Çıkış yap",
+	copilotDeviceSteps:
+		"1. Kodu kopyalayıp GitHub sayfasını açın. 2. Kodu girip Copilot lisansı olan hesabınızla onaylayın. 3. Bu ekran kendiliğinden algılar.",
+	copilotDeviceCopyOpen: "Kodu kopyala ve GitHub'ı aç",
+	copilotDeviceWaiting: "GitHub onayı bekleniyor…",
+	copilotDeviceDenied: "Giriş GitHub'da reddedildi.",
+	copilotDeviceExpired: "Kodun süresi onaylanmadan doldu. Yeniden deneyin.",
+	copilotDeviceNoCopilot: "Bu GitHub hesabının Copilot lisansı yok.",
+	copilotDeviceFailed: "Giriş için GitHub'a ulaşılamadı.",
 	assistantChats: "Sohbetler",
 	assistantNoChats: "Henüz sohbet yok. Sorduklarınız burada saklanır.",
 	assistantUntitledChat: "Yeni sohbet",

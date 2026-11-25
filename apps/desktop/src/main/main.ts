@@ -8,6 +8,7 @@ import {
 	dialog,
 	globalShortcut,
 	nativeTheme,
+	net,
 	safeStorage,
 	session,
 	shell,
@@ -24,6 +25,7 @@ import { ChatStore } from "./assistant-chats.js";
 import { AssistantStore } from "./assistant-store.js";
 import { confluenceClient } from "./confluence-ipc.js";
 import { ConfluenceStore } from "./confluence-store.js";
+import { CopilotLogin, registerCopilotLoginIpc } from "./copilot-login.js";
 import { DraftStore } from "./drafts.js";
 import { backgroundFetch } from "./git.js";
 import { findRepoRoot, isTrustedRepo } from "./git-trust.js";
@@ -110,6 +112,10 @@ function start(): void {
 	const jira = new ConfluenceStore(join(app.getPath("userData"), "jira.json"), secrets);
 	const assistant = new AssistantStore(join(app.getPath("userData"), "assistant.json"), secrets);
 	const chats = new ChatStore(join(app.getPath("userData"), "assistant-chats.json"));
+	const copilotLogin = new CopilotLogin(
+		new ConfluenceStore(join(app.getPath("userData"), "copilot-github.json"), secrets),
+		(url, init) => net.fetch(url, init),
+	);
 	const proxy = new ProxyManager(
 		new ConfluenceStore(join(app.getPath("userData"), "proxy.json"), secrets),
 		() => store.settings,
@@ -593,6 +599,8 @@ function start(): void {
 		// Before any request: the first ones would otherwise miss the proxy.
 		await proxy.start().catch((error: unknown) => console.warn("Proxy:", error));
 		registerProxyIpc(proxy);
+		await copilotLogin.start().catch((error: unknown) => console.warn("Copilot login:", error));
+		registerCopilotLoginIpc(copilotLogin);
 		watcher.watch(store.state.workspaces);
 		handleDocumentScheme({
 			loadAttachment: async (pageId, name) => {
