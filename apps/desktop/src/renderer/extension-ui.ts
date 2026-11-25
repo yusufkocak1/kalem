@@ -36,7 +36,14 @@ export function permissionLines(
 			warning: true,
 		});
 	}
-	if (permissions.http.length > 0) {
+	if (permissions.http.includes("*")) {
+		lines.push({
+			text: t.extensionPermissionAnyHost,
+			chip: t.extensionChipAnyHost,
+			icon: "link",
+			warning: true,
+		});
+	} else if (permissions.http.length > 0) {
 		lines.push({
 			text: format(t.extensionPermissionHttp, permissions.http.join(", ")),
 			chip:

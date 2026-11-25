@@ -78,6 +78,12 @@ const api = {
 		copy: fsCall("copy"),
 		resolve: fsCall("resolve"),
 	},
+	storage: {
+		get: (key: string) => invoke("storage.get", key),
+		set: (key: string, value: unknown) => invoke("storage.set", key, value),
+		remove: (key: string) => invoke("storage.set", key, null),
+		keys: () => invoke("storage.keys"),
+	},
 	workspace: {
 		folders: () => invoke("workspace.folders"),
 	},

@@ -147,7 +147,7 @@ server.listen(0, () => console.log("\\n  \\u001b[32m➜\\u001b[39m  Local:   htt
 	const url = (await opened(app))[0] as string;
 	expect(await (await fetch(url)).text()).toBe("ok");
 
-	await pane.getByRole("button", { name: "■ Stop" }).click();
+	await pane.getByRole("button", { name: "Stop", exact: true }).click();
 	await expect(output).toContainText("Process finished with exit code");
 	await expect(statusItem(page)).toHaveText("▶ Web");
 	await expect(fetch(url)).rejects.toThrow();
@@ -189,18 +189,18 @@ test("a Java class runs as an Application, and a failing step stops what comes a
 	await expect(pane.locator("#selected option")).toHaveCount(4);
 
 	await pane.locator("#selected").selectOption("Maven");
-	await pane.getByRole("button", { name: "▶ Run" }).click();
+	await pane.getByRole("button", { name: "Run", exact: true }).click();
 	await expect(pane.locator(".output")).toContainText("Apache Maven");
 	await expect(pane.locator(".output")).toContainText("Process finished with exit code 0");
 
 	await pane.locator("#selected").selectOption("Hello");
-	await pane.getByRole("button", { name: "▶ Run" }).click();
+	await pane.getByRole("button", { name: "Run", exact: true }).click();
 	const output = pane.locator(".output");
 	await expect(output).toContainText("Merhaba dünya Kalem");
 	await expect(output).toContainText("Process finished with exit code 0");
 
 	await pane.locator("#selected").selectOption("After broken");
-	await pane.getByRole("button", { name: "▶ Run" }).click();
+	await pane.getByRole("button", { name: "Run", exact: true }).click();
 	await expect(output).toContainText('"Broken" failed (exit code 4): After broken is not run.');
 	await expect(output).not.toContainText("never");
 	await expect(
@@ -232,7 +232,7 @@ test("Tomcat runs a web application on its own port, with a base of its own, and
 	]);
 	const { app, page } = await launchWith(folder);
 	const pane = await installRunner(app, page);
-	await pane.getByRole("button", { name: "▶ Run" }).click();
+	await pane.getByRole("button", { name: "Run", exact: true }).click();
 	const output = pane.locator(".output");
 	await expect(output).toContainText("Server startup in", { timeout: 60_000 });
 	const url = `http://localhost:${port}/order/`;
@@ -249,7 +249,7 @@ test("Tomcat runs a web application on its own port, with a base of its own, and
 	expect(existsSync(join(base, "conf", "web.xml"))).toBe(true);
 	expect(await readFile(join(folder, ".kalem", "run", ".gitignore"), "utf8")).toBe("*\n");
 
-	await pane.getByRole("button", { name: "■ Stop" }).click();
+	await pane.getByRole("button", { name: "Stop", exact: true }).click();
 	await expect(output).toContainText("Process finished with exit code");
 	await expect
 		.poll(() =>

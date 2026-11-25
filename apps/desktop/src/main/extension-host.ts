@@ -26,7 +26,6 @@ import {
 	MAX_REDIRECTS,
 	parseHttpRequest,
 	UI_SCRIPT,
-	UI_STYLE,
 } from "../shared/extension-api.js";
 import type { ExtensionManifest, ExtensionPermissions } from "../shared/extensions.js";
 import { hostOfSetting, isAllowedUrl, isToolName, safeEntryPath } from "../shared/extensions.js";
@@ -37,6 +36,7 @@ import { registerTools, toolNamed, unregisterTools } from "./assistant-tools.js"
 import { fileCall } from "./extension-files.js";
 import { ExtensionProcesses, parseSpawnRequest } from "./extension-process.js";
 import type { ExtensionStore } from "./extension-store.js";
+import UI_STYLE from "./extension-ui-kit.kit.css";
 import { networkLog } from "./network-log.js";
 import { EXTENSION_SCHEME } from "./protocol.js";
 
@@ -440,6 +440,15 @@ export class ExtensionHost {
 					throw new Error(`"${String(first)}" is not a command of the manifest.`);
 				}
 				running.commands.add(first);
+				return null;
+			case "storage.get":
+				return typeof first === "string" ? ((await store.data(id))[first] ?? null) : null;
+			case "storage.keys":
+				return Object.keys(await store.data(id));
+			case "storage.set":
+				if (typeof first !== "string" || first === "" || first.length > 200)
+					throw new Error("Give a key.");
+				await store.setData(id, first, second);
 				return null;
 			case "process.spawn": {
 				if (!running.granted.process)

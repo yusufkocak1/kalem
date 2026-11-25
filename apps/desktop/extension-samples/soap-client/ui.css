@@ -1,0 +1,283 @@
+.soap-layout {
+	display: grid;
+	grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+	height: 100vh;
+}
+
+.soap-load {
+	display: flex;
+	flex: none;
+	gap: 6px;
+	padding: 10px;
+	border-bottom: 1px solid var(--k-soft-line);
+}
+
+.soap-load .k-button {
+	min-width: 64px;
+}
+
+.soap-side-notice {
+	padding: 8px 10px 0;
+}
+
+.soap-side-empty {
+	min-height: 180px;
+	font-size: 12px;
+}
+
+.soap-recent-title {
+	padding: 4px 14px 0;
+}
+
+.soap-wsdl-head {
+	display: grid;
+	gap: 2px;
+	padding: 12px 14px 6px;
+}
+
+.soap-filter {
+	padding: 4px 10px 6px;
+}
+
+.soap-filter > svg {
+	left: 20px;
+}
+
+.soap-filter .k-input {
+	height: 30px;
+}
+
+.soap-port {
+	padding: 2px 0 4px;
+}
+
+.soap-port-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 14px 2px;
+}
+
+.soap-port-name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	color: var(--k-muted);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+	text-overflow: ellipsis;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+.soap-ops {
+	padding-top: 2px;
+}
+
+.soap-op-icon {
+	display: grid;
+	flex: none;
+	place-items: center;
+	width: 20px;
+	height: 20px;
+	border-radius: 6px;
+	background: color-mix(in srgb, #1769aa 14%, transparent);
+	color: #1f7fc4;
+	font-family: Georgia, serif;
+	font-size: 12px;
+	font-style: italic;
+	font-weight: 700;
+}
+
+.soap-main {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+}
+
+.soap-workspace {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.soap-title {
+	display: grid;
+	gap: 1px;
+	min-width: 0;
+}
+
+.soap-op-name {
+	font-size: 14px;
+}
+
+.soap-line {
+	display: grid;
+	flex: none;
+	gap: 6px;
+	padding: 10px 12px 8px;
+	background: var(--k-panel);
+}
+
+.soap-line .k-group {
+	height: 38px;
+	box-shadow: var(--k-shadow);
+}
+
+.soap-version {
+	min-width: 112px;
+	font-size: 12px;
+}
+
+.soap-send {
+	min-width: 96px;
+	font-weight: 600;
+}
+
+.soap-action {
+	overflow: hidden;
+	padding-left: 2px;
+	font-size: 11.5px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.soap-split {
+	flex: 1;
+	border-top: 1px solid var(--k-soft-line);
+}
+
+.soap-pane {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	background: var(--k-panel);
+}
+
+.soap-response-pane {
+	background: color-mix(in srgb, var(--k-panel) 50%, var(--k-bg));
+}
+
+.soap-pane-body {
+	position: relative;
+	flex: 1;
+	min-height: 0;
+}
+
+.soap-pad {
+	display: grid;
+	align-content: start;
+	gap: 10px;
+	padding: 12px;
+}
+
+.soap-auth {
+	max-width: 420px;
+}
+
+.soap-field {
+	display: grid;
+	gap: 5px;
+	color: var(--k-muted);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+/* The envelope: a textarea over its own colours */
+.soap-editor {
+	position: absolute;
+	inset: 0;
+}
+
+.soap-editor-input,
+.soap-editor-shade {
+	position: absolute;
+	inset: 0;
+	margin: 0;
+	padding: 12px 14px;
+	overflow: auto;
+	border: 0;
+	font-family: var(--k-mono);
+	font-size: 12px;
+	line-height: 1.6;
+	white-space: pre;
+	tab-size: 3;
+}
+
+.soap-editor-shade {
+	pointer-events: none;
+}
+
+.soap-editor-input {
+	z-index: 1;
+	width: 100%;
+	height: 100%;
+	resize: none;
+	background: transparent;
+	color: transparent;
+	caret-color: var(--k-text);
+	outline: none;
+}
+
+.soap-editor-input::selection {
+	background: color-mix(in srgb, var(--k-accent) 25%, transparent);
+	color: transparent;
+}
+
+.soap-response-head {
+	display: flex;
+	flex-wrap: wrap;
+	flex: none;
+	align-items: center;
+	gap: 6px 12px;
+	min-height: 46px;
+	padding: 6px 12px;
+	border-bottom: 1px solid var(--k-soft-line);
+}
+
+.soap-status {
+	height: 24px;
+	padding: 0 10px;
+	font-family: var(--k-mono);
+	font-size: 12px;
+}
+
+.soap-metric {
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.soap-response {
+	padding: 10px 14px;
+}
+
+.soap-fault {
+	margin: 10px 12px 0;
+}
+
+.soap-header-name {
+	color: var(--tok-key);
+	white-space: nowrap;
+}
+
+.soap-sent-title {
+	padding: 14px 10px 4px;
+}
+
+@media (max-width: 720px) {
+	.soap-layout {
+		grid-template-columns: 1fr;
+	}
+
+	.soap-side {
+		display: none;
+	}
+
+	.soap-split {
+		grid-template-columns: 1fr;
+	}
+}

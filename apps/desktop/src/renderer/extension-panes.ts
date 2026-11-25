@@ -44,6 +44,15 @@ const THEME_VARS = [
 	"--app-ok",
 	"--app-warning",
 	"--app-mono",
+	"--app-page",
+	"--app-desk",
+	"--app-pressed",
+	"--app-info-bg",
+	"--app-error-bg",
+	"--app-warning-bg",
+	"--app-shadow",
+	"--app-shadow-soft",
+	"--app-ease",
 ];
 
 function themeMessage(): { kalem: "theme"; vars: Record<string, string>; dark: boolean } {

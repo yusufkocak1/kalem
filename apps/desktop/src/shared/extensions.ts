@@ -3,6 +3,9 @@
  * it. Pure.
  */
 
+/** In `permissions.http`: any address, for a tool that calls what the user types (an API client). */
+export const ANY_HOST = "*";
+
 export const EXTENSION_FILE_EXTENSION = ".kalem-ext";
 export const MANIFEST_FILE = "manifest.json";
 export const MAX_PACKAGE_BYTES = 20 * 1024 * 1024;
@@ -231,7 +234,7 @@ export function parseManifest(raw: unknown): ManifestResult {
 	for (const item of list(permissions.http).slice(0, 50)) {
 		// kalem-locale-ok: ASCII protocol values
 		const value = typeof item === "string" ? item.trim().toLowerCase() : "";
-		if (!HOST_PATTERN.test(value))
+		if (value !== ANY_HOST && !HOST_PATTERN.test(value))
 			return { ok: false, error: `"permissions.http" has a bad host: ${JSON.stringify(item)}` };
 		if (!http.includes(value)) http.push(value);
 	}
@@ -322,6 +325,7 @@ export function isAllowedUrl(url: string, hosts: readonly string[]): boolean {
 	// kalem-locale-ok: ASCII protocol values
 	const hostname = parsed.hostname.toLowerCase();
 	return hosts.some((allowed) => {
+		if (allowed === ANY_HOST) return true;
 		const [pattern, port] = allowed.split(":") as [string, string | undefined];
 		if (port !== undefined && parsed.port !== port) return false;
 		if (pattern.startsWith("*.")) {

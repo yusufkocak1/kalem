@@ -17845,7 +17845,7 @@ dialog {
 
 .ext-tile-text {
 	display: -webkit-box;
-	flex: 1;
+	flex: none;
 	margin: 0;
 	overflow: hidden;
 	color: var(--app-muted);
@@ -17853,6 +17853,10 @@ dialog {
 	line-height: 1.5;
 	-webkit-box-orient: vertical;
 	-webkit-line-clamp: 3;
+}
+
+.ext-tile .ext-chips {
+	margin-top: auto;
 }
 
 .ext-tile-foot {

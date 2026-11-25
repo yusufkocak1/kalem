@@ -1,8 +1,20 @@
+import { icon } from "./dom.js";
 import { translator } from "./i18n.js";
 
 const $ = (id) => document.getElementById(id);
 const kalem = window.kalem;
 const t = translator(kalem.language);
+
+const TYPE_MARKS = {
+	command: "$",
+	npm: "N",
+	maven: "M",
+	gradle: "G",
+	application: "J",
+	jar: "J",
+	tomcat: "T",
+	compound: "⧉",
+};
 
 const view = {
 	selected: $("selected"),
@@ -189,7 +201,10 @@ function renderButtons() {
 	const name = view.selected.value;
 	const busy = state.sessions.some((each) => each.name === name && each.status === "running");
 	view.run.disabled = name === "";
-	view.run.textContent = busy ? t("↻ Rerun") : t("▶ Run");
+	view.run.replaceChildren(
+		icon(busy ? "refresh" : "play"),
+		document.createTextNode(busy ? t("Rerun") : t("Run")),
+	);
 	view.stop.disabled = !busy;
 	view.edit.disabled = state.folder === null;
 }
@@ -335,8 +350,15 @@ function renderList() {
 					},
 				},
 				[
-					el("span", { text: config.name || t("(no name)") }),
-					el("small", { text: t(state.types[config.type]?.title ?? config.type) }),
+					el("span", {
+						class: "type-badge",
+						"data-type": config.type,
+						text: TYPE_MARKS[config.type] ?? "?",
+					}),
+					el("span", { class: "config-text" }, [
+						el("span", { class: "config-name", text: config.name || t("(no name)") }),
+						el("small", { text: t(state.types[config.type]?.title ?? config.type) }),
+					]),
 				],
 			),
 		),
@@ -535,17 +557,17 @@ window.addEventListener("focus", () => {
 	if (draft === null) void refresh();
 });
 
-for (const [id, text] of [
-	["run", "▶ Run"],
-	["stop", "■ Stop"],
-	["edit", "Edit Configurations…"],
-	["clear", "Clear"],
-	["copy", "Copy"],
-	["remove", "Remove"],
-	["cancel", "Cancel"],
-	["save", "Save"],
+for (const [id, text, mark] of [
+	["run", "Run", "play"],
+	["stop", "Stop", "stop"],
+	["edit", "Edit Configurations…", "settings"],
+	["clear", "Clear", "trash"],
+	["copy", "Copy", "copy"],
+	["remove", "Remove", "trash"],
+	["cancel", "Cancel", null],
+	["save", "Save", "check"],
 ]) {
-	$(id).textContent = t(text);
+	$(id).replaceChildren(...(mark === null ? [] : [icon(mark)]), document.createTextNode(t(text)));
 }
 $("clear").title = t("Clear the output");
 $("selected").setAttribute("aria-label", t("Configuration"));

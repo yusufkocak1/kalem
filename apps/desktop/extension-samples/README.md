@@ -11,6 +11,8 @@ node apps/desktop/scripts/pack-extension.mjs apps/desktop/extension-samples/gray
 |---|---|
 | `hello-api` | a command, a setting, a saved token, `http.fetch`, an assistant tool |
 | `graylog` | a docked pane, the address the user types (`httpFromSettings`), three assistant tools, a fallback for older servers |
+| `rest-client` | a Postman-like client: any address (`"http": ["*"]`), `kalem.storage` for its collection, history and environments, the pane kit |
+| `soap-client` | a SoapUI-like client: WSDL read in the host page, sample envelopes from the schema, SOAP 1.1 and 1.2 |
 | `run-configurations` | IDE-like run configurations (Tomcat, Java, JAR, Maven, Gradle, npm, command, compound) kept in `.kalem/run.json`: programs, files, a status bar item, the app's language |
 
 ## Layout
@@ -46,6 +48,7 @@ ui.html         optional: the page of its panes
 ```
 
 - `permissions.http`: hosts it may reach (`*.example.com` and `host:port` work).
+- `"http": ["*"]`: any address the user types (an API client); shown as a warning when installing.
 - `permissions.httpFromSettings`: text settings whose address it may reach,
   for a server whose address only the user knows.
 - `dock`: `left`, `right` or `bottom`, where the pane goes the first time;
@@ -69,6 +72,7 @@ ui.html         optional: the page of its panes
 | `kalem.ui.pickPath({ folder, title })` | — (the user picks it) |
 | `kalem.ui.openExternal(url)` | — (http and https only) |
 | `kalem.ui.setStatusItem(key, { text, tooltip, command })` | `null` removes it; at most 3 |
+| `kalem.storage.get(key)`, `set(key, value)`, `remove(key)`, `keys()` | — (its own data, kept with Kalem's, at most 5 MB) |
 | `kalem.platform`, `kalem.language` | — |
 | `kalem.ui.showMessage(text)` | — |
 | `kalem.log(...values)` | — (the extension's log in Settings) |
@@ -88,6 +92,13 @@ ui.html         optional: the page of its panes
 | `kalem.onSettingsChanged(listener)` | the user changed its settings or token |
 | `kalem.pane`, `kalem.language` | the pane's id, the app's language |
 | `var(--app-text)`, `var(--app-accent)`… | the app's colours, kept up to date |
+
+`/__kalem/ui.css` is a small kit in Kalem's look, light and dark: `k-app`,
+`k-toolbar`, `k-input`, `k-select`, `k-textarea`, `k-group` (a request line),
+`k-button` (`primary`, `go`, `stop`, `ghost`, `small`, `icon`), `k-tabs`/`k-tab`,
+`k-segmented`, `k-badge` (`ok`, `warn`, `error`, `info`), `k-dot`, `k-method`,
+`k-list`/`k-list-item`, `k-table`, `k-kv` (key and value rows), `k-code` with
+`tok-*` colours, `k-empty`, `k-notice`, `k-spinner`, `k-split`, `k-sidebar`.
 
 ## What an extension cannot do
 

@@ -16,6 +16,8 @@ const shared = {
 	external: ["electron"],
 	sourcemap: true,
 	legalComments: "none",
+	// The extensions' look is a stylesheet of its own, served as text.
+	loader: { ".kit.css": "text" },
 	logLevel: "warning",
 };
 

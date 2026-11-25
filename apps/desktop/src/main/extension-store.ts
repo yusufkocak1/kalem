@@ -55,6 +55,8 @@ export interface InspectedPackage {
 
 export class ExtensionPackageError extends Error {}
 
+const MAX_DATA_BYTES = 5 * 1024 * 1024;
+
 export async function readPackage(
 	bytes: Uint8Array,
 	appVersion: string,
@@ -118,6 +120,7 @@ export class ExtensionStore {
 	#manifests = new Map<string, ExtensionManifest>();
 	#secrets: Record<string, Record<string, string>> | null = null;
 	readonly #memorySecrets = new Map<string, string>();
+	readonly #data = new Map<string, Record<string, unknown>>();
 
 	constructor(root: string, box: SecretBox) {
 		this.#root = root;
@@ -195,6 +198,8 @@ export class ExtensionStore {
 		this.#manifests.delete(id);
 		await this.#save();
 		await rm(this.folderOf(id), { recursive: true, force: true });
+		this.#data.delete(id);
+		await rm(this.#dataFile(id), { force: true });
 		const secrets = await this.#loadSecrets();
 		if (secrets[id] !== undefined) {
 			delete secrets[id];
@@ -222,6 +227,40 @@ export class ExtensionStore {
 			throw new Error(`It was blocked by its catalog: ${entry.blocked}`);
 		entry.enabled = enabled;
 		await this.#save();
+	}
+
+	/** What the extension keeps for itself (`kalem.storage`), by key. */
+	async data(id: string): Promise<Record<string, unknown>> {
+		const known = this.#data.get(id);
+		if (known !== undefined) return known;
+		let value: Record<string, unknown> = {};
+		try {
+			const raw = JSON.parse(await readFile(this.#dataFile(id), "utf8"));
+			if (typeof raw === "object" && raw !== null && !Array.isArray(raw)) value = raw;
+		} catch {
+			// Nothing kept yet.
+		}
+		this.#data.set(id, value);
+		return value;
+	}
+
+	async setData(id: string, key: string, value: unknown): Promise<void> {
+		if ((await this.#load())[id] === undefined) throw new Error("Not installed.");
+		const data = { ...(await this.data(id)) };
+		if (value === undefined || value === null) delete data[key];
+		else data[key] = value;
+		const text = JSON.stringify(data);
+		if (text.length > MAX_DATA_BYTES)
+			throw new Error("The extension keeps too much: at most 5 MB.");
+		this.#data.set(id, data);
+		await mkdir(join(this.#root, "data"), { recursive: true });
+		const file = this.#dataFile(id);
+		await writeFile(`${file}.tmp`, text);
+		await rename(`${file}.tmp`, file);
+	}
+
+	#dataFile(id: string): string {
+		return join(this.#root, "data", `${id}.json`);
 	}
 
 	async settingsOf(id: string): Promise<Record<string, SettingValue>> {

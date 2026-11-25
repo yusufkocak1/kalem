@@ -127,6 +127,12 @@ describe("versions", () => {
 describe("isAllowedUrl", () => {
 	const hosts = ["graylog.acme.local", "*.acme.com", "logs.example.org:9000"];
 
+	it("allows any address only with *", () => {
+		expect(isAllowedUrl("https://anything.example/x", ["*"])).toBe(true);
+		expect(isAllowedUrl("file:///etc/passwd", ["*"])).toBe(false);
+		expect(parseManifest({ ...base, permissions: { http: ["*"] } }).ok).toBe(true);
+	});
+
 	it("allows listed hosts only", () => {
 		expect(isAllowedUrl("https://graylog.acme.local/api/search", hosts)).toBe(true);
 		expect(isAllowedUrl("http://graylog.acme.local:9000/api", hosts)).toBe(true);

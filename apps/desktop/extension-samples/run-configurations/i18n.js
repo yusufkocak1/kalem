@@ -1,6 +1,7 @@
 /** The extension's words in Turkish; the English text is the key. */
 const TR = {
 	Run: "Çalıştır",
+	Rerun: "Yeniden Çalıştır",
 	"▶ Run": "▶ Çalıştır",
 	"↻ Rerun": "↻ Yeniden Çalıştır",
 	"■ Stop": "■ Durdur",

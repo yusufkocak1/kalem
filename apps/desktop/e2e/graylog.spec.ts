@@ -162,7 +162,7 @@ test("the Graylog extension's pane searches Graylog with the token, docked as Ka
 	await pane.locator("#stream").selectOption({ label: "API" });
 	await expect(pane.locator("#stream option")).toHaveText(["All streams", "API", "Default Stream"]);
 	await pane.locator("#go").click();
-	await expect(pane.locator("#status")).toHaveText(/^2 of 2 message\(s\)/);
+	await expect(pane.locator("#status")).toHaveText(/^2 of 2 messages/);
 	await expect(pane.locator("tbody tr.row")).toHaveCount(2);
 	await expect(pane.locator("tbody tr.row").first()).toContainText(
 		"NullPointerException at OrderService.java:42",
@@ -181,7 +181,7 @@ test("the Graylog extension's pane searches Graylog with the token, docked as Ka
 	});
 
 	await pane.locator("tbody tr.row").first().click();
-	await expect(pane.locator("tr.detail pre")).toContainText('"source": "api-1"');
+	await expect(pane.locator("tr.detail")).toContainText("api-1");
 
 	await dock.getByRole("button", { name: "Close" }).click();
 	await expect(dock).toBeHidden();

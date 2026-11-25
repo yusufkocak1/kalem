@@ -90,9 +90,18 @@ describe("ExtensionStore", () => {
 		});
 		await expect(again.setEnabled("acme.hello", true)).rejects.toThrow(/blocked/);
 
+		await again.setData("acme.hello", "history", [{ url: "https://x" }]);
+		expect(await new ExtensionStore(root, box).data("acme.hello")).toEqual({
+			history: [{ url: "https://x" }],
+		});
+		await again.setData("acme.hello", "history", null);
+		expect(await again.data("acme.hello")).toEqual({});
+		await again.setData("acme.hello", "kept", 1);
+
 		await again.uninstall("acme.hello");
 		expect(await again.list()).toEqual([]);
 		await expect(stat(again.folderOf("acme.hello"))).rejects.toThrow();
 		expect(await again.secret("acme.hello", "token")).toBeNull();
+		expect(await new ExtensionStore(root, box).data("acme.hello")).toEqual({});
 	});
 });

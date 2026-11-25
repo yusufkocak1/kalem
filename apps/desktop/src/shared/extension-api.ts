@@ -160,23 +160,3 @@ export const UI_SCRIPT = `(() => {
 	window.parent.postMessage({ kalem: "ready" }, "*");
 })();
 `;
-
-/** `/__kalem/ui.css`: the app's look for a pane, from the colours Kalem sends. */
-export const UI_STYLE = `:root { color-scheme: light dark; }
-* { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; }
-body { padding: 10px; background: var(--app-surface, #fff); color: var(--app-text, #222); font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
-a { color: var(--app-accent, #0b5); }
-input, select, textarea, button { font: inherit; color: inherit; }
-input, select, textarea { padding: 5px 8px; border: 1px solid var(--app-border, #ccc); border-radius: 6px; background: var(--app-raised, #fff); }
-input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--app-accent, #0b5); outline-offset: 1px; }
-button { padding: 5px 12px; border: 1px solid var(--app-border, #ccc); border-radius: 6px; background: var(--app-surface, #fff); cursor: pointer; }
-button:hover { background: var(--app-hover, #eee); }
-button.primary { border-color: var(--app-accent, #0b5); background: var(--app-accent, #0b5); color: var(--app-accent-text, #fff); }
-table { width: 100%; border-collapse: collapse; }
-th, td { padding: 4px 6px; border-bottom: 1px solid var(--app-border, #ddd); text-align: left; vertical-align: top; }
-th { color: var(--app-muted, #666); font-weight: 600; }
-.muted { color: var(--app-muted, #666); }
-.error { color: var(--app-error, #c00); }
-code, pre, .mono { font-family: var(--app-mono, ui-monospace, monospace); font-size: 12px; }
-`;
