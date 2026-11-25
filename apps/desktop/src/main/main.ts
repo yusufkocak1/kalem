@@ -8,6 +8,7 @@ import {
 	dialog,
 	globalShortcut,
 	nativeTheme,
+	net,
 	safeStorage,
 	session,
 	shell,
@@ -24,6 +25,7 @@ import { ChatStore } from "./assistant-chats.js";
 import { AssistantStore } from "./assistant-store.js";
 import { confluenceClient } from "./confluence-ipc.js";
 import { ConfluenceStore } from "./confluence-store.js";
+import { CopilotLogin, registerCopilotLoginIpc } from "./copilot-login.js";
 import { DraftStore } from "./drafts.js";
 import { backgroundFetch } from "./git.js";
 import { findRepoRoot, isTrustedRepo } from "./git-trust.js";
@@ -43,6 +45,7 @@ import { networkLog } from "./network-log.js";
 import { PackageStore } from "./package.js";
 import { pathKey } from "./path-key.js";
 import { handleDocumentScheme, registerDocumentScheme } from "./protocol.js";
+import { ProxyManager, registerProxyIpc } from "./proxy.js";
 import type { StoredSession } from "./session-store.js";
 import { SessionStore } from "./session-store.js";
 import { MAX_WORKSPACES, SettingsStore } from "./settings.js";
@@ -109,6 +112,14 @@ function start(): void {
 	const jira = new ConfluenceStore(join(app.getPath("userData"), "jira.json"), secrets);
 	const assistant = new AssistantStore(join(app.getPath("userData"), "assistant.json"), secrets);
 	const chats = new ChatStore(join(app.getPath("userData"), "assistant-chats.json"));
+	const copilotLogin = new CopilotLogin(
+		new ConfluenceStore(join(app.getPath("userData"), "copilot-github.json"), secrets),
+		(url, init) => net.fetch(url, init),
+	);
+	const proxy = new ProxyManager(
+		new ConfluenceStore(join(app.getPath("userData"), "proxy.json"), secrets),
+		() => store.settings,
+	);
 	// End-to-end tests keep every save as its own version.
 	const versionInterval = Number(process.env.KALEM_VERSION_INTERVAL);
 	const versions = new VersionStore(
@@ -241,6 +252,7 @@ function start(): void {
 		tray.apply(store.settings.tray);
 		nativeTheme.themeSource = store.settings.theme;
 		applySpellCheck();
+		void proxy.apply().catch((error: unknown) => console.warn("Proxy:", error));
 		windows.broadcastSettings(store.settings);
 		refreshMenu();
 	}
@@ -584,6 +596,11 @@ function start(): void {
 		ready = true;
 
 		nativeTheme.themeSource = store.settings.theme;
+		// Before any request: the first ones would otherwise miss the proxy.
+		await proxy.start().catch((error: unknown) => console.warn("Proxy:", error));
+		registerProxyIpc(proxy);
+		await copilotLogin.start().catch((error: unknown) => console.warn("Copilot login:", error));
+		registerCopilotLoginIpc(copilotLogin);
 		watcher.watch(store.state.workspaces);
 		handleDocumentScheme({
 			loadAttachment: async (pageId, name) => {

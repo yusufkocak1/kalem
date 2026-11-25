@@ -17039,3 +17039,57 @@ dialog {
 		color: HighlightText;
 	}
 }
+
+.settings-proxy-manual {
+	display: grid;
+	gap: 6px;
+	margin-bottom: 10px;
+}
+
+.settings-proxy-manual h5 {
+	margin: 10px 0 0;
+}
+
+.settings-proxy-manual .settings-grid input {
+	padding: 5px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-surface);
+	color: var(--app-text);
+	font: inherit;
+}
+
+.settings-proxy-manual[hidden] {
+	display: none;
+}
+
+.assistant-field .assistant-field-label {
+	font-weight: 600;
+	font-size: 13px;
+}
+
+.copilot-device {
+	margin-top: 8px;
+	padding: 12px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-surface);
+}
+
+.copilot-device[hidden],
+.copilot-login[hidden] {
+	display: none;
+}
+
+.copilot-device-code {
+	display: inline-block;
+	margin: 8px 0 12px;
+	padding: 6px 14px;
+	border-radius: 6px;
+	background: color-mix(in srgb, var(--app-text) 8%, transparent);
+	font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+	font-size: 26px;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	user-select: all;
+}

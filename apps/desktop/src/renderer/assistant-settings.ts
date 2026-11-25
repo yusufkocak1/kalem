@@ -1,4 +1,4 @@
-import type { AssistantStatus, KalemBridge } from "../shared/bridge.js";
+import type { AssistantStatus, CopilotLoginFailure, KalemBridge } from "../shared/bridge.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type { AssistantConfig, ProviderId } from "../shared/providers.js";
@@ -93,6 +93,113 @@ export function createAssistantSettings(options: AssistantSettingsOptions): Assi
 		attrs: { type: "button" },
 	});
 
+	// --- Copilot: signing in to GitHub with a device code ---------------------------
+
+	const copilotState = el("p", { class: "assistant-field-note", attrs: { role: "status" } });
+	const copilotSignIn = el("button", {
+		class: "assistant-action",
+		text: t.copilotDeviceSignIn,
+		attrs: { type: "button" },
+	});
+	const copilotSignOut = el("button", {
+		class: "assistant-link",
+		text: t.copilotDeviceSignOut,
+		attrs: { type: "button", hidden: "" },
+	});
+	const copilotCode = el("output", { class: "copilot-device-code" });
+	const copilotOpen = el("button", {
+		class: "assistant-primary",
+		text: t.copilotDeviceCopyOpen,
+		attrs: { type: "button" },
+	});
+	const copilotCancel = el("button", {
+		class: "assistant-action",
+		text: t.assistantCancel,
+		attrs: { type: "button" },
+	});
+	const copilotWaiting = el("p", {
+		class: "assistant-field-note",
+		text: t.copilotDeviceWaiting,
+		attrs: { role: "status" },
+	});
+	const copilotPanel = el("div", {
+		class: "copilot-device",
+		attrs: { hidden: "" },
+		children: [
+			el("p", { class: "assistant-field-note", text: t.copilotDeviceSteps }),
+			copilotCode,
+			el("div", { class: "assistant-missing-actions", children: [copilotOpen, copilotCancel] }),
+			copilotWaiting,
+		],
+	});
+	const copilotField = el("div", {
+		class: "assistant-field copilot-login",
+		attrs: { hidden: "" },
+		children: [
+			el("span", { class: "assistant-field-label", text: t.copilotDeviceTitle }),
+			copilotState,
+			el("div", { class: "assistant-field-links", children: [copilotSignIn, copilotSignOut] }),
+			copilotPanel,
+		],
+	});
+	let verificationUri = "https://github.com/login/device";
+
+	const failureText = (reason: CopilotLoginFailure): string =>
+		({
+			denied: t.copilotDeviceDenied,
+			expired: t.copilotDeviceExpired,
+			cancelled: "",
+			noCopilot: t.copilotDeviceNoCopilot,
+			failed: t.copilotDeviceFailed,
+		})[reason];
+
+	async function renderCopilotAccount(): Promise<void> {
+		const account = await bridge.copilotAccount().catch(() => null);
+		copilotState.textContent =
+			account === null ? t.copilotDeviceNone : format(t.copilotDeviceSignedIn, account.login);
+		copilotSignOut.hidden = account === null;
+		copilotSignIn.hidden = !copilotPanel.hidden;
+	}
+
+	function closeCopilotPanel(): void {
+		copilotPanel.hidden = true;
+		copilotSignIn.hidden = false;
+	}
+
+	copilotSignIn.addEventListener("click", async () => {
+		copilotSignIn.disabled = true;
+		try {
+			const device = await bridge.copilotLoginBegin();
+			verificationUri = device.verificationUri;
+			copilotCode.textContent = device.userCode;
+			copilotPanel.hidden = false;
+			copilotSignIn.hidden = true;
+			const result = await bridge.copilotLoginWait();
+			closeCopilotPanel();
+			await renderCopilotAccount();
+			if ("error" in result && result.error !== "cancelled") {
+				copilotState.textContent = result.detail ?? failureText(result.error);
+			}
+		} catch (failure) {
+			closeCopilotPanel();
+			copilotState.textContent = options.errorText(failure);
+		} finally {
+			copilotSignIn.disabled = false;
+		}
+	});
+	copilotOpen.addEventListener("click", () => {
+		void navigator.clipboard.writeText(copilotCode.textContent ?? "").catch(() => {});
+		options.openLink(verificationUri);
+	});
+	copilotCancel.addEventListener("click", () => {
+		void bridge.copilotLoginCancel();
+		closeCopilotPanel();
+	});
+	copilotSignOut.addEventListener("click", async () => {
+		await bridge.copilotLogout().catch(() => {});
+		await renderCopilotAccount();
+	});
+
 	const urlField = field(t.assistantBaseUrl, baseUrl);
 	const keyField = field(t.assistantKey, key, [
 		el("div", { class: "assistant-field-links", children: [getKey, forget] }),
@@ -111,6 +218,7 @@ export function createAssistantSettings(options: AssistantSettingsOptions): Assi
 			el("p", { class: "assistant-empty-title", text: t.assistantSettings }),
 			field(t.assistantProvider, provider, [inUse]),
 			cliNote,
+			copilotField,
 			urlField,
 			keyField,
 			modelField,
@@ -131,6 +239,8 @@ export function createAssistantSettings(options: AssistantSettingsOptions): Assi
 		forgetKey = false;
 		cliNote.hidden = !cli;
 		cliNote.textContent = id === "copilot" ? t.copilotCliNote : t.assistantCliNote;
+		copilotField.hidden = id !== "copilot";
+		if (id === "copilot") void renderCopilotAccount();
 		urlField.hidden = cli;
 		keyField.hidden = cli;
 		fetchModels.hidden = cli;

@@ -26,7 +26,8 @@ export type SettingPage =
 	| "mcp"
 	| "assistantTools"
 	| "connections"
-	| "git";
+	| "git"
+	| "proxy";
 
 type StringKey = keyof Strings;
 
@@ -42,7 +43,7 @@ export const SETTING_GROUPS: readonly SettingGroup[] = [
 	{ label: "settingsGroupInterface", pages: ["appearance", "window", "panels"] },
 	{ label: "settingsGroupDocument", pages: ["documentView", "typography", "editor", "page"] },
 	{ label: "settingsCatAssistant", pages: ["assistant", "modes", "mcp", "assistantTools"] },
-	{ label: "settingsCatConnections", pages: ["connections", "git"] },
+	{ label: "settingsCatConnections", pages: ["connections", "git", "proxy"] },
 ];
 
 export const SETTING_PAGES: readonly SettingPage[] = SETTING_GROUPS.flatMap((group) => group.pages);
@@ -80,6 +81,9 @@ const MOVED: Partial<Record<keyof Settings, SettingPage>> = {
 	// Git, a connection of its own.
 	gitAutoFetch: "git",
 	gitTrustedFolders: "git",
+	proxyMode: "proxy",
+	proxyServer: "proxy",
+	proxyBypass: "proxy",
 	// The assistant's panel takes a side as the other panels do: it is set up with them.
 	assistant: "panels",
 	assistantPlace: "panels",
@@ -120,6 +124,7 @@ const PAGE_LABELS: Readonly<Record<SettingPage, StringKey>> = {
 	assistantTools: "settingsPageTools",
 	connections: "settingsPageConfluenceJira",
 	git: "settingsPageGit",
+	proxy: "settingsPageProxy",
 };
 
 /** A page's name in the list at the left. */

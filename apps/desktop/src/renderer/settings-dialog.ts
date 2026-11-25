@@ -13,6 +13,7 @@ import { PALETTE_IDS, PALETTE_TOKENS, PALETTES, paletteColors } from "../shared/
 import type { PanePlace, ToolPane } from "../shared/panes.js";
 import { movePane, placesFor, TOOL_PANES } from "../shared/panes.js";
 import { PROVIDERS, providerLabel } from "../shared/providers.js";
+import { bypassList, normalizeProxyServer } from "../shared/proxy.js";
 import type { SettingPage } from "../shared/settings-pages.js";
 import {
 	changedKeys,
@@ -1103,6 +1104,186 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 
 	// The schema's rows, in each category after its own parts.
 	for (const def of SETTING_DEFS) if (def.category !== "typography") row(def);
+
+	// --- Proxy -------------------------------------------------------------------
+
+	const proxyServer = el("input", {
+		attrs: {
+			type: "text",
+			id: "settings-proxy-server",
+			placeholder: "proxy.example.com:8080",
+			spellcheck: "false",
+			autocomplete: "off",
+			"data-setting": "proxyServer",
+		},
+	});
+	const proxyServerError = el("p", {
+		class: "confluence-error",
+		text: t.settingsProxyInvalid,
+		attrs: { hidden: "", role: "alert" },
+	});
+	const proxyBypass = el("input", {
+		attrs: {
+			type: "text",
+			id: "settings-proxy-bypass",
+			placeholder: "*.example.local, 10.0.0.0/8",
+			spellcheck: "false",
+			autocomplete: "off",
+			"data-setting": "proxyBypass",
+		},
+	});
+	const proxyUser = el("input", {
+		attrs: { type: "text", id: "settings-proxy-user", autocomplete: "off", spellcheck: "false" },
+	});
+	const proxyPassword = el("input", {
+		attrs: { type: "password", id: "settings-proxy-password", autocomplete: "new-password" },
+	});
+	const proxySave = el("button", {
+		class: "jira-button",
+		text: t.settingsProxySave,
+		attrs: { type: "button" },
+	});
+	const proxyForget = el("button", {
+		class: "jira-button",
+		text: t.settingsProxyForget,
+		attrs: { type: "button", hidden: "" },
+	});
+	const proxyTest = el("button", {
+		class: "jira-button",
+		text: t.settingsProxyTest,
+		attrs: { type: "button" },
+	});
+	const proxyStatus = el("p", {
+		class: "confluence-hint",
+		attrs: { hidden: "", role: "status", "data-proxy-status": "" },
+	});
+	const proxyManual = el("div", {
+		class: "settings-proxy-manual",
+		children: [
+			el("div", {
+				class: "settings-grid",
+				children: [
+					el("label", { text: t.settingsProxyServer, attrs: { for: "settings-proxy-server" } }),
+					proxyServer,
+				],
+			}),
+			el("p", { class: "settings-note", text: t.settingsProxyServerHint }),
+			proxyServerError,
+			el("div", {
+				class: "settings-grid",
+				children: [
+					el("label", { text: t.settingsProxyBypass, attrs: { for: "settings-proxy-bypass" } }),
+					proxyBypass,
+				],
+			}),
+			el("p", { class: "settings-note", text: t.settingsProxyBypassHint }),
+			el("h5", { text: t.settingsProxyLogin }),
+			el("div", {
+				class: "settings-grid",
+				children: [
+					el("label", { text: t.settingsProxyUser, attrs: { for: "settings-proxy-user" } }),
+					proxyUser,
+					el("label", { text: t.settingsProxyPassword, attrs: { for: "settings-proxy-password" } }),
+					proxyPassword,
+				],
+			}),
+			el("div", { class: "jira-actions", children: [proxySave, proxyForget] }),
+		],
+	});
+	item(
+		"proxy",
+		[t.settingsProxyServer, t.settingsProxyBypass, t.settingsProxyLogin, "proxy"].join(" "),
+		el("div", {
+			class: "settings-block",
+			attrs: { "data-block": "proxy" },
+			children: [
+				el("p", { class: "confluence-hint", text: t.settingsProxyHint }),
+				proxyManual,
+				el("div", { class: "jira-actions", children: [proxyTest] }),
+				proxyStatus,
+			],
+		}),
+		["proxyServer", "proxyBypass"],
+	);
+	const proxyModeRow = contents
+		.get("proxy")
+		?.querySelector<HTMLElement>(':scope > [data-key="proxyMode"]');
+	if (proxyModeRow) contents.get("proxy")?.prepend(proxyModeRow);
+
+	const showProxyStatus = (text: string): void => {
+		proxyStatus.textContent = text;
+		proxyStatus.hidden = false;
+	};
+	const proxyServerValid = (value: string): boolean =>
+		value.trim() === "" || normalizeProxyServer(value) !== null;
+	proxyServer.addEventListener("input", () => {
+		proxyServerError.hidden = proxyServerValid(proxyServer.value);
+	});
+	proxyServer.addEventListener("change", () => {
+		if (!proxyServerValid(proxyServer.value)) return;
+		update({ proxyServer: proxyServer.value.trim() });
+	});
+	proxyBypass.addEventListener("change", () => {
+		update({ proxyBypass: bypassList(proxyBypass.value).join(", ") });
+		proxyBypass.value = options.settings().proxyBypass;
+	});
+	async function renderProxyAccount(): Promise<void> {
+		const account = await bridge.proxyAccount().catch(() => null);
+		proxyUser.value = account?.username ?? "";
+		proxyPassword.value = "";
+		proxyPassword.placeholder = account?.hasPassword === true ? t.settingsProxyPasswordKept : "";
+		proxyForget.hidden = account === null;
+	}
+	proxySave.addEventListener("click", async () => {
+		const password = proxyPassword.value;
+		try {
+			await bridge.proxySetLogin({
+				username: proxyUser.value.trim(),
+				password: password === "" ? null : password,
+			});
+			await renderProxyAccount();
+			showProxyStatus(t.settingsProxySaved);
+		} catch (error) {
+			showProxyStatus(options.errorText(error));
+		}
+	});
+	proxyForget.addEventListener("click", async () => {
+		await bridge.proxySetLogin({ username: "", password: null }).catch(() => {});
+		await renderProxyAccount();
+	});
+	proxyTest.addEventListener("click", async () => {
+		proxyTest.disabled = true;
+		showProxyStatus(t.settingsProxyTesting);
+		try {
+			const result = await bridge.proxyTest();
+			showProxyStatus(
+				result.ok
+					? format(t.settingsProxyTestOk, result.route)
+					: format(
+							t.settingsProxyTestFailed,
+							result.route,
+							result.error ?? `HTTP ${result.status ?? "?"}`,
+						),
+			);
+		} catch (error) {
+			showProxyStatus(options.errorText(error));
+		} finally {
+			proxyTest.disabled = false;
+		}
+	});
+	refreshers.push(() => {
+		const settings = options.settings();
+		proxyManual.hidden = settings.proxyMode !== "manual";
+		if (document.activeElement !== proxyServer) proxyServer.value = settings.proxyServer;
+		if (document.activeElement !== proxyBypass) proxyBypass.value = settings.proxyBypass;
+		proxyServerError.hidden = proxyServerValid(proxyServer.value);
+	});
+	contents.get("proxy")?.addEventListener("change", (event) => {
+		if ((event.target as HTMLElement).dataset.setting === "proxyMode") {
+			proxyManual.hidden = options.settings().proxyMode !== "manual";
+			proxyStatus.hidden = true;
+		}
+	});
 	// The templates after the page's own settings: the size and margins first, as the page's name says.
 	contents.get("page")?.append(templatesBlock);
 	// What coding agents' spec files follow goes with the templates they come from.
@@ -1178,7 +1359,7 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 	}
 
 	async function refresh(): Promise<void> {
-		await Promise.all([renderConnections(), renderTemplates()]);
+		await Promise.all([renderConnections(), renderTemplates(), renderProxyAccount()]);
 		renderValues();
 		filter();
 	}

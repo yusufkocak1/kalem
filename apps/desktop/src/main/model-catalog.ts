@@ -38,7 +38,7 @@ export class ModelCatalog {
 	readonly #file: string;
 	readonly #fetch: Fetch;
 	#learned: Record<string, string> | null = null;
-	#copilot: { until: number; models: Promise<ModelOption[]> } | null = null;
+	#copilot: { until: number; login: string; models: Promise<ModelOption[]> } | null = null;
 
 	constructor(file: string, fetchImpl: Fetch) {
 		this.#file = file;
@@ -86,13 +86,15 @@ export class ModelCatalog {
 	copilotModels(): Promise<ModelOption[]> {
 		if (process.env.KALEM_COPILOT_MODELS === "off") return Promise.resolve([]);
 		const now = Date.now();
-		if (this.#copilot !== null && this.#copilot.until > now) return this.#copilot.models;
+		const login = process.env.COPILOT_GITHUB_TOKEN ?? "";
+		const kept = this.#copilot;
+		if (kept !== null && kept.until > now && kept.login === login) return kept.models;
 		const models = this.#askCopilot().catch(() => []);
-		this.#copilot = { until: now + COPILOT_LIFETIME, models };
+		this.#copilot = { until: now + COPILOT_LIFETIME, login, models };
 		// An empty answer is asked again sooner: the user may sign in meanwhile.
 		void models.then((found) => {
 			if (found.length === 0 && this.#copilot?.models === models) {
-				this.#copilot = { until: Date.now() + 60_000, models };
+				this.#copilot = { until: Date.now() + 60_000, login, models };
 			}
 		});
 		return models;
