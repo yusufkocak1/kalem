@@ -26,7 +26,7 @@ import { liftModeServers, parseMcpServers } from "./mcp-servers.js";
 import { DEFAULT_MODE_SERVERS, isMode, parseModeSettings } from "./mode-config.js";
 /** The Settings window's categories, in its order. */
 import { PALETTE_IDS, parsePaletteCustom } from "./palette.js";
-import { MAX_DOCK_SIZE, MIN_DOCK_SIZE, parsePanePlaces, TOOL_PANES } from "./panes.js";
+import { isToolPane, MAX_DOCK_SIZE, MIN_DOCK_SIZE, parsePanePlaces } from "./panes.js";
 import { PROXY_MODES } from "./proxy.js";
 import { SPEC_PROFILE_CHOICES } from "./spec-export.js";
 import { parseToolPolicies } from "./tool-protocol.js";
@@ -192,8 +192,6 @@ export function parsePermissions(value: unknown): string[] {
 	].slice(0, 100);
 }
 
-const PANE_LABELS = ["outlineTab", "filesTab", "confluenceTab", "jiraTab"] as const;
-
 const dockSize = <K extends "rightWidth" | "bottomHeight">(
 	key: K,
 	label: StringKey,
@@ -210,15 +208,15 @@ const dockSize = <K extends "rightWidth" | "bottomHeight">(
 	assistant: "write",
 });
 
+/** Kalem's panes, or an extension's (`ext:<id>/<pane>`), which the enum of Kalem's could not hold. */
 const dockPane = <K extends "sidePane" | "rightPane" | "bottomPane">(
 	key: K,
-): EnumDef & { readonly key: K; readonly values: typeof TOOL_PANES } => ({
+): CustomDef & { readonly key: K } => ({
 	key,
 	category: "panels",
 	label: null,
-	type: "enum",
-	values: TOOL_PANES,
-	valueLabels: PANE_LABELS,
+	type: "custom",
+	parse: (value: unknown) => (isToolPane(value) ? value : "outline"),
 	keywords: [],
 	assistant: "write",
 });

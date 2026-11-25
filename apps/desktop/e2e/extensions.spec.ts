@@ -234,3 +234,79 @@ test("an extension's tool answers the assistant, and the extension reaches only 
 	);
 	expect(api.seen.map((each) => each.url)).toEqual(["/status"]);
 });
+
+test("an extension's pane reaches its host code, and nothing outside", async () => {
+	const api = await fakeApi();
+	cleanup.push(api.close);
+	const folder = await tempDir("extension-pane");
+	const source = join(folder, "pane");
+	await mkdir(source);
+	await writeFile(
+		join(source, "manifest.json"),
+		JSON.stringify({
+			id: "test.pane",
+			name: "Pane Probe",
+			version: "1.0.0",
+			host: "host.js",
+			ui: "ui.html",
+			contributes: { panes: [{ id: "main", title: "Probe", dock: "right" }] },
+		}),
+	);
+	await writeFile(
+		join(source, "host.js"),
+		'export async function activate(kalem) { await kalem.ui.handle("echo", (input) => ({ echoed: input })); }\n',
+	);
+	await writeFile(
+		join(source, "ui.html"),
+		'<!doctype html><meta charset="utf-8"><script src="/__kalem/ui.js"></script><script type="module" src="ui.js"></script><p id="out">…</p><button id="leave">Leave</button>',
+	);
+	await writeFile(
+		join(source, "ui.js"),
+		`const out = document.getElementById("out");
+const results = [];
+results.push("pane: " + window.kalem.pane);
+results.push("echo: " + JSON.stringify(await window.kalem.call("echo", { a: 1 })));
+try { await window.kalem.call("missing"); } catch (error) { results.push("missing: " + error.message); }
+try { await fetch(${JSON.stringify(`${api.url}/from-pane`)}); results.push("fetch: reached"); } catch { results.push("fetch: blocked"); }
+const image = new Image();
+image.src = ${JSON.stringify(`${api.url}/image`)};
+out.textContent = results.join("\\n");
+out.dataset.done = "";
+document.getElementById("leave").addEventListener("click", () => { location.href = ${JSON.stringify(`${api.url}/navigate`)}; });
+`,
+	);
+	const packagePath = join(folder, "pane.kalem-ext");
+	execFileSync(process.execPath, [PACK, source, packagePath]);
+
+	const { app, page } = await launch();
+	await stubOpenDialog(app, [packagePath]);
+	await clickMenu(app, "Extensions", "Manage Extensions…");
+	const settings = page.locator('[data-block="extensions"]');
+	await settings.getByRole("button", { name: "Install from File…" }).click();
+	await settings
+		.locator(".ext-preview")
+		.getByRole("button", { name: "Install", exact: true })
+		.click();
+	await expect(settings.locator(".ext-badge")).toHaveText("Running");
+
+	await page.locator('.stripe-right [data-pane="ext:test.pane/main"]').click();
+	const pane = page.frameLocator('iframe.ext-pane-frame[title="Probe"]');
+	await expect(pane.locator("#out[data-done]")).toHaveText(
+		[
+			"pane: main",
+			'echo: {"echoed":{"a":1}}',
+			'missing: The extension handles no "missing".',
+			"fetch: blocked",
+		].join("\n"),
+	);
+	// It tries to leave for the server: the navigation is stopped and nothing reaches it.
+	await pane.locator("#leave").click();
+	await page.waitForTimeout(800);
+	expect(
+		page
+			.frames()
+			.map((frame) => frame.url())
+			.filter((url) => url.startsWith(api.url)),
+	).toEqual([]);
+	expect(api.seen).toEqual([]);
+});

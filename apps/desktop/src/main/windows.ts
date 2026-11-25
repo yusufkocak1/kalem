@@ -278,6 +278,20 @@ export class WindowManager {
 
 		// The renderer is a single page; links go through `openLink`.
 		contents.on("will-navigate", (event) => event.preventDefault());
+		// An extension's pane stays on its own files: it cannot take what it shows anywhere else.
+		contents.on("will-frame-navigate", (event) => {
+			const from = event.frame?.url ?? "";
+			if (event.isMainFrame || !from.startsWith("kalem-ext:")) return;
+			const host = (url: string): string | null => {
+				try {
+					const parsed = new URL(url);
+					return parsed.protocol === "kalem-ext:" ? parsed.host : null;
+				} catch {
+					return null;
+				}
+			};
+			if (host(event.url) === null || host(event.url) !== host(from)) event.preventDefault();
+		});
 		contents.setWindowOpenHandler(() => ({ action: "deny" }));
 		// The window title is the document name, not the page's <title>.
 		window.on("page-title-updated", (event) => event.preventDefault());

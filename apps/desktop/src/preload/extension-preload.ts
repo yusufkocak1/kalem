@@ -11,6 +11,7 @@ type Handler = (input: unknown) => unknown;
 
 const commands = new Map<string, Handler>();
 const tools = new Map<string, Handler>();
+const uiHandlers = new Map<string, Handler>();
 
 const invoke = (method: string, ...args: unknown[]): Promise<unknown> =>
 	ipcRenderer.invoke(EXTENSION_CHANNEL.request, method, args).catch((error: unknown) => {
@@ -22,7 +23,9 @@ const describe = (error: unknown): string =>
 	error instanceof Error ? (error.stack ?? error.message) : String(error);
 
 ipcRenderer.on(EXTENSION_CHANNEL.call, async (_event, call: ExtensionCall) => {
-	const handler = (call.kind === "command" ? commands : tools).get(call.name);
+	const handler = (
+		call.kind === "command" ? commands : call.kind === "tool" ? tools : uiHandlers
+	).get(call.name);
 	try {
 		if (handler === undefined)
 			throw new Error(`Nothing is registered as ${call.kind} "${call.name}".`);
@@ -62,6 +65,13 @@ const api = {
 	},
 	ui: {
 		showMessage: (message: string) => invoke("ui.showMessage", message),
+		handle: async (name: string, run: Handler) => {
+			if (typeof run !== "function") throw new Error("handle needs a function.");
+			await invoke("ui.handle", name);
+			uiHandlers.set(name, run);
+		},
+		post: (message: unknown) => invoke("ui.post", message),
+		showPane: (pane: string) => invoke("ui.showPane", pane),
 	},
 	log: (...values: unknown[]) =>
 		invoke(

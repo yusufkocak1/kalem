@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
 	asksForMore,
 	compareVersions,
+	hostOfSetting,
 	isAllowedUrl,
 	NO_PERMISSIONS,
 	parseManifest,
@@ -37,6 +38,7 @@ describe("parseManifest", () => {
 		if (!result.ok) return;
 		expect(result.manifest.permissions).toEqual({
 			http: ["graylog.acme.local", "*.acme.com:9000"],
+			httpFromSettings: [],
 			assistantTools: true,
 			process: false,
 		});
@@ -64,6 +66,34 @@ describe("parseManifest", () => {
 		expect(
 			parseManifest({ ...noHost, contributes: { commands: [{ id: "c", title: "C" }] } }).ok,
 		).toBe(false);
+	});
+});
+
+describe("httpFromSettings", () => {
+	it("takes text settings only, and reads their host", () => {
+		const settings = [
+			{ key: "url", type: "string", title: "Address" },
+			{ key: "limit", type: "number" },
+		];
+		const ok = parseManifest({
+			...base,
+			permissions: { httpFromSettings: ["url"] },
+			contributes: { settings },
+		});
+		expect(ok.ok && ok.manifest.permissions.httpFromSettings).toEqual(["url"]);
+		expect(
+			parseManifest({
+				...base,
+				permissions: { httpFromSettings: ["limit"] },
+				contributes: { settings },
+			}).ok,
+		).toBe(false);
+		expect(hostOfSetting("https://Graylog.acme.local:9000/")).toBe("graylog.acme.local:9000");
+		expect(hostOfSetting("http://graylog")).toBe("graylog");
+		expect(hostOfSetting("file:///x")).toBeNull();
+		expect(hostOfSetting("")).toBeNull();
+		const granted = { ...NO_PERMISSIONS };
+		expect(asksForMore(granted, { ...NO_PERMISSIONS, httpFromSettings: ["url"] })).toBe(true);
 	});
 });
 

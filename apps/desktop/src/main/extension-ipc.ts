@@ -18,6 +18,8 @@ export interface ExtensionIpcContext {
 	windowOf(contentsId: number): BrowserWindow | null;
 	/** Tells the windows the list changed. */
 	broadcast(): void;
+	/** Tells the windows an extension's settings or secrets changed. */
+	settingsChanged(id: string): void;
 }
 
 const text = (value: unknown): string => (typeof value === "string" ? value : "");
@@ -111,6 +113,7 @@ export function registerExtensionIpc(ctx: ExtensionIpcContext): void {
 		CHANNEL.extensionSetSetting,
 		async (_event, id: unknown, key: unknown, value: unknown) => {
 			await store.setSetting(text(id), text(key), value);
+			ctx.settingsChanged(text(id));
 		},
 	);
 
@@ -118,8 +121,13 @@ export function registerExtensionIpc(ctx: ExtensionIpcContext): void {
 		CHANNEL.extensionSetSecret,
 		async (_event, id: unknown, key: unknown, value: unknown) => {
 			await store.setSecret(text(id), text(key), typeof value === "string" ? value : null);
+			ctx.settingsChanged(text(id));
 			ctx.broadcast();
 		},
+	);
+
+	ipcMain.handle(CHANNEL.extensionUiCall, (_event, id: unknown, name: unknown, input: unknown) =>
+		host.uiCall(text(id), text(name), input),
 	);
 
 	ipcMain.handle(CHANNEL.extensionDevTools, (_event, id: unknown) => host.openDevTools(text(id)));

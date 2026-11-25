@@ -6,11 +6,11 @@ import {
 	app,
 	BrowserWindow,
 	dialog,
+	session as electronSession,
 	globalShortcut,
 	nativeTheme,
 	net,
 	safeStorage,
-	session,
 	shell,
 } from "electron";
 import type { Draft, Settings, TabDocument } from "../shared/bridge.js";
@@ -47,7 +47,7 @@ import {
 import { networkLog } from "./network-log.js";
 import { PackageStore } from "./package.js";
 import { pathKey } from "./path-key.js";
-import { handleDocumentScheme, registerDocumentScheme } from "./protocol.js";
+import { EXTENSION_SCHEME, handleDocumentScheme, registerDocumentScheme } from "./protocol.js";
 import { ProxyManager, registerProxyIpc } from "./proxy.js";
 import type { StoredSession } from "./session-store.js";
 import { SessionStore } from "./session-store.js";
@@ -195,6 +195,16 @@ function start(): void {
 			refreshMenu();
 			broadcastExtensions();
 		},
+		showPane: (id, pane) => {
+			const target = BrowserWindow.getFocusedWindow() ?? windows.all()[0]?.window;
+			target?.webContents.send(CHANNEL.extensionShowPane, id, pane);
+		},
+		postToUi: (id, message) => {
+			for (const win of windows.all()) {
+				if (!win.window.isDestroyed())
+					win.window.webContents.send(CHANNEL.extensionUiMessage, id, message);
+			}
+		},
 	});
 
 	const windows: WindowManager = new WindowManager({
@@ -243,7 +253,7 @@ function start(): void {
 
 	/** The page only writes to the clipboard: camera, microphone, location and the rest are refused unasked. */
 	function applyPermissions(): void {
-		const defaultSession = session.defaultSession;
+		const defaultSession = electronSession.defaultSession;
 		const permitted = new Set(["clipboard-sanitized-write"]);
 		defaultSession.setPermissionRequestHandler((_contents, permission, answer) =>
 			answer(permitted.has(permission)),
@@ -252,7 +262,7 @@ function start(): void {
 	}
 
 	function applySpellCheck(): void {
-		const defaultSession = session.defaultSession;
+		const defaultSession = electronSession.defaultSession;
 		defaultSession.setSpellCheckerEnabled(store.settings.spellCheck);
 		// macOS uses the system spell checker and detects the language itself.
 		if (process.platform === "darwin") return;
@@ -697,7 +707,16 @@ function start(): void {
 			windowOf: (id) =>
 				windows.all().find((win) => win.window.webContents.id === id)?.window ?? null,
 			broadcast: broadcastExtensions,
+			settingsChanged: (id) => {
+				for (const win of windows.all()) {
+					if (!win.window.isDestroyed())
+						win.window.webContents.send(CHANNEL.extensionSettingsChanged, id);
+				}
+			},
 		});
+		electronSession.defaultSession.protocol.handle(EXTENSION_SCHEME, (request) =>
+			extensionHost.serveUi(request),
+		);
 		void extensionHost.startAll();
 		refreshMenu();
 		tray.apply(store.settings.tray);

@@ -8,7 +8,7 @@ export const EXTENSION_CHANNEL = {
 
 export interface ExtensionCall {
 	readonly id: string;
-	readonly kind: "command" | "tool";
+	readonly kind: "command" | "tool" | "ui";
 	readonly name: string;
 	readonly input: unknown;
 }
@@ -112,3 +112,69 @@ export function contentTypeOf(path: string): string {
 		CONTENT_TYPES[dot === -1 ? "" : path.slice(dot + 1).toLowerCase()] ?? "application/octet-stream"
 	);
 }
+
+/** The script an extension's pane loads as `/__kalem/ui.js`: `window.kalem` talks to its host code through Kalem. */
+export const UI_SCRIPT = `(() => {
+	const pending = new Map();
+	const listeners = [];
+	const settingsListeners = [];
+	let next = 0;
+	const params = new URLSearchParams(location.search);
+	window.addEventListener("message", (event) => {
+		if (event.source !== window.parent) return;
+		const data = event.data;
+		if (data === null || typeof data !== "object") return;
+		if (data.kalem === "reply") {
+			const waiting = pending.get(data.id);
+			if (waiting === undefined) return;
+			pending.delete(data.id);
+			if (data.ok) waiting.resolve(data.value);
+			else waiting.reject(new Error(data.error));
+		} else if (data.kalem === "message") {
+			for (const listener of listeners) listener(data.data);
+		} else if (data.kalem === "settings") {
+			for (const listener of settingsListeners) listener();
+		} else if (data.kalem === "theme") {
+			for (const [name, value] of Object.entries(data.vars)) document.documentElement.style.setProperty(name, value);
+			document.documentElement.dataset.theme = data.dark ? "dark" : "light";
+		}
+	});
+	window.kalem = {
+		pane: params.get("pane"),
+		call(name, input) {
+			return new Promise((resolve, reject) => {
+				const id = ++next;
+				pending.set(id, { resolve, reject });
+				window.parent.postMessage({ kalem: "call", id, name, input: input ?? null }, "*");
+			});
+		},
+		onMessage(listener) {
+			listeners.push(listener);
+		},
+		onSettingsChanged(listener) {
+			settingsListeners.push(listener);
+		},
+	};
+	window.parent.postMessage({ kalem: "ready" }, "*");
+})();
+`;
+
+/** `/__kalem/ui.css`: the app's look for a pane, from the colours Kalem sends. */
+export const UI_STYLE = `:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { padding: 10px; background: var(--app-surface, #fff); color: var(--app-text, #222); font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: var(--app-accent, #0b5); }
+input, select, textarea, button { font: inherit; color: inherit; }
+input, select, textarea { padding: 5px 8px; border: 1px solid var(--app-border, #ccc); border-radius: 6px; background: var(--app-raised, #fff); }
+input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--app-accent, #0b5); outline-offset: 1px; }
+button { padding: 5px 12px; border: 1px solid var(--app-border, #ccc); border-radius: 6px; background: var(--app-surface, #fff); cursor: pointer; }
+button:hover { background: var(--app-hover, #eee); }
+button.primary { border-color: var(--app-accent, #0b5); background: var(--app-accent, #0b5); color: var(--app-accent-text, #fff); }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 4px 6px; border-bottom: 1px solid var(--app-border, #ddd); text-align: left; vertical-align: top; }
+th { color: var(--app-muted, #666); font-weight: 600; }
+.muted { color: var(--app-muted, #666); }
+.error { color: var(--app-error, #c00); }
+code, pre, .mono { font-family: var(--app-mono, ui-monospace, monospace); font-size: 12px; }
+`;

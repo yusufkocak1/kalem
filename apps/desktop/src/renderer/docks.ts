@@ -7,13 +7,15 @@ import {
 	DOCKS,
 	dockPatch,
 	dockState,
+	isExtensionPane,
 	isPaneShown,
+	knownPanes,
 	MIN_DOCK_SIZE,
 	movePane,
 	panesIn,
+	placeOf,
 	placesFor,
 	shownPane,
-	TOOL_PANES,
 	togglePane,
 } from "../shared/panes.js";
 import { el } from "./dom.js";
@@ -72,6 +74,8 @@ export interface Docks {
 	shown(): Set<ToolPane>;
 	/** What the panes' buttons count changed (`badge`). */
 	refreshBadges(): void;
+	/** The extensions' panes, in place of those given before. */
+	setExtensionPanes(panes: readonly DockPane[]): void;
 }
 
 const DEFAULT_SIZE: Readonly<Record<Dock, number>> = {
@@ -90,7 +94,7 @@ const DEFAULT_SIZE: Readonly<Record<Dock, number>> = {
  */
 export function createDocks(options: DocksOptions): Docks {
 	const { t } = options;
-	const entries = new Map(options.panes.map((pane) => [pane.id, pane]));
+	const entries = new Map<ToolPane, DockPane>(options.panes.map((pane) => [pane.id, pane]));
 	const placeLabel: Readonly<Record<PanePlace, string>> = {
 		left: t.moveToLeft,
 		right: t.moveToRight,
@@ -105,7 +109,7 @@ export function createDocks(options: DocksOptions): Docks {
 		menu.hidden = true;
 	};
 	function showMenu(pane: ToolPane, x: number, y: number): void {
-		const place = options.settings().panePlaces[pane];
+		const place = placeOf(options.settings().panePlaces, pane);
 		openMenu(
 			placesFor(pane)
 				.filter((target) => target !== place)
@@ -402,8 +406,8 @@ export function createDocks(options: DocksOptions): Docks {
 			view.stripe.hidden = panes.length === 0 && side === null;
 		}
 		// What is not in a dock (hidden, or not set up) is not shown anywhere.
-		for (const id of TOOL_PANES) {
-			const place = settings.panePlaces[id];
+		for (const id of entries.keys()) {
+			const place = placeOf(settings.panePlaces, id);
 			if (place === "hidden" || !options.available(id)) {
 				const pane = entries.get(id);
 				if (pane !== undefined) pane.element.hidden = true;
@@ -419,6 +423,20 @@ export function createDocks(options: DocksOptions): Docks {
 		},
 		stripes: { left: views.left.stripe, right: views.right.stripe, bottom: views.bottom.stripe },
 		apply,
+		setExtensionPanes(panes) {
+			const wanted = new Set(panes.map((pane) => pane.id));
+			for (const [id, pane] of entries) {
+				if (
+					isExtensionPane(id) &&
+					(!wanted.has(id) || pane.element !== panes.find((each) => each.id === id)?.element)
+				) {
+					pane.element.remove();
+					entries.delete(id);
+				}
+			}
+			for (const pane of panes) entries.set(pane.id, pane);
+			apply();
+		},
 		refreshBadges() {
 			for (const dock of DOCKS) {
 				for (const button of views[dock].stripe.querySelectorAll<HTMLButtonElement>(
@@ -431,7 +449,9 @@ export function createDocks(options: DocksOptions): Docks {
 		},
 		shown: () =>
 			new Set(
-				TOOL_PANES.filter((pane) => isPaneShown(options.settings(), pane, options.available)),
+				knownPanes(options.settings().panePlaces).filter((pane) =>
+					isPaneShown(options.settings(), pane, options.available),
+				),
 			),
 	};
 }

@@ -38,13 +38,19 @@ export interface ExtensionCommand {
 	readonly title: string;
 }
 
+export const PANE_DOCKS = ["left", "right", "bottom"] as const;
+
 export interface ExtensionPane {
 	readonly id: string;
 	readonly title: string;
+	/** Where it goes the first time. */
+	readonly dock: (typeof PANE_DOCKS)[number];
 }
 
 export interface ExtensionPermissions {
 	readonly http: readonly string[];
+	/** Settings (strings) whose address it may reach: the user types the server's address there. */
+	readonly httpFromSettings: readonly string[];
 	readonly assistantTools: boolean;
 	readonly process: boolean;
 }
@@ -249,8 +255,20 @@ export function parseManifest(raw: unknown): ManifestResult {
 	const panes = named(contributes.panes, 5, (item): ExtensionPane | null => {
 		const paneId = text(item.id, 40);
 		const title = text(item.title, 40);
-		return NAME_PATTERN.test(paneId) && title !== "" ? { id: paneId, title } : null;
+		const dock = PANE_DOCKS.find((known) => known === item.dock) ?? "right";
+		return NAME_PATTERN.test(paneId) && title !== "" ? { id: paneId, title, dock } : null;
 	});
+	const httpFromSettings: string[] = [];
+	for (const item of list(permissions.httpFromSettings).slice(0, 10)) {
+		const setting = settings.find((known) => known.key === item);
+		if (setting === undefined || setting.type !== "string") {
+			return {
+				ok: false,
+				error: `"permissions.httpFromSettings" names no text setting: ${JSON.stringify(item)}`,
+			};
+		}
+		if (!httpFromSettings.includes(setting.key)) httpFromSettings.push(setting.key);
+	}
 	if (panes.length > 0 && ui === null) return { ok: false, error: `A pane needs a "ui" file.` };
 	if (commands.length > 0 && host === null)
 		return { ok: false, error: `A command needs a "host" file.` };
@@ -268,6 +286,7 @@ export function parseManifest(raw: unknown): ManifestResult {
 			ui,
 			permissions: {
 				http,
+				httpFromSettings,
 				assistantTools: permissions.assistantTools === true,
 				process: permissions.process === true,
 			},
@@ -307,12 +326,27 @@ export function asksForMore(granted: ExtensionPermissions, next: ExtensionPermis
 	return (
 		(next.assistantTools && !granted.assistantTools) ||
 		(next.process && !granted.process) ||
-		next.http.some((host) => !granted.http.includes(host))
+		next.http.some((host) => !granted.http.includes(host)) ||
+		next.httpFromSettings.some((key) => !granted.httpFromSettings.includes(key))
 	);
 }
 
 export const NO_PERMISSIONS: ExtensionPermissions = {
 	http: [],
+	httpFromSettings: [],
 	assistantTools: false,
 	process: false,
 };
+
+/** The host of an address the user typed in a setting (`https://graylog.acme.local:9000/` → `graylog.acme.local:9000`). */
+export function hostOfSetting(value: unknown): string | null {
+	if (typeof value !== "string" || value.trim() === "") return null;
+	try {
+		const url = new URL(value.trim());
+		if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+		// kalem-locale-ok: ASCII host names
+		return url.host.toLowerCase();
+	} catch {
+		return null;
+	}
+}

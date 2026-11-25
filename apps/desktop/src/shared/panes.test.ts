@@ -4,7 +4,10 @@ import { DEFAULT_SETTINGS } from "./bridge.js";
 import {
 	clampDockSize,
 	dockState,
+	isExtensionPane,
 	isPaneShown,
+	isToolPane,
+	knownPanes,
 	movePane,
 	oneOnEachSide,
 	panesIn,
@@ -12,6 +15,7 @@ import {
 	placesFor,
 	revealPane,
 	shownPane,
+	splitExtensionPane,
 	togglePane,
 } from "./panes.js";
 
@@ -152,5 +156,43 @@ describe("one panel open on each side, the assistant's too", () => {
 			panePlaces: { ...notesOpen.panePlaces, notes: "hidden" },
 		};
 		expect(oneOnEachSide(empty, { assistant: true })).toEqual({ assistant: true });
+	});
+});
+
+describe("an extension's panes", () => {
+	const graylog = "ext:acme.graylog/search" as const;
+
+	it("are told by their id", () => {
+		expect(isExtensionPane(graylog)).toBe(true);
+		expect(isToolPane(graylog)).toBe(true);
+		expect(isExtensionPane("ext:../x")).toBe(false);
+		expect(isExtensionPane("outline")).toBe(false);
+		expect(splitExtensionPane(graylog)).toEqual({ extension: "acme.graylog", pane: "search" });
+	});
+
+	it("keep their place, dock as Kalem's do, and are hidden until placed", () => {
+		const places = parsePanePlaces({
+			jira: "bottom",
+			[graylog]: "bottom",
+			"ext:bad": "left",
+			other: "left",
+		});
+		expect(knownPanes(places)).toEqual([
+			"outline",
+			"files",
+			"confluence",
+			"jira",
+			"notes",
+			graylog,
+		]);
+		const settings: Settings = { ...DEFAULT_SETTINGS, panePlaces: places };
+		expect(panesIn(settings, "bottom", () => true)).toEqual(["jira", graylog]);
+		expect(panesIn(settings, "bottom", (pane) => pane !== graylog)).toEqual(["jira"]);
+		const shown = { ...settings, ...togglePane(settings, graylog, () => true) };
+		expect(shownPane(shown, "bottom", () => true)).toBe(graylog);
+		expect(isPaneShown(shown, graylog, () => true)).toBe(true);
+		const other = "ext:acme.graylog/other" as const;
+		expect(isPaneShown(settings, other, () => true)).toBe(false);
+		expect(revealPane(settings, other).panePlaces?.[other]).toBe("left");
 	});
 });

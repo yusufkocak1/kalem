@@ -287,6 +287,9 @@ export class ExtensionStore {
 						http: Array.isArray(granted?.http)
 							? granted.http.filter((host) => typeof host === "string")
 							: [],
+						httpFromSettings: Array.isArray(granted?.httpFromSettings)
+							? granted.httpFromSettings.filter((key) => typeof key === "string")
+							: [],
 						assistantTools: granted?.assistantTools === true,
 						process: granted?.process === true,
 					},

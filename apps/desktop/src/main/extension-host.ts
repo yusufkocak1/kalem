@@ -24,9 +24,11 @@ import {
 	MAX_HTTP_RESPONSE,
 	MAX_REDIRECTS,
 	parseHttpRequest,
+	UI_SCRIPT,
+	UI_STYLE,
 } from "../shared/extension-api.js";
 import type { ExtensionManifest, ExtensionPermissions } from "../shared/extensions.js";
-import { isAllowedUrl, isToolName, safeEntryPath } from "../shared/extensions.js";
+import { hostOfSetting, isAllowedUrl, isToolName, safeEntryPath } from "../shared/extensions.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type { KalemTool } from "./assistant-tools.js";
@@ -52,6 +54,7 @@ interface Running {
 	error: string | null;
 	readonly tools: Set<string>;
 	readonly commands: Set<string>;
+	readonly uiHandlers: Set<string>;
 }
 
 interface Waiting {
@@ -66,6 +69,10 @@ export interface ExtensionHostOptions {
 	strings(): Strings;
 	/** Something the menu or the settings show changed. */
 	changed(): void;
+	/** Sends the extension's panes a message from its host code. */
+	postToUi(id: string, message: unknown): void;
+	/** Brings one of the extension's panes into view. */
+	showPane(id: string, pane: string): void;
 }
 
 const MAX_LOG_LINES = 200;
@@ -137,6 +144,7 @@ export class ExtensionHost {
 			error: null,
 			tools: new Set(),
 			commands: new Set(),
+			uiHandlers: new Set(),
 		};
 		this.#running.set(id, running);
 		const contentsId = contents.id;
@@ -266,14 +274,63 @@ export class ExtensionHost {
 				headers: { ...headers, "Content-Type": "text/javascript; charset=utf-8" },
 			});
 		}
+		return this.#serveFile(id, path);
+	}
+
+	/** An extension's pane and its files, as the app's windows load them. */
+	async serveUi(request: Request): Promise<Response> {
+		const url = new URL(request.url);
+		const extension = await this.#options.store.get(url.hostname);
+		if (extension === null || !extension.enabled || extension.manifest.ui === null) {
+			return new Response(null, { status: 404 });
+		}
+		const path = decodeURIComponent(url.pathname.slice(1));
+		if (path === "__kalem/ui.js") return this.#text(UI_SCRIPT, "text/javascript; charset=utf-8");
+		if (path === "__kalem/ui.css") return this.#text(UI_STYLE, "text/css; charset=utf-8");
+		return this.#serveFile(extension.manifest.id, path);
+	}
+
+	#text(body: string, type: string): Response {
+		return new Response(body, {
+			headers: {
+				"Content-Security-Policy": EXTENSION_CSP,
+				"X-Content-Type-Options": "nosniff",
+				"Content-Type": type,
+			},
+		});
+	}
+
+	async #serveFile(id: string, path: string): Promise<Response> {
 		const safe = safeEntryPath(path);
 		if (safe === null || safe.startsWith("__kalem/")) return new Response(null, { status: 404 });
 		try {
 			const data = await readFile(join(this.#options.store.folderOf(id), ...safe.split("/")));
-			return new Response(data, { headers: { ...headers, "Content-Type": contentTypeOf(safe) } });
+			return new Response(data, {
+				headers: {
+					"Content-Security-Policy": EXTENSION_CSP,
+					"X-Content-Type-Options": "nosniff",
+					"Content-Type": contentTypeOf(safe),
+				},
+			});
 		} catch {
 			return new Response(null, { status: 404 });
 		}
+	}
+
+	/** A call from one of the extension's panes to its host code (`kalem.ui.handle`). */
+	async uiCall(id: string, name: string, input: unknown): Promise<unknown> {
+		const until = Date.now() + 15_000;
+		while (this.#running.get(id)?.status === "starting" && Date.now() < until) {
+			await new Promise((resolve) => setTimeout(resolve, 50));
+		}
+		const running = this.#running.get(id);
+		if (running === undefined || running.status !== "running") {
+			throw new Error(
+				format(this.#options.strings().extensionNotRunning, running?.manifest.name ?? id),
+			);
+		}
+		if (!running.uiHandlers.has(name)) throw new Error(`The extension handles no "${name}".`);
+		return this.#call(running, { kind: "ui", name, input }, TOOL_TIMEOUT);
 	}
 
 	async #request(event: IpcMainInvokeEvent, method: unknown, args: unknown[]): Promise<unknown> {
@@ -321,6 +378,24 @@ export class ExtensionHost {
 					: dialog.showMessageBox(parent, options));
 				return null;
 			}
+			case "ui.handle":
+				if (typeof first !== "string" || !/^[a-zA-Z][a-zA-Z0-9_.-]{0,63}$/.test(first)) {
+					throw new Error(`Bad handler name: ${String(first)}`);
+				}
+				running.uiHandlers.add(first);
+				return null;
+			case "ui.showPane":
+				if (
+					typeof first !== "string" ||
+					!running.manifest.panes.some((pane) => pane.id === first)
+				) {
+					throw new Error(`"${String(first)}" is not a pane of the manifest.`);
+				}
+				this.#options.showPane(id, first);
+				return null;
+			case "ui.post":
+				this.#options.postToUi(id, first ?? null);
+				return null;
 			case "log":
 				for (const line of Array.isArray(first) ? first : []) this.#append(id, String(line));
 				return null;
@@ -344,8 +419,13 @@ export class ExtensionHost {
 	): Promise<ExtensionHttpResponse> {
 		const request = parseHttpRequest(rawInit);
 		let url = typeof rawUrl === "string" ? rawUrl : "";
+		const values = await this.#options.store.settingsOf(running.manifest.id);
+		const hosts = [
+			...running.granted.http,
+			...running.granted.httpFromSettings.flatMap((key) => hostOfSetting(values[key]) ?? []),
+		];
 		for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-			if (!isAllowedUrl(url, running.granted.http)) {
+			if (!isAllowedUrl(url, hosts)) {
 				throw new Error(
 					`The extension may not reach ${url || "(no address)"}: add its host to "permissions.http".`,
 				);

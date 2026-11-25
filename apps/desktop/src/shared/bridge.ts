@@ -1367,6 +1367,13 @@ export interface KalemBridge {
 	extensionSetSecret(id: string, key: string, value: string | null): Promise<void>;
 	extensionDevTools(id: string): Promise<void>;
 	onExtensionsChanged(handler: () => void): () => void;
+	/** A call from an extension's pane to its host code. */
+	extensionUiCall(id: string, name: string, input: unknown): Promise<unknown>;
+	/** Messages an extension's host code sends its panes. */
+	onExtensionUiMessage(handler: (id: string, message: unknown) => void): () => void;
+	onExtensionShowPane(handler: (id: string, pane: string) => void): () => void;
+	/** An extension's settings or secrets were changed in Settings. */
+	onExtensionSettingsChanged(handler: (id: string) => void): () => void;
 	onAssistantToolCall(handler: (call: AssistantToolCall) => void): () => void;
 	onAssistantEvent(handler: (chatId: string, event: ClaudeEvent) => void): () => void;
 
@@ -1559,6 +1566,10 @@ export const CHANNEL = {
 	extensionSetSecret: "kalem:extension-set-secret",
 	extensionDevTools: "kalem:extension-dev-tools",
 	extensionsChanged: "kalem:extensions-changed",
+	extensionUiCall: "kalem:extension-ui-call",
+	extensionUiMessage: "kalem:extension-ui-message",
+	extensionShowPane: "kalem:extension-show-pane",
+	extensionSettingsChanged: "kalem:extension-settings-changed",
 	specStatus: "kalem:spec-status",
 	localNotes: "kalem:local-notes",
 	setLocalNotes: "kalem:set-local-notes",

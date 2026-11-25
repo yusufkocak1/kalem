@@ -256,6 +256,11 @@ const bridge: KalemBridge = {
 		ipcRenderer.invoke(CHANNEL.extensionSetSecret, id, key, value),
 	extensionDevTools: (id) => ipcRenderer.invoke(CHANNEL.extensionDevTools, id),
 	onExtensionsChanged: (handler) => listen(CHANNEL.extensionsChanged, handler),
+	extensionUiCall: (id, name, input) =>
+		ipcRenderer.invoke(CHANNEL.extensionUiCall, id, name, input),
+	onExtensionUiMessage: (handler) => listen(CHANNEL.extensionUiMessage, handler),
+	onExtensionShowPane: (handler) => listen(CHANNEL.extensionShowPane, handler),
+	onExtensionSettingsChanged: (handler) => listen(CHANNEL.extensionSettingsChanged, handler),
 	onAssistantApproval: (handler) => listen<[ApprovalRequest]>(CHANNEL.assistantApproval, handler),
 	onAssistantToolCall: (handler) => listen<[AssistantToolCall]>(CHANNEL.assistantToolCall, handler),
 };

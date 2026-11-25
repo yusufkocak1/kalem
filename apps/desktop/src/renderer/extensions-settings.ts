@@ -34,6 +34,15 @@ export function permissionLines(
 			warning: false,
 		});
 	}
+	if (permissions.httpFromSettings.length > 0) {
+		const titles = permissions.httpFromSettings.map(
+			(key) => manifest.settings.find((setting) => setting.key === key)?.title ?? key,
+		);
+		lines.push({
+			text: format(t.extensionPermissionHttpSetting, titles.join(", ")),
+			warning: false,
+		});
+	}
 	if (permissions.assistantTools) lines.push({ text: t.extensionPermissionTools, warning: false });
 	if (manifest.secrets.length > 0) {
 		lines.push({
