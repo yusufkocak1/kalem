@@ -5,6 +5,7 @@
  * GitHub, GitLab…). Pure: the main process asks the server.
  */
 import type { StatusCategory } from "./jira.js";
+import { type FieldMeta, fieldMetasOf } from "./jira-write.js";
 
 type Json = Record<string, unknown>;
 const asJson = (value: unknown): Json =>
@@ -30,6 +31,16 @@ export interface JiraTransition {
 	readonly needs: readonly string[];
 	/** The resolution sent with it, when its screen asks for one. */
 	readonly resolution: string | null;
+	/** Every field of its screen. */
+	readonly fields: readonly FieldMeta[];
+}
+
+/** What is sent with a step besides its id. */
+export interface TransitionInput {
+	/** Screen fields as Jira takes them, by id. */
+	readonly fields?: Record<string, unknown>;
+	/** Wiki markup. */
+	readonly comment?: string;
 }
 
 /** Resolutions chosen, in this order, when a step asks for one. */
@@ -42,38 +53,49 @@ export function transitionsOf(raw: unknown): JiraTransition[] {
 		const id = asString(transition.id);
 		if (id === "") return [];
 		const to = asJson(transition.to);
-		const needs: string[] = [];
-		let resolution: string | null = null;
-		for (const [key, value] of Object.entries(asJson(transition.fields))) {
-			const field = asJson(value);
-			if (field.required !== true || field.hasDefaultValue === true) continue;
-			const allowed = asArray(field.allowedValues).map((option) => asString(asJson(option).name));
-			if (key === "resolution" && allowed.length > 0) {
-				resolution = RESOLUTIONS.find((name) => allowed.includes(name)) ?? allowed[0] ?? null;
-				continue;
-			}
-			needs.push(asString(field.name) || key);
-		}
-		return [
-			{
-				id,
-				name: asString(transition.name),
-				to: asString(to.name) || asString(transition.name),
-				toCategory: category(to),
-				needs,
-				resolution,
-			},
-		];
+		const fields = fieldMetasOf({ fields: asJson(transition.fields) });
+		const resolutionField = fields.find(
+			(field) => field.id === "resolution" && field.required && !field.hasDefault,
+		);
+		const allowed = resolutionField?.choices.map((choice) => choice.name) ?? [];
+		const resolution = RESOLUTIONS.find((name) => allowed.includes(name)) ?? allowed[0] ?? null;
+		const step = {
+			id,
+			name: asString(transition.name),
+			to: asString(to.name) || asString(transition.name),
+			toCategory: category(to),
+			needs: [] as string[],
+			resolution,
+			fields,
+		};
+		step.needs = missingFields(step, {}).map((field) => field.name);
+		return [step];
+	});
+}
+
+/** The required fields of a step's screen that neither Jira nor what is given fills. */
+export function missingFields(transition: JiraTransition, input: TransitionInput): FieldMeta[] {
+	const given = input.fields ?? {};
+	const commented = (input.comment ?? "").trim() !== "";
+	return transition.fields.filter((field) => {
+		if (!field.required || field.hasDefault) return false;
+		if (field.id === "resolution" && transition.resolution !== null) return false;
+		if (field.id === "comment") return !commented;
+		return !(field.id in given);
 	});
 }
 
 /** What `POST /rest/api/2/issue/KEY/transitions` is sent to take a step. */
-export function transitionBody(transition: JiraTransition): Json {
+export function transitionBody(transition: JiraTransition, input: TransitionInput = {}): Json {
+	const fields: Json = {
+		...(transition.resolution === null ? {} : { resolution: { name: transition.resolution } }),
+		...input.fields,
+	};
+	const comment = input.comment ?? "";
 	return {
 		transition: { id: transition.id },
-		...(transition.resolution === null
-			? {}
-			: { fields: { resolution: { name: transition.resolution } } }),
+		...(Object.keys(fields).length > 0 ? { fields } : {}),
+		...(comment.trim() === "" ? {} : { update: { comment: [{ add: { body: comment } }] } }),
 	};
 }
 
