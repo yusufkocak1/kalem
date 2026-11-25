@@ -708,7 +708,7 @@ function start(): void {
 			closeFolder: (folder) => closeFolder(folder),
 			setDebugMode,
 		});
-		registerExtensionIpc({
+		const checkCatalogs = registerExtensionIpc({
 			store: extensionStore,
 			host: extensionHost,
 			appVersion: app.getVersion(),
@@ -716,6 +716,7 @@ function start(): void {
 			windowOf: (id) =>
 				windows.all().find((win) => win.window.webContents.id === id)?.window ?? null,
 			broadcast: broadcastExtensions,
+			registries: () => store.settings.extensionRegistries,
 			settingsChanged: (id) => {
 				for (const win of windows.all()) {
 					if (!win.window.isDestroyed())
@@ -727,6 +728,10 @@ function start(): void {
 			extensionHost.serveUi(request),
 		);
 		void extensionHost.startAll();
+		const catalogCheck = (): void =>
+			void checkCatalogs().catch((error: unknown) => console.warn("Catalogs:", error));
+		setTimeout(catalogCheck, 15_000);
+		setInterval(catalogCheck, 6 * 60 * 60_000).unref();
 		refreshMenu();
 		tray.apply(store.settings.tray);
 

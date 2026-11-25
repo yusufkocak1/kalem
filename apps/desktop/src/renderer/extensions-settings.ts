@@ -1,14 +1,18 @@
 /** Settings › Extensions: install from a file after the user sees what it asks for, then manage each one. */
 import type { ExtensionInfo, ExtensionPreview, KalemBridge } from "../shared/bridge.js";
+import type { Registry } from "../shared/extension-registry.js";
 import type { ExtensionManifest, ExtensionPermissions } from "../shared/extensions.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import { el } from "./dom.js";
+import { createExtensionMarket } from "./extension-market.js";
 
 export interface ExtensionsSectionOptions {
 	readonly t: Strings;
 	readonly bridge: KalemBridge;
 	errorText(error: unknown): string;
+	registries(): readonly Registry[];
+	setRegistries(registries: readonly Registry[]): void;
 }
 
 export interface ExtensionsSection {
@@ -24,7 +28,7 @@ interface PermissionLine {
 export function permissionLines(
 	t: Strings,
 	permissions: ExtensionPermissions,
-	manifest: ExtensionManifest,
+	manifest: Pick<ExtensionManifest, "settings" | "secrets">,
 ): PermissionLine[] {
 	const lines: PermissionLine[] = [];
 	if (permissions.process) lines.push({ text: t.extensionPermissionProcess, warning: true });
@@ -132,6 +136,20 @@ export function createExtensionsSection(options: ExtensionsSectionOptions): Exte
 		preview.hidden = false;
 	}
 
+	const market = createExtensionMarket({
+		t,
+		bridge,
+		errorText: options.errorText,
+		registries: options.registries,
+		setRegistries: options.setRegistries,
+		showPreview,
+		say,
+		changed: () => void refresh(),
+		permissions: (entry) =>
+			permissionList(permissionLines(t, entry.permissions, { settings: [], secrets: [] })),
+	});
+	market.element.hidden = true;
+
 	const pick = button(t.extensionInstallFromFile, () => {
 		say("");
 		void bridge
@@ -223,6 +241,7 @@ export function createExtensionsSection(options: ExtensionsSectionOptions): Exte
 			attrs: { type: "checkbox", "aria-label": format(t.extensionEnable, manifest.name) },
 		});
 		toggle.checked = info.enabled;
+		toggle.disabled = info.blocked !== null;
 		toggle.addEventListener(
 			"change",
 			() => void run(() => bridge.extensionSetEnabled(manifest.id, toggle.checked)),
@@ -235,6 +254,20 @@ export function createExtensionsSection(options: ExtensionsSectionOptions): Exte
 			stopped: info.enabled && manifest.host === null ? t.extensionActive : t.extensionStopped,
 		};
 		const actions: HTMLElement[] = [];
+		const update = market.updateFor(manifest.id);
+		if (update !== undefined) {
+			const target = button(format(t.extensionUpdateTo, update.version), () => {
+				target.disabled = true;
+				void bridge
+					.extensionMarketPick(update.registry, update.id)
+					.then(showPreview, (error: unknown) => say(options.errorText(error), true))
+					.finally(() => {
+						target.disabled = false;
+					});
+			});
+			target.classList.add("primary");
+			actions.push(target);
+		}
 		if (info.enabled && manifest.host !== null) {
 			actions.push(
 				button(t.extensionRestart, () => void run(() => bridge.extensionRestart(manifest.id))),
@@ -268,7 +301,19 @@ export function createExtensionsSection(options: ExtensionsSectionOptions): Exte
 								el("strong", { text: manifest.name }),
 								el("span", {
 									class: "ext-meta",
-									text: `${manifest.version} · ${manifest.publisher}`,
+									text: [
+										manifest.version,
+										manifest.publisher,
+										...(info.registry === null
+											? []
+											: [
+													format(
+														t.extensionFromCatalog,
+														options.registries().find((each) => each.url === info.registry)?.name ??
+															info.registry,
+													),
+												]),
+									].join(" · "),
 								}),
 							],
 						}),
@@ -282,6 +327,9 @@ export function createExtensionsSection(options: ExtensionsSectionOptions): Exte
 				...(manifest.description === ""
 					? []
 					: [el("p", { class: "ext-description", text: manifest.description })]),
+				...(info.blocked !== null
+					? [el("pre", { class: "ext-error", text: format(t.extensionBlocked, info.blocked) })]
+					: []),
 				...(info.error !== null && info.enabled
 					? [el("pre", { class: "ext-error", text: info.error })]
 					: []),
@@ -317,8 +365,46 @@ export function createExtensionsSection(options: ExtensionsSectionOptions): Exte
 		return drawing;
 	}
 
-	bridge.onExtensionsChanged(() => void refresh());
 	void refresh();
+
+	const installedView = el("div", {
+		class: "ext-view",
+		children: [el("div", { class: "jira-actions", children: [pick] }), empty, list],
+	});
+	const tabs = el("div", { class: "ext-tabs", attrs: { role: "tablist" } });
+	let marketLoaded = false;
+	const show = (which: "installed" | "market"): void => {
+		installedView.hidden = which !== "installed";
+		market.element.hidden = which !== "market";
+		for (const tab of tabs.children)
+			tab.setAttribute("aria-selected", String((tab as HTMLElement).dataset.tab === which));
+		if (which === "market" && !marketLoaded) {
+			marketLoaded = true;
+			void market.refresh(false);
+		}
+	};
+	for (const [which, label] of [
+		["installed", t.extensionsInstalled],
+		["market", t.extensionsMarket],
+	] as const) {
+		const tab = el("button", {
+			class: "ext-tab",
+			text: label,
+			attrs: { type: "button", role: "tab", "data-tab": which },
+		});
+		tab.addEventListener("click", () => show(which));
+		tabs.append(tab);
+	}
+	show("installed");
+	bridge.onExtensionsChanged(() => {
+		void refresh();
+		if (marketLoaded) void market.refresh(false);
+	});
+	// What the catalogs offer shows on the installed cards too (updates, blocks).
+	if (options.registries().length > 0) {
+		marketLoaded = true;
+		void market.refresh(false);
+	}
 
 	return {
 		element: el("div", {
@@ -326,11 +412,11 @@ export function createExtensionsSection(options: ExtensionsSectionOptions): Exte
 			attrs: { "data-block": "extensions" },
 			children: [
 				el("p", { class: "ext-hint", text: t.extensionsHint }),
-				el("div", { class: "jira-actions", children: [pick] }),
+				tabs,
 				status,
 				preview,
-				empty,
-				list,
+				installedView,
+				market.element,
 			],
 		}),
 		refresh,

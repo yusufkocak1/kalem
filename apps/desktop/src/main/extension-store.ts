@@ -30,11 +30,17 @@ export interface InstalledExtension {
 	readonly source: ExtensionSource;
 	readonly granted: ExtensionPermissions;
 	readonly installedAt: number;
+	/** The catalog it came from (its index's address). */
+	readonly registry: string | null;
+	/** Why its catalog blocked it; it stays off while this is set. */
+	readonly blocked: string | null;
 }
 
 interface StoredEntry {
 	enabled: boolean;
 	source: ExtensionSource;
+	registry: string | null;
+	blocked: string | null;
 	granted: ExtensionPermissions;
 	installedAt: number;
 	settings: Record<string, SettingValue>;
@@ -138,6 +144,8 @@ export class ExtensionStore {
 				source: entry.source,
 				granted: entry.granted,
 				installedAt: entry.installedAt,
+				registry: entry.registry,
+				blocked: entry.blocked,
 			});
 		}
 		return found.sort((a, b) => a.manifest.name.localeCompare(b.manifest.name, "tr"));
@@ -147,7 +155,11 @@ export class ExtensionStore {
 		return (await this.list()).find((extension) => extension.manifest.id === id) ?? null;
 	}
 
-	async install(pkg: InspectedPackage, source: ExtensionSource): Promise<InstalledExtension> {
+	async install(
+		pkg: InspectedPackage,
+		source: ExtensionSource,
+		registry: string | null = null,
+	): Promise<InstalledExtension> {
 		const { manifest } = pkg;
 		const folder = this.folderOf(manifest.id);
 		const staging = `${folder}.new-${pkg.token}`;
@@ -166,6 +178,8 @@ export class ExtensionStore {
 		state[manifest.id] = {
 			enabled: true,
 			source,
+			registry: source === "registry" ? registry : null,
+			blocked: null,
 			granted: manifest.permissions,
 			installedAt: Date.now(),
 			settings: previous?.settings ?? {},
@@ -191,10 +205,21 @@ export class ExtensionStore {
 		}
 	}
 
+	/** Marks it blocked by its catalog (and turns it off), or not. */
+	async setBlocked(id: string, reason: string | null): Promise<void> {
+		const entry = (await this.#load())[id];
+		if (entry === undefined || entry.blocked === reason) return;
+		entry.blocked = reason;
+		if (reason !== null) entry.enabled = false;
+		await this.#save();
+	}
+
 	async setEnabled(id: string, enabled: boolean): Promise<void> {
 		const state = await this.#load();
 		const entry = state[id];
 		if (entry === undefined) return;
+		if (enabled && entry.blocked !== null)
+			throw new Error(`It was blocked by its catalog: ${entry.blocked}`);
 		entry.enabled = enabled;
 		await this.#save();
 	}
@@ -283,6 +308,8 @@ export class ExtensionStore {
 				this.#state[id] = {
 					enabled: entry.enabled !== false,
 					source: entry.source === "registry" ? "registry" : "file",
+					registry: typeof entry.registry === "string" ? entry.registry : null,
+					blocked: typeof entry.blocked === "string" ? entry.blocked : null,
 					granted: {
 						http: Array.isArray(granted?.http)
 							? granted.http.filter((host) => typeof host === "string")

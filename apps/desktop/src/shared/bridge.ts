@@ -6,6 +6,7 @@ import type { JiraServer, MentionUser } from "./confluence-insert.js";
 import type { ConfluenceSearchRequest, ConfluenceSearchResults } from "./confluence-search.js";
 import type { CustomMode } from "./custom-modes.js";
 import type { TextFormat } from "./encoding.js";
+import type { Registry, RegistryEntry } from "./extension-registry.js";
 import type { ExtensionManifest, ExtensionPermissions, SettingValue } from "./extensions.js";
 import type { Lang } from "./i18n.js";
 import type { JiraAccount, JiraComment, JiraIssue, JiraSearchResults } from "./jira.js";
@@ -206,6 +207,8 @@ export interface Settings extends Typography {
 	readonly assistantCustomModes: readonly CustomMode[];
 	/** The assistant's MCP servers; each mode chooses which of them it uses. */
 	readonly assistantMcpServers: readonly McpServer[];
+	/** The extension catalogs the market lists, each trusted by its owner's key. */
+	readonly extensionRegistries: readonly Registry[];
 	/** Where the assistant's panel is: at the right (as before), at the left, or under the document. */
 	readonly assistantPlace: AssistantPlace;
 	/** The assistant panel's height under the document, in pixels. */
@@ -336,6 +339,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	assistantModes: {},
 	assistantCustomModes: [],
 	assistantMcpServers: defaultServers(),
+	extensionRegistries: [],
 	assistantPlace: "right",
 	assistantHeight: 320,
 };
@@ -979,6 +983,8 @@ export interface ExtensionInfo {
 	readonly source: "file" | "registry";
 	readonly granted: ExtensionPermissions;
 	readonly installedAt: number;
+	readonly registry: string | null;
+	readonly blocked: string | null;
 	readonly status: "stopped" | "starting" | "running" | "failed";
 	readonly error: string | null;
 	readonly log: readonly string[];
@@ -995,7 +1001,25 @@ export interface ExtensionStatusItem {
 	readonly command: string | null;
 }
 
+export interface MarketEntry extends RegistryEntry {
+	/** The catalog's index address. */
+	readonly registry: string;
+	readonly installedVersion: string | null;
+	/** A newer version than the installed one. */
+	readonly update: boolean;
+}
+
+export interface MarketCatalog {
+	readonly registry: Registry;
+	readonly name: string;
+	readonly entries: readonly MarketEntry[];
+	/** Why it could not be read (or trusted); `null` when it was. */
+	readonly error: string | null;
+}
+
 export interface ExtensionPreview {
+	/** The catalog it comes from; `null` for a file. */
+	readonly registry: string | null;
 	readonly token: string;
 	readonly manifest: ExtensionManifest;
 	/** The version installed now; `null` for a new extension. */
@@ -1364,6 +1388,10 @@ export interface KalemBridge {
 	/** Brings a template in from a file; a Word file opens as a document first (`"word"`). */
 	templateImport(): Promise<TemplateInfo | "word" | null>;
 	extensions(): Promise<readonly ExtensionInfo[]>;
+	/** The catalogs' extensions; `force` reads them again from their servers. */
+	extensionMarket(force: boolean): Promise<readonly MarketCatalog[]>;
+	/** Downloads one from its catalog and checks it; nothing is installed until `extensionInstall`. */
+	extensionMarketPick(registry: string, id: string): Promise<ExtensionPreview>;
 	/** Picks a package and reads it; nothing is installed until `extensionInstall`. */
 	extensionPick(): Promise<ExtensionPreview | null>;
 	extensionInstall(token: string): Promise<void>;
@@ -1568,6 +1596,8 @@ export const CHANNEL = {
 	assistantApproval: "kalem:assistant-approval",
 	templates: "kalem:templates",
 	extensions: "kalem:extensions",
+	extensionMarket: "kalem:extension-market",
+	extensionMarketPick: "kalem:extension-market-pick",
 	extensionPick: "kalem:extension-pick",
 	extensionInstall: "kalem:extension-install",
 	extensionUninstall: "kalem:extension-uninstall",

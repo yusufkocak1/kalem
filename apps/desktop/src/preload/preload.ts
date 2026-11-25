@@ -244,6 +244,9 @@ const bridge: KalemBridge = {
 	templateSave: (request) => ipcRenderer.invoke(CHANNEL.templateSave, request),
 	templateImport: () => ipcRenderer.invoke(CHANNEL.templateImport),
 	extensions: () => ipcRenderer.invoke(CHANNEL.extensions),
+	extensionMarket: (force) => ipcRenderer.invoke(CHANNEL.extensionMarket, force),
+	extensionMarketPick: (registry, id) =>
+		ipcRenderer.invoke(CHANNEL.extensionMarketPick, registry, id),
 	extensionPick: () => ipcRenderer.invoke(CHANNEL.extensionPick),
 	extensionInstall: (token) => ipcRenderer.invoke(CHANNEL.extensionInstall, token),
 	extensionUninstall: (id) => ipcRenderer.invoke(CHANNEL.extensionUninstall, id),

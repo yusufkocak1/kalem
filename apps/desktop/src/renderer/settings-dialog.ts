@@ -795,7 +795,13 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		drawMcp();
 	});
 
-	const extensionsSection = createExtensionsSection({ t, bridge, errorText: options.errorText });
+	const extensionsSection = createExtensionsSection({
+		t,
+		bridge,
+		errorText: options.errorText,
+		registries: () => options.settings().extensionRegistries,
+		setRegistries: (registries) => update({ extensionRegistries: registries }),
+	});
 	item(
 		"extensions",
 		[

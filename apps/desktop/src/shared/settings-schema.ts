@@ -5,6 +5,7 @@
  * Settings window is built from it, and the assistant reads it to find a
  * setting without having every setting in its prompt. Pure.
  */
+
 import type { ConfluenceFavorite, JiraFavorite, Settings } from "./bridge.js";
 import {
 	DEFAULT_SETTINGS,
@@ -19,6 +20,7 @@ import {
 	ZOOM_STEP,
 } from "./bridge.js";
 import { parseCustomModes } from "./custom-modes.js";
+import { parseRegistries } from "./extension-registry.js";
 import { groupName } from "./favorites.js";
 import type { Strings } from "./i18n.js";
 import { parseIssueLayout } from "./jira-layout.js";
@@ -785,6 +787,16 @@ export const SETTINGS_SCHEMA: Schema = {
 		parse: parseMcpServers,
 		keywords: ["mcp", "sunucu", "server", "araç", "tool", "dbhub", "github", "context7"],
 		// It runs programs on this computer: changed only by the user, or with the mode_mcp tools.
+		assistant: "hidden",
+	},
+	extensionRegistries: {
+		key: "extensionRegistries",
+		category: "system",
+		label: null,
+		type: "custom",
+		parse: parseRegistries,
+		keywords: ["eklenti", "extension", "market", "katalog", "catalog"],
+		// What Kalem trusts to install code: the user's alone.
 		assistant: "hidden",
 	},
 	specProfile: {

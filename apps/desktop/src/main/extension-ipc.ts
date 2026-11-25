@@ -2,11 +2,14 @@
 import { readFile } from "node:fs/promises";
 import type { BrowserWindow } from "electron";
 import { dialog, ipcMain } from "electron";
-import type { ExtensionInfo, ExtensionPreview } from "../shared/bridge.js";
+import type { ExtensionInfo, ExtensionPreview, MarketCatalog } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
-import { asksForMore, EXTENSION_FILE_EXTENSION } from "../shared/extensions.js";
+import type { Registry } from "../shared/extension-registry.js";
+import { blockedReason, latestCompatible } from "../shared/extension-registry.js";
+import { asksForMore, compareVersions, EXTENSION_FILE_EXTENSION } from "../shared/extensions.js";
 import type { Strings } from "../shared/i18n.js";
 import type { ExtensionHost } from "./extension-host.js";
+import { RegistryClient } from "./extension-registry.js";
 import type { ExtensionStore, InspectedPackage } from "./extension-store.js";
 import { ExtensionPackageError, readPackage } from "./extension-store.js";
 
@@ -20,6 +23,14 @@ export interface ExtensionIpcContext {
 	broadcast(): void;
 	/** Tells the windows an extension's settings or secrets changed. */
 	settingsChanged(id: string): void;
+	/** The catalogs the user trusts. */
+	registries(): readonly Registry[];
+	readonly client?: RegistryClient;
+}
+
+interface Pending {
+	readonly pkg: InspectedPackage;
+	readonly registry: string | null;
 }
 
 const text = (value: unknown): string => (typeof value === "string" ? value : "");
@@ -44,9 +55,100 @@ export async function extensionInfos(
 	return found;
 }
 
-export function registerExtensionIpc(ctx: ExtensionIpcContext): void {
+/** Each catalog's extensions for this Kalem, and what is installed of them; blocked ones are turned off. */
+export async function readCatalogs(
+	ctx: Pick<ExtensionIpcContext, "store" | "host" | "appVersion" | "registries" | "broadcast">,
+	client: RegistryClient,
+	force: boolean,
+): Promise<MarketCatalog[]> {
+	const installed = await ctx.store.list();
+	const catalogs: MarketCatalog[] = [];
+	let changed = false;
+	for (const registry of ctx.registries()) {
+		try {
+			const index = await client.index(registry, force);
+			for (const extension of installed) {
+				if (extension.registry !== registry.url) continue;
+				const reason = blockedReason(index, extension.manifest.id, extension.manifest.version);
+				if (reason === extension.blocked) continue;
+				await ctx.store.setBlocked(extension.manifest.id, reason);
+				if (reason !== null) ctx.host.stop(extension.manifest.id);
+				changed = true;
+			}
+			catalogs.push({
+				registry,
+				name: index.name || registry.name,
+				error: null,
+				entries: latestCompatible(index, ctx.appVersion).map((entry) => {
+					const own = installed.find((each) => each.manifest.id === entry.id);
+					const version = own?.manifest.version ?? null;
+					return {
+						...entry,
+						registry: registry.url,
+						installedVersion: version,
+						update: version !== null && compareVersions(entry.version, version) > 0,
+					};
+				}),
+			});
+		} catch (error) {
+			catalogs.push({
+				registry,
+				name: registry.name,
+				error: error instanceof Error ? error.message : String(error),
+				entries: [],
+			});
+		}
+	}
+	if (changed) ctx.broadcast();
+	return catalogs;
+}
+
+/** Registers the requests; returns a check of the catalogs (blocked extensions turned off). */
+export function registerExtensionIpc(ctx: ExtensionIpcContext): () => Promise<void> {
 	const { store, host } = ctx;
-	const pending = new Map<string, InspectedPackage>();
+	const client = ctx.client ?? new RegistryClient();
+	const pending = new Map<string, Pending>();
+
+	const preview = async (
+		pkg: InspectedPackage,
+		registry: string | null,
+	): Promise<ExtensionPreview> => {
+		pending.clear();
+		pending.set(pkg.token, { pkg, registry });
+		const installed = await store.get(pkg.manifest.id);
+		return {
+			token: pkg.token,
+			manifest: pkg.manifest,
+			installedVersion: installed?.manifest.version ?? null,
+			asksForMore: installed === null || asksForMore(installed.granted, pkg.manifest.permissions),
+			registry,
+		};
+	};
+
+	ipcMain.handle(CHANNEL.extensionMarket, (_event, force: unknown) =>
+		readCatalogs(ctx, client, force === true),
+	);
+
+	ipcMain.handle(CHANNEL.extensionMarketPick, async (_event, registryUrl: unknown, id: unknown) => {
+		const registry = ctx.registries().find((each) => each.url === registryUrl);
+		if (registry === undefined) throw new Error("That catalog is not in Settings any more.");
+		const entry = latestCompatible(await client.index(registry), ctx.appVersion).find(
+			(each) => each.id === id,
+		);
+		if (entry === undefined) throw new Error("The catalog no longer offers it for this Kalem.");
+		let pkg: InspectedPackage;
+		try {
+			pkg = await readPackage(await client.download(entry), ctx.appVersion);
+		} catch (error) {
+			throw new Error(error instanceof Error ? error.message : String(error));
+		}
+		if (pkg.manifest.id !== entry.id || pkg.manifest.version !== entry.version) {
+			throw new Error(
+				`The package is ${pkg.manifest.id} ${pkg.manifest.version}, not what the catalog says.`,
+			);
+		}
+		return preview(pkg, registry.url);
+	});
 
 	ipcMain.handle(CHANNEL.extensions, () => extensionInfos(store, host));
 
@@ -69,23 +171,16 @@ export function registerExtensionIpc(ctx: ExtensionIpcContext): void {
 			if (error instanceof ExtensionPackageError) throw new Error(error.message);
 			throw error;
 		}
-		pending.clear();
-		pending.set(pkg.token, pkg);
-		const installed = await store.get(pkg.manifest.id);
-		return {
-			token: pkg.token,
-			manifest: pkg.manifest,
-			installedVersion: installed?.manifest.version ?? null,
-			asksForMore: installed === null || asksForMore(installed.granted, pkg.manifest.permissions),
-		};
+		return preview(pkg, null);
 	});
 
 	ipcMain.handle(CHANNEL.extensionInstall, async (_event, token: unknown) => {
-		const pkg = pending.get(text(token));
-		if (pkg === undefined) throw new Error("Pick the package again.");
+		const chosen = pending.get(text(token));
+		if (chosen === undefined) throw new Error("Pick the package again.");
+		const { pkg } = chosen;
 		pending.delete(pkg.token);
 		host.stop(pkg.manifest.id);
-		await store.install(pkg, "file");
+		await store.install(pkg, chosen.registry === null ? "file" : "registry", chosen.registry);
 		await host.start(pkg.manifest.id);
 		ctx.broadcast();
 	});
@@ -136,4 +231,8 @@ export function registerExtensionIpc(ctx: ExtensionIpcContext): void {
 	});
 
 	ipcMain.handle(CHANNEL.extensionDevTools, (_event, id: unknown) => host.openDevTools(text(id)));
+
+	return async () => {
+		if (ctx.registries().length > 0) await readCatalogs(ctx, client, true);
+	};
 }

@@ -17267,3 +17267,69 @@ dialog {
 .ext-status-items {
 	display: contents;
 }
+
+.ext-tabs {
+	display: flex;
+	gap: 4px;
+	border-bottom: 1px solid var(--app-border);
+}
+
+.ext-tab {
+	padding: 6px 12px;
+	border: 0;
+	border-bottom: 2px solid transparent;
+	background: none;
+	color: var(--app-muted);
+	cursor: pointer;
+}
+
+.ext-tab[aria-selected="true"] {
+	border-bottom-color: var(--app-accent);
+	color: var(--app-text);
+	font-weight: 600;
+}
+
+.ext-view,
+.ext-market {
+	display: grid;
+	gap: 12px;
+}
+
+.ext-search {
+	flex: 1;
+}
+
+.ext-catalog {
+	margin: 4px 0 0;
+	color: var(--app-muted);
+}
+
+.ext-registries {
+	display: grid;
+	gap: 6px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.ext-registries li {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.ext-registry-editor summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.ext-registry-editor[open] {
+	display: grid;
+	gap: 8px;
+}
+
+.ext-registry-form {
+	display: grid;
+	grid-template-columns: 1fr 2fr 2fr auto;
+	gap: 6px;
+}

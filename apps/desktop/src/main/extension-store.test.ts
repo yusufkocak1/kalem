@@ -82,6 +82,14 @@ describe("ExtensionStore", () => {
 		await again.setEnabled("acme.hello", false);
 		expect((await again.get("acme.hello"))?.enabled).toBe(false);
 
+		await again.setEnabled("acme.hello", true);
+		await again.setBlocked("acme.hello", "Leaks the token.");
+		expect(await again.get("acme.hello")).toMatchObject({
+			enabled: false,
+			blocked: "Leaks the token.",
+		});
+		await expect(again.setEnabled("acme.hello", true)).rejects.toThrow(/blocked/);
+
 		await again.uninstall("acme.hello");
 		expect(await again.list()).toEqual([]);
 		await expect(stat(again.folderOf("acme.hello"))).rejects.toThrow();
