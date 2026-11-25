@@ -2312,6 +2312,7 @@ const commands: Record<Command, () => void> = {
 	"jira-open": () => void jiraDialog.showSearch(),
 	settings: () => openSettings(),
 	typography: () => openSettings("typography"),
+	extensions: () => openSettings("extensions"),
 	"network-log": () => {
 		if (debugMode) networkPanel.toggle();
 	},

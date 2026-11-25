@@ -27,6 +27,9 @@ import { confluenceClient } from "./confluence-ipc.js";
 import { ConfluenceStore } from "./confluence-store.js";
 import { CopilotLogin, registerCopilotLoginIpc } from "./copilot-login.js";
 import { DraftStore } from "./drafts.js";
+import { ExtensionHost } from "./extension-host.js";
+import { registerExtensionIpc } from "./extension-ipc.js";
+import { ExtensionStore } from "./extension-store.js";
 import { backgroundFetch } from "./git.js";
 import { findRepoRoot, isTrustedRepo } from "./git-trust.js";
 import { VersionStore } from "./history.js";
@@ -112,6 +115,7 @@ function start(): void {
 	const jira = new ConfluenceStore(join(app.getPath("userData"), "jira.json"), secrets);
 	const assistant = new AssistantStore(join(app.getPath("userData"), "assistant.json"), secrets);
 	const chats = new ChatStore(join(app.getPath("userData"), "assistant-chats.json"));
+	const extensionStore = new ExtensionStore(join(app.getPath("userData"), "extensions"), secrets);
 	const copilotLogin = new CopilotLogin(
 		new ConfluenceStore(join(app.getPath("userData"), "copilot-github.json"), secrets),
 		(url, init) => net.fetch(url, init),
@@ -176,6 +180,21 @@ function start(): void {
 		newWindow: () => void windows.open(),
 		show: showWindow,
 		quit: () => app.quit(),
+	});
+
+	const broadcastExtensions = (): void => {
+		for (const win of windows.all()) {
+			if (!win.window.isDestroyed()) win.window.webContents.send(CHANNEL.extensionsChanged);
+		}
+	};
+	const extensionHost = new ExtensionHost({
+		store: extensionStore,
+		preloadPath: join(__dirname, "extension-preload.cjs"),
+		strings: () => t,
+		changed: () => {
+			refreshMenu();
+			broadcastExtensions();
+		},
 	});
 
 	const windows: WindowManager = new WindowManager({
@@ -431,6 +450,9 @@ function start(): void {
 			exportPdf: (win) => void exportPdf(win),
 			checkForUpdates: () => void updater.check(true),
 			quickNote: () => void quickNote(),
+			extensionCommands: extensionHost.menuCommands(),
+			runExtensionCommand: (extension, command) =>
+				void extensionHost.runCommand(extension, command),
 			print: (win) =>
 				void onPaper(
 					win,
@@ -577,6 +599,7 @@ function start(): void {
 	let draftsSettled = false;
 	app.on("will-quit", (event) => {
 		watcher.close();
+		extensionHost.stopAll();
 		globalShortcut.unregisterAll();
 		if (draftsSettled || !drafts.busy) return;
 		event.preventDefault();
@@ -666,6 +689,16 @@ function start(): void {
 			closeFolder: (folder) => closeFolder(folder),
 			setDebugMode,
 		});
+		registerExtensionIpc({
+			store: extensionStore,
+			host: extensionHost,
+			appVersion: app.getVersion(),
+			strings: () => t,
+			windowOf: (id) =>
+				windows.all().find((win) => win.window.webContents.id === id)?.window ?? null,
+			broadcast: broadcastExtensions,
+		});
+		void extensionHost.startAll();
 		refreshMenu();
 		tray.apply(store.settings.tray);
 

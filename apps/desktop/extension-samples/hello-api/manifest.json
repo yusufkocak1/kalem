@@ -1,0 +1,20 @@
+{
+  "id": "kalem.hello-api",
+  "name": "Hello API",
+  "version": "1.0.0",
+  "description": "A sample: calls a JSON API with a saved token, from a menu command and as an assistant tool.",
+  "publisher": "Kalem",
+  "engines": { "kalem": ">=3.33.0" },
+  "host": "host.js",
+  "permissions": {
+    "http": ["localhost", "127.0.0.1"],
+    "assistantTools": true
+  },
+  "contributes": {
+    "commands": [{ "id": "ping", "title": "Ping the API" }],
+    "settings": [
+      { "key": "url", "type": "string", "title": "API address", "default": "http://127.0.0.1:8787" }
+    ],
+    "secrets": [{ "key": "token", "title": "API token" }]
+  }
+}

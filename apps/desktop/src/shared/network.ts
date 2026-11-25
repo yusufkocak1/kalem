@@ -6,7 +6,14 @@
  */
 
 /** Who made the request. */
-export const NETWORK_SOURCES = ["jira", "confluence", "assistant", "mcp", "updates"] as const;
+export const NETWORK_SOURCES = [
+	"jira",
+	"confluence",
+	"assistant",
+	"mcp",
+	"updates",
+	"extensions",
+] as const;
 export type NetworkSource = (typeof NETWORK_SOURCES)[number];
 
 export type NetworkState = "pending" | "done" | "failed" | "aborted";

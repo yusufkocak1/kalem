@@ -6,6 +6,7 @@ import type { JiraServer, MentionUser } from "./confluence-insert.js";
 import type { ConfluenceSearchRequest, ConfluenceSearchResults } from "./confluence-search.js";
 import type { CustomMode } from "./custom-modes.js";
 import type { TextFormat } from "./encoding.js";
+import type { ExtensionManifest, ExtensionPermissions, SettingValue } from "./extensions.js";
 import type { Lang } from "./i18n.js";
 import type { JiraAccount, JiraComment, JiraIssue, JiraSearchResults } from "./jira.js";
 import type {
@@ -968,9 +969,33 @@ export const COMMANDS = [
 	"new-from-template",
 	"command-palette",
 	"network-log",
+	"extensions",
 ] as const;
 
 /** A command of the application menu, as the command palette lists it. */
+export interface ExtensionInfo {
+	readonly manifest: ExtensionManifest;
+	readonly enabled: boolean;
+	readonly source: "file" | "registry";
+	readonly granted: ExtensionPermissions;
+	readonly installedAt: number;
+	readonly status: "stopped" | "starting" | "running" | "failed";
+	readonly error: string | null;
+	readonly log: readonly string[];
+	readonly settings: Readonly<Record<string, SettingValue>>;
+	/** Which secrets are set. */
+	readonly secrets: Readonly<Record<string, boolean>>;
+}
+
+export interface ExtensionPreview {
+	readonly token: string;
+	readonly manifest: ExtensionManifest;
+	/** The version installed now; `null` for a new extension. */
+	readonly installedVersion: string | null;
+	/** It asks for permissions not granted before. */
+	readonly asksForMore: boolean;
+}
+
 export interface PaletteCommand {
 	/** Where it is in the menu; what it is run by. */
 	readonly id: string;
@@ -1330,6 +1355,18 @@ export interface KalemBridge {
 	}): Promise<TemplateInfo>;
 	/** Brings a template in from a file; a Word file opens as a document first (`"word"`). */
 	templateImport(): Promise<TemplateInfo | "word" | null>;
+	extensions(): Promise<readonly ExtensionInfo[]>;
+	/** Picks a package and reads it; nothing is installed until `extensionInstall`. */
+	extensionPick(): Promise<ExtensionPreview | null>;
+	extensionInstall(token: string): Promise<void>;
+	extensionUninstall(id: string): Promise<void>;
+	extensionSetEnabled(id: string, enabled: boolean): Promise<void>;
+	extensionRestart(id: string): Promise<void>;
+	extensionSetSetting(id: string, key: string, value: SettingValue): Promise<void>;
+	/** `null` forgets it; the value never comes back to the window. */
+	extensionSetSecret(id: string, key: string, value: string | null): Promise<void>;
+	extensionDevTools(id: string): Promise<void>;
+	onExtensionsChanged(handler: () => void): () => void;
 	onAssistantToolCall(handler: (call: AssistantToolCall) => void): () => void;
 	onAssistantEvent(handler: (chatId: string, event: ClaudeEvent) => void): () => void;
 
@@ -1512,6 +1549,16 @@ export const CHANNEL = {
 	assistantEvent: "kalem:assistant-event",
 	assistantApproval: "kalem:assistant-approval",
 	templates: "kalem:templates",
+	extensions: "kalem:extensions",
+	extensionPick: "kalem:extension-pick",
+	extensionInstall: "kalem:extension-install",
+	extensionUninstall: "kalem:extension-uninstall",
+	extensionSetEnabled: "kalem:extension-set-enabled",
+	extensionRestart: "kalem:extension-restart",
+	extensionSetSetting: "kalem:extension-set-setting",
+	extensionSetSecret: "kalem:extension-set-secret",
+	extensionDevTools: "kalem:extension-dev-tools",
+	extensionsChanged: "kalem:extensions-changed",
 	specStatus: "kalem:spec-status",
 	localNotes: "kalem:local-notes",
 	setLocalNotes: "kalem:set-local-notes",

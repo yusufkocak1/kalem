@@ -31,6 +31,11 @@ export async function buildMain() {
 			entryPoints: [join(root, "src/preload/preload.ts")],
 			outfile: join(root, "dist/main/preload.cjs"),
 		}),
+		build({
+			...shared,
+			entryPoints: [join(root, "src/preload/extension-preload.ts")],
+			outfile: join(root, "dist/main/extension-preload.cjs"),
+		}),
 	]);
 	// The window icon; installers take theirs from resources/ directly.
 	await copyFile(join(root, "resources/icon.png"), join(root, "dist/main/icon.png"));

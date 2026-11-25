@@ -17127,3 +17127,121 @@ dialog {
 	letter-spacing: 0.12em;
 	user-select: all;
 }
+
+.ext-list {
+	display: grid;
+	gap: 12px;
+}
+
+.ext-card,
+.ext-preview {
+	display: grid;
+	gap: 8px;
+	padding: 12px 14px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-surface);
+}
+
+.ext-preview {
+	border-color: var(--app-accent);
+}
+
+.ext-head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.ext-title {
+	display: grid;
+	flex: 1;
+	min-width: 0;
+}
+
+.ext-meta {
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.ext-badge {
+	padding: 2px 8px;
+	border-radius: 999px;
+	background: var(--app-hover);
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.ext-card[data-state="running"] .ext-badge {
+	background: var(--app-info-bg);
+	color: var(--app-ok);
+}
+
+.ext-card[data-state="failed"] .ext-badge {
+	background: var(--app-error-bg);
+	color: var(--app-error);
+}
+
+.ext-description {
+	margin: 0;
+}
+
+.ext-permissions {
+	display: grid;
+	gap: 2px;
+	margin: 0;
+	padding-left: 18px;
+	color: var(--app-muted);
+	font-size: 13px;
+}
+
+.ext-permissions li[data-warning] {
+	color: var(--app-warning);
+	font-weight: 600;
+}
+
+.ext-label {
+	font-weight: 600;
+	font-size: 13px;
+}
+
+.ext-field {
+	display: grid;
+	gap: 4px;
+}
+
+.ext-secret {
+	display: flex;
+	gap: 6px;
+}
+
+.ext-secret input {
+	flex: 1;
+}
+
+.ext-error,
+.ext-log pre {
+	max-height: 180px;
+	margin: 0;
+	padding: 8px;
+	overflow: auto;
+	border-radius: 6px;
+	background: var(--app-raised);
+	font-family: var(--app-mono);
+	font-size: 12px;
+	white-space: pre-wrap;
+}
+
+.ext-error {
+	color: var(--app-error);
+}
+
+.ext-status[data-error] {
+	color: var(--app-error);
+}
+
+.ext-hint {
+	margin: 0;
+	color: var(--app-muted);
+	font-size: 13px;
+}
