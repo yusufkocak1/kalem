@@ -11,6 +11,7 @@ import { el } from "./dom.js";
 
 export interface ExtensionPanesOptions {
 	readonly bridge: KalemBridge;
+	readonly language: string;
 	panePlaces(): PanePlaces;
 	/** Puts panes that were never placed where their extension asks. */
 	place(places: Readonly<Record<ExtensionPaneId, PanePlace>>): void;
@@ -77,7 +78,7 @@ export function createExtensionPanes(options: ExtensionPanesOptions): ExtensionP
 		const iframe = el("iframe", {
 			class: "ext-pane-frame",
 			attrs: {
-				src: `${originOf(manifest.id)}/${manifest.ui}?pane=${encodeURIComponent(paneId)}`,
+				src: `${originOf(manifest.id)}/${manifest.ui}?pane=${encodeURIComponent(paneId)}&lang=${options.language}`,
 				sandbox: "allow-scripts allow-same-origin allow-forms",
 				title,
 				referrerpolicy: "no-referrer",

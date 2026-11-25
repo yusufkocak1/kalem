@@ -987,6 +987,14 @@ export interface ExtensionInfo {
 	readonly secrets: Readonly<Record<string, boolean>>;
 }
 
+export interface ExtensionStatusItem {
+	readonly extension: string;
+	readonly key: string;
+	readonly text: string;
+	readonly tooltip: string;
+	readonly command: string | null;
+}
+
 export interface ExtensionPreview {
 	readonly token: string;
 	readonly manifest: ExtensionManifest;
@@ -1374,6 +1382,9 @@ export interface KalemBridge {
 	onExtensionShowPane(handler: (id: string, pane: string) => void): () => void;
 	/** An extension's settings or secrets were changed in Settings. */
 	onExtensionSettingsChanged(handler: (id: string) => void): () => void;
+	extensionStatusItems(): Promise<readonly ExtensionStatusItem[]>;
+	onExtensionStatusItems(handler: (items: readonly ExtensionStatusItem[]) => void): () => void;
+	extensionRunCommand(id: string, command: string): void;
 	onAssistantToolCall(handler: (call: AssistantToolCall) => void): () => void;
 	onAssistantEvent(handler: (chatId: string, event: ClaudeEvent) => void): () => void;
 
@@ -1570,6 +1581,8 @@ export const CHANNEL = {
 	extensionUiMessage: "kalem:extension-ui-message",
 	extensionShowPane: "kalem:extension-show-pane",
 	extensionSettingsChanged: "kalem:extension-settings-changed",
+	extensionStatusItems: "kalem:extension-status-items",
+	extensionRunCommand: "kalem:extension-run-command",
 	specStatus: "kalem:spec-status",
 	localNotes: "kalem:local-notes",
 	setLocalNotes: "kalem:set-local-notes",

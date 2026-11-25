@@ -261,6 +261,9 @@ const bridge: KalemBridge = {
 	onExtensionUiMessage: (handler) => listen(CHANNEL.extensionUiMessage, handler),
 	onExtensionShowPane: (handler) => listen(CHANNEL.extensionShowPane, handler),
 	onExtensionSettingsChanged: (handler) => listen(CHANNEL.extensionSettingsChanged, handler),
+	extensionStatusItems: () => ipcRenderer.invoke(CHANNEL.extensionStatusItems),
+	onExtensionStatusItems: (handler) => listen(CHANNEL.extensionStatusItems, handler),
+	extensionRunCommand: (id, command) => ipcRenderer.send(CHANNEL.extensionRunCommand, id, command),
 	onAssistantApproval: (handler) => listen<[ApprovalRequest]>(CHANNEL.assistantApproval, handler),
 	onAssistantToolCall: (handler) => listen<[AssistantToolCall]>(CHANNEL.assistantToolCall, handler),
 };

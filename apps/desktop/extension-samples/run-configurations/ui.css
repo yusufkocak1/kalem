@@ -1,0 +1,230 @@
+body {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 6px 8px;
+}
+
+.toolbar,
+.list-actions,
+.editor-actions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.spacer {
+	flex: 1;
+}
+
+#selected {
+	min-width: 180px;
+}
+
+#message {
+	margin: 0;
+	font-size: 12px;
+}
+
+#message:empty {
+	display: none;
+}
+
+#console,
+#editor {
+	display: flex;
+	flex: 1;
+	min-height: 0;
+}
+
+#console {
+	flex-direction: column;
+	gap: 4px;
+}
+
+[hidden] {
+	display: none !important;
+}
+
+.tabs {
+	display: flex;
+	gap: 2px;
+	overflow-x: auto;
+}
+
+.tab {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 8px;
+	border: 1px solid transparent;
+	border-radius: 6px 6px 0 0;
+	background: transparent;
+	white-space: nowrap;
+}
+
+.tab[aria-selected="true"] {
+	border-color: var(--app-border, #ccc);
+	border-bottom-color: transparent;
+	background: var(--app-raised, #fff);
+}
+
+.dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--app-muted, #888);
+}
+
+.dot[data-status="running"] {
+	background: var(--app-ok, #1a7f5a);
+}
+
+.dot[data-status="failed"] {
+	background: var(--app-error, #c00);
+}
+
+.tab .close {
+	padding: 0 4px;
+	border: 0;
+	background: none;
+	line-height: 1;
+}
+
+.output {
+	flex: 1;
+	min-height: 0;
+	margin: 0;
+	padding: 6px 8px;
+	overflow: auto;
+	border: 1px solid var(--app-border, #ccc);
+	border-radius: 6px;
+	background: var(--app-raised, #fff);
+	font-family: var(--app-mono, monospace);
+	font-size: 12px;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.stderr {
+	color: var(--app-error, #c00);
+}
+
+.system {
+	color: var(--app-muted, #666);
+}
+
+.bold {
+	font-weight: 700;
+}
+
+#editor {
+	display: grid;
+	grid-template-columns: 220px 1fr;
+	grid-template-rows: 1fr auto;
+	gap: 8px;
+}
+
+.list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-height: 0;
+}
+
+#add {
+	flex: 1;
+	min-width: 0;
+}
+
+#configs {
+	flex: 1;
+	margin: 0;
+	padding: 4px;
+	overflow: auto;
+	list-style: none;
+	border: 1px solid var(--app-border, #ccc);
+	border-radius: 6px;
+}
+
+#configs li {
+	display: grid;
+	padding: 4px 8px;
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+#configs li[data-selected] {
+	background: var(--app-accent, #0b5);
+	color: var(--app-accent-text, #fff);
+}
+
+#configs li small {
+	opacity: 0.75;
+}
+
+.form {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	align-content: start;
+	gap: 8px 12px;
+	min-height: 0;
+	overflow: auto;
+	padding-right: 4px;
+}
+
+.form label.title {
+	padding-top: 6px;
+	color: var(--app-muted, #666);
+	text-align: right;
+}
+
+.form .field {
+	display: flex;
+	gap: 6px;
+}
+
+.form .field > input:not([type="checkbox"]),
+.form .field > select,
+.form .field > textarea {
+	flex: 1;
+	min-width: 0;
+}
+
+.form textarea {
+	min-height: 54px;
+	resize: vertical;
+	font-family: var(--app-mono, monospace);
+}
+
+.form .checks {
+	display: grid;
+	gap: 2px;
+}
+
+.form h3 {
+	grid-column: 1 / -1;
+	margin: 6px 0 0;
+	font-size: 12px;
+	color: var(--app-muted, #666);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.editor-actions {
+	grid-column: 1 / -1;
+	justify-content: flex-end;
+}
+
+#problems {
+	flex: 1;
+	font-size: 12px;
+}
+
+.empty {
+	color: var(--app-muted, #666);
+}
+
+.warning {
+	color: var(--app-warning, #b70);
+}

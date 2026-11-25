@@ -4,6 +4,7 @@ export const EXTENSION_CHANNEL = {
 	request: "kalem-ext:request",
 	call: "kalem-ext:call",
 	result: "kalem-ext:result",
+	event: "kalem-ext:event",
 } as const;
 
 export interface ExtensionCall {
@@ -141,6 +142,7 @@ export const UI_SCRIPT = `(() => {
 	});
 	window.kalem = {
 		pane: params.get("pane"),
+		language: params.get("lang") || "en",
 		call(name, input) {
 			return new Promise((resolve, reject) => {
 				const id = ++next;

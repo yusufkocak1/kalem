@@ -195,6 +195,15 @@ function start(): void {
 			refreshMenu();
 			broadcastExtensions();
 		},
+		workspaceFolders: () => store.state.workspaces,
+		language: () => language,
+		statusItemsChanged: () => {
+			for (const win of windows.all()) {
+				if (!win.window.isDestroyed()) {
+					win.window.webContents.send(CHANNEL.extensionStatusItems, extensionHost.statusItems());
+				}
+			}
+		},
 		showPane: (id, pane) => {
 			const target = BrowserWindow.getFocusedWindow() ?? windows.all()[0]?.window;
 			target?.webContents.send(CHANNEL.extensionShowPane, id, pane);

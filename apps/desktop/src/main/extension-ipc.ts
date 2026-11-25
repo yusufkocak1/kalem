@@ -130,5 +130,10 @@ export function registerExtensionIpc(ctx: ExtensionIpcContext): void {
 		host.uiCall(text(id), text(name), input),
 	);
 
+	ipcMain.handle(CHANNEL.extensionStatusItems, () => host.statusItems());
+	ipcMain.on(CHANNEL.extensionRunCommand, (_event, id: unknown, command: unknown) => {
+		void host.runCommand(text(id), text(command));
+	});
+
 	ipcMain.handle(CHANNEL.extensionDevTools, (_event, id: unknown) => host.openDevTools(text(id)));
 }

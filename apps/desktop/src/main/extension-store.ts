@@ -292,6 +292,7 @@ export class ExtensionStore {
 							: [],
 						assistantTools: granted?.assistantTools === true,
 						process: granted?.process === true,
+						files: granted?.files === true,
 					},
 					installedAt: typeof entry.installedAt === "number" ? entry.installedAt : 0,
 					settings:

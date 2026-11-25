@@ -41,6 +41,7 @@ describe("parseManifest", () => {
 			httpFromSettings: [],
 			assistantTools: true,
 			process: false,
+			files: false,
 		});
 		expect(result.manifest.settings[1]).toMatchObject({
 			key: "limit",

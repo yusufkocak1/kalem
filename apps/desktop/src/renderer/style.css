@@ -17263,3 +17263,7 @@ dialog {
 	border: 0;
 	background: var(--app-surface);
 }
+
+.ext-status-items {
+	display: contents;
+}

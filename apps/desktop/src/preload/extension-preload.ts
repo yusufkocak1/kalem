@@ -12,6 +12,7 @@ type Handler = (input: unknown) => unknown;
 const commands = new Map<string, Handler>();
 const tools = new Map<string, Handler>();
 const uiHandlers = new Map<string, Handler>();
+const processListeners = new Map<string, (event: unknown) => void>();
 
 const invoke = (method: string, ...args: unknown[]): Promise<unknown> =>
 	ipcRenderer.invoke(EXTENSION_CHANNEL.request, method, args).catch((error: unknown) => {
@@ -36,7 +37,50 @@ ipcRenderer.on(EXTENSION_CHANNEL.call, async (_event, call: ExtensionCall) => {
 	}
 });
 
+ipcRenderer.on(
+	EXTENSION_CHANNEL.event,
+	(_event, message: { process: string; event: { type: string } }) => {
+		const listener = processListeners.get(message.process);
+		if (message.event.type === "exit" || message.event.type === "error")
+			processListeners.delete(message.process);
+		try {
+			listener?.(message.event);
+		} catch (error) {
+			void invoke("log", [`Process listener: ${describe(error)}`]);
+		}
+	},
+);
+
+const fsCall =
+	(method: string) =>
+	(...args: unknown[]) =>
+		invoke(`fs.${method}`, ...args);
+
 const api = {
+	platform: process.platform,
+	language: new URLSearchParams(location.search).get("lang") ?? "en",
+	process: {
+		spawn: async (request: unknown, listener?: (event: unknown) => void) => {
+			const id = (await invoke("process.spawn", request)) as string;
+			if (typeof listener === "function") processListeners.set(id, listener);
+			return id;
+		},
+		kill: (id: string) => invoke("process.kill", id),
+		write: (id: string, text: string) => invoke("process.write", id, text),
+	},
+	fs: {
+		readText: fsCall("readText"),
+		writeText: fsCall("writeText"),
+		exists: fsCall("exists"),
+		stat: fsCall("stat"),
+		list: fsCall("list"),
+		mkdir: fsCall("mkdir"),
+		copy: fsCall("copy"),
+		resolve: fsCall("resolve"),
+	},
+	workspace: {
+		folders: () => invoke("workspace.folders"),
+	},
 	settings: {
 		get: (key: string) => invoke("settings.get", key),
 		all: () => invoke("settings.all"),
@@ -72,6 +116,9 @@ const api = {
 		},
 		post: (message: unknown) => invoke("ui.post", message),
 		showPane: (pane: string) => invoke("ui.showPane", pane),
+		pickPath: (options?: unknown) => invoke("ui.pickPath", options ?? {}),
+		openExternal: (url: string) => invoke("ui.openExternal", url),
+		setStatusItem: (key: string, item: unknown) => invoke("ui.setStatusItem", key, item ?? null),
 	},
 	log: (...values: unknown[]) =>
 		invoke(

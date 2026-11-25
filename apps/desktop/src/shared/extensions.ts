@@ -52,7 +52,10 @@ export interface ExtensionPermissions {
 	/** Settings (strings) whose address it may reach: the user types the server's address there. */
 	readonly httpFromSettings: readonly string[];
 	readonly assistantTools: boolean;
+	/** Runs programs on this computer. */
 	readonly process: boolean;
+	/** Reads and writes files on this computer. */
+	readonly files: boolean;
 }
 
 export interface ExtensionManifest {
@@ -289,6 +292,7 @@ export function parseManifest(raw: unknown): ManifestResult {
 				httpFromSettings,
 				assistantTools: permissions.assistantTools === true,
 				process: permissions.process === true,
+				files: permissions.files === true,
 			},
 			commands,
 			settings,
@@ -326,6 +330,7 @@ export function asksForMore(granted: ExtensionPermissions, next: ExtensionPermis
 	return (
 		(next.assistantTools && !granted.assistantTools) ||
 		(next.process && !granted.process) ||
+		(next.files && !granted.files) ||
 		next.http.some((host) => !granted.http.includes(host)) ||
 		next.httpFromSettings.some((key) => !granted.httpFromSettings.includes(key))
 	);
@@ -336,6 +341,7 @@ export const NO_PERMISSIONS: ExtensionPermissions = {
 	httpFromSettings: [],
 	assistantTools: false,
 	process: false,
+	files: false,
 };
 
 /** The host of an address the user typed in a setting (`https://graylog.acme.local:9000/` → `graylog.acme.local:9000`). */

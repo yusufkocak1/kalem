@@ -9,7 +9,8 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { IpcMainInvokeEvent, Session, WebContents } from "electron";
-import { BrowserWindow, dialog, ipcMain, net, session, WebContentsView } from "electron";
+import { BrowserWindow, dialog, ipcMain, net, session, shell, WebContentsView } from "electron";
+import type { ExtensionStatusItem } from "../shared/bridge.js";
 import type {
 	ExtensionCall,
 	ExtensionHttpResponse,
@@ -33,6 +34,8 @@ import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import type { KalemTool } from "./assistant-tools.js";
 import { registerTools, toolNamed, unregisterTools } from "./assistant-tools.js";
+import { fileCall } from "./extension-files.js";
+import { ExtensionProcesses, parseSpawnRequest } from "./extension-process.js";
 import type { ExtensionStore } from "./extension-store.js";
 import { networkLog } from "./network-log.js";
 import { EXTENSION_SCHEME } from "./protocol.js";
@@ -73,6 +76,12 @@ export interface ExtensionHostOptions {
 	postToUi(id: string, message: unknown): void;
 	/** Brings one of the extension's panes into view. */
 	showPane(id: string, pane: string): void;
+	/** The app's language (`tr`, `en`). */
+	language(): string;
+	/** The open folders, the first one first. */
+	workspaceFolders(): readonly string[];
+	/** The status bar items of every extension changed. */
+	statusItemsChanged(): void;
 }
 
 const MAX_LOG_LINES = 200;
@@ -92,6 +101,8 @@ export class ExtensionHost {
 	readonly #logs = new Map<string, string[]>();
 	readonly #sessions = new Set<string>();
 	readonly #stopped = new Map<string, string | null>();
+	readonly #processes = new ExtensionProcesses();
+	readonly #statusItems = new Map<string, ExtensionStatusItem>();
 
 	constructor(options: ExtensionHostOptions) {
 		this.#options = options;
@@ -159,7 +170,7 @@ export class ExtensionHost {
 		this.#append(id, `Starting ${manifest.name} ${manifest.version}`);
 		this.#options.changed();
 		await contents
-			.loadURL(`${EXTENSION_SCHEME}://${id}/__kalem/host.html`)
+			.loadURL(`${EXTENSION_SCHEME}://${id}/__kalem/host.html?lang=${this.#options.language()}`)
 			.catch((error: unknown) => {
 				this.#fail(id, error instanceof Error ? error.message : String(error));
 			});
@@ -171,8 +182,69 @@ export class ExtensionHost {
 		this.#running.delete(id);
 		this.#stopped.set(id, running.status === "failed" ? running.error : null);
 		unregisterTools([...running.tools]);
+		this.#processes.killAll(id);
+		this.#clearStatusItems(id);
 		if (!running.contents.isDestroyed()) running.contents.close();
 		this.#options.changed();
+	}
+
+	/** The extensions' items in the status bar. */
+	statusItems(): ExtensionStatusItem[] {
+		return [...this.#statusItems.values()];
+	}
+
+	#setStatusItem(id: string, running: Running, rawKey: unknown, raw: unknown): void {
+		const key = typeof rawKey === "string" ? rawKey.slice(0, 40) : "";
+		if (key === "") throw new Error("A status item needs a key.");
+		const slot = `${id}\n${key}`;
+		if (raw === null || raw === undefined) {
+			this.#statusItems.delete(slot);
+		} else {
+			const item = (typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+			const command = typeof item.command === "string" ? item.command : null;
+			if (command !== null && !running.manifest.commands.some((known) => known.id === command)) {
+				throw new Error(`"${command}" is not a command of the manifest.`);
+			}
+			if (
+				!this.#statusItems.has(slot) &&
+				[...this.#statusItems.values()].filter((each) => each.extension === id).length >= 3
+			) {
+				throw new Error("An extension may show at most 3 status items.");
+			}
+			this.#statusItems.set(slot, {
+				extension: id,
+				key,
+				text: String(item.text ?? "").slice(0, 60),
+				tooltip: String(item.tooltip ?? "").slice(0, 200),
+				command,
+			});
+		}
+		this.#options.statusItemsChanged();
+	}
+
+	#clearStatusItems(id: string): void {
+		let changed = false;
+		for (const [slot, item] of this.#statusItems) {
+			if (item.extension === id) {
+				this.#statusItems.delete(slot);
+				changed = true;
+			}
+		}
+		if (changed) this.#options.statusItemsChanged();
+	}
+
+	async #pickPath(raw: unknown): Promise<string | null> {
+		const options = (typeof raw === "object" && raw !== null ? raw : {}) as Record<string, unknown>;
+		const parent = BrowserWindow.getFocusedWindow();
+		const request: Electron.OpenDialogOptions = {
+			...(typeof options.title === "string" ? { title: options.title.slice(0, 200) } : {}),
+			...(typeof options.defaultPath === "string" ? { defaultPath: options.defaultPath } : {}),
+			properties: [options.folder === true ? "openDirectory" : "openFile"],
+		};
+		const picked = await (parent === null
+			? dialog.showOpenDialog(request)
+			: dialog.showOpenDialog(parent, request));
+		return picked.canceled ? null : (picked.filePaths[0] ?? null);
 	}
 
 	stopAll(): void {
@@ -367,6 +439,39 @@ export class ExtensionHost {
 				}
 				running.commands.add(first);
 				return null;
+			case "process.spawn": {
+				if (!running.granted.process)
+					throw new Error(
+						`The extension may not run programs: add "process": true to its permissions.`,
+					);
+				const contents = running.contents;
+				return this.#processes.spawn(id, parseSpawnRequest(first), (process, event) => {
+					if (!contents.isDestroyed()) contents.send(EXTENSION_CHANNEL.event, { process, event });
+				});
+			}
+			case "process.kill":
+				this.#processes.kill(id, String(first));
+				return null;
+			case "process.write":
+				if (!running.granted.process) throw new Error("The extension may not run programs.");
+				this.#processes.write(id, String(first), String(second ?? ""));
+				return null;
+			case "workspace.folders":
+				if (!running.granted.files)
+					throw new Error(`The extension may not see files: add "files": true to its permissions.`);
+				return [...this.#options.workspaceFolders()];
+			case "ui.pickPath":
+				return this.#pickPath(first);
+			case "ui.openExternal": {
+				const url = typeof first === "string" ? first : "";
+				if (!/^https?:\/\//i.test(url))
+					throw new Error("Only http and https addresses can be opened.");
+				await shell.openExternal(url);
+				return null;
+			}
+			case "ui.setStatusItem":
+				this.#setStatusItem(id, running, first, second);
+				return null;
 			case "ui.showMessage": {
 				const parent = BrowserWindow.getFocusedWindow();
 				const options = {
@@ -396,6 +501,18 @@ export class ExtensionHost {
 			case "ui.post":
 				this.#options.postToUi(id, first ?? null);
 				return null;
+			default:
+				if (typeof method === "string" && method.startsWith("fs.")) {
+					if (!running.granted.files) {
+						throw new Error(
+							`The extension may not read or write files: add "files": true to its permissions.`,
+						);
+					}
+					return fileCall(method, args, this.#options.workspaceFolders()[0] ?? null);
+				}
+				break;
+		}
+		switch (method) {
 			case "log":
 				for (const line of Array.isArray(first) ? first : []) this.#append(id, String(line));
 				return null;

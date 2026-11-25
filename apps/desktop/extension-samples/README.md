@@ -11,6 +11,7 @@ node apps/desktop/scripts/pack-extension.mjs apps/desktop/extension-samples/gray
 |---|---|
 | `hello-api` | a command, a setting, a saved token, `http.fetch`, an assistant tool |
 | `graylog` | a docked pane, the address the user types (`httpFromSettings`), three assistant tools, a fallback for older servers |
+| `run-configurations` | IDE-like run configurations (Tomcat, Java, JAR, Maven, Gradle, npm, command, compound) kept in `.kalem/run.json`: programs, files, a status bar item, the app's language |
 
 ## Layout
 
@@ -62,6 +63,13 @@ ui.html         optional: the page of its panes
 | `kalem.ui.handle(name, run)` | what its panes call with `kalem.call(name, input)` |
 | `kalem.ui.post(message)` | sends its panes a message (`kalem.onMessage`) |
 | `kalem.ui.showPane(id)` | brings one of its panes into view |
+| `kalem.process.spawn({ command, args, cwd, env, shell, encoding }, onEvent)` → id; `kill(id)`, `write(id, text)` | `permissions.process`; events: `output` (`stdout`/`stderr`), `exit`, `error`; `kill` stops what it started too |
+| `kalem.fs.readText/writeText/exists/stat/list/mkdir/copy/resolve(path…)` | `permissions.files`; a relative path is in the first open folder |
+| `kalem.workspace.folders()` | `permissions.files` |
+| `kalem.ui.pickPath({ folder, title })` | — (the user picks it) |
+| `kalem.ui.openExternal(url)` | — (http and https only) |
+| `kalem.ui.setStatusItem(key, { text, tooltip, command })` | `null` removes it; at most 3 |
+| `kalem.platform`, `kalem.language` | — |
 | `kalem.ui.showMessage(text)` | — |
 | `kalem.log(...values)` | — (the extension's log in Settings) |
 
@@ -78,7 +86,7 @@ ui.html         optional: the page of its panes
 | `await kalem.call(name, input)` | runs the host code's `kalem.ui.handle(name, …)` |
 | `kalem.onMessage(listener)` | what the host code sends with `kalem.ui.post` |
 | `kalem.onSettingsChanged(listener)` | the user changed its settings or token |
-| `kalem.pane` | the pane's id |
+| `kalem.pane`, `kalem.language` | the pane's id, the app's language |
 | `var(--app-text)`, `var(--app-accent)`… | the app's colours, kept up to date |
 
 ## What an extension cannot do

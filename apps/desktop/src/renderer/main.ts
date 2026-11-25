@@ -8,6 +8,7 @@ import type { DocumentAction } from "../shared/actions.js";
 import { applyActions } from "../shared/actions.js";
 import type {
 	Command,
+	ExtensionStatusItem,
 	GitStatus,
 	KalemBridge,
 	SessionTab,
@@ -714,6 +715,7 @@ const docks = createDocks({
 refreshBadges = () => docks.refreshBadges();
 extensionPanes = createExtensionPanes({
 	bridge,
+	language: startup.language,
 	panePlaces: () => settings.panePlaces,
 	place: (places) => updateSettings({ panePlaces: { ...settings.panePlaces, ...places } }),
 	changed: (panes) => docks.setExtensionPanes(panes),
@@ -1154,6 +1156,31 @@ document.addEventListener("keydown", (event) => {
 	if (event.key === "Escape") zoomMenu.hidden = true;
 });
 
+const extensionStatus = el("span", { class: "ext-status-items" });
+function showExtensionStatus(items: readonly ExtensionStatusItem[]): void {
+	extensionStatus.replaceChildren(
+		...items.map((item) => {
+			const button = el("button", {
+				class: "status-chip ext-status-item",
+				text: item.text,
+				attrs: {
+					type: "button",
+					title: item.tooltip || item.text,
+					"data-extension": item.extension,
+					"data-key": item.key,
+				},
+			});
+			if (item.command === null) button.disabled = true;
+			else {
+				const command = item.command;
+				button.addEventListener("click", () => bridge.extensionRunCommand(item.extension, command));
+			}
+			return button;
+		}),
+	);
+}
+bridge.onExtensionStatusItems(showExtensionStatus);
+void bridge.extensionStatusItems().then(showExtensionStatus);
 const statusBar = el("footer", {
 	class: "statusbar",
 	children: [
@@ -1161,6 +1188,7 @@ const statusBar = el("footer", {
 		gitStatus,
 		confluenceChip,
 		jiraChip,
+		extensionStatus,
 		wordCountArea,
 		selectionCount,
 		goalButton,

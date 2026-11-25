@@ -28,6 +28,7 @@ export function permissionLines(
 ): PermissionLine[] {
 	const lines: PermissionLine[] = [];
 	if (permissions.process) lines.push({ text: t.extensionPermissionProcess, warning: true });
+	if (permissions.files) lines.push({ text: t.extensionPermissionFiles, warning: true });
 	if (permissions.http.length > 0) {
 		lines.push({
 			text: format(t.extensionPermissionHttp, permissions.http.join(", ")),
