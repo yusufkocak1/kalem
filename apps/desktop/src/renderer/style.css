@@ -17039,3 +17039,26 @@ dialog {
 		color: HighlightText;
 	}
 }
+
+.settings-proxy-manual {
+	display: grid;
+	gap: 6px;
+	margin-bottom: 10px;
+}
+
+.settings-proxy-manual h5 {
+	margin: 10px 0 0;
+}
+
+.settings-proxy-manual .settings-grid input {
+	padding: 5px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 6px;
+	background: var(--app-surface);
+	color: var(--app-text);
+	font: inherit;
+}
+
+.settings-proxy-manual[hidden] {
+	display: none;
+}

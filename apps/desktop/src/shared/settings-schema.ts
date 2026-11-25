@@ -27,6 +27,7 @@ import { DEFAULT_MODE_SERVERS, isMode, parseModeSettings } from "./mode-config.j
 /** The Settings window's categories, in its order. */
 import { PALETTE_IDS, parsePaletteCustom } from "./palette.js";
 import { MAX_DOCK_SIZE, MIN_DOCK_SIZE, parsePanePlaces, TOOL_PANES } from "./panes.js";
+import { PROXY_MODES } from "./proxy.js";
 import { SPEC_PROFILE_CHOICES } from "./spec-export.js";
 import { parseToolPolicies } from "./tool-protocol.js";
 import { DOCUMENT_FONTS, TYPOGRAPHY_RANGES } from "./typography.js";
@@ -995,6 +996,35 @@ export const SETTINGS_SCHEMA: Schema = {
 		keywords: [],
 		// Trusting a repository lets its git settings run programs: only the user decides.
 		assistant: "hidden",
+	},
+	proxyMode: {
+		key: "proxyMode",
+		category: "connections",
+		label: "settingsProxyMode",
+		type: "enum",
+		values: [...PROXY_MODES],
+		valueLabels: ["proxyModeSystem", "proxyModeDirect", "proxyModeManual"],
+		keywords: ["proxy", "vekil", "sunucu", "server", "ağ", "network", "internet", "firewall"],
+		assistant: "read",
+	},
+	proxyServer: {
+		key: "proxyServer",
+		category: "connections",
+		label: null,
+		type: "string",
+		maxLength: 512,
+		keywords: ["proxy", "vekil", "adres", "address", "port"],
+		// Where every request goes: changed only by the user.
+		assistant: "read",
+	},
+	proxyBypass: {
+		key: "proxyBypass",
+		category: "connections",
+		label: null,
+		type: "string",
+		maxLength: 4096,
+		keywords: ["proxy", "bypass", "no_proxy", "hariç", "exception"],
+		assistant: "read",
 	},
 	gitAutoFetch: {
 		key: "gitAutoFetch",

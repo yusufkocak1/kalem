@@ -35,6 +35,7 @@ import { PALETTES } from "./palette.js";
 import type { PanePlaces, ToolPane } from "./panes.js";
 import { DEFAULT_PANE_PLACES } from "./panes.js";
 import type { AssistantConfig, AssistantUpdate, ChatMessage, ProviderId } from "./providers.js";
+import type { ProxyMode } from "./proxy.js";
 import type { SpecProfileChoice, SpecSummary } from "./spec-export.js";
 import type { TemplateInfo } from "./templates.js";
 import type {
@@ -163,6 +164,11 @@ export interface Settings extends Typography {
 	readonly gitAutoFetch: boolean;
 	/** Repositories whose own git settings the user trusts: git runs only in these. */
 	readonly gitTrustedFolders: readonly string[];
+	/** The proxy the app's requests go through: the system's, none, or `proxyServer`. */
+	readonly proxyMode: ProxyMode;
+	readonly proxyServer: string;
+	/** Hosts reached without the proxy, separated by commas. */
+	readonly proxyBypass: string;
 	/** The Claude assistant's panel, at the right of the document. */
 	readonly assistant: boolean;
 	/**
@@ -202,6 +208,25 @@ export interface Settings extends Typography {
 	readonly assistantPlace: AssistantPlace;
 	/** The assistant panel's height under the document, in pixels. */
 	readonly assistantHeight: number;
+}
+
+export interface ProxyAccount {
+	readonly username: string;
+	readonly hasPassword: boolean;
+}
+
+export interface ProxyLogin {
+	readonly username: string;
+	/** `null` keeps the password already kept. */
+	readonly password: string | null;
+}
+
+export interface ProxyTestResult {
+	readonly ok: boolean;
+	/** The proxy Chromium chose for the address, as `PROXY host:port` or `DIRECT`. */
+	readonly route: string;
+	readonly status?: number;
+	readonly error?: string;
 }
 
 export type AssistantPlace = "right" | "left" | "bottom";
@@ -273,6 +298,9 @@ export const DEFAULT_SETTINGS: Settings = {
 	tray: false,
 	gitAutoFetch: true,
 	gitTrustedFolders: [],
+	proxyMode: "system",
+	proxyServer: "",
+	proxyBypass: "",
 	assistant: false,
 	assistantDocumentAuto: false,
 	claudePath: "",
@@ -1287,6 +1315,13 @@ export interface KalemBridge {
 	onAssistantToolCall(handler: (call: AssistantToolCall) => void): () => void;
 	onAssistantEvent(handler: (chatId: string, event: ClaudeEvent) => void): () => void;
 
+	/** The proxy's login: its user name, and whether a password is kept. */
+	proxyAccount(): Promise<ProxyAccount | null>;
+	/** Keeps the proxy's login (the password encrypted); an empty user name forgets it. */
+	proxySetLogin(login: ProxyLogin): Promise<void>;
+	/** Reaches a site through the proxy as it is set now. */
+	proxyTest(): Promise<ProxyTestResult>;
+
 	/** Turns the hidden debug mode on or off; off forgets the network log. */
 	setDebugMode(on: boolean): Promise<void>;
 	/** Debug mode was turned on or off, in this window or another. */
@@ -1469,6 +1504,9 @@ export const CHANNEL = {
 	mcpListTools: "kalem:mcp-list-tools",
 	mcpFindCommand: "kalem:mcp-find-command",
 	setDebugMode: "kalem:set-debug-mode",
+	proxyAccount: "kalem:proxy-account",
+	proxySetLogin: "kalem:proxy-set-login",
+	proxyTest: "kalem:proxy-test",
 	debugMode: "kalem:debug-mode",
 	networkLog: "kalem:network-log",
 	networkEntry: "kalem:network-entry",

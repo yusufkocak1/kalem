@@ -143,6 +143,6 @@ describe("resetPatch", () => {
 		expect(panels.panePlaces).toEqual(DEFAULT_SETTINGS.panePlaces);
 		expect(panels).not.toHaveProperty("sidePane");
 		expect(resetPatch("assistant")).not.toHaveProperty("claudePath");
-		expect(resetPatch("connections")).toEqual({});
+		expect(resetPatch("connections")).toEqual({ proxyMode: DEFAULT_SETTINGS.proxyMode });
 	});
 });
