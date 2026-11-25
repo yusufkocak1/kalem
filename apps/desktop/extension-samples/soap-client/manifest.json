@@ -1,0 +1,19 @@
+{
+  "id": "kalem.soap-client",
+  "name": "SOAP Client",
+  "version": "1.0.0",
+  "description": "Calls SOAP web services from their WSDL, as SoapUI does: the services, endpoints and operations listed, a sample envelope made from the schema for each, SOAP 1.1 and 1.2, Basic auth, the response pretty and coloured, and faults shown as such. The assistant can read a WSDL and call it, when you allow each call.",
+  "publisher": "Kalem",
+  "icon": "icon.svg",
+  "engines": { "kalem": ">=3.36.0" },
+  "host": "host.js",
+  "ui": "ui.html",
+  "permissions": {
+    "http": ["*"],
+    "assistantTools": true
+  },
+  "contributes": {
+    "panes": [{ "id": "client", "title": "SOAP", "dock": "bottom" }],
+    "commands": [{ "id": "open", "title": "Open SOAP Client" }]
+  }
+}

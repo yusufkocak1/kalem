@@ -25,11 +25,12 @@ import {
 	searchDocument,
 } from "../shared/document-outline.js";
 import { format } from "../shared/i18n.js";
-import type { PanePlace, ToolPane } from "../shared/panes.js";
+import type { BuiltinPane, PanePlace } from "../shared/panes.js";
 import {
 	movePane,
 	oneOnEachSide,
 	PANE_PLACES,
+	placeOf,
 	placesFor,
 	revealPane,
 	TOOL_PANES,
@@ -58,7 +59,7 @@ const PANE_LABEL_KEYS = {
 	confluence: "confluenceTab",
 	jira: "jiraTab",
 	notes: "notesTitle",
-} as const satisfies Record<ToolPane, string>;
+} as const satisfies Record<BuiltinPane, string>;
 
 const placeLabel = (ctx: ToolContext, place: PanePlace): string =>
 	({
@@ -467,14 +468,14 @@ const SETTING_TOOLS: readonly KalemTool[] = [
 				ctx.step({ tool: "pane_move", detail: line });
 				return `Moved: ${line}.`;
 			}
-			const pane = text(input, "pane") as ToolPane;
+			const pane = text(input, "pane") as BuiltinPane;
 			if (!TOOL_PANES.includes(pane))
 				return `No panel named ${pane}: ${TOOL_PANES.join(", ")}, assistant.`;
 			if (!PANE_PLACES.includes(place))
 				return `No place named ${place}: ${PANE_PLACES.join(", ")}.`;
 			if (!placesFor(pane).includes(place))
 				return `The ${pane} panel cannot go there: ${placesFor(pane).join(", ")}.`;
-			const now = ctx.settings().panePlaces[pane];
+			const now = placeOf(ctx.settings().panePlaces, pane);
 			if (now === place) return `The ${pane} panel is already there.`;
 			const line = `${ctx.t[PANE_LABEL_KEYS[pane]]}: ${placeLabel(ctx, now)} → ${placeLabel(ctx, place)}`;
 			const answer = await ctx.approve({
@@ -504,7 +505,7 @@ const SETTING_TOOLS: readonly KalemTool[] = [
 		risk: "ui",
 		available: () => true,
 		async run(input, ctx) {
-			const pane = text(input, "pane") as ToolPane;
+			const pane = text(input, "pane") as BuiltinPane;
 			if (!TOOL_PANES.includes(pane)) return `No panel named ${pane}: ${TOOL_PANES.join(", ")}.`;
 			const line = format(ctx.t.approvalShowPane, ctx.t[PANE_LABEL_KEYS[pane]]);
 			const answer = await ctx.approve({

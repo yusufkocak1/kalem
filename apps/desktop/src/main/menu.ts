@@ -28,6 +28,13 @@ export interface MenuContext {
 	showAbout(): void;
 	checkForUpdates(): void;
 	quickNote(): void;
+	readonly extensionCommands: readonly {
+		readonly extension: string;
+		readonly name: string;
+		readonly command: string;
+		readonly title: string;
+	}[];
+	runExtensionCommand(extension: string, command: string): void;
 }
 
 type Click = NonNullable<MenuItemConstructorOptions["click"]>;
@@ -590,6 +597,13 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 			],
 		},
 		{
+			label: t.extensionsMenu,
+			submenu: [
+				...extensionMenuItems(ctx),
+				{ label: t.extensionsManage, click: send(ctx, "extensions") },
+			],
+		},
+		{
 			label: t.help,
 			role: "help",
 			submenu: [
@@ -612,6 +626,25 @@ function menuTemplate(ctx: MenuContext): MenuItemConstructorOptions[] {
 				...(isMac ? [] : [{ label: t.about, click: () => ctx.showAbout() }]),
 			],
 		},
+	];
+}
+
+function extensionMenuItems(ctx: MenuContext): MenuItemConstructorOptions[] {
+	const byExtension = new Map<string, MenuItemConstructorOptions[]>();
+	const names = new Map<string, string>();
+	for (const command of ctx.extensionCommands) {
+		names.set(command.extension, command.name);
+		const items = byExtension.get(command.extension) ?? [];
+		items.push({
+			label: command.title,
+			click: () => ctx.runExtensionCommand(command.extension, command.command),
+		});
+		byExtension.set(command.extension, items);
+	}
+	if (byExtension.size === 0) return [];
+	return [
+		...[...byExtension].map(([id, submenu]) => ({ label: names.get(id) ?? id, submenu })),
+		{ type: "separator" },
 	];
 }
 

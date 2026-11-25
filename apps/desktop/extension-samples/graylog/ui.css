@@ -1,0 +1,142 @@
+.graylog-bar .k-search {
+	flex: 1;
+}
+
+.graylog-bar .k-search .k-input {
+	height: 34px;
+}
+
+.graylog-range {
+	width: 150px;
+	height: 34px;
+}
+
+.graylog-stream {
+	width: 170px;
+	height: 34px;
+}
+
+.graylog-bar .k-button {
+	height: 34px;
+}
+
+.graylog-summary {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: 10px;
+	min-height: 36px;
+	padding: 4px 12px;
+	border-bottom: 1px solid var(--k-soft-line);
+	font-size: 12px;
+}
+
+.graylog-status {
+	display: inline-flex;
+	align-items: center;
+	margin: 0;
+	color: var(--k-muted);
+}
+
+.graylog-status.error {
+	color: var(--k-error);
+}
+
+.graylog-status:empty {
+	display: none;
+}
+
+.graylog-levels {
+	display: flex;
+	gap: 6px;
+}
+
+.graylog-connection {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	color: var(--k-muted);
+}
+
+.graylog-results {
+	background: var(--k-panel);
+}
+
+.graylog-table td {
+	padding-top: 7px;
+	padding-bottom: 7px;
+}
+
+.graylog-table tr.row {
+	cursor: pointer;
+}
+
+.graylog-table tr.row[aria-expanded] td {
+	background: var(--k-accent-soft);
+}
+
+.graylog-time {
+	color: var(--k-muted);
+	white-space: nowrap;
+}
+
+.graylog-cell {
+	white-space: nowrap;
+}
+
+.graylog-table td.message {
+	width: 100%;
+	max-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.graylog-table tr.detail td {
+	padding: 0;
+	background: color-mix(in srgb, var(--k-accent) 4%, var(--k-panel));
+}
+
+.graylog-detail {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	padding: 12px 14px 14px 18px;
+	border-left: 3px solid var(--k-accent);
+}
+
+.graylog-kv {
+	display: grid;
+	flex: 1;
+	grid-template-columns: max-content minmax(0, 1fr);
+	gap: 5px 18px;
+	margin: 0;
+}
+
+.graylog-kv dt {
+	color: var(--k-muted);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.graylog-kv dd {
+	margin: 0;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.graylog-examples {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 6px;
+	margin-top: 6px;
+}
+
+.graylog-example code {
+	font-size: 11.5px;
+}
+
+.graylog-error {
+	padding: 12px;
+}

@@ -8,6 +8,7 @@ import type { DocumentAction } from "../shared/actions.js";
 import { applyActions } from "../shared/actions.js";
 import type {
 	Command,
+	ExtensionStatusItem,
 	GitStatus,
 	KalemBridge,
 	SessionTab,
@@ -25,8 +26,15 @@ import { keptProposals, placeProposals } from "../shared/edit-review.js";
 import { format, stringsFor } from "../shared/i18n.js";
 import { noteKey } from "../shared/local-notes.js";
 import { paletteCss, systemAccentCss } from "../shared/palette.js";
-import type { ToolPane } from "../shared/panes.js";
-import { isPaneShown, oneOnEachSide, revealPane, togglePane } from "../shared/panes.js";
+import type { BuiltinPane, ToolPane } from "../shared/panes.js";
+import {
+	extensionPaneId,
+	isExtensionPane,
+	isPaneShown,
+	oneOnEachSide,
+	revealPane,
+	togglePane,
+} from "../shared/panes.js";
 import {
 	extension,
 	isEditablePath,
@@ -62,6 +70,8 @@ import type { EditReviewUi } from "./edit-review.js";
 import { createEditReview } from "./edit-review.js";
 import type { TableContext, TableEdit } from "./edits.js";
 import { insertDivider, insertTable, replaceTable, tableAt, toggleTaskList } from "./edits.js";
+import type { ExtensionPanes } from "./extension-panes.js";
+import { createExtensionPanes } from "./extension-panes.js";
 import { createFilesPane } from "./files-pane.js";
 import { createGitDialogs } from "./git-dialogs.js";
 import type { IconName } from "./icons.js";
@@ -641,9 +651,20 @@ function showAssistantEdits(count: number): void {
 
 /** Which services are set up: their panes show only then. */
 const accounts = { confluence: false, jira: false };
+let extensionPanes: ExtensionPanes | null = null;
 const paneAvailable = (pane: ToolPane): boolean =>
-	pane === "confluence" ? accounts.confluence : pane === "jira" ? accounts.jira : true;
-const PANE_LABELS: Readonly<Record<ToolPane, string>> = {
+	isExtensionPane(pane)
+		? (extensionPanes?.has(pane) ?? false)
+		: pane === "confluence"
+			? accounts.confluence
+			: pane === "jira"
+				? accounts.jira
+				: true;
+const extensionPaneLabels = {
+	get: (pane: ToolPane): string | undefined =>
+		isExtensionPane(pane) ? extensionPanes?.label(pane) : undefined,
+};
+const PANE_LABELS: Readonly<Record<BuiltinPane, string>> = {
 	outline: t.outlineTab,
 	files: t.filesTab,
 	confluence: t.confluenceTab,
@@ -692,6 +713,18 @@ const docks = createDocks({
 	},
 });
 refreshBadges = () => docks.refreshBadges();
+extensionPanes = createExtensionPanes({
+	bridge,
+	language: startup.language,
+	panePlaces: () => settings.panePlaces,
+	place: (places) => updateSettings({ panePlaces: { ...settings.panePlaces, ...places } }),
+	changed: (panes) => docks.setExtensionPanes(panes),
+});
+void extensionPanes.refresh();
+bridge.onExtensionShowPane((extension, pane) => {
+	const id = extensionPaneId(extension, pane);
+	if (!isPaneShown(settings, id, paneAvailable)) updateSettings(revealPane(settings, id));
+});
 const deskColumn = el("div", { class: "desk-column", children: [deskArea, docks.elements.bottom] });
 
 /** The assistant's panel where the settings put it; its button stays at the right edge. */
@@ -760,7 +793,8 @@ const settingsDialog = createSettingsDialog({
 	bridge,
 	settings: () => settings,
 	update: (patch) => updateSettings(patch),
-	paneLabel: (pane) => PANE_LABELS[pane],
+	paneLabel: (pane) =>
+		isExtensionPane(pane) ? (extensionPaneLabels.get(pane) ?? pane) : PANE_LABELS[pane],
 	connectConfluence: () => void confluenceDialog.show(),
 	connectJira: () => void jiraDialog.showLogin(),
 	onAccountChange: () => void refreshAccounts(),
@@ -1122,6 +1156,31 @@ document.addEventListener("keydown", (event) => {
 	if (event.key === "Escape") zoomMenu.hidden = true;
 });
 
+const extensionStatus = el("span", { class: "ext-status-items" });
+function showExtensionStatus(items: readonly ExtensionStatusItem[]): void {
+	extensionStatus.replaceChildren(
+		...items.map((item) => {
+			const button = el("button", {
+				class: "status-chip ext-status-item",
+				text: item.text,
+				attrs: {
+					type: "button",
+					title: item.tooltip || item.text,
+					"data-extension": item.extension,
+					"data-key": item.key,
+				},
+			});
+			if (item.command === null) button.disabled = true;
+			else {
+				const command = item.command;
+				button.addEventListener("click", () => bridge.extensionRunCommand(item.extension, command));
+			}
+			return button;
+		}),
+	);
+}
+bridge.onExtensionStatusItems(showExtensionStatus);
+void bridge.extensionStatusItems().then(showExtensionStatus);
 const statusBar = el("footer", {
 	class: "statusbar",
 	children: [
@@ -1129,6 +1188,7 @@ const statusBar = el("footer", {
 		gitStatus,
 		confluenceChip,
 		jiraChip,
+		extensionStatus,
 		wordCountArea,
 		selectionCount,
 		goalButton,
@@ -2312,6 +2372,7 @@ const commands: Record<Command, () => void> = {
 	"jira-open": () => void jiraDialog.showSearch(),
 	settings: () => openSettings(),
 	typography: () => openSettings("typography"),
+	extensions: () => openSettings("extensions"),
 	"network-log": () => {
 		if (debugMode) networkPanel.toggle();
 	},

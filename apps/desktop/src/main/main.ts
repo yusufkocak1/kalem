@@ -6,11 +6,11 @@ import {
 	app,
 	BrowserWindow,
 	dialog,
+	session as electronSession,
 	globalShortcut,
 	nativeTheme,
 	net,
 	safeStorage,
-	session,
 	shell,
 } from "electron";
 import type { Draft, Settings, TabDocument } from "../shared/bridge.js";
@@ -27,6 +27,9 @@ import { confluenceClient } from "./confluence-ipc.js";
 import { ConfluenceStore } from "./confluence-store.js";
 import { CopilotLogin, registerCopilotLoginIpc } from "./copilot-login.js";
 import { DraftStore } from "./drafts.js";
+import { ExtensionHost } from "./extension-host.js";
+import { registerExtensionIpc } from "./extension-ipc.js";
+import { ExtensionStore } from "./extension-store.js";
 import { backgroundFetch } from "./git.js";
 import { findRepoRoot, isTrustedRepo } from "./git-trust.js";
 import { VersionStore } from "./history.js";
@@ -44,7 +47,7 @@ import {
 import { networkLog } from "./network-log.js";
 import { PackageStore } from "./package.js";
 import { pathKey } from "./path-key.js";
-import { handleDocumentScheme, registerDocumentScheme } from "./protocol.js";
+import { EXTENSION_SCHEME, handleDocumentScheme, registerDocumentScheme } from "./protocol.js";
 import { ProxyManager, registerProxyIpc } from "./proxy.js";
 import type { StoredSession } from "./session-store.js";
 import { SessionStore } from "./session-store.js";
@@ -112,6 +115,7 @@ function start(): void {
 	const jira = new ConfluenceStore(join(app.getPath("userData"), "jira.json"), secrets);
 	const assistant = new AssistantStore(join(app.getPath("userData"), "assistant.json"), secrets);
 	const chats = new ChatStore(join(app.getPath("userData"), "assistant-chats.json"));
+	const extensionStore = new ExtensionStore(join(app.getPath("userData"), "extensions"), secrets);
 	const copilotLogin = new CopilotLogin(
 		new ConfluenceStore(join(app.getPath("userData"), "copilot-github.json"), secrets),
 		(url, init) => net.fetch(url, init),
@@ -178,6 +182,40 @@ function start(): void {
 		quit: () => app.quit(),
 	});
 
+	const broadcastExtensions = (): void => {
+		for (const win of windows.all()) {
+			if (!win.window.isDestroyed()) win.window.webContents.send(CHANNEL.extensionsChanged);
+		}
+	};
+	const extensionHost = new ExtensionHost({
+		store: extensionStore,
+		preloadPath: join(__dirname, "extension-preload.cjs"),
+		strings: () => t,
+		changed: () => {
+			refreshMenu();
+			broadcastExtensions();
+		},
+		workspaceFolders: () => store.state.workspaces,
+		language: () => language,
+		statusItemsChanged: () => {
+			for (const win of windows.all()) {
+				if (!win.window.isDestroyed()) {
+					win.window.webContents.send(CHANNEL.extensionStatusItems, extensionHost.statusItems());
+				}
+			}
+		},
+		showPane: (id, pane) => {
+			const target = BrowserWindow.getFocusedWindow() ?? windows.all()[0]?.window;
+			target?.webContents.send(CHANNEL.extensionShowPane, id, pane);
+		},
+		postToUi: (id, message) => {
+			for (const win of windows.all()) {
+				if (!win.window.isDestroyed())
+					win.window.webContents.send(CHANNEL.extensionUiMessage, id, message);
+			}
+		},
+	});
+
 	const windows: WindowManager = new WindowManager({
 		store,
 		drafts,
@@ -224,7 +262,7 @@ function start(): void {
 
 	/** The page only writes to the clipboard: camera, microphone, location and the rest are refused unasked. */
 	function applyPermissions(): void {
-		const defaultSession = session.defaultSession;
+		const defaultSession = electronSession.defaultSession;
 		const permitted = new Set(["clipboard-sanitized-write"]);
 		defaultSession.setPermissionRequestHandler((_contents, permission, answer) =>
 			answer(permitted.has(permission)),
@@ -233,7 +271,7 @@ function start(): void {
 	}
 
 	function applySpellCheck(): void {
-		const defaultSession = session.defaultSession;
+		const defaultSession = electronSession.defaultSession;
 		defaultSession.setSpellCheckerEnabled(store.settings.spellCheck);
 		// macOS uses the system spell checker and detects the language itself.
 		if (process.platform === "darwin") return;
@@ -431,6 +469,9 @@ function start(): void {
 			exportPdf: (win) => void exportPdf(win),
 			checkForUpdates: () => void updater.check(true),
 			quickNote: () => void quickNote(),
+			extensionCommands: extensionHost.menuCommands(),
+			runExtensionCommand: (extension, command) =>
+				void extensionHost.runCommand(extension, command),
 			print: (win) =>
 				void onPaper(
 					win,
@@ -577,6 +618,7 @@ function start(): void {
 	let draftsSettled = false;
 	app.on("will-quit", (event) => {
 		watcher.close();
+		extensionHost.stopAll();
 		globalShortcut.unregisterAll();
 		if (draftsSettled || !drafts.busy) return;
 		event.preventDefault();
@@ -666,6 +708,30 @@ function start(): void {
 			closeFolder: (folder) => closeFolder(folder),
 			setDebugMode,
 		});
+		const checkCatalogs = registerExtensionIpc({
+			store: extensionStore,
+			host: extensionHost,
+			appVersion: app.getVersion(),
+			strings: () => t,
+			windowOf: (id) =>
+				windows.all().find((win) => win.window.webContents.id === id)?.window ?? null,
+			broadcast: broadcastExtensions,
+			registries: () => store.settings.extensionRegistries,
+			settingsChanged: (id) => {
+				for (const win of windows.all()) {
+					if (!win.window.isDestroyed())
+						win.window.webContents.send(CHANNEL.extensionSettingsChanged, id);
+				}
+			},
+		});
+		electronSession.defaultSession.protocol.handle(EXTENSION_SCHEME, (request) =>
+			extensionHost.serveUi(request),
+		);
+		void extensionHost.startAll();
+		const catalogCheck = (): void =>
+			void checkCatalogs().catch((error: unknown) => console.warn("Catalogs:", error));
+		setTimeout(catalogCheck, 15_000);
+		setInterval(catalogCheck, 6 * 60 * 60_000).unref();
 		refreshMenu();
 		tray.apply(store.settings.tray);
 

@@ -11,6 +11,9 @@ import { extension, uncShare, urlPathToFilePath } from "../shared/paths.js";
  */
 export const DOCUMENT_SCHEME = "kalem-doc";
 
+/** An extension's own files: `kalem-ext://<extension id>/<path>`. */
+export const EXTENSION_SCHEME = "kalem-ext";
+
 // Only image files are served: a hostile document must not be able to read
 // arbitrary files through `![](../../secret)`.
 const SERVED_EXTENSIONS = new Set([
@@ -37,6 +40,10 @@ export function registerDocumentScheme(): void {
 				stream: true,
 				corsEnabled: true,
 			},
+		},
+		{
+			scheme: EXTENSION_SCHEME,
+			privileges: { standard: true, secure: true, supportFetchAPI: true },
 		},
 	]);
 }

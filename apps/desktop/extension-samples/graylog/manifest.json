@@ -1,0 +1,60 @@
+{
+  "id": "kalem.graylog",
+  "name": "Graylog",
+  "version": "1.0.0",
+  "description": "Searches Graylog (5, 6 and 7) with an access token: a panel to search and read logs, and tools that let the assistant search them.",
+  "publisher": "Kalem",
+  "icon": "icon.svg",
+  "engines": {
+    "kalem": ">=3.34.0"
+  },
+  "host": "host.js",
+  "ui": "ui.html",
+  "permissions": {
+    "httpFromSettings": ["url"],
+    "assistantTools": true
+  },
+  "contributes": {
+    "panes": [
+      {
+        "id": "search",
+        "title": "Graylog",
+        "dock": "bottom"
+      }
+    ],
+    "commands": [
+      {
+        "id": "open",
+        "title": "Open Graylog"
+      }
+    ],
+    "settings": [
+      {
+        "key": "url",
+        "type": "string",
+        "title": "Graylog address",
+        "description": "The address you open Graylog at, e.g. https://graylog.example.com"
+      },
+      {
+        "key": "fields",
+        "type": "string",
+        "title": "Fields",
+        "default": "timestamp, source, level, message",
+        "description": "The fields shown and given to the assistant, comma separated."
+      },
+      {
+        "key": "limit",
+        "type": "number",
+        "title": "Messages per search",
+        "default": 100
+      }
+    ],
+    "secrets": [
+      {
+        "key": "token",
+        "title": "Access token",
+        "description": "Graylog › your profile › Edit tokens. Stored encrypted."
+      }
+    ]
+  }
+}

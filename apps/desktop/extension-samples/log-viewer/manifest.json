@@ -1,0 +1,36 @@
+{
+  "id": "kalem.log-viewer",
+  "name": "Log Viewer",
+  "version": "1.0.0",
+  "description": "Follow log files as they grow: several files in tabs, levels coloured and counted, stack traces kept with their line, search and filter by text or pattern, earlier parts loaded on demand. Rotated files are noticed. The assistant can read a log's last lines and search it.",
+  "publisher": "Kalem",
+  "icon": "icon.svg",
+  "engines": { "kalem": ">=3.37.0" },
+  "host": "host.js",
+  "ui": "ui.html",
+  "permissions": {
+    "files": true,
+    "assistantTools": true
+  },
+  "contributes": {
+    "panes": [{ "id": "logs", "title": "Logs", "dock": "bottom" }],
+    "commands": [
+      { "id": "open", "title": "Open Logs" },
+      { "id": "openFile", "title": "Open a Log File…" }
+    ],
+    "settings": [
+      {
+        "key": "pollMs",
+        "type": "number",
+        "title": "Check files every (milliseconds)",
+        "default": 1000
+      },
+      {
+        "key": "maxLines",
+        "type": "number",
+        "title": "Lines kept per file",
+        "default": 20000
+      }
+    ]
+  }
+}

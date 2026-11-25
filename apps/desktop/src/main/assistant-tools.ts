@@ -230,6 +230,13 @@ export function registerTools(tools: readonly KalemTool[]): void {
 	}
 }
 
+export function unregisterTools(names: readonly string[]): void {
+	for (const name of names) {
+		const at = registry.findIndex((known) => known.definition.name === name);
+		if (at !== -1) registry.splice(at, 1);
+	}
+}
+
 /** Every tool, whether or not it can be offered now: MCP's list. */
 export function allTools(): readonly KalemTool[] {
 	return registry;

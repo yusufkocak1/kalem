@@ -17127,3 +17127,991 @@ dialog {
 	letter-spacing: 0.12em;
 	user-select: all;
 }
+
+/* --- Extensions: Settings › Extensions, the market, and the panes and status items they add --- */
+
+.ext-page {
+	display: grid;
+	gap: 16px;
+	--ext-radius: 12px;
+	--ext-card: var(--app-raised);
+	--ext-line: color-mix(in srgb, var(--app-border) 75%, transparent);
+}
+
+.ext-intro {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+}
+
+.ext-hint {
+	flex: 1;
+	margin: 0;
+	color: var(--app-muted);
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.ext-muted {
+	margin: 0;
+	color: var(--app-muted);
+}
+
+.ext-mono {
+	font-family: var(--app-mono, ui-monospace, monospace);
+}
+
+/* Buttons: one look for the page, quieter than the dialogs' */
+.ext-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	height: 32px;
+	padding: 0 14px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+	font-weight: 500;
+	white-space: nowrap;
+	cursor: pointer;
+	transition:
+		background 120ms ease,
+		border-color 120ms ease,
+		box-shadow 120ms ease;
+}
+
+.ext-button:hover:not(:disabled) {
+	background: var(--app-hover);
+}
+
+.ext-button:focus-visible,
+.ext-icon-button:focus-visible,
+.ext-tab:focus-visible {
+	outline: var(--app-focus-ring);
+	outline-offset: 2px;
+}
+
+.ext-button:disabled {
+	opacity: 0.55;
+	cursor: default;
+}
+
+.ext-button svg {
+	width: 15px;
+	height: 15px;
+}
+
+.ext-button-primary {
+	border-color: var(--app-accent);
+	background: var(--app-accent);
+	color: var(--app-accent-text);
+	box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+}
+
+.ext-button-primary:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--app-accent) 88%, var(--app-text));
+	box-shadow: 0 2px 8px color-mix(in srgb, var(--app-accent) 35%, transparent);
+}
+
+.ext-button-ghost {
+	height: 28px;
+	padding: 0 10px;
+	border-color: transparent;
+	background: transparent;
+	color: var(--app-muted);
+}
+
+.ext-button-ghost:hover:not(:disabled),
+.ext-button-ghost[aria-expanded="true"] {
+	background: var(--app-hover);
+	color: var(--app-text);
+}
+
+.ext-button-danger {
+	height: 28px;
+	padding: 0 10px;
+	border-color: transparent;
+	background: transparent;
+	color: var(--app-error);
+}
+
+.ext-button-danger:hover:not(:disabled) {
+	background: var(--app-error-bg);
+}
+
+.ext-icon-button {
+	display: inline-grid;
+	place-items: center;
+	width: 36px;
+	height: 36px;
+	border: 0;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--app-muted);
+	cursor: pointer;
+}
+
+.ext-icon-button:hover:not(:disabled) {
+	background: var(--app-hover);
+	color: var(--app-text);
+}
+
+.ext-icon-button svg {
+	width: 17px;
+	height: 17px;
+}
+
+.ext-market[data-loading] .ext-icon-button svg {
+	animation: ext-spin 900ms linear infinite;
+}
+
+@keyframes ext-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* Tabs: a segmented control */
+.ext-toolbar {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.ext-tabs {
+	display: inline-flex;
+	gap: 2px;
+	padding: 3px;
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--app-text) 6%, transparent);
+}
+
+.ext-tab {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	height: 30px;
+	padding: 0 14px;
+	border: 0;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--app-muted);
+	font: inherit;
+	font-weight: 500;
+	cursor: pointer;
+	transition:
+		background 120ms ease,
+		color 120ms ease;
+}
+
+.ext-tab:hover {
+	color: var(--app-text);
+}
+
+.ext-tab[aria-selected="true"] {
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow:
+		0 1px 2px rgb(0 0 0 / 10%),
+		0 1px 1px rgb(0 0 0 / 4%);
+}
+
+.ext-count {
+	min-width: 18px;
+	padding: 0 6px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--app-text) 9%, transparent);
+	color: var(--app-muted);
+	font-size: 11px;
+	font-weight: 600;
+	line-height: 18px;
+	text-align: center;
+}
+
+.ext-update-dot {
+	position: absolute;
+	top: 5px;
+	right: 5px;
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: var(--app-accent);
+	box-shadow: 0 0 0 2px var(--app-raised);
+}
+
+.ext-status {
+	margin: 0;
+	padding: 10px 12px;
+	border-radius: 10px;
+	background: var(--app-info-bg);
+	font-size: 13px;
+}
+
+.ext-status[data-error] {
+	background: var(--app-error-bg);
+	color: var(--app-error);
+}
+
+.ext-view {
+	display: grid;
+	gap: 14px;
+}
+
+/* The extension's picture, or its initial on a colour of its own */
+.ext-avatar {
+	--size: 40px;
+	display: inline-grid;
+	flex: none;
+	place-items: center;
+	width: var(--size);
+	height: var(--size);
+	overflow: hidden;
+	border-radius: 10px;
+	background: color-mix(in oklab, hsl(var(--hue) 70% 50%) 16%, var(--app-raised));
+	color: color-mix(in oklab, hsl(var(--hue) 65% 40%) 85%, var(--app-text));
+	font-size: calc(var(--size) * 0.45);
+	font-weight: 700;
+	user-select: none;
+}
+
+.ext-avatar-large {
+	--size: 48px;
+	border-radius: 12px;
+}
+
+.ext-avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.ext-avatar:not([data-initial]) {
+	background: transparent;
+}
+
+.ext-title {
+	display: grid;
+	gap: 2px;
+	min-width: 0;
+}
+
+.ext-name {
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.ext-name-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 8px;
+}
+
+.ext-meta {
+	overflow: hidden;
+	color: var(--app-muted);
+	font-size: 12px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.ext-badge,
+.ext-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	height: 20px;
+	padding: 0 8px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--app-text) 8%, transparent);
+	color: var(--app-muted);
+	font-size: 11px;
+	font-weight: 600;
+}
+
+.ext-badge::before {
+	content: "";
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: currentcolor;
+	opacity: 0.8;
+}
+
+.ext-card[data-state="running"] .ext-badge {
+	background: color-mix(in srgb, var(--app-ok) 14%, transparent);
+	color: var(--app-ok);
+}
+
+.ext-card[data-state="starting"] .ext-badge {
+	background: var(--app-info-bg);
+	color: var(--app-accent);
+}
+
+.ext-card[data-state="failed"] .ext-badge {
+	background: var(--app-error-bg);
+	color: var(--app-error);
+}
+
+.ext-pill-warning {
+	background: var(--app-warning-bg);
+	color: var(--app-warning);
+}
+
+.ext-pill-accent {
+	background: color-mix(in srgb, var(--app-accent) 14%, transparent);
+	color: var(--app-accent);
+}
+
+/* Permissions as chips; what can do anything stands out */
+.ext-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.ext-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	max-width: 100%;
+	height: 24px;
+	padding: 0 9px;
+	overflow: hidden;
+	border: 1px solid var(--ext-line, var(--app-border));
+	border-radius: 999px;
+	color: var(--app-muted);
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.ext-chip span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.ext-chip svg {
+	flex: none;
+	width: 13px;
+	height: 13px;
+}
+
+.ext-chip[data-warning] {
+	border-color: color-mix(in srgb, var(--app-warning) 35%, transparent);
+	background: var(--app-warning-bg);
+	color: var(--app-warning);
+}
+
+.ext-error {
+	margin: 0;
+	padding: 10px 12px;
+	overflow: auto;
+	border-radius: 8px;
+	background: var(--app-error-bg);
+	color: var(--app-error);
+	font-family: var(--app-mono, ui-monospace, monospace);
+	font-size: 12px;
+	white-space: pre-wrap;
+}
+
+/* --- Installed ---------------------------------------------------------------------- */
+
+.ext-installed {
+	display: grid;
+	gap: 12px;
+}
+
+.ext-card {
+	display: grid;
+	gap: 12px;
+	padding: 16px 18px 10px;
+	border: 1px solid var(--ext-line);
+	border-radius: var(--ext-radius);
+	background: var(--ext-card);
+	box-shadow: var(--app-shadow-soft);
+	transition: border-color 120ms ease;
+}
+
+.ext-card:hover {
+	border-color: var(--app-border);
+}
+
+.ext-card[data-off] .ext-head > .ext-avatar,
+.ext-card[data-off] .ext-title,
+.ext-card[data-off] .ext-description {
+	opacity: 0.6;
+}
+
+.ext-head {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+}
+
+.ext-head .ext-title {
+	flex: 1;
+}
+
+.ext-description {
+	margin: 0;
+	color: var(--app-text);
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.ext-settings {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+	gap: 14px 18px;
+	padding: 14px;
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--app-text) 3%, transparent);
+}
+
+.ext-field {
+	display: grid;
+	align-content: start;
+	gap: 6px;
+}
+
+.ext-field-check {
+	grid-template-columns: auto 1fr;
+	align-items: center;
+}
+
+.ext-field-check .ext-field-label {
+	grid-column: 2;
+	grid-row: 1;
+}
+
+.ext-field-check .ext-input {
+	grid-column: 1;
+	grid-row: 1;
+	width: auto;
+	height: auto;
+}
+
+.ext-field-label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.ext-field-hint {
+	color: var(--app-muted);
+	font-size: 12px;
+	line-height: 1.4;
+}
+
+.ext-saved {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	color: var(--app-ok);
+	font-weight: 500;
+}
+
+.ext-saved svg {
+	width: 13px;
+	height: 13px;
+}
+
+.ext-input {
+	width: 100%;
+	height: 34px;
+	padding: 0 10px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-page);
+	color: var(--app-text);
+	font: inherit;
+	transition:
+		border-color 120ms ease,
+		box-shadow 120ms ease;
+}
+
+.ext-input:focus {
+	border-color: var(--app-accent);
+	outline: none;
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 22%, transparent);
+}
+
+.ext-secret {
+	display: flex;
+	gap: 6px;
+}
+
+.ext-secret .ext-input {
+	flex: 1;
+	min-width: 0;
+}
+
+.ext-log {
+	max-height: 200px;
+	margin: 0;
+	padding: 10px 12px;
+	overflow: auto;
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--app-text) 5%, transparent);
+	font-family: var(--app-mono, ui-monospace, monospace);
+	font-size: 12px;
+	white-space: pre-wrap;
+}
+
+.ext-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 2px;
+	margin: 0 -8px;
+	padding-top: 6px;
+	border-top: 1px solid var(--ext-line);
+}
+
+.ext-actions .ext-button-primary {
+	height: 28px;
+	margin-right: 6px;
+	padding: 0 12px;
+}
+
+.ext-spacer {
+	flex: 1;
+}
+
+/* Nothing yet: say so, and offer the way on */
+.ext-empty {
+	display: grid;
+	justify-items: center;
+	gap: 6px;
+	padding: 36px 24px;
+	border: 1px dashed var(--app-border);
+	border-radius: var(--ext-radius);
+	text-align: center;
+}
+
+.ext-empty strong {
+	font-size: 15px;
+}
+
+.ext-empty p {
+	max-width: 420px;
+	margin: 0 0 8px;
+	color: var(--app-muted);
+}
+
+.ext-empty-icon {
+	display: grid;
+	place-items: center;
+	width: 52px;
+	height: 52px;
+	margin-bottom: 6px;
+	border-radius: 14px;
+	background: color-mix(in srgb, var(--app-accent) 12%, transparent);
+	color: var(--app-accent);
+}
+
+.ext-empty-icon svg {
+	width: 26px;
+	height: 26px;
+}
+
+.ext-empty-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 8px;
+}
+
+/* --- Market ------------------------------------------------------------------------- */
+
+.ext-search {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.ext-search-icon {
+	position: absolute;
+	left: 12px;
+	display: grid;
+	color: var(--app-muted);
+	pointer-events: none;
+}
+
+.ext-search-icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+.ext-search-input {
+	flex: 1;
+	height: 38px;
+	padding: 0 12px 0 38px;
+	border: 1px solid var(--app-border);
+	border-radius: 10px;
+	background: var(--app-page);
+	color: var(--app-text);
+	font: inherit;
+}
+
+.ext-search-input:focus {
+	border-color: var(--app-accent);
+	outline: none;
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 22%, transparent);
+}
+
+.ext-market-results {
+	display: grid;
+	gap: 22px;
+}
+
+.ext-catalog {
+	display: grid;
+	gap: 12px;
+}
+
+.ext-catalog-head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.ext-page .ext-heading,
+.ext-page .ext-dialog-title h3 {
+	margin: 0;
+	color: var(--app-text);
+	font-size: 14px;
+	font-weight: 600;
+	letter-spacing: normal;
+	text-transform: none;
+}
+
+.ext-verified {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--app-ok);
+	font-size: 12px;
+	font-weight: 500;
+}
+
+.ext-verified svg {
+	width: 14px;
+	height: 14px;
+}
+
+.ext-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+	gap: 12px;
+}
+
+.ext-tile {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding: 16px;
+	border: 1px solid var(--ext-line);
+	border-radius: var(--ext-radius);
+	background: var(--ext-card);
+	box-shadow: var(--app-shadow-soft);
+	transition:
+		transform 150ms var(--app-ease),
+		box-shadow 150ms var(--app-ease),
+		border-color 150ms ease;
+}
+
+.ext-tile:hover {
+	border-color: var(--app-border);
+	box-shadow: var(--app-shadow);
+	transform: translateY(-2px);
+}
+
+.ext-tile-head {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.ext-tile-text {
+	display: -webkit-box;
+	flex: none;
+	margin: 0;
+	overflow: hidden;
+	color: var(--app-muted);
+	font-size: 13px;
+	line-height: 1.5;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+}
+
+.ext-tile .ext-chips {
+	margin-top: auto;
+}
+
+.ext-tile-foot {
+	display: flex;
+	justify-content: flex-end;
+	padding-top: 2px;
+}
+
+.ext-tile-foot .ext-button {
+	min-width: 96px;
+}
+
+/* --- Catalogs ----------------------------------------------------------------------- */
+
+.ext-registries {
+	display: grid;
+	gap: 8px;
+}
+
+.ext-registry {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 14px;
+	border: 1px solid var(--ext-line);
+	border-radius: var(--ext-radius);
+	background: var(--ext-card);
+}
+
+.ext-registry .ext-title {
+	flex: 1;
+}
+
+.ext-registry-icon {
+	display: grid;
+	place-items: center;
+	width: 36px;
+	height: 36px;
+	border-radius: 10px;
+	background: color-mix(in srgb, var(--app-ok) 14%, transparent);
+	color: var(--app-ok);
+}
+
+.ext-registry-icon svg {
+	width: 18px;
+	height: 18px;
+}
+
+.ext-form-card {
+	display: grid;
+	gap: 14px;
+	padding: 18px;
+	border: 1px solid var(--ext-line);
+	border-radius: var(--ext-radius);
+	background: var(--ext-card);
+	box-shadow: var(--app-shadow-soft);
+}
+
+.ext-form-grid {
+	display: grid;
+	grid-template-columns: minmax(140px, 1fr) minmax(220px, 2fr);
+	gap: 14px;
+}
+
+.ext-form-grid .ext-field:last-child {
+	grid-column: 1 / -1;
+}
+
+.ext-form-actions {
+	display: flex;
+	justify-content: flex-end;
+}
+
+/* --- The install dialog ------------------------------------------------------------- */
+
+.ext-dialog {
+	width: min(520px, calc(100vw - 48px));
+	max-height: calc(100vh - 64px);
+	padding: 0;
+	overflow: auto;
+	border: 1px solid var(--app-border);
+	background: var(--app-raised);
+	color: var(--app-text);
+	box-shadow: var(--app-shadow);
+}
+
+.ext-dialog::backdrop {
+	background: rgb(0 0 0 / 32%);
+}
+
+.ext-dialog > * {
+	margin-right: 24px;
+	margin-left: 24px;
+}
+
+.ext-dialog-head {
+	display: flex;
+	align-items: flex-start;
+	gap: 14px;
+	margin-top: 24px;
+}
+
+.ext-dialog-title {
+	display: grid;
+	gap: 4px;
+	min-width: 0;
+}
+
+.ext-page .ext-dialog-title h3 {
+	font-size: 17px;
+	line-height: 1.3;
+}
+
+.ext-dialog-title p {
+	margin: 0;
+}
+
+.ext-source {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	margin-top: 2px !important;
+	color: var(--app-ok);
+	font-size: 12px;
+	font-weight: 500;
+}
+
+.ext-source[data-file] {
+	color: var(--app-warning);
+}
+
+.ext-source svg {
+	width: 14px;
+	height: 14px;
+}
+
+.ext-dialog-text {
+	margin-top: 16px;
+	margin-bottom: 0;
+	line-height: 1.55;
+}
+
+.ext-dialog-label {
+	margin-top: 20px;
+	margin-bottom: 8px;
+	color: var(--app-muted);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.ext-permissions {
+	display: grid;
+	gap: 2px;
+	margin-top: 0;
+	margin-bottom: 0;
+	padding: 6px;
+	list-style: none;
+	border: 1px solid var(--ext-line, var(--app-border));
+	border-radius: 10px;
+}
+
+.ext-permissions li {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 10px;
+	border-radius: 7px;
+}
+
+.ext-permissions li svg {
+	flex: none;
+	width: 16px;
+	height: 16px;
+	color: var(--app-muted);
+}
+
+.ext-permissions li[data-warning] {
+	background: var(--app-warning-bg);
+	color: var(--app-warning);
+	font-weight: 600;
+}
+
+.ext-permissions li[data-warning] svg {
+	color: var(--app-warning);
+}
+
+.ext-dialog-note {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	margin-top: 14px;
+	margin-bottom: 0;
+	color: var(--app-muted);
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.ext-dialog-note svg {
+	flex: none;
+	width: 15px;
+	height: 15px;
+	margin-top: 1px;
+}
+
+.ext-dialog-actions {
+	position: sticky;
+	bottom: 0;
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin: 20px 0 0 !important;
+	padding: 14px 24px;
+	border-top: 1px solid var(--ext-line, var(--app-border));
+	background: var(--app-raised);
+}
+
+.ext-dialog-actions .ext-button-ghost {
+	height: 32px;
+	padding: 0 14px;
+}
+
+/* --- What extensions add to the window ---------------------------------------------- */
+
+.ext-pane {
+	display: flex;
+	height: 100%;
+	min-height: 0;
+}
+
+.ext-pane[hidden] {
+	display: none;
+}
+
+.ext-pane-frame {
+	flex: 1;
+	width: 100%;
+	height: 100%;
+	border: 0;
+	background: var(--app-surface);
+}
+
+.ext-status-items {
+	display: contents;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ext-tile,
+	.ext-tile:hover {
+		transform: none;
+		transition: none;
+	}
+
+	.ext-market[data-loading] .ext-icon-button svg {
+		animation: none;
+	}
+}
