@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { join } from "node:path";
-import type { ElectronApplication, FrameLocator, Page } from "@playwright/test";
+import type { ElectronApplication, FrameLocator, Locator, Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { clickMenu, stubOpenDialog, tempDir } from "./launch.js";
 
@@ -227,6 +227,7 @@ export async function installSample(
 	pane: string,
 	title: string,
 	language: "en" | "tr" = "en",
+	configure?: (card: Locator) => Promise<void>,
 ): Promise<FrameLocator> {
 	const words = WORDS[language];
 	const packagePath = join(await tempDir(name), `${name}.kalem-ext`);
@@ -239,9 +240,9 @@ export async function installSample(
 	if (name === "rest-client" || name === "soap-client")
 		await expect(preview).toContainText(words.any);
 	await preview.getByRole("button", { name: words.install, exact: true }).click();
-	await expect(settings.locator(`.ext-card[data-extension="kalem.${name}"] .ext-badge`)).toHaveText(
-		words.running,
-	);
+	const card = settings.locator(`.ext-card[data-extension="kalem.${name}"]`);
+	await expect(card.locator(".ext-badge")).toHaveText(words.running);
+	await configure?.(card);
 	await page.locator(`.stripe-bottom [data-pane="ext:kalem.${name}/${pane}"]`).click();
 	await page.evaluate(() => {
 		(document.querySelector(".tool-dock.dock-bottom") as HTMLElement).style.height = "560px";

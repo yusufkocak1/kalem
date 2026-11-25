@@ -140,6 +140,8 @@ export class ExtensionHost {
 				nodeIntegration: false,
 				webSecurity: true,
 				spellcheck: false,
+				// A hidden page's timers would slow to once a minute: builds and programs are watched by them.
+				backgroundThrottling: false,
 			},
 		});
 		const contents = view.webContents;

@@ -1,0 +1,48 @@
+{
+  "id": "kalem.jenkins",
+  "name": "Jenkins",
+  "version": "1.0.0",
+  "description": "Jenkins in Kalem, with QuickPipeline inside: parameterized pipelines read from Jenkins, a tree of environments whose variables targets inherit, quick actions (Start, Stop, Restart…) run on one target or a whole group after a preview, and the builds followed to their result. Browse jobs and builds, read consoles and stages, and let the assistant find why a build failed. Imports QuickPipeline's config.json.",
+  "publisher": "Kalem",
+  "icon": "icon.svg",
+  "engines": { "kalem": ">=3.37.0" },
+  "host": "host.js",
+  "ui": "ui.html",
+  "permissions": {
+    "httpFromSettings": ["url"],
+    "assistantTools": true
+  },
+  "contributes": {
+    "panes": [{ "id": "jenkins", "title": "Jenkins", "dock": "bottom" }],
+    "commands": [{ "id": "open", "title": "Open Jenkins" }],
+    "settings": [
+      {
+        "key": "url",
+        "type": "string",
+        "title": "Jenkins address",
+        "description": "e.g. https://jenkins.example.com"
+      },
+      { "key": "username", "type": "string", "title": "User name" },
+      { "key": "concurrency", "type": "number", "title": "Builds started at once", "default": 2 },
+      {
+        "key": "pollSeconds",
+        "type": "number",
+        "title": "Check builds every (seconds)",
+        "default": 2
+      },
+      {
+        "key": "confirmBulk",
+        "type": "boolean",
+        "title": "Ask before running on a whole group",
+        "default": true
+      }
+    ],
+    "secrets": [
+      {
+        "key": "token",
+        "title": "API token",
+        "description": "Jenkins › your name › Configure › API Token › Add new Token. Stored encrypted."
+      }
+    ]
+  }
+}
