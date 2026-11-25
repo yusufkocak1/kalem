@@ -13,6 +13,8 @@ node apps/desktop/scripts/pack-extension.mjs apps/desktop/extension-samples/gray
 | `graylog` | a docked pane, the address the user types (`httpFromSettings`), three assistant tools, a fallback for older servers |
 | `rest-client` | a Postman-like client: any address (`"http": ["*"]`), `kalem.storage` for its collection, history and environments, the pane kit |
 | `soap-client` | a SoapUI-like client: WSDL read in the host page, sample envelopes from the schema, SOAP 1.1 and 1.2 |
+| `jenkins` | Jenkins with QuickPipeline inside: a tree of environments whose variables targets inherit, quick actions on a target or a whole group after a preview, the build queue followed to the result, consoles, stages and a jobs browser; imports QuickPipeline's `config.json` |
+| `log-viewer` | follows log files as they grow with `kalem.fs.readRange`: levels coloured and counted, stack traces kept with their line, search by text or pattern, rotated files noticed |
 | `run-configurations` | IDE-like run configurations (Tomcat, Java, JAR, Maven, Gradle, npm, command, compound) kept in `.kalem/run.json`: programs, files, a status bar item, the app's language |
 
 ## Layout
@@ -67,7 +69,7 @@ ui.html         optional: the page of its panes
 | `kalem.ui.post(message)` | sends its panes a message (`kalem.onMessage`) |
 | `kalem.ui.showPane(id)` | brings one of its panes into view |
 | `kalem.process.spawn({ command, args, cwd, env, shell, encoding }, onEvent)` → id; `kill(id)`, `write(id, text)` | `permissions.process`; events: `output` (`stdout`/`stderr`), `exit`, `error`; `kill` stops what it started too |
-| `kalem.fs.readText/writeText/exists/stat/list/mkdir/copy/resolve(path…)` | `permissions.files`; a relative path is in the first open folder |
+| `kalem.fs.readText/writeText/exists/stat/list/mkdir/copy/resolve(path…)`, `kalem.fs.readRange(path, { start, length } \| { tail })` (whole lines, for following a log) | `permissions.files`; a relative path is in the first open folder |
 | `kalem.workspace.folders()` | `permissions.files` |
 | `kalem.ui.pickPath({ folder, title })` | — (the user picks it) |
 | `kalem.ui.openExternal(url)` | — (http and https only) |

@@ -38,7 +38,7 @@ const TR = {
 	"action: {0}": "aksiyon: {0}",
 	target: "hedef",
 	"group: {0}": "grup: {0}",
-	default: "pipeline default",
+	default: "pipeline varsayılanı",
 	empty: "boş",
 	"{0} targets": "{0} hedef",
 	"Run on {0} targets": "{0} hedefte çalıştır",

@@ -1,5 +1,5 @@
 /** Files an extension with the `files` permission reads and writes (`kalem.fs`). */
-import { cp, mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { cp, mkdir, open, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
 
 export const MAX_READ_BYTES = 20 * 1024 * 1024;
@@ -61,9 +61,65 @@ export async function fileCall(
 				force: true,
 			});
 			return null;
+		case "fs.readRange":
+			return readRange(resolvePath(first, base), second);
 		case "fs.resolve":
 			return resolvePath(first, base);
 		default:
 			throw new Error(`Unknown call: ${method}`);
+	}
+}
+
+const MAX_RANGE_BYTES = 4 * 1024 * 1024;
+const NEWLINE = 0x0a;
+
+/**
+ * Whole lines of a file from a byte offset, for following a log: `{ start, length }`, or
+ * `{ tail }` for the last bytes. A line cut at the end is left out unless it is the file's last;
+ * one cut at the start too, for `tail` or `align`.
+ */
+export async function readRange(
+	path: string,
+	options: unknown,
+): Promise<{ text: string; start: number; end: number; size: number }> {
+	const input = (options ?? {}) as {
+		start?: unknown;
+		length?: unknown;
+		tail?: unknown;
+		align?: unknown;
+	};
+	const handle = await open(path, "r");
+	try {
+		const { size } = await handle.stat();
+		const limit = Math.min(
+			MAX_RANGE_BYTES,
+			Math.max(1, Number(input.length ?? input.tail) || 256 * 1024),
+		);
+		const tail = input.tail !== undefined;
+		let start = tail
+			? Math.max(0, size - limit)
+			: Math.min(size, Math.max(0, Math.floor(Number(input.start) || 0)));
+		const length = Math.min(limit, size - start);
+		const buffer = Buffer.alloc(length);
+		const { bytesRead } = await handle.read(buffer, 0, length, start);
+		let from = 0;
+		let to = bytesRead;
+		if ((tail || input.align === true) && start > 0) {
+			const first = buffer.indexOf(NEWLINE);
+			from = first === -1 ? to : first + 1;
+		}
+		if (start + to < size) {
+			const last = buffer.lastIndexOf(NEWLINE, to - 1);
+			to = last < from ? from : last + 1;
+		}
+		start += from;
+		return {
+			text: buffer.subarray(from, to).toString("utf8"),
+			start,
+			end: start + (to - from),
+			size,
+		};
+	} finally {
+		await handle.close();
 	}
 }

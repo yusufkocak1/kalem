@@ -349,31 +349,33 @@ function preview(input, planned, editable) {
 	const draw = (items) => {
 		const warnings = [...new Set(items.flatMap((item) => item.warnings))];
 		body.replaceChildren(
-			warnings.length
-				? el("div", { class: "k-notice warn" }, [
-						icon("alert"),
-						el("div", {}, [
-							el("strong", { text: t("Warnings") }),
-							el("p", {
-								text: `${warnings.join(" · ")} — ${t("Unresolved variables are sent as they are.")}`,
-							}),
+			...[
+				warnings.length
+					? el("div", { class: "k-notice warn" }, [
+							icon("alert"),
+							el("div", {}, [
+								el("strong", { text: t("Warnings") }),
+								el("p", {
+									text: `${warnings.join(" · ")} — ${t("Unresolved variables are sent as they are.")}`,
+								}),
+							]),
+						])
+					: null,
+				...items.map((item) =>
+					el("section", { class: "jk-preview-item" }, [
+						el("header", { class: "jk-preview-head" }, [
+							icon("target"),
+							el("strong", { text: item.target.name }),
+							el("span", { class: "k-muted", text: item.target.group }),
+							el("span", { class: "k-spacer" }),
+							el("span", { class: "k-badge", text: item.pipeline.name }),
 						]),
-					])
-				: null,
-			...items.map((item) =>
-				el("section", { class: "jk-preview-item" }, [
-					el("header", { class: "jk-preview-head" }, [
-						icon("target"),
-						el("strong", { text: item.target.name }),
-						el("span", { class: "k-muted", text: item.target.group }),
-						el("span", { class: "k-spacer" }),
-						el("span", { class: "k-badge", text: item.pipeline.name }),
+						item.params.length
+							? previewTable(item, overrides, editable ? () => undefined : null)
+							: el("p", { class: "k-muted k-small", text: "—" }),
 					]),
-					item.params.length
-						? previewTable(item, overrides, editable ? () => undefined : null)
-						: el("p", { class: "k-muted k-small", text: "—" }),
-				]),
-			),
+				),
+			].filter(Boolean),
 		);
 	};
 	draw(planned);

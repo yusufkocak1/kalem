@@ -70,6 +70,7 @@ const api = {
 	},
 	fs: {
 		readText: fsCall("readText"),
+		readRange: fsCall("readRange"),
 		writeText: fsCall("writeText"),
 		exists: fsCall("exists"),
 		stat: fsCall("stat"),

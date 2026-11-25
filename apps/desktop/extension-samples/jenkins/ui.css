@@ -6,6 +6,7 @@
 
 .jk-views {
 	align-self: stretch;
+	overflow: hidden;
 	border-bottom: 0;
 }
 
@@ -943,4 +944,15 @@
 		border-top: 1px solid var(--k-soft-line);
 		border-left: 0;
 	}
+}
+
+.jk-side .k-list {
+	padding: 0 6px 10px;
+}
+
+.jk-side .k-list-item > svg {
+	flex: none;
+	width: 15px;
+	height: 15px;
+	color: var(--k-muted);
 }
