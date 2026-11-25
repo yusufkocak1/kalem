@@ -323,25 +323,113 @@ describe("the tools as the user set them", () => {
 
 /** Keşif testi: the card said "QR-1: Start Test → Test", the step's name where the status goes. */
 describe("jira_transition", () => {
-	function transitions(status: string | null) {
+	const REASON = {
+		id: "customfield_7",
+		name: "Reason",
+		required: true,
+		hasDefault: false,
+		type: "option",
+		items: "",
+		custom: "com.atlassian.jira.plugin.system.customfieldtypes:select",
+		system: "",
+		choices: [
+			{ id: "1", name: "Fixed", children: [] },
+			{ id: "2", name: "Duplicate", children: [] },
+		],
+	};
+	const COMMENT = {
+		...REASON,
+		id: "comment",
+		name: "Comment",
+		type: "comment",
+		custom: "",
+		choices: [],
+	};
+
+	function transitions(status: string | null, refuse: string | null = null) {
 		const moved: string[] = [];
+		const sent: unknown[] = [];
 		const client = {
 			site: "https://jira.example.com",
 			cloud: false,
 			transitions: async () => [
-				{ id: "11", name: "Start Test", to: "Test", toCategory: "indeterminate", needs: [] },
-				{ id: "21", name: "Done", to: "Done", toCategory: "done", needs: [] },
+				{
+					id: "11",
+					name: "Start Test",
+					to: "Test",
+					toCategory: "indeterminate",
+					needs: [],
+					resolution: null,
+					fields: [],
+				},
+				{
+					id: "21",
+					name: "Done",
+					to: "Done",
+					toCategory: "done",
+					needs: [],
+					resolution: null,
+					fields: [],
+				},
+				{
+					id: "31",
+					name: "Ready to Test",
+					to: "Ready to Test",
+					toCategory: "indeterminate",
+					needs: ["Reason", "Comment"],
+					resolution: null,
+					fields: [REASON, COMMENT],
+				},
 			],
 			row: async () => {
 				if (status === null) throw new Error("HTTP 404");
 				return { key: "QR-1", summary: "", status, statusCategory: "indeterminate", type: "Bug" };
 			},
-			async transition(_key: string, id: string) {
+			async transition(_key: string, id: string, input?: unknown) {
+				if (refuse !== null) throw new JiraError(400, refuse);
 				moved.push(id);
+				sent.push(input);
 			},
 		};
-		return { client, moved };
+		return { client, moved, sent };
 	}
+
+	it("says which fields a step asks for, with their choices, and changes nothing", async () => {
+		const jira = transitions("Development");
+		const { ctx, asked } = context(jira.client, [YES]);
+		const result = await runTool("jira_transition", { key: "QR-1", status: "Ready to Test" }, ctx);
+		expect(result.text).toContain("Reason [customfield_7] (required): Fixed, Duplicate");
+		expect(result.text).toContain("Comment [comment]");
+		expect(asked).toEqual([]);
+		expect(jira.moved).toEqual([]);
+	});
+
+	it("sends the step's fields and its comment", async () => {
+		const jira = transitions("Development");
+		const { ctx, asked } = context(jira.client, [YES]);
+		const result = await runTool(
+			"jira_transition",
+			{
+				key: "QR-1",
+				status: "Ready to Test",
+				fields: { Reason: "fixed", Comment: "Done, retest" },
+			},
+			ctx,
+		);
+		expect(asked[0]?.lines).toEqual(["QR-1: Development → Ready to Test", "Reason: Fixed"]);
+		expect(jira.sent).toEqual([
+			{ fields: { customfield_7: { id: "1" } }, comment: "Done, retest\n" },
+		]);
+		expect(result.text).toBe("QR-1 is now Ready to Test.");
+	});
+
+	it("tells the model what Jira refused, to try again with it", async () => {
+		const jira = transitions("Test", "HTTP 400: Comment - Field Comment is required.");
+		const { ctx } = context(jira.client, [YES]);
+		const result = await runTool("jira_transition", { key: "QR-1", status: "Done" }, ctx);
+		expect(result.text).toContain("Field Comment is required");
+		expect(result.text).toContain('"comment"');
+	});
 
 	it("shows the status it is in, the one it goes to and the step's name", async () => {
 		const jira = transitions("In Progress");

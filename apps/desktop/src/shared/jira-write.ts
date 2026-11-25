@@ -539,3 +539,36 @@ function valueText(value: unknown): string {
 	const child = record.child === undefined ? "" : valueText(record.child);
 	return [own, child].filter((part) => part !== "").join(" › ");
 }
+
+export interface ResolvedFields {
+	readonly fields: Record<string, unknown>;
+	/** What changes, a line each: `Priority: High`. */
+	readonly lines: readonly string[];
+	readonly errors: readonly string[];
+}
+
+/** The fields the model gave by name or id, as Jira takes them on this screen. */
+export function resolveFields(
+	metas: readonly FieldMeta[],
+	given: Record<string, unknown>,
+	cloud: boolean,
+): ResolvedFields {
+	const fields: Record<string, unknown> = {};
+	const lines: string[] = [];
+	const errors: string[] = [];
+	for (const [named, value] of Object.entries(given)) {
+		const meta = findField(metas, named);
+		if (meta === null) {
+			errors.push(`No field "${named}" on this screen.`);
+			continue;
+		}
+		const resolved = fieldValue(meta, value, cloud);
+		if (!resolved.ok) {
+			errors.push(resolved.error);
+			continue;
+		}
+		fields[meta.id] = resolved.value;
+		lines.push(`${meta.name}: ${resolved.shown.slice(0, 200)}`);
+	}
+	return { fields, lines, errors };
+}
