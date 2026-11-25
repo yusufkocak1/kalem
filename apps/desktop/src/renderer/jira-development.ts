@@ -8,8 +8,10 @@ import type {
 	DevelopmentItem,
 	DevelopmentKind,
 	JiraTransition,
+	TransitionValues,
 } from "../shared/jira-dev.js";
 import { hasDevelopment } from "../shared/jira-dev.js";
+import type { FieldMeta } from "../shared/jira-write.js";
 import { el } from "./dom.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
@@ -39,7 +41,7 @@ export interface StatusControlOptions {
 	readonly issueKey: string;
 	readonly status: string;
 	readonly category: StatusCategory;
-	/** Where a step Kalem cannot take (its screen asks for more) is taken. */
+	/** Where a step can still be taken, from its form. */
 	readonly issueUrl: string;
 	openLink(url: string): void;
 	/** After the status changed: the issue is read again. */
@@ -65,12 +67,21 @@ export function createStatusControl(options: StatusControlOptions): HTMLElement 
 	});
 	menu.hidden = true;
 	const note = el("span", { class: "jira-transition-note", attrs: { role: "status" } });
-	const wrap = el("span", { class: "jira-status-control", children: [button, menu, note] });
+	const panel = el("div", { class: "jira-transition-panel" });
+	panel.hidden = true;
+	const wrap = el("span", {
+		class: "jira-status-control",
+		children: [button, menu, panel, note],
+	});
 
 	const close = (): void => {
 		menu.hidden = true;
 		menu.replaceChildren();
 		button.setAttribute("aria-expanded", "false");
+	};
+	const closePanel = (): void => {
+		panel.hidden = true;
+		panel.replaceChildren();
 	};
 	document.addEventListener("mousedown", (event) => {
 		if (!(event.target instanceof Node && wrap.contains(event.target))) close();
@@ -81,6 +92,12 @@ export function createStatusControl(options: StatusControlOptions): HTMLElement 
 			event.preventDefault();
 			event.stopPropagation();
 			close();
+			button.focus();
+		}
+		if (event.key === "Escape" && !panel.hidden) {
+			event.preventDefault();
+			event.stopPropagation();
+			closePanel();
 			button.focus();
 		}
 		if ((event.key === "ArrowDown" || event.key === "ArrowUp") && !menu.hidden) {
@@ -95,7 +112,7 @@ export function createStatusControl(options: StatusControlOptions): HTMLElement 
 	const take = async (step: JiraTransition): Promise<void> => {
 		close();
 		if (step.needs.length > 0) {
-			options.openLink(options.issueUrl);
+			openForm(step);
 			return;
 		}
 		button.disabled = true;
@@ -113,11 +130,38 @@ export function createStatusControl(options: StatusControlOptions): HTMLElement 
 		}
 	};
 
+	const openForm = (step: JiraTransition): void => {
+		note.textContent = "";
+		const form = createTransitionForm({
+			t,
+			step,
+			cancel: () => {
+				closePanel();
+				button.focus();
+			},
+			openInJira: () => options.openLink(options.issueUrl),
+			submit: async (values) => {
+				button.disabled = true;
+				try {
+					await bridge.jiraTransition(options.issueKey, step.id, values);
+					closePanel();
+					options.onChanged();
+				} finally {
+					button.disabled = false;
+				}
+			},
+		});
+		panel.replaceChildren(form);
+		panel.hidden = false;
+		form.querySelector<HTMLElement>("select, input, textarea")?.focus();
+	};
+
 	button.addEventListener("click", async () => {
 		if (!menu.hidden) {
 			close();
 			return;
 		}
+		closePanel();
 		menu.replaceChildren(el("div", { class: "jira-menu-heading", text: t.confluenceLoading }));
 		menu.hidden = false;
 		button.setAttribute("aria-expanded", "true");
@@ -147,7 +191,7 @@ export function createStatusControl(options: StatusControlOptions): HTMLElement 
 								role: "menuitem",
 								"data-transition": step.id,
 								...(step.needs.length > 0
-									? { title: format(t.jiraTransitionInJira, step.needs.join(", ")) }
+									? { title: format(t.jiraTransitionAsks, step.needs.join(", ")) }
 									: {}),
 							},
 							children: [
@@ -156,7 +200,9 @@ export function createStatusControl(options: StatusControlOptions): HTMLElement 
 								...(step.name !== "" && step.name !== step.to
 									? [el("span", { class: "jira-transition-name", text: step.name })]
 									: []),
-								...(step.needs.length > 0 ? [mark("link", "jira-transition-out")] : []),
+								...(step.needs.length > 0
+									? [el("span", { class: "jira-transition-out", text: "…" })]
+									: []),
 							],
 						});
 						item.addEventListener("click", () => void take(step));
@@ -166,6 +212,156 @@ export function createStatusControl(options: StatusControlOptions): HTMLElement 
 		menu.querySelector<HTMLElement>("button")?.focus();
 	});
 	return wrap;
+}
+
+/** Fields a transition form leaves out: Jira fills them, or they have their own place. */
+const UNFORMED = new Set(["attachment", "worklog", "timetracking", "issuelinks"]);
+const TEXTAREA = /:textarea$/i;
+
+interface TransitionFormOptions {
+	readonly t: Strings;
+	readonly step: JiraTransition;
+	cancel(): void;
+	openInJira(): void;
+	/** Throws what Jira said; the form stays open with it. */
+	submit(values: TransitionValues): Promise<void>;
+}
+
+type Control = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+
+function controlOf(field: FieldMeta, step: JiraTransition): Control {
+	const attrs = { "data-field": field.id, ...(field.required ? { "aria-required": "true" } : {}) };
+	if (field.choices.length > 0) {
+		const multiple = field.type === "array";
+		const select = el("select", {
+			class: "jira-worklog-input jira-transition-input",
+			attrs: { ...attrs, ...(multiple ? { multiple: "" } : {}) },
+			children: [
+				...(multiple ? [] : [el("option", { text: "—", attrs: { value: "" } })]),
+				...field.choices.map((choice) =>
+					el("option", { text: choice.name, attrs: { value: choice.id } }),
+				),
+			],
+		});
+		if (field.id === "resolution" && step.resolution !== null) {
+			const chosen = field.choices.find((choice) => choice.name === step.resolution);
+			if (chosen !== undefined) select.value = chosen.id;
+		}
+		return select;
+	}
+	if (field.id === "comment" || field.system === "description" || TEXTAREA.test(field.custom)) {
+		return el("textarea", {
+			class: "jira-worklog-input jira-transition-input",
+			attrs: { ...attrs, rows: "3" },
+		});
+	}
+	const type =
+		field.type === "number"
+			? "number"
+			: field.type === "date"
+				? "date"
+				: field.type === "datetime"
+					? "datetime-local"
+					: "text";
+	return el("input", {
+		class: "jira-worklog-input jira-transition-input",
+		attrs: { ...attrs, type },
+	});
+}
+
+/** `2026-11-25T14:30` with the computer's own offset, as Jira takes a date and time. */
+function datetimeOf(local: string): string {
+	const offset = -new Date(local).getTimezoneOffset();
+	const sign = offset < 0 ? "-" : "+";
+	const hours = String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0");
+	const minutes = String(Math.abs(offset) % 60).padStart(2, "0");
+	return `${local}:00.000${sign}${hours}${minutes}`;
+}
+
+function controlValue(control: Control, field: FieldMeta): unknown {
+	if (control instanceof HTMLSelectElement && control.multiple) {
+		return [...control.selectedOptions].map((option) => option.value);
+	}
+	const value = control.value.trim();
+	if (value === "") return null;
+	return field.type === "datetime" ? datetimeOf(value) : value;
+}
+
+/** The fields a step's screen asks for, filled in Kalem instead of in Jira. */
+export function createTransitionForm(options: TransitionFormOptions): HTMLElement {
+	const { t, step } = options;
+	const fields = step.fields.filter((field) => !UNFORMED.has(field.id));
+	const controls = fields.map((field) => ({ field, control: controlOf(field, step) }));
+	for (const { control } of controls) {
+		control.addEventListener("change", () => control.classList.remove("invalid"));
+	}
+	const status = el("p", { class: "jira-worklog-status", attrs: { role: "status" } });
+	const submit = el("button", {
+		class: "jira-button primary jira-transition-submit",
+		text: t.jiraTransition,
+		attrs: { type: "submit" },
+	});
+	const inJira = el("button", {
+		class: "jira-button jira-transition-jira",
+		text: t.jiraOpenInJira,
+		attrs: { type: "button" },
+	});
+	inJira.addEventListener("click", () => options.openInJira());
+	const cancel = el("button", { class: "jira-button", text: t.cancel, attrs: { type: "button" } });
+	cancel.addEventListener("click", () => options.cancel());
+	const form = el("form", {
+		class: "jira-worklog jira-transition-form",
+		attrs: { "data-transition": step.id, "aria-label": format(t.jiraTransitionTo, step.to) },
+		children: [
+			el("h3", { class: "jira-worklog-title", text: format(t.jiraTransitionTo, step.to) }),
+			...controls.map(({ field, control }) =>
+				el("label", {
+					class: "jira-worklog-field",
+					children: [
+						el("span", {
+							class: "jira-worklog-label",
+							text: field.required ? `${field.name} *` : field.name,
+						}),
+						el("span", { class: "jira-worklog-control", children: [control] }),
+					],
+				}),
+			),
+			status,
+			el("div", { class: "jira-transition-actions", children: [inJira, cancel, submit] }),
+		],
+	});
+	form.addEventListener("submit", async (event) => {
+		event.preventDefault();
+		const values: Record<string, unknown> = {};
+		let comment = "";
+		const missing: string[] = [];
+		for (const { field, control } of controls) {
+			const value = controlValue(control, field);
+			const empty = value === null || (Array.isArray(value) && value.length === 0);
+			control.classList.toggle("invalid", field.required && empty);
+			if (field.required && empty) missing.push(field.name);
+			if (empty) continue;
+			if (field.id === "comment") comment = String(value);
+			else values[field.id] = value;
+		}
+		if (missing.length > 0) {
+			status.dataset.kind = "error";
+			status.textContent = format(t.jiraTransitionMissing, missing.join(", "));
+			return;
+		}
+		submit.disabled = true;
+		status.dataset.kind = "busy";
+		status.textContent = t.jiraTransitionMoving;
+		try {
+			await options.submit({ fields: values, comment });
+		} catch (error) {
+			status.dataset.kind = "error";
+			status.textContent = format(t.jiraTransitionFailed, errorText(error));
+		} finally {
+			submit.disabled = false;
+		}
+	});
+	return form;
 }
 
 export interface DevelopmentOptions {

@@ -13,6 +13,7 @@ import type {
 	DevelopmentKind,
 	DevelopmentSummary,
 	JiraTransition,
+	TransitionValues,
 } from "./jira-dev.js";
 import type {
 	JiraAttachment,
@@ -1091,7 +1092,7 @@ export interface KalemBridge {
 	/** The steps the issue can take from its status. */
 	jiraTransitions(key: string): Promise<JiraTransition[]>;
 	/** Moves the issue along its workflow. */
-	jiraTransition(key: string, transitionId: string): Promise<void>;
+	jiraTransition(key: string, transitionId: string, values?: TransitionValues): Promise<void>;
 	/** The issue's Development panel: branches, commits, pull requests; `null` where Jira has none. */
 	jiraDevelopment(issueId: string): Promise<DevelopmentSummary | null>;
 	jiraDevelopmentDetail(issueId: string, kind: DevelopmentKind): Promise<DevelopmentItem[]>;

@@ -35,6 +35,12 @@ export interface JiraTransition {
 	readonly fields: readonly FieldMeta[];
 }
 
+/** What the window's form gives for a step: raw values by field id, and a Markdown comment. */
+export interface TransitionValues {
+	readonly fields: Record<string, unknown>;
+	readonly comment: string;
+}
+
 /** What is sent with a step besides its id. */
 export interface TransitionInput {
 	/** Screen fields as Jira takes them, by id. */

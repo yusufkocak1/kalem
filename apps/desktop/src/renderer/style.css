@@ -10482,6 +10482,40 @@ textarea.jira-worklog-input {
 	color: var(--app-muted);
 }
 
+.jira-transition-panel {
+	position: absolute;
+	top: calc(100% + 4px);
+	left: 0;
+	z-index: 20;
+	width: min(480px, calc(100vw - 48px));
+	box-shadow: var(--app-shadow);
+	border-radius: 12px;
+}
+
+.jira-transition-panel[hidden] {
+	display: none;
+}
+
+.jira-transition-form textarea.jira-transition-input {
+	max-width: none;
+	resize: vertical;
+}
+
+.jira-transition-form select[multiple].jira-transition-input {
+	min-height: 84px;
+}
+
+.jira-transition-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.jira-transition-jira {
+	margin-right: auto;
+}
+
 .jira-transition-note {
 	font-size: 12px;
 	color: var(--app-muted);

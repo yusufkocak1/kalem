@@ -267,8 +267,12 @@ export async function fakeJira() {
 			if (req.method === "POST") {
 				let body = "";
 				for await (const chunk of req) body += chunk;
-				transitions.push(JSON.parse(body));
-				status = { name: "Test", category: "indeterminate" };
+				const taken = JSON.parse(body);
+				transitions.push(taken);
+				status =
+					taken.transition.id === "41"
+						? { name: "Rejected", category: "done" }
+						: { name: "Test", category: "indeterminate" };
 				res.writeHead(204);
 				return res.end();
 			}
@@ -291,7 +295,21 @@ export async function fakeJira() {
 						id: "41",
 						name: "Reject",
 						to: { name: "Rejected", statusCategory: { key: "done" } },
-						fields: { customfield_1: { required: true, name: "Reason" } },
+						fields: {
+							customfield_1: {
+								required: true,
+								name: "Reason",
+								schema: {
+									type: "option",
+									custom: "com.atlassian.jira.plugin.system.customfieldtypes:select",
+								},
+								allowedValues: [
+									{ id: "1", value: "Duplicate" },
+									{ id: "2", value: "Won't fix" },
+								],
+							},
+							comment: { required: false, name: "Comment", schema: { type: "comment" } },
+						},
 					},
 				],
 			});
