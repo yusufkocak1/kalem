@@ -104,6 +104,16 @@ export async function readCatalogs(
 }
 
 /** Registers the requests; returns a check of the catalogs (blocked extensions turned off). */
+/** The package's icon as a data: address, for the window to show before it is installed. */
+function iconData(pkg: InspectedPackage): string | null {
+	const path = pkg.manifest.icon;
+	const data = path === null ? undefined : pkg.files.get(path);
+	if (path === null || data === undefined || data.byteLength > 256 * 1024) return null;
+	// kalem-locale-ok: file extensions are ASCII
+	const type = path.toLowerCase().endsWith(".svg") ? "image/svg+xml" : "image/png";
+	return `data:${type};base64,${Buffer.from(data).toString("base64")}`;
+}
+
 export function registerExtensionIpc(ctx: ExtensionIpcContext): () => Promise<void> {
 	const { store, host } = ctx;
 	const client = ctx.client ?? new RegistryClient();
@@ -122,6 +132,7 @@ export function registerExtensionIpc(ctx: ExtensionIpcContext): () => Promise<vo
 			installedVersion: installed?.manifest.version ?? null,
 			asksForMore: installed === null || asksForMore(installed.granted, pkg.manifest.permissions),
 			registry,
+			icon: iconData(pkg),
 		};
 	};
 

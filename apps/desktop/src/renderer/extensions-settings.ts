@@ -1,11 +1,19 @@
-/** Settings › Extensions: install from a file after the user sees what it asks for, then manage each one. */
+/** Settings › Extensions: what is installed, the market, and the catalogs it reads. */
 import type { ExtensionInfo, ExtensionPreview, KalemBridge } from "../shared/bridge.js";
 import type { Registry } from "../shared/extension-registry.js";
-import type { ExtensionManifest, ExtensionPermissions } from "../shared/extensions.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import { el } from "./dom.js";
 import { createExtensionMarket } from "./extension-market.js";
+import {
+	avatar,
+	button,
+	createConsentDialog,
+	installedIcon,
+	permissionChips,
+	permissionLines,
+} from "./extension-ui.js";
+import { icon } from "./icons.js";
 
 export interface ExtensionsSectionOptions {
 	readonly t: Strings;
@@ -20,68 +28,22 @@ export interface ExtensionsSection {
 	refresh(): Promise<void>;
 }
 
-interface PermissionLine {
-	readonly text: string;
-	readonly warning: boolean;
-}
+type View = "installed" | "market" | "catalogs";
 
-export function permissionLines(
-	t: Strings,
-	permissions: ExtensionPermissions,
-	manifest: Pick<ExtensionManifest, "settings" | "secrets">,
-): PermissionLine[] {
-	const lines: PermissionLine[] = [];
-	if (permissions.process) lines.push({ text: t.extensionPermissionProcess, warning: true });
-	if (permissions.files) lines.push({ text: t.extensionPermissionFiles, warning: true });
-	if (permissions.http.length > 0) {
-		lines.push({
-			text: format(t.extensionPermissionHttp, permissions.http.join(", ")),
-			warning: false,
-		});
-	}
-	if (permissions.httpFromSettings.length > 0) {
-		const titles = permissions.httpFromSettings.map(
-			(key) => manifest.settings.find((setting) => setting.key === key)?.title ?? key,
-		);
-		lines.push({
-			text: format(t.extensionPermissionHttpSetting, titles.join(", ")),
-			warning: false,
-		});
-	}
-	if (permissions.assistantTools) lines.push({ text: t.extensionPermissionTools, warning: false });
-	if (manifest.secrets.length > 0) {
-		lines.push({
-			text: format(
-				t.extensionPermissionSecrets,
-				manifest.secrets.map((secret) => secret.title).join(", "),
-			),
-			warning: false,
-		});
-	}
-	if (lines.length === 0) lines.push({ text: t.extensionPermissionNone, warning: false });
-	return lines;
-}
-
-const permissionList = (lines: readonly PermissionLine[]): HTMLElement =>
-	el("ul", {
-		class: "ext-permissions",
-		children: lines.map((line) =>
-			el("li", { text: line.text, ...(line.warning ? { attrs: { "data-warning": "" } } : {}) }),
-		),
-	});
-
-const button = (text: string, onClick: () => void, extra = ""): HTMLButtonElement => {
-	const element = el("button", { class: `jira-button${extra}`, text, attrs: { type: "button" } });
-	element.addEventListener("click", onClick);
-	return element;
-};
+/** An extension that cannot work until the user fills something in (its token). */
+const needsSetup = (info: ExtensionInfo): boolean =>
+	info.manifest.secrets.some((secret) => info.secrets[secret.key] !== true) ||
+	info.manifest.settings.some(
+		(setting) => setting.type === "string" && info.settings[setting.key] === "",
+	);
 
 export function createExtensionsSection(options: ExtensionsSectionOptions): ExtensionsSection {
 	const { t, bridge } = options;
 	const status = el("p", { class: "ext-status", attrs: { role: "status", hidden: "" } });
-	const preview = el("div", { class: "ext-preview", attrs: { hidden: "" } });
-	const list = el("div", { class: "ext-list" });
-	const empty = el("p", { class: "confluence-hint", text: t.extensionsEmpty });
+	const list = el("div", { class: "ext-installed" });
+	const opened = new Set<string>();
+	const logs = new Set<string>();
+	let infos: readonly ExtensionInfo[] = [];
 
 	const say = (text: string, error = false): void => {
 		status.textContent = text;
@@ -99,42 +61,30 @@ export function createExtensionsSection(options: ExtensionsSectionOptions): Exte
 		await refresh();
 	};
 
-	function showPreview(picked: ExtensionPreview): void {
-		const { manifest } = picked;
-		const heading =
-			picked.installedVersion === null
-				? format(t.extensionInstallAsk, manifest.name)
-				: format(t.extensionUpdateAsk, manifest.name, picked.installedVersion, manifest.version);
-		const install = button(t.extensionInstall, () => {
-			preview.hidden = true;
-			void run(() => bridge.extensionInstall(picked.token));
-		});
-		install.classList.add("primary");
-		preview.replaceChildren(
-			el("strong", { text: heading }),
-			el("p", {
-				class: "ext-meta",
-				text: `${manifest.publisher} · ${manifest.id} · ${manifest.version}`,
-			}),
-			...(manifest.description === "" ? [] : [el("p", { text: manifest.description })]),
-			el("p", {
-				class: "ext-label",
-				text: picked.asksForMore ? t.extensionWillAsk : t.extensionSamePermissions,
-			}),
-			permissionList(permissionLines(t, manifest.permissions, manifest)),
-			el("p", { class: "confluence-hint", text: t.extensionTrustHint }),
-			el("div", {
-				class: "jira-actions",
-				children: [
-					install,
-					button(t.cancel, () => {
-						preview.hidden = true;
-					}),
-				],
-			}),
+	const catalogName = (url: string | null): string | null =>
+		url === null ? null : (options.registries().find((each) => each.url === url)?.name ?? url);
+
+	const consent = createConsentDialog(
+		t,
+		(picked) => void run(() => bridge.extensionInstall(picked.token)),
+	);
+	const showPreview = (picked: ExtensionPreview): void => {
+		const catalog = catalogName(picked.registry);
+		consent.open(
+			picked,
+			catalog === null ? t.extensionFromFile : format(t.extensionVerified, catalog),
 		);
-		preview.hidden = false;
-	}
+	};
+
+	const pickFile = (): void => {
+		say("");
+		void bridge
+			.extensionPick()
+			.then((picked) => {
+				if (picked !== null) showPreview(picked);
+			})
+			.catch((error: unknown) => say(options.errorText(error), true));
+	};
 
 	const market = createExtensionMarket({
 		t,
@@ -145,20 +95,9 @@ export function createExtensionsSection(options: ExtensionsSectionOptions): Exte
 		showPreview,
 		say,
 		changed: () => void refresh(),
-		permissions: (entry) =>
-			permissionList(permissionLines(t, entry.permissions, { settings: [], secrets: [] })),
 	});
-	market.element.hidden = true;
 
-	const pick = button(t.extensionInstallFromFile, () => {
-		say("");
-		void bridge
-			.extensionPick()
-			.then((picked) => {
-				if (picked !== null) showPreview(picked);
-			})
-			.catch((error: unknown) => say(options.errorText(error), true));
-	});
+	// --- An installed extension ----------------------------------------------------------
 
 	function settingsOf(info: ExtensionInfo): HTMLElement[] {
 		const { id } = info.manifest;
@@ -166,7 +105,7 @@ export function createExtensionsSection(options: ExtensionsSectionOptions): Exte
 		for (const setting of info.manifest.settings) {
 			const value = info.settings[setting.key];
 			const input = el("input", {
-				class: "publish-input",
+				class: "ext-input",
 				attrs: {
 					type:
 						setting.type === "boolean" ? "checkbox" : setting.type === "number" ? "number" : "text",
@@ -188,13 +127,13 @@ export function createExtensionsSection(options: ExtensionsSectionOptions): Exte
 			});
 			rows.push(
 				el("label", {
-					class: "ext-field",
+					class: `ext-field${setting.type === "boolean" ? " ext-field-check" : ""}`,
 					children: [
-						el("span", { class: "ext-label", text: setting.title }),
+						el("span", { class: "ext-field-label", text: setting.title }),
 						input,
 						...(setting.description === ""
 							? []
-							: [el("span", { class: "confluence-hint", text: setting.description })]),
+							: [el("span", { class: "ext-field-hint", text: setting.description })]),
 					],
 				}),
 			);
@@ -202,7 +141,7 @@ export function createExtensionsSection(options: ExtensionsSectionOptions): Exte
 		for (const secret of info.manifest.secrets) {
 			const set = info.secrets[secret.key] === true;
 			const input = el("input", {
-				class: "publish-input",
+				class: "ext-input",
 				attrs: {
 					type: "password",
 					autocomplete: "new-password",
@@ -210,23 +149,37 @@ export function createExtensionsSection(options: ExtensionsSectionOptions): Exte
 				},
 			});
 			const save = button(t.save, () => {
-				if (input.value === "") return;
-				void run(() => bridge.extensionSetSecret(id, secret.key, input.value));
+				if (input.value !== "")
+					void run(() => bridge.extensionSetSecret(id, secret.key, input.value));
 			});
 			const forget = button(
 				t.extensionSecretForget,
 				() => void run(() => bridge.extensionSetSecret(id, secret.key, null)),
+				"ghost",
 			);
 			forget.hidden = !set;
 			rows.push(
 				el("div", {
 					class: "ext-field",
 					children: [
-						el("span", { class: "ext-label", text: secret.title }),
+						el("span", {
+							class: "ext-field-label",
+							children: [
+								document.createTextNode(secret.title),
+								...(set
+									? [
+											el("span", {
+												class: "ext-saved",
+												children: [icon("check"), el("span", { text: t.extensionSecretSet })],
+											}),
+										]
+									: []),
+							],
+						}),
 						el("div", { class: "ext-secret", children: [input, save, forget] }),
 						...(secret.description === ""
 							? []
-							: [el("span", { class: "confluence-hint", text: secret.description })]),
+							: [el("span", { class: "ext-field-hint", text: secret.description })]),
 					],
 				}),
 			);
@@ -246,6 +199,7 @@ export function createExtensionsSection(options: ExtensionsSectionOptions): Exte
 			"change",
 			() => void run(() => bridge.extensionSetEnabled(manifest.id, toggle.checked)),
 		);
+
 		const state = info.enabled ? info.status : "stopped";
 		const stateLabel: Record<ExtensionInfo["status"], string> = {
 			running: t.extensionRunning,
@@ -253,71 +207,139 @@ export function createExtensionsSection(options: ExtensionsSectionOptions): Exte
 			failed: t.extensionFailed,
 			stopped: info.enabled && manifest.host === null ? t.extensionActive : t.extensionStopped,
 		};
+		const setup = info.enabled && needsSetup(info);
+		const hasSettings = manifest.settings.length + manifest.secrets.length > 0;
+		if (setup && !opened.has(`closed:${manifest.id}`)) opened.add(manifest.id);
+		const open = opened.has(manifest.id);
+
 		const actions: HTMLElement[] = [];
 		const update = market.updateFor(manifest.id);
 		if (update !== undefined) {
-			const target = button(format(t.extensionUpdateTo, update.version), () => {
-				target.disabled = true;
-				void bridge
-					.extensionMarketPick(update.registry, update.id)
-					.then(showPreview, (error: unknown) => say(options.errorText(error), true))
-					.finally(() => {
-						target.disabled = false;
-					});
-			});
-			target.classList.add("primary");
+			const target = button(
+				format(t.extensionUpdateTo, update.version),
+				() => {
+					target.disabled = true;
+					void bridge
+						.extensionMarketPick(update.registry, update.id)
+						.then(showPreview, (error: unknown) => say(options.errorText(error), true))
+						.finally(() => {
+							target.disabled = false;
+						});
+				},
+				"primary",
+			);
 			actions.push(target);
+		}
+		if (hasSettings) {
+			const toggleSettings = button(
+				t.extensionSettings,
+				() => {
+					if (open) {
+						opened.delete(manifest.id);
+						opened.add(`closed:${manifest.id}`);
+					} else {
+						opened.add(manifest.id);
+						opened.delete(`closed:${manifest.id}`);
+					}
+					draw();
+				},
+				"ghost",
+			);
+			toggleSettings.setAttribute("aria-expanded", String(open));
+			actions.push(toggleSettings);
 		}
 		if (info.enabled && manifest.host !== null) {
 			actions.push(
-				button(t.extensionRestart, () => void run(() => bridge.extensionRestart(manifest.id))),
+				button(
+					t.extensionRestart,
+					() => void run(() => bridge.extensionRestart(manifest.id)),
+					"ghost",
+				),
 			);
-			actions.push(button(t.extensionDevTools, () => void bridge.extensionDevTools(manifest.id)));
+			actions.push(
+				button(t.extensionDevTools, () => void bridge.extensionDevTools(manifest.id), "ghost"),
+			);
 		}
-		actions.push(
-			button(t.extensionUninstall, () => {
-				if (window.confirm(format(t.extensionUninstallConfirm, manifest.name))) {
-					void run(() => bridge.extensionUninstall(manifest.id));
-				}
-			}),
+		const logButton = button(
+			t.extensionLog,
+			() => {
+				if (logs.has(manifest.id)) logs.delete(manifest.id);
+				else logs.add(manifest.id);
+				draw();
+			},
+			"ghost",
 		);
-		const log = el("details", {
-			class: "ext-log",
-			children: [
-				el("summary", { text: t.extensionLog }),
-				el("pre", { text: info.log.length === 0 ? "—" : info.log.join("\n") }),
-			],
-		});
+		logButton.setAttribute("aria-expanded", String(logs.has(manifest.id)));
+		actions.push(logButton, el("span", { class: "ext-spacer" }));
+		actions.push(
+			button(
+				t.extensionUninstall,
+				() => {
+					if (window.confirm(format(t.extensionUninstallConfirm, manifest.name))) {
+						void run(() => bridge.extensionUninstall(manifest.id));
+					}
+				},
+				"danger",
+			),
+		);
+
+		const catalog = catalogName(info.registry);
+		const notices: HTMLElement[] = [];
+		if (info.blocked !== null) {
+			notices.push(
+				el("pre", { class: "ext-error", text: format(t.extensionBlocked, info.blocked) }),
+			);
+		} else if (info.error !== null && info.enabled) {
+			notices.push(el("pre", { class: "ext-error", text: info.error }));
+		}
 		return el("article", {
 			class: "ext-card",
-			attrs: { "data-extension": manifest.id, "data-state": state },
+			attrs: {
+				"data-extension": manifest.id,
+				"data-state": state,
+				...(info.enabled ? {} : { "data-off": "" }),
+			},
 			children: [
 				el("div", {
 					class: "ext-head",
 					children: [
+						avatar(manifest.id, manifest.name, installedIcon(manifest)),
 						el("div", {
 							class: "ext-title",
 							children: [
-								el("strong", { text: manifest.name }),
+								el("div", {
+									class: "ext-name-row",
+									children: [
+										el("strong", { class: "ext-name", text: manifest.name }),
+										el("span", { class: "ext-badge", text: stateLabel[state] }),
+										...(setup
+											? [
+													el("span", {
+														class: "ext-pill ext-pill-warning",
+														text: t.extensionNeedsSetup,
+													}),
+												]
+											: []),
+										...(update === undefined
+											? []
+											: [
+													el("span", {
+														class: "ext-pill ext-pill-accent",
+														text: format(t.extensionUpdateAvailable, update.version),
+													}),
+												]),
+									],
+								}),
 								el("span", {
 									class: "ext-meta",
 									text: [
 										manifest.version,
 										manifest.publisher,
-										...(info.registry === null
-											? []
-											: [
-													format(
-														t.extensionFromCatalog,
-														options.registries().find((each) => each.url === info.registry)?.name ??
-															info.registry,
-													),
-												]),
+										...(catalog === null ? [] : [format(t.extensionFromCatalog, catalog)]),
 									].join(" · "),
 								}),
 							],
 						}),
-						el("span", { class: "ext-badge", text: stateLabel[state] }),
 						el("label", {
 							class: "mode-switch",
 							children: [toggle, el("span", { class: "mode-switch-track" })],
@@ -327,96 +349,132 @@ export function createExtensionsSection(options: ExtensionsSectionOptions): Exte
 				...(manifest.description === ""
 					? []
 					: [el("p", { class: "ext-description", text: manifest.description })]),
-				...(info.blocked !== null
-					? [el("pre", { class: "ext-error", text: format(t.extensionBlocked, info.blocked) })]
+				permissionChips(t, permissionLines(t, info.granted, manifest)),
+				...notices,
+				...(open && hasSettings
+					? [el("div", { class: "ext-settings", children: settingsOf(info) })]
 					: []),
-				...(info.error !== null && info.enabled
-					? [el("pre", { class: "ext-error", text: info.error })]
+				...(logs.has(manifest.id)
+					? [
+							el("pre", {
+								class: "ext-log",
+								text: info.log.length === 0 ? "—" : info.log.join("\n"),
+							}),
+						]
 					: []),
-				permissionList(permissionLines(t, info.granted, manifest)),
-				...settingsOf(info),
-				el("div", { class: "jira-actions", children: actions }),
-				log,
+				el("div", { class: "ext-actions", children: actions }),
 			],
 		});
+	}
+
+	function emptyState(): HTMLElement {
+		const browse = button(t.extensionBrowseMarket, () => show("market"), "primary");
+		return el("div", {
+			class: "ext-empty",
+			children: [
+				el("span", { class: "ext-empty-icon", children: [icon("extension")] }),
+				el("strong", { text: t.extensionsEmptyTitle }),
+				el("p", { text: t.extensionsEmpty }),
+				el("div", {
+					class: "ext-empty-actions",
+					children: [browse, button(t.extensionInstallFromFile, pickFile)],
+				}),
+			],
+		});
+	}
+
+	// --- Tabs -------------------------------------------------------------------------------
+	const installedCount = el("span", {
+		class: "ext-count",
+		attrs: { "aria-hidden": "true", hidden: "" },
+	});
+	const updateDot = el("span", {
+		class: "ext-update-dot",
+		attrs: { "aria-hidden": "true", hidden: "" },
+	});
+	const tabs = el("div", { class: "ext-tabs", attrs: { role: "tablist" } });
+	const views: Record<View, HTMLElement> = {
+		installed: el("div", { class: "ext-view", children: [list] }),
+		market: market.element,
+		catalogs: market.catalogs,
+	};
+	let marketLoaded = false;
+
+	function draw(): void {
+		if (
+			list.contains(document.activeElement) &&
+			document.activeElement?.matches("input:not([type=checkbox])")
+		)
+			return;
+		list.replaceChildren(...(infos.length === 0 ? [emptyState()] : infos.map(card)));
+		const updates = infos.filter((info) => market.updateFor(info.manifest.id) !== undefined).length;
+		installedCount.textContent = String(infos.length);
+		installedCount.hidden = infos.length === 0;
+		updateDot.hidden = updates === 0;
 	}
 
 	let drawing = Promise.resolve();
 	async function refresh(): Promise<void> {
 		drawing = drawing.then(async () => {
-			const infos = await bridge.extensions().catch(() => []);
-			const open = new Set(
-				[...list.querySelectorAll<HTMLElement>(".ext-card")]
-					.filter((each) => each.querySelector("details")?.open === true)
-					.map((each) => each.dataset.extension),
-			);
-			if (
-				list.contains(document.activeElement) &&
-				document.activeElement?.matches("input:not([type=checkbox])")
-			)
-				return;
-			list.replaceChildren(...infos.map(card));
-			for (const each of list.querySelectorAll<HTMLElement>(".ext-card")) {
-				if (open.has(each.dataset.extension))
-					(each.querySelector("details") as HTMLDetailsElement).open = true;
-			}
-			empty.hidden = infos.length > 0;
+			infos = await bridge.extensions().catch(() => []);
+			draw();
 		});
 		return drawing;
 	}
 
-	void refresh();
-
-	const installedView = el("div", {
-		class: "ext-view",
-		children: [el("div", { class: "jira-actions", children: [pick] }), empty, list],
-	});
-	const tabs = el("div", { class: "ext-tabs", attrs: { role: "tablist" } });
-	let marketLoaded = false;
-	const show = (which: "installed" | "market"): void => {
-		installedView.hidden = which !== "installed";
-		market.element.hidden = which !== "market";
-		for (const tab of tabs.children)
+	function show(which: View): void {
+		for (const [name, view] of Object.entries(views)) view.hidden = name !== which;
+		for (const tab of tabs.children) {
 			tab.setAttribute("aria-selected", String((tab as HTMLElement).dataset.tab === which));
+		}
 		if (which === "market" && !marketLoaded) {
 			marketLoaded = true;
 			void market.refresh(false);
 		}
-	};
-	for (const [which, label] of [
-		["installed", t.extensionsInstalled],
-		["market", t.extensionsMarket],
+	}
+	for (const [which, label, extra] of [
+		["installed", t.extensionsInstalled, [installedCount, updateDot]],
+		["market", t.extensionsMarket, []],
+		["catalogs", t.extensionRegistries, []],
 	] as const) {
 		const tab = el("button", {
 			class: "ext-tab",
-			text: label,
 			attrs: { type: "button", role: "tab", "data-tab": which },
+			children: [el("span", { text: label }), ...extra],
 		});
 		tab.addEventListener("click", () => show(which));
 		tabs.append(tab);
 	}
 	show("installed");
+	market.onAdded(() => show("market"));
 	bridge.onExtensionsChanged(() => {
 		void refresh();
 		if (marketLoaded) void market.refresh(false);
 	});
-	// What the catalogs offer shows on the installed cards too (updates, blocks).
 	if (options.registries().length > 0) {
 		marketLoaded = true;
 		void market.refresh(false);
 	}
+	void refresh();
+
+	const fromFile = button(t.extensionInstallFromFile, pickFile);
+	fromFile.prepend(icon("open"));
 
 	return {
 		element: el("div", {
-			class: "settings-block",
+			class: "settings-block ext-page",
 			attrs: { "data-block": "extensions" },
 			children: [
-				el("p", { class: "ext-hint", text: t.extensionsHint }),
-				tabs,
+				el("div", {
+					class: "ext-intro",
+					children: [el("p", { class: "ext-hint", text: t.extensionsHint }), fromFile],
+				}),
+				el("div", { class: "ext-toolbar", children: [tabs] }),
 				status,
-				preview,
-				installedView,
-				market.element,
+				views.installed,
+				views.market,
+				views.catalogs,
+				consent.element,
 			],
 		}),
 		refresh,

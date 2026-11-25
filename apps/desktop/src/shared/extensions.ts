@@ -67,6 +67,8 @@ export interface ExtensionManifest {
 	readonly engine: string;
 	readonly host: string | null;
 	readonly ui: string | null;
+	/** A picture of it (.svg or .png in the package), shown in Settings and the market. */
+	readonly icon: string | null;
 	readonly permissions: ExtensionPermissions;
 	readonly commands: readonly ExtensionCommand[];
 	readonly settings: readonly ExtensionSetting[];
@@ -210,7 +212,7 @@ export function parseManifest(raw: unknown): ManifestResult {
 	if (!isValidRange(engine))
 		return { ok: false, error: `"engines.kalem" is not a version range: ${engine}` };
 
-	const entry = (key: "host" | "ui"): string | null | undefined => {
+	const entry = (key: "host" | "ui" | "icon"): string | null | undefined => {
 		if (source[key] === undefined) return null;
 		const path = typeof source[key] === "string" ? safeEntryPath(source[key] as string) : null;
 		return path ?? undefined;
@@ -219,6 +221,10 @@ export function parseManifest(raw: unknown): ManifestResult {
 	if (host === undefined) return { ok: false, error: `"host" must be a file in the package.` };
 	const ui = entry("ui");
 	if (ui === undefined) return { ok: false, error: `"ui" must be a file in the package.` };
+	const icon = entry("icon");
+	if (icon === undefined || (icon !== null && !/\.(?:svg|png)$/i.test(icon))) {
+		return { ok: false, error: `"icon" must be an .svg or .png file in the package.` };
+	}
 
 	const permissions = record(source.permissions);
 	const http: string[] = [];
@@ -287,6 +293,7 @@ export function parseManifest(raw: unknown): ManifestResult {
 			engine,
 			host,
 			ui,
+			icon,
 			permissions: {
 				http,
 				httpFromSettings,

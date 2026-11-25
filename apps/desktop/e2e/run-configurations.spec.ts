@@ -61,7 +61,7 @@ async function installRunner(app: ElectronApplication, page: Page): Promise<Fram
 	await stubOpenDialog(app, [packagePath]);
 	await clickMenu(app, "Extensions", "Manage Extensions…");
 	const settings = page.locator('[data-block="extensions"]');
-	await settings.getByRole("button", { name: "Install from File…" }).click();
+	await settings.locator(".ext-intro").getByRole("button", { name: "Install from File…" }).click();
 	const preview = settings.locator(".ext-preview");
 	await expect(preview).toContainText("Run programs on this computer");
 	await expect(preview).toContainText("Read and write files on this computer");

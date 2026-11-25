@@ -59,6 +59,20 @@ describe("parseIndex", () => {
 					url: "https://cdn.example.com/run.kalem-ext",
 					sha256: HASH,
 				},
+				{
+					id: "acme.icon",
+					version: "1.0.0",
+					url: "icon.kalem-ext",
+					sha256: HASH,
+					icon: "data:image/svg+xml;base64,PHN2Zy8+",
+				},
+				{
+					id: "acme.script",
+					version: "1.0.0",
+					url: "script.kalem-ext",
+					sha256: HASH,
+					icon: "javascript:alert(1)",
+				},
 				{ id: "acme.bad", version: "1.0.0", url: "x", sha256: "nothex" },
 				{ id: "acme.local", version: "1.0.0", url: "file:///etc/passwd", sha256: HASH },
 			],
@@ -73,7 +87,13 @@ describe("parseIndex", () => {
 			"acme.graylog@1.2.0",
 			"acme.graylog@2.0.0",
 			"acme.run@1.0.0",
+			"acme.icon@1.0.0",
+			"acme.script@1.0.0",
 		]);
+		expect(index.entries.find((entry) => entry.id === "acme.icon")?.icon).toBe(
+			"data:image/svg+xml;base64,PHN2Zy8+",
+		);
+		expect(index.entries.find((entry) => entry.id === "acme.script")?.icon).toBe("");
 		expect(index.entries[0]?.url).toBe("https://example.com/catalog/graylog-1.0.0.kalem-ext");
 		expect(index.entries[0]?.permissions.httpFromSettings).toEqual(["url"]);
 	});
@@ -81,7 +101,7 @@ describe("parseIndex", () => {
 	it("offers the newest version this Kalem runs, and nothing blocked", () => {
 		expect(
 			latestCompatible(index, "3.35.0").map((entry) => `${entry.id}@${entry.version}`),
-		).toEqual(["acme.graylog@1.2.0"]);
+		).toEqual(["acme.icon@1.0.0", "acme.script@1.0.0", "acme.graylog@1.2.0"]);
 		expect(blockedReason(index, "acme.run", "1.0.0")).toBe("Leaks the token.");
 		expect(blockedReason(index, "acme.run", "1.1.0")).toBeNull();
 	});

@@ -353,10 +353,12 @@ export class ExtensionHost {
 	async serveUi(request: Request): Promise<Response> {
 		const url = new URL(request.url);
 		const extension = await this.#options.store.get(url.hostname);
+		const path = decodeURIComponent(url.pathname.slice(1));
+		if (extension !== null && path === extension.manifest.icon)
+			return this.#serveFile(extension.manifest.id, path);
 		if (extension === null || !extension.enabled || extension.manifest.ui === null) {
 			return new Response(null, { status: 404 });
 		}
-		const path = decodeURIComponent(url.pathname.slice(1));
 		if (path === "__kalem/ui.js") return this.#text(UI_SCRIPT, "text/javascript; charset=utf-8");
 		if (path === "__kalem/ui.css") return this.#text(UI_STYLE, "text/css; charset=utf-8");
 		return this.#serveFile(extension.manifest.id, path);

@@ -1020,6 +1020,8 @@ export interface MarketCatalog {
 export interface ExtensionPreview {
 	/** The catalog it comes from; `null` for a file. */
 	readonly registry: string | null;
+	/** Its picture, as a data: address; `null` without one. */
+	readonly icon: string | null;
 	readonly token: string;
 	readonly manifest: ExtensionManifest;
 	/** The version installed now; `null` for a new extension. */

@@ -30,6 +30,16 @@ const fail = (message) => {
 	process.exit(1);
 };
 
+/** The extension's icon, kept in the index so the market shows it before the package is downloaded. */
+async function iconOf(folder, manifest) {
+	if (typeof manifest.icon !== "string" || !/\.(svg|png)$/i.test(manifest.icon)) return {};
+	const data = await readFile(join(folder, manifest.icon)).catch(() => null);
+	if (data === null || data.byteLength > 64 * 1024) return {};
+	// kalem-locale-ok: file extensions are ASCII
+	const type = manifest.icon.toLowerCase().endsWith(".svg") ? "image/svg+xml" : "image/png";
+	return { icon: `data:${type};base64,${data.toString("base64")}` };
+}
+
 if (command === "keygen") {
 	const dir = resolve(positional[0] ?? ".");
 	await mkdir(dir, { recursive: true });
@@ -86,6 +96,7 @@ if (command === "keygen") {
 			engine: manifest.engines?.kalem ?? "*",
 			permissions: manifest.permissions ?? {},
 			url: file,
+			...(await iconOf(folder, manifest)),
 			sha256,
 			size: bytes.byteLength,
 		});

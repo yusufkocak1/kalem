@@ -68,28 +68,37 @@ test("the market installs and updates from a signed catalog, refuses what was ch
 	await expect(settings.locator(".ext-market")).toContainText("No catalogs yet");
 
 	// A catalog with another key is not trusted.
-	await expect(settings.locator(".ext-registry-editor")).toHaveAttribute("open", "");
-	await settings.getByLabel("Name").fill("Wrong key");
-	await settings.getByLabel("Address of index.json").fill(server.url);
-	await settings
+	await settings.locator(".ext-market").getByRole("button", { name: "Add Catalog" }).click();
+	await expect(settings.getByRole("tab", { name: "Catalogs" })).toHaveAttribute(
+		"aria-selected",
+		"true",
+	);
+	const form = settings.locator(".ext-form-card");
+	await form.getByLabel("Name").fill("Wrong key");
+	await form.getByLabel("Address of index.json").fill(server.url);
+	await form
 		.getByLabel("Public key")
 		.fill("MCowBQYDK2VwAyEAN+3XazxLR7ME2uPajmicLCL2T/3/gtCGK1rOhZrTo7U=");
-	await settings.getByRole("button", { name: "Add Catalog" }).click();
+	await form.getByRole("button", { name: "Add Catalog" }).click();
+	await expect(settings.getByRole("tab", { name: "Market" })).toHaveAttribute(
+		"aria-selected",
+		"true",
+	);
 	await expect(settings.locator(".ext-market .ext-error")).toContainText(
 		"signature does not match its key",
 	);
-	await settings.locator(".ext-registries li").getByRole("button", { name: "Remove" }).click();
+	await settings.getByRole("tab", { name: "Catalogs" }).click();
+	await settings.locator(".ext-registry").getByRole("button", { name: "Remove" }).click();
 
-	await settings.getByLabel("Name").fill("Acme");
-	await settings.getByLabel("Address of index.json").fill(server.url);
-	await settings.getByLabel("Public key").fill(publicKey);
-	await settings.getByRole("button", { name: "Add Catalog" }).click();
+	await form.getByLabel("Name").fill("Acme");
+	await form.getByLabel("Address of index.json").fill(server.url);
+	await form.getByLabel("Public key").fill(publicKey);
+	await form.getByRole("button", { name: "Add Catalog" }).click();
 	const hello = settings.locator('[data-market="kalem.hello-api"]');
 	await expect(hello).toContainText("1.0.0 · Kalem");
 	await expect(settings.locator("[data-market]")).toHaveCount(2);
-	await expect(settings.locator('[data-market="kalem.graylog"]')).toContainText(
-		"Give the assistant tools",
-	);
+	await expect(settings.locator('[data-market="kalem.graylog"]')).toContainText("Assistant tools");
+	await expect(settings.locator(".ext-catalog-head")).toContainText("Signed");
 
 	await settings.getByLabel("Search extensions").fill("graylog");
 	await expect(settings.locator("[data-market]")).toHaveCount(1);
@@ -129,7 +138,8 @@ test("the market installs and updates from a signed catalog, refuses what was ch
 	await card.getByRole("button", { name: "Update to 1.1.0" }).click();
 	await expect(preview).toContainText("Update Hello API from 1.0.0 to 1.1.0?");
 	await expect(preview).toContainText("It asks for nothing new");
-	await preview.getByRole("button", { name: "Install", exact: true }).click();
+	await expect(preview).toContainText("From Acme: its signature checks out");
+	await preview.getByRole("button", { name: "Update", exact: true }).click();
 	await expect(card).toContainText("1.1.0 · Kalem · from Acme");
 	await expect(card.getByRole("button", { name: /Update to/ })).toHaveCount(0);
 

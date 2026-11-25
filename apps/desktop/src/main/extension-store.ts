@@ -101,7 +101,7 @@ export async function readPackage(
 	const parsed = parseManifest(raw);
 	if (!parsed.ok) throw new ExtensionPackageError(parsed.error);
 	const { manifest } = parsed;
-	for (const entry of [manifest.host, manifest.ui]) {
+	for (const entry of [manifest.host, manifest.ui, manifest.icon]) {
 		if (entry !== null && !files.has(entry))
 			throw new ExtensionPackageError(`${entry} is not in the package.`);
 	}

@@ -10,6 +10,7 @@ import { compareVersions, NO_PERMISSIONS, parseVersion, satisfies } from "./exte
 export const INDEX_VERSION = 1;
 export const MAX_INDEX_BYTES = 5 * 1024 * 1024;
 export const MAX_REGISTRIES = 10;
+const MAX_ICON_CHARS = 100_000;
 
 export interface Registry {
 	readonly name: string;
@@ -31,6 +32,8 @@ export interface RegistryEntry {
 	readonly sha256: string;
 	readonly size: number;
 	readonly homepage: string;
+	/** Its picture, as a data: address (svg or png). */
+	readonly icon: string;
 }
 
 export interface BlockedEntry {
@@ -124,6 +127,12 @@ export function parseIndex(raw: unknown, indexUrl: string): RegistryIndex {
 			sha256,
 			size: typeof entry.size === "number" && Number.isFinite(entry.size) ? entry.size : 0,
 			homepage: /^https?:\/\//i.test(text(entry.homepage, 500)) ? text(entry.homepage, 500) : "",
+			icon:
+				typeof entry.icon === "string" &&
+				entry.icon.length <= MAX_ICON_CHARS &&
+				/^data:image\/(?:svg\+xml|png);base64,[A-Za-z0-9+/=]+$/.test(entry.icon)
+					? entry.icon
+					: "",
 		});
 	}
 	const blocked: BlockedEntry[] = [];

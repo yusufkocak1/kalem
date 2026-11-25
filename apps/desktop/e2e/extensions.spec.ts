@@ -64,8 +64,8 @@ test("an extension is installed after the user sees its permissions, keeps its t
 
 	await clickMenu(app, "Extensions", "Manage Extensions…");
 	const settings = page.locator('[data-block="extensions"]');
-	await expect(settings).toContainText("No extensions are installed.");
-	await settings.getByRole("button", { name: "Install from File…" }).click();
+	await expect(settings).toContainText("No extensions yet");
+	await settings.locator(".ext-intro").getByRole("button", { name: "Install from File…" }).click();
 
 	const preview = settings.locator(".ext-preview");
 	await expect(preview).toContainText("Install Hello API?");
@@ -113,7 +113,7 @@ test("an extension is installed after the user sees its permissions, keeps its t
 		void dialog.accept().catch(() => {});
 	});
 	await card.getByRole("button", { name: "Uninstall" }).click();
-	await expect(settings).toContainText("No extensions are installed.");
+	await expect(settings).toContainText("No extensions yet");
 	expect(asked).toEqual(["Uninstall Hello API? Its settings and saved secrets are removed too."]);
 	expect(errors).toEqual([]);
 });
@@ -126,7 +126,7 @@ test("an installed extension starts with the app and keeps its settings", async 
 	await stubOpenDialog(first.app, [packagePath]);
 	await clickMenu(first.app, "Extensions", "Manage Extensions…");
 	const settings = first.page.locator('[data-block="extensions"]');
-	await settings.getByRole("button", { name: "Install from File…" }).click();
+	await settings.locator(".ext-intro").getByRole("button", { name: "Install from File…" }).click();
 	await settings
 		.locator(".ext-preview")
 		.getByRole("button", { name: "Install", exact: true })
@@ -209,7 +209,7 @@ test("an extension's tool answers the assistant, and the extension reaches only 
 	await stubOpenDialog(app, [packagePath]);
 	await clickMenu(app, "Extensions", "Manage Extensions…");
 	const settings = page.locator('[data-block="extensions"]');
-	await settings.getByRole("button", { name: "Install from File…" }).click();
+	await settings.locator(".ext-intro").getByRole("button", { name: "Install from File…" }).click();
 	await settings
 		.locator(".ext-preview")
 		.getByRole("button", { name: "Install", exact: true })
@@ -282,7 +282,7 @@ document.getElementById("leave").addEventListener("click", () => { location.href
 	await stubOpenDialog(app, [packagePath]);
 	await clickMenu(app, "Extensions", "Manage Extensions…");
 	const settings = page.locator('[data-block="extensions"]');
-	await settings.getByRole("button", { name: "Install from File…" }).click();
+	await settings.locator(".ext-intro").getByRole("button", { name: "Install from File…" }).click();
 	await settings
 		.locator(".ext-preview")
 		.getByRole("button", { name: "Install", exact: true })

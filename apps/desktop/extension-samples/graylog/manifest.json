@@ -4,7 +4,10 @@
   "version": "1.0.0",
   "description": "Searches Graylog (5, 6 and 7) with an access token: a panel to search and read logs, and tools that let the assistant search them.",
   "publisher": "Kalem",
-  "engines": { "kalem": ">=3.34.0" },
+  "icon": "icon.svg",
+  "engines": {
+    "kalem": ">=3.34.0"
+  },
   "host": "host.js",
   "ui": "ui.html",
   "permissions": {
@@ -12,8 +15,19 @@
     "assistantTools": true
   },
   "contributes": {
-    "panes": [{ "id": "search", "title": "Graylog", "dock": "bottom" }],
-    "commands": [{ "id": "open", "title": "Open Graylog" }],
+    "panes": [
+      {
+        "id": "search",
+        "title": "Graylog",
+        "dock": "bottom"
+      }
+    ],
+    "commands": [
+      {
+        "id": "open",
+        "title": "Open Graylog"
+      }
+    ],
     "settings": [
       {
         "key": "url",
@@ -28,7 +42,12 @@
         "default": "timestamp, source, level, message",
         "description": "The fields shown and given to the assistant, comma separated."
       },
-      { "key": "limit", "type": "number", "title": "Messages per search", "default": 100 }
+      {
+        "key": "limit",
+        "type": "number",
+        "title": "Messages per search",
+        "default": 100
+      }
     ],
     "secrets": [
       {

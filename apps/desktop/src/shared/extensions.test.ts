@@ -59,6 +59,13 @@ describe("parseManifest", () => {
 		expect(parseManifest({ ...base, permissions: { http: ["https://x.com/"] } }).ok).toBe(false);
 	});
 
+	it("takes an svg or png icon from the package", () => {
+		const icon = parseManifest({ ...base, icon: "icon.svg" });
+		expect(icon.ok && icon.manifest.icon).toBe("icon.svg");
+		expect(parseManifest({ ...base, icon: "icon.exe" }).ok).toBe(false);
+		expect(parseManifest({ ...base, icon: "../icon.png" }).ok).toBe(false);
+	});
+
 	it("needs a ui for a pane and a host for a command", () => {
 		expect(parseManifest({ ...base, contributes: { panes: [{ id: "p", title: "P" }] } }).ok).toBe(
 			false,

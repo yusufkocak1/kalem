@@ -125,7 +125,7 @@ async function installGraylog(
 	await stubOpenDialog(app, [packagePath]);
 	await clickMenu(app, "Extensions", "Manage Extensions…");
 	const settings = page.locator('[data-block="extensions"]');
-	await settings.getByRole("button", { name: "Install from File…" }).click();
+	await settings.locator(".ext-intro").getByRole("button", { name: "Install from File…" }).click();
 	const preview = settings.locator(".ext-preview");
 	await expect(preview).toContainText("Connect to the address you enter in: Graylog address");
 	await expect(preview).toContainText("Keep encrypted: Access token");
