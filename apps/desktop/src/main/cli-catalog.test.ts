@@ -62,12 +62,17 @@ process.stdin.on("data", (chunk) => {
 		const asked = JSON.parse(buffer.subarray(end + 4, end + 4 + size).toString());
 		buffer = buffer.subarray(end + 4 + size);
 		if (asked.method === "connect") send({ jsonrpc: "2.0", id: asked.id, result: { protocolVersion: 3 } });
+		else if (asked.method === "account.getQuota")
+			send({ jsonrpc: "2.0", id: asked.id, result: { quotaSnapshots: { premium_interactions: {
+				isUnlimitedEntitlement: false, entitlementRequests: 300, usedRequests: 30, remainingPercentage: 90,
+			} } } });
 		else if (asked.method === "models.list")
 			send({ jsonrpc: "2.0", id: asked.id, result: { models: [
 				{ id: "claude-sonnet-4.5", name: "Claude Sonnet 4.5", policy: { state: "enabled" } },
 				{ id: "gpt-5", name: "GPT-5 ü", policy: { state: "unconfigured" } },
 				{ id: "o-old", name: "Old", policy: { state: "disabled" } },
 			] } });
+		else send({ jsonrpc: "2.0", id: asked.id, error: { code: -32601, message: "Unhandled method " + asked.method } });
 	}
 });
 `;
@@ -91,6 +96,30 @@ describe("what the CLIs say the account has", () => {
 			{ id: "claude-sonnet-4.5", label: "Claude Sonnet 4.5" },
 			{ id: "gpt-5", label: "GPT-5 ü" },
 		]);
+	});
+
+	it("asks each CLI how much of the plan is used", async () => {
+		const copilot = await new CliCatalog().copilotUsage(await fakeCli(COPILOT));
+		expect(copilot?.meters[0]).toMatchObject({
+			kind: "premium",
+			percent: 10,
+			used: 30,
+			limit: 300,
+		});
+		const claude = await fakeCli(`
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => {
+	const asked = JSON.parse(chunk.split("\\n")[0]);
+	console.log(JSON.stringify({ type: "control_response", response: { subtype: "success",
+		request_id: asked.request_id, response: asked.request.subtype !== "get_usage" ? {} : {
+			subscription_type: "pro", rate_limits_available: true,
+			rate_limits: { five_hour: { utilization: 12, resets_at: null } } } } }));
+});
+`);
+		expect(await new CliCatalog().claudeUsage(claude)).toEqual({
+			plan: "pro",
+			meters: [{ kind: "session", percent: 12, resetsAt: null }],
+		});
 	});
 
 	it("gives up on a CLI that does not answer, and says nothing", async () => {

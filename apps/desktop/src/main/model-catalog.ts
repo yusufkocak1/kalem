@@ -4,6 +4,8 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { ModelOption } from "../shared/models.js";
 import { copilotModelsOf, copilotOauthToken } from "../shared/models.js";
+import type { ServiceUsage } from "../shared/usage.js";
+import { copilotUserUsageOf } from "../shared/usage.js";
 
 type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 
@@ -98,6 +100,19 @@ export class ModelCatalog {
 			}
 		});
 		return models;
+	}
+
+	/** The account's Copilot quota, as GitHub tells VS Code; `null` when no login is found. */
+	async copilotUsage(): Promise<ServiceUsage | null> {
+		for (const github of await this.#githubTokens()) {
+			const answer = await this.#fetch("https://api.github.com/copilot_internal/user", {
+				headers: { Authorization: `token ${github}`, Accept: "application/json" },
+			}).catch(() => null);
+			if (answer === null || !answer.ok) continue;
+			const usage = copilotUserUsageOf(await answer.json().catch(() => ({})));
+			if (usage !== null) return usage;
+		}
+		return null;
 	}
 
 	async #githubTokens(): Promise<string[]> {

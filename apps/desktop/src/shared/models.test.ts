@@ -91,6 +91,11 @@ describe("Copilot's choices", () => {
 			{ id: "claude-sonnet-4.5", label: "claude-sonnet-4.5" },
 		]);
 		expect(copilotModelOptions([], account)).toEqual(account);
+		expect(copilotModelOptions(["auto"], account)).toEqual([
+			{ id: "auto", label: "auto" },
+			...account,
+		]);
+		expect(copilotModelOptions(["auto"], [])).toEqual([{ id: "auto", label: "auto" }]);
 	});
 
 	it("find the Copilot plugins' GitHub login", () => {

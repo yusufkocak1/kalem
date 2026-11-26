@@ -50,6 +50,7 @@ import type {
 } from "./tool-protocol.js";
 import type { Typography } from "./typography.js";
 import { DEFAULT_TYPOGRAPHY } from "./typography.js";
+import type { ServiceUsage } from "./usage.js";
 export type Theme = "system" | "light" | "dark";
 
 export const PAGE_SIZES = ["A4", "A3", "A5", "Letter", "Legal"] as const;
@@ -1317,6 +1318,16 @@ export interface KalemBridge {
 		 */
 		readonly quick?: boolean;
 	}): Promise<readonly ModelOption[]>;
+	/**
+	 * How much of the plan the account has used: Claude Code's windows, the
+	 * Copilot quota, OpenRouter's credits. `null` when the service does not
+	 * say; `fresh` asks again rather than using an answer from moments ago.
+	 */
+	assistantUsage(request: {
+		readonly provider: ProviderId;
+		readonly key?: string;
+		readonly fresh?: boolean;
+	}): Promise<ServiceUsage | null>;
 	/** Lets the user pick the program of the CLI in use. */
 	assistantLocate(): Promise<AssistantStatus>;
 	/** Uses the CLI at a path the user typed (its file, or a folder it is in), once they say so. */
@@ -1577,6 +1588,7 @@ export const CHANNEL = {
 	assistantConfigure: "kalem:assistant-configure",
 	assistantSetModel: "kalem:assistant-set-model",
 	assistantModels: "kalem:assistant-models",
+	assistantUsage: "kalem:assistant-usage",
 	assistantToolCatalog: "kalem:assistant-tool-catalog",
 	assistantModeExport: "kalem:assistant-mode-export",
 	assistantModeImport: "kalem:assistant-mode-import",

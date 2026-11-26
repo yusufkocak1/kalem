@@ -19,6 +19,8 @@ import {
 	RpcReader,
 	rpcFrame,
 } from "../shared/models.js";
+import type { ServiceUsage } from "../shared/usage.js";
+import { claudeUsageOf, copilotQuotaOf } from "../shared/usage.js";
 import type { CliLaunch } from "./cli.js";
 import { environment } from "./cli.js";
 
@@ -27,6 +29,8 @@ const WAIT = 30_000;
 const LIFETIME = 10 * 60_000;
 /** An empty answer is asked again sooner: the user may sign in meanwhile. */
 const EMPTY_LIFETIME = 60_000;
+/** Usage changes with every question: it is asked again after this. */
+const USAGE_LIFETIME = 30_000;
 
 export interface ClaudeAccount {
 	readonly models: readonly ModelOption[];
@@ -45,8 +49,11 @@ function start(launch: CliLaunch, args: readonly string[]): ChildProcess {
 	});
 }
 
-/** Claude Code's `initialize` answer; rejects when it gives none. */
-export function askClaude(launch: CliLaunch): Promise<unknown> {
+/** Claude Code's answer to a control request (`initialize` when none is given); rejects when it gives none. */
+export function askClaude(
+	launch: CliLaunch,
+	request: Record<string, unknown> = { subtype: "initialize" },
+): Promise<unknown> {
 	return new Promise((resolve, reject) => {
 		const child = start(launch, [
 			"-p",
@@ -82,7 +89,7 @@ export function askClaude(launch: CliLaunch): Promise<unknown> {
 				const response = (data.response ?? {}) as Record<string, unknown>;
 				if (response.request_id !== undefined && response.request_id !== id) continue;
 				if (response.subtype === "error") {
-					finish(null, new Error(String(response.error ?? "initialize failed")));
+					finish(null, new Error(String(response.error ?? `${request.subtype} failed`)));
 				} else finish(response.response ?? response);
 				return;
 			}
@@ -90,14 +97,18 @@ export function askClaude(launch: CliLaunch): Promise<unknown> {
 		child.on("error", (error) => finish(null, error));
 		child.on("close", () => finish(null, new Error("Claude Code exited")));
 		child.stdin?.on("error", () => {});
-		child.stdin?.write(
-			`${JSON.stringify({ type: "control_request", request_id: id, request: { subtype: "initialize" } })}\n`,
-		);
+		child.stdin?.write(`${JSON.stringify({ type: "control_request", request_id: id, request })}\n`);
 	});
 }
 
-/** The Copilot CLI's `models.list` answer; rejects when it gives none. */
-export function askCopilot(launch: CliLaunch): Promise<unknown> {
+/**
+ * The Copilot CLI's answer to a method (`models.list` when none is given);
+ * rejects when it gives none. The handshake comes first, then the account's
+ * sign-in, which the CLI resolves as it starts: a question asked before it
+ * would be answered "not authenticated". An older CLI knows neither: its
+ * errors are fine.
+ */
+export function askCopilot(launch: CliLaunch, method = "models.list"): Promise<unknown> {
 	return new Promise((resolve, reject) => {
 		const child = start(launch, ["--headless", "--no-auto-update", "--stdio"]);
 		const reader = new RpcReader();
@@ -109,18 +120,18 @@ export function askCopilot(launch: CliLaunch): Promise<unknown> {
 			else reject(error);
 		};
 		const timer = setTimeout(() => finish(null, new Error("Copilot did not answer")), WAIT);
-		const send = (id: number, method: string): void => {
-			child.stdin?.write(rpcFrame({ jsonrpc: "2.0", id, method, params: {} }));
+		const send = (id: number, name: string): void => {
+			child.stdin?.write(rpcFrame({ jsonrpc: "2.0", id, method: name, params: {} }));
 		};
 		child.stdout?.on("data", (chunk: Buffer) => {
 			for (const raw of reader.push(new Uint8Array(chunk))) {
 				const message = (raw ?? {}) as Record<string, unknown>;
-				// The handshake first (an older CLI does not know it: its error is fine), then the list.
-				if (message.id === 1) send(2, "models.list");
-				else if (message.id === 2) {
+				if (message.id === 1) send(2, "account.getCurrentAuth");
+				else if (message.id === 2) send(3, method);
+				else if (message.id === 3) {
 					if (message.error !== undefined) {
 						const error = (message.error ?? {}) as Record<string, unknown>;
-						finish(null, new Error(String(error.message ?? "models.list failed")));
+						finish(null, new Error(String(error.message ?? `${method} failed`)));
 					} else finish(message.result);
 				}
 			}
@@ -170,6 +181,39 @@ export class CliCatalog {
 		void value.then((found) => {
 			if (found.length === 0 && this.#copilot?.value === value)
 				this.#copilot = { ...this.#copilot, until: Date.now() + EMPTY_LIFETIME };
+		});
+		return value;
+	}
+
+	/** The plan's usage, as Claude Code's `/usage` shows it; `null` when the plan has none. */
+	claudeUsage(launch: CliLaunch, fresh = false): Promise<ServiceUsage | null> {
+		return this.#usage("claude", launch, fresh, () =>
+			askClaude(launch, { subtype: "get_usage", skip_behaviors: true }).then(claudeUsageOf),
+		);
+	}
+
+	/** The account's Copilot quota, as the CLI says it; `null` when it says none. */
+	copilotUsage(launch: CliLaunch, fresh = false): Promise<ServiceUsage | null> {
+		return this.#usage("copilot", launch, fresh, () =>
+			askCopilot(launch, "account.getQuota").then(copilotQuotaOf),
+		);
+	}
+
+	#usages = new Map<string, Kept<ServiceUsage | null>>();
+
+	#usage(
+		program: string,
+		launch: CliLaunch,
+		fresh: boolean,
+		ask: () => Promise<ServiceUsage | null>,
+	): Promise<ServiceUsage | null> {
+		const kept = this.#usages.get(program);
+		if (!fresh && kept !== undefined && kept.key === launch.path && kept.until > Date.now())
+			return kept.value;
+		const value = ask();
+		this.#usages.set(program, { key: launch.path, until: Date.now() + USAGE_LIFETIME, value });
+		value.catch(() => {
+			if (this.#usages.get(program)?.value === value) this.#usages.delete(program);
 		});
 		return value;
 	}

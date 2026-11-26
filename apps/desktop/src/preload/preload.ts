@@ -190,6 +190,7 @@ const bridge: KalemBridge = {
 	assistantModeExport: (which) => ipcRenderer.invoke(CHANNEL.assistantModeExport, which),
 	assistantModeImport: () => ipcRenderer.invoke(CHANNEL.assistantModeImport),
 	assistantModels: (request) => ipcRenderer.invoke(CHANNEL.assistantModels, request),
+	assistantUsage: (request) => ipcRenderer.invoke(CHANNEL.assistantUsage, request),
 	assistantLocate: () => ipcRenderer.invoke(CHANNEL.assistantLocate),
 	assistantUsePath: (path) => ipcRenderer.invoke(CHANNEL.assistantUsePath, path),
 	assistantSearch: () => ipcRenderer.invoke(CHANNEL.assistantSearch),

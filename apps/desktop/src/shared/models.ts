@@ -109,17 +109,20 @@ export function copilotModelsOf(raw: unknown): ModelOption[] {
 }
 
 /**
- * The Copilot CLI's choices: when its help lists the models it takes
- * (`choices: …`), only those, named as the account's list names them;
- * otherwise every model of the account's list.
+ * The Copilot CLI's choices. An older CLI's help lists the models it takes
+ * (`choices: …`): then only those, named as the account's list names them.
+ * A newer one only quotes keywords (`'auto'`): those come first, then every
+ * model of the account's list.
  */
 export function copilotModelOptions(
 	fromHelp: readonly string[],
 	account: readonly ModelOption[],
 ): ModelOption[] {
-	if (fromHelp.length === 0) return [...account];
 	const names = new Map(account.map((option) => [option.id, option.label]));
-	return fromHelp.map((id) => ({ id, label: names.get(id) ?? id }));
+	const listsChoices = fromHelp.some((id) => names.has(id));
+	if (listsChoices || account.length === 0)
+		return fromHelp.map((id) => ({ id, label: names.get(id) ?? id }));
+	return [...fromHelp.map((id) => ({ id, label: id })), ...account];
 }
 
 /**
