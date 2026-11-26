@@ -692,7 +692,7 @@ test("connects to an OpenAI-compatible service and to the Anthropic API with a k
 	await form.getByLabel("Address").fill(`${services.url}/v1`);
 	await form.getByLabel("API key").fill("sk-test");
 	await form.getByRole("button", { name: "Fetch models" }).click();
-	await expect(form.locator(".assistant-field-note[role=status]")).toHaveText(
+	await expect(form.locator(".assistant-models-note")).toHaveText(
 		"2 models found; pick one in the model field.",
 	);
 	await expect(form.locator("datalist option")).toHaveCount(2);

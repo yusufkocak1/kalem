@@ -73,6 +73,8 @@ import {
 	withOnlySteps,
 	workerNote,
 } from "../shared/step-stages.js";
+import type { ServiceUsage } from "../shared/usage.js";
+import { openRouterUsageOf } from "../shared/usage.js";
 import type { ChatStore } from "./assistant-chats.js";
 import { ConfluenceLookups } from "./assistant-confluence.js";
 import { JiraLookups } from "./assistant-jira.js";
@@ -526,6 +528,42 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 			label: info.protocol === "anthropic" ? `${claudeModelName(id)} (${id})` : id,
 		}));
 	});
+
+	ipcMain.handle(
+		CHANNEL.assistantUsage,
+		async (_event, raw: unknown): Promise<ServiceUsage | null> => {
+			const request = record(raw);
+			if (!isProvider(request.provider)) return null;
+			const provider = request.provider;
+			const fresh = request.fresh === true;
+			const program = programOf(provider);
+			if (program === "claude") {
+				await locate(program);
+				const launch = clis[program].launch;
+				return launch === null ? null : cliCatalog.claudeUsage(launch, fresh);
+			}
+			if (program === "copilot") {
+				await locate(program);
+				const launch = clis[program].launch;
+				const own =
+					launch === null ? null : await cliCatalog.copilotUsage(launch, fresh).catch(() => null);
+				return own ?? catalog.copilotUsage();
+			}
+			if (provider === "openrouter") {
+				const key =
+					typeof request.key === "string" && request.key.trim() !== ""
+						? request.key.trim()
+						: await ctx.assistant.key(provider);
+				if (key === null) return null;
+				const answer = await net.fetch("https://openrouter.ai/api/v1/key", {
+					headers: { authorization: `Bearer ${key}` },
+				});
+				if (!answer.ok) throw new Error(`HTTP ${answer.status}`);
+				return openRouterUsageOf(await answer.json());
+			}
+			return null;
+		},
+	);
 
 	/** Uses the program at a path the user gave (a file, or a folder it is in); says so when it is not one. */
 	const usePath = async (win: AppWindow, program: CliProgram, path: string): Promise<void> => {

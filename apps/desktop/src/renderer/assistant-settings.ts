@@ -4,6 +4,8 @@ import { format } from "../shared/i18n.js";
 import type { AssistantConfig, ProviderId } from "../shared/providers.js";
 import { isCli, PROVIDER_INFO, PROVIDERS, providerLabel } from "../shared/providers.js";
 import { el } from "./dom.js";
+import { icon } from "./icons.js";
+import { createUsageCard } from "./usage-card.js";
 
 export interface AssistantSettingsOptions {
 	readonly t: Strings;
@@ -75,7 +77,10 @@ export function createAssistantSettings(options: AssistantSettingsOptions): Assi
 		text: t.assistantFetchModels,
 		attrs: { type: "button" },
 	});
-	const modelsNote = el("p", { class: "assistant-field-note", attrs: { role: "status" } });
+	const modelsNote = el("p", {
+		class: "assistant-field-note assistant-models-note",
+		attrs: { role: "status" },
+	});
 	const cliNote = el("p", { class: "assistant-empty-hint", text: t.assistantCliNote });
 	// The service in use, as found: a CLI's version, or a service and its model.
 	const inUse = el("p", { class: "assistant-field-note assistant-in-use", attrs: { hidden: "" } });
@@ -211,20 +216,37 @@ export function createAssistantSettings(options: AssistantSettingsOptions): Assi
 		modelsNote,
 	]);
 
+	const usage = createUsageCard(t, bridge, options.errorText, () => key.value);
+
 	const element = el("form", {
 		class: "assistant-settings",
 		attrs: { "aria-label": t.assistantSettings, hidden: "" },
 		children: [
-			el("p", { class: "assistant-empty-title", text: t.assistantSettings }),
-			field(t.assistantProvider, provider, [inUse]),
-			cliNote,
-			copilotField,
-			urlField,
-			keyField,
-			modelField,
-			el("p", { class: "assistant-field-note", text: t.assistantPrivacy }),
+			el("div", {
+				class: "assistant-settings-head",
+				children: [
+					el("span", { class: "assistant-settings-badge", children: [icon("settings")] }),
+					el("p", { class: "assistant-empty-title", text: t.assistantSettings }),
+				],
+			}),
+			el("section", {
+				class: "assistant-card",
+				children: [
+					field(t.assistantProvider, provider, [inUse]),
+					cliNote,
+					copilotField,
+					urlField,
+					keyField,
+					modelField,
+				],
+			}),
+			usage.element,
+			el("p", { class: "assistant-field-note assistant-privacy", text: t.assistantPrivacy }),
 			error,
-			el("div", { class: "assistant-missing-actions", children: [save, cancel] }),
+			el("div", {
+				class: "assistant-missing-actions assistant-settings-actions",
+				children: [save, cancel],
+			}),
 		],
 	});
 	element.addEventListener("submit", (event) => event.preventDefault());
@@ -243,7 +265,6 @@ export function createAssistantSettings(options: AssistantSettingsOptions): Assi
 		if (id === "copilot") void renderCopilotAccount();
 		urlField.hidden = cli;
 		keyField.hidden = cli;
-		fetchModels.hidden = cli;
 		model.placeholder =
 			id === "copilot"
 				? t.copilotModelPlaceholder
@@ -259,6 +280,9 @@ export function createAssistantSettings(options: AssistantSettingsOptions): Assi
 		error.hidden = true;
 		renderKey();
 		renderInUse();
+		usage.load(id);
+		// A CLI's models come from the CLI itself, kept a while once asked: filled at once.
+		if (cli) void listModels(true);
 	}
 
 	function renderInUse(): void {
@@ -297,15 +321,17 @@ export function createAssistantSettings(options: AssistantSettingsOptions): Assi
 		if (url !== null) options.openLink(url);
 	});
 
-	fetchModels.addEventListener("click", async () => {
+	async function listModels(quiet: boolean): Promise<void> {
+		const id = selected();
 		fetchModels.disabled = true;
-		modelsNote.textContent = t.assistantLoading;
+		if (!quiet) modelsNote.textContent = t.assistantLoading;
 		try {
 			const found = await bridge.assistantModels({
-				provider: selected(),
+				provider: id,
 				baseUrl: baseUrl.value,
 				...(key.value.trim() === "" ? {} : { key: key.value }),
 			});
+			if (selected() !== id) return;
 			models.replaceChildren(
 				...found.map((option) =>
 					el("option", {
@@ -316,15 +342,19 @@ export function createAssistantSettings(options: AssistantSettingsOptions): Assi
 					}),
 				),
 			);
+			if (quiet && found.length === 0) return;
 			modelsNote.textContent =
 				found.length === 0 ? t.assistantModelsNone : format(t.assistantModelsFound, found.length);
-			if (found.length > 0 && model.value.trim() === "") model.focus();
+			if (!quiet && found.length > 0 && model.value.trim() === "") model.focus();
 		} catch (failure) {
-			modelsNote.textContent = format(t.assistantActionFailed, options.errorText(failure));
+			if (!quiet)
+				modelsNote.textContent = format(t.assistantActionFailed, options.errorText(failure));
 		} finally {
 			fetchModels.disabled = false;
 		}
-	});
+	}
+
+	fetchModels.addEventListener("click", () => void listModels(false));
 
 	save.addEventListener("click", async () => {
 		const id = selected();
