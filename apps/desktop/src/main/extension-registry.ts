@@ -64,12 +64,14 @@ export class RegistryClient {
 		const key = `${registry.url}\n${registry.publicKey}`;
 		const cached = this.#cache.get(key);
 		if (!force && cached !== undefined && Date.now() - cached.at < CACHE_MS) return cached.index;
-		const signal = AbortSignal.timeout(TIMEOUT_MS);
+		// Asked of the server each time: a catalog published minutes ago is not left in the HTTP cache,
+		// and the list and its signature are never of two different publishes.
+		const init: RequestInit = { signal: AbortSignal.timeout(TIMEOUT_MS), cache: "no-cache" };
 		const [data, signature] = await Promise.all([
-			this.#fetch(registry.url, { signal }).then((response) =>
+			this.#fetch(registry.url, init).then((response) =>
 				readLimited(response, MAX_INDEX_BYTES, "The catalog"),
 			),
-			this.#fetch(`${registry.url}.sig`, { signal }).then((response) =>
+			this.#fetch(`${registry.url}.sig`, init).then((response) =>
 				readLimited(response, 4096, "The catalog's signature"),
 			),
 		]);
