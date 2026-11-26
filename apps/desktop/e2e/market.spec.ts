@@ -17,6 +17,8 @@ async function serve(folder: string) {
 		requested.push(path);
 		try {
 			const data = await readFile(join(folder, normalize(path).replace(/^([/\\])+/, "")));
+			// As GitHub Pages serves it: cacheable for ten minutes.
+			response.setHeader("Cache-Control", "max-age=600");
 			response.end(data);
 		} catch {
 			response.statusCode = 404;

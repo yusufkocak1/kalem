@@ -52,6 +52,21 @@ describe("RegistryClient", () => {
 		);
 	});
 
+	it("asks the server for the index and its signature each time, past the HTTP cache", async () => {
+		const files = catalog(bytes);
+		const asked: [string, RequestCache | undefined][] = [];
+		const fetch = (url: string, init?: RequestInit) => {
+			asked.push([url, init?.cache]);
+			return serving(files)(url);
+		};
+		const client = new RegistryClient(fetch);
+		await client.index({ name: "Acme", url: URL, publicKey: KEY }, true);
+		expect(asked).toEqual([
+			[URL, "no-cache"],
+			[`${URL}.sig`, "no-cache"],
+		]);
+	});
+
 	it("refuses an index changed after it was signed, or signed with another key", async () => {
 		await expect(
 			new RegistryClient(serving(catalog(bytes, true))).index({
