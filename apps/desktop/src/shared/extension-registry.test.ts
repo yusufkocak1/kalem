@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+	activeRegistries,
 	blockedReason,
+	KALEM_REGISTRY,
 	latestCompatible,
 	parseIndex,
 	parseRegistries,
@@ -104,5 +106,15 @@ describe("parseIndex", () => {
 		).toEqual(["acme.icon@1.0.0", "acme.script@1.0.0", "acme.graylog@1.2.0"]);
 		expect(blockedReason(index, "acme.run", "1.0.0")).toBe("Leaks the token.");
 		expect(blockedReason(index, "acme.run", "1.1.0")).toBeNull();
+	});
+});
+
+describe("activeRegistries", () => {
+	const own = { name: "Acme", url: "https://acme.example/index.json", publicKey: "A".repeat(44) };
+	it("puts Kalem's own catalog first while it is on, and never twice", () => {
+		expect(activeRegistries([own], true)).toEqual([KALEM_REGISTRY, own]);
+		expect(activeRegistries([KALEM_REGISTRY, own], true)).toEqual([KALEM_REGISTRY, own]);
+		expect(activeRegistries([KALEM_REGISTRY, own], false)).toEqual([own]);
+		expect(parseRegistries([KALEM_REGISTRY])).toEqual([KALEM_REGISTRY]);
 	});
 });

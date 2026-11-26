@@ -1,5 +1,6 @@
 import type { AssistantPlace, AssistantStatus, KalemBridge, Settings } from "../shared/bridge.js";
 import { DEFAULT_SETTINGS } from "../shared/bridge.js";
+import { activeRegistries, KALEM_REGISTRY } from "../shared/extension-registry.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import { modesUsingServers, renameServerRefs } from "../shared/modes.js";
@@ -799,8 +800,12 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		t,
 		bridge,
 		errorText: options.errorText,
-		registries: () => options.settings().extensionRegistries,
-		setRegistries: (registries) => update({ extensionRegistries: registries }),
+		registries: () =>
+			activeRegistries(options.settings().extensionRegistries, options.settings().kalemCatalog),
+		setRegistries: (registries) =>
+			update({ extensionRegistries: registries.filter((each) => each.url !== KALEM_REGISTRY.url) }),
+		kalemCatalog: () => options.settings().kalemCatalog,
+		setKalemCatalog: (on) => update({ kalemCatalog: on }),
 	});
 	item(
 		"extensions",

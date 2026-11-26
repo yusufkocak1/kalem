@@ -74,6 +74,19 @@ export function parseRegistries(raw: unknown): Registry[] {
 	return found;
 }
 
+/** Kalem's own catalog, there for everyone unless they turn it off. */
+export const KALEM_REGISTRY: Registry = {
+	name: "Kalem Eklentileri",
+	url: "https://yusufkocak1.github.io/kalem-extensions/index.json",
+	publicKey: "MCowBQYDK2VwAyEAefVQwZSxeRXlfROTZMXbOEQHRId/rGxZKMWl4flq4NI=",
+};
+
+/** The catalogs the market reads: Kalem's own first while it is on, then the user's. */
+export function activeRegistries(own: readonly Registry[], kalemCatalog: boolean): Registry[] {
+	const rest = own.filter((each) => each.url !== KALEM_REGISTRY.url);
+	return kalemCatalog ? [KALEM_REGISTRY, ...rest] : rest;
+}
+
 /** The address of a file the index names: absolute, or next to the index. */
 export function resolveUrl(target: string, index: string): string {
 	return new URL(target, index).toString();

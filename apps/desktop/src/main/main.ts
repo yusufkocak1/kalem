@@ -15,6 +15,7 @@ import {
 } from "electron";
 import type { Draft, Settings, TabDocument } from "../shared/bridge.js";
 import { CHANNEL } from "../shared/bridge.js";
+import { activeRegistries } from "../shared/extension-registry.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format, pickLanguage, stringsFor } from "../shared/i18n.js";
 import { quickNoteName } from "../shared/notes.js";
@@ -716,7 +717,8 @@ function start(): void {
 			windowOf: (id) =>
 				windows.all().find((win) => win.window.webContents.id === id)?.window ?? null,
 			broadcast: broadcastExtensions,
-			registries: () => store.settings.extensionRegistries,
+			registries: () =>
+				activeRegistries(store.settings.extensionRegistries, store.settings.kalemCatalog),
 			settingsChanged: (id) => {
 				for (const win of windows.all()) {
 					if (!win.window.isDestroyed())

@@ -156,3 +156,32 @@ test("panel erişilebilir bir gezinme bölgesi", async ({ page }) => {
 	// Maddeler düğme: adrese gitmiyoruz, imleci taşıyoruz.
 	await expect(maddeler(page).first()).toHaveRole("button");
 });
+
+test("clicking a heading near the end keeps it active", async ({ page }) => {
+	await page.evaluate(() => {
+		const sections = Array.from(
+			{ length: 8 },
+			(_, i) => `## Bölüm ${i + 1}\n\n${"Metin.\n\n".repeat(6)}`,
+		);
+		window.kalem.editor.setValue(
+			`# Üst\n\n${sections.join("")}## Son A\n\nx\n\n## Son B\n\nx\n\n## Son C\n\nx\n`,
+		);
+	});
+	await expect(maddeler(page)).toHaveCount(12);
+	await maddeler(page).nth(11).click();
+	const remeasure = () =>
+		page.evaluate(
+			() =>
+				new Promise<number>((resolve) => {
+					setTimeout(() => window.dispatchEvent(new Event("scroll")), 50);
+					setTimeout(() => resolve(window.kalem.anahatEklentisi.activeIndex()), 150);
+				}),
+		);
+	expect(await remeasure()).toBe(11);
+	await expect(maddeler(page).nth(11)).toHaveAttribute("aria-current", "location");
+
+	await page.evaluate(() =>
+		document.querySelectorAll("#editor > h2")[4]?.scrollIntoView({ block: "start" }),
+	);
+	expect(await remeasure()).toBe(5);
+});

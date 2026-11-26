@@ -45,6 +45,8 @@ export async function launch(options: LaunchOptions = {}): Promise<Launched> {
 					restoreSession: false,
 					// The document goes with each question, as before it was offered faded; a test turns that off.
 					assistantDocumentAuto: true,
+					// Kalem's own catalog is on the internet; a test that wants a market adds its own.
+					kalemCatalog: false,
 					...options.settings,
 				},
 				welcomed: options.welcomed ?? true,

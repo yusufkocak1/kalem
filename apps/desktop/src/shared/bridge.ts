@@ -209,6 +209,8 @@ export interface Settings extends Typography {
 	readonly assistantMcpServers: readonly McpServer[];
 	/** The extension catalogs the market lists, each trusted by its owner's key. */
 	readonly extensionRegistries: readonly Registry[];
+	/** Whether Kalem's own catalog is in the market (on unless the user turns it off). */
+	readonly kalemCatalog: boolean;
 	/** Where the assistant's panel is: at the right (as before), at the left, or under the document. */
 	readonly assistantPlace: AssistantPlace;
 	/** The assistant panel's height under the document, in pixels. */
@@ -340,6 +342,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	assistantCustomModes: [],
 	assistantMcpServers: defaultServers(),
 	extensionRegistries: [],
+	kalemCatalog: true,
 	assistantPlace: "right",
 	assistantHeight: 320,
 };

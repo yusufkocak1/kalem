@@ -6,7 +6,7 @@ import type {
 	MarketEntry,
 } from "../shared/bridge.js";
 import type { Registry } from "../shared/extension-registry.js";
-import { parseRegistries } from "../shared/extension-registry.js";
+import { KALEM_REGISTRY, parseRegistries } from "../shared/extension-registry.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import { el } from "./dom.js";
@@ -19,6 +19,9 @@ export interface MarketOptions {
 	errorText(error: unknown): string;
 	registries(): readonly Registry[];
 	setRegistries(registries: readonly Registry[]): void;
+	/** Whether Kalem's own catalog is on. */
+	kalemCatalog(): boolean;
+	setKalemCatalog(on: boolean): void;
 	/** Shows what a picked package asks for, to install it. */
 	showPreview(picked: ExtensionPreview): void;
 	say(text: string, error?: boolean): void;
@@ -236,11 +239,47 @@ export function createExtensionMarket(options: MarketOptions): Market {
 	);
 	add.prepend(icon("plus"));
 
+	function kalemRow(): HTMLElement {
+		const on = options.kalemCatalog();
+		const toggle = el("input", {
+			attrs: { type: "checkbox", role: "switch", "aria-label": t.extensionKalemCatalogOn },
+		});
+		toggle.checked = on;
+		toggle.addEventListener("change", () => {
+			options.setKalemCatalog(toggle.checked);
+			drawRegistries();
+			void refresh(toggle.checked);
+		});
+		return el("div", {
+			class: "ext-registry ext-registry-kalem",
+			attrs: on ? {} : { "data-off": "" },
+			children: [
+				el("span", { class: "ext-registry-icon", children: [icon("shieldCheck")] }),
+				el("div", {
+					class: "ext-title",
+					children: [
+						el("strong", { text: KALEM_REGISTRY.name }),
+						el("span", { class: "ext-meta", text: t.extensionKalemCatalogHint }),
+						el("span", { class: "ext-meta", text: KALEM_REGISTRY.url }),
+					],
+				}),
+				el("label", {
+					class: "ext-switch",
+					children: [
+						toggle,
+						el("span", { text: on ? t.extensionKalemCatalogOn : t.extensionKalemCatalogOff }),
+					],
+				}),
+			],
+		});
+	}
+
 	function drawRegistries(): void {
-		const registries = options.registries();
+		const registries = options.registries().filter((each) => each.url !== KALEM_REGISTRY.url);
 		registryList.replaceChildren(
+			kalemRow(),
 			...(registries.length === 0
-				? [el("p", { class: "ext-muted", text: t.extensionRegistriesNone })]
+				? []
 				: registries.map((registry) =>
 						el("div", {
 							class: "ext-registry",

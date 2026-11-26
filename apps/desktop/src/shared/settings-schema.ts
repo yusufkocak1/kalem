@@ -799,6 +799,15 @@ export const SETTINGS_SCHEMA: Schema = {
 		// What Kalem trusts to install code: the user's alone.
 		assistant: "hidden",
 	},
+	kalemCatalog: {
+		key: "kalemCatalog",
+		category: "system",
+		label: null,
+		type: "custom",
+		parse: (raw) => raw !== false,
+		keywords: ["eklenti", "extension", "market", "katalog", "catalog"],
+		assistant: "hidden",
+	},
 	specProfile: {
 		key: "specProfile",
 		category: "templates",
