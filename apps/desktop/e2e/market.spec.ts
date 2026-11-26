@@ -8,6 +8,7 @@ import { clickMenu, launch, tempDir } from "./launch.js";
 
 const REGISTRY = join(import.meta.dirname, "..", "scripts", "extension-registry.mjs");
 const SAMPLES = join(import.meta.dirname, "..", "extension-samples");
+const TOUR = join(import.meta.dirname, "fixtures", "api-tour");
 
 async function serve(folder: string) {
 	const requested: string[] = [];
@@ -43,7 +44,7 @@ test("the market installs and updates from a signed catalog, refuses what was ch
 		.at(-1) as string;
 	const source = await tempDir("catalog-source");
 	await cp(join(SAMPLES, "hello-api"), join(source, "hello-api"), { recursive: true });
-	await cp(join(SAMPLES, "graylog"), join(source, "graylog"), { recursive: true });
+	await cp(TOUR, join(source, "api-tour"), { recursive: true });
 	const out = await tempDir("catalog");
 	const build = (...extra: string[]) =>
 		execFileSync(process.execPath, [
@@ -101,10 +102,10 @@ test("the market installs and updates from a signed catalog, refuses what was ch
 	const hello = settings.locator('[data-market="kalem.hello-api"]');
 	await expect(hello).toContainText("1.0.0 · Kalem");
 	await expect(settings.locator("[data-market]")).toHaveCount(2);
-	await expect(settings.locator('[data-market="kalem.graylog"]')).toContainText("Assistant tools");
+	await expect(settings.locator('[data-market="kalem.api-tour"]')).toContainText("Assistant tools");
 	await expect(settings.locator(".ext-catalog-head")).toContainText("Signed");
 
-	await settings.getByLabel("Search extensions").fill("graylog");
+	await settings.getByLabel("Search extensions").fill("tour");
 	await expect(settings.locator("[data-market]")).toHaveCount(1);
 	await settings.getByLabel("Search extensions").fill("");
 
@@ -119,11 +120,11 @@ test("the market installs and updates from a signed catalog, refuses what was ch
 	await expect(card).toContainText("1.0.0 · Kalem · from Acme");
 
 	// A changed package is refused: its hash is not the signed one.
-	const graylogFile = join(out, "kalem.graylog-1.0.0.kalem-ext");
-	await writeFile(graylogFile, Buffer.concat([await readFile(graylogFile), Buffer.from("x")]));
+	const tourFile = join(out, "kalem.api-tour-1.0.0.kalem-ext");
+	await writeFile(tourFile, Buffer.concat([await readFile(tourFile), Buffer.from("x")]));
 	await settings.getByRole("tab", { name: "Market" }).click();
 	await settings
-		.locator('[data-market="kalem.graylog"]')
+		.locator('[data-market="kalem.api-tour"]')
 		.getByRole("button", { name: "Install" })
 		.click();
 	await expect(settings.locator(".ext-status")).toContainText("its sha256 differs");
@@ -133,8 +134,8 @@ test("the market installs and updates from a signed catalog, refuses what was ch
 	const manifestFile = join(source, "hello-api", "manifest.json");
 	const manifest = JSON.parse(await readFile(manifestFile, "utf8"));
 	await writeFile(manifestFile, JSON.stringify({ ...manifest, version: "1.1.0" }));
-	await cp(join(SAMPLES, "graylog"), join(source, "graylog"), { recursive: true });
-	execFileSync("rm", ["-f", graylogFile]);
+	await cp(TOUR, join(source, "api-tour"), { recursive: true });
+	execFileSync("rm", ["-f", tourFile]);
 	build();
 	await settings.getByRole("button", { name: "Refresh" }).click();
 	await expect(hello.getByRole("button", { name: "Update to 1.1.0" })).toBeVisible();

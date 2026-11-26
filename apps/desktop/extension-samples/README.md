@@ -1,21 +1,28 @@
-# Kalem extension samples
+# Writing Kalem extensions
 
-Each folder is an extension. Pack one into a `.kalem-ext` file and install it
-from **Settings › Extensions › Install from File…**:
+This folder holds the extension API's reference (below) and `hello-api`, the
+smallest extension. The extensions themselves (Graylog, Jenkins, Log Viewer,
+REST, SOAP, Run Configurations…) live in
+[kalem-extensions](https://github.com/yusufkocak1/kalem-extensions): they are
+developed, tested in a real Kalem and published to Kalem's catalog there.
+
+Pack an extension into a `.kalem-ext` file and install it from
+**Settings › Extensions › Install from File…**:
 
 ```sh
-node apps/desktop/scripts/pack-extension.mjs apps/desktop/extension-samples/graylog
+node apps/desktop/scripts/pack-extension.mjs apps/desktop/extension-samples/hello-api
 ```
 
 | Sample | Shows |
 |---|---|
 | `hello-api` | a command, a setting, a saved token, `http.fetch`, an assistant tool |
-| `graylog` | a docked pane, the address the user types (`httpFromSettings`), three assistant tools, a fallback for older servers |
-| `rest-client` | a Postman-like client: any address (`"http": ["*"]`), `kalem.storage` for its collection, history and environments, the pane kit |
-| `soap-client` | a SoapUI-like client: WSDL read in the host page, sample envelopes from the schema, SOAP 1.1 and 1.2 |
-| `jenkins` | Jenkins with QuickPipeline inside: a tree of environments whose variables targets inherit, quick actions on a target or a whole group after a preview, the build queue followed to the result, consoles, stages and a jobs browser; imports QuickPipeline's `config.json` |
-| `log-viewer` | follows log files as they grow with `kalem.fs.readRange`: levels coloured and counted, stack traces kept with their line, search by text or pattern, rotated files noticed |
-| `run-configurations` | IDE-like run configurations (Tomcat, Java, JAR, Maven, Gradle, npm, command, compound) kept in `.kalem/run.json`: programs, files, a status bar item, the app's language |
+
+Each part of the API is also called once by `e2e/fixtures/api-tour`, an
+extension the tests install (`e2e/extension-api.spec.ts`).
+
+The packing and signing tools are `scripts/pack-extension.mjs` and
+`scripts/extension-registry.mjs`; the catalog repository's CI uses them from
+here.
 
 ## Layout
 
