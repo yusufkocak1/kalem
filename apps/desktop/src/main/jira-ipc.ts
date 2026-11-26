@@ -1,11 +1,13 @@
 import { join } from "node:path";
 import { app, ipcMain } from "electron";
 import { CHANNEL } from "../shared/bridge.js";
+import { markdownToWiki } from "../shared/confluence-wiki.js";
 import type { Strings } from "../shared/i18n.js";
 import type { JiraAccount, JiraIssue } from "../shared/jira.js";
 import { searchJql } from "../shared/jira.js";
 import type { JiraEditableField, JiraOption } from "../shared/jira-fields.js";
 import type { WorklogContext, WorklogEntry } from "../shared/jira-worklog.js";
+import { resolveFields } from "../shared/jira-write.js";
 import type { ConfluenceCredentials } from "./confluence-client.js";
 import { isCloudHost, pageReference } from "./confluence-client.js";
 import { atlassianFetch, confluenceClient } from "./confluence-ipc.js";
@@ -57,6 +59,11 @@ const account = (connection: {
 	cloud: connection.client.cloud,
 	shared: connection.shared,
 });
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+	typeof value === "object" && value !== null && !Array.isArray(value)
+		? (value as Record<string, unknown>)
+		: {};
 
 const text = (value: unknown, name: string): string => {
 	if (typeof value !== "string") throw new Error(`Invalid ${name}`);
@@ -177,8 +184,26 @@ export function registerJiraIpc(ctx: JiraIpcContext): {
 		(await connected()).transitions(text(key, "issue key")),
 	);
 
-	ipcMain.handle(CHANNEL.jiraTransition, async (_event, key: unknown, id: unknown) =>
-		(await connected()).transition(text(key, "issue key"), text(id, "transition")),
+	ipcMain.handle(
+		CHANNEL.jiraTransition,
+		async (_event, key: unknown, id: unknown, values: unknown) => {
+			const client = await connected();
+			const issue = text(key, "issue key");
+			const stepId = text(id, "transition");
+			const given = asRecord(values);
+			const raw = asRecord(given.fields);
+			const comment = typeof given.comment === "string" ? given.comment.slice(0, 32_000) : "";
+			if (Object.keys(raw).length === 0 && comment.trim() === "")
+				return client.transition(issue, stepId);
+			const step = (await client.transitions(issue)).find((each) => each.id === stepId);
+			if (step === undefined) throw new Error("This status change is no longer available.");
+			const resolved = resolveFields(step.fields, raw, client.cloud);
+			if (resolved.errors.length > 0) throw new Error(resolved.errors.join(" "));
+			await client.transition(issue, stepId, {
+				fields: resolved.fields,
+				...(comment.trim() === "" ? {} : { comment: markdownToWiki(comment) }),
+			});
+		},
 	);
 
 	ipcMain.handle(CHANNEL.jiraDevelopment, async (_event, issueId: unknown) =>

@@ -24,7 +24,10 @@ describe("settings pages", () => {
 	it("lists each page once, and every page shows something", () => {
 		expect(new Set(SETTING_PAGES).size).toBe(SETTING_PAGES.length);
 		const shown = new Set(SETTING_DEFS.map((def) => pageOf(def.key)));
-		for (const page of SETTING_PAGES) expect(shown.has(page)).toBe(true);
+		// The extensions page lists the installed extensions, not settings of the schema.
+		for (const page of SETTING_PAGES.filter((each) => each !== "extensions")) {
+			expect(shown.has(page)).toBe(true);
+		}
 	});
 
 	it("puts a setting where a person looks for it, not only by its category", () => {

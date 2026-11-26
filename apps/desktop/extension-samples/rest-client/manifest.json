@@ -1,0 +1,19 @@
+{
+  "id": "kalem.rest-client",
+  "name": "REST Client",
+  "version": "1.0.0",
+  "description": "Sends HTTP requests as Postman does: a saved collection, environments with {{variables}}, parameters, headers, JSON, XML and form bodies, Bearer, Basic and API key auth, and the response pretty and coloured. The assistant can send requests too, when you allow each one.",
+  "publisher": "Kalem",
+  "icon": "icon.svg",
+  "engines": { "kalem": ">=3.36.0" },
+  "host": "host.js",
+  "ui": "ui.html",
+  "permissions": {
+    "http": ["*"],
+    "assistantTools": true
+  },
+  "contributes": {
+    "panes": [{ "id": "client", "title": "REST", "dock": "bottom" }],
+    "commands": [{ "id": "open", "title": "Open REST Client" }]
+  }
+}

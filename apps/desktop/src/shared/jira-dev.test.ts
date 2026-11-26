@@ -3,6 +3,7 @@ import {
 	developmentItemsOf,
 	developmentSummaryOf,
 	hasDevelopment,
+	missingFields,
 	transitionBody,
 	transitionsOf,
 } from "./jira-dev.js";
@@ -51,8 +52,17 @@ describe("status changes", () => {
 				toCategory: "indeterminate",
 				needs: [],
 				resolution: null,
+				fields: [],
 			},
-			{ id: "31", name: "Resolve", to: "Done", toCategory: "done", needs: [], resolution: "Done" },
+			{
+				id: "31",
+				name: "Resolve",
+				to: "Done",
+				toCategory: "done",
+				needs: [],
+				resolution: "Done",
+				fields: expect.any(Array),
+			},
 			{
 				id: "41",
 				name: "Reject",
@@ -60,6 +70,7 @@ describe("status changes", () => {
 				toCategory: "done",
 				needs: ["Reason"],
 				resolution: null,
+				fields: expect.any(Array),
 			},
 		]);
 		expect(transitionBody(steps[0] as never)).toEqual({ transition: { id: "21" } });
@@ -68,6 +79,27 @@ describe("status changes", () => {
 			fields: { resolution: { name: "Done" } },
 		});
 		expect(transitionsOf({})).toEqual([]);
+	});
+
+	it("sends the fields and the comment a step's screen asks for", () => {
+		const reject = transitionsOf(TRANSITIONS)[2];
+		if (reject === undefined) throw new Error("no step");
+		expect(missingFields(reject, { fields: { customfield_1: { value: "Dup" } } })).toEqual([]);
+		expect(
+			transitionBody(reject, { fields: { customfield_1: { value: "Dup" } }, comment: "Fixed" }),
+		).toEqual({
+			transition: { id: "41" },
+			fields: { customfield_1: { value: "Dup" } },
+			update: { comment: [{ add: { body: "Fixed" } }] },
+		});
+		const commented = transitionsOf({
+			transitions: [
+				{ id: "51", name: "Ready", fields: { comment: { required: true, name: "Comment" } } },
+			],
+		})[0];
+		if (commented === undefined) throw new Error("no step");
+		expect(commented.needs).toEqual(["Comment"]);
+		expect(missingFields(commented, { comment: "ok" })).toEqual([]);
 	});
 });
 

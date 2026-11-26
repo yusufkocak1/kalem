@@ -7,13 +7,14 @@
 import { markdownToStorage } from "../shared/confluence-storage.js";
 import { markdownToWiki } from "../shared/confluence-wiki.js";
 import { format } from "../shared/i18n.js";
-import { fieldMetasOf } from "../shared/jira-write.js";
+import { missingFields } from "../shared/jira-dev.js";
+import { type FieldMeta, fieldMetasOf } from "../shared/jira-write.js";
 import { parentLine } from "./assistant-confluence-tools.js";
 import { FIELDS_HELP, resolveFields, typeIdOf } from "./assistant-jira-tools.js";
 import type { KalemTool, ToolContext } from "./assistant-tools.js";
 import { registerTools } from "./assistant-tools.js";
 import type { ConfluenceClient } from "./confluence-client.js";
-import type { JiraClient } from "./jira-client.js";
+import { type JiraClient, JiraError } from "./jira-client.js";
 import { errorMessage } from "./windows.js";
 
 const text = (input: Record<string, unknown>, key: string): string =>
@@ -27,6 +28,19 @@ const preview = (markdown: string): string =>
 		.split("\n")
 		.map((line) => `+ ${line}`)
 		.join("\n");
+
+const recordOf = (value: unknown): Record<string, unknown> =>
+	typeof value === "object" && value !== null && !Array.isArray(value)
+		? (value as Record<string, unknown>)
+		: {};
+
+const COMMENT_NAMES = new Set(["comment", "yorum"]);
+
+const fieldHint = (field: FieldMeta): string => {
+	const choices = field.choices.slice(0, 20).map((choice) => choice.name);
+	const more = field.choices.length > 20 ? ", …" : "";
+	return `${field.name} [${field.id}]${field.required ? " (required)" : ""}${choices.length > 0 ? `: ${choices.join(", ")}${more}` : ""}`;
+};
 
 const REFUSED = "The user did not allow it: nothing was sent. Do not try again unless they ask.";
 
@@ -189,11 +203,18 @@ const TOOLS: readonly KalemTool[] = [
 	{
 		definition: {
 			name: "jira_transition",
-			description:
-				"Moves a Jira issue to another status (by the status's name or the step's name); the user is asked every time.",
+			description: `Moves a Jira issue to another status (by the status's name or the step's name); the user is asked every time. When the step's screen asks for fields (a comment, a reason, a version, a person…), give them: "comment" for the comment (Markdown), the others in ${FIELDS_HELP} When something is missing it says which fields, with their choices: fill what the issue and the conversation tell you, ask the user for the rest, then call again.`,
 			parameters: {
 				type: "object",
-				properties: { key: { type: "string" }, status: { type: "string" } },
+				properties: {
+					key: { type: "string" },
+					status: { type: "string" },
+					comment: { type: "string", description: "The comment sent with the step." },
+					fields: {
+						type: "object",
+						description: "Other fields of the step's screen, by name or id.",
+					},
+				},
 				required: ["key", "status"],
 			},
 		},
@@ -210,8 +231,22 @@ const TOOLS: readonly KalemTool[] = [
 			if (step === undefined) {
 				return `${key} cannot go to "${text(input, "status")}" now. Its steps: ${steps.map((each) => `${each.name} → ${each.to}`).join(", ") || "none"}.`;
 			}
-			if (step.needs.length > 0)
-				return `That step asks for ${step.needs.join(", ")}: the user takes it in Jira.`;
+			let comment = text(input, "comment");
+			const given: Record<string, unknown> = {};
+			for (const [named, value] of Object.entries(recordOf(input.fields))) {
+				if (COMMENT_NAMES.has(fold(named))) {
+					if (comment.trim() === "" && typeof value === "string") comment = value;
+					continue;
+				}
+				given[named] = value;
+			}
+			const screen = step.fields ?? [];
+			const resolved = resolveFields(screen, given, jira.cloud);
+			if (resolved.errors.length > 0)
+				return `${resolved.errors.join("\n")}\nNothing was changed. The step's screen has: ${screen.map(fieldHint).join("; ") || "no fields"}.`;
+			const missing = missingFields(step, { fields: resolved.fields, comment });
+			if (missing.length > 0)
+				return `Nothing was changed: the step "${step.name}" asks for ${missing.map(fieldHint).join("; ")}. Fill what the issue tells you, ask the user for the rest, then call jira_transition again with them in "fields" (the comment in "comment").`;
 			// From the status it is in to the one it goes to; the step's own name
 			// after it. "QR-1: Start Test → Test" read as if it were in "Start Test".
 			const now = await jira.row(key).then(
@@ -224,10 +259,19 @@ const TOOLS: readonly KalemTool[] = [
 				risk: "external",
 				permission: "jira",
 				title: format(ctx.t.approvalJiraTransition, key),
-				lines: [`${key}: ${now === "" ? "" : `${now} `}→ ${step.to}${named}`],
+				lines: [`${key}: ${now === "" ? "" : `${now} `}→ ${step.to}${named}`, ...resolved.lines],
+				...(comment.trim() === "" ? {} : { preview: preview(comment) }),
 			});
 			if (!answer.approved) return REFUSED;
-			await jira.transition(key, step.id);
+			try {
+				await jira.transition(key, step.id, {
+					fields: resolved.fields,
+					...(comment.trim() === "" ? {} : { comment: markdownToWiki(comment) }),
+				});
+			} catch (error) {
+				if (!(error instanceof JiraError) || error.status !== 400) throw error;
+				return `Jira refused the step: ${errorMessage(error)}. Nothing was changed. A workflow rule may ask for a field its screen does not mark as required: get its value (from the issue, or ask the user) and call jira_transition again with it in "fields" (a comment in "comment").`;
+			}
 			ctx.step({ tool: "jira_transition", detail: `${key} → ${step.to}` });
 			return `${key} is now ${step.to}.`;
 		},

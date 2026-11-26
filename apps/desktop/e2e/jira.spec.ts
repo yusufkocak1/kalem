@@ -299,7 +299,7 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await expect(pull.locator(".jira-dev-title")).toHaveText("QR-1 Oturum süresi");
 	await expect(pull.locator(".jira-dev-state")).toHaveText("MERGED");
 	await expect(pull.locator(".jira-dev-detail")).toHaveText("feature/QR-1 → develop");
-	// The status opens the steps the issue can take; one that asks for more is taken in Jira.
+	// The status opens the steps the issue can take; one that asks for more opens a form.
 	await jira.locator(".jira-status-button").click();
 	const steps = jira.locator(".jira-transition-menu .jira-transition");
 	await expect(steps).toHaveCount(3);
@@ -309,10 +309,26 @@ test("opens a Jira issue named on a Confluence page in Kalem, and docks the pane
 	await expect(jira).toBeVisible();
 	await jira.locator(".jira-status-button").click();
 	await expect(steps).toHaveCount(3);
-	await expect(steps.nth(2)).toHaveAttribute("title", "Asks for Reason: opens in Jira");
+	await expect(steps.nth(2)).toHaveAttribute("title", "Asks for Reason");
 	await steps.filter({ hasText: "Test" }).click();
 	await expect(jira.locator(".jira-status-button .jira-status")).toHaveText("Test");
 	expect(jiraServer.transitions).toEqual([{ transition: { id: "21" } }]);
+	await jira.locator(".jira-status-button").click();
+	await steps.filter({ hasText: "Rejected" }).click();
+	const transitionForm = jira.locator(".jira-transition-form");
+	await expect(transitionForm.locator(".jira-worklog-title")).toHaveText("Move to Rejected");
+	await transitionForm.locator(".jira-transition-submit").click();
+	await expect(transitionForm.locator(".jira-worklog-status")).toHaveText("Fill in: Reason");
+	await transitionForm.locator('select[data-field="customfield_1"]').selectOption("Duplicate");
+	await transitionForm.locator('textarea[data-field="comment"]').fill("Same as QR-2");
+	await transitionForm.locator(".jira-transition-submit").click();
+	await expect(jira.locator(".jira-status-button .jira-status")).toHaveText("Rejected");
+	await expect(transitionForm).toHaveCount(0);
+	expect(jiraServer.transitions[1]).toEqual({
+		transition: { id: "41" },
+		fields: { customfield_1: { id: "1" } },
+		update: { comment: [{ add: { body: "Same as QR-2\n" } }] },
+	});
 	// Work is logged from the issue, through Tempo: a quick button, then its fields.
 	await jira.locator(".jira-log-work").click();
 	const worklog = jira.locator(".jira-worklog");

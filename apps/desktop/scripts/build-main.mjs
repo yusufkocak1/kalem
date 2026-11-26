@@ -16,6 +16,8 @@ const shared = {
 	external: ["electron"],
 	sourcemap: true,
 	legalComments: "none",
+	// The extensions' look is a stylesheet of its own, served as text.
+	loader: { ".kit.css": "text" },
 	logLevel: "warning",
 };
 
@@ -30,6 +32,11 @@ export async function buildMain() {
 			...shared,
 			entryPoints: [join(root, "src/preload/preload.ts")],
 			outfile: join(root, "dist/main/preload.cjs"),
+		}),
+		build({
+			...shared,
+			entryPoints: [join(root, "src/preload/extension-preload.ts")],
+			outfile: join(root, "dist/main/extension-preload.cjs"),
 		}),
 	]);
 	// The window icon; installers take theirs from resources/ directly.

@@ -15,11 +15,13 @@ import type {
 	DevelopmentKind,
 	DevelopmentSummary,
 	JiraTransition,
+	TransitionInput,
 } from "../shared/jira-dev.js";
 import {
 	DEVELOPMENT_DATA_TYPE,
 	developmentItemsOf,
 	developmentSummaryOf,
+	missingFields,
 	transitionBody,
 	transitionsOf,
 } from "../shared/jira-dev.js";
@@ -559,15 +561,17 @@ export class JiraClient {
 		);
 	}
 
-	/** Takes a step; one whose screen asks for more than a resolution is refused, to be taken in Jira. */
-	async transition(key: string, id: string): Promise<void> {
+	/** Takes a step, with what its screen asks for; one still missing a required field is refused. */
+	async transition(key: string, id: string, input: TransitionInput = {}): Promise<void> {
 		const valid = issueKey(key);
 		if (valid === null) throw new Error("Invalid issue key");
 		// Asked again here: the step and its fields are Jira's, not what the window says.
 		const step = (await this.transitions(valid)).find((each) => each.id === id);
 		if (step === undefined) throw new Error("This status change is no longer available.");
-		if (step.needs.length > 0) throw new Error(`Needs ${step.needs.join(", ")}`);
-		await this.#send("POST", `/rest/api/2/issue/${valid}/transitions`, transitionBody(step));
+		const missing = missingFields(step, input);
+		if (missing.length > 0)
+			throw new Error(`Needs ${missing.map((field) => field.name).join(", ")}`);
+		await this.#send("POST", `/rest/api/2/issue/${valid}/transitions`, transitionBody(step, input));
 	}
 
 	/**

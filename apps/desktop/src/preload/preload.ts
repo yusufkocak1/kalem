@@ -58,7 +58,7 @@ const bridge: KalemBridge = {
 	jiraSearch: (query, next) => ipcRenderer.invoke(CHANNEL.jiraSearch, query, next),
 	jiraWorklogContext: (key) => ipcRenderer.invoke(CHANNEL.jiraWorklogContext, key),
 	jiraTransitions: (key) => ipcRenderer.invoke(CHANNEL.jiraTransitions, key),
-	jiraTransition: (key, id) => ipcRenderer.invoke(CHANNEL.jiraTransition, key, id),
+	jiraTransition: (key, id, values) => ipcRenderer.invoke(CHANNEL.jiraTransition, key, id, values),
 	jiraDevelopment: (issueId) => ipcRenderer.invoke(CHANNEL.jiraDevelopment, issueId),
 	jiraDevelopmentDetail: (issueId, kind) =>
 		ipcRenderer.invoke(CHANNEL.jiraDevelopmentDetail, issueId, kind),
@@ -243,6 +243,30 @@ const bridge: KalemBridge = {
 	templateDelete: (id) => ipcRenderer.invoke(CHANNEL.templateDelete, id),
 	templateSave: (request) => ipcRenderer.invoke(CHANNEL.templateSave, request),
 	templateImport: () => ipcRenderer.invoke(CHANNEL.templateImport),
+	extensions: () => ipcRenderer.invoke(CHANNEL.extensions),
+	extensionMarket: (force) => ipcRenderer.invoke(CHANNEL.extensionMarket, force),
+	extensionMarketPick: (registry, id) =>
+		ipcRenderer.invoke(CHANNEL.extensionMarketPick, registry, id),
+	extensionPick: () => ipcRenderer.invoke(CHANNEL.extensionPick),
+	extensionInstall: (token) => ipcRenderer.invoke(CHANNEL.extensionInstall, token),
+	extensionUninstall: (id) => ipcRenderer.invoke(CHANNEL.extensionUninstall, id),
+	extensionSetEnabled: (id, enabled) =>
+		ipcRenderer.invoke(CHANNEL.extensionSetEnabled, id, enabled),
+	extensionRestart: (id) => ipcRenderer.invoke(CHANNEL.extensionRestart, id),
+	extensionSetSetting: (id, key, value) =>
+		ipcRenderer.invoke(CHANNEL.extensionSetSetting, id, key, value),
+	extensionSetSecret: (id, key, value) =>
+		ipcRenderer.invoke(CHANNEL.extensionSetSecret, id, key, value),
+	extensionDevTools: (id) => ipcRenderer.invoke(CHANNEL.extensionDevTools, id),
+	onExtensionsChanged: (handler) => listen(CHANNEL.extensionsChanged, handler),
+	extensionUiCall: (id, name, input) =>
+		ipcRenderer.invoke(CHANNEL.extensionUiCall, id, name, input),
+	onExtensionUiMessage: (handler) => listen(CHANNEL.extensionUiMessage, handler),
+	onExtensionShowPane: (handler) => listen(CHANNEL.extensionShowPane, handler),
+	onExtensionSettingsChanged: (handler) => listen(CHANNEL.extensionSettingsChanged, handler),
+	extensionStatusItems: () => ipcRenderer.invoke(CHANNEL.extensionStatusItems),
+	onExtensionStatusItems: (handler) => listen(CHANNEL.extensionStatusItems, handler),
+	extensionRunCommand: (id, command) => ipcRenderer.send(CHANNEL.extensionRunCommand, id, command),
 	onAssistantApproval: (handler) => listen<[ApprovalRequest]>(CHANNEL.assistantApproval, handler),
 	onAssistantToolCall: (handler) => listen<[AssistantToolCall]>(CHANNEL.assistantToolCall, handler),
 };

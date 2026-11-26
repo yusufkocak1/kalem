@@ -15,6 +15,7 @@ const BRACES = [
 // 24×24 grid, stroke only, `currentColor`.
 const PATHS = {
 	new: [...PAGE, "M12 11v6", "M9 14h6"],
+	extension: ["M4 4h6v6H4z", "M14 4h6v6h-6z", "M4 14h6v6H4z", "M17 13v8", "M13 17h8"],
 	open: ["M3 6h6l2 2h10v11H3z"],
 	file: PAGE,
 	refresh: ["M20 12a8 8 0 1 1-2.34-5.66", "M20 4v5h-5"],

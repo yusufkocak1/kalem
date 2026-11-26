@@ -15,16 +15,14 @@ import {
 	sizeText,
 } from "../shared/jira-attachment-text.js";
 import { attachmentsOf, jiraImageOf } from "../shared/jira-fields.js";
-import type { FieldMeta } from "../shared/jira-write.js";
 import {
 	clonePlan,
 	fieldMetasOf,
 	fieldMetasText,
-	fieldValue,
-	findField,
 	issueFieldsText,
 	linkBody,
 	linkTypesOf,
+	resolveFields,
 } from "../shared/jira-write.js";
 import type { KalemTool, ToolContext } from "./assistant-tools.js";
 import { registerTools } from "./assistant-tools.js";
@@ -71,38 +69,7 @@ export async function typeIdOf(
 	return `${project} has no issue type "${named}". Its types: ${types.map((type) => type.name).join(", ")}.`;
 }
 
-interface ResolvedFields {
-	readonly fields: Record<string, unknown>;
-	/** What changes, a line each: `Priority: High`. */
-	readonly lines: readonly string[];
-	readonly errors: readonly string[];
-}
-
-/** The fields the model gave by name or id, as Jira takes them on this screen. */
-export function resolveFields(
-	metas: readonly FieldMeta[],
-	given: Record<string, unknown>,
-	cloud: boolean,
-): ResolvedFields {
-	const fields: Record<string, unknown> = {};
-	const lines: string[] = [];
-	const errors: string[] = [];
-	for (const [named, value] of Object.entries(given)) {
-		const meta = findField(metas, named);
-		if (meta === null) {
-			errors.push(`No field "${named}" on this screen.`);
-			continue;
-		}
-		const resolved = fieldValue(meta, value, cloud);
-		if (!resolved.ok) {
-			errors.push(resolved.error);
-			continue;
-		}
-		fields[meta.id] = resolved.value;
-		lines.push(`${meta.name}: ${resolved.shown.slice(0, 200)}`);
-	}
-	return { fields, lines, errors };
-}
+export { resolveFields };
 
 export const FIELDS_HELP =
 	'"fields": {"Field name or id": value}. A choice by its name; a user by user name (Server) or account id (Cloud); a list as an array; text in a description or multi-line field is Markdown; null empties a field. Jira\'s own shape ({"id":"10001"}) goes as it is.';

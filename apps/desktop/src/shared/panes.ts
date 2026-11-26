@@ -8,7 +8,24 @@
 import type { Settings } from "./bridge.js";
 
 export const TOOL_PANES = ["outline", "files", "confluence", "jira", "notes"] as const;
-export type ToolPane = (typeof TOOL_PANES)[number];
+export type BuiltinPane = (typeof TOOL_PANES)[number];
+/** A pane an extension adds: `ext:<extension id>/<pane id>`. */
+export type ExtensionPaneId = `ext:${string}`;
+export type ToolPane = BuiltinPane | ExtensionPaneId;
+
+const EXTENSION_PANE = /^ext:[a-z0-9][a-z0-9.-]{2,120}\/[a-z][a-zA-Z0-9-]{0,39}$/;
+
+export const isExtensionPane = (value: unknown): value is ExtensionPaneId =>
+	typeof value === "string" && EXTENSION_PANE.test(value);
+
+export const extensionPaneId = (extension: string, pane: string): ExtensionPaneId =>
+	`ext:${extension}/${pane}`;
+
+/** The extension and its pane of an extension's pane id. */
+export function splitExtensionPane(pane: ExtensionPaneId): { extension: string; pane: string } {
+	const [extension, own] = pane.slice(4).split("/") as [string, string];
+	return { extension, pane: own };
+}
 
 export const DOCKS = ["left", "right", "bottom"] as const;
 export type Dock = (typeof DOCKS)[number];
@@ -16,7 +33,18 @@ export type PanePlace = Dock | "hidden";
 
 export const PANE_PLACES: readonly PanePlace[] = ["left", "right", "bottom", "hidden"];
 
-export type PanePlaces = Readonly<Record<ToolPane, PanePlace>>;
+export type PanePlaces = Readonly<Record<BuiltinPane, PanePlace>> &
+	Readonly<Partial<Record<ExtensionPaneId, PanePlace>>>;
+
+/** Where a pane is; an extension's pane not placed yet is hidden. */
+export const placeOf = (places: PanePlaces, pane: ToolPane): PanePlace =>
+	(places as Readonly<Record<string, PanePlace | undefined>>)[pane] ?? "hidden";
+
+/** Every pane the settings know of: Kalem's, then the extensions' that were placed. */
+export const knownPanes = (places: PanePlaces): ToolPane[] => [
+	...TOOL_PANES,
+	...Object.keys(places).filter(isExtensionPane),
+];
 
 export const DEFAULT_PANE_PLACES: PanePlaces = {
 	outline: "left",
@@ -36,16 +64,16 @@ export function placesFor(pane: ToolPane): readonly PanePlace[] {
 }
 
 export const isToolPane = (value: unknown): value is ToolPane =>
-	TOOL_PANES.includes(value as ToolPane);
+	TOOL_PANES.includes(value as BuiltinPane) || isExtensionPane(value);
 
 export function parsePanePlaces(value: unknown): PanePlaces {
 	const raw = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
-	const places = { ...DEFAULT_PANE_PLACES };
-	for (const pane of TOOL_PANES) {
+	const places: Record<string, PanePlace> = { ...DEFAULT_PANE_PLACES } as Record<string, PanePlace>;
+	for (const pane of [...TOOL_PANES, ...Object.keys(raw).filter(isExtensionPane).slice(0, 50)]) {
 		const place = raw[pane];
 		if (placesFor(pane).includes(place as PanePlace)) places[pane] = place as PanePlace;
 	}
-	return places;
+	return places as PanePlaces;
 }
 
 /** A dock as the settings keep it: open or not, the pane it shows, its size in pixels. */
@@ -100,7 +128,9 @@ export function panesIn(
 	dock: Dock,
 	available: (pane: ToolPane) => boolean,
 ): ToolPane[] {
-	return TOOL_PANES.filter((pane) => settings.panePlaces[pane] === dock && available(pane));
+	return knownPanes(settings.panePlaces).filter(
+		(pane) => placeOf(settings.panePlaces, pane) === dock && available(pane),
+	);
 }
 
 /** The pane a dock shows: the one it keeps, or else its first; `null` when it holds none. */
@@ -120,14 +150,14 @@ export function isPaneShown(
 	pane: ToolPane,
 	available: (pane: ToolPane) => boolean,
 ): boolean {
-	const place = settings.panePlaces[pane];
+	const place = placeOf(settings.panePlaces, pane);
 	if (place === "hidden" || !available(pane)) return false;
 	return dockState(settings, place).open && shownPane(settings, place, available) === pane;
 }
 
 /** The settings that bring a pane into view; a hidden one goes to the left dock (the notes to the right). */
 export function revealPane(settings: Settings, pane: ToolPane): Partial<Settings> {
-	const place = settings.panePlaces[pane];
+	const place = placeOf(settings.panePlaces, pane);
 	const dock: Dock = place === "hidden" ? (pane === "notes" ? "right" : "left") : place;
 	return {
 		...(place === "hidden" ? { panePlaces: { ...settings.panePlaces, [pane]: dock } } : {}),
@@ -149,7 +179,7 @@ export function togglePane(
 	pane: ToolPane,
 	available: (pane: ToolPane) => boolean,
 ): Partial<Settings> {
-	const place = settings.panePlaces[pane];
+	const place = placeOf(settings.panePlaces, pane);
 	if (place !== "hidden" && isPaneShown(settings, pane, available)) {
 		return dockPatch(place, { open: false });
 	}

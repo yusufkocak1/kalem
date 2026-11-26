@@ -56,6 +56,7 @@ const SOURCE_LABELS: Readonly<Record<NetworkSource, keyof Strings>> = {
 	assistant: "networkSourceAssistant",
 	mcp: "networkSourceMcp",
 	updates: "networkSourceUpdates",
+	extensions: "networkSourceExtensions",
 };
 
 function readHeight(): number | null {

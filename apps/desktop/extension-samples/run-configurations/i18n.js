@@ -1,0 +1,95 @@
+/** The extension's words in Turkish; the English text is the key. */
+const TR = {
+	Run: "Çalıştır",
+	Rerun: "Yeniden Çalıştır",
+	"▶ Run": "▶ Çalıştır",
+	"↻ Rerun": "↻ Yeniden Çalıştır",
+	"■ Stop": "■ Durdur",
+	Stop: "Durdur",
+	"Edit Configurations…": "Konfigürasyonları Düzenle…",
+	Clear: "Temizle",
+	"Clear the output": "Çıktıyı temizle",
+	Configuration: "Konfigürasyon",
+	"+ Add…": "+ Ekle…",
+	Copy: "Kopyala",
+	Remove: "Kaldır",
+	Cancel: "Vazgeç",
+	Save: "Kaydet",
+	Name: "Ad",
+	Browse: "Gözat",
+	Close: "Kapat",
+	Running: "Çalışıyor",
+	"(no name)": "(adsız)",
+	"Before launch": "Çalıştırmadan önce",
+	"Run first": "Önce çalıştır",
+	"No other configurations.": "Başka konfigürasyon yok.",
+	"Add a configuration with + Add…": "+ Ekle… ile bir konfigürasyon ekleyin.",
+	"No run configurations yet: Edit Configurations… adds one.":
+		"Henüz konfigürasyon yok: Konfigürasyonları Düzenle… ile ekleyin.",
+	"Run a configuration: its output shows here.":
+		"Bir konfigürasyonu çalıştırın: çıktısı burada görünür.",
+	"Open a folder (File › Open Folder): its run configurations are kept in it, in .kalem/run.json.":
+		"Bir klasör açın (Dosya › Klasör Aç): konfigürasyonlar onun içinde, .kalem/run.json dosyasında tutulur.",
+	"{0}, exit code {1}": "{0}, çıkış kodu {1}",
+	running: "çalışıyor",
+	done: "bitti",
+	failed: "başarısız",
+	stopped: "durduruldu",
+
+	Command: "Komut",
+	"npm script": "npm script",
+	"Application (Java)": "Uygulama (Java)",
+	"JAR Application": "JAR Uygulaması",
+	"Tomcat Server (local)": "Tomcat Sunucusu (yerel)",
+	Compound: "Birleşik",
+	"Working directory": "Çalışma klasörü",
+	"Environment variables": "Ortam değişkenleri",
+	"Output encoding": "Çıktı kodlaması",
+	Script: "Script",
+	"Package manager": "Paket yöneticisi",
+	Arguments: "Argümanlar",
+	"Open the browser when the server is ready": "Sunucu hazır olunca tarayıcıyı aç",
+	Goals: "Hedefler (goals)",
+	Profiles: "Profiller",
+	"VM options (MAVEN_OPTS)": "VM seçenekleri (MAVEN_OPTS)",
+	Tasks: "Görevler",
+	"Main class": "Ana sınıf",
+	"Add the Maven project's dependencies": "Maven projesinin bağımlılıklarını ekle",
+	"Program arguments": "Program argümanları",
+	"VM options": "VM seçenekleri",
+	"JAR file": "JAR dosyası",
+	"Tomcat folder": "Tomcat klasörü",
+	"Deployment (WAR or exploded folder)": "Dağıtım (WAR ya da açılmış klasör)",
+	"Application context": "Uygulama yolu (context)",
+	"HTTP port": "HTTP portu",
+	"Open the browser when Tomcat has started": "Tomcat açılınca tarayıcıyı aç",
+	"Run together": "Birlikte çalıştır",
+	"The open folder": "Açık klasör",
+	"NAME=value, one per line": "AD=değer, her satıra bir tane",
+	"JAVA_HOME, or java on the PATH": "JAVA_HOME ya da PATH'teki java",
+
+	"Before launch: {0}": "Çalıştırmadan önce: {0}",
+	"Process finished with exit code {0}": "Süreç {0} çıkış koduyla bitti",
+	'"{0}" failed (exit code {1}): {2} is not run.':
+		'"{0}" başarısız oldu (çıkış kodu {1}): {2} çalıştırılmadı.',
+	"Started: {0}": "Başlatıldı: {0}",
+	"Run {0}": "{0} çalıştır",
+	"Stop {0}": "{0} durdur",
+	"Give it a name.": "Bir ad verin.",
+	"{0} is empty.": "{0} boş.",
+	'There is no configuration named "{0}".': '"{0}" adında bir konfigürasyon yok.',
+	"Two configurations have the same name.": "İki konfigürasyonun adı aynı.",
+	"Open a folder first: the configurations are kept in it.":
+		"Önce bir klasör açın: konfigürasyonlar onun içinde tutulur.",
+	'{0} is not there: is "{1}" a Tomcat folder?': '{0} bulunamadı: "{1}" bir Tomcat klasörü mü?',
+	"{0} is not there yet: build it first (Before launch).":
+		"{0} henüz yok: önce derleyin (Çalıştırmadan önce).",
+};
+
+export function translator(language) {
+	const words = language === "tr" ? TR : {};
+	return (text, ...values) =>
+		(words[text] ?? text).replace(/\{(\d+)\}/g, (match, index) =>
+			index < values.length ? String(values[index]) : match,
+		);
+}

@@ -27,7 +27,8 @@ export type SettingPage =
 	| "assistantTools"
 	| "connections"
 	| "git"
-	| "proxy";
+	| "proxy"
+	| "extensions";
 
 type StringKey = keyof Strings;
 
@@ -44,6 +45,7 @@ export const SETTING_GROUPS: readonly SettingGroup[] = [
 	{ label: "settingsGroupDocument", pages: ["documentView", "typography", "editor", "page"] },
 	{ label: "settingsCatAssistant", pages: ["assistant", "modes", "mcp", "assistantTools"] },
 	{ label: "settingsCatConnections", pages: ["connections", "git", "proxy"] },
+	{ label: null, pages: ["extensions"] },
 ];
 
 export const SETTING_PAGES: readonly SettingPage[] = SETTING_GROUPS.flatMap((group) => group.pages);
@@ -125,6 +127,7 @@ const PAGE_LABELS: Readonly<Record<SettingPage, StringKey>> = {
 	connections: "settingsPageConfluenceJira",
 	git: "settingsPageGit",
 	proxy: "settingsPageProxy",
+	extensions: "settingsPageExtensions",
 };
 
 /** A page's name in the list at the left. */

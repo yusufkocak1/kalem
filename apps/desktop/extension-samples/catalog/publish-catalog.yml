@@ -1,0 +1,60 @@
+# A template for the catalog's own repository (for example acme/kalem-extensions),
+# as .github/workflows/publish-catalog.yml. Each folder of extensions/ is an
+# extension; a push to main publishes the signed catalog on GitHub Pages
+# (the gh-pages branch), keeping the versions published before.
+name: Publish catalog
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-catalog
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Kalem's catalog tools
+        uses: actions/checkout@v4
+        with:
+          repository: yusufkocak1/kalem
+          path: kalem
+          sparse-checkout: apps/desktop/scripts
+
+      - name: The catalog as published so far
+        run: |
+          git fetch origin gh-pages || true
+          if git rev-parse --verify origin/gh-pages >/dev/null 2>&1; then
+            git worktree add site origin/gh-pages
+          else
+            mkdir site
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build and sign
+        env:
+          KALEM_REGISTRY_KEY: ${{ secrets.KALEM_REGISTRY_KEY }}
+        run: |
+          npm install --prefix kalem/apps/desktop/scripts jszip@3.10.1
+          node kalem/apps/desktop/scripts/extension-registry.mjs build extensions site \
+            --name "${{ vars.CATALOG_NAME || 'Kalem extensions' }}" \
+            $( [ -f blocked.json ] && echo --blocked blocked.json )
+
+      - name: Publish
+        run: |
+          cd site
+          touch .nojekyll
+          git add -A
+          git -c user.name=catalog-bot -c user.email=catalog-bot@users.noreply.github.com commit -qm "Publish catalog" || exit 0
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:gh-pages

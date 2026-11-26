@@ -1,0 +1,41 @@
+{
+  "id": "kalem.run-configurations",
+  "name": "Run Configurations",
+  "version": "1.0.0",
+  "description": "Runs your applications as an IDE does: Tomcat, Java applications and JARs, Maven, Gradle, npm scripts (Vue, React, Angular…) and any command, with their output in a Run panel. The configurations are kept in the folder (.kalem/run.json), to share with the team.",
+  "publisher": "Kalem",
+  "icon": "icon.svg",
+  "engines": {
+    "kalem": ">=3.35.0"
+  },
+  "host": "host.js",
+  "ui": "ui.html",
+  "permissions": {
+    "process": true,
+    "files": true,
+    "assistantTools": true
+  },
+  "contributes": {
+    "panes": [
+      {
+        "id": "run",
+        "title": "Run",
+        "dock": "bottom"
+      }
+    ],
+    "commands": [
+      {
+        "id": "run",
+        "title": "Run"
+      },
+      {
+        "id": "stop",
+        "title": "Stop"
+      },
+      {
+        "id": "edit",
+        "title": "Edit Configurations…"
+      }
+    ]
+  }
+}

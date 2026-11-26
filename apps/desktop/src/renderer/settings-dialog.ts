@@ -41,6 +41,7 @@ import type { TemplateInfo } from "../shared/templates.js";
 import { BUILTIN_ID } from "../shared/templates.js";
 import { createAssistantSettings } from "./assistant-settings.js";
 import { el } from "./dom.js";
+import { createExtensionsSection } from "./extensions-settings.js";
 import { icon } from "./icons.js";
 import { createMcpSection } from "./mcp-editor.js";
 import { createModeEditor } from "./mode-settings.js";
@@ -793,6 +794,27 @@ export function createSettingsDialog(options: SettingsDialogOptions): SettingsDi
 		if (mcpBlock.contains(document.activeElement)) return;
 		drawMcp();
 	});
+
+	const extensionsSection = createExtensionsSection({
+		t,
+		bridge,
+		errorText: options.errorText,
+		registries: () => options.settings().extensionRegistries,
+		setRegistries: (registries) => update({ extensionRegistries: registries }),
+	});
+	item(
+		"extensions",
+		[
+			t.settingsPageExtensions,
+			t.extensionsHint,
+			t.extensionInstallFromFile,
+			"extension",
+			"plugin",
+			"eklenti",
+		].join(" "),
+		extensionsSection.element,
+	);
+	refreshers.push(() => void extensionsSection.refresh());
 
 	// --- The assistant's modes --------------------------------------------------
 

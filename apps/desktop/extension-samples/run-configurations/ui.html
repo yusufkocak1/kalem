@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="stylesheet" href="/__kalem/ui.css" />
+		<link rel="stylesheet" href="ui.css" />
+		<script src="/__kalem/ui.js"></script>
+		<script type="module" src="ui.js"></script>
+	</head>
+	<body class="k-app">
+		<div class="k-toolbar toolbar">
+			<select id="selected" class="k-select" aria-label="Configuration"></select>
+			<button id="run" class="k-button go" type="button">Run</button>
+			<button id="stop" class="k-button stop" type="button" disabled>Stop</button>
+			<span class="divider"></span>
+			<button id="edit" class="k-button ghost" type="button">Edit Configurations…</button>
+			<span class="spacer"></span>
+			<button id="clear" class="k-button ghost small" type="button">Clear</button>
+		</div>
+		<p id="message" class="message" role="status"></p>
+
+		<section id="console">
+			<div id="tabs" class="tabs" role="tablist"></div>
+			<pre id="output" class="output"></pre>
+		</section>
+
+		<section id="editor" hidden>
+			<aside class="list k-sidebar">
+				<div class="list-actions">
+					<select id="add" class="k-select" aria-label="Add a configuration">
+						<option value="">+ Add…</option>
+					</select>
+				</div>
+				<ul id="configs"></ul>
+				<div class="list-actions list-foot">
+					<button id="copy" class="k-button ghost small" type="button">Copy</button>
+					<button id="remove" class="k-button ghost small danger" type="button">Remove</button>
+				</div>
+			</aside>
+			<div class="form-wrap k-scroll">
+				<form id="form" class="form" autocomplete="off"></form>
+			</div>
+			<div class="editor-actions">
+				<span id="problems" class="problems"></span>
+				<button id="cancel" class="k-button ghost" type="button">Cancel</button>
+				<button id="save" class="k-button primary" type="button">Save</button>
+			</div>
+		</section>
+	</body>
+</html>
