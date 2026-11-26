@@ -87,6 +87,8 @@ import {
 	allTools,
 	approver,
 	blockText,
+	groupOfTool,
+	policyIn,
 	RendererCalls,
 	runTool,
 	toolsFor,
@@ -345,7 +347,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		always: () => ctx.store.settings.assistantPermissions,
 		setAlways: (permissions) => ctx.changeSettings({ assistantPermissions: permissions }),
 		toolPolicy: (tool) =>
-			ctx.store.settings.assistantToolPolicies[tool.replace(/^mcp__kalem__/, "")],
+			policyIn(ctx.store.settings.assistantToolPolicies, tool.replace(/^mcp__kalem__/, "")),
 		approvalMode: () => ctx.store.settings.assistantApprovals,
 	});
 	/** Tool calls the windows run. */
@@ -463,8 +465,11 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 		allTools().map((tool) => ({
 			name: tool.definition.name,
 			risk: tool.risk,
-			// Its first sentence says what it does.
-			description: tool.definition.description.split(/(?<=\.)\s/)[0] ?? "",
+			group: groupOfTool(tool.definition.name),
+			...(tool.extension === undefined ? {} : { groupName: tool.extension.name }),
+			// Its first sentence says what it does, without the extension's name before it.
+			description:
+				tool.definition.description.replace(/^\[[^\]]*\]\s*/, "").split(/(?<=\.)\s/)[0] ?? "",
 		})),
 	);
 
@@ -1323,7 +1328,7 @@ export function registerAssistantIpc(ctx: AssistantIpcContext): AssistantService
 					// The look-ups in blocks are Kalem's tools too: off, or asked about, as the user set them.
 					const refused: string[] = [];
 					const lookupAllowed = async (tool: string, detail: string): Promise<boolean> => {
-						const policy = ctx.store.settings.assistantToolPolicies[tool];
+						const policy = policyIn(ctx.store.settings.assistantToolPolicies, tool);
 						if (policy === "off") {
 							refused.push(`The user turned ${tool} off in Settings: ${detail} was not looked up.`);
 							return false;

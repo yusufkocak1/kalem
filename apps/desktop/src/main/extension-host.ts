@@ -616,6 +616,7 @@ export class ExtensionHost {
 		const tool: KalemTool = {
 			definition: { name, description: `[${extensionName}] ${description}`, parameters },
 			risk: writes ? "external" : "read",
+			extension: { id, name: extensionName },
 			available: () => this.#running.get(id)?.status === "running",
 			run: async (input, ctx) => {
 				const current = this.#running.get(id);

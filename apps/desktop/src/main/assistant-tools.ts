@@ -13,6 +13,7 @@ import type { ClaudeEvent, PromptImage } from "../shared/claude.js";
 import { clipStepOutput } from "../shared/claude.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
+import { effectiveToolPolicy, toolGroupOf } from "../shared/tool-groups.js";
 import type {
 	ApprovalAnswer,
 	ApprovalRequest,
@@ -119,6 +120,8 @@ export interface ToolContext {
 export interface KalemTool {
 	readonly definition: ToolDefinition;
 	readonly risk: ToolRisk;
+	/** The extension that gives it, when one does. */
+	readonly extension?: { readonly id: string; readonly name: string };
 	/** Whether it can be offered: a connection, a workspace or the document it needs. */
 	available(ctx: ToolContext): boolean;
 	/** What it found: text, or text with pictures for the model to see. */
@@ -245,11 +248,24 @@ export function allTools(): readonly KalemTool[] {
 export const toolNamed = (name: string): KalemTool | undefined =>
 	registry.find((tool) => tool.definition.name === name);
 
+/** A tool's group in Settings: an extension's, or what it works on. */
+export const groupOfTool = (name: string): string =>
+	toolGroupOf(name, toolNamed(name)?.extension?.id);
+
+/** What the user set for a tool, its group's switch included; `undefined` for its risk's way. */
+export function policyIn(
+	policies: Readonly<Record<string, ToolPolicy>> | undefined,
+	name: string,
+): ToolPolicy | undefined {
+	return policies === undefined
+		? undefined
+		: effectiveToolPolicy(policies, name, groupOfTool(name));
+}
+
 /** What the user set for a tool in Settings; `undefined` for its risk's way. */
 export function toolPolicy(ctx: ToolContext, name: string): ToolPolicy | undefined {
 	const settings = typeof ctx.settings === "function" ? ctx.settings() : undefined;
-	const policies = settings?.assistantToolPolicies;
-	return policies !== undefined && Object.hasOwn(policies, name) ? policies[name] : undefined;
+	return policyIn(settings?.assistantToolPolicies, name);
 }
 
 /** The tools the model is given in this answer: not the mode's left out, nor those the user turned off. */

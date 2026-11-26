@@ -11359,35 +11359,214 @@ textarea.jira-worklog-input {
 
 /* --- The assistant's tools in Settings: each on, off, asked about or not ---------- */
 
+.tool-settings-search {
+	position: relative;
+	max-width: 360px;
+	margin-bottom: 12px;
+}
+
+.tool-settings-search .icon {
+	position: absolute;
+	top: 50%;
+	left: 10px;
+	width: 15px;
+	height: 15px;
+	color: var(--app-muted);
+	transform: translateY(-50%);
+	pointer-events: none;
+}
+
 .tool-settings-filter {
 	width: 100%;
-	max-width: 320px;
-	margin-bottom: 10px;
+	padding: 7px 10px 7px 32px;
+	border: 1px solid var(--app-border);
+	border-radius: 8px;
+	background: var(--app-raised);
+	color: var(--app-text);
+	font: inherit;
+}
+
+.tool-settings-filter:focus-visible {
+	outline: none;
+	border-color: var(--app-accent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-accent) 22%, transparent);
 }
 
 .tool-settings-list {
 	display: grid;
-	gap: 14px;
-	margin-bottom: 10px;
+	gap: 10px;
+	margin-bottom: 12px;
+}
+
+.tool-settings-empty {
+	margin: 0 0 12px;
+	color: var(--app-muted);
+	font-size: 13px;
 }
 
 .tool-settings-group {
 	display: grid;
-	gap: 2px;
+	overflow: hidden;
+	border: 1px solid var(--app-border);
+	border-radius: 12px;
+	background: var(--app-raised);
+	box-shadow: 0 1px 2px color-mix(in srgb, var(--app-text) 5%, transparent);
 }
 
 .tool-settings-group[hidden],
-.tool-setting[hidden] {
+.tool-setting[hidden],
+.tool-settings-empty[hidden] {
 	display: none;
 }
 
 .tool-settings-group h5 {
-	margin: 0 0 4px;
-	font-size: 12px;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 0;
+	padding: 10px 12px;
+	color: var(--app-text);
+	font-size: 13px;
 	font-weight: 600;
+	letter-spacing: 0;
+	text-transform: none;
+	cursor: pointer;
+	user-select: none;
+}
+
+.tool-settings-group h5:hover {
+	background: var(--app-hover);
+}
+
+.tool-group-icon {
+	display: inline-grid;
+	flex: none;
+	place-items: center;
+	width: 28px;
+	height: 28px;
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--app-accent) 13%, transparent);
+	color: var(--app-accent);
+}
+
+.tool-settings-group.is-extension .tool-group-icon {
+	background: color-mix(in srgb, var(--app-warning) 16%, transparent);
+	color: var(--app-warning);
+}
+
+.tool-group-icon .icon {
+	width: 16px;
+	height: 16px;
+}
+
+.tool-group-name {
+	display: flex;
+	flex: 1;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+
+.tool-group-title {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.tool-group-tag {
+	flex: none;
+	padding: 1px 7px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--app-text) 8%, transparent);
 	color: var(--app-muted);
-	text-transform: uppercase;
+	font-size: 10px;
+	font-weight: 600;
 	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.tool-group-count {
+	flex: none;
+	color: var(--app-muted);
+	font-size: 12px;
+	font-weight: 400;
+	font-variant-numeric: tabular-nums;
+}
+
+.tool-settings-group[data-state="off"] .tool-group-count {
+	color: var(--app-error);
+}
+
+/* A switch for the whole group: on is the accent, off is grey. */
+.tool-group-switch {
+	position: relative;
+	display: inline-flex;
+	flex: none;
+	cursor: pointer;
+}
+
+.tool-group-switch input {
+	position: absolute;
+	z-index: 1;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	opacity: 0;
+	cursor: pointer;
+}
+
+.tool-group-switch-track {
+	position: relative;
+	width: 34px;
+	height: 20px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--app-text) 22%, transparent);
+	transition: background 150ms var(--app-ease, ease);
+}
+
+.tool-group-switch-track::after {
+	content: "";
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background: #fff;
+	box-shadow: 0 1px 2px rgb(0 0 0 / 25%);
+	transition: transform 150ms var(--app-ease, ease);
+}
+
+.tool-group-switch input:checked + .tool-group-switch-track {
+	background: var(--app-accent);
+}
+
+.tool-group-switch input:checked + .tool-group-switch-track::after {
+	transform: translateX(14px);
+}
+
+.tool-group-switch input:focus-visible + .tool-group-switch-track {
+	outline: var(--app-focus-ring);
+	outline-offset: 2px;
+}
+
+.tool-group-body {
+	display: grid;
+	border-top: 1px solid var(--app-border);
+}
+
+.tool-group-off-note {
+	display: none;
+	margin: 0;
+	padding: 8px 12px;
+	background: color-mix(in srgb, var(--app-text) 4%, transparent);
+	color: var(--app-muted);
+	font-size: 12px;
+}
+
+.tool-settings-group[data-state="off"] .tool-group-off-note {
+	display: block;
 }
 
 .tool-setting {
@@ -11395,9 +11574,12 @@ textarea.jira-worklog-input {
 	align-items: center;
 	justify-content: space-between;
 	gap: 12px;
-	padding: 6px 8px;
-	border-radius: 7px;
+	padding: 9px 12px;
 	font-size: 12px;
+}
+
+.tool-setting + .tool-setting {
+	border-top: 1px solid color-mix(in srgb, var(--app-border) 60%, transparent);
 }
 
 .tool-setting:hover {
@@ -11405,22 +11587,61 @@ textarea.jira-worklog-input {
 }
 
 .tool-setting[data-policy="off"] .tool-setting-text {
-	opacity: 0.55;
+	opacity: 0.5;
 }
 
 .tool-setting-text {
 	display: grid;
-	gap: 1px;
+	gap: 3px;
 	min-width: 0;
 }
 
+.tool-setting-line {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+}
+
 .tool-setting-name {
+	padding: 1px 6px;
+	border-radius: 5px;
+	background: color-mix(in srgb, var(--app-accent) 10%, transparent);
 	color: var(--app-accent);
+	font-family: var(--app-mono, ui-monospace, monospace);
+	font-size: 11.5px;
 	font-weight: 600;
+}
+
+.tool-risk {
+	padding: 1px 7px;
+	border-radius: 999px;
+	background: color-mix(in srgb, var(--app-text) 7%, transparent);
+	color: var(--app-muted);
+	font-size: 10.5px;
+	font-weight: 600;
+}
+
+.tool-risk[data-risk="read"] {
+	background: color-mix(in srgb, var(--app-ok) 14%, transparent);
+	color: var(--app-ok);
+}
+
+.tool-risk[data-risk="document"],
+.tool-risk[data-risk="ui"] {
+	background: color-mix(in srgb, var(--app-accent) 12%, transparent);
+	color: var(--app-accent);
+}
+
+.tool-risk[data-risk="external"],
+.tool-risk[data-risk="command"] {
+	background: color-mix(in srgb, var(--app-warning) 16%, transparent);
+	color: var(--app-warning);
 }
 
 .tool-setting-description {
 	color: var(--app-muted);
+	line-height: 1.4;
 }
 
 .tool-setting-warning {
@@ -11434,6 +11655,16 @@ textarea.jira-worklog-input {
 .tool-setting select {
 	flex: none;
 	max-width: 240px;
+	padding: 5px 8px;
+	border: 1px solid var(--app-border);
+	border-radius: 7px;
+	background: var(--app-surface);
+	color: var(--app-text);
+	font: inherit;
+}
+
+.tool-setting select:disabled {
+	opacity: 0.5;
 }
 
 /* --- Review findings, marked in the document for this run --------------------------- */
