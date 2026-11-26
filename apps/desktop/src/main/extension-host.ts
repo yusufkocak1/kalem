@@ -334,6 +334,7 @@ export class ExtensionHost {
 		const headers = {
 			"Content-Security-Policy": EXTENSION_CSP,
 			"X-Content-Type-Options": "nosniff",
+			"Cache-Control": "no-store",
 		};
 		if (url.hostname !== id) return new Response(null, { status: 404 });
 		const manifest = this.#running.get(id)?.manifest;
@@ -371,6 +372,7 @@ export class ExtensionHost {
 			headers: {
 				"Content-Security-Policy": EXTENSION_CSP,
 				"X-Content-Type-Options": "nosniff",
+				"Cache-Control": "no-store",
 				"Content-Type": type,
 			},
 		});
@@ -385,6 +387,8 @@ export class ExtensionHost {
 				headers: {
 					"Content-Security-Policy": EXTENSION_CSP,
 					"X-Content-Type-Options": "nosniff",
+					// An update keeps the same addresses: an old ui.js must not be run with the new host.
+					"Cache-Control": "no-store",
 					"Content-Type": contentTypeOf(safe),
 				},
 			});

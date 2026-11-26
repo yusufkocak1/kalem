@@ -268,6 +268,7 @@ results.push("pane: " + window.kalem.pane);
 results.push("echo: " + JSON.stringify(await window.kalem.call("echo", { a: 1 })));
 try { await window.kalem.call("missing"); } catch (error) { results.push("missing: " + error.message); }
 try { await fetch(${JSON.stringify(`${api.url}/from-pane`)}); results.push("fetch: reached"); } catch { results.push("fetch: blocked"); }
+results.push("cache: " + (await fetch("ui.js")).headers.get("cache-control"));
 const image = new Image();
 image.src = ${JSON.stringify(`${api.url}/image`)};
 out.textContent = results.join("\\n");
@@ -297,6 +298,7 @@ document.getElementById("leave").addEventListener("click", () => { location.href
 			'echo: {"echoed":{"a":1}}',
 			'missing: The extension handles no "missing".',
 			"fetch: blocked",
+			"cache: no-store",
 		].join("\n"),
 	);
 	// It tries to leave for the server: the navigation is stopped and nothing reaches it.
