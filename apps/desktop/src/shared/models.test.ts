@@ -86,16 +86,21 @@ describe("Copilot's choices", () => {
 	});
 
 	it("keep to the CLI's own list when it has one, named as the account names them", () => {
-		expect(copilotModelOptions(["gpt-5", "claude-sonnet-4.5"], account)).toEqual([
-			{ id: "gpt-5", label: "GPT-5 (Preview)" },
-			{ id: "claude-sonnet-4.5", label: "claude-sonnet-4.5" },
-		]);
+		expect(copilotModelOptions(["gpt-5", "claude-opus-5.5", "claude-sonnet-4.5"], account)).toEqual(
+			[
+				{ id: "gpt-5", label: "GPT-5 (Preview)" },
+				{ id: "claude-opus-5.5", label: "Claude Opus 5.5" },
+				{ id: "claude-sonnet-4.5", label: "claude-sonnet-4.5" },
+			],
+		);
 		expect(copilotModelOptions([], account)).toEqual(account);
 		expect(copilotModelOptions(["auto"], account)).toEqual([
 			{ id: "auto", label: "auto" },
 			...account,
 		]);
 		expect(copilotModelOptions(["auto"], [])).toEqual([{ id: "auto", label: "auto" }]);
+		const withAuto = [{ id: "auto", label: "Auto" }, ...account];
+		expect(copilotModelOptions(["auto"], withAuto)).toEqual(withAuto);
 	});
 
 	it("find the Copilot plugins' GitHub login", () => {
