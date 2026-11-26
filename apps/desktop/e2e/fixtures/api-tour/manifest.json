@@ -1,0 +1,21 @@
+{
+  "id": "kalem.api-tour",
+  "name": "API Tour",
+  "version": "1.0.0",
+  "description": "A test fixture: one call to each part of window.kalem, from a pane.",
+  "publisher": "Kalem",
+  "engines": { "kalem": ">=3.37.0" },
+  "host": "host.js",
+  "ui": "ui.html",
+  "permissions": {
+    "http": ["*"],
+    "process": true,
+    "files": true,
+    "assistantTools": true
+  },
+  "contributes": {
+    "panes": [{ "id": "tour", "title": "Tour", "dock": "bottom" }],
+    "commands": [{ "id": "open", "title": "Open the Tour" }],
+    "settings": [{ "key": "greeting", "type": "string", "title": "Greeting", "default": "hello" }]
+  }
+}
