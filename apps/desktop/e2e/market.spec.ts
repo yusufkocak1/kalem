@@ -88,6 +88,10 @@ test("the market installs and updates from a signed catalog, refuses what was ch
 		"signature does not match its key",
 	);
 	await settings.getByRole("tab", { name: "Catalogs" }).click();
+	const kalem = settings.locator(".ext-registry-kalem");
+	await expect(kalem).toContainText("Kalem Eklentileri");
+	await expect(kalem.getByRole("switch", { name: "On" })).not.toBeChecked();
+	await expect(kalem.getByRole("button", { name: "Remove" })).toHaveCount(0);
 	await settings.locator(".ext-registry").getByRole("button", { name: "Remove" }).click();
 
 	await form.getByLabel("Name").fill("Acme");

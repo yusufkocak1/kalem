@@ -21,6 +21,9 @@ export interface ExtensionsSectionOptions {
 	errorText(error: unknown): string;
 	registries(): readonly Registry[];
 	setRegistries(registries: readonly Registry[]): void;
+	/** Whether Kalem's own catalog is on. */
+	kalemCatalog(): boolean;
+	setKalemCatalog(on: boolean): void;
 }
 
 export interface ExtensionsSection {
@@ -92,6 +95,8 @@ export function createExtensionsSection(options: ExtensionsSectionOptions): Exte
 		errorText: options.errorText,
 		registries: options.registries,
 		setRegistries: options.setRegistries,
+		kalemCatalog: options.kalemCatalog,
+		setKalemCatalog: options.setKalemCatalog,
 		showPreview,
 		say,
 		changed: () => void refresh(),

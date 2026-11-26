@@ -17886,6 +17886,58 @@ dialog {
 	background: var(--ext-card);
 }
 
+.ext-registry[data-off] .ext-title,
+.ext-registry[data-off] .ext-registry-icon {
+	opacity: 0.55;
+}
+
+.ext-switch {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	gap: 8px;
+	font-size: 12.5px;
+	cursor: pointer;
+}
+
+.ext-switch input {
+	position: relative;
+	width: 34px;
+	height: 20px;
+	margin: 0;
+	border-radius: 999px;
+	background: var(--app-border);
+	appearance: none;
+	cursor: pointer;
+	transition: background 0.15s;
+}
+
+.ext-switch input::after {
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	background: #fff;
+	box-shadow: 0 1px 2px rgb(0 0 0 / 25%);
+	content: "";
+	transition: transform 0.15s;
+}
+
+.ext-switch input:checked {
+	background: var(--app-accent);
+}
+
+.ext-switch input:checked::after {
+	transform: translateX(14px);
+}
+
+.ext-switch input:focus-visible {
+	outline: 2px solid var(--app-accent);
+	outline-offset: 2px;
+}
+
 .ext-registry .ext-title {
 	flex: 1;
 }
