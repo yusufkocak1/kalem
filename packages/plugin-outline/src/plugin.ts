@@ -85,6 +85,7 @@ export function outlinePlugin(options: OutlineOptions = {}): OutlinePlugin {
 	let etkin = -1;
 	/** Kaydırma ölçümü için planlanmış kare. */
 	let kare: number | null = null;
+	let pinnedIndex = -1;
 
 	function tazele(): void {
 		if (ctx === null) return;
@@ -94,6 +95,7 @@ export function outlinePlugin(options: OutlineOptions = {}): OutlinePlugin {
 		panel?.render(items);
 		// Liste değişti: eski indis başka bir başlığı gösteriyor olabilir.
 		etkin = -1;
+		pinnedIndex = -1;
 		imlectenEtkin();
 		// Odak editörde değilse imleç bir şey söylemiyor; ölçüme düşüyoruz.
 		if (etkin < 0) planla();
@@ -134,6 +136,7 @@ export function outlinePlugin(options: OutlineOptions = {}): OutlinePlugin {
 			if (item.blockIndex <= caret.blockIndex) bulunan = i;
 			else break;
 		}
+		if (bulunan !== pinnedIndex) pinnedIndex = -1;
 		etkinYap(bulunan);
 	}
 
@@ -163,6 +166,18 @@ export function outlinePlugin(options: OutlineOptions = {}): OutlinePlugin {
 		if (items.length === 0) return;
 		const kap = kaydiranKap();
 		const ust = kap === null ? 0 : kap.getBoundingClientRect().top + kap.clientTop;
+		const alt =
+			kap === null
+				? (ctx?.element.ownerDocument.defaultView?.innerHeight ?? 0)
+				: ust + kap.clientHeight;
+		// A heading picked from the panel near the end of the document cannot be
+		// scrolled to the top; keep it active while it stays in view.
+		const pinned = items[pinnedIndex];
+		if (pinned !== undefined) {
+			const top = eleman(pinned)?.getBoundingClientRect().top;
+			if (top !== undefined && top >= ust - esik && top < alt) return;
+			pinnedIndex = -1;
+		}
 		let bulunan = -1;
 		for (const [i, item] of items.entries()) {
 			const el = eleman(item);
@@ -210,6 +225,7 @@ export function outlinePlugin(options: OutlineOptions = {}): OutlinePlugin {
 			selectRange(holder, 0, 0);
 		}
 		holder.scrollIntoView({ block: "start" });
+		pinnedIndex = index;
 		etkinYap(index);
 	}
 
@@ -254,6 +270,7 @@ export function outlinePlugin(options: OutlineOptions = {}): OutlinePlugin {
 				panel = null;
 				items = [];
 				etkin = -1;
+				pinnedIndex = -1;
 				ctx = null;
 			};
 		},
