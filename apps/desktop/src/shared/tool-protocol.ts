@@ -49,7 +49,12 @@ export function parseToolPolicies(value: unknown): Record<string, ToolPolicy> {
 	if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
 	const policies: Record<string, ToolPolicy> = {};
 	for (const [name, policy] of Object.entries(value).slice(0, 300)) {
-		if (!/^[a-z][a-z0-9_]{0,63}$/.test(name)) continue;
+		// A tool's name (an extension's may hold capitals and `-`), or a group's switch.
+		if (
+			!/^[A-Za-z][\w-]{0,63}$/.test(name) &&
+			!/^group:(?:[a-z]+|extension:[a-z0-9][a-z0-9.-]{0,125})$/.test(name)
+		)
+			continue;
 		if (typeof policy === "string" && (TOOL_POLICIES as readonly string[]).includes(policy))
 			policies[name] = policy as ToolPolicy;
 	}

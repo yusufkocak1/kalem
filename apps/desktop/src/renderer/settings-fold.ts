@@ -25,9 +25,9 @@ function kept(): Record<string, boolean> {
 	}
 }
 
-/** A heading's name in what is kept: its block or group, and its words. */
+/** A heading's name in what is kept: its block or group, and its words (or a name of its own, when its words change). */
 const nameOf = (heading: HTMLElement): string =>
-	`${heading.closest<HTMLElement>("[data-block], [data-group]")?.dataset.block ?? heading.closest<HTMLElement>("[data-group]")?.dataset.group ?? ""}/${heading.textContent ?? ""}`;
+	`${heading.closest<HTMLElement>("[data-block], [data-group]")?.dataset.block ?? heading.closest<HTMLElement>("[data-group]")?.dataset.group ?? ""}/${heading.dataset.foldName ?? heading.textContent ?? ""}`;
 
 /** Makes the headings under `root` fold, now and whenever its parts are drawn again. */
 export function installFolds(root: HTMLElement): void {

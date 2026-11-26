@@ -1305,6 +1305,10 @@ export interface KalemBridge {
 			readonly description: string;
 			/** What it may change: `read`, `ui`, `document` or `external` (Jira, Confluence). */
 			readonly risk?: ToolRisk;
+			/** Its group in Settings: `jira`, `document`… or `extension:<id>`. */
+			readonly group?: string;
+			/** The extension's name, for an extension's tool. */
+			readonly groupName?: string;
 		}[]
 	>;
 	assistantModels(request: {

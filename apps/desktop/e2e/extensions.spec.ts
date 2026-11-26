@@ -310,3 +310,70 @@ document.getElementById("leave").addEventListener("click", () => { location.href
 	).toEqual([]);
 	expect(api.seen).toEqual([]);
 });
+
+test("an extension's tools have a group of their own in Settings, which turns off as a whole", async () => {
+	const folder = await tempDir("extension-tool-group");
+	const source = join(folder, "tickets");
+	await mkdir(source);
+	await writeFile(
+		join(source, "manifest.json"),
+		JSON.stringify({
+			id: "test.tickets",
+			name: "Ticket Tools",
+			version: "1.0.0",
+			host: "host.js",
+			permissions: { assistantTools: true },
+		}),
+	);
+	await writeFile(
+		join(source, "host.js"),
+		`export async function activate(kalem) {
+	await kalem.assistant.registerTool({ name: "ticket_find", description: "Finds a ticket. More." }, async () => "found");
+	await kalem.assistant.registerTool({ name: "ticket_close", description: "Closes a ticket.", writes: true }, async () => "closed");
+}
+`,
+	);
+	const packagePath = join(folder, "tickets.kalem-ext");
+	execFileSync(process.execPath, [PACK, source, packagePath]);
+	const { app, page, userData } = await launch();
+	await stubOpenDialog(app, [packagePath]);
+	await clickMenu(app, "Extensions", "Manage Extensions…");
+	const extensions = page.locator('[data-block="extensions"]');
+	await extensions
+		.locator(".ext-intro")
+		.getByRole("button", { name: "Install from File…" })
+		.click();
+	await extensions
+		.locator(".ext-preview")
+		.getByRole("button", { name: "Install", exact: true })
+		.click();
+	await expect(extensions.locator(".ext-badge")).toHaveText("Running");
+
+	const dialog = page.locator(".settings-dialog");
+	await dialog.locator('[data-category="assistantTools"]').click();
+	const group = dialog.locator('.tool-settings-group[data-group="extension:test.tickets"]');
+	await expect(group.locator(".tool-group-title")).toHaveText("Ticket Tools");
+	await expect(group.locator(".tool-group-count")).toHaveText("2 of 2 on");
+	await group.locator("h5").click();
+	// The extension's name is not repeated before each tool's description.
+	await expect(group.locator(".tool-setting-description").first()).toHaveText("Finds a ticket.");
+	await group.locator(".tool-setting").last().scrollIntoViewIfNeeded();
+	await page.screenshot({ path: process.env.KALEM_SHOT ?? join(folder, "tools-on.png") });
+
+	const toggle = group.getByRole("switch", { name: "All Ticket Tools tools" });
+	await toggle.uncheck();
+	await expect(group).toHaveAttribute("data-state", "off");
+	await expect(group.locator(".tool-group-count")).toHaveText("Turned off as a group");
+	await expect(group.locator('select[data-tool="ticket_find"]')).toBeDisabled();
+	// Folding still opens from the heading, and the switch does not fold it.
+	await expect(group.locator("h5")).toHaveAttribute("aria-expanded", "true");
+	await expect
+		.poll(async () => JSON.parse(await readFile(join(userData, "settings.json"), "utf8")).settings)
+		.toMatchObject({ assistantToolPolicies: { "group:extension:test.tickets": "off" } });
+	await group.locator(".tool-setting").last().scrollIntoViewIfNeeded();
+	await page.screenshot({ path: process.env.KALEM_SHOT_OFF ?? join(folder, "tools-off.png") });
+
+	await toggle.check();
+	await expect(group.locator('select[data-tool="ticket_find"]')).toBeEnabled();
+	await app.close();
+});
