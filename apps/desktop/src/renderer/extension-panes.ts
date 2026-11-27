@@ -3,7 +3,7 @@
  * docked as Kalem's panes are. The page talks only to its host code, by
  * messages that pass through here; it is sent the app's colours.
  */
-import type { ExtensionInfo, KalemBridge } from "../shared/bridge.js";
+import type { ExtensionEditorTab, ExtensionInfo, KalemBridge } from "../shared/bridge.js";
 import type { ExtensionPaneId, PanePlace, PanePlaces } from "../shared/panes.js";
 import { extensionPaneId, placeOf } from "../shared/panes.js";
 import type { DockPane } from "./docks.js";
@@ -16,12 +16,38 @@ export interface ExtensionPanesOptions {
 	/** Puts panes that were never placed where their extension asks. */
 	place(places: Readonly<Record<ExtensionPaneId, PanePlace>>): void;
 	changed(panes: readonly DockPane[]): void;
+	/** Editor tabs whose extension stopped or went: their tabs close. */
+	editorsGone(ids: readonly string[]): void;
+}
+
+/** An extension's editor open in a tab: its page in the documents' place. */
+export interface OpenEditor {
+	/** The tab's id. */
+	readonly id: string;
+	readonly element: HTMLElement;
+	/** It was not open before. */
+	readonly created: boolean;
 }
 
 export interface ExtensionPanes {
 	has(pane: ExtensionPaneId): boolean;
 	label(pane: ExtensionPaneId): string | undefined;
 	refresh(): Promise<void>;
+	/** Makes the editor's page, or gives its new data to the one already open with that key. */
+	openEditor(tab: ExtensionEditorTab): OpenEditor | null;
+	closeEditor(id: string): void;
+	/** The id of the tab an extension opened with `key`, when it is open. */
+	editorId(extension: string, key: string): string;
+}
+
+interface Messaged {
+	readonly extension: string;
+	readonly iframe: HTMLIFrameElement;
+}
+
+interface EditorFrame extends Messaged {
+	data: unknown;
+	ready: boolean;
 }
 
 interface Frame {
@@ -72,9 +98,13 @@ function themeMessage(): { kalem: "theme"; vars: Record<string, string>; dark: b
 export function createExtensionPanes(options: ExtensionPanesOptions): ExtensionPanes {
 	const { bridge } = options;
 	const frames = new Map<ExtensionPaneId, Frame>();
+	const editors = new Map<string, EditorFrame>();
+	let infos: readonly ExtensionInfo[] = [];
+	const everyFrame = (): Messaged[] => [...frames.values(), ...editors.values()];
+	const editorId = (extension: string, key: string): string => `ext-editor:${extension}:${key}`;
 	const originOf = (extension: string): string => `kalem-ext://${extension}`;
 
-	const post = (frame: Frame, message: unknown): void => {
+	const post = (frame: Messaged, message: unknown): void => {
 		frame.iframe.contentWindow?.postMessage(message, originOf(frame.extension));
 	};
 
@@ -109,7 +139,7 @@ export function createExtensionPanes(options: ExtensionPanesOptions): ExtensionP
 	}
 
 	window.addEventListener("message", (event) => {
-		const frame = [...frames.values()].find((each) => each.iframe.contentWindow === event.source);
+		const frame = everyFrame().find((each) => each.iframe.contentWindow === event.source);
 		if (frame === undefined || event.origin !== originOf(frame.extension)) return;
 		const data = event.data as {
 			kalem?: unknown;
@@ -120,6 +150,11 @@ export function createExtensionPanes(options: ExtensionPanesOptions): ExtensionP
 		if (data === null || typeof data !== "object") return;
 		if (data.kalem === "ready") {
 			post(frame, themeMessage());
+			if ("data" in frame) {
+				const editor = frame as EditorFrame;
+				editor.ready = true;
+				post(editor, { kalem: "editor-data", data: editor.data });
+			}
 			return;
 		}
 		if (data.kalem !== "call" || typeof data.name !== "string") return;
@@ -141,7 +176,7 @@ export function createExtensionPanes(options: ExtensionPanesOptions): ExtensionP
 	});
 
 	bridge.onExtensionUiMessage((extension, message) => {
-		for (const frame of frames.values()) {
+		for (const frame of everyFrame()) {
 			if (frame.extension === extension) post(frame, { kalem: "message", data: message });
 		}
 	});
@@ -151,7 +186,7 @@ export function createExtensionPanes(options: ExtensionPanesOptions): ExtensionP
 		cancelAnimationFrame(pending);
 		pending = requestAnimationFrame(() => {
 			const message = themeMessage();
-			for (const frame of frames.values()) post(frame, message);
+			for (const frame of everyFrame()) post(frame, message);
 		});
 	};
 	new MutationObserver(sendTheme).observe(document.documentElement, { attributes: true });
@@ -163,7 +198,7 @@ export function createExtensionPanes(options: ExtensionPanesOptions): ExtensionP
 	matchMedia("(prefers-color-scheme: dark)").addEventListener("change", sendTheme);
 
 	async function refresh(): Promise<void> {
-		const infos = await bridge.extensions().catch(() => [] as ExtensionInfo[]);
+		infos = await bridge.extensions().catch(() => [] as ExtensionInfo[]);
 		const next = new Map<ExtensionPaneId, Frame>();
 		const unplaced: Record<ExtensionPaneId, PanePlace> = {};
 		const places = options.panePlaces();
@@ -180,17 +215,77 @@ export function createExtensionPanes(options: ExtensionPanesOptions): ExtensionP
 		frames.clear();
 		for (const [id, frame] of next) frames.set(id, frame);
 		options.changed([...frames.values()].map((frame) => frame.pane));
+		const live = new Set(
+			infos
+				.filter((info) => info.enabled && info.manifest.ui !== null)
+				.map((info) => info.manifest.id),
+		);
+		const gone = [...editors].filter(([, editor]) => !live.has(editor.extension)).map(([id]) => id);
+		if (gone.length > 0) options.editorsGone(gone);
 		if (Object.keys(unplaced).length > 0) options.place(unplaced);
 	}
 
 	bridge.onExtensionsChanged(() => void refresh());
 	bridge.onExtensionSettingsChanged((extension) => {
-		for (const frame of frames.values()) {
+		for (const frame of everyFrame()) {
 			if (frame.extension === extension) post(frame, { kalem: "settings" });
 		}
 	});
 
+	function openEditor(tab: ExtensionEditorTab): OpenEditor | null {
+		const id = editorId(tab.extension, tab.key);
+		const known = editors.get(id);
+		const element = known?.iframe.parentElement;
+		if (known !== undefined && element != null) {
+			known.data = tab.data;
+			if (known.ready) post(known, { kalem: "editor-data", data: tab.data });
+			return { id, element, created: false };
+		}
+		const info = infos.find((each) => each.manifest.id === tab.extension);
+		if (info === undefined || !info.enabled || info.manifest.ui === null) return null;
+		const query = new URLSearchParams({
+			pane: tab.editor,
+			editor: tab.editor,
+			key: tab.key,
+			lang: options.language,
+		});
+		const iframe = el("iframe", {
+			class: "ext-pane-frame",
+			attrs: {
+				src: `${originOf(tab.extension)}/${info.manifest.ui}?${query.toString()}`,
+				sandbox: "allow-scripts allow-same-origin allow-forms",
+				title: tab.title,
+				referrerpolicy: "no-referrer",
+			},
+		});
+		const frame: EditorFrame = { extension: tab.extension, iframe, data: tab.data, ready: false };
+		editors.set(id, frame);
+		iframe.addEventListener("load", () => {
+			post(frame, themeMessage());
+			// Its "ready" can be missed while the frame is still being placed: the page's scripts have run by now.
+			if (!frame.ready) {
+				frame.ready = true;
+				post(frame, { kalem: "editor-data", data: frame.data });
+			}
+		});
+		return {
+			id,
+			element: el("div", {
+				class: "ext-editor",
+				attrs: { "data-extension-editor": id },
+				children: [iframe],
+			}),
+			created: true,
+		};
+	}
+
 	return {
+		openEditor,
+		closeEditor: (id) => {
+			editors.get(id)?.iframe.parentElement?.remove();
+			editors.delete(id);
+		},
+		editorId,
 		has: (pane) => frames.has(pane),
 		label: (pane) => frames.get(pane)?.pane.label,
 		refresh,

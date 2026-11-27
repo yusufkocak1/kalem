@@ -8,7 +8,7 @@ function entry(path: string, folder = false): WorkspaceEntry {
 
 function workspace(root: string, entries: WorkspaceEntry[]): Workspace {
 	return {
-		roots: [{ path: root, entries, truncated: false, git: null, untrustedRepo: null }],
+		roots: [{ path: root, entries, truncated: false }],
 		opened: true,
 	};
 }

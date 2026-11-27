@@ -164,10 +164,6 @@ export interface Settings extends Typography {
 	readonly checkUpdates: boolean;
 	/** A notification-area icon and the system-wide quick note shortcut; the app stays there when its windows close. */
 	readonly tray: boolean;
-	/** Fetch the open folders' repositories in the background now and then. */
-	readonly gitAutoFetch: boolean;
-	/** Repositories whose own git settings the user trusts: git runs only in these. */
-	readonly gitTrustedFolders: readonly string[];
 	/** The proxy the app's requests go through: the system's, none, or `proxyServer`. */
 	readonly proxyMode: ProxyMode;
 	readonly proxyServer: string;
@@ -321,8 +317,6 @@ export const DEFAULT_SETTINGS: Settings = {
 	pinnedFiles: [],
 	checkUpdates: true,
 	tray: false,
-	gitAutoFetch: true,
-	gitTrustedFolders: [],
 	proxyMode: "system",
 	proxyServer: "",
 	proxyBypass: "",
@@ -687,62 +681,7 @@ export interface WorkspaceRoot {
 	readonly path: string;
 	readonly entries: readonly WorkspaceEntry[];
 	readonly truncated: boolean;
-	/** The git repository the folder is in; `null` when it is in none or it is not trusted. */
-	readonly git: GitStatus | null;
-	/** The repository the folder is in when the user has not trusted it yet: git does not run there. */
-	readonly untrustedRepo: string | null;
 }
-
-/** Where a git repository stands. */
-export interface GitStatus {
-	/** The repository's top folder. */
-	readonly root: string;
-	/** `null` when no branch is checked out (detached HEAD). */
-	readonly branch: string | null;
-	/** The branch it follows, as `origin/main`; `null` when none. */
-	readonly upstream: string | null;
-	/** Commits not pushed yet. */
-	readonly ahead: number;
-	/** Commits not pulled yet. */
-	readonly behind: number;
-	/** Files changed, added or not tracked. */
-	readonly changed: number;
-	/** The changed files, at most a few thousand. */
-	readonly files: readonly GitFileChange[];
-	/** Files with unresolved conflicts. */
-	readonly conflicts: number;
-	/** A merge, rebase or cherry-pick that stopped half-way (on a conflict). */
-	readonly operation: GitOperation | null;
-}
-
-export type GitOperation = "merge" | "rebase" | "cherry-pick";
-
-export type GitChangeKind = "modified" | "added" | "deleted" | "renamed" | "untracked" | "conflict";
-
-export interface GitFileChange {
-	/** Below the repository's top folder, with `/`. */
-	readonly path: string;
-	readonly kind: GitChangeKind;
-}
-
-export interface GitBranch {
-	readonly name: string;
-	/** The remote of a branch that is only there, as `origin`; `null` for a local branch. */
-	readonly remote: string | null;
-	readonly current: boolean;
-}
-
-/** What the Files pane can ask git to do in an open folder. */
-export type GitAction =
-	| { readonly kind: "fetch" | "push" | "init" | "abort" | "continue" }
-	/** `how` when the branches went apart: merge them or put ours on top; git's setting otherwise. */
-	| { readonly kind: "pull"; readonly how?: "merge" | "rebase" }
-	/** Puts back the last commit's version of the files; new files go to the recycle bin. */
-	| { readonly kind: "discard"; readonly paths: readonly string[] }
-	| { readonly kind: "checkout"; readonly branch: string }
-	| { readonly kind: "create-branch"; readonly branch: string }
-	/** Without `paths`, every change; with them, only those files. */
-	| { readonly kind: "commit"; readonly message: string; readonly paths?: readonly string[] };
 
 export interface Workspace {
 	/**
@@ -1005,6 +944,18 @@ export interface ExtensionStatusItem {
 	readonly command: string | null;
 }
 
+/** A tab in the documents' place showing one of an extension's editors. */
+export interface ExtensionEditorTab {
+	readonly extension: string;
+	readonly editor: string;
+	/** The same key brings the same tab forward instead of opening another. */
+	readonly key: string;
+	readonly title: string;
+	readonly tooltip: string;
+	/** Given to the page (`kalem.onEditorData`) when it opens and each time it is opened again. */
+	readonly data: unknown;
+}
+
 export interface MarketEntry extends RegistryEntry {
 	/** The catalog's index address. */
 	readonly registry: string;
@@ -1265,18 +1216,6 @@ export interface KalemBridge {
 	revealInFolder(path: string): void;
 	/** Opens a file of the shown folders with the system's app for it (programs are only shown). */
 	openWithSystem(path: string): Promise<void>;
-	/** The branches of the repository a shown folder is in, local ones first. */
-	gitBranches(folder: string): Promise<readonly GitBranch[]>;
-	/** Runs git in a shown folder; resolves to what git said it did. */
-	gitRun(folder: string, action: GitAction): Promise<string>;
-	/** How a changed file of a shown folder's repository differs from the last commit. */
-	gitDiff(folder: string, path: string): Promise<string>;
-	/** A commit message for the changes (of `paths` only, when given), written by the assistant. */
-	gitSuggestMessage(folder: string, paths?: readonly string[]): Promise<string>;
-	/** Asks where to clone `url`, clones it and opens the new folder; its path, `null` when cancelled. */
-	gitClone(url: string): Promise<string | null>;
-	/** Asks the user to trust the repository a shown folder is in; resolves whether git may run there. */
-	gitTrust(folder: string): Promise<boolean>;
 
 	/** Earlier saved states of the tab's document, newest first. */
 	listVersions(tabId: string): Promise<readonly Version[]>;
@@ -1428,6 +1367,8 @@ export interface KalemBridge {
 	/** Messages an extension's host code sends its panes. */
 	onExtensionUiMessage(handler: (id: string, message: unknown) => void): () => void;
 	onExtensionShowPane(handler: (id: string, pane: string) => void): () => void;
+	onExtensionOpenEditor(handler: (tab: ExtensionEditorTab) => void): () => void;
+	onExtensionCloseEditor(handler: (id: string, key: string) => void): () => void;
 	/** An extension's settings or secrets were changed in Settings. */
 	onExtensionSettingsChanged(handler: (id: string) => void): () => void;
 	extensionStatusItems(): Promise<readonly ExtensionStatusItem[]>;
@@ -1505,7 +1446,6 @@ export const CHANNEL = {
 	confluenceOpenAttachment: "kalem:confluence-open-attachment",
 	confluenceDownloadAttachment: "kalem:confluence-download-attachment",
 	confluenceDeleteAttachment: "kalem:confluence-delete-attachment",
-	gitTrust: "kalem:git-trust",
 	jiraAccount: "kalem:jira-account",
 	jiraConnect: "kalem:jira-connect",
 	jiraDisconnect: "kalem:jira-disconnect",
@@ -1578,11 +1518,6 @@ export const CHANNEL = {
 	trashInWorkspace: "kalem:trash-in-workspace",
 	revealInFolder: "kalem:reveal-in-folder",
 	openWithSystem: "kalem:open-with-system",
-	gitBranches: "kalem:git-branches",
-	gitRun: "kalem:git-run",
-	gitClone: "kalem:git-clone",
-	gitDiff: "kalem:git-diff",
-	gitSuggestMessage: "kalem:git-suggest-message",
 	documentMoved: "kalem:document-moved",
 	workspaceChange: "kalem:workspace-change",
 	listVersions: "kalem:list-versions",
@@ -1631,6 +1566,8 @@ export const CHANNEL = {
 	extensionUiCall: "kalem:extension-ui-call",
 	extensionUiMessage: "kalem:extension-ui-message",
 	extensionShowPane: "kalem:extension-show-pane",
+	extensionOpenEditor: "kalem:extension-open-editor",
+	extensionCloseEditor: "kalem:extension-close-editor",
 	extensionSettingsChanged: "kalem:extension-settings-changed",
 	extensionStatusItems: "kalem:extension-status-items",
 	extensionRunCommand: "kalem:extension-run-command",

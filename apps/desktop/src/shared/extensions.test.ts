@@ -66,6 +66,18 @@ describe("parseManifest", () => {
 		expect(parseManifest({ ...base, icon: "../icon.png" }).ok).toBe(false);
 	});
 
+	it("takes editors, which need a ui", () => {
+		const editors = {
+			editors: [
+				{ id: "diff", title: "Diff" },
+				{ id: "Bad id", title: "X" },
+			],
+		};
+		const ok = parseManifest({ ...base, ui: "ui.html", contributes: editors });
+		expect(ok.ok && ok.manifest.editors).toEqual([{ id: "diff", title: "Diff" }]);
+		expect(parseManifest({ ...base, contributes: editors }).ok).toBe(false);
+	});
+
 	it("needs a ui for a pane and a host for a command", () => {
 		expect(parseManifest({ ...base, contributes: { panes: [{ id: "p", title: "P" }] } }).ok).toBe(
 			false,

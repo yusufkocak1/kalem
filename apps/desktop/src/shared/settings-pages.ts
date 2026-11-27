@@ -26,7 +26,6 @@ export type SettingPage =
 	| "mcp"
 	| "assistantTools"
 	| "connections"
-	| "git"
 	| "proxy"
 	| "extensions";
 
@@ -44,7 +43,7 @@ export const SETTING_GROUPS: readonly SettingGroup[] = [
 	{ label: "settingsGroupInterface", pages: ["appearance", "window", "panels"] },
 	{ label: "settingsGroupDocument", pages: ["documentView", "typography", "editor", "page"] },
 	{ label: "settingsCatAssistant", pages: ["assistant", "modes", "mcp", "assistantTools"] },
-	{ label: "settingsCatConnections", pages: ["connections", "git", "proxy"] },
+	{ label: "settingsCatConnections", pages: ["connections", "proxy"] },
 	{ label: null, pages: ["extensions"] },
 ];
 
@@ -81,8 +80,6 @@ const MOVED: Partial<Record<keyof Settings, SettingPage>> = {
 	// Saving to Confluence is set up with Confluence.
 	confluenceReviewBeforeSave: "connections",
 	// Git, a connection of its own.
-	gitAutoFetch: "git",
-	gitTrustedFolders: "git",
 	proxyMode: "proxy",
 	proxyServer: "proxy",
 	proxyBypass: "proxy",
@@ -125,7 +122,6 @@ const PAGE_LABELS: Readonly<Record<SettingPage, StringKey>> = {
 	mcp: "mcpTitle",
 	assistantTools: "settingsPageTools",
 	connections: "settingsPageConfluenceJira",
-	git: "settingsPageGit",
 	proxy: "settingsPageProxy",
 	extensions: "settingsPageExtensions",
 };

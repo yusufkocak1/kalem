@@ -13,6 +13,9 @@ const commands = new Map<string, Handler>();
 const tools = new Map<string, Handler>();
 const uiHandlers = new Map<string, Handler>();
 const processListeners = new Map<string, (event: unknown) => void>();
+/** Events of a program that came before `spawn` told its id: given to its listener once there is one. */
+const earlyEvents = new Map<string, { type: string }[]>();
+const knownProcesses = new Set<string>();
 
 const invoke = (method: string, ...args: unknown[]): Promise<unknown> =>
 	ipcRenderer.invoke(EXTENSION_CHANNEL.request, method, args).catch((error: unknown) => {
@@ -41,8 +44,16 @@ ipcRenderer.on(
 	EXTENSION_CHANNEL.event,
 	(_event, message: { process: string; event: { type: string } }) => {
 		const listener = processListeners.get(message.process);
-		if (message.event.type === "exit" || message.event.type === "error")
+		if (listener === undefined && !knownProcesses.has(message.process)) {
+			const early = earlyEvents.get(message.process) ?? [];
+			early.push(message.event);
+			earlyEvents.set(message.process, early);
+			return;
+		}
+		if (message.event.type === "exit" || message.event.type === "error") {
 			processListeners.delete(message.process);
+			knownProcesses.delete(message.process);
+		}
 		try {
 			listener?.(message.event);
 		} catch (error) {
@@ -62,7 +73,18 @@ const api = {
 	process: {
 		spawn: async (request: unknown, listener?: (event: unknown) => void) => {
 			const id = (await invoke("process.spawn", request)) as string;
-			if (typeof listener === "function") processListeners.set(id, listener);
+			const early = earlyEvents.get(id) ?? [];
+			earlyEvents.delete(id);
+			const ended = early.some((event) => event.type === "exit" || event.type === "error");
+			if (typeof listener === "function" && !ended) processListeners.set(id, listener);
+			if (!ended) knownProcesses.add(id);
+			for (const event of early) {
+				try {
+					if (typeof listener === "function") listener(event);
+				} catch (error) {
+					void invoke("log", [`Process listener: ${describe(error)}`]);
+				}
+			}
 			return id;
 		},
 		kill: (id: string) => invoke("process.kill", id),
@@ -87,6 +109,7 @@ const api = {
 	},
 	workspace: {
 		folders: () => invoke("workspace.folders"),
+		addFolder: (folder: string) => invoke("workspace.addFolder", folder),
 	},
 	settings: {
 		get: (key: string) => invoke("settings.get", key),
@@ -99,6 +122,7 @@ const api = {
 		fetch: (url: string, init?: unknown) => invoke("http.fetch", url, init ?? {}),
 	},
 	assistant: {
+		complete: (system: string, prompt: string) => invoke("assistant.complete", system, prompt),
 		registerTool: async (spec: ExtensionToolSpec, run: Handler) => {
 			if (typeof run !== "function")
 				throw new Error("registerTool needs a function to run the tool.");
@@ -123,6 +147,9 @@ const api = {
 		},
 		post: (message: unknown) => invoke("ui.post", message),
 		showPane: (pane: string) => invoke("ui.showPane", pane),
+		openEditor: (editor: string, options?: unknown) =>
+			invoke("ui.openEditor", editor, options ?? {}),
+		closeEditor: (key: string) => invoke("ui.closeEditor", key),
 		pickPath: (options?: unknown) => invoke("ui.pickPath", options ?? {}),
 		openExternal: (url: string) => invoke("ui.openExternal", url),
 		setStatusItem: (key: string, item: unknown) => invoke("ui.setStatusItem", key, item ?? null),

@@ -39,7 +39,6 @@ describe("settings pages", () => {
 		expect(pageOf("autoSave")).toBe("editor");
 		expect(pageOf("defaultTemplate")).toBe("page");
 		expect(pageOf("confluenceReviewBeforeSave")).toBe("connections");
-		expect(pageOf("gitAutoFetch")).toBe("git");
 		expect(pageOf("proxyMode")).toBe("proxy");
 		// The assistant's permissions still name the category: what was always allowed is kept.
 		expect(settingDef("language").category).toBe("appearance");

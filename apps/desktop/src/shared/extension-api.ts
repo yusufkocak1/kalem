@@ -119,6 +119,9 @@ export const UI_SCRIPT = `(() => {
 	const pending = new Map();
 	const listeners = [];
 	const settingsListeners = [];
+	const editorListeners = [];
+	let editorData;
+	let hasEditorData = false;
 	let next = 0;
 	const params = new URLSearchParams(location.search);
 	window.addEventListener("message", (event) => {
@@ -133,6 +136,10 @@ export const UI_SCRIPT = `(() => {
 			else waiting.reject(new Error(data.error));
 		} else if (data.kalem === "message") {
 			for (const listener of listeners) listener(data.data);
+		} else if (data.kalem === "editor-data") {
+			editorData = data.data;
+			hasEditorData = true;
+			for (const listener of editorListeners) listener(editorData);
 		} else if (data.kalem === "settings") {
 			for (const listener of settingsListeners) listener();
 		} else if (data.kalem === "theme") {
@@ -142,6 +149,7 @@ export const UI_SCRIPT = `(() => {
 	});
 	window.kalem = {
 		pane: params.get("pane"),
+		editor: params.get("editor") === null ? null : { id: params.get("editor"), key: params.get("key") },
 		language: params.get("lang") || "en",
 		call(name, input) {
 			return new Promise((resolve, reject) => {
@@ -152,6 +160,10 @@ export const UI_SCRIPT = `(() => {
 		},
 		onMessage(listener) {
 			listeners.push(listener);
+		},
+		onEditorData(listener) {
+			editorListeners.push(listener);
+			if (hasEditorData) listener(editorData);
 		},
 		onSettingsChanged(listener) {
 			settingsListeners.push(listener);

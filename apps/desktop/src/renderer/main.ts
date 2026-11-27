@@ -9,7 +9,6 @@ import { applyActions } from "../shared/actions.js";
 import type {
 	Command,
 	ExtensionStatusItem,
-	GitStatus,
 	KalemBridge,
 	SessionTab,
 	Settings,
@@ -73,7 +72,6 @@ import { insertDivider, insertTable, replaceTable, tableAt, toggleTaskList } fro
 import type { ExtensionPanes } from "./extension-panes.js";
 import { createExtensionPanes } from "./extension-panes.js";
 import { createFilesPane } from "./files-pane.js";
-import { createGitDialogs } from "./git-dialogs.js";
 import type { IconName } from "./icons.js";
 import { icon } from "./icons.js";
 import { createImageViewer } from "./image-viewer.js";
@@ -261,10 +259,6 @@ const filesPane = createFilesPane({
 	inform: (text) => session.notices.show({ id: "files", kind: "info", text }),
 	// The open folders are the assistant's workspace.
 	listed: () => assistant.workspaceChanged(),
-	gitChanged: (git) => showGitStatus(git),
-	git: createGitDialogs(t, startup.language),
-	autoFetch: () => settings.gitAutoFetch,
-	setAutoFetch: (on) => updateSettings({ gitAutoFetch: on }),
 });
 const versionHistory = createVersionHistory({ t, lang: startup.language });
 const attachmentsDialog = createAttachmentsDialog({
@@ -719,6 +713,9 @@ extensionPanes = createExtensionPanes({
 	panePlaces: () => settings.panePlaces,
 	place: (places) => updateSettings({ panePlaces: { ...settings.panePlaces, ...places } }),
 	changed: (panes) => docks.setExtensionPanes(panes),
+	editorsGone: (ids) => {
+		for (const id of ids) closeExtensionEditor(id);
+	},
 });
 void extensionPanes.refresh();
 bridge.onExtensionShowPane((extension, pane) => {
@@ -726,6 +723,71 @@ bridge.onExtensionShowPane((extension, pane) => {
 	if (!isPaneShown(settings, id, paneAvailable)) updateSettings(revealPane(settings, id));
 });
 const deskColumn = el("div", { class: "desk-column", children: [deskArea, docks.elements.bottom] });
+
+/**
+ * An extension's editor (a diff, a commit) is a tab beside the documents, as
+ * Settings is: its page takes the documents' place while it is chosen.
+ */
+const editorHost = el("div", { class: "ext-editor-host", attrs: { hidden: "" } });
+deskArea.append(editorHost);
+const editorTabs = new Map<string, HTMLElement>();
+let editorShown: string | null = null;
+
+function showExtensionEditor(id: string): void {
+	const element = editorTabs.get(id);
+	if (element === undefined) return;
+	leaveSettingsTab();
+	for (const [other, each] of editorTabs) each.hidden = other !== id;
+	editorShown = id;
+	deskArea.toggleAttribute("data-ext-editor", true);
+	editorHost.hidden = false;
+	tabStrip.select(id);
+}
+
+function leaveExtensionEditor(): void {
+	if (editorShown === null) return;
+	editorShown = null;
+	deskArea.removeAttribute("data-ext-editor");
+	editorHost.hidden = true;
+	tabStrip.select(session.id);
+}
+
+function closeExtensionEditor(id: string): void {
+	if (!editorTabs.has(id)) return;
+	const wasShown = editorShown === id;
+	const order = [...editorTabs.keys()];
+	editorTabs.delete(id);
+	extensionPanes?.closeEditor(id);
+	tabStrip.removePage(id);
+	if (!wasShown) return;
+	const next = order[order.indexOf(id) + 1] ?? order[order.indexOf(id) - 1];
+	if (next !== undefined && editorTabs.has(next)) showExtensionEditor(next);
+	else {
+		leaveExtensionEditor();
+		session.focus();
+	}
+}
+
+bridge.onExtensionOpenEditor((tab) => {
+	const opened = extensionPanes?.openEditor(tab) ?? null;
+	if (opened === null) return;
+	if (opened.created) {
+		editorTabs.set(opened.id, opened.element);
+		editorHost.append(opened.element);
+	}
+	tabStrip.addPage({
+		id: opened.id,
+		title: tab.title,
+		tooltip: tab.tooltip,
+		icon: "extension",
+		onSelect: () => showExtensionEditor(opened.id),
+		onClose: () => closeExtensionEditor(opened.id),
+	});
+	showExtensionEditor(opened.id);
+});
+bridge.onExtensionCloseEditor((extension, key) => {
+	if (extensionPanes !== null) closeExtensionEditor(extensionPanes.editorId(extension, key));
+});
 
 /** The assistant's panel where the settings put it; its button stays at the right edge. */
 function placeAssistant(): void {
@@ -750,6 +812,7 @@ let settingsOpen = false;
 let settingsShown = false;
 
 function showSettingsTab(): void {
+	leaveExtensionEditor();
 	if (!settingsOpen) {
 		settingsOpen = true;
 		tabStrip.page({
@@ -881,30 +944,6 @@ const zoomSlider = el("input", {
 	},
 });
 const zoomValue = el("output", { class: "zoom-value" });
-/** The open folder's branch, what waits to be pushed and pulled, and what changed; a click shows the Files pane. */
-const gitStatus = el("button", {
-	class: "status-git",
-	attrs: { type: "button" },
-});
-gitStatus.hidden = true;
-gitStatus.addEventListener("click", () => {
-	if (!docks.shown().has("files")) updateSettings(revealPane(settings, "files"));
-});
-
-function showGitStatus(git: GitStatus | null): void {
-	gitStatus.hidden = git === null;
-	if (git === null) return;
-	const branch = git.branch ?? t.statusGitDetached;
-	const parts: (Node | string)[] = [icon("branch"), el("span", { text: branch })];
-	if (git.ahead > 0) parts.push(el("span", { class: "status-git-count", text: `↑${git.ahead}` }));
-	if (git.behind > 0) parts.push(el("span", { class: "status-git-count", text: `↓${git.behind}` }));
-	if (git.changed > 0) {
-		parts.push(el("span", { class: "status-git-changed", text: `●${git.changed}` }));
-	}
-	gitStatus.replaceChildren(...parts);
-	gitStatus.title = format(t.statusGitTitle, branch, git.changed, git.ahead, git.behind);
-}
-
 // --- Status bar: what changes as one works, each a way to it -----------------
 
 /** Saved, unsaved, saving, failed: at the status bar's right, as a click saves. */
@@ -1185,7 +1224,6 @@ const statusBar = el("footer", {
 	class: "statusbar",
 	children: [
 		docks.stripes.bottom,
-		gitStatus,
 		confluenceChip,
 		jiraChip,
 		extensionStatus,
@@ -1804,6 +1842,7 @@ function activateTab(id: string): void {
 	if (tab === undefined) return;
 	// A document's tab chosen over Settings' brings the documents back.
 	leaveSettingsTab();
+	leaveExtensionEditor();
 	if (tab.session === session) return;
 
 	for (const other of tabs.values()) {

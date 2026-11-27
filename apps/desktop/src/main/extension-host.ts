@@ -6,11 +6,11 @@
  * may reach, whether it may give the assistant tools.
  */
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { IpcMainInvokeEvent, Session, WebContents } from "electron";
 import { BrowserWindow, dialog, ipcMain, net, session, shell, WebContentsView } from "electron";
-import type { ExtensionStatusItem } from "../shared/bridge.js";
+import type { ExtensionEditorTab, ExtensionStatusItem } from "../shared/bridge.js";
 import type {
 	ExtensionCall,
 	ExtensionHttpResponse,
@@ -76,6 +76,14 @@ export interface ExtensionHostOptions {
 	postToUi(id: string, message: unknown): void;
 	/** Brings one of the extension's panes into view. */
 	showPane(id: string, pane: string): void;
+	/** Opens one of the extension's editors as a tab, or brings the tab with that key forward. */
+	openEditor(id: string, tab: ExtensionEditorTab): void;
+	/** Closes the extension's editor tab with that key. */
+	closeEditor(id: string, key: string): void;
+	/** Adds a folder to the open folders. */
+	addFolder(folder: string): void;
+	/** Asks the assistant the user set up, without tools; resolves to its reply. */
+	complete(system: string, prompt: string): Promise<string>;
 	/** The app's language (`tr`, `en`). */
 	language(): string;
 	/** The open folders, the first one first. */
@@ -511,6 +519,57 @@ export class ExtensionHost {
 				}
 				this.#options.showPane(id, first);
 				return null;
+			case "ui.openEditor": {
+				const editor = running.manifest.editors.find((each) => each.id === first);
+				if (editor === undefined)
+					throw new Error(`"${String(first)}" is not an editor of the manifest.`);
+				const options = (typeof second === "object" && second !== null ? second : {}) as Record<
+					string,
+					unknown
+				>;
+				const key =
+					typeof options.key === "string" && options.key !== ""
+						? options.key.slice(0, 200)
+						: editor.id;
+				const title =
+					typeof options.title === "string" && options.title.trim() !== ""
+						? options.title.trim().slice(0, 120)
+						: editor.title;
+				this.#options.openEditor(id, {
+					extension: id,
+					editor: editor.id,
+					key,
+					title,
+					tooltip: typeof options.tooltip === "string" ? options.tooltip.slice(0, 500) : title,
+					data: options.data ?? null,
+				});
+				return null;
+			}
+			case "ui.closeEditor":
+				this.#options.closeEditor(id, String(first ?? ""));
+				return null;
+			case "workspace.addFolder": {
+				if (!running.granted.files)
+					throw new Error(`The extension may not see files: add "files": true to its permissions.`);
+				const folder = typeof first === "string" ? first : "";
+				const found = await stat(folder).catch(() => null);
+				if (found === null || !found.isDirectory())
+					throw new Error(`The folder ${folder} is not there.`);
+				this.#options.addFolder(folder);
+				return null;
+			}
+			case "assistant.complete": {
+				if (!running.granted.assistantTools) {
+					throw new Error(
+						`The extension may not ask the assistant: add "assistantTools": true to its permissions.`,
+					);
+				}
+				const system = String(first ?? "").slice(0, 20_000);
+				const prompt = String(second ?? "").slice(0, 200_000);
+				if (prompt.trim() === "") throw new Error("Ask something.");
+				this.#append(id, "Asked the assistant");
+				return this.#options.complete(system, prompt);
+			}
 			case "ui.post":
 				this.#options.postToUi(id, first ?? null);
 				return null;
