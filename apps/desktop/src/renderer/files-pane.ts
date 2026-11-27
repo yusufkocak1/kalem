@@ -1,21 +1,15 @@
 import type {
-	GitAction,
-	GitFileChange,
-	GitStatus,
 	KalemBridge,
 	SearchHit,
 	Workspace,
 	WorkspaceEntry,
 	WorkspaceRoot,
 } from "../shared/bridge.js";
-import { isCloneUrl } from "../shared/git-url.js";
 import type { Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
 import { fileName } from "../shared/paths.js";
 import { el } from "./dom.js";
 import { fileType } from "./file-types.js";
-import type { GitDialogs } from "./git-dialogs.js";
-import { CHANGE_LETTER } from "./git-dialogs.js";
 import { icon } from "./icons.js";
 
 export interface FilesPaneOptions {
@@ -33,12 +27,6 @@ export interface FilesPaneOptions {
 	inform(text: string): void;
 	/** The folders were listed again (they may have been opened or closed). */
 	listed?(workspace: Workspace): void;
-	/** The single open folder's repository, as the pane's git bar shows it; `null` without one. */
-	gitChanged?(git: GitStatus | null): void;
-	readonly git: GitDialogs;
-	/** Whether open repositories are fetched in the background now and then. */
-	autoFetch(): boolean;
-	setAutoFetch(on: boolean): void;
 }
 
 export interface FilesPane {
@@ -152,9 +140,6 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 	const openFolder = iconButton("open", t.openFolder);
 	const refreshButton = iconButton("refresh", t.refresh);
 	const closeFolder = iconButton("close", t.closeFolder);
-	const cloneButton = iconButton("branch", t.gitClone);
-	cloneButton.classList.add("files-hover-action");
-	cloneButton.addEventListener("click", () => void cloneRepository());
 	newFile.addEventListener("click", () => startCreate(targetFolder(), false));
 	newFolder.addEventListener("click", () => startCreate(targetFolder(), true));
 	collapseAll.addEventListener("click", () => {
@@ -187,8 +172,6 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 	});
 	emptyOpen.hidden = true;
 	emptyOpen.addEventListener("click", () => void bridge.openFolder());
-	/** The repository of a single open folder: its branch, what is pending, pull and push. */
-	const gitBar = el("div", { class: "files-git", attrs: { hidden: "" } });
 	const menu = el("div", { class: "files-menu", attrs: { role: "menu", hidden: "" } });
 
 	const element = el("div", {
@@ -196,18 +179,8 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 		children: [
 			el("div", {
 				class: "files-toolbar",
-				children: [
-					title,
-					newFile,
-					newFolder,
-					collapseAll,
-					cloneButton,
-					openFolder,
-					refreshButton,
-					closeFolder,
-				],
+				children: [title, newFile, newFolder, collapseAll, openFolder, refreshButton, closeFolder],
 			}),
-			gitBar,
 			search,
 			message,
 			emptyOpen,
@@ -309,7 +282,6 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 			button.hidden = roots.length === 0;
 		}
 		search.disabled = roots.length === 0;
-		renderGitBar(only);
 		emptyOpen.hidden = roots.length > 0;
 
 		if (roots.length === 0) {
@@ -381,65 +353,6 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 		item.append(twisty, glyph);
 		if (renaming) item.append(nameBox(row.name, (name) => commitRename(row, name)));
 		else item.append(el("span", { class: "files-name", text: row.name }));
-		// What Git sees changed: a letter on files, a dot on the folders above them.
-		const changed = changes.get(pathKey(row.path));
-		if (changed !== undefined) {
-			item.classList.add(`git-${changed.change.kind}`);
-			item.append(
-				el("span", {
-					class: "files-git-badge",
-					text: CHANGE_LETTER[changed.change.kind],
-					attrs: { title: t[`gitKind_${changed.change.kind}`] },
-				}),
-			);
-		} else if (row.folder && !row.isRoot && dirty.has(pathKey(row.path))) {
-			item.classList.add("git-dirty");
-			item.append(el("span", { class: "files-git-dot", attrs: { "aria-hidden": "true" } }));
-		}
-		// With several folders, each repository's branch is on its heading: a click there
-		// opens what can be done in it. A repository not trusted yet asks for that instead.
-		if (row.isRoot) {
-			const git = row.root.git;
-			const root = row.root.path;
-			if (git !== null) {
-				const busy = gitBusy.get(root);
-				const branch = el("button", {
-					class: "files-root-branch",
-					attrs: {
-						type: "button",
-						title: busy === undefined ? gitSummary(git) : format(t.gitBusy, busy),
-						"aria-label": `${git.branch ?? t.gitDetached} · ${t.gitMore}`,
-					},
-					children: [icon("branch"), el("span", { text: git.branch ?? t.gitDetached })],
-				});
-				branch.tabIndex = -1;
-				branch.disabled = busy !== undefined;
-				branch.classList.toggle("conflicted", git.conflicts > 0 || git.operation !== null);
-				branch.addEventListener("click", (event) => {
-					event.stopPropagation();
-					select(row.path, false);
-					const box = branch.getBoundingClientRect();
-					showMenu(gitMenu(root, git, true), box.left, box.bottom + 2);
-				});
-				item.append(branch);
-			} else if (row.root.untrustedRepo !== null) {
-				const trust = el("button", {
-					class: "files-root-branch untrusted",
-					attrs: {
-						type: "button",
-						title: `${t.gitUntrustedBar}\n${row.root.untrustedRepo}`,
-						"aria-label": `${t.gitUntrustedBar} · ${t.gitTrustButton}`,
-					},
-					children: [icon("branch"), el("span", { text: t.gitTrustButton })],
-				});
-				trust.tabIndex = -1;
-				trust.addEventListener("click", (event) => {
-					event.stopPropagation();
-					trustRepo(root);
-				});
-				item.append(trust);
-			}
-		}
 		if (row.isRoot && current?.opened === true) {
 			const close = iconButton("close", format(t.closeThisFolder, row.name));
 			close.classList.add("files-root-close");
@@ -642,281 +555,6 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 		void navigator.clipboard.writeText(text).catch(failed);
 	}
 
-	// --- Git ---
-
-	/** Folders git is running in, with what it is doing. */
-	const gitBusy = new Map<string, string>();
-
-	function gitLabel(action: GitAction): string {
-		switch (action.kind) {
-			case "pull":
-				return t.gitPull;
-			case "push":
-				return t.gitPush;
-			case "fetch":
-				return t.gitFetch;
-			case "init":
-				return t.gitInit;
-			case "commit":
-				return t.gitCommitButton;
-			case "checkout":
-			case "create-branch":
-				return action.branch;
-			case "discard":
-				return t.gitDiscard;
-			case "abort":
-				return t.gitAbort;
-			case "continue":
-				return t.gitContinue;
-		}
-	}
-
-	const operationName = (git: GitStatus): string =>
-		git.operation === "merge"
-			? t.gitMerging
-			: git.operation === "rebase"
-				? t.gitRebasing
-				: git.operation === "cherry-pick"
-					? t.gitCherryPicking
-					: "";
-
-	// --- Changed files in the tree ---
-
-	/** A path as the changes are looked up by: `/` between folders, case folded on Windows. */
-	const pathKey = (path: string): string => {
-		const slashes = path.replace(/\\/g, "/").replace(/\/+$/, "");
-		return /^[a-zA-Z]:\//.test(slashes) ? slashes.toLocaleLowerCase("en") : slashes;
-	};
-	/** Changed files by their key, with their repository's root. */
-	let changes = new Map<string, { root: string; change: GitFileChange }>();
-	/** Folders with a change somewhere below them. */
-	let dirty = new Set<string>();
-
-	function indexChanges(workspace: Workspace | null): void {
-		changes = new Map();
-		dirty = new Set();
-		for (const root of workspace?.roots ?? []) {
-			const git = root.git;
-			if (git === null) continue;
-			const top = pathKey(git.root);
-			for (const change of git.files) {
-				const key = `${top}/${pathKey(change.path)}`;
-				changes.set(key, { root: root.path, change });
-				for (let at = key.lastIndexOf("/"); at > top.length; at = key.lastIndexOf("/", at - 1)) {
-					dirty.add(key.slice(0, at));
-				}
-			}
-		}
-	}
-
-	async function showDiff(root: string, change: GitFileChange): Promise<void> {
-		try {
-			options.git.diff(change.path, await bridge.gitDiff(root, change.path));
-		} catch (error) {
-			options.notify(format(t.gitFailed, ipcText(error)));
-		}
-	}
-
-	function gitSummary(git: GitStatus): string {
-		const parts = [
-			operationName(git),
-			git.conflicts > 0 ? format(t.gitConflicts, git.conflicts) : "",
-			git.ahead > 0 ? format(t.gitAhead, git.ahead) : "",
-			git.behind > 0 ? format(t.gitBehind, git.behind) : "",
-			git.changed > 0 ? format(t.gitChanged, git.changed) : "",
-		].filter((part) => part !== "");
-		if (parts.length === 0 && git.upstream !== null) parts.push(t.gitUpToDate);
-		return [git.upstream ?? "", ...parts].filter((part) => part !== "").join(" · ");
-	}
-
-	/** Asks to trust the repository a folder is in; git runs there once the user agrees. */
-	function trustRepo(root: string): void {
-		void bridge.gitTrust(root).then((ok) => {
-			if (ok) void refresh();
-		});
-	}
-
-	function renderGitBar(only: WorkspaceRoot | undefined): void {
-		const git = only?.git ?? null;
-		options.gitChanged?.(only === undefined ? null : git);
-		if (only !== undefined && git === null && only.untrustedRepo !== null) {
-			const root = only.path;
-			const trust = el("button", {
-				class: "files-git-trust",
-				attrs: { type: "button", title: only.untrustedRepo },
-				text: t.gitTrustButton,
-			});
-			trust.addEventListener("click", () => trustRepo(root));
-			gitBar.hidden = false;
-			gitBar.classList.remove("conflicted");
-			gitBar.removeAttribute("aria-busy");
-			gitBar.replaceChildren(
-				icon("branch"),
-				el("span", {
-					class: "files-git-state",
-					text: t.gitUntrustedBar,
-					attrs: { title: only.untrustedRepo },
-				}),
-				trust,
-			);
-			return;
-		}
-		if (only === undefined || git === null) {
-			gitBar.hidden = true;
-			gitBar.replaceChildren();
-			return;
-		}
-		gitBar.hidden = false;
-		const root = only.path;
-		const busy = gitBusy.get(root);
-		const branch = el("button", {
-			class: "files-git-branch",
-			attrs: { type: "button", title: t.gitCheckout, "aria-label": t.gitCheckout },
-			children: [
-				icon("branch"),
-				el("span", { class: "files-git-name", text: git.branch ?? t.gitDetached }),
-			],
-		});
-		branch.addEventListener("click", () => void switchBranch(root));
-		const text = busy === undefined ? gitSummary(git) : format(t.gitBusy, busy);
-		const state = el("span", { class: "files-git-state", text, attrs: { title: text } });
-		const pull = iconButton("gitPull", t.gitPull);
-		pull.addEventListener("click", () => void runGit(root, { kind: "pull" }));
-		const push = iconButton("gitPush", t.gitPush);
-		push.addEventListener("click", () => void runGit(root, { kind: "push" }));
-		const fetch = iconButton("refresh", t.gitFetch);
-		fetch.addEventListener("click", () => void runGit(root, { kind: "fetch" }));
-		const more = iconButton("chevron", t.gitMore);
-		more.classList.add("files-git-more");
-		for (const button of [branch, pull, push, fetch, more]) button.disabled = busy !== undefined;
-		gitBar.classList.toggle("conflicted", git.conflicts > 0 || git.operation !== null);
-		more.addEventListener("click", () => {
-			const box = more.getBoundingClientRect();
-			showMenu(gitMenu(root, git, true), box.left, box.bottom + 2);
-		});
-		gitBar.setAttribute("aria-busy", String(busy !== undefined));
-		gitBar.replaceChildren(branch, state, pull, push, fetch, more);
-	}
-
-	/** What can be done in a repository, for the bar's menu and the right-click menu. */
-	function gitMenu(root: string, git: GitStatus, all: boolean): (MenuItem | null)[] {
-		const items: (MenuItem | null)[] = [
-			{ label: t.gitPull, run: () => void runGit(root, { kind: "pull" }) },
-			{ label: t.gitPush, run: () => void runGit(root, { kind: "push" }) },
-			{ label: t.gitFetch, run: () => void runGit(root, { kind: "fetch" }) },
-			null,
-			{ label: t.gitCheckout, run: () => void switchBranch(root) },
-			{ label: t.gitNewBranch, run: () => void newBranch(root, git) },
-			null,
-			{ label: t.gitCommit, run: () => void commitChanges(root, git) },
-		];
-		if (git.operation !== null) {
-			const name = operationName(git);
-			items.push(
-				null,
-				{
-					label: format(t.gitContinueOperation, name),
-					run: () => void runGit(root, { kind: "continue" }),
-				},
-				{
-					label: format(t.gitAbortOperation, name),
-					run: () => void runGit(root, { kind: "abort" }),
-					danger: true,
-				},
-			);
-		}
-		if (all) {
-			items.push(null, {
-				label: options.autoFetch() ? `✓ ${t.gitAutoFetch}` : t.gitAutoFetch,
-				run: () => options.setAutoFetch(!options.autoFetch()),
-			});
-		}
-		return items;
-	}
-
-	async function runGit(root: string, action: GitAction): Promise<boolean> {
-		if (gitBusy.has(root)) return false;
-		const label = gitLabel(action);
-		gitBusy.set(root, label);
-		renderTree();
-		try {
-			await bridge.gitRun(root, action);
-			options.inform(format(t.gitDone, label));
-			return true;
-		} catch (error) {
-			options.notify(format(t.gitFailed, ipcText(error)));
-			return false;
-		} finally {
-			gitBusy.delete(root);
-			await refresh();
-		}
-	}
-
-	async function switchBranch(root: string): Promise<void> {
-		let branches: Awaited<ReturnType<typeof bridge.gitBranches>>;
-		try {
-			branches = await bridge.gitBranches(root);
-		} catch (error) {
-			options.notify(format(t.gitFailed, ipcText(error)));
-			return;
-		}
-		const branch = await options.git.pickBranch(branches);
-		if (branch === null || branch.current) return;
-		await runGit(root, { kind: "checkout", branch: branch.name });
-	}
-
-	async function newBranch(root: string, git: GitStatus): Promise<void> {
-		const name = await options.git.prompt({
-			title: format(t.gitNewBranchTitle, git.branch ?? t.gitDetached),
-			label: t.gitNewBranchName,
-			button: t.gitCreate,
-			check: (value) => (/\s/.test(value) ? format(t.gitInvalidBranch, value) : null),
-		});
-		if (name !== null) await runGit(root, { kind: "create-branch", branch: name });
-	}
-
-	async function commitChanges(root: string, git: GitStatus): Promise<void> {
-		const files = git.files.filter((file) => file.kind !== "conflict");
-		if (files.length === 0) {
-			options.inform(t.gitNothingToCommit);
-			return;
-		}
-		const answer = await options.git.commit({
-			title: format(t.gitCommitTitle, files.length),
-			files,
-			suggest: (paths) =>
-				bridge.gitSuggestMessage(root, paths.length === files.length ? undefined : paths),
-			diff: (path) => bridge.gitDiff(root, path),
-		});
-		if (answer === null) return;
-		await runGit(root, {
-			kind: "commit",
-			message: answer.message,
-			...(answer.paths === undefined ? {} : { paths: answer.paths }),
-		});
-	}
-
-	async function cloneRepository(): Promise<void> {
-		const url = await options.git.prompt({
-			title: t.gitCloneTitle,
-			label: t.gitCloneUrl,
-			button: t.gitCloneButton,
-			placeholder: "https://github.com/…/….git",
-			hint: t.gitCloneHint,
-			check: (value) => (isCloneUrl(value) ? null : format(t.gitInvalidUrl, value)),
-		});
-		if (url === null) return;
-		showMessage(format(t.gitCloning, url));
-		try {
-			const folder = await bridge.gitClone(url);
-			if (folder !== null) options.inform(format(t.gitCloned, folder));
-		} catch (error) {
-			options.notify(format(t.gitFailed, ipcText(error)));
-		} finally {
-			await refresh();
-		}
-	}
-
 	// --- Context menu ---
 
 	function menuFor(row: Row): (MenuItem | null)[] {
@@ -940,30 +578,6 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 				{ label: t.filesRename, run: () => startRename(row), shortcut: "F2" },
 				{ label: t.filesDelete, run: () => void trash(row), shortcut: "Del", danger: true },
 			);
-		}
-		const git = row.root.git;
-		const root = row.root.path;
-		const changed = changes.get(pathKey(row.path));
-		if (changed !== undefined) {
-			const { change } = changed;
-			items.push(null, {
-				label: t.gitCompare,
-				run: () => void showDiff(changed.root, change),
-			});
-			if (change.kind !== "conflict") {
-				items.push({
-					label: t.gitDiscardChanges,
-					run: () => void runGit(changed.root, { kind: "discard", paths: [change.path] }),
-					danger: true,
-				});
-			}
-		}
-		if (git !== null) items.push(null, ...gitMenu(root, git, false));
-		else if (row.root.untrustedRepo !== null) {
-			// Already a repository, only not trusted yet: never offer to make it one.
-			items.push(null, { label: t.gitTrustMenu, run: () => trustRepo(root) });
-		} else if (row.isRoot || row.parent === null) {
-			items.push(null, { label: t.gitInit, run: () => void runGit(root, { kind: "init" }) });
 		}
 		items.push(
 			null,
@@ -1314,7 +928,6 @@ export function createFilesPane(options: FilesPaneOptions): FilesPane {
 
 	async function refresh(): Promise<void> {
 		current = await bridge.getWorkspace();
-		indexChanges(current);
 		options.listed?.(current);
 		// Folders change under an open menu or a name being typed (a save, the watcher): not now.
 		if (!menu.hidden || editing !== null) {

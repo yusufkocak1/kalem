@@ -6,8 +6,6 @@ import { app, dialog, ipcMain, Notification, shell } from "electron";
 import type {
 	Attachment,
 	DraftRequest,
-	GitBranch,
-	GitStatus,
 	ImageFile,
 	SaveResult,
 	SearchResult,
@@ -17,7 +15,6 @@ import type {
 	Workspace,
 } from "../shared/bridge.js";
 import { CHANNEL, TITLE_BAR_HEIGHT } from "../shared/bridge.js";
-import { COMMIT_MESSAGE_PROMPT, cleanCommitMessage } from "../shared/commit-message.js";
 import { toTextFormat } from "../shared/encoding.js";
 import type { Lang, Strings } from "../shared/i18n.js";
 import { format } from "../shared/i18n.js";
@@ -54,18 +51,6 @@ import type { DocxImage } from "./docx.js";
 import { markdownToDocx } from "./docx.js";
 import type { DraftStore } from "./drafts.js";
 import { copyAttachment, MAX_IMAGE_SIZE, writeDocument, writeImage } from "./files.js";
-import {
-	cloneRepository,
-	commitContext,
-	GitError,
-	gitBranches,
-	gitDiff,
-	gitStatus,
-	isCloneUrl,
-	runGitAction,
-	toGitAction,
-} from "./git.js";
-import { findRepoRoot, isTrustedRepo } from "./git-trust.js";
 import type { VersionStore } from "./history.js";
 import { connectJira, jiraConnection, registerJiraIpc } from "./jira-ipc.js";
 import { LocalNotesStore } from "./local-notes-store.js";
@@ -153,7 +138,7 @@ function toImageFile(raw: unknown): ImageFile {
  * IPC arguments are untyped at runtime and the main process writes to disk,
  * so every handler checks its sender and its arguments.
  */
-export function registerIpc(ctx: IpcContext): void {
+export function registerIpc(ctx: IpcContext): AssistantService {
 	/** The assistant's MCP servers kept running between questions. */
 	const keptServers = new KeptServers({
 		folder: join(app.getPath("userData"), "assistant-tools"),
@@ -161,9 +146,6 @@ export function registerIpc(ctx: IpcContext): void {
 		env: programEnvironment,
 	});
 	const { windows } = ctx;
-	/** Set at the end, once the assistant's requests are registered. */
-	let assistant: AssistantService;
-
 	const senderOf = (event: IpcMainInvokeEvent | IpcMainEvent): AppWindow => {
 		const win = windows.get(event.sender);
 		if (win === undefined) throw new Error("Request from an unknown window");
@@ -674,9 +656,6 @@ export function registerIpc(ctx: IpcContext): void {
 
 	// --- Workspace ----------------------------------------------------------
 
-	const trusted = (repo: string): boolean =>
-		isTrustedRepo(repo, ctx.store.settings.gitTrustedFolders);
-
 	/** Without an open folder, the folder each window last showed. */
 	const followedRoots = new WeakMap<AppWindow, string>();
 
@@ -707,21 +686,8 @@ export function registerIpc(ctx: IpcContext): void {
 
 	ipcMain.handle(CHANNEL.getWorkspace, async (event): Promise<Workspace> => {
 		const { roots, opened } = workspaceRoots(senderOf(event));
-		const listed = await listRoots(roots);
-		const git = await Promise.all(
-			roots.map(async (root): Promise<{ git: GitStatus | null; untrustedRepo: string | null }> => {
-				const repo = await findRepoRoot(root);
-				if (repo === null) return { git: null, untrustedRepo: null };
-				if (!trusted(repo)) return { git: null, untrustedRepo: repo };
-				return { git: await gitStatus(root), untrustedRepo: null };
-			}),
-		);
 		return {
-			roots: listed.map((root, i) => ({
-				...root,
-				git: git[i]?.git ?? null,
-				untrustedRepo: git[i]?.untrustedRepo ?? null,
-			})),
+			roots: await listRoots(roots),
 			opened,
 		};
 	});
@@ -827,187 +793,6 @@ export function registerIpc(ctx: IpcContext): void {
 		if (failure !== "") throw new Error(failure);
 	});
 
-	// --- Git -----------------------------------------------------------------
-
-	/** Git's failure, in words the user reads. */
-	const gitProblem = (error: unknown): Error => {
-		if (!(error instanceof GitError))
-			return error instanceof Error ? error : new Error(String(error));
-		const t = ctx.strings();
-		switch (error.problem) {
-			case "missing":
-				return new Error(t.gitMissing);
-			case "invalid-url":
-				return new Error(format(t.gitInvalidUrl, error.message));
-			case "invalid-branch":
-				return new Error(format(t.gitInvalidBranch, error.message));
-			case "exists":
-				return new Error(format(t.filesExists, error.message));
-			case "untrusted":
-				return new Error(format(t.gitUntrusted, error.message));
-			default:
-				return new Error(error.message);
-		}
-	};
-
-	/** A folder the pane shows, not just a path inside one. */
-	const shownFolder = (win: AppWindow, folder: unknown): string => {
-		const roots = workspaceRoots(win).roots;
-		const root =
-			typeof folder === "string" ? roots.find((open) => pathKey(open) === pathKey(folder)) : null;
-		if (root === undefined || root === null)
-			throw fileProblem(new WorkspaceFileError("outside", ""));
-		return root;
-	};
-
-	/** A folder git may run in: shown, and in a repository the user trusts (or in none yet). */
-	const shownRoot = async (win: AppWindow, folder: unknown): Promise<string> => {
-		const root = shownFolder(win, folder);
-		const repo = await findRepoRoot(root);
-		if (repo !== null && !trusted(repo)) throw new GitError("untrusted", repo);
-		return root;
-	};
-
-	const trust = (folder: string): void => {
-		const list = ctx.store.settings.gitTrustedFolders;
-		if (isTrustedRepo(folder, list)) return;
-		ctx.changeSettings({ gitTrustedFolders: [...list, resolve(folder)] });
-	};
-
-	ipcMain.handle(CHANNEL.gitTrust, async (event, folder: unknown): Promise<boolean> => {
-		const win = senderOf(event);
-		const t = ctx.strings();
-		const repo = await findRepoRoot(shownFolder(win, folder));
-		if (repo === null) return false;
-		if (trusted(repo)) return true;
-		const { response } = await dialog.showMessageBox(win.window, {
-			type: "warning",
-			message: t.gitTrustQuestion,
-			detail: format(t.gitTrustDetail, repo),
-			buttons: [t.gitTrustYes, t.cancel],
-			defaultId: 1,
-			cancelId: 1,
-			noLink: true,
-		});
-		if (response !== 0) return false;
-		trust(repo);
-		for (const other of windows.all()) other.window.webContents.send(CHANNEL.workspaceChange);
-		return true;
-	});
-
-	ipcMain.handle(CHANNEL.gitBranches, async (event, folder: unknown): Promise<GitBranch[]> => {
-		try {
-			return await gitBranches(await shownRoot(senderOf(event), folder));
-		} catch (error) {
-			throw gitProblem(error);
-		}
-	});
-
-	ipcMain.handle(CHANNEL.gitRun, async (event, folder: unknown, raw: unknown): Promise<string> => {
-		const win = senderOf(event);
-		const t = ctx.strings();
-		try {
-			const root = await shownRoot(win, folder);
-			const action = toGitAction(raw);
-			if (action.kind === "init") {
-				const result = await runGitAction(root, action);
-				trust(root);
-				return result;
-			}
-			if (action.kind === "discard") {
-				const { response } = await dialog.showMessageBox(win.window, {
-					type: "warning",
-					message: format(
-						t.gitDiscardConfirm,
-						action.paths.length === 1
-							? basename(action.paths[0] as string)
-							: String(action.paths.length),
-					),
-					detail: t.gitDiscardDetail,
-					buttons: [t.gitDiscard, t.cancel],
-					defaultId: 1,
-					cancelId: 1,
-				});
-				if (response !== 0) return "";
-			}
-			const trash = (path: string): Promise<void> => shell.trashItem(path);
-			try {
-				return await runGitAction(root, action, trash);
-			} catch (error) {
-				if (!(error instanceof GitError) || error.problem !== "diverged") throw error;
-				// The branches went apart and git has no setting for it: the user says how.
-				const { response } = await dialog.showMessageBox(win.window, {
-					type: "question",
-					message: t.gitDiverged,
-					detail: t.gitDivergedDetail,
-					buttons: [t.gitMerge, t.gitRebase, t.cancel],
-					defaultId: 0,
-					cancelId: 2,
-				});
-				if (response === 2) return "";
-				return await runGitAction(root, { kind: "pull", how: response === 0 ? "merge" : "rebase" });
-			}
-		} catch (error) {
-			throw gitProblem(error);
-		} finally {
-			// Branches and files change under the open folders: every window shows it.
-			for (const other of windows.all()) other.window.webContents.send(CHANNEL.workspaceChange);
-		}
-	});
-
-	ipcMain.handle(CHANNEL.gitDiff, async (event, folder: unknown, path: unknown) => {
-		try {
-			if (typeof path !== "string") throw new Error("Invalid path");
-			return await gitDiff(await shownRoot(senderOf(event), folder), path);
-		} catch (error) {
-			throw gitProblem(error);
-		}
-	});
-
-	ipcMain.handle(CHANNEL.gitSuggestMessage, async (event, folder: unknown, paths: unknown) => {
-		const chosen =
-			Array.isArray(paths) && paths.every((path) => typeof path === "string")
-				? (paths as string[])
-				: undefined;
-		try {
-			const root = await shownRoot(senderOf(event), folder);
-			const changes = await commitContext(root, chosen);
-			const text = await assistant.complete(
-				COMMIT_MESSAGE_PROMPT,
-				`${changes}\n\nWrite the commit message for these changes.`,
-				event.sender,
-			);
-			return cleanCommitMessage(text);
-		} catch (error) {
-			throw gitProblem(error);
-		}
-	});
-
-	ipcMain.handle(CHANNEL.gitClone, async (event, url: unknown): Promise<string | null> => {
-		const win = senderOf(event);
-		const t = ctx.strings();
-		if (typeof url !== "string" || !isCloneUrl(url)) {
-			throw gitProblem(new GitError("invalid-url", typeof url === "string" ? url.trim() : ""));
-		}
-		const start = ctx.store.state.workspaces.at(-1);
-		const result = await dialog.showOpenDialog(win.window, {
-			title: t.gitCloneWhere,
-			buttonLabel: t.gitCloneHere,
-			properties: ["openDirectory", "createDirectory"],
-			...(start === undefined ? {} : { defaultPath: dirname(start) }),
-		});
-		const parent = result.filePaths[0];
-		if (result.canceled || parent === undefined) return null;
-		try {
-			const folder = await cloneRepository(url, parent);
-			trust(folder);
-			ctx.addFolder(folder);
-			return folder;
-		} catch (error) {
-			throw gitProblem(error);
-		}
-	});
-
 	ipcMain.handle(CHANNEL.searchWorkspace, async (event, query: unknown): Promise<SearchResult> => {
 		const { roots } = workspaceRoots(senderOf(event));
 		if (roots.length === 0 || typeof query !== "string") return { hits: [], truncated: false };
@@ -1032,8 +817,7 @@ export function registerIpc(ctx: IpcContext): void {
 	on(CHANNEL.updateSettings, (_win, patch) => {
 		if (typeof patch !== "object" || patch === null) return;
 		// Language changes go through the menu's flow, which offers a restart.
-		// Trust is given only through the confirmation the main process shows.
-		const { language, gitTrustedFolders: _trust, ...rest } = patch as Partial<Settings>;
+		const { language, ...rest } = patch as Partial<Settings>;
 		if (Object.keys(rest).length > 0) ctx.changeSettings(rest);
 		// A server no longer kept running (changed, turned off, removed) stops now.
 		if (Object.hasOwn(rest, "assistantMcpServers")) {
@@ -1133,7 +917,7 @@ export function registerIpc(ctx: IpcContext): void {
 		await localNotes.set(key, notes);
 	});
 
-	assistant = registerAssistantIpc({
+	const assistant = registerAssistantIpc({
 		templates,
 		store: ctx.store,
 		assistant: ctx.assistant,
@@ -1182,4 +966,5 @@ export function registerIpc(ctx: IpcContext): void {
 		changeLanguage: ctx.changeLanguage,
 		language: ctx.language,
 	});
+	return assistant;
 }

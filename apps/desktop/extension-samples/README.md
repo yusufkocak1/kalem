@@ -49,6 +49,7 @@ ui.html         optional: the page of its panes
 	},
 	"contributes": {
 		"panes": [{ "id": "search", "title": "Graylog", "dock": "bottom" }],
+		"editors": [{ "id": "detail", "title": "Message" }],
 		"commands": [{ "id": "open", "title": "Open Graylog" }],
 		"settings": [{ "key": "url", "type": "string", "title": "Address" }],
 		"secrets": [{ "key": "token", "title": "Access token" }]
@@ -62,6 +63,8 @@ ui.html         optional: the page of its panes
   for a server whose address only the user knows.
 - `dock`: `left`, `right` or `bottom`, where the pane goes the first time;
   the user moves it as Kalem's own panes.
+- `editors`: pages of `ui.html` that open as tabs in the documents' place
+  (a diff, a record's detail), as many as the host code opens.
 
 ## The host code: `activate(kalem)`
 
@@ -75,6 +78,10 @@ ui.html         optional: the page of its panes
 | `kalem.ui.handle(name, run)` | what its panes call with `kalem.call(name, input)` |
 | `kalem.ui.post(message)` | sends its panes a message (`kalem.onMessage`) |
 | `kalem.ui.showPane(id)` | brings one of its panes into view |
+| `kalem.ui.openEditor(id, { key, title, tooltip, data })` | `contributes.editors`; a tab beside the documents; the same `key` brings that tab forward with the new `data` |
+| `kalem.ui.closeEditor(key)` | closes the editor tab it opened with `key` |
+| `kalem.workspace.addFolder(path)` | `permissions.files`; adds a folder to the open folders |
+| `kalem.assistant.complete(system, prompt)` → text | `permissions.assistantTools`; asks the assistant the user set up, without tools |
 | `kalem.process.spawn({ command, args, cwd, env, shell, encoding }, onEvent)` → id; `kill(id)`, `write(id, text)` | `permissions.process`; events: `output` (`stdout`/`stderr`), `exit`, `error`; `kill` stops what it started too |
 | `kalem.fs.readText/writeText/exists/stat/list/mkdir/copy/resolve(path…)`, `kalem.fs.readRange(path, { start, length } \| { tail })` (whole lines, for following a log) | `permissions.files`; a relative path is in the first open folder |
 | `kalem.workspace.folders()` | `permissions.files` |
@@ -99,7 +106,8 @@ ui.html         optional: the page of its panes
 | `await kalem.call(name, input)` | runs the host code's `kalem.ui.handle(name, …)` |
 | `kalem.onMessage(listener)` | what the host code sends with `kalem.ui.post` |
 | `kalem.onSettingsChanged(listener)` | the user changed its settings or token |
-| `kalem.pane`, `kalem.language` | the pane's id, the app's language |
+| `kalem.pane`, `kalem.language` | the pane's id (an editor's id in an editor tab), the app's language |
+| `kalem.editor`, `kalem.onEditorData(listener)` | in an editor tab: `{ id, key }`, and the `data` it was opened with (again on each `openEditor` with its key) |
 | `var(--app-text)`, `var(--app-accent)`… | the app's colours, kept up to date |
 
 `/__kalem/ui.css` is a small kit in Kalem's look, light and dark: `k-app`,

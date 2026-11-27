@@ -87,7 +87,7 @@ export async function auditPage(page: Page): Promise<string[]> {
 			if (!visible(element) || inDocument(element)) continue;
 			if (
 				element.matches(
-					"pre, textarea, input, .tabstrip, .doc-tabs, .git-diff, .changes-body, .ribbon-groups, .ribbon-body, .desk",
+					"pre, textarea, input, .tabstrip, .doc-tabs, .changes-body, .ribbon-groups, .ribbon-body, .desk",
 				)
 			)
 				continue;

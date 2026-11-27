@@ -88,7 +88,6 @@ export const SENSITIVE_SETTINGS: ReadonlySet<keyof Settings> = new Set<keyof Set
 	"assistantApprovals",
 	"claudePath",
 	"copilotPath",
-	"gitTrustedFolders",
 ]);
 
 /** A structured value as the card shows it: its JSON, cut short. */

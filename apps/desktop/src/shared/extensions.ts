@@ -50,6 +50,12 @@ export interface ExtensionPane {
 	readonly dock: (typeof PANE_DOCKS)[number];
 }
 
+/** A page of its `ui` that opens as a tab in the documents' place, as many times as it is asked to. */
+export interface ExtensionEditor {
+	readonly id: string;
+	readonly title: string;
+}
+
 export interface ExtensionPermissions {
 	readonly http: readonly string[];
 	/** Settings (strings) whose address it may reach: the user types the server's address there. */
@@ -77,6 +83,7 @@ export interface ExtensionManifest {
 	readonly settings: readonly ExtensionSetting[];
 	readonly secrets: readonly ExtensionSecret[];
 	readonly panes: readonly ExtensionPane[];
+	readonly editors: readonly ExtensionEditor[];
 }
 
 export type ManifestResult =
@@ -270,6 +277,11 @@ export function parseManifest(raw: unknown): ManifestResult {
 		const dock = PANE_DOCKS.find((known) => known === item.dock) ?? "right";
 		return NAME_PATTERN.test(paneId) && title !== "" ? { id: paneId, title, dock } : null;
 	});
+	const editors = named(contributes.editors, 10, (item): ExtensionEditor | null => {
+		const editorId = text(item.id, 40);
+		const title = text(item.title, 40);
+		return NAME_PATTERN.test(editorId) && title !== "" ? { id: editorId, title } : null;
+	});
 	const httpFromSettings: string[] = [];
 	for (const item of list(permissions.httpFromSettings).slice(0, 10)) {
 		const setting = settings.find((known) => known.key === item);
@@ -282,6 +294,8 @@ export function parseManifest(raw: unknown): ManifestResult {
 		if (!httpFromSettings.includes(setting.key)) httpFromSettings.push(setting.key);
 	}
 	if (panes.length > 0 && ui === null) return { ok: false, error: `A pane needs a "ui" file.` };
+	if (editors.length > 0 && ui === null)
+		return { ok: false, error: `An editor needs a "ui" file.` };
 	if (commands.length > 0 && host === null)
 		return { ok: false, error: `A command needs a "host" file.` };
 
@@ -308,6 +322,7 @@ export function parseManifest(raw: unknown): ManifestResult {
 			settings,
 			secrets,
 			panes,
+			editors,
 		},
 	};
 }

@@ -23,6 +23,7 @@ import { isPaneShown, oneOnEachSide, revealPane } from "../shared/panes.js";
 import { isEditablePath, isPackagePath, isProgramPath, uncShare } from "../shared/paths.js";
 import { watchSystemAccent } from "./accent.js";
 import { ChatStore } from "./assistant-chats.js";
+import type { AssistantService } from "./assistant-ipc.js";
 import { AssistantStore } from "./assistant-store.js";
 import { confluenceClient } from "./confluence-ipc.js";
 import { ConfluenceStore } from "./confluence-store.js";
@@ -31,8 +32,6 @@ import { DraftStore } from "./drafts.js";
 import { ExtensionHost } from "./extension-host.js";
 import { registerExtensionIpc } from "./extension-ipc.js";
 import { ExtensionStore } from "./extension-store.js";
-import { backgroundFetch } from "./git.js";
-import { findRepoRoot, isTrustedRepo } from "./git-trust.js";
 import { VersionStore } from "./history.js";
 import { registerIpc } from "./ipc.js";
 import { jiraConnection } from "./jira-ipc.js";
@@ -58,9 +57,6 @@ import { Updater } from "./updater.js";
 import type { AppWindow } from "./windows.js";
 import { errorMessage, WindowManager } from "./windows.js";
 import { WorkspaceWatcher } from "./workspace-files.js";
-
-/** How often the open folders' repositories are fetched in the background. */
-const AUTO_FETCH_INTERVAL = 10 * 60_000;
 
 // Lets end-to-end tests run against a throwaway profile. The single-instance
 // lock is tied to this folder, so tests do not collide with a running app.
@@ -188,6 +184,7 @@ function start(): void {
 			if (!win.window.isDestroyed()) win.window.webContents.send(CHANNEL.extensionsChanged);
 		}
 	};
+	let assistantService: AssistantService | null = null;
 	const extensionHost = new ExtensionHost({
 		store: extensionStore,
 		preloadPath: join(__dirname, "extension-preload.cjs"),
@@ -208,6 +205,23 @@ function start(): void {
 		showPane: (id, pane) => {
 			const target = BrowserWindow.getFocusedWindow() ?? windows.all()[0]?.window;
 			target?.webContents.send(CHANNEL.extensionShowPane, id, pane);
+		},
+		openEditor: (_id, tab) => {
+			const target = BrowserWindow.getFocusedWindow() ?? windows.all()[0]?.window;
+			target?.webContents.send(CHANNEL.extensionOpenEditor, tab);
+		},
+		closeEditor: (id, key) => {
+			for (const win of windows.all()) {
+				if (!win.window.isDestroyed())
+					win.window.webContents.send(CHANNEL.extensionCloseEditor, id, key);
+			}
+		},
+		addFolder: (folder) => addFolders([folder]),
+		complete: (system, prompt) => {
+			const target = BrowserWindow.getFocusedWindow() ?? windows.all()[0]?.window;
+			if (assistantService === null || target === undefined)
+				return Promise.reject(new Error("The assistant is not ready."));
+			return assistantService.complete(system, prompt, target.webContents);
 		},
 		postToUi: (id, message) => {
 			for (const win of windows.all()) {
@@ -384,26 +398,6 @@ function start(): void {
 	};
 	/** Files appearing, going or renamed in the open folders refresh the Files pane. */
 	const watcher = new WorkspaceWatcher(workspaceChanged);
-
-	/**
-	 * Now and then the open folders' repositories are fetched, so the Files
-	 * pane shows what there is to pull. Quietly: nothing asks to sign in.
-	 */
-	const fetchInBackground = async (): Promise<void> => {
-		if (!store.settings.gitAutoFetch) return;
-		const fetched = await Promise.all(
-			store.state.workspaces.map(async (root) => {
-				const repo = await findRepoRoot(root);
-				if (repo === null || !isTrustedRepo(repo, store.settings.gitTrustedFolders)) return false;
-				return backgroundFetch(root);
-			}),
-		);
-		if (fetched.some(Boolean)) workspaceChanged();
-	};
-	setTimeout(() => {
-		void fetchInBackground();
-		setInterval(() => void fetchInBackground(), AUTO_FETCH_INTERVAL);
-	}, 60_000);
 
 	function setWorkspaces(folders: readonly string[]): void {
 		store.update({ workspaces: folders.slice(0, MAX_WORKSPACES) });
@@ -681,7 +675,7 @@ function start(): void {
 		applySpellCheck();
 		applyPermissions();
 		installUserTasks();
-		registerIpc({
+		assistantService = registerIpc({
 			// The app's first start on this computer: the first window offers to set it up.
 			firstRun: () => {
 				const was = firstRun;
